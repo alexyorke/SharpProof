@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 88 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 87 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,22 @@ The active backlog contains 88 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-160 - Standalone gate evidence is not source and result bound (fixed)
+
+- [x] Fixed by `900b035c0` (`fix: authenticate standalone gate evidence`).
+- Standalone evidence now performs a fresh Release Rebuild with the exact source
+  commit embedded in the gate assembly, then binds the DLL and PDB SHA-256,
+  module MVID, acceptance-contract hash, commit, gate identity, and passing
+  result. The stale `--no-build` evidence path is removed.
+- A strict shared decoder enforces the exact corpus or performance result schema,
+  property types, gate/status/commit/build identities, and empty failure set.
+  Interactive non-certifying commands retain raw output compatibility.
+- Regression-first fixtures cover `{}`, stale binaries, wrong schema/gate/status/
+  commit/build identity, missing/extra fields, and valid corpus/performance controls.
+  Focused Architecture tests passed 2/2, the gate producer test 1/1, release
+  closure and container contract passed, and `git diff --check` passed. The long
+  corpus/performance campaigns were not rerun locally.
 
 ### SP-AUDIT-159 - The nightly fuzz campaign is disconnected (fixed)
 
@@ -1342,23 +1358,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-160 - Standalone gate evidence is not source and result bound (P1)
-
-- [ ] `Invoke-SharpProofGateEvidence.ps1` runs corpus/performance with
-  `--no-build` and declares success from exit zero plus any parseable non-null
-  JSON. It checks neither result schema/Passed/gate identity nor source/build
-  identity.
-- Certifier impact: a stale gate binary emitting `{}` can receive `passed=true`
-  evidence attributed to current source.
-- Evidence: all semantic fields are projected without validation after the
-  process exit; no assembly or commit digest is compared.
-- Required closure: require the exact result schema and successful gate identity,
-  bind executable/source commit and inputs, and reject stale/no-build reuse unless
-  independently certified. Add `{}`, wrong gate, false Passed, stale assembly,
-  canonical, and omitted-check mutations.
-- Consolidated cases: SP-AUDIT-169.
-- Unified closure: Use one strict standalone-gate decoder binding executable/source commit, gate identity, exact result schema/status, and acceptance contract.
 
 ### SP-AUDIT-167 - Fuzz campaign validation accepts non-schema JSON (P1)
 
