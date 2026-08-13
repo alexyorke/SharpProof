@@ -67,6 +67,13 @@ public sealed class SharpProofWorker : IDisposable
                 canceled ? WorkerRunStatus.Canceled : WorkerRunStatus.TimedOut, WorkerRunFailureReason.None,
                 canceled ? WorkerCallableCoverageReason.Canceled : WorkerCallableCoverageReason.ProjectTimeout,
                 canceled ? WorkerClaimReason.Canceled : WorkerClaimReason.ProjectTimeout,
+                errors: input == null
+                    ? Error(
+                        canceled ? "worker.canceled" : "worker.timeout",
+                        canceled
+                            ? "The worker was canceled before loading the compiler manifest."
+                            : "The project timed out before loading the compiler manifest.")
+                    : null,
                 versions: Versions(), elapsedMilliseconds: Elapsed(started));
         }
         WorkerInputSnapshot snapshot;

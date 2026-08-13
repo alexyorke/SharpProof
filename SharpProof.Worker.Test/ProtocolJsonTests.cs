@@ -629,7 +629,7 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
-            Does.Contain("response.fatal_claim"));
+            Does.Contain("response.run_projection"));
 
         response.RunStatus = WorkerRunStatus.Failed;
         response.FailureReason = WorkerRunFailureReason.BackendUnavailable;
@@ -647,7 +647,7 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
-            Does.Contain("response.fatal_callable"));
+            Does.Contain("response.run_projection"));
 
         response.CallableResults[0].Reason =
             WorkerCallableCoverageReason.MethodTimeout;
@@ -656,23 +656,267 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
-            Does.Contain("response.timeout_status"));
+            Does.Contain("response.run_projection"));
 
         response.RunStatus = WorkerRunStatus.TimedOut;
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
         response.RunStatus = WorkerRunStatus.Complete;
         response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
+            WorkerCallableCoverageReason.Canceled;
         SetUnknown(response, WorkerClaimReason.Canceled);
         response.Summary = CreateSummary(response);
         Assert.That(
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
-            Does.Contain("response.canceled_status"));
+            Does.Contain("response.run_projection"));
 
         response.RunStatus = WorkerRunStatus.Canceled;
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+    }
+
+    [TestCase(WorkerRunStatus.TimedOut)]
+    [TestCase(WorkerRunStatus.Canceled)]
+    public void AllProvenEvidenceRejectsFabricatedInterruptedStatus(
+        WorkerRunStatus status)
+    {
+        var response = CreateResponse(CreateManifest());
+        response.RunStatus = status;
+
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.run_projection"));
+    }
+
+    [Test]
+    public void AllProvenEvidenceRejectsFabricatedFailureStatus()
+    {
+        var response = CreateResponse(CreateManifest());
+        response.RunStatus = WorkerRunStatus.Failed;
+        response.FailureReason = WorkerRunFailureReason.BackendUnavailable;
+
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.run_projection"));
+    }
+
+    [Test]
+    public void CallableCoverageIsAnExactProjectionOfOwnedClaims()
+    {
+        var response = CreateResponse(CreateManifest());
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.callable_projection"));
+
+        SetUnknown(response, WorkerClaimReason.UnsupportedBody);
+        response.Summary = CreateSummary(response);
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+
+        var emptyManifest = CreateManifest();
+        emptyManifest.Callables[0].ClaimIds = [];
+        emptyManifest.Claims = [];
+        WorkerProtocolJson.SealManifest(emptyManifest);
+        response = CreateResponse(emptyManifest);
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.callable_projection"));
+    }
+
+    [Test]
+    public void ClaimReasonsAreBoundToClaimKind()
+    {
+        var response = CreateResponse(CreateManifest());
+        SetUnknown(response, WorkerClaimReason.EffectSummaryIncomplete);
+        response.Summary = CreateSummary(response);
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.claim_reason"));
+
+        var effectManifest = CreateManifest();
+        effectManifest.Callables[0].SelectedFeatures = [WorkerSelectedFeature.Effects];
+        effectManifest.Callables[0].SelectionReasons = [
+            WorkerSelectionReason.ExplicitAnnotation
+        ];
+        effectManifest.Claims[0].Kind = WorkerClaimKind.Effect;
+        effectManifest.Claims[0].Evidence = WorkerClaimEvidence.Attribute;
+        effectManifest.Claims[0].EffectContractKind =
+            WorkerEffectContractKind.EnforcePure;
+        WorkerProtocolJson.SealManifest(effectManifest);
+        response = CreateResponse(effectManifest);
+        SetUnknown(response, WorkerClaimReason.DeepPostcondition);
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.Unavailable;
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        response.Summary = CreateSummary(response);
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.claim_reason"));
+    }
+
+    [TestCase("containment.unavailable", WorkerRunFailureReason.BackendUnavailable)]
+    [TestCase("backend.unavailable", WorkerRunFailureReason.ContainmentFailure)]
+    [TestCase("compiler_manifest.invalid", WorkerRunFailureReason.CompilationFailure)]
+    [TestCase("compiler.CS1001", WorkerRunFailureReason.MalformedResult)]
+    [TestCase("response.claim_set", WorkerRunFailureReason.InfrastructureFailure)]
+    public void FailureReasonMustMatchProtocolErrorIdentity(
+        string code,
+        WorkerRunFailureReason reason)
+    {
+        var response = CreateResponse(CreateManifest());
+        response.RunStatus = WorkerRunStatus.Failed;
+        response.FailureReason = reason;
+        response.Errors = [new WorkerProtocolError { Code = code, Message = "failure" }];
+
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.run_projection"));
+    }
+
+    [Test]
+    public void ExactRunProjectionAcceptsSemanticProducerStatesAndCacheHits()
+    {
+        var complete = CreateResponse(CreateManifest());
+        Assert.That(ValidateForRequest(complete).IsValid, Is.True);
+
+        complete.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
+        complete.Summary = CreateSummary(complete);
+        Assert.That(ValidateForRequest(complete).IsValid, Is.True);
+
+        var unknown = CreateResponse(CreateManifest());
+        SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);
+        unknown.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        unknown.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        unknown.Summary = CreateSummary(unknown);
+        Assert.That(ValidateForRequest(unknown).IsValid, Is.True);
+
+        var timedOut = CreateResponse(CreateManifest());
+        SetUnknown(timedOut, WorkerClaimReason.MethodTimeout);
+        timedOut.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        timedOut.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.MethodTimeout;
+        timedOut.RunStatus = WorkerRunStatus.TimedOut;
+        timedOut.Summary = CreateSummary(timedOut);
+        Assert.That(ValidateForRequest(timedOut).IsValid, Is.True);
+
+        var canceled = CreateResponse(CreateManifest());
+        SetUnknown(canceled, WorkerClaimReason.Canceled);
+        canceled.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        canceled.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.Canceled;
+        canceled.RunStatus = WorkerRunStatus.Canceled;
+        canceled.Summary = CreateSummary(canceled);
+        Assert.That(ValidateForRequest(canceled).IsValid, Is.True);
+
+        var backend = CreateResponse(CreateManifest());
+        SetUnknown(backend, WorkerClaimReason.BackendUnavailable);
+        backend.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        backend.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        backend.RunStatus = WorkerRunStatus.Failed;
+        backend.FailureReason = WorkerRunFailureReason.BackendUnavailable;
+        backend.Summary = CreateSummary(backend);
+        Assert.That(ValidateForRequest(backend).IsValid, Is.True);
+
+        var replay = CreateResponse(CreateManifest());
+        SetUnknown(replay, WorkerClaimReason.CounterexampleReplayFailed);
+        replay.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        replay.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        replay.RunStatus = WorkerRunStatus.Failed;
+        replay.FailureReason =
+            WorkerRunFailureReason.CounterexampleReplayFailed;
+        replay.Summary = CreateSummary(replay);
+        Assert.That(ValidateForRequest(replay).IsValid, Is.True);
+
+        complete.Summary.CacheStatus = WorkerCacheStatus.Hit;
+        complete.Summary.CacheHit = true;
+        Assert.That(ValidateForRequest(complete).IsValid, Is.True);
+    }
+
+    [Test]
+    public void MixedClaimOutcomesProjectOneIncompleteCallable()
+    {
+        var manifest = CreateManifest();
+        var first = manifest.Claims[0];
+        manifest.Callables[0].ClaimIds = [first.ClaimId, "claim.identity.1"];
+        manifest.Claims = [
+            first,
+            new WorkerClaimManifestEntry {
+                ClaimId = "claim.identity.1",
+                CallableId = first.CallableId,
+                Ordinal = 1,
+                Kind = WorkerClaimKind.Postcondition,
+                Evidence = WorkerClaimEvidence.DirectClause,
+                Location = first.Location
+            }
+        ];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        SetUnknown(response, WorkerClaimReason.UnsupportedExpression, 1);
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        response.Summary = CreateSummary(response);
+
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Complete;
+        response.CallableResults[0].Reason = WorkerCallableCoverageReason.None;
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.callable_projection"));
+    }
+
+    [TestCase("request.malformed", WorkerRunFailureReason.InvalidRequest)]
+    [TestCase("input.unavailable", WorkerRunFailureReason.InputUnavailable)]
+    [TestCase("compiler.CS1001", WorkerRunFailureReason.CompilationFailure)]
+    [TestCase("compiler_manifest.invalid", WorkerRunFailureReason.CompilerManifestMismatch)]
+    [TestCase("backend.unavailable", WorkerRunFailureReason.BackendUnavailable)]
+    [TestCase("worker.infrastructure", WorkerRunFailureReason.InfrastructureFailure)]
+    [TestCase("response.claim_set", WorkerRunFailureReason.MalformedResult)]
+    [TestCase("containment.unavailable", WorkerRunFailureReason.ContainmentFailure)]
+    public void ExactRunProjectionAcceptsKnownFailureEvidence(
+        string code,
+        WorkerRunFailureReason reason)
+    {
+        var manifest = CreateManifest();
+        manifest.Callables = [];
+        manifest.Claims = [];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        response.RunStatus = WorkerRunStatus.Failed;
+        response.FailureReason = reason;
+        response.Errors = [new WorkerProtocolError { Code = code, Message = "failure" }];
+
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+    }
+
+    [TestCase("worker.timeout", WorkerRunStatus.TimedOut)]
+    [TestCase("worker.canceled", WorkerRunStatus.Canceled)]
+    public void EmptyManifestInterruptionRequiresExactEvidence(
+        string code,
+        WorkerRunStatus status)
+    {
+        var manifest = CreateManifest();
+        manifest.Callables = [];
+        manifest.Claims = [];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        response.RunStatus = status;
+        response.Errors = [new WorkerProtocolError { Code = code, Message = "interrupted" }];
+
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
     }
 
     [Test]
@@ -1221,6 +1465,19 @@ public sealed class ProtocolJsonTests
     {
         response.ClaimResults[index].Outcome = WorkerClaimOutcome.Unknown;
         response.ClaimResults[index].Reason = reason;
+    }
+
+    private static WorkerProtocolValidationResult ValidateForRequest(
+        WorkerVerifyResponse response)
+    {
+        var request = CreateRequest();
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        return WorkerProtocolJson.ValidateForRequest(
+            response,
+            response.RequestHash,
+            InputHash,
+            response.Manifest,
+            request.Budgets);
     }
 
     private static WorkerEffectViolationWitness CreateEffectWitness(

@@ -582,6 +582,27 @@ internal static class WorkerProtocolMetadata
                 or WorkerClaimReason.EffectContractNotEstablished,
             _ => false
         };
+    internal static bool MatchesClaimKindOutcome(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerClaimReason reason) =>
+        (kind, outcome, reason) is
+            (_, WorkerClaimOutcome.Proven, WorkerClaimReason.None) or (_, WorkerClaimOutcome.Refuted, WorkerClaimReason.None)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedCallable)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedExpression)
+            or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.DeepPostcondition)
+            or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.MissingReturnValue)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.MethodTimeout)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.ProjectTimeout)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.Canceled)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.BackendUnavailable)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.InfrastructureFailure)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.MalformedBackendResult)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleReplayFailed)
+            or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.PostconditionMayBeUndefined)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable)
+            or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete)
+            or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished);
     internal static bool MatchesEffectCertainty(WorkerClaimOutcome outcome, WorkerClaimReason reason, WorkerEffectEvidenceCertainty certainty) =>
         (outcome, reason, certainty) is
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)

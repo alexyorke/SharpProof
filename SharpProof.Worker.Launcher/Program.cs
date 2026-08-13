@@ -474,9 +474,7 @@ internal static class Program
             artifact.Manifest, request.Budgets, status, reason,
             timeout ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.InfrastructureFailure,
             timeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.InfrastructureFailure,
-            status == WorkerRunStatus.Failed
-                ? [new WorkerProtocolError { Code = code, Message = message }]
-                : [],
+            [new WorkerProtocolError { Code = code, Message = message }],
             new WorkerVersionSummary { WorkerVersion = "launcher", ApiSpecVersion = "unavailable" });
         return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeResponse(response));
     }

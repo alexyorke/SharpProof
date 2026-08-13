@@ -132,4 +132,164 @@ internal static class WorkerResultAssembler
             callableFailure != WorkerRunFailureReason.None, claimFailure != WorkerRunFailureReason.None,
             timedOut, canceled);
     }
+
+    internal static bool TryProjectRunState(
+        IEnumerable<WorkerCallableResult>? callables,
+        IEnumerable<WorkerClaimResult>? claims,
+        IEnumerable<WorkerProtocolError>? errors,
+        out WorkerRunStatus status,
+        out WorkerRunFailureReason failure)
+    {
+        var evidence = Classify(callables, claims);
+        var errorStates = (errors ?? [])
+            .Select(static error => ProjectError(error.Code))
+            .ToArray();
+        if (errorStates.Any(static state => state == null) ||
+            errorStates.Select(static state => state!.Value).Distinct().Count() > 1)
+        {
+            status = WorkerRunStatus.Unspecified;
+            failure = WorkerRunFailureReason.Unspecified;
+            return false;
+        }
+
+        if (errorStates.Length != 0)
+        {
+            (status, failure) = errorStates[0]!.Value;
+            return true;
+        }
+
+        status = evidence.Status;
+        failure = evidence.Failure;
+        return true;
+    }
+
+    internal static bool MatchesCallableProjection(
+        WorkerCallableResult callable,
+        WorkerClaimManifest manifest,
+        IEnumerable<WorkerClaimResult> claims,
+        WorkerRunStatus runStatus,
+        WorkerRunFailureReason failureReason,
+        bool hasErrors)
+    {
+        var ownedIds = manifest.Callables.FirstOrDefault(entry =>
+            entry.CallableId == callable.CallableId)?.ClaimIds ?? [];
+        var owned = claims.Where(claim =>
+            ownedIds.Contains(claim.ClaimId, StringComparer.Ordinal)).ToArray();
+        WorkerCallableCoverageReason expected;
+        if (runStatus == WorkerRunStatus.Failed && hasErrors)
+        {
+            expected = failureReason == WorkerRunFailureReason.MalformedResult
+                ? WorkerCallableCoverageReason.MissingClaimResult
+                : WorkerCallableCoverageReason.InfrastructureFailure;
+        }
+        else if (owned.Length == 0 ||
+            owned.All(static claim => claim.Outcome != WorkerClaimOutcome.Unknown))
+        {
+            expected = WorkerCallableCoverageReason.None;
+        }
+        else
+        {
+            var reasons = owned.Where(static claim =>
+                    claim.Outcome == WorkerClaimOutcome.Unknown)
+                .Select(static claim => claim.Reason)
+                .ToArray();
+            expected = reasons.All(static reason =>
+                    reason == WorkerClaimReason.UnsupportedCallable)
+                ? WorkerCallableCoverageReason.UnsupportedCallable
+                : reasons.Any(static reason =>
+                    reason == WorkerClaimReason.MethodTimeout)
+                    ? WorkerCallableCoverageReason.MethodTimeout
+                    : reasons.Any(static reason =>
+                        reason == WorkerClaimReason.ProjectTimeout)
+                        ? WorkerCallableCoverageReason.ProjectTimeout
+                        : reasons.Any(static reason =>
+                            reason == WorkerClaimReason.Canceled)
+                            ? WorkerCallableCoverageReason.Canceled
+                            : WorkerCallableCoverageReason.SemanticUnknown;
+        }
+
+        var matchesExpected = callable.Coverage ==
+                (expected == WorkerCallableCoverageReason.None
+                    ? WorkerCallableCoverage.Complete
+                    : WorkerCallableCoverage.Incomplete) &&
+            callable.Reason == expected;
+        var directInfrastructureFailure =
+            owned.Length != 0 &&
+            owned.All(static claim =>
+                claim.Outcome == WorkerClaimOutcome.Unknown &&
+                claim.Reason == WorkerClaimReason.InfrastructureFailure) &&
+            callable.Coverage == WorkerCallableCoverage.Incomplete &&
+            callable.Reason == WorkerCallableCoverageReason.InfrastructureFailure;
+        return matchesExpected || directInfrastructureFailure;
+    }
+
+    private static (WorkerRunStatus Status, WorkerRunFailureReason Failure)?
+        ProjectError(string code)
+    {
+        if (code is "worker.timeout")
+        {
+            return (WorkerRunStatus.TimedOut, WorkerRunFailureReason.None);
+        }
+        if (code is "worker.canceled")
+        {
+            return (WorkerRunStatus.Canceled, WorkerRunFailureReason.None);
+        }
+        if (code is "request.malformed" or "launcher.timeout_overflow" ||
+            HasPrefix(code, "protocol.") || HasPrefix(code, "project.") ||
+            HasPrefix(code, "budgets.") || HasPrefix(code, "cache.") ||
+            HasPrefix(code, "policy.") || code == "request.null")
+        {
+            return (WorkerRunStatus.Failed, WorkerRunFailureReason.InvalidRequest);
+        }
+        if (code is "compiler_manifest.unavailable" or "input.unavailable")
+        {
+            return (WorkerRunStatus.Failed, WorkerRunFailureReason.InputUnavailable);
+        }
+        if (IsCompilerDiagnosticCode(code))
+        {
+            return (WorkerRunStatus.Failed, WorkerRunFailureReason.CompilationFailure);
+        }
+        if (code is "compiler_manifest.invalid" or "compiler_manifest.options" or
+            "compiler_manifest.lowered_ir")
+        {
+            return (WorkerRunStatus.Failed, WorkerRunFailureReason.CompilerManifestMismatch);
+        }
+        if (code is "backend.unavailable")
+        {
+            return (WorkerRunStatus.Failed, WorkerRunFailureReason.BackendUnavailable);
+        }
+        if (code is "worker.infrastructure" or "launcher.infrastructure")
+        {
+            return (WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure);
+        }
+        if (code is "worker.malformed_result" or "worker.no_result" ||
+            HasPrefix(code, "response.") || HasPrefix(code, "summary.") ||
+            HasPrefix(code, "manifest."))
+        {
+            return (WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult);
+        }
+        if (code is "containment.unsupported" or "containment.unavailable")
+        {
+            return (WorkerRunStatus.Failed, WorkerRunFailureReason.ContainmentFailure);
+        }
+
+        return null;
+    }
+
+    private static bool HasPrefix(string value, string prefix)
+    {
+        return value.StartsWith(prefix, StringComparison.Ordinal);
+    }
+
+    private static bool IsCompilerDiagnosticCode(string value)
+    {
+        const string prefix = "compiler.";
+        return value.StartsWith(prefix, StringComparison.Ordinal) &&
+            value.Length > prefix.Length &&
+            value.Skip(prefix.Length).All(static character =>
+                (character >= 'A' && character <= 'Z') ||
+                (character >= 'a' && character <= 'z') ||
+                (character >= '0' && character <= '9') ||
+                character == '_');
+    }
 }

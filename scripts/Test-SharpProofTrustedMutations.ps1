@@ -1262,6 +1262,20 @@ $mutations = @(
 '@).TrimEnd()
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~PartialMethodHasOneExecutableEffectOwner'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-exact-run-state-projection'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = (@'
+                response.RunStatus == expectedStatus &&
+                response.FailureReason == expectedFailure,
+'@).TrimEnd()
+        Mutated = (@'
+                WorkerProtocolMetadata.MatchesRunFailure(
+                    response.RunStatus, response.FailureReason),
+'@).TrimEnd()
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~AllProvenEvidenceRejectsFabricated'
     }
 )
 

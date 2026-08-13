@@ -104,6 +104,36 @@
       ]
     },
     {
+      "name": "ClaimKindOutcome",
+      "parameters": [
+        {"name":"kind","type":"WorkerClaimKind"},
+        {"name":"outcome","type":"WorkerClaimOutcome"},
+        {"name":"reason","type":"WorkerClaimReason"}
+      ],
+      "rows": [
+        ["*","Proven","None"],
+        ["*","Refuted","None"],
+        ["*","Unknown","UnsupportedCallable"],
+        ["*","Unknown","UnsupportedContract"],
+        ["*","Unknown","UnsupportedBody"],
+        ["*","Unknown","UnsupportedExpression"],
+        ["Postcondition","Unknown","DeepPostcondition"],
+        ["Postcondition","Unknown","MissingReturnValue"],
+        ["*","Unknown","ResourceLimit"],
+        ["*","Unknown","MethodTimeout"],
+        ["*","Unknown","ProjectTimeout"],
+        ["*","Unknown","Canceled"],
+        ["*","Unknown","BackendUnavailable"],
+        ["*","Unknown","InfrastructureFailure"],
+        ["*","Unknown","MalformedBackendResult"],
+        ["*","Unknown","CounterexampleReplayFailed"],
+        ["Postcondition","Unknown","PostconditionMayBeUndefined"],
+        ["*","Unknown","CounterexampleNotReplayable"],
+        ["Effect","Unknown","EffectSummaryIncomplete"],
+        ["Effect","Unknown","EffectContractNotEstablished"]
+      ]
+    },
+    {
       "name": "EffectCertainty",
       "parameters": [
         {"name":"outcome","type":"WorkerClaimOutcome"},

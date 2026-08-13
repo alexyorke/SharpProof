@@ -193,9 +193,9 @@ public static partial class WorkerProtocolJson
             errors.Count == manifestErrorCount,
             errors);
         var protocolErrors = ValidateProtocolErrors(response.Errors, errors);
-        ValidateRun(response, protocolErrors, errors);
         var callables = ValidateCallableResults(response.CallableResults, response.Manifest, errors);
         var claims = ValidateClaimResults(response.ClaimResults, response.Manifest, errors);
+        ValidateRun(response, callables, claims, protocolErrors, errors);
         ValidateUnknownCoverage(callables, claims, response.Manifest, errors);
         ValidateSummary(response.Summary, callables, claims, errors);
         if (expectedBudgets != null)
@@ -315,6 +315,10 @@ public static partial class WorkerProtocolJson
         var claim = manifest?.Claims?.FirstOrDefault(
             item => item != null && item.ClaimId == value.ClaimId);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
+        errors.Check(claim != null &&
+                WorkerProtocolMetadata.MatchesClaimKindOutcome(
+                    claim.Kind, value.Outcome, value.Reason),
+            "response.claim_reason");
         errors.Check(effectClaim
                 ? HasValidEffectCertainty(value.Outcome, value.Reason, value.EffectCertainty)
                 : value.EffectCertainty == WorkerEffectEvidenceCertainty.Unspecified,
@@ -367,22 +371,41 @@ public static partial class WorkerProtocolJson
             owners.TryGetValue(value.ClaimId, out var owner) && !incomplete.Contains(owner)),
             "response.unknown_coverage");
     }
-    private static void ValidateRun(WorkerVerifyResponse response, WorkerProtocolError[] protocolErrors, Validator errors)
+    private static void ValidateRun(
+        WorkerVerifyResponse response,
+        WorkerCallableResult[] callables,
+        WorkerClaimResult[] claims,
+        WorkerProtocolError[] protocolErrors,
+        Validator errors)
     {
-        var failed = response.RunStatus == WorkerRunStatus.Failed;
         errors.Defined(response.RunStatus, WorkerRunStatus.Unspecified, "response.run_status")
             .Check(WorkerProtocolMetadata.MatchesRunFailure(
-                response.RunStatus, response.FailureReason) &&
-                (protocolErrors.Length == 0 || failed), "response.run_failure");
-        var evidence = WorkerResultAssembler.Classify(response.CallableResults, response.ClaimResults);
-        errors.Check(!evidence.FatalClaim || failed, "response.fatal_claim")
-            .Check(!evidence.FatalCallable || failed, "response.fatal_callable")
-            .Check(!evidence.TimedOut ||
-                response.RunStatus is WorkerRunStatus.TimedOut or WorkerRunStatus.Failed,
-                "response.timeout_status")
-            .Check(!evidence.Canceled ||
-                response.RunStatus is WorkerRunStatus.Canceled or WorkerRunStatus.Failed,
-                "response.canceled_status");
+                response.RunStatus, response.FailureReason),
+                "response.run_failure");
+        var projected = WorkerResultAssembler.TryProjectRunState(
+            callables,
+            claims,
+            protocolErrors,
+            out var expectedStatus,
+            out var expectedFailure);
+        errors.Check(projected &&
+                response.RunStatus == expectedStatus &&
+                response.FailureReason == expectedFailure,
+            "response.run_projection");
+        if (response.Manifest != null && projected)
+        {
+            foreach (var callable in callables)
+            {
+                errors.Check(WorkerResultAssembler.MatchesCallableProjection(
+                        callable,
+                        response.Manifest,
+                        claims,
+                        expectedStatus,
+                        expectedFailure,
+                        protocolErrors.Length != 0),
+                    "response.callable_projection");
+            }
+        }
     }
 
     private static void ValidateSummary(WorkerVerificationSummary? summary,
