@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 124 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 123 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 124 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-094 - Package licenses are not bound to release evidence (fixed)
+
+- [x] Fixed by `301aa8357` (`fix: bind package licenses to release evidence`).
+- The first-party package contract now owns the exact case-sensitive license
+  expression for every package. The shared nuspec authority requires exact
+  main-package declarations, permits symbol-package omission only when NuGet's
+  canonical symbol output omits the field, rejects any conflicting declaration,
+  and derives and validates both SPDX declared and concluded licenses. Evidence
+  generation, final validation, and plan-only publication each recheck it.
+- Regression-first fixtures reject wrong valid licenses, missing or file-form
+  main declarations, case/spelling changes, symbol mismatches, and missing or
+  inconsistent SBOM fields. Focused tests passed 25/25, Architecture 149/149,
+  and both release-evidence and offline-plan package controls passed locally.
 
 ### SP-AUDIT-067 - SBOM package dependencies are fabricated, not derived (fixed)
 
@@ -729,24 +743,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   claims, duplicate selections, generated companions, serialization/cache
   round trips, and real strict-worker controls plus a trusted mutation that
   removes scope parity.
-
-### SP-AUDIT-094 - Package licenses are not bound to release evidence (P0)
-
-- [ ] Release evidence reads package ID, version, and repository metadata from
-  nuspecs but independently hardcodes first-party SPDX licenses as MIT. Final
-  artifact and publication-plan validators never compare the nuspec license to
-  the SBOM license.
-- Certifier impact: a package can declare a different valid NuGet license while
-  the SBOM and release evidence still certify MIT. This permits internally
-  inconsistent legal/supply-chain evidence for the promoted bytes.
-- Reproduction: a temporary real nupkg mutation changed the SharpProof nuspec
-  license from MIT to Apache-2.0 while preserving all currently validated
-  identity fields. `New-SharpProofReleaseEvidence.ps1` exited zero and retained
-  MIT SBOM policy. The disposable package was removed.
-- Required closure: make one catalog the license authority; compare every
-  package's nuspec expression and every corresponding SPDX package row during
-  evidence creation, final validation, and plan-only publication. Add a
-  self-consistently rehashed wrong-license fixture.
 
 ### SP-AUDIT-107 - The TCB inventory can self-authorize changes (P0)
 
