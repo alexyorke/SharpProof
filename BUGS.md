@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 101 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 100 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 101 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-070 - Never-invoked lambda bodies are analyzed as executed (fixed)
+
+- [x] Fixed by `568cda5a9` (`fix: gate lambda body analysis by execution`).
+- Parent callable traversal now exclusively owns nested Requires execution
+  analysis. It tracks reachable delegate aliases and analyzes invoked,
+  conditionally invoked, returned, passed, or otherwise escaped lambdas, while
+  unused lambda bodies and nested bodies under dead lambdas remain unexecuted.
+  SP-AUDIT-069 declaration validation remains independent.
+- Regression-first tests cover dead, invoked, copied, conditional, returned,
+  passed, nested-live/dead, expression-tree, generated, and exact-count cases.
+  The focused matrix passed, the nested suite 15/15, Analyzer 287/287,
+  Architecture 176/176, and `git diff --check` passed.
 
 ### SP-AUDIT-069 - Nested callable declarations bypass full method policy (fixed)
 
@@ -1108,27 +1121,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   heuristic-only filter.
 - Consolidated cases: SP-AUDIT-064, SP-AUDIT-068, SP-AUDIT-127.
 - Unified closure: After all generators, reconcile every logical target/companion once in every non-off profile, independent of filename, partial ownership, and generator order.
-
-### SP-AUDIT-070 - Never-invoked lambda bodies are analyzed as executed (P1)
-
-- [ ] Nested call-site traversal treats every lambda creation in a reachable
-  parent CFG block as an executable child callable. Unlike local functions, it
-  does not require an invocation, method-reference escape, or other executable
-  reachability before analyzing the lambda body.
-- Supported impact: advisory/contracts analysis emits SP0027 for a call that
-  cannot execute, creating a false positive and inconsistent semantics between
-  equivalent unused local functions and lambdas. This can make supported builds
-  fail when warnings are promoted to errors.
-- Reproduction: a focused contracts-profile test assigned
-  `Func<int> dead = () => Positive(-1);` and returned zero without invoking or
-  exposing `dead`. The analyzer emitted one SP0027 at the call inside the lambda
-  instead of an empty diagnostic set. The temporary regression was removed.
-- Required closure: distinguish lambda construction from body execution; seed
-  child analysis only from reachable invocation/delegate-flow roots, with a
-  bounded conservative escape policy where exact tracking is unavailable. Add
-  never-used, directly invoked, invoked through local copy, returned/passed/
-  stored escape, conditional invocation, expression-tree, nested sibling, and
-  local-function parity cases plus a mutation restoring creation-implies-run.
 
 ### SP-AUDIT-076 - Text diagnostic transport loses structured MSBuild semantics (P1)
 
