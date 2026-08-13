@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 131 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 130 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 131 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-014 - Empty symbol packages pass release validation (fixed)
+
+- [x] Fixed by `199ca46ab` (`fix: authenticate symbol package payloads`).
+- One shared local validator now pairs every symbol package with its main
+  package, requires the exact first-party PDB entry set, rejects duplicate or
+  malformed archive entries, parses portable PDB metadata, matches each PDB ID
+  to its assembly CodeView ID, and binds Source Link to the exact repository
+  commit. Package-source, evidence, final-artifact, and publication-plan paths
+  all invoke that authority.
+- Regression-first fixtures reject missing, foreign, wrong-commit, duplicate,
+  and malformed symbol payloads; a static authority test prevents any release
+  consumer from dropping validation. The five mutation cases, authority test,
+  Architecture 110/110, and container contract validation passed locally with
+  no external NuGet or publication operation.
 
 ### SP-AUDIT-013 - Mutation qualification trusts a forged summary (fixed)
 
@@ -466,28 +481,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   plus a mutation that removes primary-initializer discovery.
 - Consolidated cases: SP-AUDIT-032.
 - Unified closure: Use one type-declaration-to-synthesized-constructor inventory for analyzer and collector, including primary base initialization and every selected callable, claim, and assumption.
-
-### SP-AUDIT-014 - Empty symbol packages pass release validation (P0)
-
-- [ ] Package-source, release-evidence, final-artifact, and publication-plan
-  validation treat a `.snupkg` as valid when it contains one nuspec with the
-  expected ID/version/commit. They do not require the matching portable PDBs,
-  Source Link records, or correspondence between symbol and main-package
-  assemblies.
-- Certifier impact: the immutable release bundle can certify and publish an
-  unusable or unrelated symbol package while all release manifests and hashes
-  remain internally consistent. This defeats the checked-in promise that the
-  exact debug/source artifacts belong to the promoted package bytes.
-- Reproduction: the audit copied the current six package files, removed every
-  `.pdb` entry from `SharpProof.Attributes.1.0.0-preview.1.snupkg`, and reran
-  `New-SharpProofReleaseEvidence.ps1`. Evidence generation exited zero and
-  blessed the modified symbol-package hash. `Test-SharpProofReleaseArtifacts`
-  then exited zero and reported the bundle immutable for current HEAD.
-- Required closure: validate the exact expected PDB entry set in every symbol
-  package, require portable PDB format and canonical Source Link commit, and
-  match each PDB's debug identifier to the corresponding DLL in the main
-  package. Add missing-PDB, foreign-PDB, wrong-commit Source Link, duplicate,
-  malformed-symbol-package, and exact-valid fixtures.
 
 ### SP-AUDIT-015 - Release evidence does not authenticate package payloads (P0)
 
