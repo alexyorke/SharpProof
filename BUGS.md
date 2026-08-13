@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 151 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 150 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -110,6 +110,17 @@ The active backlog contains 151 root-cause rows. Stable IDs are not renumbered; 
 
 ## Fixed during remediation
 
+### SP-AUDIT-002 - Using disposal effects are omitted (fixed)
+
+- [x] Fixed by `f97ac46e9` (`fix: include using disposal effects`).
+- Effect analysis now resolves synchronous disposal from using statements and
+  declarations, joins the concrete source/interface call summary, models
+  conditional null disposal, and leaves unknown interface dispatch fail-closed.
+- Regression-first coverage includes implicit statement/declaration disposal,
+  explicit-call parity, static writes, synchronization capability, escaping
+  exceptions, no-op disposal, null resources, and interface dispatch. The full
+  canonical-container Effects and Architecture suites passed 153/153 and 78/78.
+
 ### SP-AUDIT-175 - Changed-TCB path identity is not exact on Linux (fixed)
 
 - [x] Fixed by `55f014b7a` (`fix: preserve ordinal coverage paths`).
@@ -185,23 +196,6 @@ The active backlog contains 151 root-cause rows. Stable IDs are not renumbered; 
 ## P0 active bugs
 
 Release blockers: false proofs, missing verifier obligations, destructive supported behavior, verifier bypasses, or release authority accepting invalid candidate bytes.
-
-### SP-AUDIT-002 - Using disposal effects are omitted (P0)
-
-- [ ] `Using` and `UsingDeclaration` are cataloged as exact, but the effect
-  scanner has no `IUsingOperation`/using-declaration handling. Default child
-  traversal does not include the compiler's implicit `Dispose` invocation.
-- Supported impact: a method using an `IDisposable` whose `Dispose` writes
-  static state produced no `WritesStaticState`. Dispose capabilities, writes,
-  and escaping exceptions can be omitted, allowing an unsound selected effect
-  claim.
-- Reproduction: a temporary regression analyzed `using (resource) { }` where
-  source `Dispose` increments a static field. The focused Effects test failed
-  with expected `WritesStaticState`, actual `None`.
-- Required closure: resolve and join the exact synchronous dispose method for
-  statement and declaration forms, including null/conditional disposal and
-  source/API-spec summaries, or mark both operation shapes unsupported; add
-  mutation-discriminating write, capability, and exception cases.
 
 ### SP-AUDIT-006 - Publication lock symlinks mutate an unowned target (P0)
 
