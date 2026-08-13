@@ -22,6 +22,9 @@
       <SharpProofVerifyRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'request.json'))</SharpProofVerifyRequestFile>
       <SharpProofVerifyResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'result.json'))</SharpProofVerifyResultFile>
       <SharpProofCompilerManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'compiler-manifest.json'))</SharpProofCompilerManifestFile>
+      <_SharpProofEffectiveSarifFile>$(SharpProofVerifySarifFile)</_SharpProofEffectiveSarifFile>
+      <_SharpProofConfiguredSarifFullPath Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofVerifySarifFile)'))</_SharpProofConfiguredSarifFullPath>
+      <_SharpProofEffectiveSarifFile Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(_SharpProofConfiguredSarifFullPath)')), '$(TargetFramework)', $([System.IO.Path]::GetFileName('$(_SharpProofConfiguredSarifFullPath)'))))</_SharpProofEffectiveSarifFile>
       <_SharpProofVerifyCacheDirectoryNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheDirectory)').Trim())</_SharpProofVerifyCacheDirectoryNormalized>
       <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'cache'))</_SharpProofEffectiveCacheDirectory>
       <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' != ''">$(SharpProofVerifyCacheDirectory)</_SharpProofEffectiveCacheDirectory>
@@ -61,7 +64,7 @@
         ProjectDirectory="$(MSBuildProjectDirectory)"
         RequestPath="$(SharpProofVerifyRequestFile)"
         ManifestPath="$(SharpProofCompilerManifestFile)"
-        SarifPath="$(SharpProofVerifySarifFile)"
+        SarifPath="$(_SharpProofEffectiveSarifFile)"
         InvocationRequestPath="$(_SharpProofInvocationRequestFile)"
         InvocationResultPath="$(_SharpProofInvocationResultFile)"
         InvocationManifestPath="$(_SharpProofCompilerManifestPath)"
@@ -133,9 +136,9 @@
       <_SharpProofVerifierArgument Include="--cache-maximum-bytes" />
       <_SharpProofVerifierArgument Include="$(SharpProofVerifyCacheMaximumBytes)" />
       <_SharpProofVerifierArgument Include="--publish-sarif"
-                                   Condition="'$(SharpProofVerifySarifFile)' != ''" />
-      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(SharpProofVerifySarifFile)'))"
-                                   Condition="'$(SharpProofVerifySarifFile)' != ''" />
+                                   Condition="'$(_SharpProofEffectiveSarifFile)' != ''" />
+      <_SharpProofVerifierArgument Include="$([MSBuild]::Escape('$(_SharpProofEffectiveSarifFile)'))"
+                                   Condition="'$(_SharpProofEffectiveSarifFile)' != ''" />
     </ItemGroup>
     <SharpProof.BuildTasks.RunVerifier
         Executable="$(_SharpProofDotNetHost)"
@@ -155,9 +158,9 @@
         ManifestPath="$(SharpProofCompilerManifestFile)" />
     <Message Importance="High"
              Text="SharpProof verifier result: $(SharpProofVerifyResultFile)" />
-    <Message Condition="'$(SharpProofVerifySarifFile)' != ''"
+    <Message Condition="'$(_SharpProofEffectiveSarifFile)' != ''"
              Importance="High"
-             Text="SharpProof verifier SARIF result: $(SharpProofVerifySarifFile)" />
+             Text="SharpProof verifier SARIF result: $(_SharpProofEffectiveSarifFile)" />
   </Target>
 
   <Target Name="SharpProofVerify"

@@ -768,6 +768,94 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task MultiTargetConfiguredSarifIsFrameworkScoped()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            ("TargetFrameworks", "net8.0;net9.0"),
+            ("SharpProofVerifySarifFile", "evidence/result.sarif"));
+
+        var build = await project.BuildAsync(verify: true);
+
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        foreach (var framework in new[] { "net8.0", "net9.0" })
+        {
+            var sarif = Path.Combine(
+                project.Root,
+                "evidence",
+                framework,
+                "result.sarif");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(File.Exists(sarif), Is.True, build.Output);
+                Assert.That(
+                    File.Exists(LinuxPathIdentity.PublicationMarkerPath(sarif)),
+                    Is.True,
+                    build.Output);
+                Assert.That(
+                    await File.ReadAllBytesAsync(
+                        LinuxPathIdentity.PublicationMarkerPath(sarif)),
+                    Is.EqualTo(await File.ReadAllBytesAsync(
+                        LinuxPathIdentity.PublicationMarkerPath(
+                            project.VerifyOutputPath(
+                                framework,
+                                "result.json")))));
+            }
+        }
+    }
+
+    [Test]
+    public async Task ThreeTargetAbsoluteSarifSurvivesSerialIncrementalAndCleanBuilds()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            ("TargetFrameworks", "net9.0;net8.0;netstandard2.0"),
+            ("BuildInParallel", "false"));
+        var configured = Path.Combine(
+            project.Root,
+            "absolute-evidence",
+            "verification.sarif");
+
+        var first = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifySarifFile", configured));
+        var incremental = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifySarifFile", configured));
+        var clean = await project.CleanAsync(
+            ("SharpProofVerifySarifFile", configured));
+        var rebuilt = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifySarifFile", configured));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.ExitCode, Is.Zero, first.Output);
+            Assert.That(incremental.ExitCode, Is.Zero, incremental.Output);
+            Assert.That(clean.ExitCode, Is.Zero, clean.Output);
+            Assert.That(rebuilt.ExitCode, Is.Zero, rebuilt.Output);
+        }
+        var markerIdentities = new List<string>();
+        foreach (var framework in new[]
+                 {
+                     "net9.0", "net8.0", "netstandard2.0"
+                 })
+        {
+            var sarif = Path.Combine(
+                project.Root,
+                "absolute-evidence",
+                framework,
+                "verification.sarif");
+            Assert.That(File.Exists(sarif), Is.True, rebuilt.Output);
+            markerIdentities.Add(await File.ReadAllTextAsync(
+                LinuxPathIdentity.PublicationMarkerPath(sarif)));
+        }
+        Assert.That(markerIdentities, Is.Unique);
+    }
+
+    [Test]
     public async Task MissingCompilerManifestFailsBeforeWorkerLaunch()
     {
         RequireContainerWorker();
@@ -3332,6 +3420,24 @@ public sealed class WorkerMsBuildIntegrationTests
             {
                 "restore",
                 ProjectPath,
+                "--nologo",
+                "/nodeReuse:false",
+                "-p:SharpProofVerify=false"
+            };
+            arguments.AddRange(properties.Select(static property =>
+                "-p:" + property.Name + "=" + property.Value));
+            return RunDotNetAsync(arguments);
+        }
+
+        internal Task<BuildResult> CleanAsync(
+            params (string Name, string Value)[] properties)
+        {
+            var arguments = new List<string>
+            {
+                "clean",
+                ProjectPath,
+                "-c",
+                "Release",
                 "--nologo",
                 "/nodeReuse:false",
                 "-p:SharpProofVerify=false"

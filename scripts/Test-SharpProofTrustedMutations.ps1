@@ -1142,6 +1142,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CompilationReferenceTargetDiagnosticUsesCurrentCompanionLocation'
     },
     [pscustomobject]@{
+        Name = 'multitarget-sarif-framework-scope'
+        File = 'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
+        Original = "      <_SharpProofEffectiveSarifFile Condition=`"'`$(SharpProofVerifySarifFile)' != '' AND '`$(TargetFrameworks)' != ''`">"
+        Mutated = "      <_SharpProofEffectiveSarifFile Condition=`"'`$(SharpProofVerifySarifFile)' != '' AND '`$(TargetFrameworks)' == ''`">"
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~MultiTargetConfiguredSarifIsFrameworkScoped'
+    },
+    [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = '                if (type == FileTypeSymbolicLink)'

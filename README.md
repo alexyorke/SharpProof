@@ -476,6 +476,10 @@ the already validated response. It preserves `Proven`, `Refuted`, `Unknown`,
 SP0047, SP0048, and typed run-failure information with policy-matched levels.
 The SARIF file is published atomically under the same lock as the JSON result
 and cannot make an unsuccessful verifier run succeed.
+For a multitarget project, SharpProof inserts the current target-framework
+name as a directory immediately before the configured SARIF filename. This
+applies to both relative and absolute configured paths; single-target paths
+retain their existing meaning.
 
 The current body executor is capped at 64 reachable blocks, 4,096 lowered body
 instructions, and 65,536 symbolic operations. It merges acyclic predecessor

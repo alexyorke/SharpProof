@@ -64,6 +64,11 @@ validated response and atomically writes SARIF under the same publication
 mutex before committing the JSON result. Claim outcomes, SP0047 incomplete
 coverage, SP0048 assumption evidence, and run failures retain policy-matched
 levels; SARIF generation cannot change verifier exit behavior.
+For multitarget projects, each inner build owns a distinct SARIF file beneath
+the configured path's directory: `<directory>/<target-framework>/<filename>`.
+Relative paths are resolved from the project directory before this projection;
+absolute paths retain their configured directory. Single-target behavior is
+unchanged.
 
 Container verification also initializes an internal, compiler-visible
 `_SharpProofCompilerManifestPath` beneath the isolated invocation directory.
