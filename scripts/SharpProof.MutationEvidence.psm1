@@ -147,7 +147,7 @@ function Test-NUnitAssertionMessage {
     }
     if ($assertionIndex -gt 0 -and
         @($lines[0..($assertionIndex - 1)] | Where-Object {
-            $_ -match '(?i)^\s*(?:[A-Za-z0-9_.]*Exception\b|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
+            $_ -match '(?i)^\s*(?:(?:(?:[A-Za-z_][A-Za-z0-9_`+]*\.)+[A-Za-z_][A-Za-z0-9_`+]*|[A-Za-z_][A-Za-z0-9_`+]*(?:Exception|Error|Failure|Fault))\s*:|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
         }).Count -ne 0) {
         return $false
     }
@@ -173,7 +173,7 @@ function Test-NUnitAssertionMessage {
         @()
     }
     if (@($assertionContinuation | Where-Object {
-            $_ -match '(?i)^\s*(?:[A-Za-z0-9_.]*Exception\b|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
+            $_ -match '(?i)^\s*(?:(?:(?:[A-Za-z_][A-Za-z0-9_`+]*\.)+[A-Za-z_][A-Za-z0-9_`+]*|[A-Za-z_][A-Za-z0-9_`+]*(?:Exception|Error|Failure|Fault))\s*:|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
         }).Count -ne 0) {
         return $false
     }
@@ -192,6 +192,88 @@ function Test-NUnitAssertionMessage {
             $_ -match '^Expected is\b.*\bactual is\b'
         }).Count -eq 1
     return $scalarFailure -or $collectionFailure
+}
+
+function Test-NUnitAssertionStack {
+    param([AllowNull()][string]$StackTrace)
+
+    if ([string]::IsNullOrWhiteSpace($StackTrace)) {
+        return $false
+    }
+    $lines = @($StackTrace.Replace("`r`n", "`n").Split("`n") |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_.Length -ne 0 })
+    if ($lines.Count -eq 0) {
+        return $false
+    }
+    foreach ($line in $lines) {
+        if ($line -match '(?i)(?:^|\s)(?:[A-Za-z_][A-Za-z0-9_`+]*\.)*[A-Za-z_][A-Za-z0-9_`+]*(?:Exception|Error|Failure|Fault)\b' -or
+            $line -match '(?i)^\s*(?:error|warning|stack trace|fatal|unhandled)\s*:') {
+            return $false
+        }
+        if ($line -notmatch '^\s*(?:\d+\)\s+)?at\s+\S+') {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-NUnitAssertionErrorInfo {
+    param(
+        [Parameter(Mandatory = $true)][Xml.XmlElement]$ErrorInfo,
+        [Parameter(Mandatory = $true)][Xml.XmlNamespaceManager]$NamespaceManager
+    )
+
+    $elements = @($ErrorInfo.ChildNodes | Where-Object {
+            $_.NodeType -eq [Xml.XmlNodeType]::Element
+        })
+    $messages = @($ErrorInfo.SelectNodes('trx:Message', $NamespaceManager))
+    $stacks = @($ErrorInfo.SelectNodes('trx:StackTrace', $NamespaceManager))
+    return $elements.Count -eq 2 -and
+        $messages.Count -eq 1 -and
+        $stacks.Count -eq 1 -and
+        @($elements | Where-Object {
+                $_.NamespaceURI -ne $ErrorInfo.NamespaceURI -or
+                $_.LocalName -notin @('Message', 'StackTrace')
+            }).Count -eq 0 -and
+        (Test-NUnitAssertionMessage -Message $messages[0].InnerText) -and
+        (Test-NUnitAssertionStack -StackTrace $stacks[0].InnerText)
+}
+
+function Get-AssertionProvenanceSha256 {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Results,
+        [Parameter(Mandatory = $true)][Xml.XmlNamespaceManager]$NamespaceManager
+    )
+
+    $frames = [Collections.Generic.List[string]]::new()
+    foreach ($result in @($Results | Sort-Object {
+                $_.GetAttribute('testId')
+            })) {
+        foreach ($value in @(
+                $result.GetAttribute('testId'),
+                $result.GetAttribute('executionId'),
+                $result.SelectSingleNode(
+                    'trx:Output/trx:ErrorInfo/trx:Message',
+                    $NamespaceManager).InnerText,
+                $result.SelectSingleNode(
+                    'trx:Output/trx:ErrorInfo/trx:StackTrace',
+                    $NamespaceManager).InnerText)) {
+            $frames.Add($value.Length.ToString(
+                    [Globalization.CultureInfo]::InvariantCulture) + ':' +
+                $value)
+        }
+    }
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [Text.UTF8Encoding]::new($false).GetBytes(
+            [string]::Concat($frames))
+        return [Convert]::ToHexString(
+            $hasher.ComputeHash($bytes)).ToLowerInvariant()
+    }
+    finally {
+        $hasher.Dispose()
+    }
 }
 
 function Test-NUnitMethodIdentity {
@@ -583,13 +665,11 @@ function Read-SharpProofMutationTestEvidence {
             $errorInfos = @($_.SelectNodes(
                     'trx:Output/trx:ErrorInfo',
                     $namespaceManager))
-            $messages = @($_.SelectNodes(
-                    'trx:Output/trx:ErrorInfo/trx:Message',
-                    $namespaceManager))
             $outputs.Count -eq 1 -and
                 $errorInfos.Count -eq 1 -and
-                $messages.Count -eq 1 -and
-                (Test-NUnitAssertionMessage -Message $messages[0].InnerText)
+                (Test-NUnitAssertionErrorInfo `
+                    -ErrorInfo $errorInfos[0] `
+                    -NamespaceManager $namespaceManager)
         })
     if ($Mode -eq 'Mutation' -and
         $assertionFailures.Count -ne $failedResults.Count) {
@@ -600,6 +680,14 @@ function Read-SharpProofMutationTestEvidence {
         executedCount = $results.Count
         failedCount = $failedResults.Count
         assertionFailureCount = $assertionFailures.Count
+        assertionProvenanceSha256 = $(if ($assertionFailures.Count -eq 0) {
+                $null
+            }
+            else {
+                Get-AssertionProvenanceSha256 `
+                    -Results $assertionFailures `
+                    -NamespaceManager $namespaceManager
+            })
         testLedger = $ledger
         testLedgers = $ledgerByMethod
     }

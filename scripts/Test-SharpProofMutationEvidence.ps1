@@ -56,7 +56,8 @@ function New-TestParts {
         [string]$DisplayName,
         [string]$Class = 'SharpProof.Test.EvidenceTests',
         [string]$TestId = 'test-1',
-        [string]$ExecutionId = 'execution-1'
+        [string]$ExecutionId = 'execution-1',
+        [string]$StackTrace = 'at SharpProof.Test.EvidenceTests.ExpectedTest() in /workspace/SharpProof/Test.cs:line 1'
     )
 
     if ([string]::IsNullOrEmpty($DisplayName)) {
@@ -64,7 +65,8 @@ function New-TestParts {
     }
     $escaped = [Security.SecurityElement]::Escape($Message)
     $output = if ($Outcome -eq 'Failed') {
-        "<Output><ErrorInfo><Message>$escaped</Message><StackTrace>irrelevant Assert.That(text)</StackTrace></ErrorInfo></Output>"
+        $escapedStack = [Security.SecurityElement]::Escape($StackTrace)
+        "<Output><ErrorInfo><Message>$escaped</Message><StackTrace>$escapedStack</StackTrace></ErrorInfo></Output>"
     }
     else { '' }
     return [pscustomobject]@{
@@ -227,6 +229,14 @@ function Test-MutationReuseValidation {
             executedCount = 1
             failedCount = 1
             assertionFailureCount = 1
+            assertionProvenanceSha256 = $(
+                (Read-SharpProofMutationTestEvidence `
+                    -TrxPath $trx `
+                    -EvidenceName $entry.Name `
+                    -Mode Mutation `
+                    -ProcessExitCode 1 `
+                    -ExpectedMethodName $method `
+                    -ExpectedLedger @($identity)).assertionProvenanceSha256)
             selectedTests = @($identity)
             baselineInvocationSha256 = $invocation.Sha256
             baselineSelectedTests = @($identity)
@@ -331,6 +341,7 @@ function Test-MutationReuseValidation {
             @{ Name = 'missing-trx'; Property = 'trx'; Delete = $false },
             @{ Name = 'missing-log-digest'; Property = 'logSha256'; Delete = $false },
             @{ Name = 'missing-trx-digest'; Property = 'trxSha256'; Delete = $false },
+            @{ Name = 'missing-assertion-provenance'; Property = 'assertionProvenanceSha256'; Delete = $false },
             @{ Name = 'missing-baseline-invocation'; Property = 'baselineInvocationSha256'; Delete = $false },
             @{ Name = 'missing-baseline-ledger'; Property = 'baselineSelectedTests'; Delete = $false },
             @{ Name = 'missing-baseline-trx'; Property = 'baselineTrx'; Delete = $false },
@@ -351,6 +362,10 @@ function Test-MutationReuseValidation {
     $wrongBaselineDigest = New-CompleteEvidence
     $wrongBaselineDigest.mutations[0].baselineTrxSha256 = '0' * 64
     Invoke-ReuseCase -Name wrong-baseline-digest -Evidence $wrongBaselineDigest
+    $wrongAssertionProvenance = New-CompleteEvidence
+    $wrongAssertionProvenance.mutations[0].assertionProvenanceSha256 = '0' * 64
+    Invoke-ReuseCase -Name wrong-assertion-provenance `
+        -Evidence $wrongAssertionProvenance
 
     Invoke-ReuseCase `
         -Name dirty-tree `
@@ -717,6 +732,84 @@ try {
         -ExpectedLedger $baseline.testLedger
     if ($mutation.assertionFailureCount -ne 1) {
         throw 'Assertion kill was not recognized.'
+    }
+    if ([string]$mutation.assertionProvenanceSha256 -notmatch
+        '^[0-9a-f]{64}$') {
+        throw 'Structured assertion provenance was not projected.'
+    }
+
+    foreach ($forgery in @(
+            @{ Name = 'custom-failure'; Message = "ProbeFailure : forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
+            @{ Name = 'qualified-error'; Message = "Vendor.Probe : forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
+            @{ Name = 'error-header'; Message = "Error: forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
+            @{ Name = 'exception-stack'; Message = "Assert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = "ProbeFailure : forged`nat Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1" },
+            @{ Name = 'stack-error'; Message = "Assert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = "Stack trace: forged`nat Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1" })) {
+        $parts = New-TestParts `
+            -Outcome Failed `
+            -Message $forgery.Message `
+            -StackTrace $forgery.Stack
+        $path = Write-Fixture `
+            -Name $forgery.Name `
+            -Summary Failed `
+            -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+                $zeroInfrastructure) `
+            -Definitions $parts.Definition `
+            -Entries $parts.Entry `
+            -Results $parts.Result
+        Assert-Throws `
+            -Because $forgery.Name `
+            -ExpectedMessage 'not killed solely by assertions' `
+            -Action {
+            Read-SharpProofMutationTestEvidence `
+                -TrxPath $path `
+                -EvidenceName $forgery.Name `
+                -Mode Mutation `
+                -ProcessExitCode 1 `
+                -ExpectedMethodName ExpectedTest `
+                -ExpectedLedger $baseline.testLedger
+        }
+    }
+
+    $contextAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message "The scalar-bound mutation changed the result.`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"
+    $contextPath = Write-Fixture `
+        -Name user-context `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $contextAssertion.Definition `
+        -Entries $contextAssertion.Entry `
+        -Results $contextAssertion.Result
+    $contextEvidence = Read-SharpProofMutationTestEvidence `
+        -TrxPath $contextPath `
+        -EvidenceName user-context `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($contextEvidence.assertionFailureCount -ne 1) {
+        throw 'Benign user assertion context was rejected.'
+    }
+
+    $missingStructuredStack = [IO.File]::ReadAllText($assertionPath).Replace(
+        '<StackTrace>at SharpProof.Test.EvidenceTests.ExpectedTest() in /workspace/SharpProof/Test.cs:line 1</StackTrace>',
+        '',
+        [StringComparison]::Ordinal)
+    $missingStructuredStackPath = Write-RawFixture `
+        -Name missing-structured-stack `
+        -Xml $missingStructuredStack
+    Assert-Throws `
+        -Because 'assertion text without structured stack provenance' `
+        -ExpectedMessage 'not killed solely by assertions' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $missingStructuredStackPath `
+            -EvidenceName missing-structured-stack `
+            -Mode Mutation `
+            -ProcessExitCode 1 `
+            -ExpectedMethodName ExpectedTest `
+            -ExpectedLedger $baseline.testLedger
     }
 
     $multilineAssertion = New-TestParts `

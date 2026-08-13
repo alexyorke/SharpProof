@@ -1345,6 +1345,8 @@ if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
             -not [bool]$result.killed -or
             [int]$result.exitCode -eq 0 -or
             [int]$result.assertionFailureCount -lt 1 -or
+            [string]$result.assertionProvenanceSha256 -notmatch
+                '^[0-9a-f]{64}$' -or
             [string]$result.baselineInvocationSha256 -ne
                 (Get-SharpProofMutationBaselineInvocation `
                     -Project ([string]$registered.Project) `
@@ -1791,6 +1793,8 @@ try {
                 executedCount = $testEvidence.executedCount
                 failedCount = $testEvidence.failedCount
                 assertionFailureCount = $testEvidence.assertionFailureCount
+                assertionProvenanceSha256 =
+                    $testEvidence.assertionProvenanceSha256
                 selectedTests = $testEvidence.testLedger
                 baselineInvocationSha256 =
                     $mutation.BaselineInvocationSha256

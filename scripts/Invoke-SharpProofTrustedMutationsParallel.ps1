@@ -96,6 +96,8 @@ function Test-CompleteShard([object]$Shard) {
             @($evidence.mutations | Where-Object {
                     [string]$_.baselineInvocationSha256 -notmatch
                         '^[0-9a-f]{64}$' -or
+                    [string]$_.assertionProvenanceSha256 -notmatch
+                        '^[0-9a-f]{64}$' -or
                     @($_.baselineSelectedTests).Count -eq 0 -or
                     [string]$_.baselineTrxSha256 -notmatch '^[0-9a-f]{64}$'
                 }).Count -eq 0

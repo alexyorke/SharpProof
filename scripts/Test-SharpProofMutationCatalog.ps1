@@ -70,6 +70,8 @@ if ($names | Group-Object | Where-Object Count -gt 1) {
 foreach ($mutation in $mutations) {
     if (-not $mutation.killed -or
         [int]$mutation.assertionFailureCount -lt 1 -or
+        [string]$mutation.assertionProvenanceSha256 -notmatch
+            '^[0-9a-f]{64}$' -or
         [int]$mutation.exitCode -eq 0) {
         throw (
             "Mutation '$($mutation.name)' lacks assertion-backed kill evidence.")
@@ -143,6 +145,8 @@ foreach ($mutation in $mutations) {
     if ($testEvidence.executedCount -ne [int]$mutation.executedCount -or
         $testEvidence.failedCount -ne [int]$mutation.failedCount -or
         $testEvidence.assertionFailureCount -ne [int]$mutation.assertionFailureCount -or
+        [string]$testEvidence.assertionProvenanceSha256 -ne
+            [string]$mutation.assertionProvenanceSha256 -or
         [string]::Join("`n", @($testEvidence.testLedger)) -ne
             [string]::Join("`n", @($mutation.selectedTests))) {
         throw "Mutation '$($mutation.name)' does not match its TRX receipt."
