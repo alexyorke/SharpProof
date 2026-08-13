@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 126 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 125 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 126 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-008 - Primary-constructor callable ownership is incomplete (fixed)
+
+- [x] Fixed by `e37714bc5` (`fix: inventory primary constructor callables`).
+- One shared compiler-symbol inventory now maps each C# primary-constructor
+  type declaration to exactly one synthesized constructor. The contracts-only
+  analyzer path replays only the primary base initializer, never admitting the
+  type declaration as an effect/postcondition body, while compiler collection
+  records the selected synthesized callable and claims exactly once and keeps
+  unsupported lowering fail closed.
+- Regression-first class and record fixtures prove invalid base arguments emit
+  SP0027 and both constructors enter the manifest; valid, explicit-constructor,
+  and generated-tree controls preserve ownership behavior. Focused tests passed
+  6/6, the full Analyzer suite passed 232/232, and Architecture passed 124/124.
 
 ### SP-AUDIT-057 - Build success is not bound to the current verification result (fixed)
 
@@ -521,29 +535,6 @@ The active backlog contains 126 root-cause rows. Stable IDs are not renumbered; 
 ## P0 active bugs
 
 Release blockers: false proofs, missing verifier obligations, destructive supported behavior, verifier bypasses, or release authority accepting invalid candidate bytes.
-
-### SP-AUDIT-008 - Primary-constructor callable ownership is incomplete (P0)
-
-- [ ] The call-site pass handles explicit constructor declarations by adding
-  their `base(...)` or `this(...)` initializer to the entry CFG, but a C# 12
-  primary constructor is represented by a synthesized constructor whose
-  declaration is the containing type. The operation-block pipeline requires a
-  method declaration syntax reference, while the callable subset gate rejects
-  type declarations, so the primary-constructor initializer is never analyzed.
-- Supported impact: `sealed class Derived(int marker) : Base(-1)` produced no
-  SP0027 even though `Base(int value)` has the compiler-bound precondition
-  `Contract.Requires(value > 0)`. The equivalent initializer on an explicit
-  constructor is a documented replayable call-site shape and is reported.
-- Reproduction: a temporary canonical-container analyzer regression enabled
-  contract diagnostics for the primary-constructor source, expected one
-  SP0027, and received an empty diagnostic set.
-- Required closure: map a primary-constructor type declaration and its base
-  initializer to the synthesized constructor exactly once, without admitting
-  the type declaration as an effect/postcondition-verifier body. Add class,
-  record, valid-argument, generated-tree, and explicit-constructor controls
-  plus a mutation that removes primary-initializer discovery.
-- Consolidated cases: SP-AUDIT-032.
-- Unified closure: Use one type-declaration-to-synthesized-constructor inventory for analyzer and collector, including primary base initialization and every selected callable, claim, and assumption.
 
 ### SP-AUDIT-040 - Compiler variable semantics are not bound to symbol and type identity (P0)
 
