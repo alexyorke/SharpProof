@@ -2093,6 +2093,172 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task DefinitelyAbsentLiftedArithmeticSatisfiesDoesNotThrow()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [DoesNotThrow]
+                public static int? DivideNullLeft() {
+                    int? left = null;
+                    int? right = 0;
+                    return left / right;
+                }
+
+                [DoesNotThrow]
+                public static int? DivideNullRight() {
+                    int? left = int.MinValue;
+                    int? right = null;
+                    return left / right;
+                }
+
+                [DoesNotThrow]
+                public static int? DivideBothNull() {
+                    int? left = null;
+                    int? right = null;
+                    return left / right;
+                }
+
+                [DoesNotThrow]
+                public static int? RemainderNullRight() {
+                    int? left = int.MinValue;
+                    int? right = null;
+                    return left % right;
+                }
+
+                [DoesNotThrow]
+                public static uint? UnsignedDivideNullLeft() {
+                    uint? left = null;
+                    uint? right = 0;
+                    return left / right;
+                }
+
+                [DoesNotThrow]
+                public static int? CheckedAddNullLeft() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    return checked(left + right);
+                }
+
+                [DoesNotThrow]
+                public static int? CheckedNegateNull() {
+                    int? value = null;
+                    return checked(-value);
+                }
+
+                [DoesNotThrow]
+                public static int? CheckedIncrementNull() {
+                    int? value = null;
+                    checked { value++; }
+                    return value;
+                }
+
+                [DoesNotThrow]
+                public static int? DivideAssignNullRight() {
+                    int? left = 1;
+                    int? right = null;
+                    left /= right;
+                    return left;
+                }
+
+                [DoesNotThrow]
+                public static int? CheckedAddAssignNull() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    checked { left += right; }
+                    return left;
+                }
+
+                [DoesNotThrow]
+                public static int? UncheckedAddNull() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    return unchecked(left + right);
+                }
+
+                [DoesNotThrow]
+                public static long? CheckedConversionNull() {
+                    int? value = null;
+                    return checked((long?)value);
+                }
+
+                [DoesNotThrow]
+                public static int? PresentDivideZero() {
+                    int? left = 1;
+                    int? right = 0;
+                    return left / right;
+                }
+
+                [DoesNotThrow]
+                public static int? PresentCheckedAdd() {
+                    int? left = int.MaxValue;
+                    int? right = 1;
+                    return checked(left + right);
+                }
+
+                [DoesNotThrow]
+                public static int? UnknownDivide(int? left, int? right) =>
+                    left / right;
+
+                [DoesNotThrow]
+                public static int? UnknownCheckedAdd(int? left, int? right) =>
+                    checked(left + right);
+            }
+            """,
+            "effects",
+            ["SP0046"],
+            new SharpProofAnalyzer(factory));
+
+        var unsafeMethods = new[]
+        {
+            "PresentDivideZero",
+            "PresentCheckedAdd",
+            "UnknownDivide",
+            "UnknownCheckedAdd"
+        };
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0046", unsafeMethods.Length)));
+        foreach (var methodName in unsafeMethods)
+        {
+            Assert.That(
+                diagnostics.Select(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contain("'" + methodName + "'"),
+                methodName);
+            Assert.That(
+                factory.Outcomes[methodName],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown),
+                methodName);
+        }
+
+        foreach (var methodName in new[]
+                 {
+                     "DivideNullLeft",
+                     "DivideNullRight",
+                     "DivideBothNull",
+                     "RemainderNullRight",
+                     "UnsignedDivideNullLeft",
+                     "CheckedAddNullLeft",
+                     "CheckedNegateNull",
+                     "CheckedIncrementNull",
+                     "DivideAssignNullRight",
+                     "CheckedAddAssignNull",
+                     "UncheckedAddNull",
+                     "CheckedConversionNull"
+                 })
+        {
+            Assert.That(
+                factory.Outcomes[methodName],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven),
+                methodName);
+        }
+    }
+
+    [Test]
     public async Task EffectContractSelectsUnsupportedMethod()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

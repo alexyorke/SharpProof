@@ -478,6 +478,161 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void LiftedArithmeticSkipsHazardsWhenAnyOperandIsAbsent()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static int? DivideNullLeft() {
+                    int? left = null;
+                    int? right = 0;
+                    return left / right;
+                }
+
+                public static int? DivideNullRight() {
+                    int? left = int.MinValue;
+                    int? right = null;
+                    return left / right;
+                }
+
+                public static int? DivideBothNull() {
+                    int? left = null;
+                    int? right = null;
+                    return left / right;
+                }
+
+                public static int? RemainderNullRight() {
+                    int? left = int.MinValue;
+                    int? right = null;
+                    return left % right;
+                }
+
+                public static uint? UnsignedDivideNullLeft() {
+                    uint? left = null;
+                    uint? right = 0;
+                    return left / right;
+                }
+
+                public static int? CheckedAddNullLeft() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    return checked(left + right);
+                }
+
+                public static int? CheckedNegateNull() {
+                    int? value = null;
+                    return checked(-value);
+                }
+
+                public static int? CheckedIncrementNull() {
+                    int? value = null;
+                    checked { value++; }
+                    return value;
+                }
+
+                public static int? DivideAssignNullRight() {
+                    int? left = 1;
+                    int? right = null;
+                    left /= right;
+                    return left;
+                }
+
+                public static int? DivideAssignNullLeft() {
+                    int? left = null;
+                    int? right = 0;
+                    left /= right;
+                    return left;
+                }
+
+                public static int? CheckedAddAssignNull() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    checked { left += right; }
+                    return left;
+                }
+
+                public static int? UncheckedAddNull() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    return unchecked(left + right);
+                }
+
+                public static long? CheckedConversionNull() {
+                    int? value = null;
+                    return checked((long?)value);
+                }
+
+                public static int? PresentDivideZero() {
+                    int? left = 1;
+                    int? right = 0;
+                    return left / right;
+                }
+
+                public static int? PresentCheckedAdd() {
+                    int? left = int.MaxValue;
+                    int? right = 1;
+                    return checked(left + right);
+                }
+
+                public static int? PresentCheckedIncrement() {
+                    int? value = int.MaxValue;
+                    checked { value++; }
+                    return value;
+                }
+
+                public static int? UnknownDivide(int? left, int? right) =>
+                    left / right;
+
+                public static int? UnknownCheckedAdd(int? left, int? right) =>
+                    checked(left + right);
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[]
+                 {
+                     "DivideNullLeft",
+                     "DivideNullRight",
+                     "DivideBothNull",
+                     "RemainderNullRight",
+                     "UnsignedDivideNullLeft",
+                     "CheckedAddNullLeft",
+                     "CheckedNegateNull",
+                     "CheckedIncrementNull",
+                     "DivideAssignNullRight",
+                     "DivideAssignNullLeft",
+                     "CheckedAddAssignNull",
+                     "UncheckedAddNull",
+                     "CheckedConversionNull"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Throws.IsEmpty,
+                Is.True,
+                methodName);
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        AssertThrows(
+            session.Analyze(Method(compilation, "PresentDivideZero")).Summary,
+            "System.DivideByZeroException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "PresentCheckedAdd")).Summary,
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "PresentCheckedIncrement")).Summary,
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "UnknownDivide")).Summary,
+            "System.DivideByZeroException",
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "UnknownCheckedAdd")).Summary,
+            "System.OverflowException");
+    }
+
+    [Test]
     public void ManagedAllocationUsesModeledObjectConstructor()
     {
         var result = Analyze(

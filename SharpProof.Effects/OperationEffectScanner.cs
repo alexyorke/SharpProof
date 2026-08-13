@@ -429,7 +429,8 @@ internal sealed class OperationEffectScanner
     private EffectSummary IntegralDivisionExceptions(
         BinaryOperatorKind operatorKind, ITypeSymbol? type, IOperation left, IOperation right, IOperation origin)
     {
-        if (operatorKind is not (BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) ||
+        if (_conversionEffects.SkipsLiftedOperator(origin) ||
+            operatorKind is not (BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) ||
             !TryGetIntegralDivisionSemantics(
                 type, out var isSigned, out var hasMinimum, out var minimum))
         {

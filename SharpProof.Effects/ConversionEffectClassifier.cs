@@ -97,9 +97,35 @@ internal sealed class ConversionEffectClassifier(
         bool isChecked,
         IOperation operation)
     {
-        return isChecked && abstractFlow?.ProvesNoOverflow(operation) != true
+        return isChecked &&
+               !SkipsLiftedOperator(operation) &&
+               abstractFlow?.ProvesNoOverflow(operation) != true
             ? Throw(FrameworkTypeMetadataNames.OverflowException)
             : EffectSummary.Empty;
+    }
+
+    internal bool SkipsLiftedOperator(IOperation operation)
+    {
+        var operands = operation switch
+        {
+            IBinaryOperation { IsLifted: true } binary =>
+                [binary.LeftOperand, binary.RightOperand],
+            IUnaryOperation { IsLifted: true } unary =>
+                [unary.Operand],
+            IIncrementOrDecrementOperation { IsLifted: true } increment =>
+                [increment.Target],
+            ICompoundAssignmentOperation { IsLifted: true } assignment =>
+                [assignment.Target, assignment.Value],
+            _ => Array.Empty<IOperation>()
+        };
+
+        return operands.Any(operand =>
+            ManagedAbstractValue.IsNullableType(operand.Type) &&
+            abstractFlow?.TryEvaluate(
+                operation,
+                operand,
+                out var value) == true &&
+            value.IsDefinitelyNull);
     }
 
     private EffectSummary ClassifyBoxing(IConversionOperation operation)
