@@ -219,6 +219,80 @@ public sealed class CoverageScriptTests
             expectedChangedFiles: 0);
     }
 
+    [TestCaseSource(nameof(UnmappedSemanticDeclarationCases))]
+    public async Task UnmappedSemanticDeclarationFailsClosed(
+        string originalLine,
+        string changedLine,
+        bool generated)
+    {
+        var result = await RunUnmappedChangedLineFixtureAsync(
+            originalLine,
+            changedLine,
+            generated,
+            targetClosesMethod: false);
+
+        Assert.That(result.Process.ExitCode, Is.Zero, result.Process.Error);
+        using var document = JsonDocument.Parse(result.Process.Output);
+        var changed = document.RootElement.GetProperty("changedTcb");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                changed.GetProperty("uncoveredLines")
+                    .EnumerateArray()
+                    .Select(static value => value.GetString())
+                    .ToArray(),
+                Is.EqualTo(new[]
+                {
+                    "Project/Trusted.cs:" + result.ChangedLine
+                }));
+            Assert.That(
+                changed.GetProperty("passed").GetBoolean(),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public async Task UnmappedTriviaOnlyChangeRemainsAdmissible()
+    {
+        var result = await RunUnmappedChangedLineFixtureAsync(
+            "    // explanation before",
+            "    // explanation after",
+            generated: false,
+            targetClosesMethod: false);
+
+        Assert.That(result.Process.ExitCode, Is.Zero, result.Process.Error);
+        using var document = JsonDocument.Parse(result.Process.Output);
+        var changed = document.RootElement.GetProperty("changedTcb");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                changed.GetProperty("uncoveredLines").GetArrayLength(),
+                Is.Zero);
+            Assert.That(changed.GetProperty("passed").GetBoolean(), Is.True);
+        }
+    }
+
+    [Test]
+    public async Task UnmappedBraceOnlyChangeRemainsAdmissible()
+    {
+        var result = await RunUnmappedChangedLineFixtureAsync(
+            "    }",
+            "}",
+            generated: false,
+            targetClosesMethod: true);
+
+        Assert.That(result.Process.ExitCode, Is.Zero, result.Process.Error);
+        using var document = JsonDocument.Parse(result.Process.Output);
+        var changed = document.RootElement.GetProperty("changedTcb");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                changed.GetProperty("uncoveredLines").GetArrayLength(),
+                Is.Zero);
+            Assert.That(changed.GetProperty("passed").GetBoolean(), Is.True);
+        }
+    }
+
     [Test]
     public async Task CaseDistinctTcbPathsKeepIndependentCoverage()
     {
@@ -481,6 +555,171 @@ public sealed class CoverageScriptTests
         {
             DeleteTemporaryRepository(repository);
         }
+    }
+
+    private static IEnumerable<TestCaseData>
+        UnmappedSemanticDeclarationCases()
+    {
+        yield return new TestCaseData(
+            "    public const int Limit = 128;",
+            "    public const int Limit = 129;",
+            false).SetName("UnmappedConstantChangeFailsClosed");
+        yield return new TestCaseData(
+            "    public static int Initialized = 1;",
+            "    public static int Initialized = 2;",
+            false).SetName("UnmappedInitializerChangeFailsClosed");
+        yield return new TestCaseData(
+            "    [System.Obsolete(\"before\")] public static void Legacy() { }",
+            "    [System.Obsolete(\"after\")] public static void Legacy() { }",
+            false).SetName("UnmappedAttributeChangeFailsClosed");
+        yield return new TestCaseData(
+            "    public static int Visible = 1;",
+            "    internal static int Visible = 1;",
+            false).SetName("UnmappedModifierChangeFailsClosed");
+        yield return new TestCaseData(
+            "    public static int Transform(int value) => value;",
+            "    public static long Transform(int value) => value;",
+            false).SetName("UnmappedSignatureChangeFailsClosed");
+        yield return new TestCaseData(
+            "    public static int Computed => 1;",
+            "    public static int Computed => 2;",
+            false).SetName("UnmappedExpressionBodyChangeFailsClosed");
+        yield return new TestCaseData(
+            "    public const int GeneratedLimit = 128;",
+            "    public const int GeneratedLimit = 129;",
+            true).SetName("UnmappedGeneratedDeclarationChangeFailsClosed");
+    }
+
+    private static async Task<ChangedLineResult>
+        RunUnmappedChangedLineFixtureAsync(
+            string originalLine,
+            string changedLine,
+            bool generated,
+            bool targetClosesMethod)
+    {
+        var root = RepositoryRoot();
+        var repository = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-coverage-unmapped-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(repository);
+        try
+        {
+            await InitializeRepositoryAsync(repository);
+            var original = CreateChangedLineSource(
+                originalLine,
+                generated,
+                targetClosesMethod);
+            await WriteChangedLineFixtureAsync(root, repository, original);
+            await CommitAllAsync(repository, "root");
+            await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "branch",
+                "comparison"));
+
+            var changed = CreateChangedLineSource(
+                changedLine,
+                generated,
+                targetClosesMethod);
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "Project", "Trusted.cs"),
+                changed.Text);
+            await CommitAllAsync(repository, "change trusted source");
+
+            var process = await RunCoverageAsync(
+                repository,
+                comparisonRef: "comparison",
+                reportOnly: true);
+            return new ChangedLineResult(process, changed.TargetLine);
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    private static SourceFixture CreateChangedLineSource(
+        string targetLine,
+        bool generated,
+        bool targetClosesMethod)
+    {
+        var lines = new List<string>();
+        if (generated)
+        {
+            lines.Add("// <auto-generated />");
+        }
+        lines.Add("public static class Trusted");
+        lines.Add("{");
+        lines.Add("    public static int Covered()");
+        lines.Add("    {");
+        lines.Add("        return 1;");
+        if (!targetClosesMethod)
+        {
+            lines.Add("    }");
+        }
+        lines.Add(targetLine);
+        var targetLineNumber = lines.Count;
+        lines.Add("}");
+        return new SourceFixture(
+            string.Join("\n", lines) + "\n",
+            targetLineNumber,
+            lines.IndexOf("        return 1;") + 1);
+    }
+
+    private static async Task WriteChangedLineFixtureAsync(
+        string root,
+        string repository,
+        SourceFixture source)
+    {
+        var scripts = Path.Combine(repository, "scripts");
+        var acceptance = Path.Combine(repository, "eng", "acceptance");
+        var coverage = Path.Combine(repository, "coverage");
+        var project = Path.Combine(repository, "Project");
+        Directory.CreateDirectory(scripts);
+        Directory.CreateDirectory(acceptance);
+        Directory.CreateDirectory(coverage);
+        Directory.CreateDirectory(project);
+
+        File.Copy(
+            Path.Combine(root, "scripts", "Test-SharpProofCoverage.ps1"),
+            Path.Combine(scripts, "Test-SharpProofCoverage.ps1"));
+        File.Copy(
+            Path.Combine(root, "scripts", "Get-SharpProofTcbPaths.ps1"),
+            Path.Combine(scripts, "Get-SharpProofTcbPaths.ps1"));
+        await File.WriteAllTextAsync(
+            Path.Combine(acceptance, "contract.json"),
+            JsonSerializer.Serialize(new
+            {
+                trustedKernel = new { paths = s_trustedPaths },
+                trustedComputingBase = new
+                {
+                    components = Array.Empty<object>()
+                }
+            }) + "\n");
+        await File.WriteAllTextAsync(
+            Path.Combine(repository, "baseline.json"),
+            JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                projects = new Dictionary<string, double>
+                {
+                    ["Project"] = 0
+                },
+                declarationOnlyTcbFiles = Array.Empty<string>(),
+                minimumAggregateLinePercent = 0,
+                minimumChangedTcbLinePercent = 100
+            }) + "\n");
+        await File.WriteAllTextAsync(
+            Path.Combine(coverage, "fixture.cobertura.xml"),
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+            "<coverage><packages><package name=\"Project\"><classes>" +
+            "<class name=\"Trusted\" filename=\"Project/Trusted.cs\">" +
+            "<lines><line number=\"" + source.CoveredLine +
+            "\" hits=\"1\" /></lines></class></classes></package>" +
+            "</packages></coverage>\n");
+        await File.WriteAllTextAsync(
+            Path.Combine(project, "Trusted.cs"),
+            source.Text);
     }
 
     private static async Task InitializeRepositoryAsync(string repository)
@@ -861,4 +1100,13 @@ public sealed class CoverageScriptTests
         string SourcePath,
         string ReportPath,
         int Hits);
+
+    private sealed record SourceFixture(
+        string Text,
+        int TargetLine,
+        int CoveredLine);
+
+    private sealed record ChangedLineResult(
+        ProcessResult Process,
+        int ChangedLine);
 }

@@ -40,6 +40,24 @@ function ConvertTo-OrdinalSortedArray {
     return $items.ToArray()
 }
 
+function Test-ClearlyNonSemanticSourceLine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$Line
+    )
+
+    $trimmed = $Line.Trim()
+    if ($trimmed.Length -eq 0 -or $trimmed -in @('{', '}')) {
+        return $true
+    }
+    if ($trimmed.StartsWith('//', [StringComparison]::Ordinal)) {
+        return $true
+    }
+    return $trimmed.StartsWith('/*', [StringComparison]::Ordinal) -and
+        $trimmed.EndsWith('*/', [StringComparison]::Ordinal)
+}
+
 function Invoke-GitText {
     param(
         [Parameter(Mandatory = $true)]
@@ -486,6 +504,8 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $declarationOnlyChangedFiles =
         [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
+    $unmappedSemanticChangedLines =
+        [Collections.Generic.List[string]]::new()
     foreach ($changedPath in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
             # The canonical union also contains metadata, such as the
@@ -523,19 +543,21 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             @()
         }
         foreach ($number in $changedLines[$changedPath]) {
-            if ($number -gt 0 -and
-                $number -le $sourceLines.Count -and
-                $sourceLines[$number - 1].Trim() -in @('{', '}')) {
-                # Coverlet may attach a sequence point to a brace-only line
-                # for generated cleanup code. Braces are not executable
-                # source and do not participate in the changed-TCB ratchet.
+            if ($number -gt 0 -and $number -le $sourceLines.Count -and
+                (Test-ClearlyNonSemanticSourceLine `
+                    -Line $sourceLines[$number - 1])) {
+                # Clearly trivia-only and brace-only changes do not alter
+                # trusted execution and need no sequence point.
                 continue
             }
             if (-not $fileHits.ContainsKey($number)) {
-                # A changed source line without a sequence point is
-                # non-executable syntax such as a declaration or brace.
-                # Coverlet emits sequence points for executable lines; only
-                # those lines participate in the changed-TCB ratchet.
+                # Declarations and initializers can alter trusted execution
+                # without receiving a Coverlet sequence point. Treat every
+                # unmapped line not proven to be trivia as uncovered.
+                $identifier = "${changedPath}:$number"
+                $changedCoverable++
+                $uncoveredChangedLines.Add($identifier)
+                $unmappedSemanticChangedLines.Add($identifier)
                 continue
             }
             $changedCoverable++
@@ -572,6 +594,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         uncoveredLines = @(ConvertTo-OrdinalSortedArray `
             -Values @($uncoveredChangedLines))
         passed = $nonCoverableChangedFiles.Count -eq 0 -and
+            $unmappedSemanticChangedLines.Count -eq 0 -and
             $changedPercent + 0.005 -ge
                 [double]$baseline.minimumChangedTcbLinePercent
     }
