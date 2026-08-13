@@ -7,12 +7,11 @@ internal sealed class OperationEffectScanner
     private readonly ManagedFlowResult? _abstractFlow;
     private readonly bool _allowDirectWitnesses;
     private readonly EffectCallSiteResolver _callResolver;
+    private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
     private readonly SyntaxNode? _directSyntax;
     private readonly ImmutableArray<EffectDirectWitness>.Builder _directWitnesses =
         ImmutableArray.CreateBuilder<EffectDirectWitness>();
     private readonly INamedTypeSymbol? _exceptionType;
-    private readonly HashSet<CaptureId> _ambiguousFlowCaptures = [];
-    private readonly Dictionary<CaptureId, IOperation> _flowCaptures = [];
     private readonly Dictionary<ISymbol, EffectRegionSet> _localRegions =
         new(SymbolEqualityComparer.Default);
     private readonly IMethodSymbol _method;
@@ -313,7 +312,7 @@ internal sealed class OperationEffectScanner
         IOperation value,
         bool valueIsStoredDirectly = true)
     {
-        target = ResolveFlowCapture(target);
+        target = _coalesceCaptures.Resolve(target);
         return target switch
         {
             IFieldReferenceOperation field => ScanField(field, EffectAccess.Write),
@@ -339,53 +338,8 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanFlowCapture(IFlowCaptureOperation capture)
     {
-        if (IsCoalesceAssignmentCapture(capture) &&
-            _flowCaptures.TryGetValue(capture.Id, out var existing))
-        {
-            if (!ManagedFlowResult.HasSameIdentity(existing, capture.Value))
-            {
-                _ambiguousFlowCaptures.Add(capture.Id);
-            }
-        }
-        else if (IsCoalesceAssignmentCapture(capture))
-        {
-            _flowCaptures.Add(capture.Id, capture.Value);
-        }
-
+        _coalesceCaptures.Record(capture);
         return Scan(capture.Value);
-    }
-
-    private static bool IsCoalesceAssignmentCapture(
-        IFlowCaptureOperation capture)
-    {
-        return capture.Syntax.AncestorsAndSelf()
-            .Any(static syntax => syntax is AssignmentExpressionSyntax
-            {
-                RawKind: (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind
-                    .CoalesceAssignmentExpression
-            });
-    }
-
-    private IOperation ResolveFlowCapture(IOperation operation)
-    {
-        var seen = new HashSet<CaptureId>();
-        while (operation is IFlowCaptureReferenceOperation capture &&
-               seen.Add(capture.Id) &&
-               !_ambiguousFlowCaptures.Contains(capture.Id) &&
-               _flowCaptures.TryGetValue(capture.Id, out var captured))
-        {
-            operation = captured;
-        }
-
-        return operation;
-    }
-
-    private bool TryResolveFlowCapture(
-        IFlowCaptureReferenceOperation capture,
-        out IOperation resolved)
-    {
-        resolved = ResolveFlowCapture(capture);
-        return resolved is not IFlowCaptureReferenceOperation;
     }
 
     private EffectSummary ScanCompoundAssignment(ICompoundAssignmentOperation assignment)
@@ -1041,7 +995,9 @@ internal sealed class OperationEffectScanner
             IParameterReferenceOperation parameter => ClassifyParameter(parameter.Parameter),
             ILocalReferenceOperation local => ClassifyLocal(local.Local),
             IFlowCaptureReferenceOperation capture
-                when TryResolveFlowCapture(capture, out var captured) =>
+                when _coalesceCaptures.TryResolve(
+                    capture,
+                    out var captured) =>
                 ClassifyRegion(captured, aliasSource),
             IFlowCaptureReferenceOperation => EffectRegionSet.Unknown,
             IFieldReferenceOperation { Field.IsStatic: true } => EffectRegionSet.Create(EffectRegionId.Static()),
