@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 121 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 120 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 121 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-126 - Ill-formed UTF-16 is non-injective across verifier boundaries (fixed)
+
+- [x] Fixed by `57c372cd4` (`fix: reject ill-formed UTF-16 inputs`).
+- One shared UTF-16 authority now rejects lone surrogates in source,
+  generated/additional text, IR construction, and semantic hashing before any
+  lossy UTF-8 or JSON boundary. Roslyn string literals containing malformed
+  UTF-16 map to the existing typed UnsupportedExpression abstention; valid
+  surrogate pairs and U+FFFD remain distinct throughout fingerprints, claim
+  identities, and artifact round trips.
+- Regression-first coverage includes lone high/low surrogates, valid pairs,
+  replacement characters, source/generated text, diagnostics, fingerprints,
+  direct IR construction, JSON round trips, and compiler-term abstention.
+  Analyzer passed 243/243, Frontend 64/64, Worker 436/436, and Architecture
+  171/171.
 
 ### SP-AUDIT-111 - Publication can overwrite compiler outputs created later (fixed)
 
@@ -793,27 +808,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   change alters both production and TCB digests.
 - Consolidated cases: SP-AUDIT-147.
 - Unified closure: Independently derive an immutable TCB closure containing every certifier leaf; deletion, movement, or change must alter its digest and coverage universe.
-
-### SP-AUDIT-126 - Ill-formed UTF-16 is non-injective across verifier boundaries (P0)
-
-- [ ] Compiler string terms and generated source text can contain lone UTF-16
-  surrogates, but default JSON/text encoding replaces them with U+FFFD. The
-  producer neither preserves nor typed-rejects the value before hashing and
-  serialization.
-- Supported impact: a valid ASCII-escaped contract comparing U+D800 with
-  U+FFFD lowered successfully, then round-trip serialization collapsed both
-  values to U+FFFD. Hydration failed with `CompilerManifestMismatch` instead of
-  preserving semantics or returning a typed unsupported expression.
-- Reproduction: the read-only compiler auditor observed code units
-  `55296,65533` before serialization and `65533,65533` afterward; decode threw
-  `InvalidDataException`. Generated-source hashing also collided for the two
-  values.
-- Required closure: for frozen schema 12, reject ill-formed UTF-16 before any
-  hash or wire encoding and map affected literals to typed abstention. Add
-  source/generated text, high/low/lone/paired surrogates, U+FFFD, diagnostics,
-  fingerprint, round-trip, and validation-removal mutation controls.
-- Consolidated cases: SP-AUDIT-227.
-- Unified closure: Reject ill-formed UTF-16 at the earliest shared boundary or use one injective code-unit representation across hashing, JSON, interpretation, and SMT.
 
 ### SP-AUDIT-173 - Call instantiation is not bound to parameter order and free-variable roles (P0)
 
