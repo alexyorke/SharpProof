@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 98 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 97 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 98 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-083 - Compose projects share one mutable tooling image tag (fixed)
+
+- [x] Fixed by `44afbbcfa` (`fix: isolate compose tooling images`).
+- The default tooling image is now `<COMPOSE_PROJECT_NAME>-tooling:local`, so
+  Compose project isolation covers images as well as containers and volumes.
+  Build and run share the same project-private tag; a reviewed explicit
+  `SHARPPROOF_TOOLING_IMAGE` override remains supported and documented.
+- Regression-first tests cover distinct project names, stable same-project
+  resolution, explicit override, structural decoys, and restoration of the old
+  global tag. Container authority passed 13/13, Architecture 178/178, the full
+  container contract, actual `compose config --images`, cached build/run smoke,
+  and `git diff --check` passed.
 
 ### SP-AUDIT-079 - Backend renewal failure is erased as a method timeout (fixed)
 
@@ -1149,28 +1162,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   heuristic-only filter.
 - Consolidated cases: SP-AUDIT-064, SP-AUDIT-068, SP-AUDIT-127.
 - Unified closure: After all generators, reconcile every logical target/companion once in every non-off profile, independent of filename, partial ownership, and generator order.
-
-### SP-AUDIT-083 - Compose projects share one mutable tooling image tag (P1)
-
-- [ ] Compose project names isolate containers, networks, and named volumes, but
-  the common service explicitly sets every project image to the same default
-  `sharpproof-tooling:local` tag. Building one worktree moves the tag globally;
-  another worktree can then start that image despite having different source
-  and container inputs.
-- Developer/certifier impact: the documented independent-worktree workflow is
-  not image-isolated. Concurrent builds can race, and a later task can execute
-  the wrong worktree's SDK/native/tooling image while its bind-mounted source
-  and evidence paths belong to the current worktree.
-- Reproduction: the audit ran `docker compose config --images` with
-  `COMPOSE_PROJECT_NAME=audit-one` and then `audit-two`. Both resolved every
-  relevant service to exactly `sharpproof-tooling:local`; no image was built or
-  changed by the probe.
-- Required closure: make the default tooling image identity project/worktree-
-  scoped (or immutable content-addressed) while retaining an explicit override,
-  and bind the selected image identity into task/evidence execution. Add two-
-  project build/run, concurrent build, stale-tag, explicit shared override,
-  cleanup, and exact-image evidence controls plus a Compose mutation restoring
-  the global tag.
 
 ### SP-AUDIT-086 - Unboxed struct copies retain boxed-argument ownership (P1)
 
