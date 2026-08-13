@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 142 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 141 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 142 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-011 - Dirty source can be certified as the clean HEAD (fixed)
+
+- [x] Fixed by `8fddf37b1` (`fix: reject dirty exact-commit inputs`).
+- The container entrypoint now rejects tracked, staged, and relevant untracked
+  source changes before creating the disposable overlay for every command that
+  emits or validates exact-commit artifacts: acceptance, mutation, pack,
+  pilots, release-tag, release-baseline, release-plan, release-qualification,
+  and release-publish. Ordinary development commands remain dirty-tree capable.
+- Regression-first disposable Git fixtures cover tracked, staged, and untracked
+  production changes, every guarded command, clean source, dirty development
+  builds, ignored artifacts, and admitted release inputs. The focused matrix
+  passed 13/13 and the full Architecture suite passed 101/101 in the canonical
+  container.
 
 ### SP-AUDIT-060 - Managed flow loses post-catch execution state (fixed)
 
@@ -345,32 +359,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   plus a mutation that removes primary-initializer discovery.
 - Consolidated cases: SP-AUDIT-032.
 - Unified closure: Use one type-declaration-to-synthesized-constructor inventory for analyzer and collector, including primary base initialization and every selected callable, claim, and assumption.
-
-### SP-AUDIT-011 - Dirty source can be certified as the clean HEAD (P0)
-
-- [ ] The canonical `tooling pack` path derives `RepositoryCommit` from
-  `git rev-parse HEAD` but does not require a clean tracked index/worktree or
-  reject untracked production sources. The disposable container checkout then
-  overlays the caller's entire working tree, so uncommitted code is compiled
-  while every package and release document claims the unchanged commit.
-- Certifier impact: a locally prepared or manually published candidate can
-  pass package-graph, deterministic release-evidence, and immutable-artifact
-  validation while its binaries do not correspond to the asserted Git tree.
-  The same unchecked source overlay is available to other exact-commit local
-  evidence commands.
-- Reproduction: the audit added an untracked internal constant containing
-  `SHARPPROOF_AUDIT_DIRTY_PACKAGE_20260811` to `SharpProof.Attributes`, then ran
-  `docker compose run --rm tooling pack -Configuration Release`. The complete
-  build, package-source validator, release-evidence generator, and final
-  artifact validator exited zero. The accepted Attributes DLL contained the
-  UTF-16 marker, while its nuspec and `SharpProof.release.json` both asserted
-  clean HEAD `a1c28160205b5376ec75cd4e11ef11de1ef122a4`.
-- Required closure: make every exact-commit package/evidence/publication entry
-  require a clean tracked index and worktree and reject relevant untracked
-  source/build inputs before the disposable clone is created. Record the
-  verified Git tree identity in the evidence and add tracked-dirty,
-  staged-dirty, untracked-source, clean-tree, and CI-checkout fixtures. The
-  temporary marker source has been removed.
 
 ### SP-AUDIT-013 - Mutation qualification trusts a forged summary (P0)
 
