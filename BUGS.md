@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 119 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 118 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,22 @@ The active backlog contains 119 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-192 - Exception text can masquerade as a mutation assertion (fixed)
+
+- [x] Fixed by `b90adfc36` (`fix: authenticate mutation assertion failures`).
+- Mutation kills now require one exact structured TRX ErrorInfo with the
+  supported NUnit assertion grammar and a nonempty stack containing only
+  adapter/test frames. Generic or custom exception/error/failure/fault headers,
+  infrastructure markers, missing or extra fields, and mixed failures are
+  rejected. A canonical assertion-provenance digest binds test/execution IDs,
+  message, and stack through child results, resume/shard reuse, and independent
+  final catalog validation.
+- Regression-first fixtures cover custom ProbeFailure and qualified types,
+  exception/error/stack variants, missing structured stack, benign context,
+  provenance removal/change, real scalar/collection/multiple assertions, and
+  mixed failures. Mutation evidence fixtures passed, all affected scripts
+  parsed, and Architecture passed 171/171.
 
 ### SP-AUDIT-178 - Batched baselines can falsely certify mutation kills (fixed)
 
@@ -837,19 +853,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   and binding-removal mutation controls.
 - Consolidated cases: SP-AUDIT-100, SP-AUDIT-208.
 - Unified closure: Order actuals by Roslyn parameter ordinal and authenticate receiver, ordered arguments, result, existential roles, and relation during hydration.
-
-### SP-AUDIT-192 - Exception text can masquerade as a mutation assertion (P0)
-
-- [ ] Mutation evidence classifies assertion-backed failures from message text;
-  its exception preamble rejection recognizes only type names ending in
-  `Exception` and ignores structured error/stack fields.
-- Certifier impact: a custom `ProbeFailure : Exception` whose message contains
-  NUnit-shaped `Assert.That`/Expected/But-was text can fail before the mutant is
-  exercised and still certify the mutant as killed.
-- Required closure: validate structured adapter assertion provenance or reject
-  all generic exception headers across every error field. Add custom-type,
-  assertion-shaped exception, real scalar/collection assertion, user-context,
-  mixed-failure, and heuristic-removal fixtures.
 
 ### SP-AUDIT-243 - Compiler effect verdicts are only self-sealed (P0)
 
