@@ -1276,6 +1276,25 @@ $mutations = @(
 '@).TrimEnd()
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~AllProvenEvidenceRejectsFabricated'
+    },
+    [pscustomobject]@{
+        Name = 'effects-rethrow-nearest-catch-owner'
+        File = 'SharpProof.Effects\EffectExceptionFlow.cs'
+        Original = (@'
+            node.Ancestors()
+                .TakeWhile(static ancestor =>
+                    ancestor is not AnonymousFunctionExpressionSyntax and
+                    not LocalFunctionStatementSyntax)
+                .OfType<CatchClauseSyntax>()
+                .FirstOrDefault()?.Block == block);
+'@).TrimEnd()
+        Mutated = (@'
+            !node.Ancestors()
+                .TakeWhile(ancestor => !ReferenceEquals(ancestor, block))
+                .Any(ancestor => ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax));
+'@).TrimEnd()
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~BareRethrowBelongsOnlyToItsNearestCatch'
     }
 )
 

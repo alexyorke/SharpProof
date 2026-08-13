@@ -3751,6 +3751,138 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void BareRethrowBelongsOnlyToItsNearestCatch()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                private static void ThrowInvalid(InvalidOperationException value) {
+                    Contract.Requires(value != null);
+                    throw value;
+                }
+                private static void ThrowApplication(ApplicationException value) {
+                    Contract.Requires(value != null);
+                    throw value;
+                }
+                private static void ThrowArgument(ArgumentException value) {
+                    Contract.Requires(value != null);
+                    throw value;
+                }
+
+                public static void NestedCatch(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException inner) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(inner); }
+                        catch (ApplicationException) { throw; }
+                    }
+                }
+
+                public static void DirectOuterRethrow(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException inner) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(inner); }
+                        catch (ApplicationException) { }
+                        throw;
+                    }
+                }
+
+                public static void MultipleNestedCatch(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException middle,
+                    [NotNull] ArgumentException inner) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(middle); }
+                        catch (ApplicationException) {
+                            try { ThrowArgument(inner); }
+                            catch (ArgumentException) { throw; }
+                        }
+                    }
+                }
+
+                public static void NestedFilteredCatch(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException inner,
+                    bool selected) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(inner); }
+                        catch (ApplicationException) when (selected) { throw; }
+                        catch (ApplicationException) { }
+                    }
+                }
+
+                public static void NestedFinally(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException inner) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(inner); }
+                        catch (ApplicationException) { throw; }
+                        finally { _ = 1; }
+                    }
+                }
+
+                public static void NestedCallableDeclarations(
+                    [NotNull] InvalidOperationException outer) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        Action lambda = () => {
+                            try { throw new ApplicationException(); }
+                            catch (ApplicationException) { throw; }
+                        };
+                        static void Local() {
+                            try { throw new ArgumentException(); }
+                            catch (ArgumentException) { throw; }
+                        }
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                ExceptionNames(session, compilation, "NestedCatch"),
+                Is.EqualTo(["System.ApplicationException"]));
+            AssertThrows(
+                session.Analyze(Method(compilation, "DirectOuterRethrow")).Summary,
+                "System.InvalidOperationException");
+            Assert.That(
+                ExceptionNames(session, compilation, "MultipleNestedCatch"),
+                Is.EqualTo(["System.ArgumentException"]));
+            Assert.That(
+                ExceptionNames(session, compilation, "NestedFilteredCatch"),
+                Is.EqualTo(["System.ApplicationException"]));
+            Assert.That(
+                ExceptionNames(session, compilation, "NestedFinally"),
+                Is.EqualTo(["System.ApplicationException"]));
+            Assert.That(
+                session.Analyze(Method(compilation, "NestedCallableDeclarations"))
+                    .Summary.Throws.Types.IsEmpty,
+                Is.True);
+        }
+
+        static string[] ExceptionNames(
+            EffectAnalysisSession session,
+            CSharpCompilation compilation,
+            string method)
+        {
+            return [.. session.Analyze(Method(compilation, method)).Summary.Throws.Types
+                .Select(static type =>
+                    type.ContainingNamespace.MetadataName + "." + type.MetadataName)];
+        }
+    }
+
+    [Test]
     public void CatchVariableFlowUsesTheEffectDiscoveryCatalog()
     {
         var compilation = EffectTestHost.CreateCompilation(

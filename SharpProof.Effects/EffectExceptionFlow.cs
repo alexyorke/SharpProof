@@ -225,9 +225,12 @@ internal static class EffectExceptionFlow
     {
         return block.DescendantNodes().Any(node =>
             node is ThrowStatementSyntax { Expression: null } &&
-            !node.Ancestors()
-                .TakeWhile(ancestor => !ReferenceEquals(ancestor, block))
-                .Any(ancestor => ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax));
+            node.Ancestors()
+                .TakeWhile(static ancestor =>
+                    ancestor is not AnonymousFunctionExpressionSyntax and
+                    not LocalFunctionStatementSyntax)
+                .OfType<CatchClauseSyntax>()
+                .FirstOrDefault()?.Block == block);
     }
 
     private readonly record struct CatchFlow(
