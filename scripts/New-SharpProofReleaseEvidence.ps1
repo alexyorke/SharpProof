@@ -154,6 +154,9 @@ function New-DeterministicPackageSbom {
         [object[]]$DependencyGraph,
 
         [Parameter(Mandatory = $true)]
+        [object[]]$LicenseGraph,
+
+        [Parameter(Mandatory = $true)]
         [string]$RepositoryRoot
     )
 
@@ -184,6 +187,12 @@ function New-DeterministicPackageSbom {
         $hash = (Get-FileHash `
             -LiteralPath $item.File.FullName `
             -Algorithm SHA256).Hash.ToLowerInvariant()
+        $license = @($LicenseGraph | Where-Object {
+            [string]$_.PackageId -eq $id
+        })
+        if ($license.Count -ne 1) {
+            throw "Package license authority is missing '$id'."
+        }
         $packages.Add([pscustomobject][ordered]@{
             name = $id
             SPDXID = $spdxId
@@ -196,8 +205,8 @@ function New-DeterministicPackageSbom {
                     checksumValue = $hash
                 }
             )
-            licenseConcluded = 'MIT'
-            licenseDeclared = 'MIT'
+            licenseConcluded = [string]$license[0].LicenseExpression
+            licenseDeclared = [string]$license[0].LicenseExpression
             copyrightText = 'NOASSERTION'
             externalRefs = @(
                 [pscustomobject][ordered]@{
@@ -600,6 +609,8 @@ if ($commits[0] -ne $checkoutCommit) {
 }
 $dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
     -PackagePaths @($identities.File.FullName))
+$licenseGraph = @(Get-SharpProofPackageLicenseGraph `
+    -PackagePaths @($identities.File.FullName))
 
 $packagePayloadEvidence = [Collections.Generic.List[object]]::new()
 foreach ($item in $identities |
@@ -704,6 +715,7 @@ if ([string]::IsNullOrWhiteSpace($SbomPath)) {
         -RepositoryCommit $commits[0] `
         -ThirdPartyComponents @($thirdPartyComponents) `
         -DependencyGraph $dependencyGraph `
+        -LicenseGraph $licenseGraph `
         -RepositoryRoot $repositoryRoot
 }
 else {
@@ -815,6 +827,9 @@ foreach ($component in $thirdPartyComponents) {
 Test-SharpProofSbomDependencyGraph `
     -Relationships $relationships `
     -DependencyGraph $dependencyGraph
+Test-SharpProofSbomLicenseGraph `
+    -SbomPackages $sbomPackages `
+    -LicenseGraph $licenseGraph
 $sbomFile = Get-Item -LiteralPath $resolvedSbom
 $sbomHash = Get-FileHash `
     -LiteralPath $resolvedSbom `

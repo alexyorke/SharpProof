@@ -50,6 +50,62 @@ public sealed class PackageDependencyAuthorityTests
     }
 
     [TestCase("canonical", true)]
+    [TestCase("license-apache", false)]
+    [TestCase("license-missing", false)]
+    [TestCase("license-file", false)]
+    [TestCase("license-case", false)]
+    [TestCase("license-spelling", false)]
+    [TestCase("license-symbol-mismatch", false)]
+    public async Task PackageLicensesMatchTheExactCatalogExpression(
+        string mutation,
+        bool expectedSuccess)
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-licenses-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var paths = WritePackageGraph(root, mutation);
+            var result = await RunAuthorityAsync(paths);
+            Assert.That(
+                result.ExitCode == 0,
+                Is.EqualTo(expectedSuccess),
+                result.Output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestCase("canonical", true)]
+    [TestCase("license-apache", false)]
+    [TestCase("license-missing", false)]
+    [TestCase("license-case", false)]
+    public async Task SbomLicensesMatchTheExactPackageAuthority(
+        string mutation,
+        bool expectedSuccess)
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-sbom-license-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var result = await RunSbomLicenseAuthorityAsync(root, mutation);
+            Assert.That(
+                result.ExitCode == 0,
+                Is.EqualTo(expectedSuccess),
+                result.Output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestCase("canonical", true)]
     [TestCase("missing", false)]
     [TestCase("extra", false)]
     [TestCase("fabricated", false)]
@@ -87,11 +143,32 @@ public sealed class PackageDependencyAuthorityTests
                          "SharpProof.Verifier"
                      })
             {
-                var effectiveMutation = extension == ".snupkg" &&
-                    mutation != "symbol-mismatch"
-                        ? "canonical"
-                        : mutation;
+                var effectiveMutation = mutation;
+                if (extension == ".snupkg" &&
+                    mutation is not "symbol-mismatch" and
+                        not "license-symbol-mismatch")
+                {
+                    effectiveMutation = "canonical";
+                }
+                else if (mutation == "symbol-mismatch")
+                {
+                    effectiveMutation = extension == ".snupkg"
+                        ? "fabricated"
+                        : "canonical";
+                }
+                else if (mutation == "license-symbol-mismatch")
+                {
+                    effectiveMutation = extension == ".snupkg"
+                        ? "license-apache"
+                        : "canonical";
+                }
                 var dependencies = DependencyXml(id, effectiveMutation);
+                var license = LicenseXml(id, effectiveMutation);
+                if (extension == ".snupkg" &&
+                    effectiveMutation == "canonical")
+                {
+                    license = string.Empty;
+                }
                 var path = Path.Combine(root, id + extension);
                 using var archive = ZipFile.Open(
                     path,
@@ -106,6 +183,7 @@ public sealed class PackageDependencyAuthorityTests
                       <metadata>
                         <id>{{id}}</id>
                         <version>{{Version}}</version>
+                        {{license}}
                         {{dependencies}}
                       </metadata>
                     </package>
@@ -115,6 +193,24 @@ public sealed class PackageDependencyAuthorityTests
         }
 
         return paths.ToArray();
+    }
+
+    private static string LicenseXml(string id, string mutation)
+    {
+        if (id != "SharpProof")
+        {
+            return "<license type=\"expression\">MIT</license>";
+        }
+        return mutation switch
+        {
+            "license-apache" =>
+                "<license type=\"expression\">Apache-2.0</license>",
+            "license-missing" => string.Empty,
+            "license-file" => "<license type=\"file\">LICENSE.txt</license>",
+            "license-case" => "<license type=\"expression\">mit</license>",
+            "license-spelling" => "<license type=\"expression\">MITT</license>",
+            _ => "<license type=\"expression\">MIT</license>"
+        };
     }
 
     private static string DependencyXml(string id, string mutation)
@@ -252,6 +348,36 @@ public sealed class PackageDependencyAuthorityTests
             "}\n" +
             "Test-SharpProofSbomDependencyGraph " +
             "-Relationships $rows -DependencyGraph $graph\n",
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        return await RunPowerShellAsync(repositoryRoot, runner, mutation);
+    }
+
+    private static async Task<ProcessResult> RunSbomLicenseAuthorityAsync(
+        string root,
+        string mutation)
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var runner = Path.Combine(root, "run-sbom-license-authority.ps1");
+        await File.WriteAllTextAsync(
+            runner,
+            "param([string]$Helper, [string]$Mutation)\n" +
+            ". $Helper\n" +
+            "$graph=@('SharpProof.Attributes','SharpProof'," +
+            "'SharpProof.Verifier') | ForEach-Object {" +
+            "[pscustomobject]@{PackageId=$_;LicenseExpression='MIT'}}\n" +
+            "$rows=@($graph | ForEach-Object {" +
+            "[pscustomobject]@{name=$_.PackageId;licenseDeclared='MIT';" +
+            "licenseConcluded='MIT'}})\n" +
+            "switch ($Mutation) {\n" +
+            " 'license-apache' {$rows[1].licenseDeclared='Apache-2.0';" +
+            "$rows[1].licenseConcluded='Apache-2.0'}\n" +
+            " 'license-missing' {$rows[1].PSObject.Properties.Remove(" +
+            "'licenseDeclared')}\n" +
+            " 'license-case' {$rows[1].licenseDeclared='mit';" +
+            "$rows[1].licenseConcluded='mit'}\n" +
+            "}\n" +
+            "Test-SharpProofSbomLicenseGraph " +
+            "-SbomPackages $rows -LicenseGraph $graph\n",
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         return await RunPowerShellAsync(repositoryRoot, runner, mutation);
     }

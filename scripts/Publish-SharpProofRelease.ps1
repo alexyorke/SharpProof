@@ -461,6 +461,11 @@ function Get-ValidatedRelease {
             $_.mainPath
             $_.symbolsPath
         }))
+    $licenseGraph = @(Get-SharpProofPackageLicenseGraph `
+        -PackagePaths @($packages | ForEach-Object {
+            $_.mainPath
+            $_.symbolsPath
+        }))
     $sbomPath = Get-ArtifactPath `
         -Directory $Directory `
         -FileName ([string]$sbomArtifacts[0].fileName)
@@ -472,6 +477,12 @@ function Get-ValidatedRelease {
     Test-SharpProofSbomDependencyGraph `
         -Relationships @($sbom.relationships) `
         -DependencyGraph $dependencyGraph
+    if ($null -eq $sbom.PSObject.Properties['packages']) {
+        throw 'Release SBOM has no package graph.'
+    }
+    Test-SharpProofSbomLicenseGraph `
+        -SbomPackages @($sbom.packages) `
+        -LicenseGraph $licenseGraph
 
     return [pscustomobject][ordered]@{
         version = $version

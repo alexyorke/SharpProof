@@ -38,9 +38,21 @@ function Get-SharpProofNuspecDependencyModel {
     }
     $idNode = $metadata.SelectSingleNode('n:id', $manager)
     $versionNode = $metadata.SelectSingleNode('n:version', $manager)
+    $licenseNodes = @($metadata.SelectNodes('n:license', $manager))
     if ($null -eq $idNode -or
-        $null -eq $versionNode) {
+        $null -eq $versionNode -or
+        $licenseNodes.Count -gt 1) {
         throw "Package '$PackagePath' has incomplete nuspec metadata."
+    }
+    $licenseExpression = $null
+    if ($licenseNodes.Count -eq 1) {
+        $license = $licenseNodes[0]
+        if ($license.Attributes.Count -ne 1 -or
+            $license.GetAttribute('type') -ne 'expression' -or
+            [string]::IsNullOrWhiteSpace($license.InnerText)) {
+            throw "Package '$PackagePath' must declare a license expression."
+        }
+        $licenseExpression = $license.InnerText
     }
 
     $groups = [Collections.Generic.List[object]]::new()
@@ -84,6 +96,7 @@ function Get-SharpProofNuspecDependencyModel {
     return [pscustomobject][ordered]@{
         Id = $idNode.InnerText
         Version = $versionNode.InnerText
+        LicenseExpression = $licenseExpression
         DependencyGroups = @($groups)
     }
 }
@@ -135,6 +148,16 @@ function Get-SharpProofPackageDependencyGraph {
         })
         if ($expected.Count -ne 1) {
             throw "Unexpected package dependency owner '$($model.Nuspec.Id)'."
+        }
+        $actualLicense = [string]$model.Nuspec.LicenseExpression
+        if (($model.Extension -eq '.nupkg' -and
+                $actualLicense -cne
+                    [string]$expected[0].licenseExpression) -or
+            ($model.Extension -eq '.snupkg' -and
+                -not [string]::IsNullOrEmpty($actualLicense) -and
+                $actualLicense -cne
+                    [string]$expected[0].licenseExpression)) {
+            throw "Package '$($model.Nuspec.Id)' has an invalid license expression."
         }
         $expectedGroups = @($expected[0].dependencyGroups)
         $actualGroups = @($model.Nuspec.DependencyGroups)
@@ -189,6 +212,30 @@ function Get-SharpProofPackageDependencyGraph {
     return @($edges | Sort-Object FromId, ToId, TargetFramework)
 }
 
+function Get-SharpProofPackageLicenseGraph {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$PackagePaths,
+
+        [Parameter()]
+        [string]$ContractPath = (Join-Path `
+            (Join-Path $PSScriptRoot '..') `
+            'eng/release/package-dependency-contract.json')
+    )
+
+    $null = Get-SharpProofPackageDependencyGraph `
+        -PackagePaths $PackagePaths `
+        -ContractPath $ContractPath
+    $contract = Get-Content -LiteralPath $ContractPath -Raw |
+        ConvertFrom-Json
+    return @($contract.packages | ForEach-Object {
+        [pscustomobject][ordered]@{
+            PackageId = [string]$_.id
+            LicenseExpression = [string]$_.licenseExpression
+        }
+    } | Sort-Object PackageId)
+}
+
 function Get-SharpProofDependencySpdxId {
     param([Parameter(Mandatory = $true)][string]$Name)
 
@@ -218,6 +265,34 @@ function Test-SharpProofSbomDependencyGraph {
                 [string]$_.relatedSpdxElement -eq $to
             }).Count -ne 1) {
             throw "SPDX SBOM dependency is missing: $from -> $to"
+        }
+    }
+}
+
+function Test-SharpProofSbomLicenseGraph {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$SbomPackages,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$LicenseGraph
+    )
+
+    foreach ($license in $LicenseGraph) {
+        $matches = @($SbomPackages | Where-Object {
+            [string]$_.name -eq [string]$license.PackageId
+        })
+        if ($matches.Count -ne 1 -or
+            $null -eq $matches[0].PSObject.Properties['licenseDeclared'] -or
+            $null -eq $matches[0].PSObject.Properties['licenseConcluded']) {
+            throw "SPDX SBOM license is invalid: $($license.PackageId)"
+        }
+        if (
+            [string]$matches[0].licenseDeclared -cne
+                [string]$license.LicenseExpression -or
+            [string]$matches[0].licenseConcluded -cne
+                [string]$license.LicenseExpression) {
+            throw "SPDX SBOM license is invalid: $($license.PackageId)"
         }
     }
 }
