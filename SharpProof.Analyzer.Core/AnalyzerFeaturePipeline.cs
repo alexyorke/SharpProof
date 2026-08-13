@@ -56,6 +56,10 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+        if (method.PartialImplementationPart != null)
+        {
+            return;
+        }
 
         EffectContractDiagnostics.ValidateArguments(method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(method, session, context.ReportDiagnostic);
@@ -124,6 +128,17 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+
+        if (method.PartialImplementationPart != null)
+        {
+            return;
+        }
+        if (method.PartialDefinitionPart != null &&
+            !session.TryBeginExecutableAnalysis(method))
+        {
+            return;
+        }
+        method = EffectAnalysisSession.NormalizeMethod(method);
 
         if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
         {

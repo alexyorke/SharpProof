@@ -1242,6 +1242,26 @@ $mutations = @(
         Mutated = '                            false)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~ExecutedRelationalSummaryCallIsNotAReplayableCounterexample'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-partial-executable-owner'
+        File = 'SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs'
+        Original = (@'
+        if (method.PartialImplementationPart != null)
+        {
+            return;
+        }
+        if (method.PartialDefinitionPart != null &&
+'@).TrimEnd()
+        Mutated = (@'
+        if (false)
+        {
+            return;
+        }
+        if (method.PartialDefinitionPart != null &&
+'@).TrimEnd()
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~PartialMethodHasOneExecutableEffectOwner'
     }
 )
 

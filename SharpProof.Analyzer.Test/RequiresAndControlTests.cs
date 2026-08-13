@@ -8,6 +8,30 @@ namespace SharpProof.Analyzer.Test;
 public sealed class RequiresAndControlTests
 {
     [Test]
+    public async Task PartialMethodRequiresBelongsToImplementationExactlyOnce()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static partial class Subject {
+                public static partial int Positive(int value);
+                public static partial int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+                public static int Invalid() => Positive(-1);
+                public static int Valid() => Positive(1);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task PropertyAndEventAccessorsCheckRequiresExactlyOnce()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

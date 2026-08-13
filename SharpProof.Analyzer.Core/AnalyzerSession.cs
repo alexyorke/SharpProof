@@ -47,6 +47,9 @@ internal sealed class AnalyzerSession
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _requiresCallSiteAnalyses =
             new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+        _executableAnalyses =
+            new(SymbolEqualityComparer.Default);
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -159,6 +162,13 @@ internal sealed class AnalyzerSession
         return _requiresCallSiteAnalyses.TryAdd(
             ContractClauseInventoryBuilder.NormalizeCallable(
                 method),
+            0);
+    }
+
+    internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
+    {
+        return _executableAnalyses.TryAdd(
+            EffectAnalysisSession.NormalizeMethod(method),
             0);
     }
 
