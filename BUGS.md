@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 129 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 128 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 129 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-028 - Qualification evidence blesses arbitrary package files (fixed)
+
+- [x] Fixed by `d6b69fd55` (`fix: authenticate release qualification evidence`).
+- Qualification now requires a clean exact-HEAD checkout at an annotated tag,
+  invokes the strict six-package release validator, and binds acceptance,
+  coverage, full mutation, package-consumer, and five-pilot receipts to the
+  candidate commit and their immutable evidence bytes. Package-consumer and
+  pilot receipts also bind the exact six candidate package names, sizes, and
+  SHA-256 hashes.
+- Regression-first fixtures reject malformed, failed, stale, incomplete,
+  duplicate, and invalid-digest gate evidence; architecture assertions keep
+  every required workflow gate and the strict release authority connected.
+  The focused qualification suite passed 5/5, the full Architecture suite
+  passed 113/113, and the canonical container contract gate passed.
 
 ### SP-AUDIT-015 - Release evidence does not authenticate package payloads (fixed)
 
@@ -497,31 +512,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   plus a mutation that removes primary-initializer discovery.
 - Consolidated cases: SP-AUDIT-032.
 - Unified closure: Use one type-declaration-to-synthesized-constructor inventory for analyzer and collector, including primary base initialization and every selected callable, claim, and assumption.
-
-### SP-AUDIT-028 - Qualification evidence blesses arbitrary package files (P0)
-
-- [ ] `Invoke-SharpProofReleaseContainer.ps1 -Mode
-  WriteQualificationEvidence` trusts `GITHUB_SHA` and `GITHUB_REF_NAME`, then
-  accepts every regular file whose name ends in `.nupkg` or `.snupkg`. It does
-  not require the six expected artifacts, open NuGet packages, validate the
-  three-package graph/version/nuspec commit, compare identity with checkout
-  HEAD, or require the gate evidence whose completion `status: passed` claims.
-- Certifier impact: a standalone or reused canonical qualification command can
-  produce exact-looking passed evidence for arbitrary bytes and a nonexistent
-  commit/tag. The current GitHub job's preceding steps reduce exposure in its
-  normal sequence, but the retained qualification document does not prove
-  those steps or the identity of the files it certifies.
-- Reproduction: a disposable canonical-container clone supplied one text file
-  named `not-a-package.nupkg`, forty zeroes as `GITHUB_SHA`, and
-  `v999.999.999` as `GITHUB_REF_NAME`. `tooling release-qualification` exited
-  zero and wrote `qualification.json` with `status: passed`, the bogus identity,
-  and the text file's hash.
-- Required closure: make qualification self-validating: invoke strict release
-  identity validation, require checkout HEAD and a clean tree, validate the
-  exact six-file artifact set and package graph/metadata, and bind the required
-  acceptance, coverage, mutation, package-consumer, and corrected pilot
-  receipts into the record. Add fake-file, missing-package, extra-package,
-  wrong-commit/tag, missing-receipt, stale-receipt, and exact-valid fixtures.
 
 ### SP-AUDIT-040 - Compiler variable semantics are not bound to symbol and type identity (P0)
 
