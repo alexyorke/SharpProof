@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 100 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 99 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 100 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-076 - Text diagnostic transport loses structured MSBuild semantics (fixed)
+
+- [x] Fixed by `4acbda3f0` (`fix: transport structured verifier diagnostics`).
+- Launcher and BuildTask now share a strict versioned JSON-line transport for
+  SP0047/SP0048 warnings and errors, preserving exact code, severity, path,
+  line, column, message, punctuation, Unicode, and embedded newlines. Structured
+  errors suppress only the redundant generic exit-code error; infrastructure
+  failures retain it. The legacy parser uses the valid rightmost grammar boundary.
+- Regression-first tests cover marker-like paths, structured and legacy records,
+  malformed/locationless records, severity-specific MSBuild logging, packaged
+  warning policy, and target topology. BuildTask tests passed 14/14, packaged
+  policy tests 2/2, topology 1/1, Architecture 176/176, and `git diff --check`.
+  One unrelated existing launcher fixture was blocked earlier by the separate
+  `response.callable_projection` invariant and was not modified.
 
 ### SP-AUDIT-070 - Never-invoked lambda bodies are analyzed as executed (fixed)
 
@@ -1121,28 +1136,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   heuristic-only filter.
 - Consolidated cases: SP-AUDIT-064, SP-AUDIT-068, SP-AUDIT-127.
 - Unified closure: After all generators, reconcile every logical target/companion once in every non-off profile, independent of filename, partial ownership, and generator order.
-
-### SP-AUDIT-076 - Text diagnostic transport loses structured MSBuild semantics (P1)
-
-- [ ] The build task parses launcher warnings by searching the entire stderr
-  line for the first SP0047 marker before it searches for SP0048. Linux
-  filenames may contain colons and the complete marker text, so a marker inside
-  the source path is mistaken for the diagnostic boundary.
-- Supported impact: a real SP0048 can be reclassified as SP0047, and its source
-  path, line, and column are truncated. Code-specific `NoWarn` or
-  `WarningsAsErrors` policy can therefore suppress or promote the wrong
-  diagnostic, while MSBuild/binlog/IDE locations become incorrect.
-- Reproduction: a focused BuildTasks test logged an SP0048 at line 4, column 5
-  for `/tmp/source: warning SP0047: detail.cs`. The task emitted SP0047 with
-  file `/tmp/source` and zero location instead. The temporary test was removed.
-- Required closure: parse the canonical diagnostic suffix/location grammar from
-  the right-hand boundary rather than searching arbitrary path text; preferably
-  carry structured launcher diagnostics across the process boundary. Add both
-  codes, marker-like filenames, parentheses/commas/Unicode, locationless
-  diagnostics, malformed lines, and code-specific warning-policy integration
-  controls plus a parser mutation restoring first-marker matching.
-- Consolidated cases: SP-AUDIT-084.
-- Unified closure: Use structured diagnostics or one unambiguous grammar and preserve code, severity, location, punctuation, and Unicode through the correct MSBuild APIs.
 
 ### SP-AUDIT-079 - Backend renewal failure is erased as a method timeout (P1)
 
