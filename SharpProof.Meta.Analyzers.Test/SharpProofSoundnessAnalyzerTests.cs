@@ -252,43 +252,80 @@ public sealed class SharpProofSoundnessAnalyzerTests
         }
         """,
         "SPMETA010")]
-    [TestCase(
-        """
-        namespace SharpProof.Verify;
-        enum Answer { Proven }
-        sealed class AnswerSource {
-            internal Answer Unknown => Answer.Proven;
-        }
-        sealed class ProofCache {
-            internal void Write(Answer answer) { }
-        }
-        sealed class C {
-            void M(ProofCache cache, AnswerSource source) =>
-                cache.Write(source.Unknown);
-        }
-        """,
-        "SPMETA010")]
-    [TestCase(
-        """
-        namespace SharpProof.Verify;
-        enum Answer { Proven }
-        sealed class ProofCache {
-            internal void Write(Answer answer) { }
-        }
-        sealed class C {
-            void M(ProofCache cache) {
-                var TimeoutAnswer = Answer.Proven;
-                cache.Write(TimeoutAnswer);
-            }
-        }
-        """,
-        "SPMETA010")]
     public async Task ReportsSoundnessBoundaryViolation(string source, string expectedId)
     {
         var diagnostics = await Analyze(source);
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain(expectedId));
+    }
+
+    [Test]
+    public async Task SemanticCacheWritesTrackAliasesAndAssignments()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify {
+            using ExternalAnswer = Other.Answer;
+            enum Answer { Unknown, TimedOut, Failed, Proven }
+            sealed class AnswerSource {
+                internal Answer Unknown => Answer.Proven;
+                internal Answer CreateTimeout() => Answer.Proven;
+            }
+            sealed class ProofCache {
+                internal Answer this[string key] { set { } }
+                internal Answer Latest { set { } }
+                internal void Add(string key, Answer answer) { }
+                internal void AddOrUpdate(string key, Answer answer) { }
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                void AliasUnknown(ProofCache cache) {
+                    var answer = Answer.Unknown;
+                    cache.Add("key", answer);
+                }
+                void AliasTimedOut(ProofCache cache) {
+                    var answer = Answer.TimedOut;
+                    cache.Write(answer);
+                }
+                void AliasFailed(ProofCache cache) {
+                    var answer = Answer.Failed;
+                    cache["key"] = answer;
+                }
+                void Branch(ProofCache cache, bool condition) {
+                    var answer = Answer.Proven;
+                    if (condition) answer = Answer.Unknown;
+                    cache.Write(answer);
+                }
+                void DirectIndexer(ProofCache cache) =>
+                    cache["key"] = Answer.Unknown;
+                void Property(ProofCache cache) =>
+                    cache.Latest = Answer.Failed;
+                void Overwrite(ProofCache cache) =>
+                    cache.AddOrUpdate("key", Answer.TimedOut);
+                void Unresolved(ProofCache cache, Answer answer) =>
+                    cache.Write(answer);
+                void Safe(ProofCache cache, AnswerSource source) {
+                    var answer = Answer.Unknown;
+                    answer = Answer.Proven;
+                    cache.Add("key", answer);
+                    cache["key"] = Answer.Proven;
+                    cache.Latest = source.Unknown;
+                    cache.Write(source.CreateTimeout());
+                    var TimeoutAnswer = Answer.Proven;
+                    cache.Write(TimeoutAnswer);
+                    _ = ExternalAnswer.Unknown;
+                }
+            }
+            }
+            namespace Other {
+                enum Answer { Unknown }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(8));
     }
 
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
