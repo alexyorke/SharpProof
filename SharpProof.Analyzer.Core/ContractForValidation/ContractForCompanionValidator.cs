@@ -8,6 +8,7 @@ internal static class ContractForCompanionValidator
 {
     internal static void Validate(
         ResolvedCompanion companion,
+        Compilation compilation,
         ContractClauseInventoryBuilder clauses,
         List<Diagnostic> diagnostics,
         CancellationToken cancellationToken)
@@ -51,7 +52,10 @@ internal static class ContractForCompanionValidator
         {
             diagnostics.Add(At(
                 descriptor,
-                GetSourceLocation(symbol, companion.AttributeLocation),
+                GetSourceLocation(
+                    symbol,
+                    compilation,
+                    companion.AttributeLocation),
                 arguments));
         }
 
@@ -137,6 +141,7 @@ internal static class ContractForCompanionValidator
                 ContractClauseInventoryBuilder.NormalizeCallable(matches[0]),
                 clauses,
                 diagnostics,
+                compilation,
                 companion.AttributeLocation,
                 cancellationToken);
         }
@@ -146,6 +151,7 @@ internal static class ContractForCompanionValidator
         IMethodSymbol method,
         ContractClauseInventoryBuilder clauses,
         List<Diagnostic> diagnostics,
+        Compilation compilation,
         Location fallback,
         CancellationToken cancellationToken)
     {
@@ -154,7 +160,7 @@ internal static class ContractForCompanionValidator
         {
             diagnostics.Add(At(
                 ContractForDiagnosticDescriptors.BodyRequired,
-                GetSourceLocation(method, fallback),
+                GetSourceLocation(method, compilation, fallback),
                 method.Name));
             return;
         }
@@ -183,9 +189,15 @@ internal static class ContractForCompanionValidator
         return Diagnostic.Create(descriptor, location, arguments);
     }
 
-    internal static Location GetSourceLocation(ISymbol symbol, Location fallback)
+    internal static Location GetSourceLocation(
+        ISymbol symbol,
+        Compilation compilation,
+        Location fallback)
     {
-        return symbol.Locations.Where(static location => location.IsInSource)
+        return symbol.Locations.Where(location =>
+                location.IsInSource &&
+                location.SourceTree is { } tree &&
+                compilation.ContainsSyntaxTree(tree))
             .OrderBy(
                 static location => location.SourceTree?.FilePath,
                 StringComparer.Ordinal)

@@ -40,6 +40,7 @@
       "SharpProof.Effects.Test\\SharpProof.Effects.Test.csproj": 3,
       "SharpProof.ArchitectureTest\\SharpProof.ArchitectureTest.csproj": 2,
       "SharpProof.Contracts.Test\\SharpProof.Contracts.Test.csproj": 2,
+      "SharpProof.ContractForGenerator.Test\\SharpProof.ContractForGenerator.Test.csproj": 2,
       "SharpProof.Frontend.Test\\SharpProof.Frontend.Test.csproj": 2,
       "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj": 2,
       "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj": 2,

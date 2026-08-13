@@ -407,6 +407,89 @@ public sealed class ContractForValidatorGeneratorTests
     }
 
     [Test]
+    public void CompilationReferenceTargetDiagnosticUsesCurrentCompanionLocation()
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            """
+            public interface IReferencedTarget { void Invoke(); }
+            """,
+            ("CurrentCompanion.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(IReferencedTarget))]
+            public static class ReferencedTargetContracts { }
+            """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.Run(compilation),
+            "SPCF0004");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostic.Location.SourceTree?.FilePath,
+                Is.EqualTo("CurrentCompanion.cs"));
+            Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
+            Assert.That(
+                compilation.ContainsSyntaxTree(diagnostic.Location.SourceTree!),
+                Is.True);
+        }
+    }
+
+    [Test]
+    public void MetadataReferenceTargetDiagnosticUsesCurrentCompanionLocation()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("MetadataCompanion.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+            [ContractFor(typeof(IDisposable))]
+            public static class DisposableContracts { }
+            """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.Run(compilation),
+            "SPCF0004");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostic.Location.SourceTree?.FilePath,
+                Is.EqualTo("MetadataCompanion.cs"));
+            Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
+        }
+    }
+
+    [Test]
+    public void CurrentCompilationTargetDiagnosticUsesTargetLocation()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("CurrentTarget.cs",
+            """
+            public interface ICurrentTarget { void Invoke(); }
+            """),
+            ("CurrentCompanion.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(ICurrentTarget))]
+            public static class CurrentTargetContracts { }
+            """));
+
+        var diagnostic = AssertSingle(
+            GeneratorTestHost.Run(compilation),
+            "SPCF0004");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostic.Location.SourceTree?.FilePath,
+                Is.EqualTo("CurrentTarget.cs"));
+            Assert.That(GetLocatedText(diagnostic), Is.EqualTo("Invoke"));
+        }
+    }
+
+    [Test]
     public void RepeatedContractForAttributesOnOneCompanionFailClosed()
     {
         var compilation =

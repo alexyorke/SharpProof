@@ -1134,6 +1134,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~PublicationMetadataSupportsNameMaxBoundaryForEveryMember'
     },
     [pscustomobject]@{
+        Name = 'contractfor-location-active-compilation'
+        File = 'SharpProof.Analyzer.Core\ContractForValidation\ContractForCompanionValidator.cs'
+        Original = "                location.SourceTree is { } tree &&`n                compilation.ContainsSyntaxTree(tree))"
+        Mutated = "                location.SourceTree is { } tree &&`n                !compilation.ContainsSyntaxTree(tree))"
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilationReferenceTargetDiagnosticUsesCurrentCompanionLocation'
+    },
+    [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = '                if (type == FileTypeSymbolicLink)'

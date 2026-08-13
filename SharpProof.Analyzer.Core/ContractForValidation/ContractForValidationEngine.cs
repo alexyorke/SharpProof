@@ -31,14 +31,18 @@ internal static class ContractForValidationEngine
                 diagnostics.Add(At(
                     ContractForDiagnosticDescriptors.InvalidTarget,
                     ContractForCompanionValidator.GetSourceLocation(
-                        candidate, Location.None),
+                        candidate, compilation, Location.None),
                     candidate.Name));
             }
             return Order(diagnostics);
         }
 
         var companions = ResolveCompanions(
-            contractFor, candidates, diagnostics, cancellationToken);
+            contractFor,
+            compilation,
+            candidates,
+            diagnostics,
+            cancellationToken);
         var clauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
         var overlapping = FindOverlappingCompanions(
             companions,
@@ -52,6 +56,7 @@ internal static class ContractForValidationEngine
             {
                 ContractForCompanionValidator.Validate(
                     companion,
+                    compilation,
                     clauses,
                     diagnostics,
                     cancellationToken);
@@ -147,6 +152,7 @@ internal static class ContractForValidationEngine
 
     private static ImmutableArray<ResolvedCompanion> ResolveCompanions(
         INamedTypeSymbol contractFor,
+        Compilation compilation,
         ImmutableArray<INamedTypeSymbol> candidates,
         List<Diagnostic> diagnostics,
         CancellationToken cancellationToken)
@@ -158,18 +164,26 @@ internal static class ContractForValidationEngine
             cancellationToken.ThrowIfCancellationRequested();
             var attributes = ContractForSymbolMatcher.GetAttributes(companion, contractFor);
             var fallback = ContractForCompanionValidator.GetSourceLocation(
-                companion, Location.None);
+                companion, compilation, Location.None);
             if (attributes.Length != 1)
             {
                 var location = attributes.FirstOrDefault() is { } first
-                    ? GetAttributeLocation(first, fallback, cancellationToken)
+                    ? GetAttributeLocation(
+                        first,
+                        compilation,
+                        fallback,
+                        cancellationToken)
                     : fallback;
                 diagnostics.Add(At(
                     ContractForDiagnosticDescriptors.InvalidTarget, location, companion.Name));
                 continue;
             }
             var attribute = attributes[0];
-            var attributeLocation = GetAttributeLocation(attribute, fallback, cancellationToken);
+            var attributeLocation = GetAttributeLocation(
+                attribute,
+                compilation,
+                fallback,
+                cancellationToken);
             if (!ContractForSymbolMatcher.TryGetTarget(attribute, out var target))
             {
                 diagnostics.Add(At(ContractForDiagnosticDescriptors.InvalidTarget,
@@ -192,10 +206,17 @@ internal static class ContractForValidationEngine
 
     private static Location GetAttributeLocation(
         AttributeData attribute,
+        Compilation compilation,
         Location fallback,
         CancellationToken cancellationToken)
     {
-        return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ?? fallback;
+        var location = attribute.ApplicationSyntaxReference?
+            .GetSyntax(cancellationToken)
+            .GetLocation();
+        return location?.SourceTree is { } tree &&
+               compilation.ContainsSyntaxTree(tree)
+            ? location
+            : fallback;
     }
 
 }
