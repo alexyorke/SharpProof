@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 134 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 133 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 134 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-033 - Definitely null lifted operators report impossible exceptions (fixed)
+
+- [x] Fixed by `2bfbbd23d` (`fix: skip absent lifted arithmetic hazards`).
+- Arithmetic hazard classification now consults managed nullable-presence facts
+  before applying the underlying lifted operator. A definitely absent operand
+  skips division, remainder, and checked-overflow hazards; present and unknown
+  operands retain the existing conservative exception behavior.
+- Regression-first coverage includes binary, unary, increment, compound,
+  divide/remainder, signed/unsigned, checked/unchecked, null-left/right/both,
+  present/unknown, conversion, and DoesNotThrow projection controls. Full
+  Effects passed 167/167, Analyzer passed 227/227, and Architecture passed
+  110/110 in the canonical container.
 
 ### SP-AUDIT-023 - Empty nullable boxing reports an allocation (fixed)
 
@@ -1214,34 +1227,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   receivers, conditional access, reduced extensions, and a mutation probe.
 - Consolidated cases: SP-AUDIT-030.
 - Unified closure: Model source-order normal completion once; join later receiver, argument, conditional-access, lock, constructor, and initializer effects only when prior evaluation may complete.
-
-### SP-AUDIT-033 - Definitely null lifted operators report impossible exceptions (P1)
-
-- [ ] Integral division and checked-overflow classification inspect the
-  underlying scalar operation without first applying lifted nullable
-  normal-completion semantics. If a nullable operand is definitely null, the
-  underlying operator is skipped and the result is null, so it cannot throw
-  an arithmetic hazard.
-- Supported impact: null-left and null-right division, checked nullable
-  addition, checked nullable increment, and nullable compound division all
-  produced complete summaries containing impossible `DivideByZeroException`
-  and/or `OverflowException` facts. Valid selected
-  `DoesNotThrow`/allowed-exception contracts can therefore be rejected for
-  supported scalar expressions.
-- Reproduction: a temporary canonical-container Effects regression analyzed
-  null-left and null-right methods together and expected neither exception.
-  The focused division failure reported both method names as containing the
-  impossible exceptions. A follow-up four-shape matrix reported
-  `Add:OverflowException`, `Increment:OverflowException`, and both division
-  exceptions for `DivideAssign`; its checked nullable conversion control was
-  clean.
-- Required closure: evaluate nullable presence before arithmetic hazards:
-  definitely absent on any lifted input means no underlying exception,
-  definitely present reduces to the scalar operation, and unknown presence
-  retains the possible hazard. Add binary/unary/increment/compound shapes,
-  divide/remainder, signed/unsigned, checked/unchecked, left/right/both-null,
-  known-present, unknown, conversion controls, and mutation-discriminating
-  runtime controls.
 
 ### SP-AUDIT-037 - Generated classification can suppress handwritten analysis (P1)
 
