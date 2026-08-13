@@ -132,6 +132,7 @@
       "scripts/Generate-ProjectionCatalog.ps1",
       "scripts/Generate-ProtocolModel.ps1",
       "scripts/GeneratedFileHelpers.ps1",
+      "scripts/Get-SharpProofPilotPackageAuthority.ps1",
       "scripts/Get-SharpProofReleaseAuthorityClosure.ps1",
       "scripts/Get-SharpProofTcbPaths.ps1",
       "scripts/Invoke-SharpProofChangedTests.ps1",
@@ -159,7 +160,9 @@
       "scripts/Test-SharpProofPackageConsumers.ps1",
       "scripts/Test-SharpProofPackageDependencies.ps1",
       "scripts/Test-SharpProofPackagePayloads.ps1",
+      "scripts/Test-SharpProofPilotAuthorityFixtures.ps1",
       "scripts/Test-SharpProofPilots.ps1",
+      "scripts/Test-SharpProofPilotReport.ps1",
       "scripts/Test-SharpProofReleaseArtifacts.ps1",
       "scripts/Test-SharpProofReleaseAuthorityClosure.ps1",
       "scripts/Test-SharpProofReleaseAuthorityClosureFixtures.ps1",
@@ -181,7 +184,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "a59db564184dd3d6c59384f04df6ba9448ea32c8f7b93aecb1ae277ff83b415f",
+    "inventorySha256": "74bfec9960d188a12e88c9f63dcb0890f07d601abadababd5f53bab0af145ec9",
     "components": [
       {
         "name": "discovery",
@@ -644,6 +647,7 @@
           "eng/release/package-dependency-contract.json",
           "eng/release/third-party-components.json",
           "scripts/Get-SharpProofReleaseAuthorityClosure.ps1",
+          "scripts/Get-SharpProofPilotPackageAuthority.ps1",
           "scripts/Invoke-SharpProofCoverage.ps1",
           "scripts/Invoke-SharpProofDotnet.ps1",
           "scripts/Invoke-SharpProofGateEvidence.ps1",
@@ -653,7 +657,9 @@
           "scripts/Test-SharpProofDependencyAudit.ps1",
           "scripts/Test-SharpProofPackageDependencies.ps1",
           "scripts/Test-SharpProofPackagePayloads.ps1",
+          "scripts/Test-SharpProofPilotAuthorityFixtures.ps1",
           "scripts/Test-SharpProofPilots.ps1",
+          "scripts/Test-SharpProofPilotReport.ps1",
           "scripts/Test-SharpProofReleaseArtifacts.ps1",
           "scripts/Test-SharpProofReleaseAuthorityClosure.ps1",
           "scripts/Test-SharpProofReleaseAuthorityClosureFixtures.ps1",
@@ -661,7 +667,8 @@
           "scripts/Test-SharpProofSymbolPackages.ps1",
           "scripts/Write-SharpProofQualificationReceipt.ps1",
           "scripts/package-projects.json",
-          "SharpProof.ArchitectureTest/ReleaseAuthorityClosureTests.cs"
+          "SharpProof.ArchitectureTest/ReleaseAuthorityClosureTests.cs",
+          "SharpProof.ArchitectureTest/PilotAuthorityTests.cs"
         ]
       }
     ]

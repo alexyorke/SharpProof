@@ -150,7 +150,10 @@ public sealed class ReleaseCoverageBaselineTests
                 Does.Contain("targets different packages"));
             Assert.That(receiptWriter, Does.Contain("status -ceq 'passed'"));
             Assert.That(receiptWriter, Does.Contain("mutationCount"));
-            Assert.That(receiptWriter, Does.Contain("pilotCount -eq 5"));
+            Assert.That(
+                receiptWriter,
+                Does.Contain("Test-SharpProofPilotReport")
+                    .And.Contain("pilotEvidence"));
             Assert.That(receiptWriter, Does.Contain("packageArtifacts"));
         }
     }

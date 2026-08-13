@@ -167,6 +167,7 @@ Start-AcceptanceTimingPhase -Name 'static-validation'
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofReleaseConfigurationFixtures.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofReleaseAuthorityClosure.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofReleaseAuthorityClosureFixtures.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofPilotAuthorityFixtures.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $previewEvidence = Get-Content -LiteralPath (

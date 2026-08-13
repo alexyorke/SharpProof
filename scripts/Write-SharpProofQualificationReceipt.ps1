@@ -14,6 +14,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $resolvedEvidence = (Resolve-Path -LiteralPath $EvidencePath).Path
 $relativeEvidence = [IO.Path]::GetRelativePath(
@@ -73,15 +74,8 @@ $valid = switch ($Gate) {
         $packageArtifacts.Count -eq 6
     }
     'pilots' {
-        [int]$evidence.schemaVersion -eq 1 -and
-        [string]$evidence.commit -ceq $commit -and
-        [int]$evidence.pilotCount -eq 5 -and
-        @($evidence.pilots).Count -eq 5 -and
-        $packageArtifacts.Count -eq 6 -and
-        @($evidence.pilots | Where-Object {
-                [string]$_.runStatus -cne 'Complete' -or
-                -not [bool]$_.sarifProduced
-            }).Count -eq 0
+        (Test-SharpProofPilotReport -Report $evidence -ExpectedCommit $commit) -and
+        $packageArtifacts.Count -eq 6
     }
 }
 if (-not $valid) {
@@ -115,6 +109,11 @@ $receipt = [ordered]@{
 }
 if ($packageArtifacts.Count -ne 0) {
     $receipt.packageArtifacts = $packageArtifacts
+}
+if ($Gate -eq 'pilots') {
+    $receipt.pilotEvidence = @($evidence.pilots | Sort-Object id | ForEach-Object {
+            [ordered]@{ id = [string]$_.id; evidence = @($_.evidence) }
+        })
 }
 [IO.File]::WriteAllText(
     (Join-Path $receiptDirectory "$Gate.json"),
