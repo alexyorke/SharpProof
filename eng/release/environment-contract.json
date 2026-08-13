@@ -7,10 +7,11 @@
       "refs/tags/evidence/v*"
     ],
     "excludes": [],
-    "requiredRules": [
+    "rules": [
       "deletion",
       "update"
-    ]
+    ],
+    "bypassActors": []
   },
   "environments": [
     {

@@ -67,6 +67,34 @@ function Require-ExactSet {
     }
 }
 
+function Get-BypassActorIdentity {
+    param(
+        [Parameter(Mandatory = $true)][object]$Actor,
+        [Parameter(Mandatory = $true)][bool]$ContractShape
+    )
+
+    $idName = if ($ContractShape) { 'actorId' } else { 'actor_id' }
+    $typeName = if ($ContractShape) { 'actorType' } else { 'actor_type' }
+    $modeName = if ($ContractShape) { 'bypassMode' } else { 'bypass_mode' }
+    $expectedProperties = @($idName, $typeName, $modeName)
+    $actualProperties = @($Actor.PSObject.Properties.Name)
+    Require-ExactSet `
+        -Actual $actualProperties `
+        -Expected $expectedProperties `
+        -Owner 'A release-tag bypass actor shape'
+
+    $actorId = $Actor.$idName
+    $actorType = [string]$Actor.$typeName
+    $bypassMode = [string]$Actor.$modeName
+    if ($null -eq $actorId -or
+        [string]::IsNullOrWhiteSpace($actorType) -or
+        [string]::IsNullOrWhiteSpace($bypassMode)) {
+        throw 'A release-tag bypass actor identity is incomplete.'
+    }
+    $actorIdIdentity = $actorId | ConvertTo-Json -Compress -Depth 4
+    return "$actorType|$actorIdIdentity|$bypassMode"
+}
+
 $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
     throw 'The release-configuration commit could not be resolved.'
@@ -106,10 +134,43 @@ if (@($rulesetIncludes | Where-Object {
         }).Count -ne 0) {
     throw 'The release-tag ruleset cannot both include and exclude a ref.'
 }
-Require-SetMembers `
-    -Actual @($tagRuleset.rules.type | ForEach-Object { [string]$_ }) `
-    -Expected @($contract.tagRuleset.requiredRules) `
-    -Owner 'The release-tag ruleset'
+$actualRules = @($tagRuleset.rules | ForEach-Object {
+        $ruleProperties = @($_.PSObject.Properties.Name)
+        if ('type' -notin $ruleProperties -or
+            [string]::IsNullOrWhiteSpace([string]$_.type)) {
+            throw 'A release-tag rule has no type.'
+        }
+        if ('parameters' -in $ruleProperties -and $null -ne $_.parameters) {
+            throw "Release-tag rule '$($_.type)' has unauthorized parameters."
+        }
+        [string]$_.type
+    })
+Require-ExactSet `
+    -Actual $actualRules `
+    -Expected @($contract.tagRuleset.rules) `
+    -Owner 'The release-tag rules'
+
+if ('bypass_actors' -notin @($tagRuleset.PSObject.Properties.Name)) {
+    throw 'The release-tag ruleset bypass policy is missing.'
+}
+$actualBypassActors = @($tagRuleset.bypass_actors | ForEach-Object {
+        Get-BypassActorIdentity -Actor $_ -ContractShape $false
+    })
+$expectedBypassActors = @($contract.tagRuleset.bypassActors |
+    ForEach-Object {
+        Get-BypassActorIdentity -Actor $_ -ContractShape $true
+    })
+if ($expectedBypassActors.Count -eq 0) {
+    if ($actualBypassActors.Count -ne 0) {
+        throw 'The release-tag bypass policy must equal the exact contract set.'
+    }
+}
+else {
+    Require-ExactSet `
+        -Actual $actualBypassActors `
+        -Expected $expectedBypassActors `
+        -Owner 'The release-tag bypass policy'
+}
 
 $environmentEvidence = @()
 foreach ($required in $contract.environments) {
@@ -177,6 +238,8 @@ $evidence = [ordered]@{
     commit = $head
     checkedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
     tagRulesetId = [long]$tagRuleset.id
+    tagRules = @($contract.tagRuleset.rules)
+    tagRulesetBypassActors = @($contract.tagRuleset.bypassActors)
     environments = $environmentEvidence
 }
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {

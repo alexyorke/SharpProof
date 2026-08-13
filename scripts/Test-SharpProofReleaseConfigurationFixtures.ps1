@@ -28,6 +28,7 @@ function New-State {
             })
         Ruleset = [pscustomobject]@{
             id = 7
+            bypass_actors = @()
             conditions = [pscustomobject]@{
                 ref_name = [pscustomobject]@{
                     include = @('refs/tags/v1.0.0*', 'refs/tags/evidence/v*')
@@ -160,6 +161,22 @@ cat "$GH_FIXTURE_ROOT/$file.json"
         Invoke-Case ruleset-case { param($state) $state.Ruleset.conditions.ref_name.include[0] = 'refs/tags/V1.0.0*' } $false
         Invoke-Case include-exclude-conflict { param($state) $state.Ruleset.conditions.ref_name.exclude = @($state.Ruleset.conditions.ref_name.include[0]) } $false
         Invoke-Case second-active-tag-ruleset { param($state) $state.Rulesets += [pscustomobject]@{ id = 8; target = 'tag'; enforcement = 'active' } } $false
+        Invoke-Case bypass-user-always { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 41; actor_type = 'User'; bypass_mode = 'always' }) } $false
+        Invoke-Case bypass-team-pull-request { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 42; actor_type = 'Team'; bypass_mode = 'pull_request' }) } $false
+        Invoke-Case bypass-app-always { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 49; actor_type = 'Integration'; bypass_mode = 'always' }) } $false
+        Invoke-Case bypass-unknown-actor { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 43; actor_type = 'Unknown'; bypass_mode = 'always' }) } $false
+        Invoke-Case bypass-extra-role { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 5; actor_type = 'RepositoryRole'; bypass_mode = 'always' }) } $false
+        Invoke-Case bypass-missing-mode { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 44; actor_type = 'Integration' }) } $false
+        Invoke-Case bypass-duplicate { param($state) $actor = [pscustomobject]@{ actor_id = 45; actor_type = 'Team'; bypass_mode = 'pull_request' }; $state.Ruleset.bypass_actors = @($actor, $actor) } $false
+        Invoke-Case bypass-type-case { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 46; actor_type = 'user'; bypass_mode = 'always' }) } $false
+        Invoke-Case bypass-id-mismatch { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = '47'; actor_type = 'User'; bypass_mode = 'always' }) } $false
+        Invoke-Case bypass-mode-case { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 48; actor_type = 'User'; bypass_mode = 'Always' }) } $false
+        Invoke-Case bypass-unknown-mode { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 50; actor_type = 'User'; bypass_mode = 'sometimes' }) } $false
+        Invoke-Case missing-bypass-policy { param($state) $state.Ruleset.PSObject.Properties.Remove('bypass_actors') } $false
+        Invoke-Case extra-rule { param($state) $state.Ruleset.rules += [pscustomobject]@{ type = 'creation' } } $false
+        Invoke-Case missing-rule { param($state) $state.Ruleset.rules = @($state.Ruleset.rules | Where-Object { $_.type -ne 'update' }) } $false
+        Invoke-Case duplicate-rule { param($state) $state.Ruleset.rules += [pscustomobject]@{ type = 'deletion' } } $false
+        Invoke-Case unexpected-rule-parameters { param($state) $state.Ruleset.rules[0] | Add-Member -NotePropertyName parameters -NotePropertyValue ([pscustomobject]@{ enabled = $true }) } $false
     }
     finally {
         $env:PATH = $oldPath
