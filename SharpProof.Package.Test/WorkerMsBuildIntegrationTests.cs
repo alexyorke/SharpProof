@@ -590,9 +590,16 @@ public sealed class WorkerMsBuildIntegrationTests
         File.WriteAllText(result, "replacement");
         var replaced = LinuxPathIdentity.PublicationLockName(result);
 
-        Assert.That(before, Does.EndWith(".sharpproof-publication-lock"));
-        Assert.That(existing, Is.EqualTo(before));
-        Assert.That(replaced, Is.EqualTo(before));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Path.GetExtension(before), Is.EqualTo(".lock"));
+            Assert.That(
+                Path.GetFileName(Path.GetDirectoryName(before)),
+                Is.EqualTo(".sharpproof-publication"));
+            Assert.That(Path.GetFileNameWithoutExtension(before), Has.Length.EqualTo(64));
+            Assert.That(existing, Is.EqualTo(before));
+            Assert.That(replaced, Is.EqualTo(before));
+        }
     }
 
     [Test]
@@ -606,6 +613,14 @@ public sealed class WorkerMsBuildIntegrationTests
         var missingResult = Path.Combine(directory, "missing-result.json");
         var missingLock = LinuxPathIdentity.PublicationLockName(missingResult);
         var missingTarget = Path.Combine(directory, "missing-lock-target");
+        if (OperatingSystem.IsLinux())
+        {
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(missingLock)!,
+                UnixFileMode.UserRead |
+                UnixFileMode.UserWrite |
+                UnixFileMode.UserExecute);
+        }
         File.CreateSymbolicLink(missingLock, missingTarget);
 
         Assert.Throws<IOException>((Action)(() =>

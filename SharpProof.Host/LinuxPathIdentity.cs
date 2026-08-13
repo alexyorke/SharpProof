@@ -25,14 +25,20 @@ public static partial class LinuxPathIdentity
     private const int OpenNoFollow = 0x20000;
     private const int OpenCloseOnExec = 0x80000;
     private const uint OwnerReadWrite = 0x180;
-    private const string PublicationMarkerSuffix =
+    private const string LegacyPublicationMarkerSuffix =
         ".sharpproof-publication-set";
-    private const string PublicationLockSuffix =
+    private const string LegacyPublicationLockSuffix =
         ".sharpproof-publication-lock";
+    private const string PublicationMetadataDirectory =
+        ".sharpproof-publication";
+    private const string PublicationMarkerExtension = ".set";
+    private const string PublicationLockExtension = ".lock";
     private const string PublicationMarkerHeader =
         "SharpProof.PublicationSet/1\n";
     private static readonly byte[] PublicationSetIdentityDomain =
         Encoding.ASCII.GetBytes("SharpProof.PublicationSetIdentity/1\0");
+    private static readonly byte[] PublicationPathIdentityDomain =
+        Encoding.ASCII.GetBytes("SharpProof.PublicationPathIdentity/1\0");
     private static readonly HashSet<string> UnsupportedRemoteFileSystems =
         new(StringComparer.Ordinal)
         {
@@ -120,7 +126,9 @@ public static partial class LinuxPathIdentity
 
     public static string PublicationMarkerPath(string publicationPath)
     {
-        return Canonicalize(publicationPath) + PublicationMarkerSuffix;
+        return PublicationMetadataPath(
+            Canonicalize(publicationPath),
+            PublicationMarkerExtension);
     }
 
     public static IDisposable AcquirePublicationSet(
@@ -272,15 +280,42 @@ public static partial class LinuxPathIdentity
     private static string PublicationLockNameForCanonicalPath(
         string canonicalPath)
     {
-        return canonicalPath + PublicationLockSuffix;
+        return PublicationMetadataPath(
+            canonicalPath,
+            PublicationLockExtension);
+    }
+
+    private static string PublicationMetadataPath(
+        string canonicalPath,
+        string extension)
+    {
+        var directory = Path.GetDirectoryName(canonicalPath) ??
+            throw new IOException(
+                "SharpProof publication path has no parent directory.");
+        var utf8 = new UTF8Encoding(false, true);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData(PublicationPathIdentityDomain);
+        hash.AppendData(utf8.GetBytes(canonicalPath));
+        var identity = Convert.ToHexString(hash.GetHashAndReset());
+        return Path.Combine(
+            directory,
+            PublicationMetadataDirectory,
+            identity + extension);
     }
 
     private static void ValidatePublicationMetadataAliases(
-        IReadOnlyCollection<string> canonicalPaths)
+        string[] canonicalPaths)
     {
         if (canonicalPaths.Any(static path =>
-                path.EndsWith(PublicationMarkerSuffix, StringComparison.Ordinal) ||
-                path.EndsWith(PublicationLockSuffix, StringComparison.Ordinal)))
+                path.EndsWith(
+                    LegacyPublicationMarkerSuffix,
+                    StringComparison.Ordinal) ||
+                path.EndsWith(
+                    LegacyPublicationLockSuffix,
+                    StringComparison.Ordinal) ||
+                path.Split('/').Contains(
+                    PublicationMetadataDirectory,
+                    StringComparer.Ordinal)))
         {
             throw new ArgumentException(
                 "SharpProof publication paths must not use the publication metadata namespace.");
@@ -288,11 +323,12 @@ public static partial class LinuxPathIdentity
         var metadata = new HashSet<string>(
             canonicalPaths.SelectMany(static path => new[]
             {
-                path + PublicationMarkerSuffix,
-                path + PublicationLockSuffix
+                PublicationMetadataPath(path, PublicationMarkerExtension),
+                PublicationMetadataPath(path, PublicationLockExtension)
             }),
             StringComparer.Ordinal);
-        if (canonicalPaths.Any(metadata.Contains))
+        if (metadata.Count != canonicalPaths.Length * 2 ||
+            canonicalPaths.Any(metadata.Contains))
         {
             throw new ArgumentException(
                 "SharpProof publication paths must not alias publication metadata.");
@@ -306,7 +342,10 @@ public static partial class LinuxPathIdentity
         var pending = new List<(string Path, string MarkerPath)>();
         foreach (var path in canonicalPaths)
         {
-            var markerPath = path + PublicationMarkerSuffix;
+            var markerPath = PublicationMetadataPath(
+                path,
+                PublicationMarkerExtension);
+            EnsurePublicationMetadataDirectory(markerPath);
             if (File.Exists(markerPath))
             {
                 ValidatePublicationMarker(markerPath, marker);
@@ -322,10 +361,7 @@ public static partial class LinuxPathIdentity
 
         foreach (var item in pending)
         {
-            var directory = Path.GetDirectoryName(item.MarkerPath) ??
-                throw new IOException(
-                    "SharpProof publication metadata has no directory.");
-            Directory.CreateDirectory(directory);
+            EnsurePublicationMetadataDirectory(item.MarkerPath);
         }
 
         var created = new List<string>();
@@ -479,6 +515,43 @@ public static partial class LinuxPathIdentity
         return handle;
     }
 
+    private static void EnsurePublicationMetadataDirectory(
+        string metadataPath)
+    {
+        var metadataDirectory = Path.GetDirectoryName(metadataPath) ??
+            throw new IOException(
+                "SharpProof publication metadata has no directory.");
+        var publicationDirectory = Path.GetDirectoryName(metadataDirectory) ??
+            throw new IOException(
+                "SharpProof publication metadata has no parent directory.");
+        Directory.CreateDirectory(publicationDirectory);
+        if (!Directory.Exists(metadataDirectory))
+        {
+            if (!OperatingSystem.IsLinux())
+            {
+                throw new PlatformNotSupportedException(
+                    "SharpProof publication metadata requires Linux.");
+            }
+            Directory.CreateDirectory(
+                metadataDirectory,
+                UnixFileMode.UserRead |
+                UnixFileMode.UserWrite |
+                UnixFileMode.UserExecute);
+        }
+        if (NativeMethods.LStat(metadataDirectory, out var information) != 0)
+        {
+            throw new IOException(
+                $"SharpProof could not inspect the publication metadata directory (errno {Marshal.GetLastPInvokeError()}).");
+        }
+        if ((information.Mode & FileTypeMask) != FileTypeDirectory ||
+            information.UserId != NativeMethods.GetEffectiveUserId() ||
+            (information.Mode & 0x3F) != 0)
+        {
+            throw new IOException(
+                "SharpProof publication metadata must be an owned private directory.");
+        }
+    }
+
     private static void ReleaseLocks(PublicationLock[] locks, int acquired)
     {
         for (var index = acquired - 1; index >= 0; index--)
@@ -592,10 +665,7 @@ public static partial class LinuxPathIdentity
 
         internal PublicationLock(string path)
         {
-            var directory = Path.GetDirectoryName(path) ??
-                throw new IOException(
-                    "SharpProof publication lock has no directory.");
-            Directory.CreateDirectory(directory);
+            EnsurePublicationMetadataDirectory(path);
             _handle = OpenRegularMetadata(
                 path,
                 OpenReadWrite | OpenCreate,
@@ -734,5 +804,9 @@ public static partial class LinuxPathIdentity
             StringMarshalling = StringMarshalling.Utf8)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int Open(string path, int flags, uint mode);
+
+        [LibraryImport("libc", EntryPoint = "geteuid")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial uint GetEffectiveUserId();
     }
 }

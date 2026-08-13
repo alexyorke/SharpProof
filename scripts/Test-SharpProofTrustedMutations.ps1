@@ -1126,6 +1126,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~PublicationSetIdentityUsesCanonicalInjectiveUtf8Framing'
     },
     [pscustomobject]@{
+        Name = 'publication-metadata-fixed-size-hash-name'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = "            PublicationMetadataDirectory,`n            identity + extension);"
+        Mutated = "            PublicationMetadataDirectory,`n            Path.GetFileName(canonicalPath) + extension);"
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~PublicationMetadataSupportsNameMaxBoundaryForEveryMember'
+    },
+    [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = '                if (type == FileTypeSymbolicLink)'

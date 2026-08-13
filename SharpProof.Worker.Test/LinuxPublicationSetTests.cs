@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using NUnit.Framework;
 using SharpProof.Host;
 
@@ -248,11 +249,21 @@ public sealed class LinuxPublicationSetTests
                     "foreign.sharpproof-publication-lock")],
                 TimeSpan.FromSeconds(1));
         }));
+        var directoryError = Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [Path.Combine(
+                    directory.Path,
+                    ".sharpproof-publication",
+                    "foreign.json")],
+                TimeSpan.FromSeconds(1));
+        }));
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(aliasError!.Message, Does.Contain("publication metadata"));
             Assert.That(reservedError!.Message, Does.Contain("publication metadata"));
+            Assert.That(directoryError!.Message, Does.Contain("publication metadata"));
             Assert.That(File.Exists(marker), Is.False);
         }
     }
@@ -381,6 +392,126 @@ public sealed class LinuxPublicationSetTests
 
         Assert.That(canonical, Is.EqualTo(Path.GetFullPath(result)));
         Assert.That(canonical, Has.Length.GreaterThan(260));
+    }
+
+    [Test]
+    public void PublicationMetadataSupportsNameMaxBoundaryForEveryMember()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var paths = Enumerable.Range(0, 4)
+            .Select(index => Path.Combine(
+                directory.Path,
+                new string((char)('a' + index), 250) + ".json"))
+            .ToArray();
+        foreach (var path in paths)
+        {
+            File.WriteAllText(path, "boundary");
+            File.Delete(path);
+        }
+
+        using var publication = LinuxPathIdentity.AcquirePublicationSet(
+            paths,
+            TimeSpan.FromSeconds(1));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(paths.Select(LinuxPathIdentity.PublicationLockName),
+                Has.All.Matches<string>(path => File.Exists(path)));
+            Assert.That(paths.Select(LinuxPathIdentity.PublicationMarkerPath),
+                Has.All.Matches<string>(path => File.Exists(path)));
+        }
+    }
+
+    [Test]
+    public void PublicationMetadataUsesUtf8ByteBoundedHashNames()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+        using var directory = TemporaryDirectory.Create();
+        var first = Path.Combine(
+            directory.Path,
+            new string('\u96ea', 80) + "-first.json");
+        var second = Path.Combine(
+            directory.Path,
+            new string('\u96ea', 80) + "-second.json");
+        var sibling = Directory.CreateDirectory(
+            Path.Combine(directory.Path, "sibling")).FullName;
+        var sameBasename = Path.Combine(sibling, Path.GetFileName(first));
+        foreach (var path in new[] { first, second })
+        {
+            File.WriteAllText(path, "multibyte boundary");
+            File.Delete(path);
+        }
+
+        var firstLock = LinuxPathIdentity.PublicationLockName(first);
+        var repeatedLock = LinuxPathIdentity.PublicationLockName(first);
+        var secondLock = LinuxPathIdentity.PublicationLockName(second);
+        var sameBasenameLock = LinuxPathIdentity.PublicationLockName(
+            sameBasename);
+        using var publication = LinuxPathIdentity.AcquirePublicationSet(
+            [first, second],
+            TimeSpan.FromSeconds(1));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(firstLock, Is.EqualTo(repeatedLock));
+            Assert.That(firstLock, Is.Not.EqualTo(secondLock));
+            Assert.That(firstLock, Is.Not.EqualTo(sameBasenameLock));
+            Assert.That(
+                Encoding.UTF8.GetByteCount(Path.GetFileName(firstLock)),
+                Is.LessThanOrEqualTo(255));
+            Assert.That(
+                Path.GetDirectoryName(firstLock),
+                Is.EqualTo(Path.GetDirectoryName(secondLock)));
+            Assert.That(File.Exists(firstLock), Is.True);
+            Assert.That(
+                File.GetUnixFileMode(Path.GetDirectoryName(firstLock)!) &
+                (UnixFileMode.GroupRead |
+                 UnixFileMode.GroupWrite |
+                 UnixFileMode.GroupExecute |
+                 UnixFileMode.OtherRead |
+                 UnixFileMode.OtherWrite |
+                 UnixFileMode.OtherExecute),
+                Is.EqualTo((UnixFileMode)0));
+        }
+    }
+
+    [Test]
+    public void UnownedPublicationMetadataDirectoryFailsBeforeMutation()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+        using var directory = TemporaryDirectory.Create();
+        var result = Path.Combine(directory.Path, "result.json");
+        var metadataDirectory = Path.GetDirectoryName(
+            LinuxPathIdentity.PublicationLockName(result))!;
+        Directory.CreateDirectory(metadataDirectory);
+        File.SetUnixFileMode(
+            metadataDirectory,
+            UnixFileMode.UserRead |
+            UnixFileMode.UserWrite |
+            UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead);
+
+        var error = Assert.Throws<IOException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [result],
+                TimeSpan.FromSeconds(1));
+        }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("owned private directory"));
+            Assert.That(File.Exists(result), Is.False);
+            Assert.That(
+                Directory.EnumerateFileSystemEntries(metadataDirectory),
+                Is.Empty);
+        }
     }
 
     [Test]
