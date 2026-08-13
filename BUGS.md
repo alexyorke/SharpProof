@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 128 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 127 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,22 @@ The active backlog contains 128 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-046 - Container contract does not bind the effective Docker authority (fixed)
+
+- [x] Fixed by `b3444f92d` (`fix: bind effective container authority`).
+- The container gate now parses a constrained authority grammar: every
+  catalog-owned image argument must be declared exactly once globally, the
+  complete ordered `FROM` graph must consume those arguments exactly, and all
+  Compose services must inherit one structurally exact image/build/platform
+  authority without overrides. The unnecessary unpinned external Dockerfile
+  frontend directive was removed, so Docker's bundled parser is the only
+  frontend authority.
+- Regression-first coverage rejects ten duplicate, redeclared, unused,
+  alternate, comment-decoy, frontend, and service-override mutations while
+  preserving the canonical control. The focused suite passed 11/11, full
+  Architecture passed 124/124, the container contract passed, and the tooling
+  image rebuilt successfully.
 
 ### SP-AUDIT-028 - Qualification evidence blesses arbitrary package files (fixed)
 
@@ -544,35 +560,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   rather than silently defaulting the field.
 - Consolidated cases: SP-AUDIT-099.
 - Unified closure: Persist authoritative parameter ordinal, source type, pre-state source, and scalar domain; independently derive and validate their exact relationship.
-
-### SP-AUDIT-046 - Container contract does not bind the effective Docker authority (P0)
-
-- [ ] `Test-SharpProofContainerContract.ps1` validates Dockerfile authorities
-  with unanchored whole-file regex presence checks. It requires the catalog's
-  exact `ARG ...=<image>@<digest>` text to occur somewhere, but does not parse
-  the effective Dockerfile instruction or require that each authority is
-  declared exactly once. Similar substring checks protect Compose platform and
-  container-entry contracts.
-- Certifier impact: a Dockerfile can retain the reviewed SDK pin as a decoy and
-  redeclare the same build argument with another image before `FROM`. The
-  canonical contract gate reports success even though a build resolves a
-  different base. A crafted compatible image containing the pinned SDK could
-  therefore preserve subsequent build behavior while bypassing the intended
-  base-image digest boundary.
-- Reproduction: the audit temporarily added a second
-  `ARG DOTNET_SDK_IMAGE=...9.0.300...@sha256:...` immediately after the
-  catalog-owned 9.0.316 declaration, then ran canonical-container `tooling
-  contract`. The command exited zero with `SharpProof container contract
-  validation passed.` The temporary Dockerfile mutation was removed.
-- Required closure: parse a deliberately constrained Dockerfile authority
-  grammar (or generate the authoritative prefix), require exactly one global
-  declaration and one matching `FROM` consumer for every pinned image, and
-  validate the effective Compose service contract structurally rather than by
-  substring. Add duplicate/redeclared/unused/comment-decoy pins, alternate
-  `FROM`, duplicate platform keys, canonical files, and a certifier mutation
-  that restores presence-only matching.
-- Consolidated cases: SP-AUDIT-077.
-- Unified closure: Validate the effective Dockerfile, frontend digest, base-image arguments, installed toolchain, Compose references, and evidence identity as one authority.
 
 ### SP-AUDIT-050 - Coverage and TCB universes are self-defined (P0)
 
