@@ -666,6 +666,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 enum WorkerClaimReason { Canceled, ProjectTimeout }
                 static class WorkerResultAssembler {
                     internal static WorkerVerifyResponse Create(
+                        string inputHash,
                         WorkerRunStatus runStatus) => new();
                     internal static WorkerVerifyResponse CreateIncomplete(
                         WorkerRunStatus status,
@@ -686,7 +687,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
                         try { throw new OperationCanceledException(); }
                         catch (OperationCanceledException) {
                             return await Respond(WorkerResultAssembler.Create(
-                                WorkerRunStatus.Canceled));
+                                "input", WorkerRunStatus.Canceled))
+                                .ConfigureAwait(false);
                         }
                     }
                 }
@@ -721,6 +723,65 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         var diagnostics = await Analyze(source);
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        "true ? await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Failed)) : await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Canceled))")]
+    [TestCase(
+        "await Respond(true ? WorkerResultAssembler.Create(WorkerRunStatus.Failed) : WorkerResultAssembler.Create(WorkerRunStatus.Canceled))")]
+    [TestCase(
+        "await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Canceled == WorkerRunStatus.Canceled ? WorkerRunStatus.Failed : WorkerRunStatus.Failed))")]
+    [TestCase(
+        "await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Failed, WorkerRunStatus.Canceled))")]
+    [TestCase(
+        "await Respond(Pick(WorkerResultAssembler.Create(WorkerRunStatus.Failed), WorkerResultAssembler.Create(WorkerRunStatus.Canceled)))")]
+    public async Task RejectsInexactWorkerCancellationResponseShapes(
+        string returnExpression)
+    {
+        var source =
+            $$"""
+            using System;
+            using System.Threading.Tasks;
+
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyResponse { }
+                enum WorkerRunStatus { Canceled, Failed }
+                static class WorkerResultAssembler {
+                    internal static WorkerVerifyResponse Create(
+                        WorkerRunStatus runStatus) => new();
+                    internal static WorkerVerifyResponse Create(
+                        WorkerRunStatus first,
+                        WorkerRunStatus second) => new();
+                }
+            }
+
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+
+                static class Program {
+                    internal static async Task<int> Main(string[] args) {
+                        async Task<int> Respond(
+                            WorkerVerifyResponse response) {
+                            await Task.Yield();
+                            return 0;
+                        }
+                        WorkerVerifyResponse Pick(
+                            WorkerVerifyResponse selected,
+                            WorkerVerifyResponse decoy) => selected;
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return {{returnExpression}};
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
     }
 
     [TestCase(
