@@ -753,6 +753,133 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void CoalesceAssignmentRetainsObservableTargetWrites()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Box {
+                public object? Value;
+            }
+
+            public sealed class Sample {
+                private object? _field;
+                private static object? s_field;
+                private object? _propertyValue;
+                private object? _indexerValue;
+
+                private object? Property {
+                    get => _propertyValue;
+                    set => _propertyValue = value;
+                }
+
+                private object? this[int index] {
+                    get => _indexerValue;
+                    set => _indexerValue = value;
+                }
+
+                public void ReceiverField(object value) =>
+                    _field ??= value;
+                public static void StaticField(object value) =>
+                    s_field ??= value;
+                public static void ParameterField(Box box, object value) =>
+                    box.Value ??= value;
+                public void PropertySetter(object value) =>
+                    Property ??= value;
+                public void IndexerSetter(object value) =>
+                    this[0] ??= value;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var cases = new[] {
+            (Method: "ReceiverField", Region: EffectRegionId.Receiver),
+            (Method: "StaticField", Region: EffectRegionId.Static()),
+            (Method: "ParameterField", Region: EffectRegionId.Parameter(0)),
+            (Method: "PropertySetter", Region: EffectRegionId.Receiver),
+            (Method: "IndexerSetter", Region: EffectRegionId.Receiver)
+        };
+
+        foreach (var (methodName, region) in cases)
+        {
+            var method = EffectTestHost.RequireMethod(
+                compilation,
+                "Sample",
+                methodName);
+            var result = session.Analyze(method);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Writes.Regions,
+                    Is.EqualTo(new[] { region }),
+                    methodName);
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+                Assert.That(result.Projection.IsComplete, Is.True, methodName);
+            }
+        }
+    }
+
+    [Test]
+    public void CoalesceAssignmentLocalTargetsRemainConservativeAndUnobservable()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void DefinitelyNull() {
+                    object? value = null;
+                    value ??= new object();
+                }
+
+                public static void DefinitelyNonNull() {
+                    object? value = typeof(object);
+                    value ??= new object();
+                }
+
+                public static void MaybeNull(object? value) {
+                    value ??= new object();
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var definitelyNull = session.Analyze(
+            Method(compilation, "DefinitelyNull"));
+        var definitelyNonNull = session.Analyze(
+            Method(compilation, "DefinitelyNonNull"));
+        var maybeNull = session.Analyze(
+            Method(compilation, "MaybeNull"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                definitelyNull.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                definitelyNonNull.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                maybeNull.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                new[] {
+                    definitelyNull.Summary,
+                    definitelyNonNull.Summary,
+                    maybeNull.Summary
+                },
+                Has.All.Property(nameof(EffectSummary.Writes))
+                    .EqualTo(EffectRegionSet.Empty));
+            Assert.That(
+                new[] {
+                    definitelyNull.Summary,
+                    definitelyNonNull.Summary,
+                    maybeNull.Summary
+                },
+                Has.All.Property(nameof(EffectSummary.Completeness))
+                    .EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void LocalAliasesRetainCallerOwnedAndFreshRegions()
     {
         var compilation = EffectTestHost.CreateCompilation(
