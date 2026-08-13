@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 89 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 88 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 89 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-159 - The nightly fuzz campaign is disconnected (fixed)
+
+- [x] Fixed by `8c2af405d` (`fix: connect nightly fuzz campaign`).
+- The container dispatcher now exposes a Release-only, clean exact-commit
+  `fuzz-nightly` command, and the nightly workflow invokes it after acceptance.
+  PR acceptance keeps its fixed pull-request campaign. Nightly uses the
+  catalog-owned case count, a rotating UTC seed, and every retained seed.
+- Fuzz evidence schema 3 binds the exact commit, status, rotating and retained
+  counts/seeds, retained manifest hash, per-run result hashes, observed cases,
+  and validation results. Regression tests cover command/workflow connectivity,
+  seed and case behavior, retained replay, schema/status evidence, and the
+  disconnected-script mutation. Focused and authority tests passed, Architecture
+  179/179, the container contract, and `git diff --check` passed. The long
+  10,000-case campaign was intentionally not run locally.
 
 ### SP-AUDIT-138 - Compiler-elided invocations still receive SP0027 (fixed)
 
@@ -1327,20 +1342,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-159 - The nightly fuzz campaign is disconnected (P1)
-
-- [ ] Nightly runs only ordinary `tooling acceptance`, whose fuzz phase always
-  uses the PR case count and fixed seed. The script that owns `nightlyCases`,
-  rotating seeds, and retained-seed replay has no workflow or container-command
-  caller.
-- Certifier impact: the nightly job can remain green while never executing the
-  larger/rotating campaign represented by the checked-in fuzz contract.
-- Evidence: workflow and dispatcher command graphs contain no nightly campaign
-  invocation; acceptance hardcodes the PR count and seed.
-- Required closure: expose one container-native nightly fuzz command, invoke it
-  from the nightly workflow, retain seed/case/commit evidence, and add command-
-  graph, fixed-seed, retained-seed, case-count, and disconnected-script controls.
 
 ### SP-AUDIT-160 - Standalone gate evidence is not source and result bound (P1)
 
