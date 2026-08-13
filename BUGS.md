@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 147 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 146 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 147 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-223 - Changed-line coverage fallback checks only the tip commit (fixed)
+
+- [x] Fixed by `c7de68f88` (`fix: require coverage comparison authority`).
+- Enforced changed-TCB coverage now requires an explicit durable comparison
+  authority, resolves it to one exact commit, and records that commit. The
+  container command and CI workflow no longer guess `HEAD^`.
+- Regression-first fixtures cover an earlier trusted change hidden by an
+  unrelated tip, explicit named/commit authorities, missing and unusable refs,
+  one-commit repositories, merge commits, working-tree mode, and report-only
+  local use. Focused coverage tests passed 12/12 and the full canonical-
+  container Architecture suite passed 84/84.
 
 ### SP-AUDIT-207 - Module initializer effects are omitted (fixed)
 
@@ -906,18 +918,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   all generic exception headers across every error field. Add custom-type,
   assertion-shaped exception, real scalar/collection assertion, user-context,
   mixed-failure, and heuristic-removal fixtures.
-
-### SP-AUDIT-223 - Changed-line coverage fallback checks only the tip commit (P0)
-
-- [ ] When CI or a local run lacks a usable comparison reference, changed-TCB
-  coverage falls back to `HEAD^`, so it inventories only the final commit.
-- Certifier impact: a multi-commit branch can change trusted production code in
-  an earlier commit, leave the tip unrelated, and pass the changed-line policy
-  without covering the trusted change.
-- Required closure: require a durable merge-base/baseline authority for every
-  qualification mode and fail closed when it is unavailable. Add two- and
-  three-commit branches, workflow dispatch, shallow checkout, explicit base,
-  merge commit, and fallback-removal controls.
 
 ### SP-AUDIT-243 - Compiler effect verdicts are only self-sealed (P0)
 
