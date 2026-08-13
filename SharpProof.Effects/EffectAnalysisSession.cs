@@ -28,8 +28,10 @@ public sealed class EffectAnalysisSession
     private readonly ExternalEffectResolver _external;
     private readonly IEffectCallPreconditionPolicy
         _callPreconditions;
+    private readonly EffectModuleInitialization _moduleInitialization;
     private readonly EffectMethodNodeBuilder _nodeBuilder;
     private readonly object _gate = new();
+    private ImmutableArray<IMethodSymbol> _moduleInitializers;
     private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes = new(SymbolEqualityComparer.Default);
     private volatile ImmutableDictionary<IMethodSymbol, EffectSummary> _summaries =
         ImmutableDictionary.Create<IMethodSymbol, EffectSummary>(SymbolEqualityComparer.Default);
@@ -56,6 +58,7 @@ public sealed class EffectAnalysisSession
             callPreconditions ??
             new ConservativeEffectCallPreconditionPolicy(
                 compilation);
+        _moduleInitialization = new EffectModuleInitialization(compilation);
         _nodeBuilder = new EffectMethodNodeBuilder(
             this,
             compilation,
@@ -86,14 +89,23 @@ public sealed class EffectAnalysisSession
                     ResolveEntryPreconditions(normalized)));
         }
 
-        EnsureAnalyzed([normalized], cancellationToken);
-        var summary = _summaries.TryGetValue(normalized, out var analyzed)
+        var moduleInitializers = GetModuleInitializers(cancellationToken);
+        EnsureAnalyzed(moduleInitializers.Add(normalized), cancellationToken);
+        var summaries = _summaries;
+        var summary = summaries.TryGetValue(normalized, out var analyzed)
             ? analyzed
             : EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnsupportedOperation);
+        var initialization = EffectModuleInitialization.SummarizeBeforeEntry(
+            normalized,
+            moduleInitializers,
+            summaries);
+        summary = EffectSummaryDomain.Instance.Join(initialization, summary);
         ImmutableArray<EffectDirectWitness> directWitnesses;
         lock (_gate)
         {
-            directWitnesses = _nodes.TryGetValue(normalized, out var node)
+            directWitnesses =
+                !EffectModuleInitialization.CanPreventBodyEntry(initialization) &&
+                _nodes.TryGetValue(normalized, out var node)
                 ? node.DirectWitnesses
                 : [];
         }
@@ -105,13 +117,28 @@ public sealed class EffectAnalysisSession
         CancellationToken cancellationToken = default)
     {
         var methods = CollectSourceMethods(cancellationToken);
+        var moduleInitializers = GetModuleInitializers(cancellationToken);
         EnsureAnalyzed(methods, cancellationToken);
+        var summaries = _summaries;
         lock (_gate)
         {
-            return [.. methods.Select(method => new EffectMethodResult(
-                method,
-                _summaries[method],
-                _nodes[method].DirectWitnesses))];
+            return [.. methods.Select(method =>
+            {
+                var initialization =
+                    EffectModuleInitialization.SummarizeBeforeEntry(
+                        method,
+                        moduleInitializers,
+                        summaries);
+                return new EffectMethodResult(
+                    method,
+                    EffectSummaryDomain.Instance.Join(
+                        initialization,
+                        summaries[method]),
+                    EffectModuleInitialization.CanPreventBodyEntry(
+                        initialization)
+                        ? []
+                        : _nodes[method].DirectWitnesses);
+            })];
         }
     }
 
@@ -423,6 +450,21 @@ public sealed class EffectAnalysisSession
         }
         return [.. methods.OrderBy(
             static method => method, EffectSymbolComparer<IMethodSymbol>.Instance)];
+    }
+
+    private ImmutableArray<IMethodSymbol> GetModuleInitializers(
+        CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            if (_moduleInitializers.IsDefault)
+            {
+                _moduleInitializers = _moduleInitialization.Discover(
+                    cancellationToken);
+            }
+
+            return _moduleInitializers;
+        }
     }
 
     private bool IsSourceMethod(IMethodSymbol method)
