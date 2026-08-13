@@ -9,6 +9,124 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class RequiresCallSiteDiscoveryTests
 {
+    [TestCase(false, 0)]
+    [TestCase(true, 1)]
+    public async Task SourceConditionalInvocationAndArgumentsFollowEmission(
+        bool defineFirstSymbol,
+        int expectedDiagnostics)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System.Diagnostics;
+            using SharpProof.Attributes;
+            public static class Subject {
+                [Conditional("FIRST")]
+                [Conditional("SECOND")]
+                private static void Trace(int value) {
+                    Contract.Requires(value > 0);
+                }
+                public static void Call() { Trace(-1); }
+            }
+            """,
+            ["SP0027"]);
+        if (defineFirstSymbol)
+        {
+            var tree = compilation.SyntaxTrees.Single();
+            compilation = compilation.ReplaceSyntaxTree(
+                tree,
+                tree.WithRootAndOptions(
+                    await tree.GetRootAsync(),
+                    ((CSharpParseOptions)tree.Options)
+                    .WithPreprocessorSymbols("FIRST")));
+        }
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", expectedDiagnostics)));
+    }
+
+    [TestCase(false, 0)]
+    [TestCase(true, 1)]
+    public async Task MetadataConditionalInvocationArgumentsFollowEmission(
+        bool defineDebug,
+        int expectedDiagnostics)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System.Diagnostics;
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static bool Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return true;
+                }
+                public static void Call() { Debug.Assert(Positive(-1)); }
+            }
+            """,
+            ["SP0027"]);
+        if (defineDebug)
+        {
+            var originalTree = compilation.SyntaxTrees.Single();
+            compilation = compilation.ReplaceSyntaxTree(
+                originalTree,
+                originalTree.WithRootAndOptions(
+                    await originalTree.GetRootAsync(),
+                    ((CSharpParseOptions)originalTree.Options)
+                    .WithPreprocessorSymbols("DEBUG")));
+        }
+
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = (await tree.GetRootAsync()).DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Call");
+        var model = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                model,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(
+            candidates!.Value.Count(static candidate =>
+                candidate.TargetMethod.Name == "Positive"),
+            Is.EqualTo(expectedDiagnostics));
+    }
+
+    [TestCase(false, 0)]
+    [TestCase(true, 1)]
+    public async Task PartialInvocationFollowsCompilerEmission(
+        bool implemented,
+        int expectedDiagnostics)
+    {
+        var implementation = implemented
+            ? "static partial void Target(int value) { }"
+            : string.Empty;
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            $$"""
+            using SharpProof.Attributes;
+            public static partial class Subject {
+                static partial void Target([Positive] int value);
+                {{implementation}}
+                public static void Call() { Target(-1); }
+            }
+            """,
+            ["SP0027", "SP0047"]);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", expectedDiagnostics)));
+    }
+
     [Test]
     public void PotentialCallScreeningIncludesPropertyAndEventAccessors()
     {

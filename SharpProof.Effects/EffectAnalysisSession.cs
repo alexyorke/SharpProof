@@ -23,8 +23,7 @@ public sealed partial class EffectMethodResult
 public sealed class EffectAnalysisSession
 {
     private readonly Compilation _compilation;
-    private readonly INamedTypeSymbol? _conditionalAttribute;
-    private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>> _definedPreprocessorSymbols = [];
+    private readonly InvocationEmissionPolicy _invocationEmission;
     private readonly ExternalEffectResolver _external;
     private readonly IEffectCallPreconditionPolicy
         _callPreconditions;
@@ -51,7 +50,7 @@ public sealed class EffectAnalysisSession
         IEffectCallPreconditionPolicy? callPreconditions = null)
     {
         _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-        _conditionalAttribute = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.ConditionalAttribute);
+        _invocationEmission = new InvocationEmissionPolicy(compilation);
         _external = new ExternalEffectResolver(compilation,
             ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs)));
         _callPreconditions =
@@ -217,41 +216,7 @@ public sealed class EffectAnalysisSession
 
     internal bool IsConditionallyElided(IInvocationOperation invocation)
     {
-        if (_conditionalAttribute == null ||
-            invocation.Syntax.SyntaxTree.Options is not CSharpParseOptions)
-        {
-            return false;
-        }
-
-        var conditionalSymbols = invocation.TargetMethod.GetAttributes()
-            .Where(attribute => SymbolEqualityComparer.Default.Equals(
-                attribute.AttributeClass?.OriginalDefinition, _conditionalAttribute.OriginalDefinition))
-            .Select(attribute =>
-                attribute.ConstructorArguments.Length == 1
-                    ? attribute.ConstructorArguments[0].Value as string
-                    : null)
-            .Where(static symbol => !string.IsNullOrWhiteSpace(symbol))
-            .ToImmutableArray();
-        if (conditionalSymbols.IsDefaultOrEmpty)
-        {
-            return false;
-        }
-
-        var definedSymbols = GetDefinedPreprocessorSymbols(invocation.Syntax.SyntaxTree);
-        return conditionalSymbols.All(symbol => !definedSymbols.Contains(symbol!));
-    }
-
-    private ImmutableHashSet<string> GetDefinedPreprocessorSymbols(
-        SyntaxTree tree)
-    {
-        if (_definedPreprocessorSymbols.TryGetValue(tree, out var cached))
-        {
-            return cached;
-        }
-
-        cached = CSharpPreprocessorSymbols.GetDefined(tree);
-        _definedPreprocessorSymbols.Add(tree, cached);
-        return cached;
+        return _invocationEmission.IsElided(invocation);
     }
 
     internal EffectThrowSet ResolveThrownException(IOperation? exception)

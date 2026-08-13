@@ -8,6 +8,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
     ControlFlowGraph? suppliedGraph = null,
     IOperation? suppliedOperationRoot = null)
 {
+    private readonly InvocationEmissionPolicy _invocationEmission =
+        new(semanticModel.Compilation);
+
     internal bool HasPotentialCallSite(
         Func<IMethodSymbol, bool> hasPotentialPreconditions)
     {
@@ -36,7 +39,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             IMethodSymbol>(
             SymbolEqualityComparer.Default);
         foreach (var operation in
-                 operationRoot.DescendantsAndSelf())
+                 ExecutableDescendantsAndSelf(operationRoot))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var calls = GetCalls(operation);
@@ -108,7 +111,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         ? [initializer]
                         : []);
             foreach (var operation in roots.SelectMany(
-                         static root => root.DescendantsAndSelf()))
+                         ExecutableDescendantsAndSelf))
             {
                 var calls = GetCalls(operation);
                 if (calls.IsDefaultOrEmpty ||
@@ -174,6 +177,24 @@ internal sealed partial class RequiresCallSiteDiscovery(
             .. callSites.OrderBy(
                 static candidate => candidate.Operation.Syntax.SpanStart)
         ];
+    }
+
+    private IEnumerable<IOperation> ExecutableDescendantsAndSelf(
+        IOperation operation)
+    {
+        if (operation is IInvocationOperation invocation &&
+            _invocationEmission.IsElided(invocation))
+        {
+            yield break;
+        }
+        yield return operation;
+        foreach (var child in operation.ChildOperations)
+        {
+            foreach (var descendant in ExecutableDescendantsAndSelf(child))
+            {
+                yield return descendant;
+            }
+        }
     }
 
     internal bool TryCreateGraph(

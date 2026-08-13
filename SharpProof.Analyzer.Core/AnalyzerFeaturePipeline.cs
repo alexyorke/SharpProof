@@ -156,6 +156,10 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+        if (InvocationEmissionPolicy.IsUnimplementedPartial(method))
+        {
+            return;
+        }
 
         if (method.PartialImplementationPart != null)
         {

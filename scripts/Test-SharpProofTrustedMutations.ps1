@@ -1166,6 +1166,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication'
     },
     [pscustomobject]@{
+        Name = 'requires-skips-compiler-elided-invocations'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
+        Original = "        if (operation is IInvocationOperation invocation &&`n            _invocationEmission.IsElided(invocation))"
+        Mutated = "        if (operation is IInvocationOperation invocation &&`n            !_invocationEmission.IsElided(invocation))"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~SourceConditionalInvocationAndArgumentsFollowEmission'
+    },
+    [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = '                if (type == FileTypeSymbolicLink)'
