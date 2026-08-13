@@ -168,7 +168,8 @@ internal sealed class ManagedAbstractFlow
             {
                 var condition = block.BranchValue;
                 var edgeBlock = blocks.Count;
-                blocks.Add(new(edgeBlock, state => expected.HasValue && condition != null
+                blocks.Add(new(edgeBlock, state => expected.HasValue && condition != null &&
+                    !ManagedMutationFacts.HasMutation(condition)
                     ? Assume(state, condition, expected.Value) : state));
                 edges.Add(new(block.Ordinal, edgeBlock));
                 edges.Add(new(edgeBlock, branch.Destination!.Ordinal));
@@ -228,17 +229,36 @@ internal sealed class ManagedAbstractFlow
                 }
                 else
                 {
+                    var hasMutation = ManagedMutationFacts.HasMutation(
+                        declarator.Initializer.Value);
                     state = Transfer(state, declarator.Initializer.Value, result, cancellationToken);
-                    state = state.Set(declarator.Symbol, EvaluateCore(declarator.Initializer.Value, state));
+                    state = state.Set(
+                        declarator.Symbol,
+                        hasMutation
+                            ? TopForType(declarator.Symbol.Type)
+                            : EvaluateCore(declarator.Initializer.Value, state));
                 }
                 break;
             case IFlowCaptureOperation capture:
+                var captureHasMutation = ManagedMutationFacts.HasMutation(
+                    capture.Value);
                 state = Transfer(state, capture.Value, result, cancellationToken);
-                state = state.Set(capture.Id, EvaluateCore(capture.Value, state));
+                state = state.Set(
+                    capture.Id,
+                    captureHasMutation
+                        ? TopForType(capture.Value.Type)
+                        : EvaluateCore(capture.Value, state));
                 break;
             case ISimpleAssignmentOperation assignment:
+                var valueHasMutation = ManagedMutationFacts.HasMutation(
+                    assignment.Value);
                 state = TransferMany(state, assignment.ChildOperations, result, cancellationToken);
-                state = SetStorage(state, assignment.Target, EvaluateCore(assignment.Value, state));
+                state = SetStorage(
+                    state,
+                    assignment.Target,
+                    valueHasMutation
+                        ? TopForType(assignment.Type)
+                        : EvaluateCore(assignment.Value, state));
                 break;
             case ICompoundAssignmentOperation compound:
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
@@ -1100,7 +1120,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool TryEvaluate(IOperation origin, IOperation value, out ManagedAbstractValue result)
     {
-        if (!HasMutation(value) &&
+        if (!ManagedMutationFacts.HasMutation(value) &&
             (TryGetState(value, out var state) ||
              TryGetState(origin, out state)))
         {
@@ -1111,7 +1131,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         var unwrapped =
             DefiniteOperationFacts.UnwrapHarmlessValue(value);
         if (unwrapped is ISimpleAssignmentOperation assignment &&
-            !HasMutation(assignment.Value) &&
+            !ManagedMutationFacts.HasMutation(assignment.Value) &&
             TryGetState(assignment.Value, out var valueState))
         {
             result = flow.Evaluate(
@@ -1129,7 +1149,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         IOperation value,
         out ManagedAbstractValue result)
     {
-        if (!HasMutation(value) &&
+        if (!ManagedMutationFacts.HasMutation(value) &&
             TryGetState(origin, out var state))
         {
             result = flow.Evaluate(value, state);
@@ -1158,7 +1178,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     internal bool ProvesNoSignedDivisionOverflow(
         IOperation origin, IOperation left, IOperation right, long minimum)
     {
-        return !HasMutation(right) &&
+        return !ManagedMutationFacts.HasMutation(right) &&
         TryEvaluate(origin, left, out var leftValue) &&
         TryEvaluate(origin, right, out var rightValue) &&
         leftValue.TryGetInteger(out var leftInterval) &&
@@ -1169,7 +1189,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     internal bool ProvesArrayAccess(IArrayElementReferenceOperation element)
     {
         return element.Indices.Length == 1 &&
-        !HasMutation(element.Indices[0]) &&
+        !ManagedMutationFacts.HasMutation(element.Indices[0]) &&
         TryEvaluate(element, element.ArrayReference, out var array) &&
         TryEvaluate(element, element.Indices[0], out var index) &&
         array.IsDefinitelyNonNull &&
@@ -1180,19 +1200,9 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool ProvesNoOverflow(IOperation operation)
     {
-        return operation is not IBinaryOperation binary || !HasMutation(binary.RightOperand)
+        return !ManagedMutationFacts.HasMutation(operation)
             ? TryGetState(operation, out var state) && flow.ProvesNoOverflow(operation, state)
             : false;
-    }
-
-    private static bool HasMutation(IOperation operation)
-    {
-        return operation.DescendantsAndSelf().Any(static candidate =>
-            candidate is IAssignmentOperation or IIncrementOrDecrementOperation or IDynamicInvocationOperation ||
-            candidate is IArgumentOperation { Parameter.RefKind: not RefKind.None } ||
-            candidate is IInvocationOperation invocation &&
-            (invocation.TargetMethod.MethodKind == MethodKind.LocalFunction ||
-             invocation.TargetMethod.ContainingType.TypeKind == TypeKind.Delegate));
     }
 
     private static bool IsControlFlow(IOperation operation)

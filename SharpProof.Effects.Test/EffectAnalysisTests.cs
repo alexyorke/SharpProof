@@ -3493,6 +3493,133 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void MutationBearingExpressionsKeepRuntimeReachableEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int s_state;
+
+                public static void DirectFalseEdge() {
+                    var value = 1;
+                    if (value + (value = 2) == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void DirectTrueEdge() {
+                    var value = 1;
+                    if (value + (value = 2) == 3) {
+                        s_state++;
+                    }
+                }
+
+                public static void InitializerFalseEdge() {
+                    var value = 1;
+                    var predicate = value + (value = 2) == 4;
+                    if (predicate) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void AssignmentFalseEdge() {
+                    var value = 1;
+                    var predicate = false;
+                    predicate = value + (value = 2) == 4;
+                    if (predicate) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void IncrementFalseEdge() {
+                    var value = 1;
+                    if (value++ + value == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                private static int Replace(ref int value) {
+                    value = 2;
+                    return value;
+                }
+
+                public static void RefCallFalseEdge() {
+                    var value = 1;
+                    if (value + Replace(ref value) == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void NestedTrueEdge() {
+                    var value = 1;
+                    if ((value + (value = 2) == 3) && true) {
+                        s_state++;
+                    }
+                }
+
+                public static void StableImpossibleEdge() {
+                    var value = 2;
+                    if (value + value == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void StableReachableEdge() {
+                    var value = 1;
+                    if (value + value == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var methodName in new[] {
+                         "DirectFalseEdge",
+                         "DirectTrueEdge",
+                     "InitializerFalseEdge",
+                     "AssignmentFalseEdge",
+                     "IncrementFalseEdge",
+                     "RefCallFalseEdge",
+                     "NestedTrueEdge",
+                         "StableReachableEdge"
+                     })
+            {
+                var result = session.Analyze(Method(compilation, methodName));
+                Assert.That(
+                    result.Summary.Writes.Contains(EffectRegionId.Static()),
+                    Is.True,
+                    methodName);
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+            }
+
+            Assert.That(
+                session.Analyze(Method(compilation, "StableImpossibleEdge"))
+                    .Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+        }
+    }
+
+    [Test]
     public void AcyclicFlowDischargesOnlyProvenImplicitExceptions()
     {
         var compilation = EffectTestHost.CreateCompilation(
