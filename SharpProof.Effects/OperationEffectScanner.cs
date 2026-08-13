@@ -160,7 +160,11 @@ internal sealed class OperationEffectScanner
                 ILocalReferenceOperation or IInstanceReferenceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation or ISizeOfOperation => EffectSummary.Empty,
             IFlowCaptureOperation capture => ScanFlowCapture(capture),
-            IParameterReferenceOperation parameter => parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out
+            IParameterReferenceOperation parameter =>
+                parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
+                PrimaryConstructorParameterOwnership.IsReceiverBacked(
+                    parameter.Parameter,
+                    _method)
                     ? EffectSummaryOperations.Read(ClassifyParameter(parameter.Parameter))
                     : EffectSummary.Empty,
             IFieldReferenceOperation field => ScanField(field, access),
@@ -238,6 +242,20 @@ internal sealed class OperationEffectScanner
     private EffectSummary ScanProperty(
         IPropertyReferenceOperation property, EffectAccess access, IOperation? assignedValue = null)
     {
+        if (PrimaryConstructorParameterOwnership
+            .IsPositionalRecordProperty(property.Property))
+        {
+            var region = ClassifyRegion(
+                property.Instance,
+                aliasSource: true);
+            return EffectSummaryOperations.Join(
+                ScanInstance(property.Instance),
+                PotentialNullReceiver(property.Instance, property),
+                access == EffectAccess.Read
+                    ? EffectSummaryOperations.Read(region)
+                    : EffectSummaryOperations.Write(region));
+        }
+
         if (access == EffectAccess.Read &&
             IsIntrinsicArrayCardinalityProperty(property))
         {
@@ -1035,6 +1053,13 @@ internal sealed class OperationEffectScanner
 
     private EffectRegionSet ClassifyParameter(IParameterSymbol parameter)
     {
+        if (PrimaryConstructorParameterOwnership.IsReceiverBacked(
+                parameter,
+                _method))
+        {
+            return EffectRegionSet.Create(EffectRegionId.Receiver);
+        }
+
         if (SymbolEqualityComparer.Default.Equals(
                 parameter.ContainingSymbol?.OriginalDefinition,
                 _method.OriginalDefinition))

@@ -501,6 +501,157 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void CapturedPrimaryConstructorParametersReadReceiverState()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class ClassSample(int seed) {
+                private static int Pass(int value) => value;
+
+                public int Read() => seed;
+                public int Forward() => Pass(seed);
+                public int Value => seed;
+            }
+
+            public record class RecordSample(int seed) {
+                public int Read() => seed;
+                public int Value => seed;
+            }
+
+            public struct StructSample(int seed) {
+                public int Read() => seed;
+                public int Value => seed;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var methods = new[] {
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ClassSample",
+                "Read"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ClassSample",
+                "Forward"),
+            RequireGetter(compilation, "ClassSample", "Value"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "RecordSample",
+                "Read"),
+            RequireGetter(compilation, "RecordSample", "Value"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "StructSample",
+                "Read"),
+            RequireGetter(compilation, "StructSample", "Value")
+        };
+
+        foreach (var method in methods)
+        {
+            var result = session.Analyze(method);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Reads.Regions,
+                    Is.EqualTo(new[] { EffectRegionId.Receiver }),
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Summary.Writes.IsEmpty,
+                    Is.True,
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Projection.Effects,
+                    Is.EqualTo(SharpProofEffect.ReadsReceiverState),
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Projection.IsComplete,
+                    Is.True,
+                    method.ToDisplayString());
+            }
+        }
+    }
+
+    [Test]
+    public void PrimaryConstructorAndOrdinaryParameterReadsStayLocal()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public class BaseSample {
+                protected BaseSample(int value) {
+                }
+            }
+
+            public sealed class ForwardOnly(int seed) : BaseSample(seed) {
+                public int Constant() => 1;
+                public int Ordinary(int value) => value;
+            }
+
+            public sealed class ConstructorOnly(int seed) {
+                private readonly int _copy = seed;
+
+                public int Constant() => 1;
+                public static int Ordinary(int value) => value;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var exactControls = new[] {
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ForwardOnly",
+                "Constant"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ForwardOnly",
+                "Ordinary"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ConstructorOnly",
+                "Constant"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ConstructorOnly",
+                "Ordinary")
+        };
+
+        foreach (var method in exactControls)
+        {
+            var result = session.Analyze(method);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Reads.IsEmpty,
+                    Is.True,
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Projection.Effects,
+                    Is.EqualTo(SharpProofEffect.None),
+                    method.ToDisplayString());
+            }
+        }
+
+        foreach (var typeName in new[] { "ForwardOnly", "ConstructorOnly" })
+        {
+            var constructor = EffectTestHost.RequireType(
+                    compilation,
+                    typeName)
+                .InstanceConstructors
+                .Single(static method => method.Parameters.Length == 1);
+            Assert.That(
+                session.Analyze(constructor).Summary.Reads.IsEmpty,
+                Is.True,
+                typeName);
+        }
+    }
+
+    [Test]
     public void ValueTypeConstructionDoesNotReportManagedAllocation()
     {
         var result = Analyze(
@@ -4388,6 +4539,19 @@ public sealed class EffectAnalysisTests
         string methodName)
     {
         return EffectTestHost.RequireMethod(compilation, "Sample", methodName);
+    }
+
+    private static IMethodSymbol RequireGetter(
+        Compilation compilation,
+        string typeMetadataName,
+        string propertyName)
+    {
+        return EffectTestHost.RequireType(compilation, typeMetadataName)
+            .GetMembers(propertyName)
+            .OfType<IPropertySymbol>()
+            .Single()
+            .GetMethod ?? throw new InvalidOperationException(
+                $"Property '{typeMetadataName}.{propertyName}' has no getter.");
     }
 
     private static void AssertThrows(
