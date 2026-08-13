@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 111 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 110 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,22 @@ The active backlog contains 111 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-016 - Property and event accessor calls escape SP0027 analysis (fixed)
+
+- [x] Fixed by `af95a3889` (`fix: analyze accessor contract calls`).
+- Requires discovery now represents property/indexer getters and setters and
+  event add/remove accessors with exact receiver and parameter-ordinal argument
+  bindings. Target-aware deduplication prevents duplicate getter diagnostics;
+  compound/increment setters and conditional access remain explicitly
+  nonreplayable and fail closed when exact assigned values or execution are not
+  available.
+- Regression-first tests cover static/instance getters and setters, indexer
+  arguments and assigned values, event add/remove, compound/increment access,
+  valid calls, generated code, direct source accessor contracts, exact
+  candidate shapes, and conditional-access abstention. The primary focused
+  matrix passed 7/7, the final static/conditional regression passed, Analyzer
+  passed 252/252, Architecture passed 176/176, and `git diff --check` passed.
 
 ### SP-AUDIT-009 - Container evidence path guards are case-insensitive (fixed)
 
@@ -901,35 +917,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   package-mismatched pilot evidence.
 - Consolidated cases: SP-AUDIT-082, SP-AUDIT-133, SP-AUDIT-145, SP-AUDIT-161, SP-AUDIT-171.
 - Unified closure: Generate one authoritative qualification matrix and exact-commit receipt set covering pilots, Debug, release configuration, portable OS consumers, repeated cancellation, and minimum SDK.
-
-### SP-AUDIT-016 - Property and event accessor calls escape SP0027 analysis (P1)
-
-- [ ] `RequiresCallSiteDiscovery.CreateCandidate` recognizes only
-  `IInvocationOperation` and `IObjectCreationOperation`. Reads/writes
-  represented by `IPropertyReferenceOperation` and subscriptions represented
-  by `IEventAssignmentOperation` never become call-site candidates for their
-  getter, setter, add, or remove method, even though those accessors and
-  expressions are explicitly admitted by the documented analyzer subset.
-- Supported impact: compiler-bound `Contract.Requires` clauses on a property
-  getter or setter are not checked at ordinary property uses. Definitely false
-  preconditions therefore produce no SP0027 while the equivalent ordinary
-  method call does. The same omission applies to custom event add/remove
-  accessors.
-- Reproduction: a temporary canonical-container analyzer test defined a
-  static getter containing `Contract.Requires(false)` and a setter requiring
-  `value > 0`; a caller read the getter and assigned `-1` to the setter. The
-  focused contracts-profile run expected two SP0027 diagnostics and received
-  an empty diagnostic set.
-- Adjacent reproduction: custom event add/remove accessors each required a
-  non-null `value`; subscribing and removing `null!` expected two SP0027
-  diagnostics and likewise produced none.
-- Required closure: create getter/setter call-site candidates from property and
-  indexer operations with compiler evaluation order, receiver, index
-  arguments, and assigned value aligned to accessor parameters; likewise map
-  event assignment value and add/remove direction. Deduplicate
-  compound/increment operations and conditional access. Add static/instance
-  getter, setter, indexer, add/remove, compound assignment, null-conditional,
-  generated tree, valid-precondition, and mutation-discriminating cases.
 
 ### SP-AUDIT-017 - Publication-set path hashing is not injective (P1)
 
