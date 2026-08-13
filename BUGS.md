@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 145 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 144 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 145 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-162 - Lowered-body hydration omits producer body invariants (fixed)
+
+- [x] Fixed by `6abd80862` (`fix: validate lowered body invariants`).
+- Hydration now rejects reachable cycles, more than 64 reachable blocks,
+  missing bodies for successful postcondition callables, and value-returning
+  paths without an exactly typed return value. Unreachable graph rows remain
+  outside the executable-body budget.
+- Regression-first coverage includes reachable cycles, the exact 64/65-block
+  boundary, an unreachable-cycle control, required and legitimately bodyless
+  callable shapes, missing returns, wrong-type returns, and an honest control.
+  The focused suite passed 39/39; full Worker passed 435/435 and Architecture
+  passed 88/88 in the canonical container.
 
 ### SP-AUDIT-158 - Acceptance skip switches still certify Passed (fixed)
 
@@ -858,22 +871,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   values during pack, artifact qualification, final validation, and planning.
   Add every field, three packages, conflicting support claims, canonical output,
   and individual-field mutation controls.
-
-### SP-AUDIT-162 - Lowered-body hydration omits producer body invariants (P0)
-
-- [ ] The compiler producer rejects cycles and more than 64 reachable blocks,
-  but `CompilerLoweredArtifact.DecodeBody` checks only entry shape and the
-  4,096-instruction limit.
-- Certifier impact: replacing a terminal return with `Goto 0` survived canonical
-  round-trip and hydration; an equivalent 65-block graph is also producer-
-  impossible but reader-admissible.
-- Reproduction: the compiler-lowering auditor's canonical probe reported
-  `self-cycle=accepted`.
-- Required closure: apply the exact producer acyclicity/reachable-block predicate
-  before creating a prepared body. Add self/back/cross cycles, unreachable rows,
-  64/65 blocks, instruction interplay, and validator-removal mutation.
-- Consolidated cases: SP-AUDIT-163, SP-AUDIT-172.
-- Unified closure: Apply one producer predicate for required body, reachable acyclic CFG limits, instruction limits, and correctly typed/value-bearing terminators.
 
 ### SP-AUDIT-173 - Call instantiation is not bound to parameter order and free-variable roles (P0)
 
