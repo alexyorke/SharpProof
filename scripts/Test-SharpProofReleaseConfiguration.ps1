@@ -95,12 +95,85 @@ function Get-BypassActorIdentity {
     return "$actorType|$actorIdIdentity|$bypassMode"
 }
 
+function Get-CanonicalWorkflowJob {
+    param(
+        [Parameter(Mandatory = $true)][string]$Yaml,
+        [Parameter(Mandatory = $true)][string]$JobId
+    )
+
+    if ($Yaml.Contains("`t", [StringComparison]::Ordinal)) {
+        throw 'The release workflow cannot contain YAML tab indentation.'
+    }
+    $normalized = $Yaml.Replace("`r`n", "`n").Replace("`r", "`n")
+    $jobsHeaders = [regex]::Matches($normalized, '(?m)^jobs:\s*(?:#.*)?$')
+    if ($jobsHeaders.Count -ne 1) {
+        throw 'The release workflow must contain exactly one jobs mapping.'
+    }
+    $jobsText = $normalized.Substring(
+        $jobsHeaders[0].Index + $jobsHeaders[0].Length).TrimStart("`n")
+    $jobHeadings = [regex]::Matches(
+        $jobsText,
+        '(?m)^  (?<id>[A-Za-z0-9_-]+):\s*(?:#.*)?$')
+    $duplicateJobIds = @($jobHeadings | Group-Object {
+            $_.Groups['id'].Value
+        } | Where-Object Count -ne 1)
+    if ($duplicateJobIds.Count -ne 0) {
+        throw 'The release workflow contains duplicate job keys.'
+    }
+    $heading = @($jobHeadings | Where-Object {
+            $_.Groups['id'].Value -ceq $JobId
+        })
+    if ($heading.Count -ne 1) {
+        throw "The release workflow must contain exactly one '$JobId' job."
+    }
+    $start = $heading[0].Index
+    $nextHeading = @($jobHeadings | Where-Object Index -gt $start |
+        Select-Object -First 1)
+    $length = if ($nextHeading.Count -eq 0) {
+        $jobsText.Length - $start
+    }
+    else {
+        $nextHeading[0].Index - $start
+    }
+    $block = $jobsText.Substring($start, $length).TrimEnd("`n")
+    if ([regex]::IsMatch($block, '(?m)^\s*(?:<<:|[^#\n]+:\s*[&*][A-Za-z0-9_-]+)')) {
+        throw "Release job '$JobId' cannot use YAML aliases or merge keys."
+    }
+    return $block
+}
+
+function Get-Sha256Text {
+    param([Parameter(Mandatory = $true)][string]$Value)
+
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
+    return [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+}
+
 $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
     throw 'The release-configuration commit could not be resolved.'
 }
 
 $repository = [string]$contract.repository
+$expectedWorkflowJobIds = @('publish-private-preview', 'publish')
+Require-ExactSet `
+    -Actual @($contract.workflowJobs | ForEach-Object { [string]$_.id }) `
+    -Expected $expectedWorkflowJobIds `
+    -Owner 'The release workflow job authority'
+$workflowEvidence = @($contract.workflowJobs | ForEach-Object {
+        $jobId = [string]$_.id
+        $expectedHash = [string]$_.canonicalSha256
+        if ($expectedHash -notmatch '^[0-9a-f]{64}$') {
+            throw "Release job '$jobId' has an invalid canonical hash."
+        }
+        $actualHash = Get-Sha256Text (
+            Get-CanonicalWorkflowJob -Yaml $workflow -JobId $jobId)
+        if (-not $actualHash.Equals($expectedHash, [StringComparison]::Ordinal)) {
+            throw "Release job '$jobId' does not equal its canonical structural contract."
+        }
+        [pscustomobject]@{ id = $jobId; canonicalSha256 = $actualHash }
+    })
 $rulesets = @(Invoke-GitHubJson "repos/$repository/rulesets")
 $activeTagRulesets = @($rulesets |
     Where-Object { $_.target -ceq 'tag' -and $_.enforcement -ceq 'active' })
@@ -212,24 +285,12 @@ foreach ($required in $contract.environments) {
             -Owner "Environment '$name' secrets"
     }
 
-    foreach ($token in @($name) + @($required.tags) +
-        @($required.variables) + @($required.secrets)) {
-        if (-not $workflow.Contains([string]$token, [StringComparison]::Ordinal)) {
-            throw "The release workflow does not reference '$token'."
-        }
-    }
-
     $environmentEvidence += [pscustomobject]@{
         name = $name
         tags = @($required.tags)
         variables = @($required.variables)
         secrets = @($required.secrets)
     }
-}
-
-if (-not $workflow.Contains('NuGet/login@', [StringComparison]::Ordinal) -or
-    -not $workflow.Contains('id-token: write', [StringComparison]::Ordinal)) {
-    throw 'The public NuGet job must use GitHub OIDC trusted publishing.'
 }
 
 $evidence = [ordered]@{
@@ -240,6 +301,7 @@ $evidence = [ordered]@{
     tagRulesetId = [long]$tagRuleset.id
     tagRules = @($contract.tagRuleset.rules)
     tagRulesetBypassActors = @($contract.tagRuleset.bypassActors)
+    workflowJobs = $workflowEvidence
     environments = $environmentEvidence
 }
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
