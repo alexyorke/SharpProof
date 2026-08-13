@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 109 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 108 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 109 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-019 - Unreachable catch handlers contribute effects (fixed)
+
+- [x] Fixed by `fe0f8af81` (`fix: model exception handler reachability`).
+- A shared exception-handler reachability authority now derives potential known
+  and unknown exceptions from the protected region and applies ordered catch
+  type and constant-filter selection. Catch/filter effects are scanned only
+  when reachable; `finally` remains conservative on reachable exits.
+- Regression-first tests cover empty and nonthrowing protected regions, known
+  and unknown throws, true/false filters, ordered exception hierarchies,
+  rethrow, `finally`, and generated selected analyzer projection. Effects passed
+  168/168, Analyzer passed 255/255, Architecture passed 176/176, the container
+  contract passed, and `git diff --check` passed. The registered mutation is
+  pinned but its campaign remains blocked by the unrelated pre-existing
+  nonunique generated ContractFor mutation target.
 
 ### SP-AUDIT-017 - Publication-set path hashing is not injective (fixed)
 
@@ -930,25 +945,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   package-mismatched pilot evidence.
 - Consolidated cases: SP-AUDIT-082, SP-AUDIT-133, SP-AUDIT-145, SP-AUDIT-161, SP-AUDIT-171.
 - Unified closure: Generate one authoritative qualification matrix and exact-commit receipt set covering pilots, Debug, release configuration, portable OS consumers, repeated cancellation, and minimum SDK.
-
-### SP-AUDIT-019 - Unreachable catch handlers contribute effects (P1)
-
-- [ ] `OperationEffectScanner.IsReachable` returns true for every operation
-  lexically inside a catch, filter, or finally clause even when managed flow
-  proves it unreachable. This avoids losing exceptional paths, but it also
-  scans catch handlers for `try` regions that contain no throwing operation.
-- Supported impact: an empty `try` followed by a catch that increments a static
-  field produced a complete summary containing a static write. Impossible
-  filters and their handler bodies can similarly add calls, capabilities,
-  allocations, writes, and exceptions, rejecting valid selected effect claims.
-- Reproduction: a temporary canonical-container Effects regression analyzed
-  `try { } catch { state++; }`; it expected an empty write set and received a
-  nonempty set from the unreachable handler.
-- Required closure: compute handler reachability from the set of exceptions
-  that can escape the protected region and the catch type/filter selection,
-  while continuing to scan `finally` clauses that execute on reachable exits.
-  Add empty/no-throw try, known thrown type, unknown call, constant true/false
-  filter, rethrow, finally, and mutation-discriminating cases.
 
 ### SP-AUDIT-020 - Exact safe array stores report type-mismatch throws (P1)
 
