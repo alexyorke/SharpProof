@@ -3366,6 +3366,48 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ExceptionHandlersContributeEffectsOnlyWhenReachable()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            public interface IExternal { void Run(); }
+            public static class Sample {
+                private static int s_state;
+                public static void EmptyTry() { try { } catch { s_state++; } }
+                public static void NoThrowTry() { try { var value = 1; value++; } catch { s_state++; } }
+                public static void KnownThrow() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { s_state++; } }
+                public static void UnknownThrow(IExternal external) { try { external.Run(); } catch (Exception) { s_state++; } }
+                public static void FalseFilter() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) when (false) { s_state++; } }
+                public static void TrueFilter() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) when (true) { s_state++; } }
+                public static void OrderedHierarchy() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { } catch (Exception) { s_state++; } }
+                public static void Rethrow() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { throw; } } catch (Exception) { s_state++; } }
+                public static void FinallyRuns() { try { } finally { s_state++; } }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(HasStaticWrite("EmptyTry"), Is.False);
+            Assert.That(HasStaticWrite("NoThrowTry"), Is.False);
+            Assert.That(HasStaticWrite("KnownThrow"), Is.True);
+            Assert.That(HasStaticWrite("UnknownThrow"), Is.True);
+            Assert.That(HasStaticWrite("FalseFilter"), Is.False);
+            Assert.That(HasStaticWrite("TrueFilter"), Is.True);
+            Assert.That(HasStaticWrite("OrderedHierarchy"), Is.False);
+            Assert.That(HasStaticWrite("Rethrow"), Is.True);
+            Assert.That(HasStaticWrite("FinallyRuns"), Is.True);
+        }
+
+        bool HasStaticWrite(string methodName)
+        {
+            return session.Analyze(Method(compilation, methodName))
+                .Summary.Writes.Contains(EffectRegionId.Static());
+        }
+    }
+
+    [Test]
     public void ExceptionFlowReportsOnlyExceptionsThatEscape()
     {
         var compilation = EffectTestHost.CreateCompilation(

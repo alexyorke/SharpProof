@@ -270,6 +270,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CatchVariableFlowUsesTheEffectDiscoveryCatalog'
     },
     [pscustomobject]@{
+        Name = 'effect-exception-handler-reachability'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = "            return _handlerReachability.IsReachable(`n                @catch,`n                @catch.Filter?.Span.Contains(operation.Syntax.Span) == true);"
+        Mutated = '            return true;'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ExceptionHandlersContributeEffectsOnlyWhenReachable'
+    },
+    [pscustomobject]@{
         Name = 'effect-fresh-array-content-provenance'
         File = 'SharpProof.Effects\OperationEffectScanner.cs'
         Original = "            IFieldReferenceOperation or IArrayElementReferenceOperation =>`n                EffectRegionSet.Unknown,"

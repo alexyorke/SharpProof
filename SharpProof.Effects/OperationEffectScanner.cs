@@ -13,6 +13,7 @@ internal sealed class OperationEffectScanner
     private readonly ImmutableArray<EffectDirectWitness>.Builder _directWitnesses =
         ImmutableArray.CreateBuilder<EffectDirectWitness>();
     private readonly INamedTypeSymbol? _exceptionType;
+    private readonly ExceptionHandlerReachability _handlerReachability;
     private readonly Dictionary<ISymbol, EffectRegionSet> _localRegions =
         new(SymbolEqualityComparer.Default);
     private readonly IMethodSymbol _method;
@@ -47,6 +48,7 @@ internal sealed class OperationEffectScanner
         _allowDirectWitnesses = allowDirectWitnesses;
         _directSyntax = GetDirectSyntax(root.Syntax);
         _exceptionType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
+        _handlerReachability = new ExceptionHandlerReachability(session.Compilation);
         _monitorType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Monitor);
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
         // remain useful in a try body, but absence of a fact cannot prove an
@@ -1058,16 +1060,23 @@ internal sealed class OperationEffectScanner
 
     internal bool IsReachable(IOperation operation)
     {
+        var handler = operation.Syntax.AncestorsAndSelf()
+            .FirstOrDefault(static syntax =>
+                syntax is CatchClauseSyntax or FinallyClauseSyntax);
+        if (handler is FinallyClauseSyntax)
+        {
+            return true;
+        }
+        if (handler is CatchClauseSyntax @catch)
+        {
+            return _handlerReachability.IsReachable(
+                @catch,
+                @catch.Filter?.Span.Contains(operation.Syntax.Span) == true);
+        }
+
         return _abstractFlow == null ||
         !_useAbstractReachability ||
-        _abstractFlow.IsReachable(operation) ||
-        IsInsideExceptionHandler(operation);
-    }
-
-    private static bool IsInsideExceptionHandler(IOperation operation)
-    {
-        return operation.Syntax.AncestorsAndSelf().Any(static syntax =>
-            syntax is CatchClauseSyntax or CatchFilterClauseSyntax or FinallyClauseSyntax);
+        _abstractFlow.IsReachable(operation);
     }
 
     private static bool IsSourceThrow(IThrowOperation operation)
