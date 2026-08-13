@@ -38,6 +38,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -242,6 +243,8 @@ function Get-ValidatedRelease {
         [string]$RepositoryCommit
     )
 
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+
     $manifestPath = Join-Path $Directory 'SharpProof.release.json'
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
         throw "Release manifest is missing: $manifestPath"
@@ -355,6 +358,14 @@ function Get-ValidatedRelease {
     }
 
     $packages = [Collections.Generic.List[object]]::new()
+    $payloadSets = @(
+        Get-RequiredProperty $manifest 'packagePayloads' 'Release manifest'
+    )
+    if ($payloadSets.Count -ne $packageOrder.Count -or
+        ((@($payloadSets.packageId | Sort-Object) -join '|') -ne
+            (@($packageOrder | Sort-Object) -join '|'))) {
+        throw 'Release manifest has an invalid package payload graph.'
+    }
     foreach ($packageId in $packageOrder) {
         $main = @(
             $packageArtifacts |
@@ -406,12 +417,26 @@ function Get-ValidatedRelease {
                 "Release package repository commit does not match checkout " +
                 "'$RepositoryCommit' for '$packageId'.")
         }
-        Test-SharpProofSymbolPackagePair `
+        $components = @(
+            $manifest.thirdPartyComponents |
+                Where-Object { [string]$_.packageId -eq $packageId }
+        )
+        $null = Test-SharpProofPackagePayload `
+            -PackagePath $mainPath `
+            -PackageId $packageId `
+            -RepositoryRoot $repositoryRoot `
+            -Components $components `
+            -ExpectedPayloads @(
+                $payloadSets |
+                    Where-Object { [string]$_.packageId -eq $packageId } |
+                    ForEach-Object { @($_.entries) }
+            )
+        $null = Test-SharpProofSymbolPackagePair `
             -PackagePath $mainPath `
             -SymbolPackagePath $symbolsPath `
             -PackageId $packageId `
             -RepositoryCommit $RepositoryCommit
-        $packages.Add([pscustomobject][ordered]@{
+        $null = $packages.Add([pscustomobject][ordered]@{
             packageId = $packageId
             version = $version
             mainFileName = [string]$main[0].fileName

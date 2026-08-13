@@ -10,6 +10,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 
 function Get-SpdxPackageId {
     param(
@@ -113,6 +114,12 @@ foreach ($artifact in $artifacts) {
         throw "Release artifact hash or size mismatch: $($artifact.fileName)"
     }
 }
+$payloadSets = @($manifest.packagePayloads)
+if ($payloadSets.Count -ne $expectedPackageIds.Count -or
+    ((@($payloadSets.packageId | Sort-Object) -join '|') -ne
+        ($expectedPackageIds -join '|'))) {
+    throw 'Release evidence does not contain the exact package payload graph.'
+}
 foreach ($packageId in $expectedPackageIds) {
     $mainArtifact = @(
         $artifacts |
@@ -128,7 +135,23 @@ foreach ($packageId in $expectedPackageIds) {
                 [string]$_.packageId -eq $packageId
             }
     )[0]
-    Test-SharpProofSymbolPackagePair `
+    $components = @(
+        $manifest.thirdPartyComponents |
+            Where-Object { [string]$_.packageId -eq $packageId }
+    )
+    $null = Test-SharpProofPackagePayload `
+        -PackagePath (Join-Path `
+            $resolvedSource `
+            ([string]$mainArtifact.fileName)) `
+        -PackageId $packageId `
+        -RepositoryRoot $repositoryRoot `
+        -Components $components `
+        -ExpectedPayloads @(
+            $payloadSets |
+                Where-Object { [string]$_.packageId -eq $packageId } |
+                ForEach-Object { @($_.entries) }
+        )
+    $null = Test-SharpProofSymbolPackagePair `
         -PackagePath (Join-Path `
             $resolvedSource `
             ([string]$mainArtifact.fileName)) `

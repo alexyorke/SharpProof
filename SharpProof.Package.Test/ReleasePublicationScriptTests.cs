@@ -430,6 +430,154 @@ public sealed class ReleasePublicationScriptTests
         }
     }
 
+    [Test]
+    public async Task EveryReleaseAuthorityUsesExactPackagePayloadValidation()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var scriptName in new[]
+                 {
+                     "New-SharpProofReleaseEvidence.ps1",
+                     "Test-SharpProofReleaseArtifacts.ps1",
+                     "Publish-SharpProofRelease.ps1"
+                 })
+        {
+            var script = await File.ReadAllTextAsync(
+                Path.Combine(root, "scripts", scriptName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofPackagePayloads.ps1"),
+                    scriptName);
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofPackagePayload"),
+                    scriptName);
+            }
+        }
+    }
+
+    [TestCase("foreign")]
+    [TestCase("z3-byte")]
+    [TestCase("duplicate-first-party")]
+    [TestCase("missing-managed")]
+    [TestCase("missing-native")]
+    [TestCase("valid")]
+    public async Task ReleaseEvidenceAuthenticatesExactPackagePayloadClosure(
+        string mutation)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PublicationWorkspace.Create();
+        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
+        {
+            File.Copy(
+                package.Path,
+                Path.Combine(
+                    workspace.PackageSource,
+                    Path.GetFileName(package.Path)));
+        }
+
+        if (mutation != "valid")
+        {
+            var packageId = mutation == "duplicate-first-party" ||
+                mutation == "missing-managed"
+                ? PackagedProductFeed.AttributesPackageId
+                : PackagedProductFeed.VerifierPackageId;
+            var packagePath = Path.Combine(
+                workspace.PackageSource,
+                Path.GetFileName(feed.Packages.Single(package =>
+                    package.Id == packageId).Path));
+            using var archive = ZipFile.Open(
+                packagePath,
+                ZipArchiveMode.Update);
+            switch (mutation)
+            {
+                case "foreign":
+                    {
+                        var entry = archive.CreateEntry(
+                            "tools/net9/SharpProof.Untracked.dll");
+                        await using var output = entry.Open();
+                        await output.WriteAsync(new byte[] { 1, 2, 3, 4 });
+                        break;
+                    }
+                case "z3-byte":
+                    {
+                        var entry = archive.GetEntry(
+                            "runtimes/linux-x64/native/libz3.so")!;
+                        using var image = new MemoryStream();
+                        await using (var input = entry.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        var bytes = image.ToArray();
+                        bytes[^1] ^= 0x01;
+                        RewriteEntry(
+                            archive,
+                            entry,
+                            "runtimes/linux-x64/native/libz3.so",
+                            bytes);
+                        break;
+                    }
+                case "duplicate-first-party":
+                    {
+                        var entry = archive.GetEntry(
+                            "lib/netstandard2.0/SharpProof.Attributes.dll")!;
+                        using var image = new MemoryStream();
+                        await using (var input = entry.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        var duplicate = archive.CreateEntry(
+                            "tools/net9/SharpProof.Attributes.dll");
+                        await using var output = duplicate.Open();
+                        await output.WriteAsync(image.ToArray());
+                        break;
+                    }
+                case "missing-managed":
+                    archive.GetEntry(
+                        "lib/netstandard2.0/SharpProof.Attributes.dll")!
+                        .Delete();
+                    break;
+                case "missing-native":
+                    archive.GetEntry(
+                        "runtimes/linux-x64/native/libz3.so")!
+                        .Delete();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mutation),
+                        mutation,
+                        "Unknown payload mutation.");
+            }
+        }
+
+        var evidence = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "New-SharpProofReleaseEvidence.ps1"),
+            "-PackageSource",
+            workspace.PackageSource);
+        if (mutation == "valid")
+        {
+            Assert.That(evidence.ExitCode, Is.Zero, evidence.Output);
+            return;
+        }
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(evidence.ExitCode, Is.Not.Zero, evidence.Output);
+            Assert.That(
+                evidence.Output,
+                Does.Contain("payload").IgnoreCase,
+                evidence.Output);
+        }
+    }
+
     private static string PublicationPolicy(string documentation)
     {
         var paragraphs = Regex.Split(

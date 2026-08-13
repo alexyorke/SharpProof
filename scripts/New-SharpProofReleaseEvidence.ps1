@@ -16,6 +16,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 
 function Get-PackageIdentity {
     param(
@@ -599,6 +600,24 @@ if ($commits[0] -ne $checkoutCommit) {
         "checkout '$checkoutCommit'.")
 }
 
+$packagePayloadEvidence = [Collections.Generic.List[object]]::new()
+foreach ($item in $identities |
+        Where-Object { $_.File.Extension -eq '.nupkg' }) {
+    $packageId = $item.Identity.Id
+    $components = @(
+        $thirdPartyManifest.packages.PSObject.Properties[$packageId].Value
+    )
+    $payloads = @(Test-SharpProofPackagePayload `
+        -PackagePath $item.File.FullName `
+        -PackageId $packageId `
+        -RepositoryRoot $repositoryRoot `
+        -Components $components)
+    $packagePayloadEvidence.Add([pscustomobject][ordered]@{
+        packageId = $packageId
+        entries = $payloads
+    })
+}
+
 foreach ($packageId in $expectedIds) {
     $main = @(
         $identities |
@@ -847,6 +866,10 @@ $manifest = [pscustomobject][ordered]@{
     }
     hashAlgorithm = 'SHA256'
     artifacts = $orderedArtifacts
+    packagePayloads = @(
+        $packagePayloadEvidence |
+            Sort-Object packageId
+    )
     thirdPartyComponents = @(
         $thirdPartyComponents |
             Sort-Object packageId, id, version
