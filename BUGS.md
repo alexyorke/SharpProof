@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 148 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 147 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 148 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-207 - Module initializer effects are omitted (fixed)
+
+- [x] Fixed by `37e52be93` (`fix: include module initializer effects`).
+- Effect sessions now discover trusted framework-attributed source module
+  initializers, analyze their call graph once, and join their effects before
+  ordinary entry points without recursively reapplying initialization to the
+  initializer itself.
+- Regression coverage includes module-initializer writes, synchronization and
+  throws, body-witness suppression after a throwing initializer, type-scoped
+  static-initializer controls, and initializer-callee reentry/deduplication.
+  The full canonical-container Effects and Architecture suites passed 162/162
+  and 78/78.
 
 ### SP-AUDIT-141 - Captured primary-constructor reads lose receiver ownership (fixed)
 
@@ -893,19 +906,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   all generic exception headers across every error field. Add custom-type,
   assertion-shaped exception, real scalar/collection assertion, user-context,
   mixed-failure, and heuristic-removal fixtures.
-
-### SP-AUDIT-207 - Module initializer effects are omitted (P0)
-
-- [ ] Pre-body effect analysis considers only the analyzed callable's containing
-  type initialization and never inventories module initializers.
-- Soundness impact: a selected empty method can prove `DoesNotThrow` and a
-  complete empty effect contract even though a module initializer throws before
-  the first callable body executes.
-- Required closure: attach the current module-initialization boundary to every
-  callable it may precede, excluding recursive self-entry, and disable direct
-  witnesses when it can prevent the event. Add empty/effectful/throwing/diverging,
-  multiple initializer, method/constructor, first/subsequent entry, and
-  containing-type-only mutation controls.
 
 ### SP-AUDIT-223 - Changed-line coverage fallback checks only the tip commit (P0)
 
