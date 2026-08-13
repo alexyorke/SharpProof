@@ -119,6 +119,7 @@
       "eng/release/first-party-assemblies.json",
       "eng/release/package-dependency-contract.json",
       "eng/release/third-party-components.json",
+      "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
       "scripts/Assert-SharpProofStandaloneGateResult.ps1",
       "scripts/CSharpSourceMetrics.ps1",
       "scripts/Generate-AnalyzerDiagnosticCatalog.ps1",
@@ -192,7 +193,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "ec07b5067f6a599e33a31bfeaeb8fa1a46aec690cca7ddb0883094c7781f8637",
+    "inventorySha256": "85f2bd940fa4ac85911dd7236fb3161c0fa53b5de5722375a55c90bcc5e146de",
     "components": [
       {
         "name": "discovery",
@@ -683,6 +684,14 @@
           "scripts/package-projects.json",
           "SharpProof.ArchitectureTest/ReleaseAuthorityClosureTests.cs",
           "SharpProof.ArchitectureTest/PilotAuthorityTests.cs"
+        ]
+      },
+      {
+        "name": "fuzzEvidenceAuthority",
+        "paths": [
+          "SharpProof.ArchitectureTest/FuzzRunnerEvidenceTests.cs",
+          "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
+          "scripts/Test-SharpProofFuzzRunnerResult.ps1"
         ]
       },
       {

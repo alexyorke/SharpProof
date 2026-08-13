@@ -1182,6 +1182,30 @@ $mutations = @(
         Filter = 'FullyQualifiedName~NightlyFuzzCampaignIsContainerConnectedAndEvidenceBound'
     },
     [pscustomobject]@{
+        Name = 'fuzz-result-requires-exact-property-count'
+        File = 'scripts\Assert-SharpProofFuzzRunnerResult.ps1'
+        Original = '$actual.Count -ne $Expected.Count -or'
+        Mutated = '$false -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FuzzRunnerEvidenceUsesStrictSchemaFourDecoder'
+    },
+    [pscustomobject]@{
+        Name = 'fuzz-result-requires-number-tokens'
+        File = 'scripts\Assert-SharpProofFuzzRunnerResult.ps1'
+        Original = '$property.ValueKind -ne [Text.Json.JsonValueKind]::Number -or'
+        Mutated = '$property.ValueKind -eq [Text.Json.JsonValueKind]::Number -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FuzzRunnerEvidenceUsesStrictSchemaFourDecoder'
+    },
+    [pscustomobject]@{
+        Name = 'fuzz-result-requires-positive-coverage'
+        File = 'scripts\Assert-SharpProofFuzzRunnerResult.ps1'
+        Original = '(Get-ExactJsonInt32 $coverage $name) -le 0'
+        Mutated = '(Get-ExactJsonInt32 $coverage $name) -lt 0'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FuzzRunnerEvidenceUsesStrictSchemaFourDecoder'
+    },
+    [pscustomobject]@{
         Name = 'standalone-gate-requires-passing-result'
         File = 'scripts\Assert-SharpProofStandaloneGateResult.ps1'
         Original = '$document.Result.Passed -isnot [bool] -or'

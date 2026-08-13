@@ -24,6 +24,7 @@ if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'Unable to bind fuzz evidence to the exact source commit.'
 }
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
 $contract = Get-Content `
     -LiteralPath (Join-Path $repositoryRoot 'eng\acceptance\contract.json') `
     -Raw |
@@ -130,90 +131,16 @@ function Invoke-FuzzRun {
         if (-not (Test-Path -LiteralPath $standardOutput -PathType Leaf)) {
             throw 'runner did not emit a JSON result'
         }
-        $result = Get-Content -LiteralPath $standardOutput -Raw |
-            ConvertFrom-Json -ErrorAction Stop
-        $requiredProperties = @(
-            'SchemaVersion',
-            'Cases',
-            'Seed',
-            'MaximumParallelism',
-            'Agreements',
-            'Abstentions',
-            'FrontendAgreements',
-            'SmtAgreements',
-            'PartialSmtAgreements',
-            'CoverageSatisfied',
-            'Failures',
-            'Passed'
-        )
-        foreach ($propertyName in $requiredProperties) {
-            if ($null -eq $result.PSObject.Properties[$propertyName]) {
-                throw "runner result is missing '$propertyName'"
-            }
-        }
-
+        $result = Assert-SharpProofFuzzRunnerResult `
+            -Path $standardOutput `
+            -ExpectedCases $Cases `
+            -ExpectedSeed $Seed `
+            -ExpectedMaximumParallelism ([int]$contract.fuzz.maximumParallelism)
         $runnerSchemaVersion = [int]$result.SchemaVersion
         $observedCases = [int]$result.Cases
-        $observedSeed = [int]$result.Seed
-        $observedMaximumParallelism = [int]$result.MaximumParallelism
         $agreements = [int]$result.Agreements
         $abstentions = [int]$result.Abstentions
-        $failureCount = @($result.Failures).Count
-        if ($result.Passed -isnot [bool] -or
-            $result.CoverageSatisfied -isnot [bool]) {
-            throw 'runner status properties must be JSON booleans'
-        }
         $runnerPassed = [bool]$result.Passed
-
-        if ($runnerSchemaVersion -ne 4) {
-            throw "runner schema '$runnerSchemaVersion' is not supported"
-        }
-        if ($observedCases -ne $Cases) {
-            throw "runner reported $observedCases cases; expected $Cases"
-        }
-        if ($observedSeed -ne $Seed) {
-            throw "runner reported seed $observedSeed; expected $Seed"
-        }
-        if ($observedMaximumParallelism -ne
-            [int]$contract.fuzz.maximumParallelism) {
-            throw (
-                "runner reported maximum parallelism " +
-                "$observedMaximumParallelism; expected " +
-                [string]$contract.fuzz.maximumParallelism)
-        }
-        if ($agreements -lt 0 -or
-            $abstentions -lt 0 -or
-            $agreements + $abstentions -ne $observedCases) {
-            throw (
-                "runner accounted for $($agreements + $abstentions) of " +
-                "$observedCases cases")
-        }
-        if ($abstentions -ne 0 -or $agreements -ne $observedCases) {
-            throw (
-                "supported-domain fuzzing requires zero abstentions and " +
-                "agreement for every case; agreements=$agreements, " +
-                "abstentions=$abstentions")
-        }
-        foreach ($countName in @(
-                'FrontendAgreements',
-                'SmtAgreements',
-                'PartialSmtAgreements')) {
-            $count = [int]$result.$countName
-            if ($count -ne $observedCases) {
-                throw (
-                    "runner '$countName' reported $count agreements; " +
-                    "expected $observedCases")
-            }
-        }
-        if ($failureCount -ne 0) {
-            throw "runner reported $failureCount differential failures"
-        }
-        if (-not [bool]$result.CoverageSatisfied) {
-            throw 'runner did not satisfy required fuzz coverage'
-        }
-        if (-not $runnerPassed) {
-            throw 'runner reported Passed=false'
-        }
     }
     catch {
         $validationError = $_.Exception.Message
