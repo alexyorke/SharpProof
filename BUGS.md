@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 143 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 142 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 143 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-060 - Managed flow loses post-catch execution state (fixed)
+
+- [x] Fixed by `cf26c6044` (`fix: retain effects after handled exceptions`).
+- For methods with structured exception handling, absence of regular-edge
+  abstract-flow state no longer proves an operation unreachable. Roslyn CFG
+  reachability remains the outer filter and scalar facts remain available for
+  exception discharge.
+- Regression-first coverage proves a normally completing catch preserves a
+  later static write and DivideByZeroException, retains a no-throw control, and
+  projects the reachable purity violation through SP0002. Full Effects passed
+  164/164, Analyzer passed 219/219, and Architecture passed 88/88 in the
+  canonical container.
 
 ### SP-AUDIT-101 - Mutation-bearing expressions are re-evaluated from post-state (fixed)
 
@@ -651,27 +664,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   and exact-valid controls plus provenance mutations.
 - Consolidated cases: SP-AUDIT-239.
 - Unified closure: Authenticate every source, IL, specification, and transitive summary dependency at hydration and project the materially used closure into proof evidence.
-
-### SP-AUDIT-060 - Managed flow loses post-catch execution state (P0)
-
-- [ ] `ManagedAbstractFlow` makes throws bottom and propagates only regular CFG
-  successors. It does not model structured exception edges into handlers or
-  merge handler exit states into the post-try continuation. The scanner forces
-  handler operations themselves reachable, but not later operations whose only
-  path runs through a catch.
-- Supported impact: definite effects and exceptions after a handled exception
-  can disappear from a complete summary. Purity, no-throw, allowed-exception,
-  and effect-contract claims may therefore be accepted using an impossible
-  pre-handler state.
-- Reproduction: a focused effect test initialized a divisor to one, threw and
-  caught `InvalidOperationException`, assigned zero in the catch, then divided
-  by that local. The expected certain `DivideByZeroException` was absent and
-  the throw set was empty. The temporary regression was removed.
-- Required closure: model exceptional CFG transfer into catches/finally and
-  merge normally completing handler states into the continuation, preserving
-  definite facts only when valid on every escaping path. Add exact/base/
-  filtered catches, catch assignments, multiple handlers, finally completion,
-  rethrow/nonreturning handlers, post-handler effects, and mutation cases.
 
 ### SP-AUDIT-065 - Release workflow authority is checked as raw substrings (P0)
 
