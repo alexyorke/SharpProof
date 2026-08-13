@@ -24,6 +24,69 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
+
+function ConvertTo-OrdinalSortedArray {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$Values
+    )
+
+    $items = [Collections.Generic.List[string]]::new()
+    foreach ($value in $Values) {
+        $items.Add([string]$value)
+    }
+    $items.Sort([StringComparer]::Ordinal)
+    return $items.ToArray()
+}
+
+function Invoke-GitText {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FailureMessage
+    )
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'git'
+    $startInfo.WorkingDirectory = $repositoryRoot
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+    $startInfo.ArgumentList.Add('-C')
+    $startInfo.ArgumentList.Add($repositoryRoot)
+    foreach ($argument in $Arguments) {
+        $startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw $FailureMessage
+        }
+        $output = $process.StandardOutput.ReadToEndAsync()
+        $errorOutput = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $text = $output.GetAwaiter().GetResult()
+        $errorText = $errorOutput.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            if ([string]::IsNullOrWhiteSpace($errorText)) {
+                throw $FailureMessage
+            }
+            throw "$FailureMessage $($errorText.Trim())"
+        }
+        return $text
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
 $resolvedCoverageRoot = (Resolve-Path `
     -LiteralPath $CoverageRoot `
     -ErrorAction Stop).Path
@@ -62,7 +125,7 @@ foreach ($property in $baseline.projects.PSObject.Properties) {
 }
 $declarationOnlyTcbFiles =
     [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
+        [StringComparer]::Ordinal)
 foreach ($value in @($baseline.declarationOnlyTcbFiles)) {
     $path = [string]$value
     if ([string]::IsNullOrWhiteSpace($path) -or
@@ -93,7 +156,7 @@ if ([string]::IsNullOrWhiteSpace($ComparisonRef) -and -not $ReportOnly) {
 
 $lineHits = [Collections.Generic.Dictionary[string,
     Collections.Generic.Dictionary[int, int]]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
+        [StringComparer]::Ordinal)
 
 function Resolve-CoverageSourcePath {
     param(
@@ -105,24 +168,26 @@ function Resolve-CoverageSourcePath {
         [string[]]$SourceRoots
     )
 
+    $normalizedFileName = $FileName.Replace('\', '/')
     $candidates = [Collections.Generic.List[string]]::new()
-    if ([IO.Path]::IsPathRooted($FileName)) {
-        $candidates.Add([IO.Path]::GetFullPath($FileName))
+    if ([IO.Path]::IsPathRooted($normalizedFileName)) {
+        $candidates.Add([IO.Path]::GetFullPath($normalizedFileName))
     }
     else {
         $candidates.Add([IO.Path]::GetFullPath(
-            (Join-Path $repositoryRoot $FileName)))
+            (Join-Path $repositoryRoot $normalizedFileName)))
         foreach ($sourceRoot in $SourceRoots) {
             if (-not [string]::IsNullOrWhiteSpace($sourceRoot)) {
+                $normalizedSourceRoot = $sourceRoot.Replace('\', '/')
                 $candidates.Add([IO.Path]::GetFullPath(
-                    (Join-Path $sourceRoot $FileName)))
+                    (Join-Path $normalizedSourceRoot $normalizedFileName)))
             }
         }
     }
     foreach ($candidate in $candidates) {
         if ($candidate.StartsWith(
                 $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::OrdinalIgnoreCase) -and
+                [StringComparison]::Ordinal) -and
             (Test-Path -LiteralPath $candidate -PathType Leaf)) {
             return $candidate.Substring($repositoryRoot.Length + 1).
                 Replace('\', '/')
@@ -145,8 +210,8 @@ foreach ($report in $reports) {
             -not $relativePath.EndsWith(
                 '.cs',
                 [StringComparison]::OrdinalIgnoreCase) -or
-            $relativePath.Contains('/obj/', [StringComparison]::OrdinalIgnoreCase) -or
-            $relativePath.Contains('/bin/', [StringComparison]::OrdinalIgnoreCase)) {
+            $relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or
+            $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) {
             continue
         }
         if (-not $lineHits.ContainsKey($relativePath)) {
@@ -204,10 +269,10 @@ foreach ($property in $baseline.projects.PSObject.Properties |
             Where-Object {
                 $_.StartsWith(
                     $prefix,
-                    [StringComparison]::OrdinalIgnoreCase)
-            } |
-            Sort-Object
+                    [StringComparison]::Ordinal)
+            }
     )
+    $paths = @(ConvertTo-OrdinalSortedArray -Values $paths)
     if ($paths.Count -eq 0) {
         throw "Coverage did not contain production project '$projectName'."
     }
@@ -223,21 +288,20 @@ foreach ($property in $baseline.projects.PSObject.Properties |
     })
 }
 
-$productionPaths = @(
-    $projects |
-        ForEach-Object {
-            $prefix = $_.name + '/'
-            @(
-                $lineHits.Keys |
-                    Where-Object {
-                        $_.StartsWith(
-                            $prefix,
-                            [StringComparison]::OrdinalIgnoreCase)
-                    }
-            )
-        } |
-        Sort-Object -Unique
-)
+$productionPathSet = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($project in $projects) {
+    $prefix = $project.name + '/'
+    foreach ($path in $lineHits.Keys) {
+        if ($path.StartsWith(
+                $prefix,
+                [StringComparison]::Ordinal)) {
+            [void]$productionPathSet.Add($path)
+        }
+    }
+}
+$productionPaths = @(ConvertTo-OrdinalSortedArray `
+    -Values @($productionPathSet))
 $aggregate = Measure-Coverage -Paths $productionPaths
 $aggregateMinimum = [double]$baseline.minimumAggregateLinePercent
 $aggregatePassed =
@@ -272,7 +336,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
                 $_.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)
             })
     $coverageTcbFiles = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
+        [StringComparer]::Ordinal)
     foreach ($coveragePath in $coverageTcbPaths) {
         [void]$coverageTcbFiles.Add($coveragePath)
     }
@@ -285,35 +349,33 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     }
     $diffTarget = "$ComparisonRef...HEAD"
     if ($IncludeWorkingTree) {
-        $mergeBaseOutput = @(& git -C $repositoryRoot merge-base `
-            $ComparisonRef HEAD)
-        if ($LASTEXITCODE -ne 0 -or
-            $mergeBaseOutput.Count -ne 1 -or
-            [string]::IsNullOrWhiteSpace([string]$mergeBaseOutput[0])) {
+        $mergeBaseOutput = Invoke-GitText `
+            -Arguments @('merge-base', $ComparisonRef, 'HEAD') `
+            -FailureMessage (
+                "Could not resolve the merge base for comparison ref '$ComparisonRef'.")
+        $mergeBase = $mergeBaseOutput.Trim()
+        if ([string]::IsNullOrWhiteSpace($mergeBase) -or
+            $mergeBase.Contains("`n") -or
+            $mergeBase.Contains("`r")) {
             throw "Could not resolve the merge base for comparison ref '$ComparisonRef'."
         }
-        $diffTarget = ([string]$mergeBaseOutput[0]).Trim()
-    }
-    $diff = & git -C $repositoryRoot diff `
-        --unified=0 `
-        --no-renames `
-        $diffTarget `
-        -- `
-        @canonicalTcbPaths
-    if ($LASTEXITCODE -ne 0) {
-        throw "git diff failed for comparison ref '$ComparisonRef'."
+        $diffTarget = $mergeBase
     }
     $changedTcbFiles = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
-    $changedFileNames = & git -C $repositoryRoot diff `
-        --name-only `
-        --no-renames `
-        $diffTarget `
-        -- `
-        @canonicalTcbPaths
-    if ($LASTEXITCODE -ne 0) {
-        throw "git changed-file enumeration failed for comparison ref '$ComparisonRef'."
-    }
+        [StringComparer]::Ordinal)
+    $changedFileArguments = @(
+        'diff',
+        '--name-only',
+        '-z',
+        '--no-renames',
+        $diffTarget,
+        '--'
+    ) + @($canonicalTcbPaths)
+    $changedFileOutput = Invoke-GitText `
+        -Arguments $changedFileArguments `
+        -FailureMessage (
+            "git changed-file enumeration failed for comparison ref '$ComparisonRef'.")
+    $changedFileNames = $changedFileOutput -split ([string][char]0)
     foreach ($changedFileName in $changedFileNames) {
         $normalized = ([string]$changedFileName).Replace('\', '/')
         if (-not [string]::IsNullOrWhiteSpace($normalized)) {
@@ -322,43 +384,48 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     }
     $changedLines = [Collections.Generic.Dictionary[string,
         Collections.Generic.HashSet[int]]]::new(
-            [StringComparer]::OrdinalIgnoreCase)
-    $currentPath = $null
-    foreach ($line in $diff) {
-        if ($line.StartsWith('+++ b/', [StringComparison]::Ordinal)) {
-            $currentPath = $line.Substring(6).Replace('\', '/')
-            continue
-        }
-        if ($null -eq $currentPath) {
-            continue
-        }
-        $match = [Text.RegularExpressions.Regex]::Match(
-            $line,
-            '^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@')
-        if (-not $match.Success) {
-            continue
-        }
-        $start = [int]$match.Groups['start'].Value
-        $count = if ($match.Groups['count'].Success) {
-            [int]$match.Groups['count'].Value
-        }
-        else {
-            1
-        }
-        for ($number = $start; $number -lt $start + $count; $number++) {
-            if (-not $changedLines.ContainsKey($currentPath)) {
-                $changedLines[$currentPath] =
-                    [Collections.Generic.HashSet[int]]::new()
+            [StringComparer]::Ordinal)
+    foreach ($changedPath in $changedTcbFiles) {
+        $patch = Invoke-GitText `
+            -Arguments @(
+                'diff',
+                '--unified=0',
+                '--no-renames',
+                $diffTarget,
+                '--',
+                $changedPath) `
+            -FailureMessage (
+                "git diff failed for changed TCB path '$changedPath'.")
+        foreach ($line in $patch.Split([char]10)) {
+            $match = [Text.RegularExpressions.Regex]::Match(
+                $line,
+                '^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@')
+            if (-not $match.Success) {
+                continue
             }
-            [void]$changedLines[$currentPath].Add($number)
+            $start = [int]$match.Groups['start'].Value
+            $count = if ($match.Groups['count'].Success) {
+                [int]$match.Groups['count'].Value
+            }
+            else {
+                1
+            }
+            for ($number = $start;
+                $number -lt $start + $count;
+                $number++) {
+                if (-not $changedLines.ContainsKey($changedPath)) {
+                    $changedLines[$changedPath] =
+                        [Collections.Generic.HashSet[int]]::new()
+                }
+                [void]$changedLines[$changedPath].Add($number)
+            }
         }
     }
     $changedCovered = 0
     $changedCoverable = 0
-    $changedMetadataFiles = @(
+    $changedMetadataFiles = @(ConvertTo-OrdinalSortedArray -Values @(
         $changedTcbFiles |
-            Where-Object { -not $coverageTcbFiles.Contains($_) } |
-            Sort-Object)
+            Where-Object { -not $coverageTcbFiles.Contains($_) }))
     $nonCoverableChangedFiles =
         [Collections.Generic.List[string]]::new()
     $declarationOnlyChangedFiles =
@@ -390,7 +457,10 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
             continue
         }
         $fileHits = $lineHits[$changedPath]
-        $sourcePath = Join-Path $repositoryRoot ($changedPath.Replace('/', '\'))
+        $sourcePath = Join-Path $repositoryRoot (
+            $changedPath.Replace(
+                '/',
+                [string][IO.Path]::DirectorySeparatorChar))
         $sourceLines = if (Test-Path -LiteralPath $sourcePath -PathType Leaf) {
             @(Get-Content -LiteralPath $sourcePath)
         }
@@ -440,10 +510,12 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
         coverableLines = $changedCoverable
         linePercent = $changedPercent
         minimumLinePercent = [double]$baseline.minimumChangedTcbLinePercent
-        declarationOnlyFiles = @(
-            $declarationOnlyChangedFiles | Sort-Object)
-        nonCoverableFiles = @($nonCoverableChangedFiles | Sort-Object)
-        uncoveredLines = @($uncoveredChangedLines | Sort-Object)
+        declarationOnlyFiles = @(ConvertTo-OrdinalSortedArray `
+            -Values @($declarationOnlyChangedFiles))
+        nonCoverableFiles = @(ConvertTo-OrdinalSortedArray `
+            -Values @($nonCoverableChangedFiles))
+        uncoveredLines = @(ConvertTo-OrdinalSortedArray `
+            -Values @($uncoveredChangedLines))
         passed = $nonCoverableChangedFiles.Count -eq 0 -and
             $changedPercent + 0.005 -ge
                 [double]$baseline.minimumChangedTcbLinePercent
