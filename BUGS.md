@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 138 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 137 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 138 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-106 - Interpolated C# synthesis bypasses SPMETA009 (fixed)
+
+- [x] Fixed by `963009746` (`fix: inspect interpolated expression text`).
+- SPMETA009 now owns interpolated-string operations containing a real hole and
+  inspects their literal text parts for semantic C# expression fragments.
+  Interpolation values, alignment, and format expressions are not treated as
+  generated syntax, and existing concatenation detection remains unchanged.
+- Regression-first coverage includes plain, constant, formatted, aligned,
+  escaped, and concatenated expression construction plus ordinary formatting,
+  alignment, value-only, and format-fragment decoys. Five interpolated cases
+  failed before the fix; afterward focused tests passed 7/7, full Meta Analyzers
+  passed 79/79, and Architecture passed 110/110 in the canonical container.
 
 ### SP-AUDIT-098 - Mutable static properties evade analyzer-state policy (fixed)
 
@@ -1587,20 +1600,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   indexer/property-setter cache writes, conservatively rejecting unresolved
   semantic answer values. Add Unknown/TimedOut/Failed aliases, Proven controls,
   overwrite/add/indexer APIs, branches, and mutation probes.
-
-### SP-AUDIT-106 - Interpolated C# synthesis bypasses SPMETA009 (P1)
-
-- [ ] The C#-expression-text policy recognizes only string binary addition;
-  interpolated strings are not registered or inspected.
-- Supported impact: `$"({name}) is not null"` emitted no SPMETA009 although it
-  constructs the same semantic C# expression text as the rejected concatenated
-  form.
-- Reproduction: a harmless in-memory soundness-analyzer fixture used the
-  interpolated form and received an empty diagnostic set.
-- Required closure: inspect interpolated-string operations for semantic C#
-  expression construction while allowing ordinary non-expression formatting.
-  Add constant, formatted, aligned, escaped, concatenated, and decoy controls
-  plus a mutation removing interpolation ownership.
 
 ### SP-AUDIT-112 - Valid long filenames overflow publication metadata names (P1)
 
