@@ -449,6 +449,14 @@ internal sealed partial class ClaimManifestBuilder(
                 cancellationToken.ThrowIfCancellationRequested();
                 switch (node)
                 {
+                    case TypeDeclarationSyntax type
+                        when PrimaryConstructorCallableInventory.TryGet(
+                            type,
+                            model,
+                            cancellationToken,
+                            out var primaryConstructor):
+                        Add(primaryConstructor);
+                        break;
                     case BaseMethodDeclarationSyntax:
                     case AccessorDeclarationSyntax:
                     case LocalFunctionStatementSyntax:

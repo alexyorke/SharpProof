@@ -42,6 +42,58 @@ internal static partial class RequiresCallSiteAnalyzer
             .Run(screenForPotentialCalls);
     }
 
+    internal static AnalyzerSemanticOutcome AnalyzePrimaryConstructorInitializer(
+        IMethodSymbol constructor,
+        TypeDeclarationSyntax declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        var initializer = declaration.BaseList?.Types
+            .OfType<PrimaryConstructorBaseTypeSyntax>()
+            .SingleOrDefault();
+        if (initializer == null)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+
+        var target = semanticModel.GetSymbolInfo(
+                initializer,
+                cancellationToken)
+            .Symbol as IMethodSymbol;
+        var arguments = initializer.ArgumentList.Arguments
+            .Select(argument => semanticModel.GetOperation(
+                argument,
+                cancellationToken) as IArgumentOperation)
+            .ToImmutableArray();
+        if (target == null || arguments.IsDefaultOrEmpty ||
+            arguments.Any(static argument => argument == null))
+        {
+            return AnalyzerSemanticOutcome.Unknown;
+        }
+
+        var call = new RequiresCallSiteCandidate(
+            arguments[0]!,
+            target,
+            Instance: null,
+            arguments.OfType<IArgumentOperation>().ToImmutableArray(),
+            CanReplay: true,
+            Flow: null,
+            ManagedFlowStatus.BudgetExceeded);
+
+        return new Analysis(
+                constructor,
+                declaration,
+                semanticModel,
+                session,
+                reportDiagnostic,
+                graph: null,
+                operationRoot: null,
+                cancellationToken)
+            .AnalyzeCallSite(call);
+    }
+
     private sealed class Analysis(
         IMethodSymbol caller,
         SyntaxNode declaration,
@@ -89,7 +141,7 @@ internal static partial class RequiresCallSiteAnalyzer
             return outcome;
         }
 
-        private AnalyzerSemanticOutcome AnalyzeCallSite(
+        internal AnalyzerSemanticOutcome AnalyzeCallSite(
             RequiresCallSiteCandidate candidate)
         {
             if (!SymbolEqualityComparer.Default.Equals(

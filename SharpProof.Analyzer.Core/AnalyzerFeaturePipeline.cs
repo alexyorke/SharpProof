@@ -249,6 +249,44 @@ internal static partial class AnalyzerFeaturePipeline
         session.RecordSemanticOutcome(method, outcome);
     }
 
+    internal static void AnalyzePrimaryConstructor(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.Node is not TypeDeclarationSyntax declaration ||
+            !PrimaryConstructorCallableInventory.TryGet(
+                declaration,
+                context.SemanticModel,
+                context.CancellationToken,
+                out var constructor) ||
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                constructor,
+                declaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken) ||
+            !session.TryBeginRequiresCallSiteAnalysis(constructor))
+        {
+            return;
+        }
+
+        var outcome = SharpProofControlAttributePolicy
+            .ValidateAndShouldSuppress(
+                constructor,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken)
+            ? AnalyzerSemanticOutcome.Suppressed
+            : RequiresCallSiteAnalyzer.AnalyzePrimaryConstructorInitializer(
+                constructor,
+                declaration,
+                context.SemanticModel,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken);
+        session.RecordSemanticOutcome(constructor, outcome);
+    }
+
     private static bool ValidateContractClauses(
         IMethodSymbol method,
         AnalyzerSession session,

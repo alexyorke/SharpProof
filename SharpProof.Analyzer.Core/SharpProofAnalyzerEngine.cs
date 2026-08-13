@@ -132,6 +132,18 @@ internal sealed partial class SharpProofAnalyzerEngine
         }
         if (activation.RequiresOperationAnalysis)
         {
+            if (configuration.ContractsEnabled)
+            {
+                context.RegisterSyntaxNodeAction(
+                    syntaxContext =>
+                        AnalyzerFeaturePipeline.AnalyzePrimaryConstructor(
+                            syntaxContext,
+                            session),
+                    SyntaxKind.ClassDeclaration,
+                    SyntaxKind.StructDeclaration,
+                    SyntaxKind.RecordDeclaration,
+                    SyntaxKind.RecordStructDeclaration);
+            }
             if (activation.RequiresFullOperationAnalysis)
             {
                 context.RegisterOperationBlockAction(operationContext =>
