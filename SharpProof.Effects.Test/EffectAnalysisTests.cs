@@ -519,6 +519,133 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ValueTypeInstanceCallsAccountForExplicitTypeInitialization()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global {
+                public static object? State;
+            }
+
+            public struct InitializedValue {
+                static InitializedValue() {
+                    Global.State = new object();
+                    throw new InvalidOperationException();
+                }
+
+                public readonly void Touch() { }
+                public readonly int Number => 0;
+            }
+
+            public readonly struct PlainValue {
+                public void Touch() { }
+                public int Number => 0;
+            }
+
+            public sealed class InitializedReference {
+                static InitializedReference() {
+                    Global.State = new object();
+                }
+
+                public void Touch() { }
+            }
+
+            public static class InitializedStatic {
+                static InitializedStatic() {
+                    Global.State = new object();
+                }
+
+                public static void Touch() { }
+            }
+
+            public static class Sample {
+                public static void CallInitializedMethod() =>
+                    default(InitializedValue).Touch();
+
+                public static int ReadInitializedProperty() =>
+                    default(InitializedValue).Number;
+
+                public static void CallPlainMethod() =>
+                    default(PlainValue).Touch();
+
+                public static int ReadPlainProperty() =>
+                    default(PlainValue).Number;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var affected = new[]
+        {
+            session.Analyze(Method(compilation, "CallInitializedMethod")),
+            session.Analyze(Method(compilation, "ReadInitializedProperty")),
+            session.Analyze(EffectTestHost.RequireMethod(
+                compilation,
+                "InitializedStatic",
+                "Touch"))
+        };
+        var exact = new[]
+        {
+            session.Analyze(Method(compilation, "CallPlainMethod")),
+            session.Analyze(Method(compilation, "ReadPlainProperty")),
+            session.Analyze(EffectTestHost.RequireMethod(
+                compilation,
+                "InitializedReference",
+                "Touch"))
+        };
+
+        foreach (var result in affected)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Incomplete),
+                    ResultKey(result));
+                Assert.That(
+                    result.Summary.Uncertainty & EffectUncertainty.UnmodeledCall,
+                    Is.EqualTo(EffectUncertainty.UnmodeledCall),
+                    ResultKey(result));
+                Assert.That(
+                    result.Summary.Writes.IsUnknown,
+                    Is.True,
+                    ResultKey(result));
+                Assert.That(
+                    result.Summary.Allocation,
+                    Is.EqualTo(EffectAllocationKind.Unknown),
+                    ResultKey(result));
+                Assert.That(
+                    result.Summary.Throws.IncludesUnknown,
+                    Is.True,
+                    ResultKey(result));
+                Assert.That(
+                    result.Projection.IsComplete,
+                    Is.False,
+                    ResultKey(result));
+            }
+        }
+
+        foreach (var result in exact)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    ResultKey(result));
+                Assert.That(result.Summary.Reads.IsEmpty, Is.True, ResultKey(result));
+                Assert.That(result.Summary.Writes.IsEmpty, Is.True, ResultKey(result));
+                Assert.That(
+                    result.Summary.Allocation,
+                    Is.EqualTo(EffectAllocationKind.None),
+                    ResultKey(result));
+                Assert.That(result.Summary.Throws.IsEmpty, Is.True, ResultKey(result));
+                Assert.That(result.Projection.IsComplete, Is.True, ResultKey(result));
+            }
+        }
+    }
+
+    [Test]
     public void CrossTypeStaticFieldAccessAccountsForTypeInitialization()
     {
         var compilation = EffectTestHost.CreateCompilation(

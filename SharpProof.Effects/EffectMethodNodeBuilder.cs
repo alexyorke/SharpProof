@@ -206,7 +206,8 @@ internal sealed class EffectMethodNodeBuilder
     private static bool CanTriggerOwnTypeInitialization(IMethodSymbol method)
     {
         return method.MethodKind == MethodKind.Constructor ||
-        method.IsStatic && method.MethodKind != MethodKind.StaticConstructor;
+        method.MethodKind != MethodKind.StaticConstructor &&
+        (method.IsStatic || method.ContainingType.IsValueType);
     }
 
     private static bool IsInitializableMember(
