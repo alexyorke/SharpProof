@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 137 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 136 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 137 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-097 - Semantic strings evade the meta-analyzer through patterns (fixed)
+
+- [x] Fixed by `e22c653d7` (`fix: inspect semantic string patterns`).
+- SPMETA004 now owns constant patterns and classic switch-case labels using
+  Roslyn semantic constant values and the existing closed semantic-string
+  prefix filter. Switch expressions, nested patterns, and switch statements
+  produce one diagnostic per controlling semantic literal.
+- Regression-first coverage includes `is`, switch-statement, switch-expression,
+  and nested exact-one cases plus ordinary string, null, default/discard, and
+  relational controls. All four semantic cases failed before the fix; afterward
+  focused tests passed 5/5, full Meta Analyzers passed 84/84, and Architecture
+  passed 110/110 in the canonical container.
 
 ### SP-AUDIT-106 - Interpolated C# synthesis bypasses SPMETA009 (fixed)
 
@@ -1569,21 +1582,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   from each project reference, and require non-vacuous category-specific claim
   evidence. Add duplicate, mislabeled, zero-claim, and valid five-library
   certifier fixtures.
-
-### SP-AUDIT-097 - Semantic strings evade the meta-analyzer through patterns (P1)
-
-- [ ] SPMETA004 registers invocation and binary operations and recognizes only
-  equality or `string.Equals`. Constant patterns and switch arms can make proof
-  behavior depend on semantic reason strings without entering that policy.
-- Supported impact: both `reason is "ir_condition_both_branches_feasible"`
-  and an equivalent switch expression emitted zero SPMETA004 diagnostics in a
-  soundness-critical namespace.
-- Reproduction: harmless in-memory meta-analyzer fixtures exercised both forms;
-  the diagnostic sets were empty.
-- Required closure: analyze constant/relational patterns and switch statement/
-  expression labels that control soundness behavior, deduplicate overlapping
-  syntax, and retain nonsemantic-string controls. Add a mutation that removes
-  each newly owned operation shape.
 
 ### SP-AUDIT-105 - Semantic cache policy misses aliases and indexer writes (P1)
 
