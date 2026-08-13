@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 155 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 154 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 155 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-109 - Value-type instance calls omit type initialization (fixed)
+
+- [x] Fixed by `e669122f5` (`fix: include value-type instance initialization`).
+- Type-initialization triggering now includes non-static value-type members,
+  while static-constructor self-entry and reference-type instance behavior stay
+  unchanged.
+- Regressions cover explicit struct static initialization with allocation,
+  static write, and throw; default-receiver method/property calls; no-cctor
+  structs; reference instances; and static controls. The full canonical-
+  container Effects suite passed 149/149.
 
 ### SP-AUDIT-210 - Mutation ledgers compare identities case-insensitively (fixed)
 
@@ -772,23 +783,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   change alters both production and TCB digests.
 - Consolidated cases: SP-AUDIT-147.
 - Unified closure: Independently derive an immutable TCB closure containing every certifier leaf; deletion, movement, or change must alter its digest and coverage universe.
-
-### SP-AUDIT-109 - Value-type instance calls omit type initialization (P0)
-
-- [ ] The effect call graph attaches a type-initialization boundary only to
-  constructors and static methods. A non-`beforefieldinit` value type can also
-  run its explicit static constructor before an instance method call.
-- Supported impact: `default(Value).Touch()` was classified complete and
-  effect-free even though `Value`'s static constructor increments a static
-  field on the first call. A selected purity claim can therefore omit a real
-  static write.
-- Reproduction: a temporary Effects test defined the explicit struct static
-  constructor and expected an incomplete type-initialization boundary; the
-  projection was complete. The test was removed.
-- Required closure: include value-type instance method/property entry in the
-  exact type-initialization trigger model. Add struct/class, explicit/no cctor,
-  default/constructed receiver, instance/static/constructor/property, repeated-
-  call, projection, and mutation controls.
 
 ### SP-AUDIT-111 - Publication can overwrite compiler outputs created later (P0)
 
