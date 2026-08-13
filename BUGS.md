@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 149 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 148 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 149 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-141 - Captured primary-constructor reads lose receiver ownership (fixed)
+
+- [x] Fixed by `db08657dc` (`fix: retain primary constructor ownership`).
+- Captured primary-constructor parameter reads now map to receiver state, and
+  positional record properties retain their receiver-storage semantics.
+  Constructor-time forwarding and ordinary parameters remain local.
+- Regression-first coverage includes classes, record classes, structs,
+  methods, accessors, forwarded captured values, constructor-only uses, and
+  ordinary parameter controls with exact effect projections. The full
+  canonical-container Effects and Architecture suites passed 158/158 and 78/78.
 
 ### SP-AUDIT-072 - String concatenation omits implicit ToString effects (fixed)
 
@@ -811,21 +822,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   values during pack, artifact qualification, final validation, and planning.
   Add every field, three packages, conflicting support claims, canonical output,
   and individual-field mutation controls.
-
-### SP-AUDIT-141 - Captured primary-constructor reads lose receiver ownership (P0)
-
-- [ ] The effect scanner treats every by-value parameter reference as
-  effect-free, including a primary-constructor parameter captured into hidden
-  instance state and read later by an ordinary instance member.
-- Supported impact: `sealed class Sample(int value) { int Read() => value; }`
-  produced a complete summary without `ReadsReceiverState`; an exact
-  `EffectContract(None)` can therefore be proven for a real receiver-state read.
-- Reproduction: a focused canonical-container Effects regression expected the
-  receiver read and failed with `False`. The temporary test was removed.
-- Required closure: identify instance-captured primary-constructor parameters as
-  receiver-backed while retaining ordinary method parameters as snapshots. Cover
-  class/record/struct, methods/accessors, constructor-only use, forwarding, exact
-  claims, and blanket-parameter mutation.
 
 ### SP-AUDIT-158 - Acceptance skip switches still certify Passed (P0)
 
