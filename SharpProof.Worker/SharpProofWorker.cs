@@ -205,7 +205,9 @@ public sealed class SharpProofWorker : IDisposable
             var retirementCallableReason = WorkerCallableCoverageReason.InfrastructureFailure;
             var retirementClaimReason = WorkerClaimReason.InfrastructureFailure;
             var hasRetirementReason = false;
-            void RecordRetirement(WorkerCallableCoverageReason reason)
+            void RecordRetirement(
+                WorkerCallableCoverageReason callableReason,
+                WorkerClaimReason claimReason)
             {
                 lock (retirementSynchronization)
                 {
@@ -213,14 +215,8 @@ public sealed class SharpProofWorker : IDisposable
                     {
                         return;
                     }
-                    retirementCallableReason = reason;
-                    retirementClaimReason = reason switch
-                    {
-                        WorkerCallableCoverageReason.Canceled => WorkerClaimReason.Canceled,
-                        WorkerCallableCoverageReason.ProjectTimeout => WorkerClaimReason.ProjectTimeout,
-                        WorkerCallableCoverageReason.MethodTimeout => WorkerClaimReason.MethodTimeout,
-                        _ => WorkerClaimReason.InfrastructureFailure
-                    };
+                    retirementCallableReason = callableReason;
+                    retirementClaimReason = claimReason;
                     hasRetirementReason = true;
                 }
             }
@@ -228,6 +224,13 @@ public sealed class SharpProofWorker : IDisposable
             {
                 while (true)
                 {
+                    lock (retirementSynchronization)
+                    {
+                        if (hasRetirementReason)
+                        {
+                            return;
+                        }
+                    }
                     var index = Interlocked.Increment(ref nextTarget);
                     if (index >= orderedTargets.Length)
                     {
@@ -238,14 +241,29 @@ public sealed class SharpProofWorker : IDisposable
                         lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
                         projectBoundary, cancellationToken).ConfigureAwait(false);
                     results[index] = result;
-                    if ((result.Callable.Reason is WorkerCallableCoverageReason.Canceled or
-                            WorkerCallableCoverageReason.ProjectTimeout or
-                            WorkerCallableCoverageReason.MethodTimeout) &&
-                        !projectBoundary.IsCancellationRequested &&
-                        !lane.TryRenew(solverLanes, request.Budgets.MaximumExpressionDepth))
+                    if (result.Callable.Reason ==
+                            WorkerCallableCoverageReason.MethodTimeout &&
+                        !projectBoundary.IsCancellationRequested)
                     {
-                        RecordRetirement(result.Callable.Reason);
-                        return;
+                        var renewal = lane.Renew(
+                            solverLanes,
+                            request.Budgets.MaximumExpressionDepth);
+                        if (renewal != LaneRenewalResult.Success)
+                        {
+                            RecordRetirement(
+                                renewal == LaneRenewalResult.Unsupported
+                                    ? WorkerCallableCoverageReason.MethodTimeout
+                                    : WorkerCallableCoverageReason.InfrastructureFailure,
+                                renewal switch
+                                {
+                                    LaneRenewalResult.Unsupported =>
+                                        WorkerClaimReason.MethodTimeout,
+                                    LaneRenewalResult.BackendUnavailable =>
+                                        WorkerClaimReason.BackendUnavailable,
+                                    _ => WorkerClaimReason.InfrastructureFailure
+                                });
+                            return;
+                        }
                     }
                 }
             }
@@ -452,28 +470,32 @@ public sealed class SharpProofWorker : IDisposable
         internal ISmtBackend Backend { get; private set; } = backend;
         internal CallableVerifier Verifier { get; private set; } = verifier;
         internal Func<long>? ReadConsumedResourceCount { get; private set; } = readConsumedResourceCount;
-        internal bool TryRenew(VerificationLane[] lanes, int maximumExpressionDepth)
+        internal LaneRenewalResult Renew(
+            VerificationLane[] lanes,
+            int maximumExpressionDepth)
         {
             if (_backendFactory == null)
             {
-                return false;
+                return LaneRenewalResult.Unsupported;
             }
 
             lock (lanes)
             {
                 var prior = Backend;
-                _ownedBackend?.Dispose();
-                _ownedBackend = null;
                 IDisposable? replacementOwner = null;
                 try
                 {
+                    var priorOwner = _ownedBackend;
+                    _ownedBackend = null;
+                    priorOwner?.Dispose();
                     var replacement = _backendFactory() ??
                         throw new InvalidOperationException("The backend factory returned null.");
                     if (ReferenceEquals(replacement, prior) ||
                         lanes.Any(lane => !ReferenceEquals(lane, this) &&
                             ReferenceEquals(lane.Backend, replacement)))
                     {
-                        return false;
+                        (replacement as IDisposable)?.Dispose();
+                        return LaneRenewalResult.BackendUnavailable;
                     }
 
                     replacementOwner = replacement as IDisposable;
@@ -481,13 +503,15 @@ public sealed class SharpProofWorker : IDisposable
                     Verifier = new CallableVerifier(replacement, maximumExpressionDepth);
                     ReadConsumedResourceCount = ReadResources(replacement);
                     _ownedBackend = replacementOwner;
-                    return true;
+                    return LaneRenewalResult.Success;
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException and
                     not StackOverflowException and not OperationCanceledException)
                 {
                     replacementOwner?.Dispose();
-                    return false;
+                    return Program.IsBackendUnavailable(exception)
+                        ? LaneRenewalResult.BackendUnavailable
+                        : LaneRenewalResult.InfrastructureFailure;
                 }
             }
         }
@@ -496,5 +520,13 @@ public sealed class SharpProofWorker : IDisposable
             _ownedBackend?.Dispose();
             _ownedBackend = null;
         }
+    }
+
+    private enum LaneRenewalResult
+    {
+        Success,
+        Unsupported,
+        BackendUnavailable,
+        InfrastructureFailure
     }
 }

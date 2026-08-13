@@ -4794,6 +4794,146 @@ public sealed class WorkerTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task RenewalFailurePreservesTimeoutAndClassifiesUnclaimedWork(
+        bool backendUnavailable)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 1;
+        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.ProjectWallTimeMilliseconds = 1_000;
+        var factoryCalls = 0;
+        using var worker = new SharpProofWorker(() =>
+        {
+            if (Interlocked.Increment(ref factoryCalls) == 1)
+            {
+                return new DelayingBackend();
+            }
+
+            throw backendUnavailable
+                ? new DllNotFoundException("replacement z3 missing")
+                : new InvalidOperationException("replacement creation failed");
+        });
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factoryCalls, Is.EqualTo(2));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(backendUnavailable
+                    ? WorkerRunFailureReason.BackendUnavailable
+                    : WorkerRunFailureReason.InfrastructureFailure));
+            Assert.That(
+                response.CallableResults.Select(static result => result.Reason),
+                Is.EqualTo((WorkerCallableCoverageReason[])[
+                    WorkerCallableCoverageReason.MethodTimeout,
+                    WorkerCallableCoverageReason.InfrastructureFailure
+                ]));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.EqualTo((WorkerClaimReason[])[
+                    WorkerClaimReason.MethodTimeout,
+                    backendUnavailable
+                        ? WorkerClaimReason.BackendUnavailable
+                        : WorkerClaimReason.InfrastructureFailure
+                ]));
+            Assert.That(
+                WorkerProtocolJson.ValidateForRequest(
+                    response,
+                    WorkerProtocolJson.ComputeRequestHash(request),
+                    response.InputHash,
+                    response.Manifest,
+                    request.Budgets).IsValid,
+                Is.True);
+        }
+    }
+
+    [TestCase("null", WorkerRunFailureReason.InfrastructureFailure,
+        WorkerClaimReason.InfrastructureFailure, 2)]
+    [TestCase("reuse", WorkerRunFailureReason.BackendUnavailable,
+        WorkerClaimReason.BackendUnavailable, 2)]
+    [TestCase("dispose", WorkerRunFailureReason.InfrastructureFailure,
+        WorkerClaimReason.InfrastructureFailure, 1)]
+    public async Task InvalidRenewalStateFailsClosedWithTypedEvidence(
+        string scenario,
+        WorkerRunFailureReason expectedFailure,
+        WorkerClaimReason expectedClaimReason,
+        int expectedFactoryCalls)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 1;
+        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.ProjectWallTimeMilliseconds = 1_000;
+        var factoryCalls = 0;
+        ISmtBackend? original = null;
+        using var worker = new SharpProofWorker(() =>
+        {
+            factoryCalls++;
+            if (factoryCalls == 1)
+            {
+                original = scenario == "dispose"
+                    ? new ThrowingDisposeDelayingBackend()
+                    : new DelayingBackend();
+                return original;
+            }
+
+            return scenario switch
+            {
+                "null" => null!,
+                "reuse" => original!,
+                _ => new CountingBackend(
+                    BackendCheckResult.Unsatisfiable([]))
+            };
+        });
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factoryCalls, Is.EqualTo(expectedFactoryCalls));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(response.FailureReason, Is.EqualTo(expectedFailure));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.EqualTo((WorkerClaimReason[])[
+                    WorkerClaimReason.MethodTimeout,
+                    expectedClaimReason
+                ]));
+        }
+    }
+
     [Test]
     public async Task FactorylessTimeoutClassifiesEveryUnclaimedTargetAsTimedOut()
     {
@@ -4917,9 +5057,8 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(() =>
             Interlocked.Increment(ref factoryCalls) <= 2
                 ? new DelayingBackend()
-                : new SharpProof.Smt.IrSmtBackend(
-                    new SharpProof.Smt.IrSmtBackendOptions(
-                        request.Budgets.QueryRlimit)));
+                : new CountingBackend(
+                    BackendCheckResult.Unsatisfiable([])));
 
         var response = await worker.VerifyAsync(request);
 
@@ -4932,7 +5071,7 @@ public sealed class WorkerTests
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,
-                    WorkerClaimOutcome.Refuted
+                    WorkerClaimOutcome.Proven
                 ]));
             Assert.That(
                 response.ClaimResults.Take(2)
@@ -5549,6 +5688,25 @@ public sealed class WorkerTests
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return BackendCheckResult.Unknown(
                 BackendFailureReason.InfrastructureFailure);
+        }
+    }
+
+    private sealed class ThrowingDisposeDelayingBackend :
+        ISmtBackend,
+        IDisposable
+    {
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return BackendCheckResult.Unknown(
+                BackendFailureReason.InfrastructureFailure);
+        }
+
+        public void Dispose()
+        {
+            throw new InvalidOperationException("backend disposal failed");
         }
     }
 

@@ -118,7 +118,11 @@ internal static class WorkerResultAssembler
                     : claimReasons.Contains(WorkerClaimReason.CounterexampleReplayFailed)
                         ? WorkerRunFailureReason.CounterexampleReplayFailed
                         : WorkerRunFailureReason.None;
-        var failure = callableFailure != WorkerRunFailureReason.None ? callableFailure : claimFailure;
+        var failure = claimFailure == WorkerRunFailureReason.BackendUnavailable
+            ? claimFailure
+            : callableFailure != WorkerRunFailureReason.None
+                ? callableFailure
+                : claimFailure;
         var canceled = callableReasons.Contains(WorkerCallableCoverageReason.Canceled) ||
             claimReasons.Contains(WorkerClaimReason.Canceled);
         var timedOut = callableReasons.Any(static reason => reason is
@@ -217,7 +221,8 @@ internal static class WorkerResultAssembler
             owned.Length != 0 &&
             owned.All(static claim =>
                 claim.Outcome == WorkerClaimOutcome.Unknown &&
-                claim.Reason == WorkerClaimReason.InfrastructureFailure) &&
+                claim.Reason is WorkerClaimReason.InfrastructureFailure or
+                    WorkerClaimReason.BackendUnavailable) &&
             callable.Coverage == WorkerCallableCoverage.Incomplete &&
             callable.Reason == WorkerCallableCoverageReason.InfrastructureFailure;
         return matchesExpected || directInfrastructureFailure;
