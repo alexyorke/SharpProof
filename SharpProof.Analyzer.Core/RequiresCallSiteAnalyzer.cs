@@ -78,6 +78,7 @@ internal static partial class RequiresCallSiteAnalyzer
             target,
             Instance: null,
             arguments.OfType<IArgumentOperation>().ToImmutableArray(),
+            ImmutableDictionary<int, IOperation>.Empty,
             CanReplay: true,
             Flow: null,
             ManagedFlowStatus.BudgetExceeded);
@@ -121,7 +122,8 @@ internal static partial class RequiresCallSiteAnalyzer
             _ => default
         };
         var call = new RequiresCallSiteCandidate(
-            operation, target, instance, arguments, CanReplay: true,
+            operation, target, instance, arguments,
+            ImmutableDictionary<int, IOperation>.Empty, CanReplay: true,
             Flow: null, ManagedFlowStatus.BudgetExceeded);
         return new Analysis(
                 constructor, initializer, semanticModel, session,
@@ -422,6 +424,14 @@ internal static partial class RequiresCallSiteAnalyzer
     {
         var isReducedExtension =
             callSite.TargetMethod.ReducedFrom != null;
+        if (variable.Role == BoundContractVariableRole.Parameter &&
+            callSite.ExplicitArguments.TryGetValue(
+                variable.Ordinal,
+                out var explicitArgument))
+        {
+            return explicitArgument;
+        }
+
         return variable.Role switch
         {
             BoundContractVariableRole.Receiver => callSite.Instance,
@@ -440,6 +450,11 @@ internal static partial class RequiresCallSiteAnalyzer
         IOperation actual)
     {
         if (variable.Role != BoundContractVariableRole.Parameter)
+        {
+            return CallArgumentEvaluation.Snapshot;
+        }
+
+        if (callSite.ExplicitArguments.ContainsKey(variable.Ordinal))
         {
             return CallArgumentEvaluation.Snapshot;
         }

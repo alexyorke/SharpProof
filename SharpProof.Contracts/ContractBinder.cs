@@ -72,7 +72,12 @@ public sealed class ContractBinder(
         }
 
         if (target.MethodKind is not (
-                MethodKind.Ordinary or MethodKind.Constructor))
+                MethodKind.Ordinary or
+                MethodKind.Constructor or
+                MethodKind.PropertyGet or
+                MethodKind.PropertySet or
+                MethodKind.EventAdd or
+                MethodKind.EventRemove))
         {
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedTarget);
         }

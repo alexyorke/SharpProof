@@ -1054,6 +1054,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~GeneratedCompanionIsValidatedFromFinalCompilation'
     },
     [pscustomobject]@{
+        Name = 'requires-accessor-call-site-discovery'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
+        Original = "            IPropertyReferenceOperation property =>`n                GetPropertyCalls(property),`n            IEventReferenceOperation eventReference =>`n                GetEventCalls(eventReference),"
+        Mutated = "            IPropertyReferenceOperation property => [],`n            IEventReferenceOperation eventReference => [],"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~PropertyAndEventAccessorsCheckRequiresExactlyOnce'
+    },
+    [pscustomobject]@{
         Name = 'package-contract-for-generator-entrypoint'
         File = 'SharpProof.Package\SharpProof.nuspec'
         Original = '    <file src="..\SharpProof.ContractForGenerator\bin\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.dll" target="tools\analyzers\dotnet\cs" />'

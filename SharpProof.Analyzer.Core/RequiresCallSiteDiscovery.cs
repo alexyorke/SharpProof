@@ -39,28 +39,30 @@ internal sealed partial class RequiresCallSiteDiscovery(
                  operationRoot.DescendantsAndSelf())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var call = GetCall(operation);
-            if (call == null)
+            var calls = GetCalls(operation);
+            if (calls.IsDefaultOrEmpty)
             {
                 continue;
             }
-
-            var target =
-                call.Value.TargetMethod.ReducedFrom ??
-                call.Value.TargetMethod;
-            if (hasPotentialPreconditions(target))
+            foreach (var call in calls)
             {
-                var owner = semanticModel.GetEnclosingSymbol(
-                    operation.Syntax.SpanStart,
-                    cancellationToken) as IMethodSymbol;
-                if (owner == null)
+                var target =
+                    call.TargetMethod.ReducedFrom ??
+                    call.TargetMethod;
+                if (hasPotentialPreconditions(target))
                 {
-                    return null;
-                }
+                    var owner = semanticModel.GetEnclosingSymbol(
+                        operation.Syntax.SpanStart,
+                        cancellationToken) as IMethodSymbol;
+                    if (owner == null)
+                    {
+                        return null;
+                    }
 
-                owners.Add(
-                    ContractClauseInventoryBuilder
-                        .NormalizeCallable(owner));
+                    owners.Add(
+                        ContractClauseInventoryBuilder
+                            .NormalizeCallable(owner));
+                }
             }
         }
 
@@ -85,9 +87,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             entryState,
             cancellationToken);
         var flowResult = flowAnalysis.Result;
-        var callSites = new Dictionary<
-            (SyntaxTree Tree, TextSpan Span),
-            RequiresCallSiteCandidate>();
+        var callSites = new List<RequiresCallSiteCandidate>();
         var initializer = (operationRoot as IConstructorBodyOperation)?.Initializer;
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
@@ -110,8 +110,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var operation in roots.SelectMany(
                          static root => root.DescendantsAndSelf()))
             {
-                var call = GetCall(operation);
-                if (call == null ||
+                var calls = GetCalls(operation);
+                if (calls.IsDefaultOrEmpty ||
                     !SymbolEqualityComparer.Default.Equals(
                         semanticModel.GetEnclosingSymbol(
                             operation.Syntax.SpanStart,
@@ -130,28 +130,48 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     continue;
                 }
 
-                var candidate = new RequiresCallSiteCandidate(
-                    operation,
-                    call.Value.TargetMethod,
-                    call.Value.Instance,
-                    call.Value.Arguments,
-                    (hasFlowState || !flowAnalysis.IsComplete) &&
-                    HasReplayablePrefix(operation, operationFacts),
-                    hasFlowState ? flowResult : null,
-                    flowAnalysis.Status);
-                var key = (
-                    operation.Syntax.SyntaxTree,
-                    operation.Syntax.Span);
-                if (!callSites.TryGetValue(key, out var existing) ||
-                    !existing.CanReplay && candidate.CanReplay)
+                foreach (var call in calls)
                 {
-                    callSites[key] = candidate;
+                    var candidate = new RequiresCallSiteCandidate(
+                        operation,
+                        call.TargetMethod,
+                        call.Instance,
+                        call.Arguments,
+                        call.ExplicitArguments,
+                        call.CanReplay &&
+                        (hasFlowState || !flowAnalysis.IsComplete) &&
+                        (IsAccessorCall(call.TargetMethod)
+                            ? HasReplayableAccessorEvaluation(
+                                call,
+                                operationFacts)
+                            : HasReplayablePrefix(
+                                operation,
+                                operationFacts)),
+                        hasFlowState ? flowResult : null,
+                        flowAnalysis.Status);
+                    var existingIndex = callSites.FindIndex(existing =>
+                        existing.Operation.Syntax.SyntaxTree ==
+                            operation.Syntax.SyntaxTree &&
+                        existing.Operation.Syntax.Span ==
+                            operation.Syntax.Span &&
+                        SymbolEqualityComparer.Default.Equals(
+                            existing.TargetMethod,
+                            candidate.TargetMethod));
+                    if (existingIndex < 0)
+                    {
+                        callSites.Add(candidate);
+                    }
+                    else if (!callSites[existingIndex].CanReplay &&
+                             candidate.CanReplay)
+                    {
+                        callSites[existingIndex] = candidate;
+                    }
                 }
             }
         }
 
         return [
-            .. callSites.Values.OrderBy(
+            .. callSites.OrderBy(
                 static candidate => candidate.Operation.Syntax.SpanStart)
         ];
     }
@@ -287,6 +307,27 @@ internal sealed partial class RequiresCallSiteDiscovery(
                                cancellationToken)));
     }
 
+    private static bool IsAccessorCall(IMethodSymbol method)
+    {
+        return method.MethodKind is
+            MethodKind.PropertyGet or
+            MethodKind.PropertySet or
+            MethodKind.EventAdd or
+            MethodKind.EventRemove;
+    }
+
+    private static bool HasReplayableAccessorEvaluation(
+        RequiresCallTarget call,
+        DefiniteOperationFacts operationFacts)
+    {
+        return (call.Instance == null ||
+                operationFacts.CompletesNormally(call.Instance)) &&
+            call.Arguments.All(argument =>
+                operationFacts.CompletesNormally(argument.Value)) &&
+            call.ExplicitArguments.Values.All(
+                operationFacts.CompletesNormally);
+    }
+
     private bool IsDirectReplayableStatement(
         StatementSyntax statement,
         IOperation callSite,
@@ -319,23 +360,124 @@ internal sealed partial class RequiresCallSiteDiscovery(
         };
     }
 
-    private static RequiresCallTarget? GetCall(IOperation operation)
+    private static ImmutableArray<RequiresCallTarget> GetCalls(
+        IOperation operation)
     {
         return operation switch
         {
-            IInvocationOperation invocation => new(
+            IInvocationOperation invocation => [new(
                 invocation.TargetMethod,
                 invocation.Instance,
-                invocation.Arguments),
+                invocation.Arguments,
+                ImmutableDictionary<int, IOperation>.Empty,
+                true)],
             IObjectCreationOperation
             {
                 Constructor: { } constructor
-            } creation => new(
+            } creation => [new(
                 constructor,
                 null,
-                creation.Arguments),
-            _ => null
+                creation.Arguments,
+                ImmutableDictionary<int, IOperation>.Empty,
+                true)],
+            IPropertyReferenceOperation property =>
+                GetPropertyCalls(property),
+            IEventReferenceOperation eventReference =>
+                GetEventCalls(eventReference),
+            _ => []
         };
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetPropertyCalls(
+        IPropertyReferenceOperation property)
+    {
+        var getter = property.Property.GetMethod;
+        var setter = property.Property.SetMethod;
+        if (property.Parent is ISimpleAssignmentOperation assignment &&
+            ReferenceEquals(assignment.Target, property))
+        {
+            return setter == null
+                ? []
+                : [CreateSetterCall(property, setter, assignment.Value, true)];
+        }
+        if (property.Parent is ICompoundAssignmentOperation compound &&
+            ReferenceEquals(compound.Target, property) ||
+            property.Parent is IIncrementOrDecrementOperation increment &&
+            ReferenceEquals(increment.Target, property))
+        {
+            var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>(2);
+            if (getter != null)
+            {
+                calls.Add(CreateGetterCall(property, getter));
+            }
+            if (setter != null)
+            {
+                calls.Add(CreateSetterCall(property, setter, null, false));
+            }
+            return calls.ToImmutable();
+        }
+        if (property.Parent is INameOfOperation || getter == null)
+        {
+            return [];
+        }
+        return [CreateGetterCall(property, getter)];
+    }
+
+    private static RequiresCallTarget CreateGetterCall(
+        IPropertyReferenceOperation property,
+        IMethodSymbol getter)
+    {
+        return new RequiresCallTarget(
+            getter,
+            property.Instance,
+            property.Arguments,
+            ImmutableDictionary<int, IOperation>.Empty,
+            true);
+    }
+
+    private static RequiresCallTarget CreateSetterCall(
+        IPropertyReferenceOperation property,
+        IMethodSymbol setter,
+        IOperation? value,
+        bool canReplay)
+    {
+        var explicitArguments = value == null
+            ? ImmutableDictionary<int, IOperation>.Empty
+            : ImmutableDictionary<int, IOperation>.Empty.Add(
+                setter.Parameters.Length - 1,
+                value);
+        return new RequiresCallTarget(
+            setter,
+            property.Instance,
+            property.Arguments,
+            explicitArguments,
+            canReplay);
+    }
+
+
+    private static ImmutableArray<RequiresCallTarget> GetEventCalls(
+        IEventReferenceOperation eventReference)
+    {
+        if (eventReference.Parent is not IEventAssignmentOperation assignment ||
+            !ReferenceEquals(assignment.EventReference, eventReference))
+        {
+            return [];
+        }
+        var target = assignment.Adds
+            ? eventReference.Event.AddMethod
+            : eventReference.Event.RemoveMethod;
+        if (target == null)
+        {
+            return [];
+        }
+        return [new RequiresCallTarget(
+            target,
+            eventReference.Instance,
+            [],
+            ImmutableDictionary<int, IOperation>.Empty.Add(
+                0,
+                assignment.HandlerValue),
+            true)];
     }
 
     private static ExpressionSyntax? GetPropertyExpression(
