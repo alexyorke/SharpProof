@@ -5,6 +5,10 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
+  <ItemGroup Condition="'$(SharpProofSourceCommit)' != ''">
+    <AssemblyMetadata Include="SharpProofSourceCommit"
+                      Value="$(SharpProofSourceCommit)" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Collections.Immutable" />
     <Reference Include="Microsoft.CodeAnalysis"

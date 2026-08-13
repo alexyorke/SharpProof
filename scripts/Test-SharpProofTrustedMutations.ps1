@@ -1182,6 +1182,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~NightlyFuzzCampaignIsContainerConnectedAndEvidenceBound'
     },
     [pscustomobject]@{
+        Name = 'standalone-gate-requires-passing-result'
+        File = 'scripts\Assert-SharpProofStandaloneGateResult.ps1'
+        Original = '$document.Result.Passed -isnot [bool] -or'
+        Mutated = '$document.Result.Passed -is [bool] -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~StandaloneGateDecoderRejectsUnauthenticatedEvidence'
+    },
+    [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = '                if (type == FileTypeSymbolicLink)'
