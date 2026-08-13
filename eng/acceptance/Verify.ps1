@@ -76,7 +76,7 @@ function Complete-AcceptanceTimingPhase {
 function Write-AcceptanceTimingEvidence {
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('passed', 'failed')]
+        [ValidateSet('passed', 'failed', 'incomplete')]
         [string]$Status,
 
         [string]$Failure = ''
@@ -691,6 +691,19 @@ finally {
     Pop-Location
 }
 
-Write-AcceptanceTimingEvidence -Status passed
+$acceptanceStatus = if ($SkipBuild -or $SkipTests) {
+    'incomplete'
+}
+else {
+    'passed'
+}
+Write-AcceptanceTimingEvidence -Status $acceptanceStatus
 Write-Host "Acceptance timing evidence: $timingOutput"
-Write-Host 'SharpProof acceptance checks passed.'
+if ($acceptanceStatus -ceq 'passed') {
+    Write-Host 'SharpProof acceptance checks passed.'
+}
+else {
+    Write-Host (
+        'SharpProof acceptance checks completed in non-qualifying ' +
+        'partial mode.')
+}
