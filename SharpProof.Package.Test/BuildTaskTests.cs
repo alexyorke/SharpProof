@@ -397,6 +397,109 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    public void EveryPublicationMemberRejectsEveryCompilerOwnedOutput()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-compiler-output-");
+        try
+        {
+            var tools = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "tools"));
+            var worker = Path.Combine(tools.FullName, "worker.dll");
+            var launcher = Path.Combine(tools.FullName, "launcher.dll");
+            var protocol = Path.Combine(tools.FullName, "protocol.dll");
+            foreach (var path in new[] { worker, launcher, protocol })
+            {
+                File.WriteAllText(path, Path.GetFileName(path));
+            }
+
+            var compilerNames = new[]
+            {
+                "Consumer.dll",
+                "obj/Consumer.dll",
+                "Consumer.xml",
+                "obj/Consumer.pdb",
+                "obj/ref/Consumer.dll",
+                "obj/refint/Consumer.dll",
+                "obj/Consumer.AssemblyInfo.cs",
+                "obj/Consumer.GeneratedMSBuildEditorConfig.editorconfig",
+                "obj/Consumer.deps.json",
+                "obj/Consumer.runtimeconfig.json"
+            };
+            foreach (var compilerName in compilerNames)
+            {
+                foreach (var member in new[]
+                         {
+                             "request", "result", "manifest", "sarif"
+                         })
+                {
+                    var root = Directory.CreateDirectory(Path.Combine(
+                        directory.FullName,
+                        Guid.NewGuid().ToString("N")));
+                    var request = Path.Combine(root.FullName, "request.json");
+                    var result = Path.Combine(root.FullName, "result.json");
+                    var manifest = Path.Combine(root.FullName, "manifest.json");
+                    var sarif = Path.Combine(root.FullName, "result.sarif");
+                    var compilerOutput = Path.Combine(root.FullName, compilerName);
+                    Directory.CreateDirectory(
+                        Path.GetDirectoryName(compilerOutput)!);
+                    switch (member)
+                    {
+                        case "request":
+                            request = compilerOutput;
+                            break;
+                        case "result":
+                            result = compilerOutput;
+                            break;
+                        case "manifest":
+                            manifest = compilerOutput;
+                            break;
+                        case "sarif":
+                            sarif = compilerOutput;
+                            break;
+                    }
+                    var task = new InvalidatePublishedResult
+                    {
+                        BuildEngine = new RecordingBuildEngine(),
+                        ResultPath = result,
+                        RequestPath = request,
+                        ManifestPath = manifest,
+                        SarifPath = sarif,
+                        ProjectDirectory = root.FullName,
+                        WorkerPath = worker,
+                        LauncherPath = launcher,
+                        WorkerProtocolPath = protocol,
+                        CompilerOutputPaths = [new TaskItem(compilerOutput)]
+                    };
+
+                    Assert.That(
+                        task.Execute(),
+                        Is.False,
+                        $"{member} -> {compilerName}");
+                    Assert.That(File.Exists(compilerOutput), Is.False);
+                    foreach (var publication in new[]
+                             {
+                                 request, result, manifest, sarif
+                             })
+                    {
+                        Assert.That(
+                            File.Exists(
+                                LinuxPathIdentity.PublicationMarkerPath(
+                                    publication)),
+                            Is.False,
+                            $"{member} -> {compilerName}");
+                    }
+                }
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public async System.Threading.Tasks.Task InvalidationCancellationInterruptsPublicationLockWait()
     {
         var directory = Directory.CreateTempSubdirectory(

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using SharpProof.Host;
@@ -38,6 +39,12 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
     public string WorkerProtocolPath { get; set; } = string.Empty;
 
     public string? CachePath { get; set; }
+
+    [SuppressMessage(
+        "Performance",
+        "CA1819:Properties should not return arrays",
+        Justification = "MSBuild task item parameters use ITaskItem arrays.")]
+    public ITaskItem[] CompilerOutputPaths { get; set; } = [];
 
     public override bool Execute()
     {
@@ -97,6 +104,12 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
             .ToArray();
         var publicationMutationPaths = outputPaths
             .Concat(publicationMarkerPaths)
+            .ToArray();
+        var compilerOutputPaths = CompilerOutputPaths
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ItemSpec))
+            .Select(static item => item.ItemSpec)
+            .Select(ResolvePath)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
         var aliasesOutput = outputPaths
             .Distinct(StringComparer.Ordinal)
@@ -164,6 +177,16 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
              LinuxPathIdentity.IsSameOrDescendant(
                  resolvedCachePath,
                  workerDirectory));
+        var aliasesCompilerOutput = publicationPaths
+            .Concat(publicationMarkerPaths)
+            .Any(publication => compilerOutputPaths.Any(compilerOutput =>
+                string.Equals(
+                    publication,
+                    compilerOutput,
+                    StringComparison.Ordinal) ||
+                LinuxPathIdentity.AreSameExistingFile(
+                    publication,
+                    compilerOutput)));
 
         if (aliasesOutput)
         {
@@ -184,6 +207,11 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
         if (aliasesCache)
         {
             Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");
+        }
+        if (aliasesCompilerOutput)
+        {
+            Log.LogError(
+                "SharpProof publication paths must not alias compiler-owned outputs.");
         }
         if (Log.HasLoggedErrors)
         {

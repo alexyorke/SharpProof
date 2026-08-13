@@ -35,6 +35,26 @@
       <_SharpProofCompilerManifestPath>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'compiler-manifest.json'))</_SharpProofCompilerManifestPath>
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
+    <ItemGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+      <_SharpProofCompilerOwnedOutput Remove="@(_SharpProofCompilerOwnedOutput)" />
+      <_SharpProofCompilerOwnedOutput Include="$(TargetPath)" Condition="'$(TargetPath)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="@(IntermediateAssembly)" />
+      <_SharpProofCompilerOwnedOutput Include="$(DocumentationFile)" Condition="'$(DocumentationFile)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)$(TargetName).pdb" Condition="'$(TargetName)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$([System.IO.Path]::ChangeExtension('$(TargetPath)', '.pdb'))" Condition="'$(TargetPath)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$(IntermediateRefAssembly)" Condition="'$(IntermediateRefAssembly)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)ref/$(TargetName)$(TargetExt)" />
+      <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)refint/$(TargetName)$(TargetExt)" />
+      <_SharpProofCompilerOwnedOutput Include="$(GeneratedAssemblyInfoFile)" Condition="'$(GeneratedAssemblyInfoFile)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)$(MSBuildProjectName).AssemblyInfo.cs" />
+      <_SharpProofCompilerOwnedOutput Include="$(GeneratedGlobalUsingsFile)" Condition="'$(GeneratedGlobalUsingsFile)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)$(MSBuildProjectName).GlobalUsings.g.cs" />
+      <_SharpProofCompilerOwnedOutput Include="$(GeneratedMSBuildEditorConfigFile)" Condition="'$(GeneratedMSBuildEditorConfigFile)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)$(MSBuildProjectName).GeneratedMSBuildEditorConfig.editorconfig" />
+      <_SharpProofCompilerOwnedOutput Include="$(ProjectDepsFilePath)" Condition="'$(ProjectDepsFilePath)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$(ProjectRuntimeConfigFilePath)" Condition="'$(ProjectRuntimeConfigFilePath)' != ''" />
+      <_SharpProofCompilerOwnedOutput Include="$(ProjectRuntimeConfigDevFilePath)" Condition="'$(ProjectRuntimeConfigDevFilePath)' != ''" />
+    </ItemGroup>
     <SharpProof.BuildTasks.InvalidatePublishedResult
         Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
         ResultPath="$(SharpProofVerifyResultFile)"
@@ -48,6 +68,7 @@
         WorkerPath="$(_SharpProofWorkerPath)"
         LauncherPath="$(_SharpProofLauncherPath)"
         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
+        CompilerOutputPaths="@(_SharpProofCompilerOwnedOutput)"
         CachePath="$(_SharpProofEffectiveCacheDirectory)" />
   </Target>
 

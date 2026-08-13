@@ -827,6 +827,75 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task PublicationRejectsCompilerOwnedOutputsBeforeMutation()
+    {
+        RequireContainerWorker();
+        var collisions = new[]
+        {
+            ("SharpProofVerifyResultFile", "target"),
+            ("SharpProofVerifyRequestFile", "intermediate"),
+            ("SharpProofCompilerManifestFile", "documentation"),
+            ("SharpProofVerifySarifFile", "debug-symbols"),
+            ("SharpProofVerifyRequestFile", "reference-assembly"),
+            ("SharpProofCompilerManifestFile", "generated-editorconfig")
+        };
+        foreach (var (publicationProperty, outputKind) in collisions)
+        {
+            using var project = ConsumerProject.Create(IdentitySource);
+            var compilerOutput = project.CompilerOutputPath(outputKind);
+            var properties = new List<(string Name, string Value)>
+            {
+                (publicationProperty, compilerOutput)
+            };
+            if (outputKind == "documentation")
+            {
+                properties.Add(("DocumentationFile", compilerOutput));
+            }
+
+            var build = await project.BuildAsync(
+                verify: true,
+                properties.ToArray());
+
+            Assert.That(
+                build.ExitCode,
+                Is.Not.Zero,
+                $"{publicationProperty} -> {outputKind}{Environment.NewLine}" +
+                build.Output);
+            Assert.That(
+                build.Output,
+                Does.Contain("compiler-owned outputs"),
+                $"{publicationProperty} -> {outputKind}");
+            Assert.That(
+                File.Exists(
+                    LinuxPathIdentity.PublicationMarkerPath(compilerOutput)),
+                Is.False,
+                $"{publicationProperty} -> {outputKind}");
+            Assert.That(
+                File.Exists(compilerOutput),
+                Is.False,
+                $"{publicationProperty} -> {outputKind}");
+        }
+
+        using var incremental = ConsumerProject.Create(IdentitySource);
+        var baseline = await incremental.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var targetPath = incremental.CompilerOutputPath("target");
+        var targetBytes = await File.ReadAllBytesAsync(targetPath);
+
+        var rejected = await incremental.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyResultFile", targetPath));
+
+        Assert.That(rejected.ExitCode, Is.Not.Zero, rejected.Output);
+        Assert.That(
+            await File.ReadAllBytesAsync(targetPath),
+            Is.EqualTo(targetBytes));
+        Assert.That(
+            File.Exists(LinuxPathIdentity.PublicationMarkerPath(targetPath)),
+            Is.False);
+    }
+
+    [Test]
     public async Task WorkerExitWithoutResultProducesTypedFailure()
     {
         RequireContainerWorker();
@@ -2935,6 +3004,26 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             return Path.Combine(_root, "obj", "Release", framework, "SharpProof",
                 fileName);
+        }
+
+        internal string CompilerOutputPath(string kind)
+        {
+            var intermediate = Path.Combine(
+                _root, "obj", "Release", "net8.0");
+            return kind switch
+            {
+                "target" => Path.Combine(
+                    _root, "bin", "Release", "net8.0", "Consumer.dll"),
+                "intermediate" => Path.Combine(intermediate, "Consumer.dll"),
+                "documentation" => Path.Combine(intermediate, "Consumer.xml"),
+                "debug-symbols" => Path.Combine(intermediate, "Consumer.pdb"),
+                "reference-assembly" => Path.Combine(
+                    intermediate, "ref", "Consumer.dll"),
+                "generated-editorconfig" => Path.Combine(
+                    intermediate,
+                    "Consumer.GeneratedMSBuildEditorConfig.editorconfig"),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
         }
 
         internal async Task<string> CreateResultlessWorkerAsync()
