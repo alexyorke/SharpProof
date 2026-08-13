@@ -48,6 +48,44 @@ if [[ "${command_name}" = "dev" ]]; then
   exec /bin/bash "$@"
 fi
 
+requires_clean_exact_commit_source() {
+  case "$1" in
+    acceptance|mutation|pack|pilots|release-tag|release-baseline|release-plan|release-qualification|release-publish)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+assert_clean_exact_commit_source() {
+  if ! git -C "${repo_root}" diff --quiet --ignore-submodules=none -- ||
+    ! git -C "${repo_root}" diff --cached --quiet \
+      --ignore-submodules=none HEAD --; then
+    echo "SharpProof ${command_name} requires clean exact-commit source; tracked index or working-tree changes were found." >&2
+    exit 2
+  fi
+
+  local untracked_path
+  while IFS= read -r -d '' untracked_path; do
+    case "${untracked_path}" in
+      nupkgs/*)
+        # Release commands receive the exact package-job artifacts here.
+        ;;
+      *)
+        echo "SharpProof ${command_name} requires clean exact-commit source; an untracked source path was found." >&2
+        exit 2
+        ;;
+    esac
+  done < <(git -C "${repo_root}" ls-files \
+    --others --exclude-standard -z --)
+}
+
+if requires_clean_exact_commit_source "${command_name}"; then
+  assert_clean_exact_commit_source
+fi
+
 case "${command_name}" in
   *)
     task_root="$(mktemp -d /tmp/sharpproof-task.XXXXXXXX)"
