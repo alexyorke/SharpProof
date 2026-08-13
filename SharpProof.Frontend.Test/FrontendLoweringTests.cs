@@ -843,8 +843,8 @@ public sealed class FrontendLoweringTests
         Assert.That(
             OperationSubsetClassifier.Classify(
                 OperationSupportStage.EffectDiscovery,
-                OperationKind.InterpolatedString).Abstention,
-            Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
+                OperationKind.InterpolatedString).IsExact,
+            Is.True);
     }
 
     [Test]

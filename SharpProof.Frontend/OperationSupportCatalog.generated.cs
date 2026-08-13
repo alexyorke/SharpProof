@@ -76,6 +76,7 @@ internal static class OperationSupportCatalogData
         OperationKind.CatchClause,
         OperationKind.SwitchCase,
         OperationKind.CaseClause,
+        OperationKind.InterpolatedString,
         OperationKind.InterpolatedStringText,
         OperationKind.Interpolation,
         OperationKind.MethodBodyOperation,

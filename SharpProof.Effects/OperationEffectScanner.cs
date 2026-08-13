@@ -212,8 +212,9 @@ internal sealed class OperationEffectScanner
                 ScanChildren(thrown),
                 EffectSummaryOperations.Throw(
                     ResolveThrownException(thrown))),
-            IInterpolatedStringOperation { ConstantValue.HasValue: true } or IThrowOperation =>
-                EffectSummary.Empty,
+            IInterpolatedStringOperation interpolation =>
+                ScanInterpolatedString(interpolation),
+            IThrowOperation => EffectSummary.Empty,
             IBinaryOperation binary => ScanBinary(binary),
             IUnaryOperation unary => ScanUnary(unary),
             IConversionOperation conversion => ScanConversion(conversion),
@@ -586,6 +587,45 @@ internal sealed class OperationEffectScanner
                 binary.OperatorMethod,
                 [binary.LeftOperand, binary.RightOperand],
                 binary));
+    }
+
+    private EffectSummary ScanInterpolatedString(
+        IInterpolatedStringOperation interpolation)
+    {
+        if (interpolation.ConstantValue.HasValue)
+        {
+            return EffectSummary.Empty;
+        }
+
+        var summary = EffectSummaryOperations.Allocate(
+            EffectAllocationKind.Managed);
+        foreach (var part in interpolation.Parts)
+        {
+            if (part is not IInterpolationOperation value)
+            {
+                continue;
+            }
+            if (value.Alignment != null || value.FormatString != null)
+            {
+                summary = EffectSummaryOperations.Join(
+                    summary,
+                    ScanChildren(value),
+                    EffectSummaryOperations.Unsupported());
+                continue;
+            }
+
+            summary = EffectSummaryOperations.Join(
+                summary,
+                Scan(value.Expression),
+                StringConcatenationEffectResolver.ResolveFormattedValue(
+                    value.Expression,
+                    value,
+                    _session.Compilation,
+                    _callResolver,
+                    _abstractFlow,
+                    ClassifyRegion));
+        }
+        return summary;
     }
 
     private EffectSummary ScanUnary(IUnaryOperation unary)

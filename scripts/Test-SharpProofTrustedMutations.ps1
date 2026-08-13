@@ -462,12 +462,12 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnsupportedEffectCallableShapesCannotCarryReplayEvidence'
     },
     [pscustomobject]@{
-        Name = 'runtime-interpolation-fails-closed'
+        Name = 'ordinary-interpolation-catalog-parent'
         File = 'SharpProof.Frontend\OperationSupportCatalog.generated.cs'
-        Original = "        OperationKind.ConditionalAccessInstance,`n        OperationKind.ObjectOrCollectionInitializer,"
-        Mutated = "        OperationKind.ConditionalAccessInstance,`n        OperationKind.InterpolatedString,`n        OperationKind.ObjectOrCollectionInitializer,"
-        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
-        Filter = 'FullyQualifiedName~StringConstructionDistinguishesKnownAndUnknownAllocation'
+        Original = "        OperationKind.InterpolatedString,`n        OperationKind.InterpolatedStringText,"
+        Mutated = '        OperationKind.InterpolatedStringText,'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~StageSpecificOperationClassifiersMatchTheClosedCatalog'
     },
     [pscustomobject]@{
         Name = 'effect-incomplete-reason-projection'

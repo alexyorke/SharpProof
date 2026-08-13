@@ -31,14 +31,14 @@ internal static class StringConcatenationEffectResolver
 
         return EffectSummaryOperations.Join(
             allocation,
-            ResolveOperand(
+            ResolveFormattedValue(
                 binary.LeftOperand,
                 binary,
                 compilation,
                 calls,
                 flow,
                 classifyRegion),
-            ResolveOperand(
+            ResolveFormattedValue(
                 binary.RightOperand,
                 binary,
                 compilation,
@@ -47,9 +47,9 @@ internal static class StringConcatenationEffectResolver
                 classifyRegion));
     }
 
-    private static EffectSummary ResolveOperand(
+    internal static EffectSummary ResolveFormattedValue(
         IOperation operand,
-        IBinaryOperation origin,
+        IOperation origin,
         Compilation compilation,
         EffectCallSiteResolver calls,
         ManagedFlowResult? flow,

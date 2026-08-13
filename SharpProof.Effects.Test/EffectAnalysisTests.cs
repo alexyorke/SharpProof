@@ -88,16 +88,77 @@ public sealed class EffectAnalysisTests
         Assert.That(interpolated.Projection.IsComplete, Is.False);
         Assert.That(
             interpolatedString.Summary.Allocation,
-            Is.EqualTo(EffectAllocationKind.Unknown));
+            Is.EqualTo(EffectAllocationKind.Managed));
         Assert.That(
-            interpolatedString.Summary.Throws.IncludesUnknown,
+            interpolatedString.Summary.Throws.IsEmpty,
             Is.True);
         Assert.That(
             interpolatedString.Projection.IsComplete,
-            Is.False);
+            Is.True);
         Assert.That(
             interpolatedConstant.Summary.Allocation,
             Is.EqualTo(EffectAllocationKind.None));
+    }
+
+    [Test]
+    public void OrdinaryInterpolationPreservesFormattingAndEvaluationEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class ThrowingValue {
+                private static int s_state;
+                public override string ToString() {
+                    s_state++;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                private static int s_state;
+                private static string Next() { s_state++; return "next"; }
+                public static string StringValue(string value) => $"{{{value}}}";
+                public static string Scalar(int value) => $"value={value}";
+                public static string Ordered(string value) => $"{Next()}{value}";
+                public static string Throwing(ThrowingValue value) => $"{value}";
+                public static string Aligned(string value) => $"{value,4}";
+                public static string Formatted(int value) => $"{value:X}";
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var stringValue = session.Analyze(Method(compilation, "StringValue"));
+        Assert.That(stringValue.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(stringValue.Summary.Completeness,
+            Is.EqualTo(EffectCompleteness.Complete));
+
+        var scalar = session.Analyze(Method(compilation, "Scalar"));
+        Assert.That(scalar.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Unknown));
+        Assert.That(scalar.Summary.Completeness,
+            Is.EqualTo(EffectCompleteness.Incomplete));
+
+        var ordered = session.Analyze(Method(compilation, "Ordered"));
+        Assert.That(ordered.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+
+        var throwing = session.Analyze(Method(compilation, "Throwing"));
+        Assert.That(throwing.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+        AssertContainsThrows(
+            throwing.Summary,
+            "System.InvalidOperationException");
+
+        foreach (var unsupported in new[] { "Aligned", "Formatted" })
+        {
+            Assert.That(
+                session.Analyze(Method(compilation, unsupported))
+                    .Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete),
+                unsupported);
+        }
     }
 
     [Test]
