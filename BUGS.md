@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 136 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 135 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 136 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-018 - Definitely safe casts report impossible exceptions (fixed)
+
+- [x] Fixed by `d39bde755` (`fix: classify proven safe conversions`).
+- Conversion effects now use abstract nullness and nullable-presence facts, plus
+  exact runtime types preserved by immediate boxing/reference conversions, to
+  remove only proven-impossible cast and unwrap exceptions. Unknown,
+  incompatible, and null-to-nonnullable conversions remain conservative.
+- Regression-first coverage includes null-to-nullable unboxing, null reference
+  casts, present nullable unwraps, compatible boxed/reference values, unknown
+  and incompatible values, nonnullable null unboxing, and DoesNotThrow analyzer
+  projection. Full Effects passed 165/165, Analyzer passed 225/225, and
+  Architecture passed 110/110 in the canonical container.
 
 ### SP-AUDIT-097 - Semantic strings evade the meta-analyzer through patterns (fixed)
 
@@ -1086,38 +1099,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   control characters before marker/lock creation. Add newline, carriage-return,
   separator-like Unicode, ordinary paths, reordered sets, and true
   partial-overlap cases plus a mutation that restores delimiter joining.
-
-### SP-AUDIT-018 - Definitely safe casts report impossible exceptions (P1)
-
-- [ ] `OperationEffectScanner.ClassifyConversion` assigns both
-  `InvalidCastException` and `NullReferenceException` to every unboxing
-  conversion before accounting for a nullable target and the operand's known
-  null value. A conversion from a null boxed value to `Nullable<T>` returns an
-  empty nullable value and cannot throw either exception. The explicit
-  reference-conversion branch likewise assigns `InvalidCastException` without
-  checking that a null reference is always a valid result. Its nullable
-  conversion branch also assigns `InvalidOperationException` whenever a
-  nullable is unwrapped, even when managed flow proves it has a value.
-- Supported impact: `(int?)(object?)null` produced both impossible exception
-  types, and `(string)(object?)null` produced an impossible
-  `InvalidCastException`. A local initialized as `int? value = 1` and returned
-  as `(int)value` produced an impossible `InvalidOperationException`; all three
-  projections were complete. This can reject a valid selected no-throw claim
-  and makes effect evidence disagree with CLR conversion semantics for
-  admitted conversion shapes.
-- Reproduction: a temporary canonical-container Effects regression analyzed
-  `public static int? Convert() => (int?)(object?)null`; it expected an empty
-  throw set and received `InvalidCastException` plus `NullReferenceException`.
-  An adjacent regression for `public static string? Convert() =>
-  (string)(object?)null` received `InvalidCastException` instead of an empty
-  throw set. A third focused regression initialized `int? value = 1`, converted
-  it to `int`, and received a nonempty throw set.
-- Required closure: classify nullable unboxing, nullable unwrapping, and
-  explicit reference casts with abstract null/type state, eliminating
-  impossible throws while retaining conservative failure for unknown or
-  incompatible values. Add definitely-null, definitely-present, compatible
-  boxed/reference, incompatible boxed/reference, non-nullable unbox, unknown
-  operand, and mutation-discriminating cases.
 
 ### SP-AUDIT-019 - Unreachable catch handlers contribute effects (P1)
 
