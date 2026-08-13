@@ -24,6 +24,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 
 function Get-PackageIdentity {
     param(
@@ -127,6 +128,22 @@ function Resolve-SharpProofPackageSource {
     )
     if ($versions.Count -ne 1) {
         throw "SharpProof package and symbol package versions must match; found '$($versions -join ', ')'."
+    }
+
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $repositoryCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or
+        $repositoryCommit -notmatch '^[0-9a-f]{40}$') {
+        throw 'Could not resolve the package-source checkout commit.'
+    }
+    foreach ($packageId in $expectedIds) {
+        $main = @($identities | Where-Object Id -eq $packageId)[0]
+        $symbols = @($symbolIdentities | Where-Object Id -eq $packageId)[0]
+        Test-SharpProofSymbolPackagePair `
+            -PackagePath $main.Path `
+            -SymbolPackagePath $symbols.Path `
+            -PackageId $packageId `
+            -RepositoryCommit $repositoryCommit
     }
     return $resolved
 }

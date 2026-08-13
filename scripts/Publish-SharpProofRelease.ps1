@@ -37,6 +37,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -405,6 +406,11 @@ function Get-ValidatedRelease {
                 "Release package repository commit does not match checkout " +
                 "'$RepositoryCommit' for '$packageId'.")
         }
+        Test-SharpProofSymbolPackagePair `
+            -PackagePath $mainPath `
+            -SymbolPackagePath $symbolsPath `
+            -PackageId $packageId `
+            -RepositoryCommit $RepositoryCommit
         $packages.Add([pscustomobject][ordered]@{
             packageId = $packageId
             version = $version

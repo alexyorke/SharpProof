@@ -263,6 +263,173 @@ public sealed class ReleasePublicationScriptTests
         }
     }
 
+    [Test]
+    public async Task EveryReleaseAuthorityUsesStrictSymbolValidation()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var scriptName in new[]
+                 {
+                     "New-SharpProofReleaseEvidence.ps1",
+                     "Test-SharpProofReleaseArtifacts.ps1",
+                     "Publish-SharpProofRelease.ps1",
+                     "Test-SharpProofPackageConsumers.ps1"
+                 })
+        {
+            var script = await File.ReadAllTextAsync(
+                Path.Combine(root, "scripts", scriptName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofSymbolPackages.ps1"),
+                    scriptName);
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofSymbolPackagePair"),
+                    scriptName);
+            }
+        }
+    }
+
+    [TestCase("missing")]
+    [TestCase("foreign")]
+    [TestCase("wrong-commit")]
+    [TestCase("duplicate")]
+    [TestCase("malformed")]
+    public async Task ReleaseEvidenceRejectsInvalidSymbolPayload(
+        string mutation)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PublicationWorkspace.Create();
+        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
+        {
+            File.Copy(
+                package.Path,
+                Path.Combine(
+                    workspace.PackageSource,
+                    Path.GetFileName(package.Path)));
+        }
+
+        var symbolsPath = Path.Combine(
+            workspace.PackageSource,
+            Path.GetFileName(feed.GetSymbolPackagePath(
+                PackagedProductFeed.AttributesPackageId)));
+        using (var symbols = ZipFile.Open(
+                   symbolsPath,
+                   ZipArchiveMode.Update))
+        {
+            var pdb = symbols.Entries.Single(entry =>
+                entry.FullName.EndsWith(
+                    ".pdb",
+                    StringComparison.Ordinal));
+            var pdbName = pdb.FullName;
+            switch (mutation)
+            {
+                case "missing":
+                    pdb.Delete();
+                    break;
+                case "foreign":
+                    {
+                        var foreignPath = Path.Combine(
+                            workspace.PackageSource,
+                            Path.GetFileName(feed.GetSymbolPackagePath(
+                                PackagedProductFeed.PortablePackageId)));
+                        using var foreign = ZipFile.OpenRead(foreignPath);
+                        var foreignPdb = foreign.Entries.First(entry =>
+                            entry.FullName.EndsWith(
+                                ".pdb",
+                                StringComparison.Ordinal));
+                        using var image = new MemoryStream();
+                        using (var input = foreignPdb.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        RewriteEntry(symbols, pdb, pdbName, image.ToArray());
+                        break;
+                    }
+                case "wrong-commit":
+                    {
+                        using var image = new MemoryStream();
+                        using (var input = pdb.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        var bytes = image.ToArray();
+                        var head = Encoding.ASCII.GetBytes(
+                            (await RunProcessAsync(
+                                FindRepositoryRoot(),
+                                "git",
+                                "rev-parse",
+                                "HEAD")).Output.Trim());
+                        var offset = bytes.AsSpan().IndexOf(head);
+                        Assert.That(offset, Is.GreaterThanOrEqualTo(0));
+                        Encoding.ASCII.GetBytes(new string('0', 40))
+                            .CopyTo(bytes, offset);
+                        RewriteEntry(symbols, pdb, pdbName, bytes);
+                        break;
+                    }
+                case "duplicate":
+                    {
+                        using var image = new MemoryStream();
+                        using (var input = pdb.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        var duplicate = symbols.CreateEntry(pdbName);
+                        await using var output = duplicate.Open();
+                        await output.WriteAsync(image.ToArray());
+                        break;
+                    }
+                case "malformed":
+                    RewriteEntry(
+                        symbols,
+                        pdb,
+                        pdbName,
+                        Encoding.ASCII.GetBytes("not-a-portable-pdb"));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mutation),
+                        mutation,
+                        "Unknown symbol mutation.");
+            }
+        }
+
+        var evidence = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "New-SharpProofReleaseEvidence.ps1"),
+            "-PackageSource",
+            workspace.PackageSource);
+        var expectedFailure = mutation switch
+        {
+            "missing" => "exact PDB entry set",
+            "foreign" => "debug identifier",
+            "wrong-commit" => "canonical repository commit",
+            "duplicate" => "duplicate entry",
+            "malformed" => "portable PDB",
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation))
+        };
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(evidence.ExitCode, Is.Not.Zero, evidence.Output);
+            Assert.That(
+                evidence.Output,
+                Does.Contain(expectedFailure).IgnoreCase,
+                evidence.Output);
+            Assert.That(
+                evidence.Output,
+                Does.Not.Contain("Unable to find type"),
+                evidence.Output);
+        }
+    }
+
     private static string PublicationPolicy(string documentation)
     {
         var paragraphs = Regex.Split(
@@ -466,6 +633,20 @@ public sealed class ReleasePublicationScriptTests
             replacement.Open(),
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         document.Save(output);
+    }
+
+    private static void RewriteEntry(
+        ZipArchive archive,
+        ZipArchiveEntry entry,
+        string entryName,
+        byte[] contents)
+    {
+        entry.Delete();
+        var replacement = archive.CreateEntry(
+            entryName,
+            CompressionLevel.Optimal);
+        using var output = replacement.Open();
+        output.Write(contents);
     }
 
     private static string FindRepositoryRoot()

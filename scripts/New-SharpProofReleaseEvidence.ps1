@@ -15,6 +15,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 
 function Get-PackageIdentity {
     param(
@@ -596,6 +597,28 @@ if ($commits[0] -ne $checkoutCommit) {
     throw (
         "NuGet artifact repository commit '$($commits[0])' does not match " +
         "checkout '$checkoutCommit'.")
+}
+
+foreach ($packageId in $expectedIds) {
+    $main = @(
+        $identities |
+            Where-Object {
+                $_.File.Extension -eq '.nupkg' -and
+                $_.Identity.Id -eq $packageId
+            }
+    )[0]
+    $symbols = @(
+        $identities |
+            Where-Object {
+                $_.File.Extension -eq '.snupkg' -and
+                $_.Identity.Id -eq $packageId
+            }
+    )[0]
+    Test-SharpProofSymbolPackagePair `
+        -PackagePath $main.File.FullName `
+        -SymbolPackagePath $symbols.File.FullName `
+        -PackageId $packageId `
+        -RepositoryCommit $checkoutCommit
 }
 
 $thirdPartyPackages = @(

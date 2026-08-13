@@ -9,6 +9,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 
 function Get-SpdxPackageId {
     param(
@@ -111,6 +112,31 @@ foreach ($artifact in $artifacts) {
         [int64]$file.Length -ne [int64]$artifact.bytes) {
         throw "Release artifact hash or size mismatch: $($artifact.fileName)"
     }
+}
+foreach ($packageId in $expectedPackageIds) {
+    $mainArtifact = @(
+        $artifacts |
+            Where-Object {
+                [string]$_.kind -eq 'package' -and
+                [string]$_.packageId -eq $packageId
+            }
+    )[0]
+    $symbolArtifact = @(
+        $artifacts |
+            Where-Object {
+                [string]$_.kind -eq 'symbols' -and
+                [string]$_.packageId -eq $packageId
+            }
+    )[0]
+    Test-SharpProofSymbolPackagePair `
+        -PackagePath (Join-Path `
+            $resolvedSource `
+            ([string]$mainArtifact.fileName)) `
+        -SymbolPackagePath (Join-Path `
+            $resolvedSource `
+            ([string]$symbolArtifact.fileName)) `
+        -PackageId $packageId `
+        -RepositoryCommit $head
 }
 $sbomArtifact = @(
     $artifacts |
