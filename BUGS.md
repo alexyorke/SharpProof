@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 118 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 117 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 118 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-053 - Release tag policy does not bind the effective allowed ref set (fixed)
+
+- [x] Fixed by `72b5d934a` (`fix: bind effective release tag policies`).
+- Release configuration now requires exactly one active tag ruleset with an
+  exact, case-sensitive, duplicate-free include/exclude set and rejects any
+  include/exclude conflict. Each publishing environment must expose the exact
+  typed deployment-ref set; wildcard, branch, extra, missing, duplicate, and
+  case-different policies fail. Variable and secret checks remain independent
+  least-privilege presence checks.
+- Local mocked-GitHub fixtures cover the canonical contract plus all authority
+  mutations, including a second active ruleset. The fixture gate passed,
+  Architecture passed 172/172, and release-publication tests passed 18/18.
 
 ### SP-AUDIT-192 - Exception text can masquerade as a mutation assertion (fixed)
 
@@ -696,29 +709,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   mutation restoring report-defined denominators.
 - Consolidated cases: SP-AUDIT-120, SP-AUDIT-148, SP-AUDIT-149, SP-AUDIT-150.
 - Unified closure: Independently derive the complete production project/source/parse-option/generator universe and make coverage, complexity, generated exclusions, and TCB consume it.
-
-### SP-AUDIT-053 - Release tag policy does not bind the effective allowed ref set (P0)
-
-- [ ] `Test-SharpProofReleaseConfiguration.ps1` uses
-  `Require-SetMembers` for environment deployment tag policies. It proves only
-  that required tags are present and never rejects additional tag patterns.
-- Certifier impact: an environment intended to authorize three exact release
-  tags can also authorize `*` (or another unreviewed tag pattern) while the
-  release-configuration certifier reports success. This defeats the
-  environment policy as an independent publication boundary.
-- Reproduction: after temporarily working around SP-AUDIT-052 only, a mocked
-  GitHub API returned every contract-required policy plus an additional `*`
-  tag policy for both NuGet environments. The canonical validator exited zero,
-  wrote passed evidence, and printed that both publishing environments were
-  validated. The contract change, API mock, and evidence were removed.
-- Required closure: require exact set equality for deployment tag policies and
-  reject duplicate, broader, differently cased, branch, or otherwise invented
-  policies. Keep variables/secrets least-privilege checks explicit rather than
-  silently conflating required presence with exact authorization. Add wildcard,
-  extra exact tag, branch policy, missing tag, duplicate, and exact-contract
-  fixtures plus a certifier mutation restoring subset-only validation.
-- Consolidated cases: SP-AUDIT-055.
-- Unified closure: Compute and require the exact effective allowed tag/ref set across every environment and ruleset include/exclude rule.
 
 ### SP-AUDIT-054 - Protected release tags may have unreviewed bypass actors (P0)
 
