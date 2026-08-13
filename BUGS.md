@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 108 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 107 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 108 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-020 - Exact safe array stores report type-mismatch throws (fixed)
+
+- [x] Fixed by `297d71965` (`fix: prove exact fresh array stores safe`).
+- Effect analysis now records fresh array runtime element types by fresh-region
+  identity, follows local alias unions, and suppresses
+  `ArrayTypeMismatchException` only for a single exact fresh array with an
+  implicit CLR assignment conversion. Covariant, parameter, field, and
+  multi-provenance arrays remain conservative; null, sealed, and value-array
+  behavior is preserved.
+- Regression-first tests cover fresh object/base/interface/boxing stores, local
+  aliases, covariant arrays, parameters, fields, null, value arrays, and
+  generated selected analyzer projection. Effects passed 169/169, Analyzer
+  passed 256/256, Architecture passed 176/176, the container contract passed,
+  and `git diff --check` passed.
 
 ### SP-AUDIT-019 - Unreachable catch handlers contribute effects (fixed)
 
@@ -945,26 +960,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   package-mismatched pilot evidence.
 - Consolidated cases: SP-AUDIT-082, SP-AUDIT-133, SP-AUDIT-145, SP-AUDIT-161, SP-AUDIT-171.
 - Unified closure: Generate one authoritative qualification matrix and exact-commit receipt set covering pilots, Debug, release configuration, portable OS consumers, repeated cancellation, and minimum SDK.
-
-### SP-AUDIT-020 - Exact safe array stores report type-mismatch throws (P1)
-
-- [ ] `ArrayStoreIsDefinitelyCompatible` suppresses
-  `ArrayTypeMismatchException` only when the declared element type is sealed or
-  the assigned value is null. It does not retain the exact runtime element type
-  of a fresh array through a local, nor use assignability when covariance cannot
-  have changed that runtime type.
-- Supported impact: storing a string into a freshly allocated `object[]`
-  produced a complete summary containing `ArrayTypeMismatchException`, although
-  the store is necessarily valid. This can reject a valid no-throw claim for an
-  ordinary supported array operation.
-- Reproduction: a temporary canonical-container Effects regression analyzed
-  `var values = new object[1]; values[0] = "value";`; it expected no
-  `ArrayTypeMismatchException` and received one.
-- Required closure: track exact array-allocation element types through local
-  aliases and prove assignment compatibility when the runtime type is fixed;
-  retain the exception for covariant aliases such as `object[] values = new
-  string[1]`. Add fresh/local/parameter/field aliases, null, compatible and
-  incompatible values, covariance, and a mutation-discriminating case.
 
 ### SP-AUDIT-021 - Documented ordinary interpolation is rejected (P1)
 
