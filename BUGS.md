@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 139 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 138 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 139 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-098 - Mutable static properties evade analyzer-state policy (fixed)
+
+- [x] Fixed by `a6b1b9745` (`fix: reject mutable static member storage`).
+- SPMETA002 now covers compiler-backed mutable static storage introduced by
+  settable auto-properties and field-like events in critical analyzer,
+  frontend, and verifier namespaces, while preserving the existing field rule.
+  Get-only properties, computed accessors, custom events, instance members, and
+  noncritical namespaces remain admissible.
+- Regression-first tests prove mutable static property/event rejection and the
+  complete control matrix. The diagnostic wording was updated in the
+  authoritative catalog and regenerated. Focused tests passed 2/2, full Meta
+  Analyzers passed 72/72, and Architecture passed 110/110 in the canonical
+  container.
 
 ### SP-AUDIT-071 - Unicode-escaped Contract identifiers evade advisory activation (fixed)
 
@@ -1557,21 +1571,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   expression labels that control soundness behavior, deduplicate overlapping
   syntax, and retain nonsemantic-string controls. Add a mutation that removes
   each newly owned operation shape.
-
-### SP-AUDIT-098 - Mutable static properties evade analyzer-state policy (P1)
-
-- [ ] SPMETA002 registers only `SymbolKind.Field`. Static auto-properties and
-  field-like events introduce mutable process-wide backing storage without an
-  explicit field symbol action.
-- Supported impact: a mutable static auto-property in `SharpProof.Analyzer`
-  emitted no SPMETA002, so moving shared state from a field to a property can
-  bypass the compilation/worker-scoped state invariant.
-- Reproduction: an in-memory meta-analyzer fixture declared
-  `private static int State { get; set; }`; the diagnostic set was empty.
-- Required closure: cover mutable static properties and events in critical
-  assemblies while allowing proven immutable/get-only forms. Add auto/manual
-  property, init/get-only, event, containing-type, and namespace controls plus
-  a move-field-to-property mutation.
 
 ### SP-AUDIT-105 - Semantic cache policy misses aliases and indexer writes (P1)
 
