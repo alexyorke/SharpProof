@@ -30,6 +30,7 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationScheduling.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $output = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
@@ -1343,7 +1344,14 @@ if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
             [string]$result.mutated -ne [string]$registered.Mutated -or
             -not [bool]$result.killed -or
             [int]$result.exitCode -eq 0 -or
-            [int]$result.assertionFailureCount -lt 1) {
+            [int]$result.assertionFailureCount -lt 1 -or
+            [string]$result.baselineInvocationSha256 -ne
+                (Get-SharpProofMutationBaselineInvocation `
+                    -Project ([string]$registered.Project) `
+                    -Filter ([string]$registered.Filter) `
+                    -Configuration $Configuration).Sha256 -or
+            @($result.baselineSelectedTests).Count -eq 0 -or
+            [string]$result.baselineTrxSha256 -notmatch '^[0-9a-f]{64}$') {
             throw 'Mutation checkpoint result does not match its catalog entry.'
         }
     }
@@ -1352,6 +1360,9 @@ if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
         if ($completedResults.Count -ne $catalogCount) {
             throw 'Completed mutation evidence does not cover the full catalog.'
         }
+        & (Join-Path $PSScriptRoot 'Test-SharpProofMutationCatalog.ps1') `
+            -EvidencePath $output `
+            -ExpectedCommit $sourceCommit
         Write-Host "Mutation evidence is already complete: $output"
         return
     }
@@ -1508,7 +1519,7 @@ try {
         $savedBaseline = Get-Content -LiteralPath $baselineFile -Raw |
             ConvertFrom-Json
         $savedTests = @($savedBaseline.tests)
-        if ([int]$savedBaseline.schemaVersion -ne 1 -or
+        if ([int]$savedBaseline.schemaVersion -ne 2 -or
             [string]$savedBaseline.commit -ne $sourceCommit -or
             [string]$savedBaseline.configuration -ne $Configuration -or
             [string]$savedBaseline.selection -notin @('full', 'selected') -or
@@ -1521,30 +1532,66 @@ try {
             string, object]]::new([StringComparer]::Ordinal)
         foreach ($test in $savedTests) {
             $project = [string]$test.project
-            $method = [string]$test.method
+            $filter = [string]$test.filter
             $ledger = @($test.ledger)
             if ([string]::IsNullOrWhiteSpace($project) -or
-                [string]::IsNullOrWhiteSpace($method) -or
+                [string]::IsNullOrWhiteSpace($filter) -or
+                [string]$test.configuration -ne $Configuration -or
                 $ledger.Count -eq 0) {
                 throw 'Mutation baseline evidence contains an invalid test row.'
             }
-            $key = $project + "`n" + $method
-            if (-not $baselineMap.TryAdd($key, [object]$ledger)) {
-                throw "Mutation baseline evidence duplicates '$project::$method'."
+            $invocation = Get-SharpProofMutationBaselineInvocation `
+                -Project $project -Filter $filter -Configuration $Configuration
+            if ([string]$test.invocationSha256 -ne $invocation.Sha256) {
+                throw 'Mutation baseline evidence has a mismatched invocation identity.'
+            }
+            $baselineRoot = Split-Path -Parent $baselineFile
+            $baselineTrxPath = [IO.Path]::GetFullPath((Join-Path `
+                    $baselineRoot ([string]$test.trx)))
+            if (-not $baselineTrxPath.StartsWith(
+                    $baselineRoot + [IO.Path]::DirectorySeparatorChar,
+                    [StringComparison]::Ordinal) -or
+                -not [IO.File]::Exists($baselineTrxPath) -or
+                [string]$test.trxSha256 -notmatch '^[0-9a-f]{64}$' -or
+                (Get-FileHash -LiteralPath $baselineTrxPath -Algorithm SHA256).
+                    Hash.ToLowerInvariant() -ne [string]$test.trxSha256) {
+                throw 'Mutation baseline evidence has an invalid TRX receipt.'
+            }
+            $method = $filter.Substring('FullyQualifiedName~'.Length)
+            [void](Read-SharpProofMutationTestEvidence `
+                    -TrxPath $baselineTrxPath `
+                    -EvidenceName ($project + ' saved baseline') `
+                    -Mode Baseline `
+                    -ProcessExitCode 0 `
+                    -ExpectedMethodName $method `
+                    -ExpectedLedger $ledger)
+            $key = $invocation.Sha256
+            if (-not $baselineMap.TryAdd($key, [object]$test)) {
+                throw "Mutation baseline evidence duplicates '$project::$filter'."
             }
         }
         foreach ($mutation in $pendingMutations) {
-            $method = $mutation.Filter.Substring(
-                'FullyQualifiedName~'.Length)
-            $key = [string]$mutation.Project + "`n" + $method
+            $invocation = Get-SharpProofMutationBaselineInvocation `
+                -Project ([string]$mutation.Project) `
+                -Filter ([string]$mutation.Filter) `
+                -Configuration $Configuration
+            $key = $invocation.Sha256
             if (-not $baselineMap.ContainsKey($key)) {
                 throw (
                     "Mutation baseline evidence does not cover " +
-                    "'$($mutation.Project)::$method'.")
+                    "'$($mutation.Project)::$($mutation.Filter)'.")
             }
+            $saved = $baselineMap[$key]
             $mutation | Add-Member `
                 -NotePropertyName BaselineLedger `
-                -NotePropertyValue @($baselineMap[$key])
+                -NotePropertyValue @($saved.ledger)
+            $mutation | Add-Member `
+                -NotePropertyName BaselineInvocationSha256 `
+                -NotePropertyValue $key
+            $mutation | Add-Member -NotePropertyName BaselineTrx `
+                -NotePropertyValue ([string]$saved.trx)
+            $mutation | Add-Member -NotePropertyName BaselineTrxSha256 `
+                -NotePropertyValue ([string]$saved.trxSha256)
         }
     }
     else {
@@ -1552,19 +1599,15 @@ try {
         $baselineKeys = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
         $baselineGroupIndex = 0
-        foreach ($projectGroup in @($pendingMutations | Group-Object Project)) {
+        $baselinePlan = @(Get-SharpProofMutationBaselinePlan `
+                -Mutations $pendingMutations `
+                -Configuration $Configuration)
+        foreach ($baselineGroup in $baselinePlan) {
             $baselineGroupIndex++
-            $projectMutations = @($projectGroup.Group)
-            $filters = @($projectMutations.Filter | Sort-Object -Unique)
-            $expectedMethodNames = @($filters | ForEach-Object {
-                    $_.Substring('FullyQualifiedName~'.Length)
-                })
-            if (@($expectedMethodNames | Sort-Object -Unique).Count -ne
-                $expectedMethodNames.Count) {
-                throw (
-                    "Mutation baseline project '$($projectGroup.Name)' has " +
-                    'duplicate method identities.')
-            }
+            $projectMutations = @($baselineGroup.Mutations)
+            $invocation = $baselineGroup.Invocation
+            $expectedMethodName = $invocation.Filter.Substring(
+                'FullyQualifiedName~'.Length)
             $baselineTrxName = 'project-' +
                 $baselineGroupIndex.ToString(
                     'D2', [Globalization.CultureInfo]::InvariantCulture) +
@@ -1575,12 +1618,12 @@ try {
             $baselineExit = Invoke-IsolatedDotnet `
                 -Arguments @(
                     'test',
-                    [string]$projectGroup.Name,
+                    $invocation.Project,
                     '-c',
                     $Configuration,
                     '--no-restore',
                     '--filter',
-                    ($filters -join '|'),
+                    $invocation.Filter,
                     '--logger',
                     'console;verbosity=minimal',
                     '--logger',
@@ -1592,33 +1635,49 @@ try {
                     '-baseline.log')
             $baselineElapsedMilliseconds += $lastInvocationElapsedMilliseconds
             $baselineInvocationCount++
-            if ($baselineExit -ne 0) {
-                throw (
-                    "Baseline for mutation project '$($projectGroup.Name)' " +
-                    "failed; see $logs\project-" +
-                    $baselineGroupIndex.ToString(
-                        'D2', [Globalization.CultureInfo]::InvariantCulture) +
-                    '-baseline.log.')
-            }
+            Assert-SharpProofMutationBaselineResult `
+                -ExitCode $baselineExit `
+                -TrxPath $baselineTrx `
+                -EvidenceName ($invocation.Project + '::' + $invocation.Filter)
             $baselineTestEvidence = Read-SharpProofMutationTestEvidence `
                 -TrxPath $baselineTrx `
-                -EvidenceName ($projectGroup.Name + ' baseline') `
+                -EvidenceName ($invocation.Project + ' baseline') `
                 -Mode Baseline `
                 -ProcessExitCode $baselineExit `
-                -ExpectedMethodName $expectedMethodNames
+                -ExpectedMethodName $expectedMethodName
+            $ledger = @($baselineTestEvidence.testLedgers[$expectedMethodName])
+            $baselineEvidenceRoot = if ($null -ne $baselineFile) {
+                Split-Path -Parent $baselineFile
+            }
+            else {
+                Split-Path -Parent $output
+            }
+            $baselineTrxRelative = [IO.Path]::GetRelativePath(
+                $baselineEvidenceRoot,
+                $baselineTrx).Replace('\', '/')
+            $baselineTrxSha256 = (Get-FileHash -LiteralPath $baselineTrx `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
             foreach ($mutation in $projectMutations) {
-                $method = $mutation.Filter.Substring(
-                    'FullyQualifiedName~'.Length)
-                $ledger = @($baselineTestEvidence.testLedgers[$method])
                 $mutation | Add-Member `
                     -NotePropertyName BaselineLedger `
                     -NotePropertyValue $ledger
-                $key = [string]$mutation.Project + "`n" + $method
+                $mutation | Add-Member `
+                    -NotePropertyName BaselineInvocationSha256 `
+                    -NotePropertyValue $invocation.Sha256
+                $mutation | Add-Member -NotePropertyName BaselineTrx `
+                    -NotePropertyValue $baselineTrxRelative
+                $mutation | Add-Member -NotePropertyName BaselineTrxSha256 `
+                    -NotePropertyValue $baselineTrxSha256
+                $key = $invocation.Sha256
                 if ($baselineKeys.Add($key)) {
                     $baselineRows.Add([pscustomobject]@{
                         project = [string]$mutation.Project
-                        method = $method
+                        filter = [string]$mutation.Filter
+                        configuration = $Configuration
+                        invocationSha256 = $invocation.Sha256
                         ledger = $ledger
+                        trx = $baselineTrxRelative
+                        trxSha256 = $baselineTrxSha256
                     })
                 }
             }
@@ -1629,14 +1688,14 @@ try {
             $temporaryBaseline = $baselineFile + '.' +
                 [Guid]::NewGuid().ToString('N') + '.tmp'
             [pscustomobject]@{
-                schemaVersion = 1
+                schemaVersion = 2
                 commit = $sourceCommit
                 configuration = $Configuration
                 selection = $selection
                 catalogCount = $catalogCount
                 catalogSha256 = $catalogSha256
                 testCount = $baselineRows.Count
-                tests = @($baselineRows | Sort-Object project, method)
+                tests = @($baselineRows | Sort-Object project, filter)
                 timing = [ordered]@{
                     restoreElapsedMilliseconds = $restoreElapsedMilliseconds
                     baselineElapsedMilliseconds = $baselineElapsedMilliseconds
@@ -1648,7 +1707,7 @@ try {
                 -Destination $baselineFile -Force
             Write-Host (
                 "Recorded $($baselineRows.Count) exact mutation baselines " +
-                "from $baselineInvocationCount test projects.")
+                "from $baselineInvocationCount focused invocations.")
             Write-Host "Baseline evidence: $baselineFile"
             return
         }
@@ -1733,6 +1792,11 @@ try {
                 failedCount = $testEvidence.failedCount
                 assertionFailureCount = $testEvidence.assertionFailureCount
                 selectedTests = $testEvidence.testLedger
+                baselineInvocationSha256 =
+                    $mutation.BaselineInvocationSha256
+                baselineSelectedTests = @($mutation.BaselineLedger)
+                baselineTrx = $mutation.BaselineTrx
+                baselineTrxSha256 = $mutation.BaselineTrxSha256
                 log = "mutation-logs/$runId/$($mutation.Name)-test.log"
                 trx = "mutation-logs/$runId/$testTrxName"
                 logSha256 = (Get-FileHash `

@@ -163,6 +163,7 @@ Start-AcceptanceTimingPhase -Name 'static-validation'
 & (Join-Path $repositoryRoot 'scripts\Test-CompilerArtifactModelGenerator.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationEvidence.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationScheduling.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationBaselines.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $previewEvidence = Get-Content -LiteralPath (

@@ -5,6 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
 
 $fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) (
     'SharpProof-mutation-evidence-' + [Guid]::NewGuid().ToString('N'))
@@ -111,6 +112,7 @@ function Test-MutationReuseValidation {
             'Invoke-SharpProofTrustedMutationsParallel.ps1',
             'Test-SharpProofMutationCatalog.ps1',
             'SharpProof.MutationEvidence.psm1',
+            'SharpProof.MutationBaselines.psm1',
             'SharpProof.ContainerExecution.psm1')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) `
             -Destination (Join-Path $scripts $name)
@@ -187,6 +189,32 @@ function Test-MutationReuseValidation {
             $trx, $xml, [Text.UTF8Encoding]::new($false))
         [IO.File]::WriteAllText(
             $log, "assertion-backed failure`n", [Text.UTF8Encoding]::new($false))
+        $baselineParts = New-TestParts `
+            -Outcome Passed `
+            -Message '' `
+            -Method $method `
+            -DisplayName $method `
+            -Class 'Fixture.Tests' `
+            -TestId "baseline-test-$index" `
+            -ExecutionId "baseline-execution-$index"
+        $baselineTrx = Join-Path $receiptDirectory (
+            $entry.Name + '-baseline.trx')
+        $baselineXml = @"
+<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <TestDefinitions>$($baselineParts.Definition)</TestDefinitions>
+  <TestEntries>$($baselineParts.Entry)</TestEntries>
+  <Results>$($baselineParts.Result)</Results>
+  <ResultSummary outcome="Completed"><Counters total="1" executed="1" passed="1" failed="0" $zeroInfrastructure /></ResultSummary>
+</TestRun>
+"@
+        [IO.File]::WriteAllText(
+            $baselineTrx,
+            $baselineXml,
+            [Text.UTF8Encoding]::new($false))
+        $invocation = Get-SharpProofMutationBaselineInvocation `
+            -Project $entry.Project `
+            -Filter $entry.Filter `
+            -Configuration Release
         $results += [pscustomobject][ordered]@{
             name = $entry.Name
             file = $entry.File
@@ -200,6 +228,12 @@ function Test-MutationReuseValidation {
             failedCount = 1
             assertionFailureCount = 1
             selectedTests = @($identity)
+            baselineInvocationSha256 = $invocation.Sha256
+            baselineSelectedTests = @($identity)
+            baselineTrx = "receipts/$($entry.Name)-baseline.trx"
+            baselineTrxSha256 = (Get-FileHash `
+                -LiteralPath $baselineTrx `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
             log = "receipts/$($entry.Name).log"
             trx = "receipts/$($entry.Name).trx"
             logSha256 = (Get-FileHash -LiteralPath $log -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -296,11 +330,27 @@ function Test-MutationReuseValidation {
             @{ Name = 'missing-log'; Property = 'log'; Delete = $false },
             @{ Name = 'missing-trx'; Property = 'trx'; Delete = $false },
             @{ Name = 'missing-log-digest'; Property = 'logSha256'; Delete = $false },
-            @{ Name = 'missing-trx-digest'; Property = 'trxSha256'; Delete = $false })) {
+            @{ Name = 'missing-trx-digest'; Property = 'trxSha256'; Delete = $false },
+            @{ Name = 'missing-baseline-invocation'; Property = 'baselineInvocationSha256'; Delete = $false },
+            @{ Name = 'missing-baseline-ledger'; Property = 'baselineSelectedTests'; Delete = $false },
+            @{ Name = 'missing-baseline-trx'; Property = 'baselineTrx'; Delete = $false },
+            @{ Name = 'missing-baseline-trx-digest'; Property = 'baselineTrxSha256'; Delete = $false })) {
         $candidate = New-CompleteEvidence
         $candidate.mutations[0].PSObject.Properties.Remove($missing.Property)
         Invoke-ReuseCase -Name $missing.Name -Evidence $candidate
     }
+
+    $wrongBaselineInvocation = New-CompleteEvidence
+    $wrongBaselineInvocation.mutations[0].baselineInvocationSha256 = '0' * 64
+    Invoke-ReuseCase -Name wrong-baseline-invocation `
+        -Evidence $wrongBaselineInvocation
+    $wrongBaselineLedger = New-CompleteEvidence
+    $wrongBaselineLedger.mutations[0].baselineSelectedTests = @(
+        'Fixture.Tests.Other|Other')
+    Invoke-ReuseCase -Name wrong-baseline-ledger -Evidence $wrongBaselineLedger
+    $wrongBaselineDigest = New-CompleteEvidence
+    $wrongBaselineDigest.mutations[0].baselineTrxSha256 = '0' * 64
+    Invoke-ReuseCase -Name wrong-baseline-digest -Evidence $wrongBaselineDigest
 
     Invoke-ReuseCase `
         -Name dirty-tree `

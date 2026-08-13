@@ -93,7 +93,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "35ea1b0bf9cf21f40c5103b54f643619e9d9d342b0f091dee577378a7fdd7c54",
+    "inventorySha256": "fb87cd12e5deae931f6ad49fda87fb7554d4dc937a13109f009b873f1990b688",
     "components": [
       {
         "name": "discovery",
@@ -287,6 +287,8 @@
         "paths": [
           "scripts/SharpProof.MutationEvidence.psm1",
           "scripts/SharpProof.MutationScheduling.psm1",
+          "scripts/SharpProof.MutationBaselines.psm1",
+          "scripts/Test-SharpProofMutationBaselines.ps1",
           "scripts/Test-SharpProofMutationScheduling.ps1",
           "scripts/Test-SharpProofMutationEvidence.ps1",
           "scripts/Test-SharpProofTrustedMutations.ps1",

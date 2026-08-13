@@ -11,6 +11,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
 
 if ($ExpectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw "ExpectedCommit must be a 40-character commit SHA: '$ExpectedCommit'."
@@ -102,6 +103,34 @@ foreach ($mutation in $mutations) {
     if (-not $test.StartsWith($filterPrefix, [StringComparison]::Ordinal)) {
         throw "Mutation '$($mutation.name)' has an invalid selected-test filter."
     }
+    $baselineInvocation = Get-SharpProofMutationBaselineInvocation `
+        -Project ([string]$mutation.project) `
+        -Filter $test `
+        -Configuration ([string]$evidence.configuration)
+    if ([string]$mutation.baselineInvocationSha256 -ne
+            $baselineInvocation.Sha256 -or
+        @($mutation.baselineSelectedTests).Count -eq 0 -or
+        [string]$mutation.baselineTrxSha256 -notmatch '^[0-9a-f]{64}$') {
+        throw "Mutation '$($mutation.name)' has invalid focused baseline evidence."
+    }
+    $baselineTrxPath = [IO.Path]::GetFullPath(
+        (Join-Path $evidenceDirectory ([string]$mutation.baselineTrx)))
+    $receiptPrefix = $evidenceDirectory + [IO.Path]::DirectorySeparatorChar
+    if (-not $baselineTrxPath.StartsWith(
+            $receiptPrefix, [StringComparison]::Ordinal) -or
+        -not [IO.File]::Exists($baselineTrxPath) -or
+        (Get-FileHash -LiteralPath $baselineTrxPath -Algorithm SHA256).
+            Hash.ToLowerInvariant() -ne
+            [string]$mutation.baselineTrxSha256) {
+        throw "Mutation '$($mutation.name)' has an invalid baseline TRX receipt."
+    }
+    [void](Read-SharpProofMutationTestEvidence `
+            -TrxPath $baselineTrxPath `
+            -EvidenceName ([string]$mutation.name + ' baseline') `
+            -Mode Baseline `
+            -ProcessExitCode 0 `
+            -ExpectedMethodName $test.Substring($filterPrefix.Length) `
+            -ExpectedLedger @($mutation.baselineSelectedTests))
     $trxPath = [IO.Path]::GetFullPath(
         (Join-Path $evidenceDirectory ([string]$mutation.trx)))
     $testEvidence = Read-SharpProofMutationTestEvidence `

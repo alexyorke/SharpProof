@@ -1255,7 +1255,10 @@ public sealed class ArchitectureTests
                 Does.Contain("workerMethods = $workerMethodTimings"));
             Assert.That(
                 mutationDriver,
-                Does.Contain("Group-Object Project"));
+                Does.Contain("Get-SharpProofMutationBaselinePlan"));
+            Assert.That(
+                mutationDriver,
+                Does.Not.Contain("($filters -join '|')"));
             Assert.That(
                 mutationDriver,
                 Does.Contain("baselineInvocationCount"));
@@ -1267,7 +1270,7 @@ public sealed class ArchitectureTests
                 Does.Contain("-BaselineEvidencePath"));
             Assert.That(
                 parallelMutationDriver,
-                Does.Contain("shared-baseline-v2"));
+                Does.Contain("focused-baseline-v3"));
             Assert.That(
                 developerCheck,
                 Does.Contain("Invoke-SharpProofSemanticTests.ps1"));
