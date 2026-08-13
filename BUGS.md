@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 158 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 157 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -107,6 +107,17 @@ The active backlog contains 158 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-062 removed from the supported-preview backlog: The discriminating case requires user-defined operators or conversions, which the documented subset rejects.
 - SP-AUDIT-012 removed from the supported-preview backlog: The reproducer requires foreach, which the documented language-subset gate rejects before effect proof.
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
+
+## Fixed during remediation
+
+### SP-AUDIT-244 - Dirty-tree coverage loses merge-base semantics (fixed)
+
+- [x] Fixed by `b2e7b48a6` (`fix: preserve merge-base coverage semantics`).
+- Working-tree coverage now resolves the exact merge base before diffing the
+  index/worktree; clean coverage retains triple-dot comparison semantics.
+- Disposable diverged-history regressions cover identical base/feature TCB
+  edits and base-only edits under unrelated working-tree dirtiness. The full
+  canonical-container ArchitectureTest suite passed 74/74.
 
 ## P0 active bugs
 
@@ -991,22 +1002,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   authority. Add honest `Refuted -> Proven` and `Unknown -> Proven` transitions,
   constraint changes, same-kind evidence swaps, valid unchanged evidence,
   worker/launcher result classification, and authority-check-removal controls.
-
-### SP-AUDIT-244 - Dirty-tree coverage loses merge-base semantics (P0)
-
-- [ ] Changed-line coverage normally diffs `$ComparisonRef...HEAD`, but any
-  dirty path enables `IncludeWorkingTree` and changes the target to plain
-  `$ComparisonRef`. On a diverged branch this compares the base-tip tree with
-  the worktree instead of comparing the merge base with the worktree.
-- Certifier impact: if base and feature independently make the same uncovered
-  TCB edit, an unrelated dirty file makes the edit disappear and changed-TCB
-  coverage can report 100 percent. Conversely, a base-only TCB edit is invented
-  as a feature-side change, producing a false failure.
-- Required closure: resolve the exact merge base first, then diff that commit
-  against the index/worktree without changing baseline semantics. Add diverged
-  branches with identical base/feature edits, base-only edits, feature-only
-  edits, unrelated dirty tracked/untracked files, clean controls, and a mutation
-  restoring the two-tree comparison.
 
 ## P1 active bugs
 
