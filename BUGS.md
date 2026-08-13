@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 115 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 114 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 115 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-107 - The TCB inventory can self-authorize changes (fixed)
+
+- [x] Fixed by `bc90c1ab7` (`fix: derive complete release authority closure`).
+- A constrained independent traversal now derives the release authority from
+  workflow and container entrypoints, statically invoked PowerShell and shell
+  scripts, local actions, catalogs, and package manifests. Its canonical
+  84-path set must exactly match the catalog and every leaf must occur exactly
+  once in the TCB; missing roots/leaves and untracked paths fail closed.
+- Regression-first disposable fixtures cover deletion, movement, and byte
+  changes for all formerly missing authorities, digest and changed-file
+  selection, newly invoked leaves, uninvoked decoys, duplicate inventory,
+  cycles, and the canonical closure. Architecture passed 174/174 and the
+  container contract passed.
 
 ### SP-AUDIT-065 - Release workflow authority is checked as raw substrings (fixed)
 
@@ -784,28 +798,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   claims, duplicate selections, generated companions, serialization/cache
   round trips, and real strict-worker controls plus a trusted mutation that
   removes scope parity.
-
-### SP-AUDIT-107 - The TCB inventory can self-authorize changes (P0)
-
-- [ ] The `releaseContainment` inventory includes wrapper scripts but omits the
-  leaf release-evidence generator, artifact validator, publisher, release
-  workflow, and verifier nuspec they execute. TCB hashing and changed-TCB
-  coverage derive solely from that incomplete inventory.
-- Certifier impact: changing package-hash validation, evidence generation,
-  publication validation, workflow authority, or package layout leaves the
-  claimed trusted-computing-base digest and file count unchanged and bypasses
-  changed-TCB selection.
-- Reproduction: a read-only executable inventory probe flattened all canonical
-  components and found all five authorities absent from its 264 paths:
-  `New-SharpProofReleaseEvidence.ps1`, `Test-SharpProofReleaseArtifacts.ps1`,
-  `Publish-SharpProofRelease.ps1`, `package-consumers.yml`, and the verifier
-  nuspec.
-- Required closure: inventory every statically invoked release-authority leaf,
-  workflow, and package-layout authority exactly once. Add an architecture
-  closure test and disposable-commit digest mutation proving that any leaf byte
-  change alters both production and TCB digests.
-- Consolidated cases: SP-AUDIT-147.
-- Unified closure: Independently derive an immutable TCB closure containing every certifier leaf; deletion, movement, or change must alter its digest and coverage universe.
 
 ### SP-AUDIT-173 - Call instantiation is not bound to parameter order and free-variable roles (P0)
 
