@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 144 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 143 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 144 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-101 - Mutation-bearing expressions are re-evaluated from post-state (fixed)
+
+- [x] Fixed by `c767348df` (`fix: preserve mutation-bearing flow effects`).
+- Abstract flow now treats mutation-bearing branch predicates and stored values
+  conservatively instead of re-evaluating them from their post-mutation state.
+  Stable expressions retain their existing precise branch refinement.
+- Regression-first coverage includes assignment, initializer, increment,
+  ref-call, nested-condition, evaluation-order, true/false-edge, and stable
+  controls, plus analyzer projection proving the reachable write reports
+  SP0002. The focused regressions passed; full Effects passed 163/163, Analyzer
+  passed 218/218, and Architecture passed 88/88 in the canonical container.
 
 ### SP-AUDIT-162 - Lowered-body hydration omits producer body invariants (fixed)
 
@@ -777,24 +789,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   package's nuspec expression and every corresponding SPDX package row during
   evidence creation, final validation, and plan-only publication. Add a
   self-consistently rehashed wrong-license fixture.
-
-### SP-AUDIT-101 - Mutation-bearing expressions are re-evaluated from post-state (P0)
-
-- [ ] `ManagedAbstractFlow` transfers a branch expression, including nested
-  assignments, then evaluates the expression again from the mutated state when
-  applying edge assumptions. The second evaluation can mark the actually taken
-  edge unreachable.
-- Supported impact: for `x = 1; if (x + (x = 2) == 4) { } else { state++; }`,
-  runtime takes the else branch (`1 + 2 != 4`), but analysis re-evaluates it as
-  `2 + 2 == 4`, omits the reachable static write, and can accept `[EnforcePure]`.
-- Reproduction: a temporary Effects regression expected the summary to contain
-  `EffectRegionId.Static()`; actual was false. The test was removed.
-- Required closure: snapshot branch facts before mutation or conservatively
-  suppress refinement for mutation-bearing predicates. Add assignment,
-  increment, ref/local-call mutation, evaluation-order, both-edge, nested
-  boolean/conditional, projection, analyzer, and mutation-reversion controls.
-- Consolidated cases: SP-AUDIT-108, SP-AUDIT-116.
-- Unified closure: Snapshot each mutation-bearing expression value and state once; branch refinement, assignment storage, and checked-hazard proofs must consume that snapshot.
 
 ### SP-AUDIT-107 - The TCB inventory can self-authorize changes (P0)
 
