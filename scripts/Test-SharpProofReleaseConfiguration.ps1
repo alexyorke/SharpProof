@@ -43,6 +43,30 @@ function Require-SetMembers {
     }
 }
 
+function Require-ExactSet {
+    param(
+        [AllowEmptyCollection()][string[]]$Actual = @(),
+        [AllowEmptyCollection()][object[]]$Expected = @(),
+        [Parameter(Mandatory = $true)][string]$Owner
+    )
+
+    $expectedStrings = @($Expected | ForEach-Object { [string]$_ })
+    $actualUnique = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $expectedUnique = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    if (@($Actual | Where-Object { -not $actualUnique.Add($_) }).Count -ne 0 -or
+        @($expectedStrings | Where-Object {
+                -not $expectedUnique.Add($_)
+            }).Count -ne 0 -or
+        $actualUnique.Count -ne $expectedUnique.Count -or
+        @($actualUnique | Where-Object {
+                -not $expectedUnique.Contains($_)
+            }).Count -ne 0) {
+        throw "$Owner must equal the exact contract set."
+    }
+}
+
 $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
     throw 'The release-configuration commit could not be resolved.'
@@ -50,16 +74,37 @@ if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
 
 $repository = [string]$contract.repository
 $rulesets = @(Invoke-GitHubJson "repos/$repository/rulesets")
-$tagRuleset = $rulesets |
-    Where-Object { $_.target -eq 'tag' -and $_.enforcement -eq 'active' } |
-    ForEach-Object { Invoke-GitHubJson "repos/$repository/rulesets/$($_.id)" } |
-    Where-Object {
-        $includes = @($_.conditions.ref_name.include | ForEach-Object { [string]$_ })
-        @($contract.tagRuleset.includes | Where-Object { [string]$_ -notin $includes }).Count -eq 0
-    } |
-    Select-Object -First 1
-if ($null -eq $tagRuleset) {
-    throw 'No active tag ruleset covers every required release tag.'
+$activeTagRulesets = @($rulesets |
+    Where-Object { $_.target -ceq 'tag' -and $_.enforcement -ceq 'active' })
+if ($activeTagRulesets.Count -ne 1) {
+    throw 'Exactly one active tag ruleset must own the release tag policy.'
+}
+$tagRuleset = Invoke-GitHubJson (
+    "repos/$repository/rulesets/$($activeTagRulesets[0].id)")
+$rulesetIncludes = @($tagRuleset.conditions.ref_name.include |
+    ForEach-Object { [string]$_ })
+$rulesetExcludes = @($tagRuleset.conditions.ref_name.exclude |
+    ForEach-Object { [string]$_ })
+Require-ExactSet `
+    -Actual $rulesetIncludes `
+    -Expected @($contract.tagRuleset.includes) `
+    -Owner 'The release-tag ruleset include policy'
+$expectedRulesetExcludes = @($contract.tagRuleset.excludes)
+if ($expectedRulesetExcludes.Count -eq 0) {
+    if ($rulesetExcludes.Count -ne 0) {
+        throw 'The release-tag ruleset exclude policy must equal the exact contract set.'
+    }
+}
+else {
+    Require-ExactSet `
+        -Actual $rulesetExcludes `
+        -Expected $expectedRulesetExcludes `
+        -Owner 'The release-tag ruleset exclude policy'
+}
+if (@($rulesetIncludes | Where-Object {
+            $rulesetExcludes -ccontains $_
+        }).Count -ne 0) {
+    throw 'The release-tag ruleset cannot both include and exclude a ref.'
 }
 Require-SetMembers `
     -Actual @($tagRuleset.rules.type | ForEach-Object { [string]$_ }) `
@@ -78,13 +123,16 @@ foreach ($required in $contract.environments) {
     }
     $policies = Invoke-GitHubJson (
         "repos/$repository/environments/$escapedName/deployment-branch-policies")
-    $actualTags = @($policies.branch_policies |
-        Where-Object { $_.type -eq 'tag' } |
-        ForEach-Object { [string]$_.name })
-    Require-SetMembers `
-        -Actual $actualTags `
-        -Expected @($required.tags) `
-        -Owner "Environment '$name' tag policies"
+    $actualRefs = @($policies.branch_policies | ForEach-Object {
+            ([string]$_.type) + ':' + ([string]$_.name)
+        })
+    $expectedRefs = @($required.tags | ForEach-Object {
+            'tag:' + ([string]$_)
+        })
+    Require-ExactSet `
+        -Actual $actualRefs `
+        -Expected $expectedRefs `
+        -Owner "Environment '$name' deployment ref policies"
 
     $variables = Invoke-GitHubJson "repos/$repository/environments/$escapedName/variables"
     $actualVariables = @($variables.variables | ForEach-Object { [string]$_.name })
@@ -95,10 +143,13 @@ foreach ($required in $contract.environments) {
 
     $secrets = Invoke-GitHubJson "repos/$repository/environments/$escapedName/secrets"
     $actualSecrets = @($secrets.secrets | ForEach-Object { [string]$_.name })
-    Require-SetMembers `
-        -Actual $actualSecrets `
-        -Expected @($required.secrets) `
-        -Owner "Environment '$name' secrets"
+    $requiredSecrets = @($required.secrets)
+    if ($requiredSecrets.Count -ne 0) {
+        Require-SetMembers `
+            -Actual $actualSecrets `
+            -Expected $requiredSecrets `
+            -Owner "Environment '$name' secrets"
+    }
 
     foreach ($token in @($name) + @($required.tags) +
         @($required.variables) + @($required.secrets)) {

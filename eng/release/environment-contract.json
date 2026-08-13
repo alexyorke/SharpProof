@@ -6,6 +6,7 @@
       "refs/tags/v1.0.0*",
       "refs/tags/evidence/v*"
     ],
+    "excludes": [],
     "requiredRules": [
       "deletion",
       "update"

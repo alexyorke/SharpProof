@@ -1,0 +1,174 @@
+[CmdletBinding()]
+param()
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$fixture = Join-Path ([IO.Path]::GetTempPath()) (
+    'SharpProof-release-configuration-' + [Guid]::NewGuid().ToString('N'))
+$mockBin = Join-Path $fixture 'mock-bin'
+$apiRoot = Join-Path $fixture 'api'
+New-Item -ItemType Directory -Path `
+    (Join-Path $fixture 'scripts'), `
+    (Join-Path $fixture 'eng/release'), `
+    (Join-Path $fixture '.github/workflows'), `
+    $mockBin, $apiRoot -Force | Out-Null
+
+function Write-Json([string]$Name, [object]$Value) {
+    $Value | ConvertTo-Json -Depth 12 | Set-Content `
+        -LiteralPath (Join-Path $apiRoot ($Name + '.json')) `
+        -Encoding utf8NoBOM
+}
+
+function New-State {
+    [pscustomobject]@{
+        Rulesets = @([pscustomobject]@{
+                id = 7; target = 'tag'; enforcement = 'active'
+            })
+        Ruleset = [pscustomobject]@{
+            id = 7
+            conditions = [pscustomobject]@{
+                ref_name = [pscustomobject]@{
+                    include = @('refs/tags/v1.0.0*', 'refs/tags/evidence/v*')
+                    exclude = @()
+                }
+            }
+            rules = @(
+                [pscustomobject]@{ type = 'deletion' },
+                [pscustomobject]@{ type = 'update' })
+        }
+        PrivatePolicies = @([pscustomobject]@{
+                type = 'tag'; name = 'v1.0.0-preview.1'
+            })
+        PublicPolicies = @(
+            [pscustomobject]@{ type = 'tag'; name = 'v1.0.0-preview.2' },
+            [pscustomobject]@{ type = 'tag'; name = 'v1.0.0-rc.1' },
+            [pscustomobject]@{ type = 'tag'; name = 'v1.0.0' })
+    }
+}
+
+function Invoke-Case {
+    param(
+        [string]$Name,
+        [scriptblock]$Mutate,
+        [bool]$ExpectedSuccess
+    )
+
+    $state = New-State
+    & $Mutate $state
+    Write-Json rulesets $state.Rulesets
+    Write-Json ruleset $state.Ruleset
+    Write-Json private-environment ([pscustomobject]@{
+            deployment_branch_policy = [pscustomobject]@{
+                protected_branches = $false
+                custom_branch_policies = $true
+            }
+        })
+    Write-Json public-environment ([pscustomobject]@{
+            deployment_branch_policy = [pscustomobject]@{
+                protected_branches = $false
+                custom_branch_policies = $true
+            }
+        })
+    Write-Json private-policies ([pscustomobject]@{
+            branch_policies = @($state.PrivatePolicies)
+        })
+    Write-Json public-policies ([pscustomobject]@{
+            branch_policies = @($state.PublicPolicies)
+        })
+    Write-Json private-variables ([pscustomobject]@{
+            variables = @([pscustomobject]@{ name = 'NUGET_PRIVATE_SOURCE' })
+        })
+    Write-Json public-variables ([pscustomobject]@{
+            variables = @([pscustomobject]@{ name = 'NUGET_USER' })
+        })
+    Write-Json private-secrets ([pscustomobject]@{
+            secrets = @([pscustomobject]@{ name = 'NUGET_PRIVATE_API_KEY' })
+        })
+    Write-Json public-secrets ([pscustomobject]@{ secrets = @() })
+
+    $output = & pwsh -NoLogo -NoProfile -File (
+        Join-Path $fixture 'scripts/Test-SharpProofReleaseConfiguration.ps1') `
+        -OutputPath "artifacts/$Name.json" 2>&1
+    $success = $LASTEXITCODE -eq 0
+    if ($success -ne $ExpectedSuccess) {
+        throw "Release configuration fixture '$Name' expected success=${ExpectedSuccess}: $output"
+    }
+    if ($success -and -not (Test-Path -LiteralPath (
+                Join-Path $fixture "artifacts/$Name.json") -PathType Leaf)) {
+        throw "Release configuration fixture '$Name' wrote no evidence."
+    }
+}
+
+try {
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Test-SharpProofReleaseConfiguration.ps1') `
+        -Destination (Join-Path $fixture 'scripts/Test-SharpProofReleaseConfiguration.ps1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'eng/release/environment-contract.json') `
+        -Destination (Join-Path $fixture 'eng/release/environment-contract.json')
+    @'
+NuGet/login@
+permissions: id-token: write
+nuget.private-preview v1.0.0-preview.1 NUGET_PRIVATE_SOURCE NUGET_PRIVATE_API_KEY
+nuget.org v1.0.0-preview.2 v1.0.0-rc.1 v1.0.0 NUGET_USER
+'@ | Set-Content -LiteralPath (
+        Join-Path $fixture '.github/workflows/package-consumers.yml') `
+        -Encoding utf8NoBOM
+    @'
+#!/bin/sh
+case "$2" in
+  repos/alexyorke/SharpProof/rulesets) file="rulesets" ;;
+  repos/alexyorke/SharpProof/rulesets/7) file="ruleset" ;;
+  */environments/nuget.private-preview/deployment-branch-policies) file="private-policies" ;;
+  */environments/nuget.org/deployment-branch-policies) file="public-policies" ;;
+  */environments/nuget.private-preview/variables) file="private-variables" ;;
+  */environments/nuget.org/variables) file="public-variables" ;;
+  */environments/nuget.private-preview/secrets) file="private-secrets" ;;
+  */environments/nuget.org/secrets) file="public-secrets" ;;
+  */environments/nuget.private-preview) file="private-environment" ;;
+  */environments/nuget.org) file="public-environment" ;;
+  *) exit 3 ;;
+esac
+cat "$GH_FIXTURE_ROOT/$file.json"
+'@ | Set-Content -LiteralPath (Join-Path $mockBin 'gh') -Encoding utf8NoBOM
+    & chmod +x (Join-Path $mockBin 'gh')
+    if ($LASTEXITCODE -ne 0) { throw 'Could not make the fixture gh executable.' }
+    & git -C $fixture init --quiet
+    & git -C $fixture config user.email fixture@sharpproof.test
+    & git -C $fixture config user.name 'SharpProof Fixture'
+    & git -C $fixture add -- .
+    & git -C $fixture commit --quiet -m fixture
+    if ($LASTEXITCODE -ne 0) { throw 'Could not initialize fixture repository.' }
+
+    $oldPath = $env:PATH
+    $oldFixtureRoot = $env:GH_FIXTURE_ROOT
+    $env:PATH = $mockBin + [IO.Path]::PathSeparator + $oldPath
+    $env:GH_FIXTURE_ROOT = $apiRoot
+    try {
+        Invoke-Case exact-contract { param($state) } $true
+        Invoke-Case wildcard { param($state) $state.PrivatePolicies += [pscustomobject]@{ type = 'tag'; name = '*' } } $false
+        Invoke-Case extra-exact-tag { param($state) $state.PrivatePolicies += [pscustomobject]@{ type = 'tag'; name = 'v1.0.0-preview.99' } } $false
+        Invoke-Case branch-policy { param($state) $state.PrivatePolicies += [pscustomobject]@{ type = 'branch'; name = 'master' } } $false
+        Invoke-Case missing-tag { param($state) $state.PublicPolicies = @($state.PublicPolicies | Select-Object -Skip 1) } $false
+        Invoke-Case duplicate-tag { param($state) $state.PrivatePolicies += $state.PrivatePolicies[0] } $false
+        Invoke-Case case-difference { param($state) $state.PrivatePolicies[0].name = 'V1.0.0-preview.1' } $false
+        Invoke-Case extra-ruleset-include { param($state) $state.Ruleset.conditions.ref_name.include += 'refs/tags/*' } $false
+        Invoke-Case missing-ruleset-include { param($state) $state.Ruleset.conditions.ref_name.include = @($state.Ruleset.conditions.ref_name.include | Select-Object -Skip 1) } $false
+        Invoke-Case duplicate-ruleset-include { param($state) $state.Ruleset.conditions.ref_name.include += $state.Ruleset.conditions.ref_name.include[0] } $false
+        Invoke-Case ruleset-case { param($state) $state.Ruleset.conditions.ref_name.include[0] = 'refs/tags/V1.0.0*' } $false
+        Invoke-Case include-exclude-conflict { param($state) $state.Ruleset.conditions.ref_name.exclude = @($state.Ruleset.conditions.ref_name.include[0]) } $false
+        Invoke-Case second-active-tag-ruleset { param($state) $state.Rulesets += [pscustomobject]@{ id = 8; target = 'tag'; enforcement = 'active' } } $false
+    }
+    finally {
+        $env:PATH = $oldPath
+        $env:GH_FIXTURE_ROOT = $oldFixtureRoot
+    }
+    Write-Host 'Release configuration exact-ref fixtures passed.'
+}
+finally {
+    if (Test-Path -LiteralPath $fixture) {
+        Remove-Item -LiteralPath $fixture -Recurse -Force
+    }
+}

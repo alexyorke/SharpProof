@@ -93,7 +93,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "fb87cd12e5deae931f6ad49fda87fb7554d4dc937a13109f009b873f1990b688",
+    "inventorySha256": "1347b2baa77f1c3d003719f9902335b19154aaa12671bfc9338b5ffcecaf3721",
     "components": [
       {
         "name": "discovery",
@@ -509,6 +509,16 @@
           "SharpProof.Package/buildTransitive/SharpProof.targets",
           "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
           "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
+        ]
+      },
+      {
+        "name": "releaseConfigurationAuthority",
+        "paths": [
+          ".github/workflows/package-consumers.yml",
+          "eng/release/environment-contract.json",
+          "scripts/Test-SharpProofReleaseConfiguration.ps1",
+          "scripts/Test-SharpProofReleaseConfigurationFixtures.ps1",
+          "SharpProof.ArchitectureTest/ReleaseConfigurationScriptTests.cs"
         ]
       },
       {
