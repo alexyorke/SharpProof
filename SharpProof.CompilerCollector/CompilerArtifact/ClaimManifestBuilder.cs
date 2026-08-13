@@ -463,6 +463,13 @@ internal sealed partial class ClaimManifestBuilder(
                     case BasePropertyDeclarationSyntax property:
                         AddAccessors(model.GetDeclaredSymbol(property, cancellationToken));
                         break;
+                    case EventFieldDeclarationSyntax eventField:
+                        foreach (var variable in eventField.Declaration.Variables)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            AddAccessors(model.GetDeclaredSymbol(variable, cancellationToken));
+                        }
+                        break;
                 }
             }
         }

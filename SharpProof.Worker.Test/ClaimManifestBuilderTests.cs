@@ -595,6 +595,98 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void FieldLikeEventMethodAttributesDiscoverBothAccessorsOnce()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Subject {
+                [method: DoesNotThrow]
+                public event Action? FieldLike, SecondFieldLike;
+
+                public event Action? Custom {
+                    [DoesNotThrow]
+                    add { }
+                    [DoesNotThrow]
+                    remove { }
+                }
+
+                public event Action? Unselected;
+
+                [DoesNotThrow]
+                public int Value => 1;
+
+                [DoesNotThrow]
+                public void Method() { }
+            }
+            """));
+        var targets = result.Targets.Values.ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(targets, Has.Length.EqualTo(8));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "FieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventAdd),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "FieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventRemove),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "SecondFieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventAdd),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "SecondFieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventRemove),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "Custom" &&
+                    target.Method.MethodKind == MethodKind.EventAdd),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "Custom" &&
+                    target.Method.MethodKind == MethodKind.EventRemove),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "Value" &&
+                    target.Method.MethodKind == MethodKind.PropertyGet),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.Name == "Method" &&
+                    target.Method.MethodKind == MethodKind.Ordinary),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Any(static target =>
+                    target.Method.AssociatedSymbol?.Name == "Unselected"),
+                Is.False);
+            Assert.That(
+                result.Manifest.Callables.Select(static callable =>
+                    callable.CallableId).Distinct(StringComparer.Ordinal).ToArray(),
+                Has.Length.EqualTo(8));
+            Assert.That(
+                result.Manifest.Claims.Select(static claim =>
+                    claim.ClaimId).Distinct(StringComparer.Ordinal).ToArray(),
+                Has.Length.EqualTo(8));
+            Assert.That(
+                targets.SelectMany(static target => target.EffectClaims).ToArray(),
+                Has.Length.EqualTo(8));
+        }
+    }
+
+    [Test]
     public void UnsupportedEffectCallablesCannotCarryConcreteEvidence()
     {
         var result = Build((
