@@ -2006,6 +2006,93 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task NullableBoxingProjectsZeroAllocationsFromPresence()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [ZeroAllocations]
+                public static object? Empty() => (int?)null;
+
+                [ZeroAllocations]
+                public static object? Present() {
+                    int? value = 1;
+                    return value;
+                }
+
+                [ZeroAllocations]
+                public static object? Unknown(int? value) => value;
+
+                [ZeroAllocations]
+                public static object? LiftedEmpty() {
+                    int? source = null;
+                    long? value = source;
+                    return value;
+                }
+
+                [ZeroAllocations]
+                public static object? LiftedPresent() {
+                    int? source = 1;
+                    long? value = source;
+                    return value;
+                }
+
+                [ZeroAllocations]
+                public static object OrdinaryValue(int value) => value;
+            }
+            """,
+            "effects",
+            ["SP0045"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0045", 4)));
+        Assert.That(
+            diagnostics.Single(diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)
+                        .Contains("'Unknown'", StringComparison.Ordinal))
+                .GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("AllocationUnknown"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                factory.Outcomes["Empty"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["LiftedEmpty"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+            Assert.That(
+                factory.Outcomes["Unknown"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            foreach (var methodName in new[]
+                     {
+                         "Present",
+                         "LiftedPresent",
+                         "OrdinaryValue"
+                     })
+            {
+                Assert.That(
+                    factory.Outcomes[methodName],
+                    Is.EqualTo(AnalyzerSemanticOutcome.Unknown),
+                    methodName);
+                var message = diagnostics.Single(diagnostic =>
+                        diagnostic.GetMessage(CultureInfo.InvariantCulture)
+                            .Contains(
+                                "'" + methodName + "'",
+                                StringComparison.Ordinal))
+                    .GetMessage(CultureInfo.InvariantCulture);
+                Assert.That(message, Does.Contain("allocation: Managed"));
+                Assert.That(message, Does.Not.Contain("AllocationUnknown"));
+            }
+        }
+    }
+
+    [Test]
     public async Task EffectContractSelectsUnsupportedMethod()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

@@ -402,6 +402,82 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void NullableBoxingUsesProvenPresenceWithoutDefiniteUnknownWitness()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static object? Empty() => (int?)null;
+
+                public static object? Present() {
+                    int? value = 1;
+                    return value;
+                }
+
+                public static object? Unknown(int? value) => value;
+
+                public static object? LiftedEmpty() {
+                    int? source = null;
+                    long? value = source;
+                    return value;
+                }
+
+                public static object? LiftedPresent() {
+                    int? source = 1;
+                    long? value = source;
+                    return value;
+                }
+
+                public static object OrdinaryValue(int value) => value;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] { "Empty", "LiftedEmpty" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.None),
+                methodName);
+            Assert.That(
+                result.Projection.Effects & SharpProofEffect.Allocates,
+                Is.EqualTo(SharpProofEffect.None),
+                methodName);
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        foreach (var methodName in new[]
+                 {
+                     "Present",
+                     "LiftedPresent",
+                     "OrdinaryValue"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed),
+                methodName);
+            Assert.That(
+                result.Projection.Effects & SharpProofEffect.Allocates,
+                Is.EqualTo(SharpProofEffect.Allocates),
+                methodName);
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        var unknown = session.Analyze(Method(compilation, "Unknown"));
+        Assert.That(
+            unknown.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Unknown));
+        Assert.That(
+            unknown.Projection.Effects & SharpProofEffect.Allocates,
+            Is.EqualTo(SharpProofEffect.None));
+        Assert.That(unknown.Projection.IsComplete, Is.False);
+        Assert.That(unknown.DirectWitnesses, Is.Empty);
+    }
+
+    [Test]
     public void ManagedAllocationUsesModeledObjectConstructor()
     {
         var result = Analyze(

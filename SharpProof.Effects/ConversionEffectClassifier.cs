@@ -27,7 +27,7 @@ internal sealed class ConversionEffectClassifier(
 
         if (conversion.IsBoxing)
         {
-            return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
+            return ClassifyBoxing(operation);
         }
 
         if (conversion.IsUnboxing)
@@ -100,6 +100,35 @@ internal sealed class ConversionEffectClassifier(
         return isChecked && abstractFlow?.ProvesNoOverflow(operation) != true
             ? Throw(FrameworkTypeMetadataNames.OverflowException)
             : EffectSummary.Empty;
+    }
+
+    private EffectSummary ClassifyBoxing(IConversionOperation operation)
+    {
+        if (!ManagedAbstractValue.IsNullableType(operation.Operand.Type))
+        {
+            return EffectSummaryOperations.Allocate(
+                EffectAllocationKind.Managed);
+        }
+
+        if (abstractFlow?.TryEvaluate(
+                operation,
+                operation.Operand,
+                out var operand) == true)
+        {
+            if (operand.IsDefinitelyNull)
+            {
+                return EffectSummary.Empty;
+            }
+
+            if (operand.IsDefinitelyNonNull)
+            {
+                return EffectSummaryOperations.Allocate(
+                    EffectAllocationKind.Managed);
+            }
+        }
+
+        return EffectSummaryOperations.Allocate(
+            EffectAllocationKind.Unknown);
     }
 
     private EffectSummary ClassifyUnboxing(IConversionOperation operation)
