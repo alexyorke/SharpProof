@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 140 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 139 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 140 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-071 - Unicode-escaped Contract identifiers evade advisory activation (fixed)
+
+- [x] Fixed by `a4f5e0d0a` (`fix: activate escaped contract identifiers`).
+- The cheap activation prefilter now recognizes potential C# Unicode identifier
+  escapes and delegates those trees to the existing syntax-token scan, which
+  compares compiler-decoded identifier `ValueText`. Comment and string decoys
+  still do not activate analysis.
+- Regression-first coverage includes literal, `\u`, and `\U` spellings,
+  Unicode comment/string decoys, and no-contract fast-path controls. Before the
+  fix both escaped cases created zero sessions and emitted no SP0027 while all
+  eight controls passed. Afterward the focused suite passed 10/10, full Analyzer
+  passed 224/224, and Architecture passed 110/110 in the canonical container.
 
 ### SP-AUDIT-078 - Behavioral declaration changes bypass changed-TCB coverage (fixed)
 
@@ -1377,28 +1390,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   never-used, directly invoked, invoked through local copy, returned/passed/
   stored escape, conditional invocation, expression-tree, nested sibling, and
   local-function parity cases plus a mutation restoring creation-implies-run.
-
-### SP-AUDIT-071 - Unicode-escaped Contract identifiers evade advisory activation (P1)
-
-- [ ] Advisory activation uses raw source-text substring searches for contract
-  method spellings before it creates an analyzer session. C# Unicode escapes
-  are decoded by the compiler inside identifiers, so an invocation can bind to
-  the exact `Contract.Requires` symbol while its source text contains none of
-  the activation substrings.
-- Supported impact: compiler-equivalent spelling alone can suppress all
-  contracts analysis for an otherwise ordinary source tree. A definitely false
-  call-site precondition then receives no SP0027 in the documented advisory
-  profile.
-- Reproduction: a focused advisory/contracts test declared a precondition as
-  `Contract.\u0052equires(value > 0)` and called that method with `-1`. The
-  compilation was valid, but the expected SP0027 set was empty. Replacing the
-  escaped identifier with literal `Requires` is the existing positive control.
-  The temporary regression was removed.
-- Required closure: make the cheap activation scan syntax-aware and compare
-  identifier `ValueText`, or use a bounded semantic candidate scan, while
-  retaining false-positive-resistant fast paths. Add literal, verbatim,
-  `\u`/`\U` escape, trivia/string decoy, generated-tree, and no-contract controls
-  plus a mutation restoring raw-text-only activation.
 
 ### SP-AUDIT-076 - Text diagnostic transport loses structured MSBuild semantics (P1)
 
