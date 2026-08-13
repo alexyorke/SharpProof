@@ -1,5 +1,13 @@
 <Project>
   <PropertyGroup>
+    <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
+    <_SharpProofAnalyzerPath>$(_SharpProofAnalyzerDirectory)/SharpProof.Analyzer.dll</_SharpProofAnalyzerPath>
+    <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofTestContractForGeneratorPath)' == ''">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</_SharpProofContractForGeneratorPath>
+    <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofTestContractForGeneratorPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestContractForGeneratorPath)'))</_SharpProofContractForGeneratorPath>
+    <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
+    <_SharpProofCompilerCollectorPathConfigured>$([System.String]::Copy('$(SharpProofCompilerCollectorPath)').Trim())</_SharpProofCompilerCollectorPathConfigured>
+    <SharpProofCompilerCollectorPath Condition="'$(_SharpProofCompilerCollectorPathConfigured)' == ''">$(_SharpProofCollectorDirectory)/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
+    <SharpProofCompilerCollectorPath>$([System.IO.Path]::GetFullPath('$(SharpProofCompilerCollectorPath)'))</SharpProofCompilerCollectorPath>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').ToLowerInvariant())</_SharpProofProfileNormalized>

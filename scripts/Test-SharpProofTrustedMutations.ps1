@@ -1150,6 +1150,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~MultiTargetConfiguredSarifIsFrameworkScoped'
     },
     [pscustomobject]@{
+        Name = 'packaged-paths-normalize-after-project-body'
+        File = 'SharpProof.Package\buildTransitive\SharpProof.targets'
+        Original = "    <_SharpProofAnalyzerDirectory>`$([System.IO.Path]::GetFullPath('`$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>"
+        Mutated = "    <_SharpProofAnalyzerDirectory>`$([System.IO.Path]::GetFullPath('`$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</_SharpProofAnalyzerDirectory>"
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ProjectBodyAnalyzerAndCollectorOverridesNormalizeLate'
+    },
+    [pscustomobject]@{
+        Name = 'runtime-closure-validates-before-invalidation'
+        File = 'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
+        Original = '          DependsOnTargets="_SharpProofValidateRuntimeClosure"'
+        Mutated = '          DependsOnTargets=""'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication'
+    },
+    [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = '                if (type == FileTypeSymbolicLink)'

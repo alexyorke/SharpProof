@@ -8,7 +8,6 @@
     <_SharpProofSharedDirectory Condition="'$(_SharpProofSharedDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/shared/netstandard2.0'))</_SharpProofSharedDirectory>
     <SharpProofCollectorDirectory Condition="'$(SharpProofCollectorDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/collector'))</SharpProofCollectorDirectory>
     <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
-    <SharpProofCompilerCollectorPath Condition="'$(SharpProofCompilerCollectorPath)' == ''">$(_SharpProofCollectorDirectory)/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
     <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>
   </PropertyGroup>
   <ItemGroup>

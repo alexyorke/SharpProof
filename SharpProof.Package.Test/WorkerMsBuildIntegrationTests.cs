@@ -231,6 +231,89 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(File.Exists(project.ResultPath), Is.False);
     }
 
+    [TestCase("SharpProofToolsDirectory")]
+    [TestCase("SharpProofWorkerPath")]
+    [TestCase("SharpProofLauncherPath")]
+    public async Task ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication(
+        string property)
+    {
+        RequireContainerWorker();
+        var foreign = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.ForeignRuntime",
+            Guid.NewGuid().ToString("N"));
+        var value = property == "SharpProofToolsDirectory"
+            ? foreign
+            : Path.Combine(foreign, "foreign.dll");
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            (property, value));
+
+        var build = await project.BuildAsync(verify: true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+            Assert.That(
+                build.Output,
+                Does.Contain("exact package-owned runtime closure"));
+            Assert.That(File.Exists(project.ResultPath), Is.False);
+            Assert.That(
+                File.Exists(LinuxPathIdentity.PublicationMarkerPath(
+                    project.ResultPath)),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public async Task ProjectBodyAnalyzerAndCollectorOverridesNormalizeLate()
+    {
+        var analyzerDirectory = Path.Combine("relative", "analyzers");
+        var collectorDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "absolute-collector");
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            ("SharpProofAnalyzerDirectory", analyzerDirectory),
+            ("SharpProofCollectorDirectory", collectorDirectory),
+            ("SharpProofCompilerCollectorPath", " "),
+            ("_SharpProofTestContractForGeneratorPath", " "));
+
+        var properties = await project.EvaluatePropertiesAsync(
+            "_SharpProofAnalyzerDirectory",
+            "_SharpProofAnalyzerPath",
+            "_SharpProofContractForGeneratorPath",
+            "_SharpProofCollectorDirectory",
+            "SharpProofCompilerCollectorPath");
+
+        var expectedAnalyzerDirectory = Path.GetFullPath(
+            Path.Combine(project.Root, analyzerDirectory));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                properties["_SharpProofAnalyzerDirectory"],
+                Is.EqualTo(expectedAnalyzerDirectory));
+            Assert.That(
+                properties["_SharpProofAnalyzerPath"],
+                Is.EqualTo(Path.Combine(
+                    expectedAnalyzerDirectory,
+                    "SharpProof.Analyzer.dll")));
+            Assert.That(
+                properties["_SharpProofContractForGeneratorPath"],
+                Is.EqualTo(Path.Combine(
+                    expectedAnalyzerDirectory,
+                    "SharpProof.ContractForGenerator.dll")));
+            Assert.That(
+                properties["_SharpProofCollectorDirectory"],
+                Is.EqualTo(Path.GetFullPath(collectorDirectory)));
+            Assert.That(
+                properties["SharpProofCompilerCollectorPath"],
+                Is.EqualTo(Path.Combine(
+                    Path.GetFullPath(collectorDirectory),
+                    "SharpProof.CompilerCollector.dll")));
+        }
+    }
+
     [Test]
     public async Task NonBuildingEvaluationPreservesPublishedVerificationFiles()
     {
@@ -3447,6 +3530,29 @@ public sealed class WorkerMsBuildIntegrationTests
             return RunDotNetAsync(arguments);
         }
 
+        internal async Task<IReadOnlyDictionary<string, string>>
+            EvaluatePropertiesAsync(params string[] propertyNames)
+        {
+            var result = await RunDotNetAsync([
+                "msbuild",
+                ProjectPath,
+                "--nologo",
+                "-getProperty:" + string.Join(';', propertyNames)
+            ]);
+            if (result.ExitCode != 0)
+            {
+                throw new InvalidOperationException(result.Output);
+            }
+            using var document = JsonDocument.Parse(result.Output);
+            return propertyNames.ToDictionary(
+                static name => name,
+                name => document.RootElement
+                    .GetProperty("Properties")
+                    .GetProperty(name)
+                    .GetString() ?? string.Empty,
+                StringComparer.Ordinal);
+        }
+
         internal Task<BuildResult> BuildIsolatedAsync(
             string name, string features)
         {
@@ -3655,28 +3761,23 @@ public sealed class WorkerMsBuildIntegrationTests
                   <Import Project="{verifierProps}" />
                   <PropertyGroup>
                     <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
-                    <_SharpProofAnalyzerDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>
-                    <_SharpProofAnalyzerPath>{analyzerDirectory}/SharpProof.Analyzer.dll</_SharpProofAnalyzerPath>
-                    <_SharpProofContractForGeneratorPath>{generatorDirectory}/SharpProof.ContractForGenerator.dll</_SharpProofContractForGeneratorPath>
+                    <_SharpProofTestContractForGeneratorPath>{generatorDirectory}/SharpProof.ContractForGenerator.dll</_SharpProofTestContractForGeneratorPath>
                     <_SharpProofSharedDirectory>{collectorDirectory}</_SharpProofSharedDirectory>
                     <SharpProofCollectorDirectory>{collectorDirectory}</SharpProofCollectorDirectory>
-                    <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
                     <SharpProofCompilerCollectorPath>{collectorDirectory}/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
-                {configuredProperties}
                     <TargetFramework Condition="'$(TargetFrameworks)' == ''">net8.0</TargetFramework>
                     <LangVersion>12.0</LangVersion>
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{worker}</SharpProofWorkerPath>
-                    <_SharpProofWorkerPath>$([System.IO.Path]::GetFullPath('$(SharpProofWorkerPath)'))</_SharpProofWorkerPath>
                     <SharpProofLauncherPath>{launcher}</SharpProofLauncherPath>
-                    <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
-                    <_SharpProofWorkerProtocolPath>{protocol}</_SharpProofWorkerProtocolPath>
-                    <_SharpProofBuildTasksPath>{buildTasks}</_SharpProofBuildTasksPath>
+                    <_SharpProofTestWorkerProtocolPath>{protocol}</_SharpProofTestWorkerProtocolPath>
+                    <_SharpProofTestBuildTasksPath>{buildTasks}</_SharpProofTestBuildTasksPath>
                     <_SharpProofPackageWorkerPath>{worker}</_SharpProofPackageWorkerPath>
                     <_SharpProofPackageWorkerPath Condition="'$(_SharpProofTestWorkerPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestWorkerPath)'))</_SharpProofPackageWorkerPath>
                     <_SharpProofPackageLauncherPath>{launcher}</_SharpProofPackageLauncherPath>
                     <_SharpProofPackageWorkerProtocolPath>{protocol}</_SharpProofPackageWorkerProtocolPath>
                     <_SharpProofPackageBuildTasksPath>{buildTasks}</_SharpProofPackageBuildTasksPath>
+                {configuredProperties}
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="SharpProof.Attributes">
