@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 125 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 124 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 125 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-067 - SBOM package dependencies are fabricated, not derived (fixed)
+
+- [x] Fixed by `f68cc2669` (`fix: derive SBOM dependencies from packages`).
+- One shared release dependency authority now parses and canonicalizes the
+  exact dependency groups in all three main and symbol package nuspecs,
+  enforces the supported framework and exact-version graph, and derives the
+  SPDX `DEPENDS_ON` relationships from those authenticated bytes. Evidence
+  generation, immutable-artifact validation, and plan-only publication each
+  invoke that authority independently.
+- Regression-first fixtures reject fabricated, missing, extra, wrong-version,
+  reversed, wrong-framework, duplicate, and symbol/main mismatch graphs while
+  retaining the canonical packages and SBOM. Focused tests passed 14/14,
+  Architecture passed 138/138, and the release-evidence and offline-plan
+  package controls both passed without network or publication operations.
 
 ### SP-AUDIT-008 - Primary-constructor callable ownership is incomplete (fixed)
 
@@ -691,31 +706,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   comment/dead-job decoys, wrong environment, missing job permission, wrong
   secret source, changed guard, and valid workflow controls plus certifier
   mutations for every semantic field.
-
-### SP-AUDIT-067 - SBOM package dependencies are fabricated, not derived (P0)
-
-- [ ] Release evidence reads only each nuspec's package ID, version, and
-  repository metadata. It then hardcodes the two expected `DEPENDS_ON`
-  relationships into the SBOM; final artifact validation and plan-only
-  publication compare against the same hardcoded graph without reading the
-  dependency groups in the package bytes.
-- Certifier impact: the immutable bundle can contain a package whose actual
-  dependency topology differs from the SBOM and reviewed three-package graph,
-  yet every local release certifier approves and plans those bytes. Fresh
-  package-layout tests mitigate normal builds but do not make these independent
-  evidence/publication boundaries authoritative.
-- Reproduction: a disposable package test replaced the `SharpProof` nuspec's
-  `SharpProof.Attributes` dependency with `Fabricated.Dependency`, leaving
-  package identity/version/repository metadata intact. Release-evidence
-  generation exited 0, immutable artifact validation exited 0, and plan-only
-  publication exited 0 while the SBOM retained the expected hardcoded edge.
-  The package workspace and temporary regression/helper were removed.
-- Required closure: parse and canonicalize every dependency group from each
-  main package, validate supported target-framework groups and exact version
-  ranges, generate the SBOM relationships from those bytes, and independently
-  compare them again during final validation/publication. Add removed, added,
-  replaced, wrong-version, framework-specific, duplicate, symbol/main mismatch,
-  and exact-valid cases plus mutations severing each package-to-SBOM binding.
 
 ### SP-AUDIT-080 - Compiler feature labels do not bind discovered proof scope (P0)
 
