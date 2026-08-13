@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 122 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 121 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 122 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-111 - Publication can overwrite compiler outputs created later (fixed)
+
+- [x] Fixed by `69803b6fe` (`fix: reserve compiler outputs from publication`).
+- Publication invalidation now receives the complete compiler-owned output set
+  and rejects lexical or existing-file identity collisions involving any
+  request, result, manifest, SARIF, or ownership-marker path before acquiring
+  publication ownership. The reserved set includes final/intermediate and
+  reference assemblies, PDB and documentation outputs, generated compiler
+  inputs, and runtime/dependency manifests.
+- Regression-first coverage exhaustively tests four publication members
+  against ten compiler outputs, plus packaged clean and incremental collision
+  cases that preserve prior assembly bytes and create no marker. BuildTask tests
+  passed 12/12 and Architecture passed 171/171.
 
 ### SP-AUDIT-131 - Public package metadata is not contract-validated (fixed)
 
@@ -779,23 +793,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   change alters both production and TCB digests.
 - Consolidated cases: SP-AUDIT-147.
 - Unified closure: Independently derive an immutable TCB closure containing every certifier leaf; deletion, movement, or change must alter its digest and coverage universe.
-
-### SP-AUDIT-111 - Publication can overwrite compiler outputs created later (P0)
-
-- [ ] Publication invalidation runs before compilation, receives no compiler-
-  output paths, and may claim an absent output path. If CoreCompile later creates
-  the assembly at that path, the pre-created ownership marker causes launcher
-  publication to accept and replace it.
-- Supported impact: a clean packaged build configured the verifier result as
-  `obj/Release/net8.0/Consumer.dll`; the build exited zero and reported Proven,
-  then replaced the intermediate managed assembly with result JSON.
-- Reproduction: a temporary package integration test required early rejection
-  and a valid `MZ` intermediate assembly. Current build succeeded and named the
-  DLL as the verifier result. The test was removed.
-- Required closure: reserve every compiler output (intermediate/final assembly,
-  PDB, reference assembly, generated files and manifests) before publication
-  ownership is established, and revalidate claimed absent paths before commit.
-  Add every publication member/output combination and clean/incremental controls.
 
 ### SP-AUDIT-126 - Ill-formed UTF-16 is non-injective across verifier boundaries (P0)
 
