@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 150 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 149 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 150 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-072 - String concatenation omits implicit ToString effects (fixed)
+
+- [x] Fixed by `db8f97770` (`fix: include string formatting effects`).
+- Built-in string concatenation now resolves statically known source
+  `ToString()` calls, preserves their writes, capabilities, and escaping
+  exceptions, and treats open dispatch or unresolved metadata formatting as
+  incomplete rather than effect-free.
+- Regression-first coverage includes sealed reference and value-type source
+  formatting, writes/throws/capabilities, string/null/no-op cases, open virtual
+  dispatch, primitives, nullable values, interpolation, and allocation. The
+  full canonical-container Effects and Architecture suites passed 156/156 and
+  78/78.
 
 ### SP-AUDIT-002 - Using disposal effects are omitted (fixed)
 
@@ -639,28 +652,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   compare them again during final validation/publication. Add removed, added,
   replaced, wrong-version, framework-specific, duplicate, symbol/main mismatch,
   and exact-valid cases plus mutations severing each package-to-SBOM binding.
-
-### SP-AUDIT-072 - String concatenation omits implicit ToString effects (P0)
-
-- [ ] Built-in string concatenation is treated as operand traversal plus an
-  allocation. When an operand is not already a string, the compiler/runtime
-  conversion invokes formatting or `ToString`, but the effect scanner does not
-  resolve or join that call when the binary operation has no user-defined
-  operator method.
-- Supported impact: a selected purity or no-throw claim can be proven for a
-  method whose string concatenation invokes source code that writes observable
-  state or throws. The produced effect projection remained complete while the
-  real operation was not effect-free.
-- Reproduction: a focused Effects test concatenated a literal with an instance
-  of a sealed source type whose `ToString()` increments a static field and
-  throws `ApplicationException`. The summary contained neither the static write
-  nor the declared exception. The temporary regression was removed.
-- Required closure: model the exact string-concatenation conversion/formatting
-  path and join source/API summaries where it is statically resolvable;
-  conservatively abstain for open or otherwise unresolved virtual formatting.
-  Add string, primitive, nullable, null, sealed source override, open virtual,
-  throwing, interpolated-string parity, and allocation controls plus a mutation
-  restoring allocation-only handling.
 
 ### SP-AUDIT-078 - Behavioral declaration changes bypass changed-TCB coverage (P0)
 
