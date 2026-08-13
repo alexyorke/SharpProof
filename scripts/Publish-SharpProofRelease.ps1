@@ -39,6 +39,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -454,6 +455,23 @@ function Get-ValidatedRelease {
         (@($packageOrder | Sort-Object) -join '|')) {
         throw 'Release manifest contains an unexpected package ID.'
     }
+
+    $dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
+        -PackagePaths @($packages | ForEach-Object {
+            $_.mainPath
+            $_.symbolsPath
+        }))
+    $sbomPath = Get-ArtifactPath `
+        -Directory $Directory `
+        -FileName ([string]$sbomArtifacts[0].fileName)
+    $sbom = Get-Content -LiteralPath $sbomPath -Raw |
+        ConvertFrom-Json
+    if ($null -eq $sbom.PSObject.Properties['relationships']) {
+        throw 'Release SBOM has no relationship graph.'
+    }
+    Test-SharpProofSbomDependencyGraph `
+        -Relationships @($sbom.relationships) `
+        -DependencyGraph $dependencyGraph
 
     return [pscustomobject][ordered]@{
         version = $version

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "id": "SharpProof.Attributes",
+      "dependencyGroups": [
+        {
+          "targetFramework": ".NETStandard2.0",
+          "dependencies": []
+        }
+      ]
+    },
+    {
+      "id": "SharpProof",
+      "dependencyGroups": [
+        {
+          "targetFramework": ".NETStandard2.0",
+          "dependencies": [
+            "SharpProof.Attributes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SharpProof.Verifier",
+      "dependencyGroups": [
+        {
+          "targetFramework": ".NETStandard2.0",
+          "dependencies": [
+            "SharpProof"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -17,6 +17,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 
 function Get-PackageIdentity {
     param(
@@ -150,6 +151,9 @@ function New-DeterministicPackageSbom {
         [object[]]$ThirdPartyComponents,
 
         [Parameter(Mandatory = $true)]
+        [object[]]$DependencyGraph,
+
+        [Parameter(Mandatory = $true)]
         [string]$RepositoryRoot
     )
 
@@ -254,18 +258,13 @@ function New-DeterministicPackageSbom {
             relatedSpdxElement = [string]$componentIds[$key]
         })
     }
-    $relationships.Add([pscustomobject][ordered]@{
-        spdxElementId = Get-SpdxPackageId -Name 'SharpProof'
-        relationshipType = 'DEPENDS_ON'
-        relatedSpdxElement = Get-SpdxPackageId `
-            -Name 'SharpProof.Attributes'
-    })
-    $relationships.Add([pscustomobject][ordered]@{
-        spdxElementId = Get-SpdxPackageId `
-            -Name 'SharpProof.Verifier'
-        relationshipType = 'DEPENDS_ON'
-        relatedSpdxElement = Get-SpdxPackageId -Name 'SharpProof'
-    })
+    foreach ($dependency in $DependencyGraph) {
+        $relationships.Add([pscustomobject][ordered]@{
+            spdxElementId = Get-SpdxPackageId -Name $dependency.FromId
+            relationshipType = 'DEPENDS_ON'
+            relatedSpdxElement = Get-SpdxPackageId -Name $dependency.ToId
+        })
+    }
 
     $document = [pscustomobject][ordered]@{
         spdxVersion = 'SPDX-2.3'
@@ -599,6 +598,8 @@ if ($commits[0] -ne $checkoutCommit) {
         "NuGet artifact repository commit '$($commits[0])' does not match " +
         "checkout '$checkoutCommit'.")
 }
+$dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
+    -PackagePaths @($identities.File.FullName))
 
 $packagePayloadEvidence = [Collections.Generic.List[object]]::new()
 foreach ($item in $identities |
@@ -702,6 +703,7 @@ if ([string]::IsNullOrWhiteSpace($SbomPath)) {
         -Version $versions[0] `
         -RepositoryCommit $commits[0] `
         -ThirdPartyComponents @($thirdPartyComponents) `
+        -DependencyGraph $dependencyGraph `
         -RepositoryRoot $repositoryRoot
 }
 else {
@@ -810,36 +812,9 @@ foreach ($component in $thirdPartyComponents) {
             "'$($component.packageId)' and '$($component.id)'.")
     }
 }
-$expectedDependencies = @(
-    [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof'
-        to = Get-SpdxPackageId -Name 'SharpProof.Attributes'
-    },
-    [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof.Verifier'
-        to = Get-SpdxPackageId -Name 'SharpProof'
-    }
-)
-$dependencyRelationships = @(
-    $relationships |
-        Where-Object {
-            [string]$_.relationshipType -eq 'DEPENDS_ON'
-        }
-)
-if ($dependencyRelationships.Count -ne $expectedDependencies.Count) {
-    throw 'SPDX SBOM does not contain the exact package dependency graph.'
-}
-foreach ($dependency in $expectedDependencies) {
-    if (@($dependencyRelationships |
-            Where-Object {
-                [string]$_.spdxElementId -eq $dependency.from -and
-                [string]$_.relatedSpdxElement -eq $dependency.to
-            }).Count -ne 1) {
-        throw (
-            "SPDX SBOM dependency is missing: " +
-            "$($dependency.from) -> $($dependency.to)")
-    }
-}
+Test-SharpProofSbomDependencyGraph `
+    -Relationships $relationships `
+    -DependencyGraph $dependencyGraph
 $sbomFile = Get-Item -LiteralPath $resolvedSbom
 $sbomHash = Get-FileHash `
     -LiteralPath $resolvedSbom `

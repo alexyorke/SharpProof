@@ -11,6 +11,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 
 function Get-SpdxPackageId {
     param(
@@ -161,6 +162,14 @@ foreach ($packageId in $expectedPackageIds) {
         -PackageId $packageId `
         -RepositoryCommit $head
 }
+$dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
+    -PackagePaths @(
+        $artifacts |
+            Where-Object { [string]$_.kind -in @('package', 'symbols') } |
+            ForEach-Object {
+                Join-Path $resolvedSource ([string]$_.fileName)
+            }
+    ))
 $sbomArtifact = @(
     $artifacts |
         Where-Object { [string]$_.kind -eq 'sbom' }
@@ -249,36 +258,9 @@ foreach ($component in $manifest.thirdPartyComponents) {
             "$($component.packageId)/$($component.id)")
     }
 }
-$expectedDependencies = @(
-    [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof'
-        to = Get-SpdxPackageId -Name 'SharpProof.Attributes'
-    },
-    [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof.Verifier'
-        to = Get-SpdxPackageId -Name 'SharpProof'
-    }
-)
-$dependencyRelationships = @(
-    $relationships |
-        Where-Object {
-            [string]$_.relationshipType -eq 'DEPENDS_ON'
-        }
-)
-if ($dependencyRelationships.Count -ne $expectedDependencies.Count) {
-    throw 'Release SBOM package dependency graph is not exact.'
-}
-foreach ($dependency in $expectedDependencies) {
-    if (@($dependencyRelationships |
-            Where-Object {
-                [string]$_.spdxElementId -eq $dependency.from -and
-                [string]$_.relatedSpdxElement -eq $dependency.to
-            }).Count -ne 1) {
-        throw (
-            "Release SBOM dependency is missing: " +
-            "$($dependency.from) -> $($dependency.to)")
-    }
-}
+Test-SharpProofSbomDependencyGraph `
+    -Relationships $relationships `
+    -DependencyGraph $dependencyGraph
 $expectedSums = @(
     $artifacts |
         ForEach-Object {
