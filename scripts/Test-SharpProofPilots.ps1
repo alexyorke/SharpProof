@@ -12,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofPilotPackageAuthority.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 
 function Resolve-RepositoryPath([string]$Path) {
     if ([IO.Path]::IsPathRooted($Path)) {
@@ -239,6 +240,20 @@ foreach ($pilot in $catalog.pilots) {
     }
     $response = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     $claims = @($response.claimResults)
+    $claimEvidence = @($response.manifest.claims | ForEach-Object {
+            $manifestClaim = $_
+            $matches = @($claims | Where-Object {
+                    [string]$_.claimId -ceq [string]$manifestClaim.claimId
+                })
+            if ($matches.Count -ne 1) {
+                throw "Pilot '$($pilot.id)' has an incoherent manifest/result claim set."
+            }
+            [ordered]@{
+                claimId = [string]$manifestClaim.claimId
+                kind = [string]$manifestClaim.kind
+                outcome = [string]$matches[0].outcome
+            }
+        } | Sort-Object claimId)
     $unknownReasons = @($claims |
         Where-Object { [string]$_.outcome -eq 'Unknown' } |
         Group-Object reason |
@@ -276,11 +291,13 @@ foreach ($pilot in $catalog.pilots) {
         })
     $results += [pscustomobject]@{
         id = [string]$pilot.id
+        project = [string]$pilot.project
         category = [string]$pilot.category
         library = [string]$pilot.library
         libraryVersion = [string]$pilot.libraryVersion
         runStatus = [string]$response.runStatus
         claimCount = $claims.Count
+        claimEvidence = $claimEvidence
         outcomes = @($claims | Group-Object outcome | Sort-Object Name |
             ForEach-Object { [pscustomobject]@{ outcome = $_.Name; count = $_.Count } })
         unknownReasons = $unknownReasons
@@ -336,6 +353,13 @@ $report = [ordered]@{
     pilotCount = $results.Count
     packageArtifacts = $packageArtifacts
     pilots = $results
+}
+if (-not (Test-SharpProofPilotReport `
+        -Report ([pscustomobject]$report) `
+        -ExpectedCommit $head `
+        -RepositoryRoot $repositoryRoot `
+        -CatalogPath (Join-Path $pilotRoot 'catalog.json'))) {
+    throw 'Pilot evidence does not satisfy the catalog and category authority.'
 }
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
