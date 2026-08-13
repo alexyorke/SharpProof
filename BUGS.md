@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 112 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 111 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 112 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-009 - Container evidence path guards are case-insensitive (fixed)
+
+- [x] Fixed by `174d9a7d1` (`fix: enforce ordinal contained paths`).
+- A shared canonical ordinal child-path authority now owns repository-contained
+  evidence, output, baseline, generator, and cleanup boundaries. Root equality,
+  case-distinct and prefix siblings, and traversal escapes fail closed; exact,
+  canonicalized, and absolute children remain supported.
+- Regression-first fixtures exercise every boundary shape and assert all
+  affected consumers use the shared authority. A trusted mutation restores the
+  case-insensitive comparison. Architecture passed 176/176; container contract,
+  release closure, deterministic generators, release-configuration fixtures,
+  and `git diff --check` passed. The full mutation campaign remains blocked by
+  an unrelated pre-existing nonunique target in
+  `generated-contract-for-final-compilation-validation`.
 
 ### SP-AUDIT-005 - Initializer call sites escape SP0027 analysis (fixed)
 
@@ -886,29 +901,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   package-mismatched pilot evidence.
 - Consolidated cases: SP-AUDIT-082, SP-AUDIT-133, SP-AUDIT-145, SP-AUDIT-161, SP-AUDIT-171.
 - Unified closure: Generate one authoritative qualification matrix and exact-commit receipt set covering pilots, Debug, release configuration, portable OS consumers, repeated cancellation, and minimum SDK.
-
-### SP-AUDIT-009 - Container evidence path guards are case-insensitive (P1)
-
-- [ ] Several Linux-only evidence commands validate repository-contained
-  output paths with `StringComparison.OrdinalIgnoreCase`. On the canonical
-  case-sensitive filesystem, a sibling directory whose spelling differs only
-  by case therefore passes as if it were below the repository.
-- Supported impact: coverage, corpus/performance evidence, fuzz output, pilot
-  reports, mutation evidence/baselines, and release-configuration evidence can
-  be written outside the checked-out repository despite their explicit
-  containment contract. The mutation cleanup guard uses the same comparison,
-  so it also has a wider deletion boundary than its message claims.
-- Reproduction: a disposable canonical-container probe placed
-  `Invoke-SharpProofGateEvidence.ps1` under `/tmp/.../Repo/scripts` and supplied
-  `/tmp/.../repo/out/report.json`. The command passed the guard and created the
-  case-distinct sibling output directory before later failing because the
-  disposable fixture intentionally contained no gate project
-  (`OUTSIDE_CREATED=1`).
-- Required closure: centralize repository-relative path resolution with
-  platform-correct ordinal containment, reject the repository root itself when
-  a child is required, and use it in every evidence/output/baseline/workspace
-  command. Add case-distinct sibling, exact child, `..`, absolute path, and
-  cleanup-boundary fixtures plus a release-authority mutation.
 
 ### SP-AUDIT-016 - Property and event accessor calls escape SP0027 analysis (P1)
 
