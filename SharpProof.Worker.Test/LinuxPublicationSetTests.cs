@@ -143,6 +143,91 @@ public sealed class LinuxPublicationSetTests
     }
 
     [Test]
+    public void NewlineDelimitedSetCollisionIsRejectedAsPartialOverlap()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var prefix = directory.Path + Path.DirectorySeparatorChar;
+        var shared = Path.Combine(directory.Path, "z-shared.json");
+        var first = new[]
+        {
+            prefix + "a",
+            prefix + "b\n" + prefix + "c",
+            shared
+        };
+        var second = new[]
+        {
+            prefix + "a\n" + prefix + "b",
+            prefix + "c",
+            shared
+        };
+        Assert.That(
+            string.Join("\n", first.Order(StringComparer.Ordinal)),
+            Is.EqualTo(string.Join(
+                "\n",
+                second.Order(StringComparer.Ordinal))));
+
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   first,
+                   TimeSpan.FromSeconds(1)))
+        {
+        }
+        var sharedMarker = LinuxPathIdentity.PublicationMarkerPath(shared);
+        var markerIdentity = File.ReadAllBytes(sharedMarker);
+        var error = Assert.Throws<IOException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                second,
+                TimeSpan.FromSeconds(1));
+        }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("partially overlap"));
+            Assert.That(
+                File.ReadAllBytes(sharedMarker),
+                Is.EqualTo(markerIdentity));
+            Assert.That(
+                second.Take(2).Select(
+                    LinuxPathIdentity.PublicationMarkerPath),
+                Has.None.Matches<string>(File.Exists));
+        }
+    }
+
+    [Test]
+    public void PublicationSetIdentityUsesCanonicalInjectiveUtf8Framing()
+    {
+        var collisionLeft = new[] { "/a", "/b\n/c" };
+        var collisionRight = new[] { "/a\n/b", "/c" };
+        Assert.That(
+            string.Join("\n", collisionLeft),
+            Is.EqualTo(string.Join("\n", collisionRight)));
+
+        var empty = LinuxPathIdentity.PublicationSetId([]);
+        var single = LinuxPathIdentity.PublicationSetId(["/a"]);
+        var multiple = LinuxPathIdentity.PublicationSetId(["/a", "/b"]);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(empty, Has.Length.EqualTo(64));
+            Assert.That(single, Is.Not.EqualTo(empty));
+            Assert.That(multiple, Is.Not.EqualTo(single));
+            Assert.That(
+                LinuxPathIdentity.PublicationSetId(collisionLeft),
+                Is.Not.EqualTo(
+                    LinuxPathIdentity.PublicationSetId(collisionRight)));
+            Assert.That(
+                LinuxPathIdentity.PublicationSetId(["/z", "/a"]),
+                Is.EqualTo(
+                    LinuxPathIdentity.PublicationSetId(["/a", "/z"])));
+            Assert.That(
+                LinuxPathIdentity.PublicationSetId(
+                    ["/雪\u2028x", "/carriage\rreturn"]),
+                Is.Not.EqualTo(
+                    LinuxPathIdentity.PublicationSetId(
+                        ["/雪", "/x\n/carriage", "/return"])));
+        }
+    }
+
+    [Test]
     public void PublicationMetadataNamespaceIsReserved()
     {
         using var directory = TemporaryDirectory.Create();

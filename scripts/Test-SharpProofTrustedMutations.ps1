@@ -1094,6 +1094,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
     },
     [pscustomobject]@{
+        Name = 'publication-set-identity-injective-framing'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '            AppendPublicationSetFrame(hash, bytes.Length);'
+        Mutated = '            hash.AppendData(Encoding.UTF8.GetBytes("\n"));'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~PublicationSetIdentityUsesCanonicalInjectiveUtf8Framing'
+    },
+    [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = '                if (type == FileTypeSymbolicLink)'

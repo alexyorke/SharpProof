@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -30,6 +31,8 @@ public static partial class LinuxPathIdentity
         ".sharpproof-publication-lock";
     private const string PublicationMarkerHeader =
         "SharpProof.PublicationSet/1\n";
+    private static readonly byte[] PublicationSetIdentityDomain =
+        Encoding.ASCII.GetBytes("SharpProof.PublicationSetIdentity/1\0");
     private static readonly HashSet<string> UnsupportedRemoteFileSystems =
         new(StringComparer.Ordinal)
         {
@@ -374,11 +377,34 @@ public static partial class LinuxPathIdentity
         }
     }
 
-    private static string PublicationSetId(
+    internal static string PublicationSetId(
         IEnumerable<string> canonicalPaths)
     {
-        var bytes = Encoding.UTF8.GetBytes(string.Join("\n", canonicalPaths));
-        return Convert.ToHexString(SHA256.HashData(bytes));
+        ArgumentNullException.ThrowIfNull(canonicalPaths);
+        var paths = canonicalPaths
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+        var utf8 = new UTF8Encoding(false, true);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData(PublicationSetIdentityDomain);
+        AppendPublicationSetFrame(hash, paths.Length);
+        foreach (var path in paths)
+        {
+            ArgumentNullException.ThrowIfNull(path);
+            var bytes = utf8.GetBytes(path);
+            AppendPublicationSetFrame(hash, bytes.Length);
+            hash.AppendData(bytes);
+        }
+        return Convert.ToHexString(hash.GetHashAndReset());
+    }
+
+    private static void AppendPublicationSetFrame(
+        IncrementalHash hash,
+        int value)
+    {
+        Span<byte> frame = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32BigEndian(frame, value);
+        hash.AppendData(frame);
     }
 
     private static void ValidatePublicationMarker(
