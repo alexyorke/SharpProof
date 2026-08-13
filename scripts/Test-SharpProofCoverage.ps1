@@ -87,6 +87,55 @@ function Invoke-GitText {
     }
 }
 
+function Resolve-DurableComparisonCommit {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Reference
+    )
+
+    $authority = $Reference
+    if ($Reference -notmatch '^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$') {
+        if ($Reference -ceq 'HEAD' -or $Reference -ceq '@') {
+            throw (
+                "ComparisonRef '$Reference' is not a durable explicit " +
+                'comparison authority.')
+        }
+
+        $symbolic = Invoke-GitText `
+            -Arguments @(
+                'rev-parse',
+                '--symbolic-full-name',
+                '--verify',
+                $Reference) `
+            -FailureMessage (
+                "ComparisonRef '$Reference' is not a durable explicit " +
+                'comparison authority.')
+        $authority = $symbolic.Trim()
+        if ([string]::IsNullOrWhiteSpace($authority) -or
+            $authority.Contains("`n") -or
+            $authority.Contains("`r") -or
+            -not $authority.StartsWith(
+                'refs/',
+                [StringComparison]::Ordinal)) {
+            throw (
+                "ComparisonRef '$Reference' is not a durable explicit " +
+                'comparison authority.')
+        }
+    }
+
+    $commit = (Invoke-GitText `
+        -Arguments @('rev-parse', '--verify', "$authority^{commit}") `
+        -FailureMessage (
+            "ComparisonRef '$Reference' is not a durable explicit " +
+            'comparison authority.')).Trim()
+    if ($commit -notmatch '^(?:[0-9a-f]{40}|[0-9a-f]{64})$') {
+        throw (
+            "ComparisonRef '$Reference' did not resolve to one exact commit.")
+    }
+
+    return $commit
+}
+
 $resolvedCoverageRoot = (Resolve-Path `
     -LiteralPath $CoverageRoot `
     -ErrorAction Stop).Path
@@ -152,6 +201,12 @@ if ($reports.Count -eq 0) {
 }
 if ([string]::IsNullOrWhiteSpace($ComparisonRef) -and -not $ReportOnly) {
     throw 'ComparisonRef is required for changed-TCB coverage enforcement.'
+}
+$comparisonCommit = if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
+    ''
+}
+else {
+    Resolve-DurableComparisonCommit -Reference $ComparisonRef
 }
 
 $lineHits = [Collections.Generic.Dictionary[string,
@@ -308,7 +363,7 @@ $aggregatePassed =
     $aggregate.linePercent + 0.005 -ge $aggregateMinimum
 
 $changedTcb = [pscustomobject][ordered]@{
-    comparisonRef = $ComparisonRef
+    comparisonRef = $comparisonCommit
     canonicalFiles = 0
     changedFiles = 0
     coverageFiles = 0
@@ -323,7 +378,7 @@ $changedTcb = [pscustomobject][ordered]@{
     uncoveredLines = @()
     passed = $true
 }
-if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
+if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $contractPath = Join-Path $repositoryRoot 'eng\acceptance\contract.json'
     $contract = Get-Content -LiteralPath $contractPath -Raw |
         ConvertFrom-Json
@@ -347,10 +402,10 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
             throw "Declaration-only TCB coverage path is not canonical: '$declarationOnlyPath'."
         }
     }
-    $diffTarget = "$ComparisonRef...HEAD"
+    $diffTarget = "$comparisonCommit...HEAD"
     if ($IncludeWorkingTree) {
         $mergeBaseOutput = Invoke-GitText `
-            -Arguments @('merge-base', $ComparisonRef, 'HEAD') `
+            -Arguments @('merge-base', $comparisonCommit, 'HEAD') `
             -FailureMessage (
                 "Could not resolve the merge base for comparison ref '$ComparisonRef'.")
         $mergeBase = $mergeBaseOutput.Trim()
@@ -500,7 +555,7 @@ if (-not [string]::IsNullOrWhiteSpace($ComparisonRef)) {
     }
     $changedPercent = [Math]::Round($changedPercent, 2)
     $changedTcb = [pscustomobject][ordered]@{
-        comparisonRef = $ComparisonRef
+        comparisonRef = $comparisonCommit
         canonicalFiles = $canonicalTcbPaths.Count
         changedFiles = $changedTcbFiles.Count
         coverageFiles = $coverageTcbPaths.Count

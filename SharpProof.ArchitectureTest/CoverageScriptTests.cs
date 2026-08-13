@@ -14,6 +14,196 @@ public sealed class CoverageScriptTests
     ];
 
     [Test]
+    public void ContainerCoverageRequiresExplicitComparisonAuthority()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows",
+            "coverage.yml"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(script, Does.Not.Contain("'HEAD^'"));
+            Assert.That(
+                script,
+                Does.Contain(
+                    "SHARPPROOF_COVERAGE_COMPARISON_REF is required"));
+            Assert.That(workflow, Does.Not.Contain("comparison='HEAD^'"));
+            Assert.That(workflow, Does.Contain("comparison_ref:"));
+        }
+    }
+
+    [Test]
+    public async Task RelativeHeadComparisonCannotHideEarlierTcbCommit()
+    {
+        var repository = await CreateMultiCommitFixtureAsync();
+        try
+        {
+            var result = await RunCoverageAsync(
+                repository,
+                comparisonRef: "HEAD^",
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Not.Zero);
+            Assert.That(
+                result.Output + result.Error,
+                Does.Contain("durable explicit comparison authority"));
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    [Test]
+    public async Task ExplicitComparisonCoversEarlierTcbCommit()
+    {
+        var repository = await CreateMultiCommitFixtureAsync();
+        try
+        {
+            var result = await RunCoverageAsync(
+                repository,
+                comparisonRef: "comparison",
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Zero, result.Error);
+            using var document = JsonDocument.Parse(result.Output);
+            Assert.That(
+                document.RootElement
+                    .GetProperty("changedTcb")
+                    .GetProperty("changedFiles")
+                    .GetInt32(),
+                Is.EqualTo(1));
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    [Test]
+    public async Task MissingAndUnusableComparisonAuthoritiesFailClosed()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            var missing = await RunCoverageAsync(
+                repository,
+                comparisonRef: null,
+                reportOnly: false);
+            var unusable = await RunCoverageAsync(
+                repository,
+                comparisonRef: "missing-comparison-ref",
+                reportOnly: false,
+                includeWorkingTree: true);
+            var localReport = await RunCoverageAsync(
+                repository,
+                comparisonRef: null,
+                reportOnly: true);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(missing.ExitCode, Is.Not.Zero);
+                Assert.That(
+                    missing.Output + missing.Error,
+                    Does.Contain("ComparisonRef is required"));
+                Assert.That(unusable.ExitCode, Is.Not.Zero);
+                Assert.That(localReport.ExitCode, Is.Zero, localReport.Error);
+            }
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    [Test]
+    public async Task OneCommitRepositoryRejectsRelativeHeadAuthority()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            var result = await RunCoverageAsync(
+                repository,
+                comparisonRef: "HEAD^",
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Not.Zero);
+            Assert.That(
+                result.Output + result.Error,
+                Does.Contain("durable explicit comparison authority"));
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    [Test]
+    public async Task ExplicitComparisonCoversTcbChangeThroughMergeCommit()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "branch",
+                "comparison"));
+            await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "switch",
+                "-c",
+                "trusted-change"));
+            await WriteTrustedSourceAsync(repository, value: 1);
+            await CommitAllAsync(repository, "trusted change");
+            await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "switch",
+                "-c",
+                "integration",
+                "comparison"));
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "unrelated.txt"),
+                "unrelated\n");
+            await CommitAllAsync(repository, "unrelated change");
+            await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "merge",
+                "--no-ff",
+                "trusted-change",
+                "-m",
+                "merge trusted change"));
+
+            var result = await RunCoverageAsync(
+                repository,
+                comparisonRef: "comparison",
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Zero, result.Error);
+            using var document = JsonDocument.Parse(result.Output);
+            Assert.That(
+                document.RootElement
+                    .GetProperty("changedTcb")
+                    .GetProperty("changedFiles")
+                    .GetInt32(),
+                Is.EqualTo(1));
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    [Test]
     public async Task WorkingTreeKeepsIdenticalFeatureTcbEdit()
     {
         await AssertChangedFilesAsync(
@@ -324,6 +514,73 @@ public sealed class CoverageScriptTests
             "config",
             "core.quotePath",
             "true"));
+    }
+
+    private static async Task<string> CreateSingleCommitFixtureAsync()
+    {
+        var repository = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-coverage-authority-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(repository);
+        await InitializeRepositoryAsync(repository);
+        await WriteFixtureAsync(RepositoryRoot(), repository);
+        await CommitAllAsync(repository, "root");
+        return repository;
+    }
+
+    private static async Task<string> CreateMultiCommitFixtureAsync()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        await AssertSuccessAsync(RunAsync(
+            repository,
+            "git",
+            "branch",
+            "comparison"));
+        await WriteTrustedSourceAsync(repository, value: 1);
+        await CommitAllAsync(repository, "trusted change");
+        await File.WriteAllTextAsync(
+            Path.Combine(repository, "unrelated.txt"),
+            "unrelated\n");
+        await CommitAllAsync(repository, "unrelated tip");
+        return repository;
+    }
+
+    private static Task<ProcessResult> RunCoverageAsync(
+        string repository,
+        string? comparisonRef,
+        bool reportOnly,
+        bool includeWorkingTree = false)
+    {
+        var arguments = new List<string>
+        {
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            Path.Combine(
+                repository,
+                "scripts",
+                "Test-SharpProofCoverage.ps1"),
+            "-CoverageRoot",
+            Path.Combine(repository, "coverage"),
+            "-BaselinePath",
+            Path.Combine(repository, "baseline.json")
+        };
+        if (comparisonRef != null)
+        {
+            arguments.Add("-ComparisonRef");
+            arguments.Add(comparisonRef);
+        }
+        if (includeWorkingTree)
+        {
+            arguments.Add("-IncludeWorkingTree");
+        }
+        if (reportOnly)
+        {
+            arguments.Add("-ReportOnly");
+        }
+
+        return RunAsync(repository, "pwsh", [.. arguments]);
     }
 
     private static async Task WriteIdentityFixtureAsync(

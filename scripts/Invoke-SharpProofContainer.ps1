@@ -207,6 +207,13 @@ switch ($Command) {
             '--no-restore', '--', 'performance-smoke')
     }
     'coverage' {
+        if ([string]::IsNullOrWhiteSpace(
+                $env:SHARPPROOF_COVERAGE_COMPARISON_REF)) {
+            throw (
+                'SHARPPROOF_COVERAGE_COMPARISON_REF is required for ' +
+                'changed-TCB coverage enforcement.')
+        }
+        $comparisonRef = $env:SHARPPROOF_COVERAGE_COMPARISON_REF
         Invoke-DotNet @(
             'restore', 'SharpProof.sln', '--locked-mode')
         Invoke-DotNet @(
@@ -223,13 +230,6 @@ switch ($Command) {
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofCoverage.ps1') `
             @coverageCollectionArguments
         if ($LASTEXITCODE -ne 0) { throw 'Coverage collection failed.' }
-        $comparisonRef = if (-not [string]::IsNullOrWhiteSpace(
-                $env:SHARPPROOF_COVERAGE_COMPARISON_REF)) {
-            $env:SHARPPROOF_COVERAGE_COMPARISON_REF
-        }
-        else {
-            'HEAD^'
-        }
         $summaryPath = Join-Path $coverageRoot 'SharpProof.coverage.json'
         $coverageArguments = @{
             CoverageRoot = $coverageRoot
