@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 105 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 104 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 105 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-042 - Partial callable normalization lacks one executable owner (fixed)
+
+- [x] Fixed by `0fb6bd878` (`fix: assign one partial callable owner`).
+- Analyzer sessions now normalize partial methods to their implementation and
+  atomically assign one executable-analysis owner. Definition-side attributes
+  remain available, while only the implementation body and location produce
+  diagnostics and semantic outcomes.
+- Regression-first tests cover definition-, implementation-, both-, and
+  conflicting-attribute placement; valid and violating bodies; partial
+  properties; generated/handwritten splits; concurrent runs; Requires call
+  sites; exact locations; and compiler collector ownership. Focused Analyzer
+  tests passed 9/9, Worker ownership controls 2/2, Analyzer 282/282,
+  Architecture 176/176, the container contract, and `git diff --check` passed.
 
 ### SP-AUDIT-037 - Generated classification can suppress handwritten analysis (fixed)
 
@@ -1027,32 +1041,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   receivers, conditional access, reduced extensions, and a mutation probe.
 - Consolidated cases: SP-AUDIT-030.
 - Unified closure: Model source-order normal completion once; join later receiver, argument, conditional-access, lock, constructor, and initializer effects only when prior evaluation may complete.
-
-### SP-AUDIT-042 - Partial callable normalization lacks one executable owner (P1)
-
-- [ ] The analyzer registers both symbol and operation-block paths for partial
-  methods. A definition symbol normalizes to its implementation for effect
-  resolution, while the implementation operation block analyzes the same body
-  again; there is no effect-analysis/reporting ownership gate equivalent to
-  the call-site and attribute deduplication gates.
-- Supported impact: one declared effect contract and one violating executable
-  body produce duplicate diagnostics. This doubles build/IDE errors and can
-  distort diagnostic counts or warning-as-error reporting for a standard C#
-  partial-method form.
-- Reproduction: a temporary canonical-container analyzer test declared
-  `[EnforcePure] public static partial void Write();` and implemented it with a
-  static-field write. The expected single SP0002 was reported twice. The
-  attribute was correctly inherited, so this is duplicate analysis rather than
-  a missing-contract false negative. The temporary test was removed.
-- Required closure: normalize to one compiler-owned partial-method identity and
-  atomically assign effect diagnostic/outcome ownership before either symbol or
-  operation-block analysis reports. Preserve definition-only attributes and
-  implementation-body syntax. Add definition/implementation attribute
-  placement, identical/conflicting duplicates, valid/violating bodies,
-  concurrent repeated analyzer runs, exact diagnostic location/count, outcome
-  observer, and mutation tests that remove the ownership gate.
-- Consolidated cases: SP-AUDIT-128.
-- Unified closure: Normalize each partial callable to one executable declaration owner, merge definition contracts, and emit one body analysis, diagnostic set, and outcome.
 
 ### SP-AUDIT-043 - Worker result state is not an exact producer projection (P1)
 
