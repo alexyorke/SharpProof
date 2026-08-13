@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 156 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 155 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,15 @@ The active backlog contains 156 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-210 - Mutation ledgers compare identities case-insensitively (fixed)
+
+- [x] Fixed by `12577c87d` (`fix: compare mutation ledgers ordinally`).
+- Expected methods, global and per-method ledgers, uniqueness, ordering, and
+  baseline comparison now share explicit ordinal case-sensitive semantics.
+- Regression fixtures reject case-only parameter, display, class, and method
+  drift; retain case-distinct rows and method keys; and accept unchanged exact-
+  case evidence. The complete canonical-container fixture passed twice.
 
 ### SP-AUDIT-031 - Field-like event accessor claims are not discovered (fixed)
 
@@ -946,17 +955,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   witnesses when it can prevent the event. Add empty/effectful/throwing/diverging,
   multiple initializer, method/constructor, first/subsequent entry, and
   containing-type-only mutation controls.
-
-### SP-AUDIT-210 - Mutation ledgers compare identities case-insensitively (P0)
-
-- [ ] Baseline/mutant ledger sorting, uniqueness, and `Compare-Object` equality
-  use PowerShell's default case-insensitive semantics.
-- Certifier impact: a mutation can change a parameterized test case from
-  `Case("A")` to `Case("a")`; a different case then fails before exercising the
-  intended mutant yet is accepted as the same selected test and a valid kill.
-- Required closure: use ordinal case-sensitive identity and uniqueness
-  throughout ledgers. Add case-only argument/display/class identities, duplicate
-  rows, identical controls, discovery drift, and comparer-removal fixtures.
 
 ### SP-AUDIT-223 - Changed-line coverage fallback checks only the tip commit (P0)
 
