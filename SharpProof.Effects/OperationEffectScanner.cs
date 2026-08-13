@@ -116,6 +116,15 @@ internal sealed class OperationEffectScanner
         return result;
     }
 
+    internal EffectSummary ScanUsingDisposalEffects(IOperation root)
+    {
+        return new UsingDisposalEffectResolver(
+            _session.Compilation,
+            _method,
+            _callResolver,
+            _abstractFlow).Scan(root, ClassifyRegion);
+    }
+
     private EffectSummary Scan(IOperation operation, EffectAccess access)
     {
         // Every recursive path through the scanner funnels here, so this is the
@@ -419,6 +428,12 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanInvocation(IInvocationOperation invocation)
     {
+        if (UsingDisposalEffectResolver
+            .IsSynthesizedSynchronousDispose(invocation))
+        {
+            return EffectSummary.Empty;
+        }
+
         if (invocation.IsImplicit &&
             invocation.Syntax.AncestorsAndSelf().Any(static syntax => syntax is LockStatementSyntax))
         {

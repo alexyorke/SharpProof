@@ -69,6 +69,7 @@ internal sealed class EffectMethodNodeBuilder
             localSummary,
             _session.ResolveEntryPreconditions(method),
             scanner.ScanLexicalControlEffects(root),
+            scanner.ScanUsingDisposalEffects(root),
             ScanConstructorMemberInitializers(method, scanner, cancellationToken),
             CanTriggerOwnTypeInitialization(method) &&
             HasPotentialStaticInitialization(

@@ -880,6 +880,112 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void UsingFormsIncludeImplicitDisposeEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class Resource : IDisposable {
+                private static volatile int s_state;
+
+                public void Dispose() {
+                    s_state = 1;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                public static void Statement(Resource resource) {
+                    using (resource) { }
+                }
+
+                public static void Declaration(Resource resource) {
+                    using var alias = resource;
+                }
+
+                public static void Explicit(Resource resource) =>
+                    resource.Dispose();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] { "Statement", "Declaration", "Explicit" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Writes.Contains(EffectRegionId.Static()),
+                    Is.True,
+                    methodName);
+                Assert.That(
+                    result.Summary.Capabilities.Contains(
+                        EffectCapabilityKind.Synchronization),
+                    Is.True,
+                    methodName);
+                AssertContainsThrows(
+                    result.Summary,
+                    "System.InvalidOperationException");
+                Assert.That(result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete), methodName);
+            }
+        }
+    }
+
+    [Test]
+    public void UsingNullNoOpAndInterfaceControlsStaySound()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class NoOp : IDisposable {
+                public void Dispose() { }
+            }
+
+            public sealed class NullSensitive : IDisposable {
+                private static int s_state;
+                public void Dispose() => s_state = 1;
+            }
+
+            public static class Sample {
+                public static void NoOpResource(NoOp resource) {
+                    using (resource) { }
+                }
+
+                public static void NullResource() {
+                    NullSensitive? resource = null;
+                    using (resource) { }
+                }
+
+                public static void InterfaceResource(IDisposable resource) {
+                    using (resource) { }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var noOp = session.Analyze(Method(compilation, "NoOpResource"));
+        var @null = session.Analyze(Method(compilation, "NullResource"));
+        var @interface = session.Analyze(Method(compilation, "InterfaceResource"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(noOp.Summary.Writes.IsEmpty, Is.True);
+            Assert.That(noOp.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(@null.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+            Assert.That(@null.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(@interface.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(@interface.Summary.Uncertainty & EffectUncertainty.Dispatch,
+                Is.EqualTo(EffectUncertainty.Dispatch));
+        }
+    }
+
+    [Test]
     public void LocalAliasesRetainCallerOwnedAndFreshRegions()
     {
         var compilation = EffectTestHost.CreateCompilation(
