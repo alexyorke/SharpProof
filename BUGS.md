@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 120 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 119 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 120 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-178 - Batched baselines can falsely certify mutation kills (fixed)
+
+- [x] Fixed by `5c10dd8de` (`fix: isolate mutation baselines by invocation`).
+- Mutation baselines now run once per exact project, filter, and configuration
+  invocation identity, with reuse only for byte-identical identities. Each
+  mutant result binds the baseline invocation digest, passing selected-test
+  ledger, contained TRX path, and TRX SHA-256; saved baselines, resume state,
+  final validation, and parallel merging independently revalidate them.
+- Regression-first planner and evidence fixtures cover ordered/shared-state
+  contamination, identical and differing filters/projects/configurations,
+  deterministic parallel order, baseline failure/timeout/missing TRX, stale
+  resume data, receipt/hash/ledger mismatch, and valid kills. All mutation
+  fixtures passed, PowerShell parsing passed, and Architecture passed 171/171.
 
 ### SP-AUDIT-126 - Ill-formed UTF-16 is non-injective across verifier boundaries (fixed)
 
@@ -823,19 +837,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   and binding-removal mutation controls.
 - Consolidated cases: SP-AUDIT-100, SP-AUDIT-208.
 - Unified closure: Order actuals by Roslyn parameter ordinal and authenticate receiver, ordered arguments, result, existential roles, and relation during hydration.
-
-### SP-AUDIT-178 - Batched baselines can falsely certify mutation kills (P0)
-
-- [ ] Mutation baselines OR all project filters into one invocation, while each
-  mutant is run under its focused filter. The ledger proves selected test names,
-  not invocation-equivalent independent baseline success.
-- Certifier impact: ordered test A can initialize state needed by B in the
-  batched baseline; focused mutated B then fails before reaching the mutant and
-  is accepted as an assertion-backed kill.
-- Required closure: baseline each distinct project/filter with the exact focused
-  invocation used by its mutants and share results only when command bytes and
-  environment are identical. Add ordered-state, fixture-state, parallel, shared-
-  filter, and invocation-shape mutation fixtures.
 
 ### SP-AUDIT-192 - Exception text can masquerade as a mutation assertion (P0)
 
