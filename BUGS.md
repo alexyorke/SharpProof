@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 113 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 112 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 113 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-005 - Initializer call sites escape SP0027 analysis (fixed)
+
+- [x] Fixed by `0c946f892` (`fix: analyze contract calls in initializers`).
+- Contracts-mode analysis now inventories field and auto-property initializer
+  operation roots, excludes locals and generated trees, selects the relevant
+  static or instance constructor deterministically, and reuses the existing
+  Requires binding and concrete replay without broadening effect analysis.
+- Regression-first coverage includes invalid instance/static fields and
+  auto-properties, a valid initializer, multiple constructor overloads with no
+  duplicate diagnostics, and a generated-tree control. The focused tests passed
+  2/2, the full Analyzer suite passed 245/245, the full Architecture suite
+  passed 175/175, and `git diff --check` passed.
 
 ### SP-AUDIT-003 - Pilot qualification is not bound to fresh candidate outputs (fixed)
 
@@ -873,28 +886,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   package-mismatched pilot evidence.
 - Consolidated cases: SP-AUDIT-082, SP-AUDIT-133, SP-AUDIT-145, SP-AUDIT-161, SP-AUDIT-171.
 - Unified closure: Generate one authoritative qualification matrix and exact-commit receipt set covering pilots, Debug, release configuration, portable OS consumers, repeated cancellation, and minimum SDK.
-
-### SP-AUDIT-005 - Initializer call sites escape SP0027 analysis (P1)
-
-- [ ] The operation-block pipeline returns immediately when Roslyn assigns an
-  operation block to a field or property rather than an `IMethodSymbol`.
-  Constructor call-site discovery adds base/`this` initializers, but it never
-  adds instance/static field or auto-property initializer expressions.
-- Supported impact: definitely executed ordinary calls in initializers can
-  violate compiler-bound `Contract.Requires` clauses without the documented
-  SP0027 warning. This is not a conditional or unsupported-expression
-  abstention; the same constant call in a method or expression-bodied property
-  is reported.
-- Reproduction: a temporary analyzer regression put `Positive(-1)` in an
-  instance field initializer and `Positive(-2)` in an auto-property
-  initializer. The canonical container run expected two SP0027 diagnostics and
-  received an empty diagnostic set.
-- Required closure: analyze executable initializer operation roots exactly once
-  and associate their outcome with the relevant synthesized/declared
-  constructor without duplicating diagnostics across constructor overloads.
-  Add instance/static field, auto-property, valid-call, generated-tree, and
-  multiple-constructor controls plus a mutation that removes initializer
-  discovery.
 
 ### SP-AUDIT-009 - Container evidence path guards are case-insensitive (P1)
 
