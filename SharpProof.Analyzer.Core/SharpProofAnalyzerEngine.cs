@@ -109,6 +109,14 @@ internal sealed partial class SharpProofAnalyzerEngine
         }
         if (activation.RequiresSymbolAnalysis)
         {
+            context.RegisterSyntaxNodeAction(
+                syntaxContext =>
+                    AnalyzerFeaturePipeline.ValidateNestedCallableDeclaration(
+                        syntaxContext,
+                        session),
+                SyntaxKind.LocalFunctionStatement,
+                SyntaxKind.SimpleLambdaExpression,
+                SyntaxKind.ParenthesizedLambdaExpression);
             context.RegisterSymbolAction(
                 symbolContext => AnalyzerFeaturePipeline.ValidateMethodAttributes(
                     symbolContext,

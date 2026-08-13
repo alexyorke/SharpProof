@@ -2,6 +2,27 @@ namespace SharpProof.Analyzer;
 
 internal static partial class AnalyzerFeaturePipeline
 {
+    internal static void ValidateNestedCallableDeclaration(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                context.Node.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
+            context.Node,
+            context.SemanticModel,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
+    }
+
     internal static void AnalyzeUnselectedOperationBlock(
         OperationBlockAnalysisContext context,
         AnalyzerSession session)

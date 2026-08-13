@@ -25,6 +25,66 @@ internal static class SharpProofControlAttributePolicy
             symbol, session, reportDiagnostic, cancellationToken);
     }
 
+    internal static void ValidateNestedCallableDeclaration(
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        var attributeLists = declaration switch
+        {
+            LocalFunctionStatementSyntax localFunction =>
+                localFunction.AttributeLists,
+            ParenthesizedLambdaExpressionSyntax parenthesizedLambda =>
+                parenthesizedLambda.AttributeLists,
+            SimpleLambdaExpressionSyntax simpleLambda =>
+                simpleLambda.AttributeLists,
+            _ => default
+        };
+        foreach (var attribute in attributeLists.SelectMany(
+                     static list => list.Attributes))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var constructor = semanticModel.GetSymbolInfo(
+                attribute,
+                cancellationToken).Symbol as IMethodSymbol;
+            var suppressing = constructor == null
+                ? null
+                : IsSuppressing(
+                    constructor.ContainingType,
+                    session.Attributes);
+            if (!suppressing.HasValue)
+            {
+                continue;
+            }
+
+            var argument = attribute.ArgumentList?.Arguments.Count == 1
+                ? semanticModel.GetConstantValue(
+                    attribute.ArgumentList.Arguments[0].Expression,
+                    cancellationToken)
+                : default;
+            var reason = argument.HasValue && argument.Value is string value
+                ? value
+                : string.Empty;
+            if (!string.IsNullOrWhiteSpace(reason) ||
+                !session.TryMarkAttributeValidated(
+                    attribute.SyntaxTree,
+                    attribute.Span))
+            {
+                continue;
+            }
+
+            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                suppressing.Value
+                    ? "[SharpProofSuppress]"
+                    : "[SharpProofTrusted]",
+                string.IsNullOrEmpty(reason) ? "<empty>" : reason,
+                "expected a non-empty reason",
+                attribute.GetLocation()));
+        }
+    }
+
     internal static IEnumerable<ISymbol> EnumerateScopes(IMethodSymbol method)
     {
         yield return method;
@@ -109,6 +169,21 @@ internal static class SharpProofControlAttributePolicy
         return ContractSelectionInventory.Is(attribute, inventory.Suppress)
             ? true
             : ContractSelectionInventory.Is(attribute, inventory.Trusted)
+                ? false
+                : null;
+    }
+
+    private static bool? IsSuppressing(
+        INamedTypeSymbol attributeType,
+        ContractSelectionInventory inventory)
+    {
+        return SymbolEqualityComparer.Default.Equals(
+                attributeType,
+                inventory.Suppress)
+            ? true
+            : SymbolEqualityComparer.Default.Equals(
+                attributeType,
+                inventory.Trusted)
                 ? false
                 : null;
     }

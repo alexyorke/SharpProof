@@ -44,6 +44,7 @@ public sealed class NestedRequiresCallSiteTests
         var diagnostics = await Analyze(
             """
             using System;
+            using System.Linq.Expressions;
             using SharpProof.Attributes;
 
             public static class Fixture {
@@ -438,6 +439,107 @@ public sealed class NestedRequiresCallSiteTests
                 factory.GetOutcomes(MethodKind.AnonymousFunction),
                 Does.Contain(AnalyzerSemanticOutcome.Refuted));
         }
+    }
+
+    [Test]
+    public async Task NestedCallableControlReasonsAreValidatedRegardlessOfReachability()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static int Outer() {
+                    [SharpProofSuppress("")]
+                    int UnusedLocal() => 0;
+
+                    [SharpProofTrusted(" ")]
+                    int UsedLocal() => 1;
+
+                    [SharpProofTrusted("")]
+                    int EscapedLocal() => 2;
+                    Func<int> escaped = EscapedLocal;
+
+                    Func<int> unusedExpression =
+                        [SharpProofSuppress("")]
+                        () => 3;
+                    Func<int> usedBlock =
+                        [SharpProofTrusted(" ")]
+                        () => { return 4; };
+                    Func<int> unusedAnonymous =
+                        delegate { return 5; };
+                    Expression<Func<int>> quoted =
+                        [SharpProofSuppress(" ")]
+                        () => 6;
+
+                    [SharpProofSuppress("reviewed outer")]
+                    int ValidNested() {
+                        Func<int> nested =
+                            [SharpProofTrusted("reviewed nested")]
+                            () => 5;
+                        return nested();
+                    }
+
+                    return UsedLocal() + escaped() + usedBlock() +
+                        ValidNested();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(
+            source,
+            enabledIds: ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0024", 6)));
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EqualTo(new[]
+            {
+                source.IndexOf("SharpProofSuppress(\"\")", StringComparison.Ordinal),
+                source.IndexOf("SharpProofTrusted(\" \")", StringComparison.Ordinal),
+                source.IndexOf("SharpProofTrusted(\"\")", StringComparison.Ordinal),
+                source.IndexOf(
+                    "SharpProofSuppress(\"\")",
+                    source.IndexOf("unusedExpression", StringComparison.Ordinal),
+                    StringComparison.Ordinal),
+                source.IndexOf(
+                    "SharpProofTrusted(\" \")",
+                    source.IndexOf("usedBlock", StringComparison.Ordinal),
+                    StringComparison.Ordinal),
+                source.IndexOf(
+                    "SharpProofSuppress(\" \")",
+                    source.IndexOf("quoted", StringComparison.Ordinal),
+                    StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
+    public async Task GeneratedNestedCallableControlReasonsRemainExcluded()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static void Outer() {
+                    [SharpProofSuppress("")]
+                    void Local() { }
+                    Func<int> lambda =
+                        [SharpProofTrusted(" ")]
+                        () => 1;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024"],
+            filePath: "Fixture.g.cs");
+
+        Assert.That(diagnostics, Is.Empty);
     }
 
     private static Task<ImmutableArray<Diagnostic>> Analyze(

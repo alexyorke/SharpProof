@@ -221,8 +221,16 @@ internal sealed class AnalyzerSession
     {
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
-               _validatedAttributes.TryAdd(
-                   (reference.SyntaxTree, reference.Span), 0);
+               TryMarkAttributeValidated(
+                   reference.SyntaxTree,
+                   reference.Span);
+    }
+
+    internal bool TryMarkAttributeValidated(
+        SyntaxTree tree,
+        TextSpan span)
+    {
+        return _validatedAttributes.TryAdd((tree, span), 0);
     }
 
     internal bool TryMarkContractIntrinsicValidated(
