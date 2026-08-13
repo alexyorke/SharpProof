@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 91 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 90 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 91 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-136 - Packaged MSBuild configuration lacks one normalized authority (fixed)
+
+- [x] Fixed by `1d90a6f16` (`fix: normalize late package configuration`).
+- Portable and verifier targets now derive analyzer, generator, collector,
+  tools, worker, launcher, and protocol paths after project-body evaluation.
+  Runtime-closure validation is an explicit dependency before verification
+  initialization, so mismatches fail before invalidation, output, or ownership
+  marker mutation. BuildTasks remains package-owned; private overrides are
+  restricted to explicit test seams.
+- Regression-first package tests cover project-body analyzer/collector effective
+  paths and late tools/worker/launcher mismatches with no result or marker.
+  The full container build completed with zero warnings/errors, focused tests
+  passed 4/4, final Architecture passed 178/178, and `git diff --check` passed.
 
 ### SP-AUDIT-124 - One SARIF path breaks multitarget verification (fixed)
 
@@ -1299,25 +1313,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-136 - Packaged MSBuild configuration lacks one normalized authority (P1)
-
-- [ ] NuGet imports `SharpProof.props` before the consumer project body and
-  eagerly freezes analyzer, collector, tools, launcher, worker, protocol, and
-  BuildTasks paths. Later public-property assignments change the visible values
-  but not the private paths consumed by targets.
-- Supported impact: a real MSBuild evaluation showed
-  `SharpProofAnalyzerDirectory=/tmp/audit-analyzers` while
-  `_SharpProofAnalyzerPath` still named the package default; collector paths had
-  the same split. Existing tests mask it by recomputing private properties.
-- Reproduction: the canonical container evaluated an ordinary project-body
-  override and printed the divergent public/private property set. Global `-p:`
-  assignment remains an early-working control.
-- Required closure: either remove unsafe runtime overrides before preview or
-  derive every retained override after project evaluation. Add project-body,
-  global, analyzer, collector, worker, launcher, and packaged-feed controls.
-- Consolidated cases: SP-AUDIT-137.
-- Unified closure: Evaluate supported properties after the project body, normalize once, and share effective values across invalidation, arguments, and diagnostics.
 
 ### SP-AUDIT-138 - Compiler-elided invocations still receive SP0027 (P1)
 
