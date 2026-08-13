@@ -317,6 +317,12 @@ public sealed class IrFactory
     public IrStringTerm String(string value)
     {
         ArgumentNullGuard.NotNull(value, nameof(value));
+        if (!Utf16WellFormedness.IsWellFormed(value))
+        {
+            throw new ArgumentException(
+                "String terms require well-formed UTF-16.",
+                nameof(value));
+        }
 
         lock (_gate)
         {

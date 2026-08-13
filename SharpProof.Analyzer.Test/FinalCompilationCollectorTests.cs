@@ -18,6 +18,143 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class FinalCompilationCollectorTests
 {
+    [TestCase('\uD800')]
+    [TestCase('\uDC00')]
+    public void TextHashRejectsLoneSurrogatesBeforeEncoding(char value)
+    {
+        var malformed = SourceText.From(new string(value, 1), Encoding.Unicode);
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            _ = CompilerCompilationCapture.ComputeTextSha256(malformed)));
+        Assert.That(exception!.Message, Does.Contain("ill-formed UTF-16"));
+    }
+
+    [Test]
+    public void TextHashDistinguishesValidPairFromReplacementCharacter()
+    {
+        var pair = CompilerCompilationCapture.ComputeTextSha256(
+            SourceText.From("\U0001F600", Encoding.Unicode));
+        var replacement = CompilerCompilationCapture.ComputeTextSha256(
+            SourceText.From("\uFFFD", Encoding.Unicode));
+
+        Assert.That(pair, Is.Not.EqualTo(replacement));
+    }
+
+    [TestCase("Source.cs", '\uD800')]
+    [TestCase("Source.cs", '\uDC00')]
+    [TestCase("Generated.Subject.g.cs", '\uD800')]
+    [TestCase("Generated.Subject.g.cs", '\uDC00')]
+    public async Task MalformedSourceOrGeneratedTextProducesTypedDiagnostic(
+        string filePath,
+        char surrogate)
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("ill-formed-text");
+        var compilation = CreateCompilation();
+        var malformed = CSharpSyntaxTree.ParseText(
+            "// " + new string(surrogate, 1),
+            (CSharpParseOptions)compilation.SyntaxTrees.Single().Options,
+            filePath,
+            Encoding.Unicode);
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation.AddSyntaxTrees(malformed),
+            Options(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(
+                diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("ill-formed UTF-16"));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task ValidPairAndReplacementRoundTripWithDistinctFingerprints()
+    {
+        using var workspace = new CollectorWorkspace();
+        var pairPath = workspace.SealPath("pair");
+        var replacementPath = workspace.SealPath("replacement");
+        var prefix =
+            "using SharpProof.Attributes; internal static class Subject { " +
+            "internal static string Identity(string value) { " +
+            "Contract.Ensures(Contract.Result<string>() == \"";
+        const string suffix = "\"); return value; } }";
+        var pair = CreateCompilation(prefix + "\\uD83D\\uDE00" + suffix);
+        var replacement = CreateCompilation(
+            prefix + "\\uFFFD" + suffix);
+
+        var pairArtifact = await EmitArtifact(pair, pairPath);
+        var replacementArtifact = await EmitArtifact(
+            replacement,
+            replacementPath);
+        var pairRoundTrip = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(pairArtifact));
+        var replacementRoundTrip = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(replacementArtifact));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                pairArtifact.CompilationSha256,
+                Is.Not.EqualTo(replacementArtifact.CompilationSha256));
+            Assert.That(
+                pairArtifact.Manifest.Hash,
+                Is.Not.EqualTo(replacementArtifact.Manifest.Hash));
+            Assert.That(
+                pairArtifact.Manifest.Claims.Single().ClaimId,
+                Is.Not.EqualTo(
+                    replacementArtifact.Manifest.Claims.Single().ClaimId));
+            Assert.That(
+                pairRoundTrip.Compilation.SyntaxTrees[0].Sha256,
+                Is.EqualTo(pairArtifact.Compilation.SyntaxTrees[0].Sha256));
+            Assert.That(
+                replacementRoundTrip.Compilation.SyntaxTrees[0].Sha256,
+                Is.EqualTo(
+                    replacementArtifact.Compilation.SyntaxTrees[0].Sha256));
+            Assert.That(pairRoundTrip.CompilerDiagnostics, Is.Empty);
+            Assert.That(replacementRoundTrip.CompilerDiagnostics, Is.Empty);
+            Assert.That(pairRoundTrip.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(replacementRoundTrip.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.None));
+        }
+    }
+
+    [TestCase("D800")]
+    [TestCase("DC00")]
+    public async Task IllFormedCompilerStringTermsBecomeUnsupportedExpression(
+        string escape)
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("ill-formed-string-term-" + escape);
+        var compilation = CreateCompilation(
+            "using SharpProof.Attributes; " +
+            "internal static class Subject { " +
+            "internal static string Identity(string value) { " +
+            "Contract.Ensures(Contract.Result<string>() == \"\\u" + escape +
+            "\"); return value; } }");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+            Assert.That(
+                artifact.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        }
+    }
+
     [TestCase("class", "public sealed class Subject(int value) { }")]
     [TestCase("record", "public sealed record Subject(int value);")]
     public async Task PrimaryConstructorSelectionIsInventoriedExactlyOnce(

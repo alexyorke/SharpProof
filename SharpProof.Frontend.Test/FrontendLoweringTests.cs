@@ -75,6 +75,48 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void IllFormedUtf16StringConstantsAbstainWithoutCollapsingValues()
+    {
+        var factory = new IrFactory();
+        Assert.Throws<ArgumentException>((Action)(() =>
+            factory.String(new string('\uD800', 1))));
+        Assert.Throws<ArgumentException>((Action)(() =>
+            factory.String(new string('\uDC00', 1))));
+        Assert.That(factory.String("\U0001F600"), Is.Not.Null);
+        Assert.That(factory.String("\uFFFD"), Is.Not.Null);
+
+        AssertClassification(
+            """
+            public static string Target() => "\uD800";
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
+            public static string Target() => "\uDC00";
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+
+        using var pair = CompiledMethod.Create(
+            """
+            public static string Target() => "\uD83D\uDE00";
+            """);
+        using var replacement = CompiledMethod.Create(
+            """
+            public static string Target() => "\uFFFD";
+            """);
+        var pairValue = pair.CompareWithInterpreter();
+        var replacementValue = replacement.CompareWithInterpreter();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(pairValue, Is.EqualTo("\U0001F600"));
+            Assert.That(replacementValue, Is.EqualTo("\uFFFD"));
+            Assert.That(pairValue, Is.Not.EqualTo(replacementValue));
+        }
+    }
+
+    [Test]
     public void ArrayLengthAndElementAccessMatchCompiledCSharp()
     {
         using var element = CompiledMethod.Create(

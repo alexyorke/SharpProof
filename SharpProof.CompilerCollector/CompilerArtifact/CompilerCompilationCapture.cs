@@ -292,8 +292,13 @@ internal static class CompilerCompilationCapture
     internal static string ComputeTextSha256(SourceText text)
     {
         text = ArgumentNullGuard.NotNull(text, nameof(text));
-
-        return Hash(Encoding.UTF8.GetBytes(text.ToString()));
+        var value = text.ToString();
+        if (!Utf16WellFormedness.IsWellFormed(value))
+        {
+            throw new InvalidDataException(
+                "Compiler text contains ill-formed UTF-16.");
+        }
+        return Hash(Encoding.UTF8.GetBytes(value));
     }
 
     private static string Identity(MetadataReader reader)
