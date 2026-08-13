@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 110 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 109 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 110 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-017 - Publication-set path hashing is not injective (fixed)
+
+- [x] Fixed by `b92f58309` (`fix: frame publication set identities`).
+- Publication-set IDs now hash a versioned domain, path count, and ordinally
+  sorted sequence of big-endian length-prefixed strict UTF-8 path bytes. The
+  existing acquisition and marker validation paths share this sole identity.
+- Regression-first tests reproduce the exact newline-delimiter collision and
+  require the second partial-overlap set to fail without changing existing
+  marker bytes or creating new markers. Additional controls cover empty,
+  single, multiple, reordered, carriage-return, newline, and Unicode
+  separator-like paths. Focused Worker tests passed 4/4, Architecture passed
+  176/176, the container contract passed, and `git diff --check` passed.
 
 ### SP-AUDIT-016 - Property and event accessor calls escape SP0027 analysis (fixed)
 
@@ -917,28 +930,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   package-mismatched pilot evidence.
 - Consolidated cases: SP-AUDIT-082, SP-AUDIT-133, SP-AUDIT-145, SP-AUDIT-161, SP-AUDIT-171.
 - Unified closure: Generate one authoritative qualification matrix and exact-commit receipt set covering pilots, Debug, release configuration, portable OS consumers, repeated cancellation, and minimum SDK.
-
-### SP-AUDIT-017 - Publication-set path hashing is not injective (P1)
-
-- [ ] `LinuxPathIdentity.PublicationSetId` hashes
-  `string.Join("\n", canonicalPaths)` without length framing or escaping.
-  Linux path components may contain newline characters, so distinct sorted
-  path arrays can produce the same byte sequence and ownership marker.
-- Supported impact: two sequential publication configurations can partially
-  overlap one output while carrying different companion outputs, yet the
-  persistent marker accepts both as the same set. Locking serializes the
-  writers but cannot keep both request/result/manifest/SARIF generations
-  coherent after the false identity match.
-- Reproduction: a temporary canonical-container worker test formed two
-  three-path sets whose newline-containing names serialize identically and
-  that share a fourth ordinary output path. After acquiring the first set,
-  acquisition of the second was expected to throw `partially overlap`; it was
-  accepted without an exception.
-- Required closure: hash a domain/version plus a count and length-prefixed UTF-8
-  path sequence using the repository's canonical hash framing, or reject all
-  control characters before marker/lock creation. Add newline, carriage-return,
-  separator-like Unicode, ordinary paths, reordered sets, and true
-  partial-overlap cases plus a mutation that restores delimiter joining.
 
 ### SP-AUDIT-019 - Unreachable catch handlers contribute effects (P1)
 
