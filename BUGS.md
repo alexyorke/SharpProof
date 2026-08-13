@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 102 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 101 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 102 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-069 - Nested callable declarations bypass full method policy (fixed)
+
+- [x] Fixed by `6b92ef813` (`fix: validate nested callable controls`).
+- Independent syntax-node declaration analysis now semantically resolves trusted
+  `SharpProofSuppress` and `SharpProofTrusted` attributes on local functions and
+  lambdas regardless of invocation reachability. Tree/span deduplication prevents
+  duplicates when reachable-callable analysis later visits the same attribute;
+  generated trees remain excluded and nested bodies are not executed.
+- Regression-first tests cover unused, invoked, and method-group locals;
+  unused/invoked/expression-tree lambdas; nested valid controls; exact diagnostic
+  counts; generated exclusion; and the unannotated anonymous-method grammar
+  control. Focused tests passed 2/2, the nested suite 14/14, Analyzer 286/286,
+  Architecture 176/176, and `git diff --check` passed.
 
 ### SP-AUDIT-051 - Nested catch rethrows fabricate an outer exception (fixed)
 
@@ -1094,30 +1108,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   heuristic-only filter.
 - Consolidated cases: SP-AUDIT-064, SP-AUDIT-068, SP-AUDIT-127.
 - Unified closure: After all generators, reconcile every logical target/companion once in every non-off profile, independent of filename, partial ownership, and generator order.
-
-### SP-AUDIT-069 - Nested callable declarations bypass full method policy (P1)
-
-- [ ] Nested `SharpProofSuppress`/`SharpProofTrusted` validation is performed
-  only while recursively analyzing a reachable nested callable. Unreferenced
-  local functions and never-invoked lambdas are deliberately excluded from
-  call-site analysis, but no independent declaration/symbol action validates
-  their control-attribute reasons.
-- Supported impact: malformed empty or whitespace-only reasons silently escape
-  the documented SP0024 policy depending on whether a nested callable happens
-  to be invoked. Attribute validity is a source declaration rule and should not
-  vary with execution reachability.
-- Reproduction: a focused contracts-profile analyzer test declared an unused
-  local function with `[SharpProofSuppress("")]` and an uninvoked lambda with
-  `[SharpProofTrusted(" ")]`, enabling only SP0024. The expected two diagnostics
-  were both absent. Existing invoked-callable controls diagnose the same reason
-  shapes. The temporary regression was removed.
-- Required closure: validate nested callable control attributes independently
-  of semantic call-site traversal, retaining syntax/span deduplication when an
-  invoked callable is also analyzed. Add used/unused local functions, lambdas,
-  anonymous methods, method-group escape, expression trees, valid reasons, and
-  duplicate-action controls plus a mutation restoring reachability-only checks.
-- Consolidated cases: SP-AUDIT-087.
-- Unified closure: Inventory nested declarations independently of reachability, validate controls and explicit selection, and separately gate body traversal by executable reachability.
 
 ### SP-AUDIT-070 - Never-invoked lambda bodies are analyzed as executed (P1)
 
