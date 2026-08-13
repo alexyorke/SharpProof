@@ -552,6 +552,67 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void PublicationLocksRejectSymlinksAndNonRegularFilesWithoutTouchingTargets()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var directory = Path.GetDirectoryName(project.ProjectPath)!;
+
+        var missingResult = Path.Combine(directory, "missing-result.json");
+        var missingLock = LinuxPathIdentity.PublicationLockName(missingResult);
+        var missingTarget = Path.Combine(directory, "missing-lock-target");
+        File.CreateSymbolicLink(missingLock, missingTarget);
+
+        Assert.Throws<IOException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [missingResult],
+                TimeSpan.FromSeconds(1));
+        }));
+        Assert.That(File.Exists(missingTarget), Is.False);
+
+        var existingResult = Path.Combine(directory, "existing-result.json");
+        var existingLock = LinuxPathIdentity.PublicationLockName(existingResult);
+        var existingTarget = Path.Combine(directory, "existing-lock-target");
+        const string sentinel = "user-owned lock target bytes";
+        File.WriteAllText(existingTarget, sentinel);
+        File.CreateSymbolicLink(existingLock, existingTarget);
+
+        Assert.Throws<IOException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [existingResult],
+                TimeSpan.FromSeconds(1));
+        }));
+        Assert.That(File.ReadAllText(existingTarget), Is.EqualTo(sentinel));
+
+        var directoryResult = Path.Combine(directory, "directory-result.json");
+        Directory.CreateDirectory(
+            LinuxPathIdentity.PublicationLockName(directoryResult));
+        Assert.Throws<IOException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [directoryResult],
+                TimeSpan.FromSeconds(1));
+        }));
+
+        var normalResult = Path.Combine(directory, "normal-result.json");
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   [normalResult],
+                   TimeSpan.FromSeconds(1)))
+        {
+        }
+        var normalLock = LinuxPathIdentity.PublicationLockName(normalResult);
+        using var normalStream = new FileStream(
+            normalLock,
+            FileMode.Open,
+            FileAccess.ReadWrite,
+            FileShare.ReadWrite);
+        Assert.That(normalStream.Length, Is.Zero);
+    }
+
+    [Test]
     public async Task ChangingOneMemberOfAPublishedSetRequiresCleanOutputMetadata()
     {
         RequireContainerWorker();

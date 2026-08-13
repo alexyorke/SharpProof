@@ -198,6 +198,39 @@ public sealed class LinuxPublicationSetTests
     }
 
     [Test]
+    public void OwnershipMarkerSymlinkIsRejectedWithoutModifyingItsTarget()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var result = Path.Combine(directory.Path, "result.json");
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   [result],
+                   TimeSpan.FromSeconds(1)))
+        {
+        }
+
+        var marker = LinuxPathIdentity.PublicationMarkerPath(result);
+        var target = Path.Combine(directory.Path, "user-owned-marker.txt");
+        File.Move(marker, target);
+        var expected = File.ReadAllBytes(target);
+        File.CreateSymbolicLink(marker, target);
+
+        Assert.Throws<IOException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [result],
+                TimeSpan.FromSeconds(1));
+        }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.ReadAllBytes(target), Is.EqualTo(expected));
+            Assert.That(
+                new FileInfo(marker).LinkTarget,
+                Is.EqualTo(target));
+        }
+    }
+
+    [Test]
     public void RejectedPartialOverlapLeavesNoNewOwnershipMarkers()
     {
         using var directory = TemporaryDirectory.Create();

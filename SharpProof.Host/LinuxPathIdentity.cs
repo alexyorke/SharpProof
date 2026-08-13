@@ -18,8 +18,10 @@ public static partial class LinuxPathIdentity
     private const int LockExclusive = 2;
     private const int LockNonBlocking = 4;
     private const int LockUnlock = 8;
+    private const int OpenReadOnly = 0;
     private const int OpenReadWrite = 2;
     private const int OpenCreate = 0x40;
+    private const int OpenNoFollow = 0x20000;
     private const int OpenCloseOnExec = 0x80000;
     private const uint OwnerReadWrite = 0x180;
     private const string PublicationMarkerSuffix =
@@ -383,10 +385,28 @@ public static partial class LinuxPathIdentity
         string markerPath,
         string expected)
     {
-        var information = new FileInfo(markerPath);
-        if (information.Length > 256 ||
-            !string.Equals(
-                File.ReadAllText(markerPath, new UTF8Encoding(false, true)),
+        using var handle = OpenRegularMetadata(
+            markerPath,
+            OpenReadOnly,
+            mode: 0,
+            "publication ownership marker",
+            out var information);
+        if (information.Size is < 0 or > 256)
+        {
+            throw new IOException(
+                "SharpProof publication paths partially overlap another publication set. " +
+                "Clean the prior output set before changing publication paths.");
+        }
+
+        using var stream = new FileStream(handle, FileAccess.Read);
+        using var reader = new StreamReader(
+            stream,
+            new UTF8Encoding(false, true),
+            detectEncodingFromByteOrderMarks: false,
+            bufferSize: 256,
+            leaveOpen: false);
+        if (!string.Equals(
+                reader.ReadToEnd(),
                 expected,
                 StringComparison.Ordinal))
         {
@@ -394,6 +414,43 @@ public static partial class LinuxPathIdentity
                 "SharpProof publication paths partially overlap another publication set. " +
                 "Clean the prior output set before changing publication paths.");
         }
+    }
+
+    private static SafeFileHandle OpenRegularMetadata(
+        string path,
+        int flags,
+        uint mode,
+        string description,
+        out LinuxStat information)
+    {
+        information = default;
+        var descriptor = NativeMethods.Open(
+            path,
+            flags | OpenNoFollow | OpenCloseOnExec,
+            mode);
+        if (descriptor < 0)
+        {
+            throw new IOException(
+                $"SharpProof could not open a {description} (errno {Marshal.GetLastPInvokeError()}).");
+        }
+
+        var handle = new SafeFileHandle(
+            new IntPtr(descriptor),
+            ownsHandle: true);
+        if (NativeMethods.FStat(descriptor, out information) != 0)
+        {
+            var error = Marshal.GetLastPInvokeError();
+            handle.Dispose();
+            throw new IOException(
+                $"SharpProof could not inspect a {description} (errno {error}).");
+        }
+        if ((information.Mode & FileTypeMask) != FileTypeRegular)
+        {
+            handle.Dispose();
+            throw new IOException(
+                $"SharpProof {description}s must be regular files.");
+        }
+        return handle;
     }
 
     private static void ReleaseLocks(PublicationLock[] locks, int acquired)
@@ -513,26 +570,12 @@ public static partial class LinuxPathIdentity
                 throw new IOException(
                     "SharpProof publication lock has no directory.");
             Directory.CreateDirectory(directory);
-            var descriptor = NativeMethods.Open(
+            _handle = OpenRegularMetadata(
                 path,
-                OpenReadWrite | OpenCreate | OpenCloseOnExec,
-                OwnerReadWrite);
-            if (descriptor < 0)
-            {
-                throw new IOException(
-                    $"SharpProof could not open a publication lock (errno {Marshal.GetLastPInvokeError()}).");
-            }
-            _handle = new SafeFileHandle(
-                new IntPtr(descriptor),
-                ownsHandle: true);
-            var information = TryInformation(path);
-            if (!information.HasValue ||
-                (information.Value.Mode & FileTypeMask) != FileTypeRegular)
-            {
-                _handle.Dispose();
-                throw new IOException(
-                    "SharpProof publication locks must be regular files.");
-            }
+                OpenReadWrite | OpenCreate,
+                OwnerReadWrite,
+                "publication lock",
+                out _);
         }
 
         internal bool Acquire(
@@ -656,6 +699,10 @@ public static partial class LinuxPathIdentity
         [LibraryImport("libc", EntryPoint = "flock", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int Flock(int descriptor, int operation);
+
+        [LibraryImport("libc", EntryPoint = "fstat", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int FStat(int descriptor, out LinuxStat information);
 
         [LibraryImport("libc", EntryPoint = "open", SetLastError = true,
             StringMarshalling = StringMarshalling.Utf8)]
