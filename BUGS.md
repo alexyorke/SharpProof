@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 133 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 132 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 133 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-006 - Publication lock symlinks mutate an unowned target (fixed)
+
+- [x] Fixed by `cf209d40b` (`fix: reject publication metadata symlinks`).
+- Publication locks and ownership markers now open with no-follow and
+  close-on-exec semantics, validate the opened descriptor as a regular file
+  with `fstat`, and read marker bytes only through that validated descriptor.
+  Validation failures dispose the descriptor without touching symlink targets.
+- Regression-first coverage proves missing and existing lock-symlink targets
+  remain uncreated/byte-identical, exact-content marker symlinks are rejected,
+  directory locks fail, and ordinary regular locks still work. Focused Package
+  and Worker tests passed 1/1 each, full Worker passed 436/436, and Architecture
+  passed 110/110 in the canonical container. The full Package suite could not
+  run because the offline cache lacked
+  `microsoft.netframework.referenceassemblies` 1.0.3.
 
 ### SP-AUDIT-033 - Definitely null lifted operators report impossible exceptions (fixed)
 
@@ -414,34 +429,6 @@ The active backlog contains 133 root-cause rows. Stable IDs are not renumbered; 
 ## P0 active bugs
 
 Release blockers: false proofs, missing verifier obligations, destructive supported behavior, verifier bypasses, or release authority accepting invalid candidate bytes.
-
-### SP-AUDIT-006 - Publication lock symlinks mutate an unowned target (P0)
-
-- [ ] `LinuxPathIdentity.PublicationLock` calls `open(O_CREAT)` on the derived
-  lock path before checking it with `lstat`, and does not use a no-follow open.
-  A pre-existing lock-path symlink is therefore followed before SharpProof
-  rejects it as non-regular metadata.
-- Supported impact: an ordinary rejected publication configuration can create
-  or open a file outside the publication set. In the demonstrated case the
-  lock symlink pointed to a nonexistent victim; acquisition threw as intended,
-  but the victim file had already been created. This violates fail-closed
-  ownership even without concurrent path swapping.
-- Reproduction: a temporary Linux package test created
-  `result.json.sharpproof-publication-lock -> victim.txt`, acquired the result
-  publication set, and asserted rejection plus byte-preserving non-creation.
-  Rejection occurred, but `victim.txt` existed afterward.
-- Adjacent reproduction: a temporary Linux worker test created an
-  exact-content ownership-marker file outside the publication set and made
-  `result.json.sharpproof-publication-set` a symlink to it. Publication-set
-  acquisition was accepted without an exception. The derived marker path is
-  therefore both followed before lock rejection and trusted outright during
-  ownership validation.
-- Required closure: open lock metadata with no-follow semantics, validate the
-  opened descriptor with `fstat`, dispose it on every validation failure, and
-  read ownership markers only from no-follow, regular-file descriptors whose
-  identity remains stable. Add missing-target, existing-target, directory,
-  FIFO/device, marker-symlink, and normal-lock controls plus a containment
-  mutation.
 
 ### SP-AUDIT-008 - Primary-constructor callable ownership is incomplete (P0)
 
