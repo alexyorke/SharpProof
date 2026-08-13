@@ -3,6 +3,8 @@
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
   <UsingTask TaskName="SharpProof.BuildTasks.RunVerifier"
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
+  <UsingTask TaskName="SharpProof.BuildTasks.ValidatePublishedVerificationResult"
+             AssemblyFile="$(_SharpProofBuildTasksPath)" />
 
   <PropertyGroup>
     <SharpProofVerifyPolicy Condition="'$(SharpProofVerifyPolicy)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">require-proven</SharpProofVerifyPolicy>
@@ -34,7 +36,7 @@
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
     <SharpProof.BuildTasks.InvalidatePublishedResult
-        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
+        Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
         ResultPath="$(SharpProofVerifyResultFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
         RequestPath="$(SharpProofVerifyRequestFile)"
@@ -51,6 +53,8 @@
 
   <Target Name="_SharpProofVerifyCore"
           DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
+    <Error Condition="'$(_SharpProofToolsDirectory)' != '$(_SharpProofPackageToolsDirectory)' OR '$(_SharpProofWorkerPath)' != '$(_SharpProofPackageWorkerPath)' OR '$(_SharpProofLauncherPath)' != '$(_SharpProofPackageLauncherPath)' OR '$(_SharpProofWorkerProtocolPath)' != '$(_SharpProofPackageWorkerProtocolPath)' OR '$(_SharpProofBuildTasksPath)' != '$(_SharpProofPackageBuildTasksPath)'"
+           Text="SharpProof verifier runtime paths must resolve to the exact package-owned runtime closure." />
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
            Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
     <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
@@ -122,6 +126,10 @@
     <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
     <Error Condition="'$(_SharpProofVerifierExitCode)' != '0'"
            Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
+    <SharpProof.BuildTasks.ValidatePublishedVerificationResult
+        RequestPath="$(SharpProofVerifyRequestFile)"
+        ResultPath="$(SharpProofVerifyResultFile)"
+        ManifestPath="$(SharpProofCompilerManifestFile)" />
     <Message Importance="High"
              Text="SharpProof verifier result: $(SharpProofVerifyResultFile)" />
     <Message Condition="'$(SharpProofVerifySarifFile)' != ''"

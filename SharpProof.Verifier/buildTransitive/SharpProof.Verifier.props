@@ -4,7 +4,8 @@
     <_SharpProofVerifierHostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</_SharpProofVerifierHostArchitecture>
     <_SharpProofVerifierProcessArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)</_SharpProofVerifierProcessArchitecture>
     <_SharpProofVerifierHostSupported Condition="'$(MSBuildRuntimeType)' == 'Core' AND '$(SHARPPROOF_CONTAINER)' == '1' AND '$(_SharpProofVerifierHostArchitecture)' == 'X64' AND '$(_SharpProofVerifierProcessArchitecture)' == 'X64'">true</_SharpProofVerifierHostSupported>
-    <SharpProofToolsDirectory Condition="'$(SharpProofToolsDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net9'))</SharpProofToolsDirectory>
+    <_SharpProofPackageToolsDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net9'))</_SharpProofPackageToolsDirectory>
+    <SharpProofToolsDirectory Condition="'$(SharpProofToolsDirectory)' == ''">$(_SharpProofPackageToolsDirectory)</SharpProofToolsDirectory>
     <_SharpProofToolsDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofToolsDirectory)'))</_SharpProofToolsDirectory>
     <SharpProofWorkerPath Condition="'$(SharpProofWorkerPath)' == ''">$(_SharpProofToolsDirectory)/SharpProof.Worker.dll</SharpProofWorkerPath>
     <SharpProofLauncherPath Condition="'$(SharpProofLauncherPath)' == ''">$(_SharpProofToolsDirectory)/SharpProof.Worker.Launcher.dll</SharpProofLauncherPath>
@@ -12,6 +13,10 @@
     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
     <_SharpProofWorkerProtocolPath>$([System.IO.Path]::Combine('$(_SharpProofToolsDirectory)', 'SharpProof.Worker.Protocol.dll'))</_SharpProofWorkerProtocolPath>
     <_SharpProofBuildTasksPath>$([System.IO.Path]::Combine('$(_SharpProofToolsDirectory)', 'SharpProof.BuildTasks.dll'))</_SharpProofBuildTasksPath>
+    <_SharpProofPackageWorkerPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.dll'))</_SharpProofPackageWorkerPath>
+    <_SharpProofPackageLauncherPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.Launcher.dll'))</_SharpProofPackageLauncherPath>
+    <_SharpProofPackageWorkerProtocolPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.Worker.Protocol.dll'))</_SharpProofPackageWorkerProtocolPath>
+    <_SharpProofPackageBuildTasksPath>$([System.IO.Path]::Combine('$(_SharpProofPackageToolsDirectory)', 'SharpProof.BuildTasks.dll'))</_SharpProofPackageBuildTasksPath>
     <SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>
     <SharpProofVerifyMethodRlimit Condition="'$(SharpProofVerifyMethodRlimit)' == ''">20000000</SharpProofVerifyMethodRlimit>
     <SharpProofVerifyMethodWallTimeMilliseconds Condition="'$(SharpProofVerifyMethodWallTimeMilliseconds)' == ''">10000</SharpProofVerifyMethodWallTimeMilliseconds>

@@ -187,6 +187,50 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(File.Exists(project.ResultPath), Is.False);
     }
 
+    [TestCase(false, "advisory")]
+    [TestCase(true, "off")]
+    public async Task DisabledVerificationInvalidatesPriorPublishedResult(
+        bool verify,
+        string profile)
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var verified = await project.BuildAsync(verify: true);
+        Assert.That(verified.ExitCode, Is.Zero, verified.Output);
+        Assert.That(File.Exists(project.ResultPath), Is.True);
+
+        var disabled = await project.BuildAsync(
+            verify,
+            ("SharpProofProfile", profile));
+
+        Assert.That(disabled.ExitCode, Is.Zero, disabled.Output);
+        Assert.That(File.Exists(project.ResultPath), Is.False);
+    }
+
+    [TestCase("SharpProofToolsDirectory")]
+    [TestCase("SharpProofWorkerPath")]
+    [TestCase("SharpProofLauncherPath")]
+    public async Task RuntimeClosureOverridesAreRejected(string property)
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var foreign = Path.Combine(
+            Path.GetDirectoryName(project.ProjectPath)!,
+            "foreign-runtime");
+        Directory.CreateDirectory(foreign);
+        var value = property == "SharpProofToolsDirectory"
+            ? foreign
+            : project.CompilerManifestPath;
+
+        var build = await project.BuildAsync(
+            verify: true,
+            (property, value));
+
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("exact package-owned runtime closure"));
+        Assert.That(File.Exists(project.ResultPath), Is.False);
+    }
+
     [Test]
     public async Task NonBuildingEvaluationPreservesPublishedVerificationFiles()
     {
@@ -791,7 +835,8 @@ public sealed class WorkerMsBuildIntegrationTests
 
         var build = await project.BuildAsync(
             verify: true,
-            ("SharpProofWorkerPath", resultlessWorker));
+            ("SharpProofWorkerPath", resultlessWorker),
+            ("_SharpProofTestWorkerPath", resultlessWorker));
 
         Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
         Assert.That(File.Exists(project.ResultPath), Is.True, build.Output);
@@ -1080,6 +1125,7 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofCompilerManifestFile",
                 malformedManifest),
             ("SharpProofWorkerPath", malformedWorker),
+            ("_SharpProofTestWorkerPath", malformedWorker),
             ("SharpProofVerifySarifFile", sarifPath));
 
         Assert.That(malformed.ExitCode, Is.Not.Zero);
@@ -1375,6 +1421,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var run = await project.BuildAsync(
             verify: true,
             ("SharpProofWorkerPath", worker),
+            ("_SharpProofTestWorkerPath", worker),
             ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
             ("SharpProofVerifyProjectWallTimeMilliseconds", "100"),
             ("SharpProofVerifyTerminationGraceMilliseconds", "1000"));
@@ -1553,6 +1600,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var failed = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofWorkerPath", collisionWorker),
+            ("_SharpProofTestWorkerPath", collisionWorker),
             ("SharpProofVerifyResultFile", collisionCompanion),
             ("_SharpProofSkipTestInvalidation", "true"));
 
@@ -1600,6 +1648,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var failed = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofWorkerPath", collisionWorker),
+            ("_SharpProofTestWorkerPath", collisionWorker),
             ("SharpProofVerifyResultFile", symbolicAlias));
 
         using (Assert.EnterMultipleScope())
@@ -1656,6 +1705,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var failed = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofWorkerPath", collisionWorker),
+            ("_SharpProofTestWorkerPath", collisionWorker),
             ("SharpProofVerifyResultFile", hardLink));
 
         using (Assert.EnterMultipleScope())
@@ -1921,6 +1971,7 @@ public sealed class WorkerMsBuildIntegrationTests
         var failed = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofWorkerPath", collisionWorker),
+            ("_SharpProofTestWorkerPath", collisionWorker),
             ("SharpProofVerifyResultFile", collisionAsset));
 
         using (Assert.EnterMultipleScope())
@@ -1958,6 +2009,7 @@ public sealed class WorkerMsBuildIntegrationTests
             var failed = await project.RunVerificationTargetAsync(
                 ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
                 ("SharpProofWorkerPath", worker),
+                ("_SharpProofTestWorkerPath", worker),
                 ("SharpProofVerifyResultFile", result));
 
             using (Assert.EnterMultipleScope())
@@ -3386,6 +3438,11 @@ public sealed class WorkerMsBuildIntegrationTests
                     <_SharpProofLauncherPath>$([System.IO.Path]::GetFullPath('$(SharpProofLauncherPath)'))</_SharpProofLauncherPath>
                     <_SharpProofWorkerProtocolPath>{protocol}</_SharpProofWorkerProtocolPath>
                     <_SharpProofBuildTasksPath>{buildTasks}</_SharpProofBuildTasksPath>
+                    <_SharpProofPackageWorkerPath>{worker}</_SharpProofPackageWorkerPath>
+                    <_SharpProofPackageWorkerPath Condition="'$(_SharpProofTestWorkerPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestWorkerPath)'))</_SharpProofPackageWorkerPath>
+                    <_SharpProofPackageLauncherPath>{launcher}</_SharpProofPackageLauncherPath>
+                    <_SharpProofPackageWorkerProtocolPath>{protocol}</_SharpProofPackageWorkerProtocolPath>
+                    <_SharpProofPackageBuildTasksPath>{buildTasks}</_SharpProofPackageBuildTasksPath>
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="SharpProof.Attributes">

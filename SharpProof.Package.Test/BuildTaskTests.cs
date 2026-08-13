@@ -3,6 +3,8 @@ using Microsoft.Build.Utilities;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using System.Security.Cryptography;
+using System.Text.Json;
 using SharpProof.BuildTasks;
 using SharpProof.Host;
 using SharpProof.Worker;
@@ -13,6 +15,64 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
+    [TestCase("missing")]
+    [TestCase("malformed")]
+    [TestCase("stale-request")]
+    [Platform("Linux")]
+    public void PublishedResultValidatorRejectsAbsentOrStaleEvidence(string kind)
+    {
+        var directory = Directory.CreateTempSubdirectory("sharpproof-result-binding-");
+        try
+        {
+            var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
+            var request = Path.Combine(directory.FullName, "request.json");
+            var result = Path.Combine(directory.FullName, "result.json");
+            File.WriteAllText(manifest, "{}");
+            var manifestHash = Convert.ToHexString(
+                SHA256.HashData(File.ReadAllBytes(manifest)));
+            var requestJson = JsonSerializer.Serialize(new
+            {
+                protocolVersion = "11",
+                compilerManifest = new { path = manifest, sha256 = manifestHash },
+                budgets = new { },
+                cache = new { },
+                verifyPolicy = "Advisory",
+                assumptionPolicy = "Allow"
+            });
+            File.WriteAllText(request, requestJson);
+            if (kind == "malformed")
+            {
+                File.WriteAllText(result, "not json");
+            }
+            else if (kind == "stale-request")
+            {
+                File.WriteAllText(result, JsonSerializer.Serialize(new
+                {
+                    protocolVersion = "11",
+                    requestHash = new string('0', 64),
+                    inputHash = new string('1', 64),
+                    runStatus = "Complete"
+                }));
+            }
+
+            var engine = new RecordingBuildEngine();
+            var task = new ValidatePublishedVerificationResult
+            {
+                BuildEngine = engine,
+                RequestPath = request,
+                ResultPath = result,
+                ManifestPath = manifest
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            Assert.That(engine.Errors, Is.Not.Empty);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Test]
     public void CanceledVerifierTaskDoesNotLaunchAProcess()
     {
