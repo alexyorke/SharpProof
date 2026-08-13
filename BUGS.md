@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 90 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 89 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 90 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-138 - Compiler-elided invocations still receive SP0027 (fixed)
+
+- [x] Fixed by `56dc75db2` (`fix: skip compiler-elided invocations`).
+- Effects and Requires analysis now share one compiler-emission policy for
+  source/metadata Conditional methods and unimplemented partial methods.
+  Requires discovery prunes an elided invocation's entire subtree, including
+  its arguments, and analyzer declaration processing skips non-executable
+  partial declarations.
+- Regression-first tests cover source Conditional methods with multiple symbols,
+  metadata Debug.Assert with and without DEBUG, missing and implemented partial
+  methods, exact SP0027 counts, and absence of spurious SP0047. Focused tests
+  passed 6/6; final Analyzer passed 299/299, Architecture 178/178, and
+  `git diff --check` passed.
 
 ### SP-AUDIT-136 - Packaged MSBuild configuration lacks one normalized authority (fixed)
 
@@ -1313,21 +1327,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-138 - Compiler-elided invocations still receive SP0027 (P1)
-
-- [ ] Requires call-site discovery analyzes every `IInvocationOperation` without
-  checking whether the compiler emits it. Undefined `[Conditional]` calls and
-  calls to unimplemented partial methods are therefore treated as executing.
-- Supported impact: `Positive(-1)` emitted SP0027 both when its conditional
-  symbol was undefined and when defined; an erased unimplemented-partial call
-  emitted SP0027 plus SP0047. Defined/implemented controls correctly emitted
-  SP0027.
-- Reproduction: the analyzer auditor executed both source matrices against the
-  current engine.
-- Required closure: share the exact invocation-emission policy already used by
-  Effects. Cover conditional metadata/source methods, multiple symbols, erased
-  arguments, missing/implemented partial methods, and admission-removal mutation.
 
 ### SP-AUDIT-159 - The nightly fuzz campaign is disconnected (P1)
 
