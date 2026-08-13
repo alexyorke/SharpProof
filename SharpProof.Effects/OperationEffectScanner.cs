@@ -17,6 +17,7 @@ internal sealed class OperationEffectScanner
     private readonly IMethodSymbol _method;
     private readonly INamedTypeSymbol? _monitorType;
     private readonly EffectAnalysisSession _session;
+    private readonly bool _useAbstractReachability;
     private IOperation? _directOperation;
     private int _scanDepth;
     private int _nestingDepth;
@@ -45,6 +46,12 @@ internal sealed class OperationEffectScanner
         _directSyntax = GetDirectSyntax(root.Syntax);
         _exceptionType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         _monitorType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Monitor);
+        // ManagedAbstractFlow currently follows regular CFG edges. Its facts
+        // remain useful in a try body, but absence of a fact cannot prove an
+        // operation unreachable after a normally completing handler. The
+        // enclosing Roslyn CFG still supplies the outer IsReachable gate.
+        _useAbstractReachability = !root.DescendantsAndSelf().Any(
+            static operation => operation is ITryOperation);
         BuildLocalRegions(root);
     }
 
@@ -82,9 +89,7 @@ internal sealed class OperationEffectScanner
                          operation is ILockOperation or IThrowOperation &&
                          !IsInsideNestedCallable(operation, root)))
         {
-            if (_abstractFlow != null &&
-                !_abstractFlow.IsReachable(operation) &&
-                !IsInsideExceptionHandler(operation))
+            if (!IsReachable(operation))
             {
                 continue;
             }
@@ -1155,6 +1160,7 @@ internal sealed class OperationEffectScanner
     internal bool IsReachable(IOperation operation)
     {
         return _abstractFlow == null ||
+        !_useAbstractReachability ||
         _abstractFlow.IsReachable(operation) ||
         IsInsideExceptionHandler(operation);
     }

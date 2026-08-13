@@ -1127,6 +1127,45 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task PostCatchExecutionCannotHideAReachablePurityViolation()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int State;
+
+                [EnforcePure]
+                public static void Run() {
+                    try {
+                        throw new InvalidOperationException();
+                    }
+                    catch (InvalidOperationException) {
+                    }
+
+                    State++;
+                }
+            }
+            """,
+            "effects",
+            ["SP0002"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0002"]));
+            Assert.That(
+                factory.Outcomes["Run"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task FreshAggregateBorrowedContentCannotProvePurity()
     {
         var factory = new RecordingSessionFactory();

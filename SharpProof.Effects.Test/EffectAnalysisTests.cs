@@ -3000,6 +3000,64 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void NormallyCompletingCatchFlowsIntoPostTryEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                private static int s_state;
+
+                public static int HandledThrow() {
+                    var divisor = 1;
+                    try {
+                        throw new InvalidOperationException();
+                    }
+                    catch (InvalidOperationException) {
+                        divisor = 0;
+                    }
+
+                    s_state++;
+                    return 1 / divisor;
+                }
+
+                public static int NoThrowControl() {
+                    var divisor = 1;
+                    try {
+                        divisor = 1;
+                    }
+                    catch (InvalidOperationException) {
+                        divisor = 0;
+                    }
+
+                    return 1 / divisor;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var handled = session.Analyze(Method(compilation, "HandledThrow"));
+        var control = session.Analyze(Method(compilation, "NoThrowControl"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                handled.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            AssertContainsThrows(
+                handled.Summary,
+                "System.DivideByZeroException");
+            Assert.That(
+                EffectContractMappings.IsObservablePure(handled.Summary),
+                Is.False);
+            Assert.That(
+                handled.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(control.Summary.Throws.IsEmpty, Is.True);
+        }
+    }
+
+    [Test]
     public void ExceptionFlowReportsOnlyExceptionsThatEscape()
     {
         var compilation = EffectTestHost.CreateCompilation(
