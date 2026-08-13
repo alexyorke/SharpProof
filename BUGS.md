@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 93 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 92 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 93 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-114 - ContractFor reports foreign-compilation source locations (fixed)
+
+- [x] Fixed by `d97f35ec7` (`fix: bind ContractFor diagnostic locations`).
+- ContractFor validation now threads the active Compilation through every symbol
+  and attribute location decision and accepts a source location only when its
+  syntax tree belongs to that compilation. CompilationReference and metadata
+  targets fall back to the current companion attribute; local targets retain
+  their target-member location.
+- Regression-first tests cover foreign source, metadata, and local source
+  targets with exact SPCF0004 IDs, locations, and counts, plus a trusted mutation
+  that removes active-compilation ownership. Focused tests passed 3/3,
+  ContractFor Generator 54/54, Analyzer 293/293, Architecture 178/178, and
+  `git diff --check` passed.
 
 ### SP-AUDIT-112 - Valid long filenames overflow publication metadata names (fixed)
 
@@ -1271,21 +1285,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-114 - ContractFor reports foreign-compilation source locations (P1)
-
-- [ ] ContractFor validation selects any target location marked `IsInSource`,
-  even when that syntax tree belongs to a `CompilationReference`, and passes
-  the foreign location to the active compilation's diagnostic reporter.
-- Supported impact: an empty companion for a referenced source interface
-  produced only Roslyn warning `CS8785` because intended error `SPCF0004` used
-  a location outside the compilation. The malformed companion therefore
-  escaped the error-level ContractFor gate.
-- Reproduction: the read-only analyzer auditor used the existing compilation-
-  reference harness and received `CS8785` instead of `SPCF0004`.
-- Required closure: select a source location only when its syntax tree belongs
-  to the active compilation; otherwise report at the current companion
-  attribute. Add reference/source/metadata targets and mutation controls.
 
 ### SP-AUDIT-124 - One SARIF path breaks multitarget verification (P1)
 
