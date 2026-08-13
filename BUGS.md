@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 123 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 122 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 123 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-131 - Public package metadata is not contract-validated (fixed)
+
+- [x] Fixed by `00429629f` (`fix: validate public package metadata`).
+- The authoritative first-party package contract now owns exact case-sensitive
+  `authors`, `projectUrl`, `description`, and `tags` values for all three
+  packages. The shared nuspec validator requires each main-package field
+  exactly once as attribute-free nonempty text and permits symbol-package
+  omission only for canonical NuGet output; any present symbol value must
+  match. Every release authority already invokes this shared validator.
+- Regression-first fixtures cover missing, changed, duplicated, recased, and
+  alternate XML forms for every field and all package identities, plus
+  symbol/main mismatches. Focused tests passed 47/47, Architecture 171/171,
+  and the release-evidence and offline-plan package controls both passed.
 
 ### SP-AUDIT-094 - Package licenses are not bound to release evidence (fixed)
 
@@ -803,22 +817,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   fingerprint, round-trip, and validation-removal mutation controls.
 - Consolidated cases: SP-AUDIT-227.
 - Unified closure: Reject ill-formed UTF-16 at the earliest shared boundary or use one injective code-unit representation across hashing, JSON, interpretation, and SMT.
-
-### SP-AUDIT-131 - Public package metadata is not contract-validated (P0)
-
-- [ ] Package and release validators authenticate ID, version, repository,
-  dependencies, and layout but ignore `authors`, `projectUrl`, `description`,
-  and `tags`. Those fields are duplicated across nuspecs despite checked-in
-  release authorities.
-- Certifier impact: replacing them with a fabricated publisher, unrelated URL,
-  Windows-only product description, and unrelated tags left every field consumed
-  by the current evidence, planning, and exact-package predicates unchanged.
-- Reproduction: the read-only release auditor applied that in-memory nuspec
-  mutation and compared the complete consumed projections.
-- Required closure: establish one package-metadata catalog and require exact
-  values during pack, artifact qualification, final validation, and planning.
-  Add every field, three packages, conflicting support claims, canonical output,
-  and individual-field mutation controls.
 
 ### SP-AUDIT-173 - Call instantiation is not bound to parameter order and free-variable roles (P0)
 
