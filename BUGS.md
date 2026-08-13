@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 104 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 103 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,23 @@ The active backlog contains 104 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-043 - Worker result state is not an exact producer projection (fixed)
+
+- [x] Fixed by `9b4096793` (`fix: validate exact worker result state`).
+- Request-bound validation now derives exact claim-kind reason tuples, callable
+  coverage, error-code failure category, failure reason, and run status from the
+  validated evidence and requires equality. Producers emit explicit pre-manifest
+  timeout/cancellation identities, while semantic backend failures remain
+  distinct from thrown infrastructure failures.
+- Regression-first tests cover false timeout/cancel/failure, fabricated callable
+  coverage, cross-kind claim reasons, compiler/backend/containment/malformed
+  error swaps, genuine interruption/failure, mixed and zero-claim controls, and
+  producer parity. Projection tests passed 26/26, Protocol 55/55, Worker Program
+  7/7, Architecture 176/176, protocol generation verification, the container
+  contract, and `git diff --check`. Full Worker was 459/460 before the final
+  producer-parity correction; the sole failing scenario and its matrix passed
+  targeted validation afterward.
 
 ### SP-AUDIT-042 - Partial callable normalization lacks one executable owner (fixed)
 
@@ -1041,30 +1058,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   receivers, conditional access, reduced extensions, and a mutation probe.
 - Consolidated cases: SP-AUDIT-030.
 - Unified closure: Model source-order normal completion once; join later receiver, argument, conditional-access, lock, constructor, and initializer effects only when prior evaluation may complete.
-
-### SP-AUDIT-043 - Worker result state is not an exact producer projection (P1)
-
-- [ ] `WorkerProtocolJson.ValidateRun` enforces only one direction of the
-  status/evidence relation: timeout or cancellation evidence requires a
-  compatible status. It does not require a `TimedOut` or `Canceled` status to
-  have any corresponding callable or claim evidence.
-- Supported impact: a request-, input-, manifest-, budget-, result-set-, and
-  summary-bound response can report that verification timed out or was canceled
-  even when every callable is complete and every claim is proven. Consumers
-  therefore cannot trust the top-level completion classification they use for
-  build policy and reporting.
-- Reproduction: a temporary canonical-container protocol test started from the
-  valid all-proven response fixture, changed only `RunStatus` to `TimedOut` and
-  then `Canceled`, and passed each through `ValidateForRequest`. Both responses
-  remained valid. The temporary test was removed.
-- Required closure: derive the exact admissible run status and failure reason
-  from validated protocol errors, callable coverage/reasons, and claim
-  outcomes/reasons, then require equality rather than one-way implications.
-  Add all-proven timeout/cancel/failure, genuine timeout/cancel, mixed fatal,
-  empty-manifest, protocol-error, cache-hit, valid complete, and reverting
-  mutation cases.
-- Consolidated cases: SP-AUDIT-218, SP-AUDIT-219, SP-AUDIT-237.
-- Unified closure: Generate one producer/validator state projection across claim tuples, certainty/vacuity, callable coverage, cache state, errors, failure reason, and run status.
 
 ### SP-AUDIT-051 - Nested catch rethrows fabricate an outer exception (P1)
 
