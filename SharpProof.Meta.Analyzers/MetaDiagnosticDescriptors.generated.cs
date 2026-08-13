@@ -26,7 +26,7 @@ internal static class MetaDiagnosticDescriptors
     internal static readonly DiagnosticDescriptor MutableStaticState = new(
         id: "SPMETA002",
         title: "Mutable static state",
-        messageFormat: "Mutable static field '{0}' is forbidden in analyzer, frontend, and verifier layers",
+        messageFormat: "Mutable static storage '{0}' is forbidden in analyzer, frontend, and verifier layers",
         category: "SharpProof.Soundness",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

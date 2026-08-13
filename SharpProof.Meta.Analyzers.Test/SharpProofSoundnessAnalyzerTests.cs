@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -314,6 +315,77 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         var diagnostics = await Analyze(source);
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsMutableStaticPropertyAndEventStorage()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Analyzer;
+            sealed class C {
+                internal static int State { get; set; }
+                internal static event Action? Changed;
+                internal static void Raise() => Changed?.Invoke();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        var mutableState = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SPMETA002")
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(mutableState, Has.Length.EqualTo(2));
+            Assert.That(
+                mutableState.Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contains("State"));
+            Assert.That(
+                mutableState.Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contains("Changed"));
+        }
+    }
+
+    [Test]
+    public async Task AllowsStaticImmutableAndNonStorageMemberForms()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Analyzer {
+                sealed class Critical {
+                    internal static int Immutable { get; } = 1;
+                    internal int InstanceState { get; set; }
+                    internal event Action? InstanceChanged;
+                    internal static int Computed {
+                        get => 1;
+                        set { }
+                    }
+                    internal static event Action? CustomChanged {
+                        add { }
+                        remove { }
+                    }
+                    internal void Raise() => InstanceChanged?.Invoke();
+                }
+            }
+            namespace SharpProof.Effects {
+                sealed class Noncritical {
+                    internal static int State { get; set; }
+                    internal static event Action? Changed;
+                    internal static void Raise() => Changed?.Invoke();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA002"));
     }
 
     [Test]

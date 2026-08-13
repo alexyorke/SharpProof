@@ -69,6 +69,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
             startContext.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
+            startContext.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
+            startContext.RegisterSymbolAction(AnalyzeEvent, SymbolKind.Event);
             startContext.RegisterSyntaxNodeAction(
                 c => CancellationBoundaryAnalyzer.AnalyzeCatchClause(c, symbols),
                 SyntaxKind.CatchClause);
@@ -312,7 +314,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (field.IsStatic && !field.IsReadOnly && IsCriticalStateNamespace(field.ContainingNamespace))
+        if (!field.IsReadOnly && IsForbiddenMutableStaticStorage(field))
         {
             Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
         }
@@ -322,6 +324,66 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             Report(context, MetaDiagnosticDescriptors.StringFieldInIr, field.Locations.FirstOrDefault(), field.Name);
         }
+    }
+
+    private static void AnalyzeProperty(SymbolAnalysisContext context)
+    {
+        var property = (IPropertySymbol)context.Symbol;
+        if (property.SetMethod != null &&
+            IsForbiddenMutableStaticStorage(property) &&
+            IsAutoProperty(property, context.CancellationToken))
+        {
+            Report(
+                context,
+                MetaDiagnosticDescriptors.MutableStaticState,
+                property.Locations.FirstOrDefault(),
+                property.Name);
+        }
+    }
+
+    private static void AnalyzeEvent(SymbolAnalysisContext context)
+    {
+        var @event = (IEventSymbol)context.Symbol;
+        if (IsForbiddenMutableStaticStorage(@event) &&
+            IsFieldLikeEvent(@event, context.CancellationToken))
+        {
+            Report(
+                context,
+                MetaDiagnosticDescriptors.MutableStaticState,
+                @event.Locations.FirstOrDefault(),
+                @event.Name);
+        }
+    }
+
+    private static bool IsForbiddenMutableStaticStorage(ISymbol symbol)
+    {
+        return symbol.IsStatic &&
+            IsCriticalStateNamespace(symbol.ContainingNamespace);
+    }
+
+    private static bool IsAutoProperty(
+        IPropertySymbol property,
+        CancellationToken cancellationToken)
+    {
+        return property.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax
+            {
+                ExpressionBody: null,
+                AccessorList.Accessors: var accessors
+            } &&
+            accessors.All(static accessor =>
+                accessor.Body == null && accessor.ExpressionBody == null));
+    }
+
+    private static bool IsFieldLikeEvent(
+        IEventSymbol @event,
+        CancellationToken cancellationToken)
+    {
+        return @event.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax
+            {
+                Parent.Parent: EventFieldDeclarationSyntax
+            });
     }
 
     private static bool IsCriticalStateNamespace(INamespaceSymbol? value)
