@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 94 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 93 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 94 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-112 - Valid long filenames overflow publication metadata names (fixed)
+
+- [x] Fixed by `572cdc7ee` (`fix: bound publication metadata names`).
+- Publication locks and ownership markers now use fixed-size SHA-256 identities
+  of canonical paths under a private sibling `.sharpproof-publication` directory.
+  The directory must be owned by the effective user and inaccessible to group
+  and other users; legacy suffixes and the new namespace remain reserved.
+- Regression-first tests cover all four publication members at Linux NAME_MAX,
+  multibyte UTF-8 boundaries, stable/distinct and cross-directory identities,
+  private mode, namespace collisions, unowned directories, and existing
+  overlap/rollback/symlink behavior. The baseline failed with errno 36; final
+  publication tests passed 20/20, package lock tests 2/2, Architecture 178/178,
+  the full container build with zero warnings/errors, and `git diff --check`.
 
 ### SP-AUDIT-105 - Semantic cache policy misses aliases and indexer writes (fixed)
 
@@ -1257,22 +1271,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-112 - Valid long filenames overflow publication metadata names (P1)
-
-- [ ] Publication lock and marker paths append 27- or 28-character suffixes
-  directly to the user output basename. A valid path component near Linux
-  `NAME_MAX` therefore becomes an invalid SharpProof metadata component.
-- Supported impact: a valid absent 228-byte ASCII output basename failed before
-  verification with `could not open a publication lock (errno 36)` solely
-  because the derived lock filename exceeded 255 bytes.
-- Reproduction: a temporary Linux host test first created and deleted the
-  228-byte destination successfully, then attempted to acquire its publication
-  set; acquisition threw `IOException`. The test was removed.
-- Required closure: use fixed-size hash-derived metadata basenames in an owned
-  directory rather than suffixing arbitrary user names. Add exact NAME_MAX
-  boundaries, multibyte Unicode byte counts, all four members, collision, stable
-  identity, cleanup, and compatibility controls.
 
 ### SP-AUDIT-114 - ContractFor reports foreign-compilation source locations (P1)
 
