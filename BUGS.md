@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 154 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 153 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 154 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-025 - Cancellation policy certifies non-equivalent control flow (fixed)
+
+- [x] Fixed by `5a5379e7a` (`fix: bind cancellation response shape`).
+- Cancellation certification now requires the exact awaited local `Respond`
+  invocation, an exact `WorkerResultAssembler.Create` response argument, and
+  the `runStatus` parameter bound directly to `WorkerRunStatus.Canceled`.
+- Regressions reject conditional returns, conditional response creation,
+  conditional status expressions, alternate overloads, and wrapper/decoy
+  calls while retaining the canonical multi-argument and `ConfigureAwait`
+  shape. The full canonical-container Meta.Analyzers suite passed 70/70.
 
 ### SP-AUDIT-109 - Value-type instance calls omit type initialization (fixed)
 
@@ -350,31 +361,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   validation. Add renamed-foreign-DLL, unexpected SharpProof DLL,
   altered-first-party DLL, altered-Z3, duplicate-entry, and exact-closure
   fixtures.
-
-### SP-AUDIT-025 - Cancellation policy certifies non-equivalent control flow (P0)
-
-- [ ] `CancellationBoundaryAnalyzer.ReifiesWorkerProgramCancellation` accepts
-  a Worker `Main` catch when the return expression contains a local `Respond`
-  call, any `WorkerResultAssembler.Create` call, and any descendant reference
-  to `WorkerRunStatus.Canceled`. It does not prove that the canceled value is
-  the `runStatus` argument of the response passed to `Respond`.
-- Certifier impact: a trusted-boundary mutation can translate cancellation to
-  `Failed` (or another non-canceled result), place an unrelated/dead
-  `WorkerRunStatus.Canceled` comparison elsewhere in the return expression,
-  and still pass SPMETA003. The cancellation policy can therefore certify the
-  exact swallowing behavior it is intended to prohibit.
-- Reproduction: a temporary Meta.Analyzers regression returned a conditional
-  whose true branch was `Respond(Create(WorkerRunStatus.Failed))` while its
-  constant condition mentioned `Canceled` twice. It expected one SPMETA003 and
-  received zero.
-- Required closure: validate one exact operation tree: the sole returned value
-  must be the local `Respond` invocation, its response argument must be the
-  exact `WorkerResultAssembler.Create` invocation, and that invocation's
-  `runStatus` parameter must receive the exact `Canceled` enum field. Reject
-  conditionals, decoys, alternate overloads, and detached calls; add mutations
-  replacing, relocating, or conditionally wrapping the status.
-- Consolidated cases: SP-AUDIT-059, SP-AUDIT-096, SP-AUDIT-104.
-- Unified closure: Prove the complete cancellation catch and control-flow shape, including exact token, argument evaluation, all exits, enclosing finally blocks, and exact canceled response fields.
 
 ### SP-AUDIT-028 - Qualification evidence blesses arbitrary package files (P0)
 
