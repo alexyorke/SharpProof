@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 152 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 151 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 152 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-175 - Changed-TCB path identity is not exact on Linux (fixed)
+
+- [x] Fixed by `55f014b7a` (`fix: preserve ordinal coverage paths`).
+- Coverage source maps, TCB sets, changed files, and changed-line maps now use
+  ordinal Linux path identity. Git paths are decoded from NUL-delimited output,
+  and hunk parsing operates on each decoded path independently.
+- Regressions reproduce case-distinct path collapse and a quoted Unicode/tab
+  path false pass, while retaining ordinary and Windows-separator controls.
+  The focused canonical-container coverage-script suite passed 6/6.
 
 ### SP-AUDIT-001 - Coalesce assignment omits observable writes (fixed)
 
@@ -876,19 +886,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   and binding-removal mutation controls.
 - Consolidated cases: SP-AUDIT-100, SP-AUDIT-208.
 - Unified closure: Order actuals by Roslyn parameter ordinal and authenticate receiver, ordered arguments, result, existential roles, and relation during hydration.
-
-### SP-AUDIT-175 - Changed-TCB path identity is not exact on Linux (P0)
-
-- [ ] Canonical TCB paths are case-sensitive, but changed-TCB coverage identity
-  uses case-insensitive comparison and max-hit merging.
-- Certifier impact: two authentic Linux files whose paths differ only by case
-  can collapse into one coverage record, allowing hits from one trusted file to
-  certify uncovered changed lines in the other.
-- Required closure: use canonical-container ordinal path identity throughout
-  coverage ingestion, unions, and reporting. Add case-twin source/report,
-  exact-hit, missing-file, Windows-produced-report, and comparer-mutation tests.
-- Consolidated cases: SP-AUDIT-191.
-- Unified closure: Use NUL-delimited decoded Git paths and ordinal Linux identity for coverage and TCB comparisons.
 
 ### SP-AUDIT-178 - Batched baselines can falsely certify mutation kills (P0)
 
