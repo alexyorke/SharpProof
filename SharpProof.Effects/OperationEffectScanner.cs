@@ -523,11 +523,12 @@ internal sealed class OperationEffectScanner
         return EffectSummaryOperations.Join(
             Scan(binary.LeftOperand),
             Scan(binary.RightOperand),
-            binary.OperatorKind == BinaryOperatorKind.Add &&
-            binary.Type?.SpecialType == SpecialType.System_String &&
-            !binary.ConstantValue.HasValue
-                ? EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)
-                : EffectSummary.Empty,
+            StringConcatenationEffectResolver.Resolve(
+                binary,
+                _session.Compilation,
+                _callResolver,
+                _abstractFlow,
+                ClassifyRegion),
             IntegralDivisionExceptions(binary.OperatorKind, binary.Type,
                 binary.LeftOperand, binary.RightOperand, binary),
             CheckedOverflow(binary.IsChecked, binary),

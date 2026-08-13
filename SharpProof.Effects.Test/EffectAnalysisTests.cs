@@ -101,6 +101,177 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void StringConcatenationIncludesExactSourceToStringEffects()
+    {
+        var result = Analyze(
+            """
+            using System;
+
+            public sealed class FormattedValue {
+                private static volatile int s_state;
+
+                public override string ToString() {
+                    s_state = 1;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                public static string Format(FormattedValue value) =>
+                    "value=" + value;
+            }
+            """,
+            "Sample",
+            "Format");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Capabilities.Contains(
+                    EffectCapabilityKind.Synchronization),
+                Is.True);
+            AssertContainsThrows(
+                result.Summary,
+                "System.InvalidOperationException");
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(result.Projection.IsComplete, Is.True);
+        }
+    }
+
+    [Test]
+    public void StringConcatenationKeepsExactNoFormattingControls()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class NoOpValue {
+                public override string ToString() => "";
+            }
+
+            public readonly struct NoOpStruct {
+                public override string ToString() => "";
+            }
+
+            public static class Sample {
+                public static string StringOperand(string value) =>
+                    "value=" + value;
+                public static string NullOperand() =>
+                    "value=" + (object?)null;
+                public static string ReferenceNoOp(NoOpValue value) =>
+                    "value=" + value;
+                public static string ValueNoOp(NoOpStruct value) =>
+                    "value=" + value;
+                public static string Constant() => "value=" + "known";
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "StringOperand",
+                     "NullOperand",
+                     "ReferenceNoOp",
+                     "ValueNoOp"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Summary.Writes.IsEmpty, Is.True, methodName);
+                Assert.That(result.Summary.Capabilities.IsEmpty, Is.True, methodName);
+                Assert.That(result.Summary.Throws.IsEmpty, Is.True, methodName);
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+                Assert.That(result.Projection.IsComplete, Is.True, methodName);
+            }
+        }
+
+        Assert.That(
+            session.Analyze(Method(compilation, "ReferenceNoOp"))
+                .Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(
+            session.Analyze(Method(compilation, "ReferenceNoOp"))
+                .Summary.Uncertainty & EffectUncertainty.DirectCall,
+            Is.EqualTo(EffectUncertainty.DirectCall));
+        Assert.That(
+            session.Analyze(Method(compilation, "ValueNoOp"))
+                .Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(
+            session.Analyze(Method(compilation, "ValueNoOp"))
+                .Summary.Uncertainty & EffectUncertainty.DirectCall,
+            Is.EqualTo(EffectUncertainty.DirectCall));
+        Assert.That(
+            session.Analyze(Method(compilation, "Constant"))
+                .Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.None));
+    }
+
+    [Test]
+    public void StringConcatenationFailsClosedForUnresolvedFormatting()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public class OpenValue {
+                public override string ToString() => "";
+            }
+
+            public static class Sample {
+                public static string Open(OpenValue value) =>
+                    "value=" + value;
+                public static string Primitive(int value) =>
+                    "value=" + value;
+                public static string Nullable(int? value) =>
+                    "value=" + value;
+                public static string Interpolated(OpenValue value) =>
+                    $"{value}";
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var open = session.Analyze(Method(compilation, "Open"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(open.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                open.Summary.Uncertainty & EffectUncertainty.Dispatch,
+                Is.EqualTo(EffectUncertainty.Dispatch));
+            Assert.That(open.Projection.IsComplete, Is.False);
+
+            foreach (var methodName in new[] { "Primitive", "Nullable" })
+            {
+                var result = session.Analyze(Method(compilation, methodName));
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Incomplete),
+                    methodName);
+                Assert.That(
+                    result.Summary.Uncertainty &
+                        EffectUncertainty.UnmodeledCall,
+                    Is.EqualTo(EffectUncertainty.UnmodeledCall),
+                    methodName);
+                Assert.That(result.Projection.IsComplete, Is.False, methodName);
+            }
+
+            var interpolated = session.Analyze(
+                Method(compilation, "Interpolated"));
+            Assert.That(interpolated.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(interpolated.Projection.IsComplete, Is.False);
+        }
+    }
+
+    [Test]
     public void ConversionEffectsPreventFalseZeroAllocationAndDoesNotThrowProofs()
     {
         var compilation = EffectTestHost.CreateCompilation(
