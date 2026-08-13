@@ -52,21 +52,25 @@ function New-TestParts {
         [string]$Outcome,
         [string]$Message,
         [string]$Method = 'ExpectedTest',
+        [string]$DisplayName,
         [string]$Class = 'SharpProof.Test.EvidenceTests',
         [string]$TestId = 'test-1',
         [string]$ExecutionId = 'execution-1'
     )
 
+    if ([string]::IsNullOrEmpty($DisplayName)) {
+        $DisplayName = $Method
+    }
     $escaped = [Security.SecurityElement]::Escape($Message)
     $output = if ($Outcome -eq 'Failed') {
         "<Output><ErrorInfo><Message>$escaped</Message><StackTrace>irrelevant Assert.That(text)</StackTrace></ErrorInfo></Output>"
     }
     else { '' }
     return [pscustomobject]@{
-        Definition = "<UnitTest id='$TestId' name='$Method'><Execution id='$ExecutionId'/><TestMethod className='$Class' name='$Method'/></UnitTest>"
+        Definition = "<UnitTest id='$TestId' name='$DisplayName'><Execution id='$ExecutionId'/><TestMethod className='$Class' name='$Method'/></UnitTest>"
         Entry = "<TestEntry testId='$TestId' executionId='$ExecutionId'/>"
-        Result = "<UnitTestResult testId='$TestId' executionId='$ExecutionId' testName='$Method' outcome='$Outcome'>$output</UnitTestResult>"
-        Identity = "$Class.$Method|$Method"
+        Result = "<UnitTestResult testId='$TestId' executionId='$ExecutionId' testName='$DisplayName' outcome='$Outcome'>$output</UnitTestResult>"
+        Identity = "$Class.$Method|$DisplayName"
     }
 }
 
@@ -224,6 +228,185 @@ try {
         -ExpectedMethodName ExpectedTest
     if ($parameterizedBaseline.executedCount -ne 1) {
         throw 'Parameterized method evidence was not projected correctly.'
+    }
+
+    $caseAssertionMessage =
+        "Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"
+    $caseBaselineParts = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTest `
+        -DisplayName 'ExpectedTest(Case("A"))'
+    $caseBaselinePath = Write-Fixture `
+        -Name case-ledger-baseline `
+        -Summary Completed `
+        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions $caseBaselineParts.Definition `
+        -Entries $caseBaselineParts.Entry `
+        -Results $caseBaselineParts.Result
+    $caseBaseline = Read-SharpProofMutationTestEvidence `
+        -TrxPath $caseBaselinePath `
+        -EvidenceName case-ledger-baseline `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName ExpectedTest
+
+    $exactCaseParts = New-TestParts `
+        -Outcome Failed `
+        -Message $caseAssertionMessage `
+        -Method ExpectedTest `
+        -DisplayName 'ExpectedTest(Case("A"))'
+    $exactCasePath = Write-Fixture `
+        -Name exact-case-ledger `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $exactCaseParts.Definition `
+        -Entries $exactCaseParts.Entry `
+        -Results $exactCaseParts.Result
+    $exactCase = Read-SharpProofMutationTestEvidence `
+        -TrxPath $exactCasePath `
+        -EvidenceName exact-case-ledger `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $caseBaseline.testLedger
+    if ($exactCase.assertionFailureCount -ne 1) {
+        throw 'Exact-case ledger identity did not pass unchanged.'
+    }
+
+    $caseOnlyDrifts = @(
+        [pscustomobject]@{
+            Name = 'parameter-case-ledger'
+            Because = 'case-only parameter identity drift'
+            ExpectedMethod = 'ExpectedTest'
+            Parts = New-TestParts `
+                -Outcome Failed `
+                -Message $caseAssertionMessage `
+                -Method ExpectedTest `
+                -DisplayName 'ExpectedTest(Case("a"))'
+        },
+        [pscustomobject]@{
+            Name = 'display-case-ledger'
+            Because = 'case-only display identity drift'
+            ExpectedMethod = 'ExpectedTest'
+            Parts = New-TestParts `
+                -Outcome Failed `
+                -Message $caseAssertionMessage `
+                -Method ExpectedTest `
+                -DisplayName 'expectedTest(Case("A"))'
+        },
+        [pscustomobject]@{
+            Name = 'class-case-ledger'
+            Because = 'case-only class identity drift'
+            ExpectedMethod = 'ExpectedTest'
+            Parts = New-TestParts `
+                -Outcome Failed `
+                -Message $caseAssertionMessage `
+                -Method ExpectedTest `
+                -DisplayName 'ExpectedTest(Case("A"))' `
+                -Class 'SharpProof.Test.evidenceTests'
+        },
+        [pscustomobject]@{
+            Name = 'method-case-ledger'
+            Because = 'case-only method identity drift'
+            ExpectedMethod = 'expectedTest'
+            Parts = New-TestParts `
+                -Outcome Failed `
+                -Message $caseAssertionMessage `
+                -Method expectedTest `
+                -DisplayName 'ExpectedTest(Case("A"))'
+        })
+    foreach ($drift in $caseOnlyDrifts) {
+        $driftPath = Write-Fixture `
+            -Name $drift.Name `
+            -Summary Failed `
+            -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+                $zeroInfrastructure) `
+            -Definitions $drift.Parts.Definition `
+            -Entries $drift.Parts.Entry `
+            -Results $drift.Parts.Result
+        Assert-Throws `
+            -Because $drift.Because `
+            -ExpectedMessage 'test ledger changed' `
+            -Action {
+            Read-SharpProofMutationTestEvidence `
+                -TrxPath $driftPath `
+                -EvidenceName $drift.Name `
+                -Mode Mutation `
+                -ProcessExitCode 1 `
+                -ExpectedMethodName $drift.ExpectedMethod `
+                -ExpectedLedger $caseBaseline.testLedger
+        }
+    }
+
+    $upperParameter = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTest `
+        -DisplayName 'ExpectedTest(Case("A"))' `
+        -TestId test-case-row-1 `
+        -ExecutionId execution-case-row-1
+    $lowerParameter = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTest `
+        -DisplayName 'ExpectedTest(Case("a"))' `
+        -TestId test-case-row-2 `
+        -ExecutionId execution-case-row-2
+    $caseRowsPath = Write-Fixture `
+        -Name case-distinct-rows `
+        -Summary Completed `
+        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions ($upperParameter.Definition + $lowerParameter.Definition) `
+        -Entries ($upperParameter.Entry + $lowerParameter.Entry) `
+        -Results ($upperParameter.Result + $lowerParameter.Result)
+    $caseRows = Read-SharpProofMutationTestEvidence `
+        -TrxPath $caseRowsPath `
+        -EvidenceName case-distinct-rows `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName ExpectedTest
+    if ($caseRows.testLedger.Count -ne 2 -or
+        -not [StringComparer]::Ordinal.Equals(
+            $caseRows.testLedger[0], $upperParameter.Identity) -or
+        -not [StringComparer]::Ordinal.Equals(
+            $caseRows.testLedger[1], $lowerParameter.Identity)) {
+        throw 'Case-distinct parameter rows were collapsed or misordered.'
+    }
+
+    $upperMethod = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTest `
+        -TestId test-case-method-1 `
+        -ExecutionId execution-case-method-1
+    $lowerMethod = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method expectedTest `
+        -TestId test-case-method-2 `
+        -ExecutionId execution-case-method-2
+    $caseMethodsPath = Write-Fixture `
+        -Name case-distinct-methods `
+        -Summary Completed `
+        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions ($upperMethod.Definition + $lowerMethod.Definition) `
+        -Entries ($upperMethod.Entry + $lowerMethod.Entry) `
+        -Results ($upperMethod.Result + $lowerMethod.Result)
+    $caseMethods = Read-SharpProofMutationTestEvidence `
+        -TrxPath $caseMethodsPath `
+        -EvidenceName case-distinct-methods `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName @('ExpectedTest', 'expectedTest')
+    if ($caseMethods.testLedgers.Count -ne 2 -or
+        @($caseMethods.testLedgers['ExpectedTest']).Count -ne 1 -or
+        @($caseMethods.testLedgers['expectedTest']).Count -ne 1) {
+        throw 'Case-distinct method identities were collapsed.'
     }
 
     $renamed = New-TestParts `

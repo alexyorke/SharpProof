@@ -210,6 +210,46 @@ function Test-NUnitMethodIdentity {
          $Actual.EndsWith(')', [StringComparison]::Ordinal))
 }
 
+function Get-OrdinalSortedUniqueStrings {
+    param(
+        [AllowEmptyCollection()]
+        [string[]]$Values
+    )
+
+    $unique = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($value in @($Values)) {
+        [void]$unique.Add($value)
+    }
+    $sorted = [Collections.Generic.List[string]]::new()
+    foreach ($value in $unique) {
+        $sorted.Add($value)
+    }
+    $sorted.Sort([StringComparer]::Ordinal)
+    return $sorted.ToArray()
+}
+
+function Test-OrdinalStringSequenceEqual {
+    param(
+        [AllowEmptyCollection()]
+        [string[]]$Left,
+
+        [AllowEmptyCollection()]
+        [string[]]$Right
+    )
+
+    if (@($Left).Count -ne @($Right).Count) {
+        return $false
+    }
+    for ($index = 0; $index -lt @($Left).Count; $index++) {
+        if (-not [StringComparer]::Ordinal.Equals(
+                $Left[$index], $Right[$index])) {
+            return $false
+        }
+    }
+    return $true
+}
+
 function Read-SharpProofMutationTestEvidence {
     param(
         [Parameter(Mandatory = $true)]
@@ -240,7 +280,8 @@ function Read-SharpProofMutationTestEvidence {
         ($null -eq $ExpectedLedger -or @($ExpectedLedger).Count -eq 0)) {
         throw "Mutation '$EvidenceName' requires a nonempty baseline ledger."
     }
-    $expectedMethodNames = @($ExpectedMethodName | Sort-Object -Unique)
+    $expectedMethodNames = @(
+        Get-OrdinalSortedUniqueStrings -Values $ExpectedMethodName)
     if ($expectedMethodNames.Count -eq 0 -or
         @($ExpectedMethodName).Count -ne $expectedMethodNames.Count -or
         @($expectedMethodNames | Where-Object {
@@ -441,7 +482,9 @@ function Read-SharpProofMutationTestEvidence {
     }
 
     $ledger = @()
-    $ledgerByMethod = @{}
+    $ledgerByMethod =
+        [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::Ordinal)
     foreach ($methodName in $expectedMethodNames) {
         $ledgerByMethod[$methodName] =
             [Collections.Generic.List[string]]::new()
@@ -491,12 +534,14 @@ function Read-SharpProofMutationTestEvidence {
         }
     }
 
-    $ledger = @($ledger | Sort-Object -Unique)
+    $ledger = @(Get-OrdinalSortedUniqueStrings -Values $ledger)
     if ($ledger.Count -ne $results.Count) {
         throw "TRX for '$EvidenceName' has duplicate stable test identities."
     }
     foreach ($methodName in $expectedMethodNames) {
-        $methodLedger = @($ledgerByMethod[$methodName] | Sort-Object -Unique)
+        $methodLedger = @(
+            Get-OrdinalSortedUniqueStrings `
+                -Values $ledgerByMethod[$methodName])
         if ($methodLedger.Count -eq 0 -or
             $methodLedger.Count -ne $ledgerByMethod[$methodName].Count) {
             throw (
@@ -506,10 +551,13 @@ function Read-SharpProofMutationTestEvidence {
         $ledgerByMethod[$methodName] = $methodLedger
     }
     if ($null -ne $ExpectedLedger) {
-        $expected = @($ExpectedLedger | Sort-Object -Unique)
+        $expected = @(
+            Get-OrdinalSortedUniqueStrings -Values $ExpectedLedger)
         if ($expected.Count -ne @($ExpectedLedger).Count -or
             $ledger.Count -ne $expected.Count -or
-            @(Compare-Object $expected $ledger).Count -ne 0) {
+            -not (Test-OrdinalStringSequenceEqual `
+                -Left $expected `
+                -Right $ledger)) {
             throw "TRX test ledger changed for '$EvidenceName'."
         }
     }
