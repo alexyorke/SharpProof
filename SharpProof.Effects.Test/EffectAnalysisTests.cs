@@ -3018,6 +3018,60 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ArrayStoreCompatibilityUsesExactFreshRuntimeElementType()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public interface IValue { }
+            public sealed class Value : IValue { }
+            public class Base { }
+            public sealed class Derived : Base { }
+            public static class Sample {
+                private static object[] s_field = new object[1];
+                public static void FreshObject() { object[] values = new object[1]; values[0] = "value"; }
+                public static void LocalAlias() { object[] values = new object[1]; object[] alias = values; alias[0] = "value"; }
+                public static void FreshBase() { Base[] values = new Base[1]; values[0] = new Derived(); }
+                public static void FreshInterface() { IValue[] values = new IValue[1]; values[0] = new Value(); }
+                public static void FreshBoxing() { object[] values = new object[1]; values[0] = 1; }
+                public static void Covariant() { object[] values = new string[1]; values[0] = new object(); }
+                public static void UnknownParameter(object[] values, string value) { values[0] = value; }
+                public static void FieldAlias(string value) { s_field[0] = value; }
+                public static void CovariantNull() { object[] values = new string[1]; values[0] = null; }
+                public static void ValueArray() { int[] values = new int[1]; values[0] = 1; }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            AssertCompatible("FreshObject");
+            AssertCompatible("LocalAlias");
+            AssertCompatible("FreshBase");
+            AssertCompatible("FreshInterface");
+            AssertCompatible("FreshBoxing");
+            AssertIncompatible("Covariant");
+            AssertIncompatible("UnknownParameter");
+            AssertIncompatible("FieldAlias");
+            AssertCompatible("CovariantNull");
+            AssertCompatible("ValueArray");
+        }
+
+        void AssertCompatible(string methodName)
+        {
+            AssertDoesNotThrow(
+                session.Analyze(Method(compilation, methodName)).Summary,
+                "System.ArrayTypeMismatchException");
+        }
+
+        void AssertIncompatible(string methodName)
+        {
+            AssertContainsThrows(
+                session.Analyze(Method(compilation, methodName)).Summary,
+                "System.ArrayTypeMismatchException");
+        }
+    }
+
+    [Test]
     public void ResolvedNullReceiverThrowSurvivesUnknownDispatch()
     {
         var result = Analyze(

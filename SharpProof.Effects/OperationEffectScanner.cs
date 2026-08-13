@@ -14,6 +14,7 @@ internal sealed class OperationEffectScanner
         ImmutableArray.CreateBuilder<EffectDirectWitness>();
     private readonly INamedTypeSymbol? _exceptionType;
     private readonly ExceptionHandlerReachability _handlerReachability;
+    private readonly Dictionary<int, IArrayTypeSymbol> _freshArrayTypes = new();
     private readonly Dictionary<ISymbol, EffectRegionSet> _localRegions =
         new(SymbolEqualityComparer.Default);
     private readonly IMethodSymbol _method;
@@ -56,6 +57,14 @@ internal sealed class OperationEffectScanner
         // enclosing Roslyn CFG still supplies the outer IsReachable gate.
         _useAbstractReachability = !root.DescendantsAndSelf().Any(
             static operation => operation is ITryOperation);
+        foreach (var creation in root.DescendantsAndSelf()
+                     .OfType<IArrayCreationOperation>())
+        {
+            if (creation.Type is IArrayTypeSymbol type)
+            {
+                _freshArrayTypes[creation.Syntax.SpanStart] = type;
+            }
+        }
         BuildLocalRegions(root);
     }
 
@@ -417,15 +426,28 @@ internal sealed class OperationEffectScanner
         IArrayTypeSymbol arrayType,
         IOperation? assignedValue)
     {
-        if (arrayType.ElementType.IsSealed)
+        if (arrayType.ElementType.IsSealed ||
+            assignedValue != null &&
+            (assignedValue.ConstantValue is { HasValue: true, Value: null } ||
+             _abstractFlow?.TryEvaluate(element, assignedValue, out var value) == true &&
+             value.IsDefinitelyNull))
         {
             return true;
         }
 
-        return assignedValue != null &&
-            (assignedValue.ConstantValue is { HasValue: true, Value: null } ||
-             _abstractFlow?.TryEvaluate(element, assignedValue, out var value) == true &&
-             value.IsDefinitelyNull);
+        var regions = ClassifyRegion(element.ArrayReference, aliasSource: true);
+        if (assignedValue == null ||
+            regions.Regions.Length != 1 ||
+            regions.Regions[0] is not { Kind: EffectRegionKind.Fresh } fresh ||
+            !_freshArrayTypes.TryGetValue(fresh.Ordinal, out var runtimeType) ||
+            assignedValue.Type == null)
+        {
+            return false;
+        }
+
+        return _session.Compilation.ClassifyCommonConversion(
+            assignedValue.Type,
+            runtimeType.ElementType).IsImplicit;
     }
 
     private EffectSummary IntegralDivisionExceptions(

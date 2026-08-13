@@ -278,6 +278,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ExceptionHandlersContributeEffectsOnlyWhenReachable'
     },
     [pscustomobject]@{
+        Name = 'effect-exact-array-store-compatibility'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = "        return _session.Compilation.ClassifyCommonConversion(`n            assignedValue.Type,`n            runtimeType.ElementType).IsImplicit;"
+        Mutated = '        return false;'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ArrayStoreCompatibilityUsesExactFreshRuntimeElementType'
+    },
+    [pscustomobject]@{
         Name = 'effect-fresh-array-content-provenance'
         File = 'SharpProof.Effects\OperationEffectScanner.cs'
         Original = "            IFieldReferenceOperation or IArrayElementReferenceOperation =>`n                EffectRegionSet.Unknown,"
