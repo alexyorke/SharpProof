@@ -145,6 +145,7 @@ trap {
 
 Start-AcceptanceTimingPhase -Name 'static-validation'
 . (Join-Path $repositoryRoot 'scripts\Get-SharpProofTcbPaths.ps1')
+. (Join-Path $repositoryRoot 'scripts\Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainerContract.ps1')
     & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
@@ -168,6 +169,7 @@ Start-AcceptanceTimingPhase -Name 'static-validation'
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofReleaseAuthorityClosure.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofReleaseAuthorityClosureFixtures.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofPilotAuthorityFixtures.ps1')
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainedPathFixtures.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $previewEvidence = Get-Content -LiteralPath (
@@ -304,12 +306,15 @@ function Assert-RepositoryPaths {
             -not $seenPaths.Add($relativePath)) {
             throw "$Scope contains a blank or duplicate path: $relativePath"
         }
-        $fullPath = [IO.Path]::GetFullPath(
-            (Join-Path $repositoryRoot $relativePath))
-        if (-not $fullPath.StartsWith(
-                $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::OrdinalIgnoreCase) -or
-            -not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        try {
+            $fullPath = Resolve-SharpProofContainedPath `
+                -Root $repositoryRoot -Path $relativePath `
+                -ParameterName "$Scope path"
+        }
+        catch {
+            throw "Invalid $Scope path: $relativePath"
+        }
+        if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
             throw "Invalid $Scope path: $relativePath"
         }
     }

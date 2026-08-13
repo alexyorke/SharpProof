@@ -19,6 +19,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $contract = Get-Content `
     -LiteralPath (Join-Path $repositoryRoot 'eng\acceptance\contract.json') `
     -Raw |
@@ -49,13 +50,9 @@ $effectiveRetainedCases = if ($RetainedCases -gt 0) {
 else {
     [int]$retained.casesPerSeed
 }
-$resolvedOutput = [IO.Path]::GetFullPath(
-    (Join-Path $repositoryRoot $OutputDirectory))
-if (-not $resolvedOutput.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw "OutputDirectory must be inside the repository: $resolvedOutput"
-}
+$resolvedOutput = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $OutputDirectory `
+    -ParameterName 'OutputDirectory'
 New-Item -ItemType Directory -Force -Path $resolvedOutput |
     Out-Null
 

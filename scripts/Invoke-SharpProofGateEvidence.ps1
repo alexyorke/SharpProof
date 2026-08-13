@@ -16,18 +16,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$resolvedOutput = [IO.Path]::GetFullPath(
-    $(if ([IO.Path]::IsPathRooted($OutputPath)) {
-        $OutputPath
-    }
-    else {
-        Join-Path $repositoryRoot $OutputPath
-    }))
-if (-not $resolvedOutput.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw "OutputPath must be inside the repository: $resolvedOutput"
-}
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+$resolvedOutput = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 $outputDirectory = Split-Path -Parent $resolvedOutput
 New-Item -ItemType Directory -Force -Path $outputDirectory |
     Out-Null

@@ -128,7 +128,7 @@ function Resolve-ReleaseDotNet {
     }
     if ($path.StartsWith(
             $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-            [StringComparison]::OrdinalIgnoreCase)) {
+            [StringComparison]::Ordinal)) {
         throw "DotNetPath cannot use a project-local host: '$path'."
     }
     $actualVersion = (& $path --version 2>&1).Trim()
@@ -229,7 +229,7 @@ function Get-ArtifactPath {
     if (-not [string]::Equals(
             $parent,
             $Directory,
-            [StringComparison]::OrdinalIgnoreCase)) {
+            [StringComparison]::Ordinal)) {
         throw "Release artifact escapes PackageSource: '$FileName'."
     }
     return $path

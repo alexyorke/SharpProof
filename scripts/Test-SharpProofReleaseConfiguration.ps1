@@ -7,6 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $contractPath = Join-Path $repositoryRoot 'eng\release\environment-contract.json'
 $workflowPath = Join-Path $repositoryRoot '.github\workflows\package-consumers.yml'
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
@@ -305,12 +306,8 @@ $evidence = [ordered]@{
     environments = $environmentEvidence
 }
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
-    $resolvedOutput = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
-    if (-not $resolvedOutput.StartsWith(
-            $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-            [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'OutputPath must be inside the repository.'
-    }
+    $resolvedOutput = Resolve-SharpProofContainedPath `
+        -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
     $directory = [IO.Path]::GetDirectoryName($resolvedOutput)
     [IO.Directory]::CreateDirectory($directory) | Out-Null
     [IO.File]::WriteAllText(

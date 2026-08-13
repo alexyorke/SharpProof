@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofPilotPackageAuthority.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 
 function Resolve-RepositoryPath([string]$Path) {
     if ([IO.Path]::IsPathRooted($Path)) {
@@ -336,12 +337,8 @@ $report = [ordered]@{
     packageArtifacts = $packageArtifacts
     pilots = $results
 }
-$resolvedOutput = Resolve-RepositoryPath $OutputPath
-if (-not $resolvedOutput.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'OutputPath must be inside the repository.'
-}
+$resolvedOutput = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($resolvedOutput)) | Out-Null
 [IO.File]::WriteAllText(
     $resolvedOutput,

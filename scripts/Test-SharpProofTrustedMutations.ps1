@@ -31,24 +31,18 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationScheduling.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$output = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
-if (-not $output.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw "OutputPath must be inside the repository: $output"
-}
+$output = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 $baselineFile = if ([string]::IsNullOrWhiteSpace($BaselineEvidencePath)) {
     $null
 }
 else {
-    [IO.Path]::GetFullPath((Join-Path $repositoryRoot $BaselineEvidencePath))
-}
-if ($null -ne $baselineFile -and -not $baselineFile.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw "BaselineEvidencePath must be inside the repository: $baselineFile"
+    Resolve-SharpProofContainedPath `
+        -Root $repositoryRoot -Path $BaselineEvidencePath `
+        -ParameterName 'BaselineEvidencePath'
 }
 if ($BaselineOnly -and $null -eq $baselineFile) {
     throw 'BaselineOnly requires BaselineEvidencePath.'
@@ -1076,6 +1070,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~TrustedComputingBaseRejectsNoncanonicalPaths'
     },
     [pscustomobject]@{
+        Name = 'release-authority-contained-path-case-sensitivity'
+        File = 'scripts\Resolve-SharpProofContainedPath.ps1'
+        Original = "    if (-not `$canonicalPath.StartsWith(`n            `$prefix,`n            [StringComparison]::Ordinal)) {"
+        Mutated = "    if (-not `$canonicalPath.StartsWith(`n            `$prefix,`n            [StringComparison]::OrdinalIgnoreCase)) {"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~LinuxEvidencePathsUseOrdinalCanonicalContainment'
+    },
+    [pscustomobject]@{
         Name = 'publication-locks-every-member'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Select(static path => new PublicationLock(path))"
@@ -1845,12 +1847,9 @@ finally {
         (Test-Path -LiteralPath $workspace)) {
         $resolvedWorkspace = [IO.Path]::GetFullPath($workspace)
         $resolvedMutationRoot = [IO.Path]::GetFullPath($mutationRoot)
-        if (-not $resolvedWorkspace.StartsWith(
-                $resolvedMutationRoot +
-                [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Refusing to remove mutation workspace: $resolvedWorkspace"
-        }
+        [void](Resolve-SharpProofContainedPath `
+            -Root $resolvedMutationRoot -Path $resolvedWorkspace `
+            -ParameterName 'Mutation workspace')
         Remove-Item -LiteralPath $resolvedWorkspace -Recurse -Force
     }
 }

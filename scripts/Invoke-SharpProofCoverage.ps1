@@ -15,26 +15,14 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $testProjectParallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
-$resolvedResultsDirectory = [IO.Path]::GetFullPath(
-    $(if ([IO.Path]::IsPathRooted($ResultsDirectory)) {
-        $ResultsDirectory
-    }
-    else {
-        Join-Path $repositoryRoot $ResultsDirectory
-    }))
-$repositoryPrefix =
-    $repositoryRoot + [IO.Path]::DirectorySeparatorChar
-if (-not $resolvedResultsDirectory.StartsWith(
-        $repositoryPrefix,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw (
-        'ResultsDirectory must be inside the repository: ' +
-        $resolvedResultsDirectory)
-}
+$resolvedResultsDirectory = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $ResultsDirectory `
+    -ParameterName 'ResultsDirectory'
 if (Test-Path -LiteralPath $resolvedResultsDirectory -PathType Container) {
     $existingReport = Get-ChildItem `
         -LiteralPath $resolvedResultsDirectory `

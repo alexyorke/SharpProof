@@ -16,6 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $samplesRoot = Join-Path $repositoryRoot 'samples'
 $isSupportedWorkerHost = $IsLinux -and
     $env:SHARPPROOF_CONTAINER -ceq '1' -and
@@ -432,13 +433,9 @@ try {
         "SharpProof package-backed samples passed ($ExpectedSmt host policy).")
 }
 finally {
-    $resolvedTemporaryRoot = [IO.Path]::GetFullPath($temporaryRoot)
-    if (-not $resolvedTemporaryRoot.StartsWith(
-            $temporaryParent,
-            [StringComparison]::OrdinalIgnoreCase) -or
-        $resolvedTemporaryRoot -eq $temporaryParent) {
-        throw "Refusing to remove unexpected temporary path: $resolvedTemporaryRoot"
-    }
+    $resolvedTemporaryRoot = Resolve-SharpProofContainedPath `
+        -Root $temporaryParent -Path $temporaryRoot `
+        -ParameterName 'Sample temporary path'
     if (Test-Path -LiteralPath $resolvedTemporaryRoot) {
         Remove-Item -LiteralPath $resolvedTemporaryRoot -Recurse -Force
     }

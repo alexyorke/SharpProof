@@ -55,8 +55,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 136,
-    "expectedCatalogSha256": "d1cbcb480f24595e9874bd19f5f39e0f1c2dd1d89a6a0dc4504e40826a4646f6"
+    "expectedCatalogCount": 137,
+    "expectedCatalogSha256": "8ae4374b11ed648dbc21d09dc352dd1007813af325d5250ab3a941be44f4fcab"
   },
   "worker": {
     "protocolVersion": 11,
@@ -112,6 +112,7 @@
       "eng/coverage/baseline.json",
       "eng/diagnostics/diagnostic-descriptors.v1.json",
       "eng/generated/approved-outputs.v1.json",
+      "eng/fuzz/retained-seeds.json",
       "eng/release/environment-contract.json",
       "eng/release/first-party-assemblies.json",
       "eng/release/package-dependency-contract.json",
@@ -130,6 +131,7 @@
       "scripts/Generate-LauncherArguments.ps1",
       "scripts/Generate-OperationSupportCatalog.ps1",
       "scripts/Generate-ProjectionCatalog.ps1",
+      "scripts/Generate-Readme.ps1",
       "scripts/Generate-ProtocolModel.ps1",
       "scripts/GeneratedFileHelpers.ps1",
       "scripts/Get-SharpProofPilotPackageAuthority.ps1",
@@ -141,6 +143,7 @@
       "scripts/Invoke-SharpProofDevCheck.ps1",
       "scripts/Invoke-SharpProofDotnet.ps1",
       "scripts/Invoke-SharpProofGateEvidence.ps1",
+      "scripts/Invoke-SharpProofFuzzCampaign.ps1",
       "scripts/Invoke-SharpProofPackageTests.ps1",
       "scripts/Invoke-SharpProofReleaseContainer.ps1",
       "scripts/Invoke-SharpProofSemanticTests.ps1",
@@ -148,9 +151,11 @@
       "scripts/New-SharpProofReleaseEvidence.ps1",
       "scripts/Publish-SharpProofRelease.ps1",
       "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
+      "scripts/Resolve-SharpProofContainedPath.ps1",
       "scripts/Test-CompilerArtifactModelGenerator.ps1",
       "scripts/Test-ProductionCSharpComplexity.ps1",
       "scripts/Test-SharpProofContainerContract.ps1",
+      "scripts/Test-SharpProofContainedPathFixtures.ps1",
       "scripts/Test-SharpProofCoverage.ps1",
       "scripts/Test-SharpProofDependencyAudit.ps1",
       "scripts/Test-SharpProofMutationBaselines.ps1",
@@ -184,7 +189,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "74bfec9960d188a12e88c9f63dcb0890f07d601abadababd5f53bab0af145ec9",
+    "inventorySha256": "c0f3660eabfe8809a709a235850f0af7dce4664a2383e8d0dc40be6c89e6d07e",
     "components": [
       {
         "name": "discovery",
@@ -669,6 +674,17 @@
           "scripts/package-projects.json",
           "SharpProof.ArchitectureTest/ReleaseAuthorityClosureTests.cs",
           "SharpProof.ArchitectureTest/PilotAuthorityTests.cs"
+        ]
+      },
+      {
+        "name": "containedPathAuthority",
+        "paths": [
+          "eng/fuzz/retained-seeds.json",
+          "scripts/Generate-Readme.ps1",
+          "scripts/Invoke-SharpProofFuzzCampaign.ps1",
+          "scripts/Resolve-SharpProofContainedPath.ps1",
+          "scripts/Test-SharpProofContainedPathFixtures.ps1",
+          "SharpProof.ArchitectureTest/ContainedPathAuthorityTests.cs"
         ]
       }
     ]

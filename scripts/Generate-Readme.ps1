@@ -7,6 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $repositoryDefaultBranch = 'master'
 $currentMaintainedDocuments = @(
     'README.md',
@@ -137,12 +138,16 @@ function Assert-RepositoryDocumentLink {
         throw "Repository documentation link has no file path in ${SourceRelativePath}: $Target"
     }
 
-    $targetPath = Get-RepositoryPath (
-        [Uri]::UnescapeDataString($parts[0]))
-    if (-not $targetPath.StartsWith(
-            $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-            [StringComparison]::OrdinalIgnoreCase) -or
-        -not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+    try {
+        $targetPath = Resolve-SharpProofContainedPath `
+            -Root $repositoryRoot `
+            -Path ([Uri]::UnescapeDataString($parts[0])) `
+            -ParameterName 'Repository documentation link'
+    }
+    catch {
+        throw "Broken repository documentation link in ${SourceRelativePath}: $Target"
+    }
+    if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
         throw "Broken repository documentation link in ${SourceRelativePath}: $Target"
     }
 

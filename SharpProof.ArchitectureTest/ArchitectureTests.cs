@@ -929,7 +929,7 @@ public sealed class ArchitectureTests
                 Does.Contain("$resolvedPackageSource = Resolve-RepositoryPath $PackageSource"));
             Assert.That(
                 script,
-                Does.Contain("$resolvedOutput = Resolve-RepositoryPath $OutputPath"));
+                Does.Contain("Resolve-SharpProofContainedPath `"));
             Assert.That(script, Does.Not.Contain("Get-CimInstance"));
             Assert.That(
                 script,
@@ -1755,7 +1755,7 @@ public sealed class ArchitectureTests
             "Invoke-SharpProofGateEvidence.ps1"));
         Assert.That(
             gateEvidence,
-            Does.Contain("[IO.Path]::IsPathRooted($OutputPath)"));
+            Does.Contain("Resolve-SharpProofContainedPath `"));
         foreach (var workflow in new[] {
                      ".github/workflows/coverage.yml",
                      ".github/workflows/package-consumers.yml"

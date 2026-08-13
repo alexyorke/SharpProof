@@ -114,6 +114,9 @@ try {
         Join-Path $repositoryRoot 'scripts/Test-SharpProofReleaseConfiguration.ps1') `
         -Destination (Join-Path $fixture 'scripts/Test-SharpProofReleaseConfiguration.ps1')
     Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Resolve-SharpProofContainedPath.ps1') `
+        -Destination (Join-Path $fixture 'scripts/Resolve-SharpProofContainedPath.ps1')
+    Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'eng/release/environment-contract.json') `
         -Destination (Join-Path $fixture 'eng/release/environment-contract.json')
     Copy-Item -LiteralPath (
