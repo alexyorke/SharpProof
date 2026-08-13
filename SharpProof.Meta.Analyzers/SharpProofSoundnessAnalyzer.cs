@@ -77,6 +77,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             startContext.RegisterSyntaxNodeAction(
                 c => CancellationBoundaryAnalyzer.AnalyzeCatchClause(c, symbols),
                 SyntaxKind.CatchClause);
+            startContext.RegisterSyntaxNodeAction(
+                AnalyzeSemanticPatternControlFlow,
+                SyntaxKind.ConstantPattern,
+                SyntaxKind.CaseSwitchLabel);
         });
     }
 
@@ -222,6 +226,35 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    private static void AnalyzeSemanticPatternControlFlow(
+        SyntaxNodeAnalysisContext context)
+    {
+        var expression = context.Node switch
+        {
+            ConstantPatternSyntax pattern => pattern.Expression,
+            CaseSwitchLabelSyntax label => label.Value,
+            _ => null
+        };
+        if (expression == null)
+        {
+            return;
+        }
+
+        var constant = context.SemanticModel.GetConstantValue(
+            expression,
+            context.CancellationToken);
+        var literal = !constant.HasValue
+            ? null
+            : GetSemanticLiteral(constant.Value);
+        if (literal != null)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                MetaDiagnosticDescriptors.SemanticStringControlFlow,
+                expression.GetLocation(),
+                literal));
+        }
+    }
+
     private static void AnalyzeCSharpExpressionText(OperationAnalysisContext context)
     {
         if (context.Operation is not IBinaryOperation { OperatorKind: BinaryOperatorKind.Add } binary ||
@@ -318,12 +351,21 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     private static string? GetSemanticLiteral(IOperation operation)
     {
-        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value)
+        if (!operation.ConstantValue.HasValue)
         {
             return null;
         }
 
-        return value.StartsWith("ir.", StringComparison.Ordinal) || value.StartsWith("ir_", StringComparison.Ordinal) ? value : null;
+        return GetSemanticLiteral(operation.ConstantValue.Value);
+    }
+
+    private static string? GetSemanticLiteral(object? value)
+    {
+        return value is string text &&
+            (text.StartsWith("ir.", StringComparison.Ordinal) ||
+             text.StartsWith("ir_", StringComparison.Ordinal))
+                ? text
+                : null;
     }
 
     private static bool IsInsideCondition(SyntaxNode syntax)

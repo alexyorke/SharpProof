@@ -329,6 +329,57 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Does.Not.Contain("SPMETA009"));
     }
 
+    [TestCaseSource(nameof(SemanticPatternControlFlowCases))]
+    public async Task ReportsSemanticPatternControlFlowOnce(string source)
+    {
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA004"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AllowsNonsemanticAndNonconstantPatternControls()
+    {
+        const string source =
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool OrdinaryIs(string reason) =>
+                    reason is "ordinary";
+                internal static bool NullIs(string reason) => reason is null;
+                internal static bool OrdinarySwitch(string reason) {
+                    switch (reason) {
+                        case "ordinary": return true;
+                        default: return false;
+                    }
+                }
+                internal static bool OrdinaryExpression(string reason) =>
+                    reason switch {
+                        "ordinary" => true,
+                        _ => false
+                    };
+                internal static int Relational(int value) => value switch {
+                    > 0 => 1,
+                    _ => 0
+                };
+                internal static string DefaultOnly(string reason) {
+                    switch (reason) {
+                        default: return reason;
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA004"));
+    }
+
     [Test]
     public async Task AllowsImmutableStateAndCancellationRethrow()
     {
@@ -1715,6 +1766,54 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     "(" + name + ") is not null";
             }
             """).SetName("ConcatenatedExpressionTextRemainsRejected");
+    }
+
+    private static IEnumerable<TestCaseData> SemanticPatternControlFlowCases()
+    {
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool M(string reason) =>
+                    reason is "ir_condition_both_branches_feasible";
+            }
+            """).SetName("SemanticIsConstantPatternIsRejectedOnce");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool M(string reason) {
+                    switch (reason) {
+                        case "ir_condition_both_branches_feasible":
+                            return true;
+                        default:
+                            return false;
+                    }
+                }
+            }
+            """).SetName("SemanticSwitchStatementCaseIsRejectedOnce");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool M(string reason) => reason switch {
+                    "ir_condition_both_branches_feasible" => true,
+                    _ => false
+                };
+            }
+            """).SetName("SemanticSwitchExpressionArmIsRejectedOnce");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool M(string reason) =>
+                    (reason is ("ir_condition_both_branches_feasible"))
+                        switch {
+                            true => true,
+                            _ => false
+                        };
+            }
+            """).SetName("NestedSemanticPatternIsRejectedOnce");
     }
 
     private static IEnumerable<MetadataReference> PlatformReferences()
