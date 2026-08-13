@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 146 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 145 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 146 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-158 - Acceptance skip switches still certify Passed (fixed)
+
+- [x] Fixed by `3e04a6722` (`fix: mark partial acceptance incomplete`).
+- Acceptance runs using `-SkipBuild` or `-SkipTests` now emit top-level
+  `status=incomplete` and an explicit non-qualifying completion message. Only a
+  full run retains `status=passed` and the qualifying success message.
+- Regression-first disposable harnesses cover each skip combination and the
+  full-run control, asserting evidence status, output, and exit behavior. The
+  focused suite passed 4/4 and the full canonical-container Architecture suite
+  passed 88/88.
 
 ### SP-AUDIT-223 - Changed-line coverage fallback checks only the tip commit (fixed)
 
@@ -847,20 +858,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   values during pack, artifact qualification, final validation, and planning.
   Add every field, three packages, conflicting support claims, canonical output,
   and individual-field mutation controls.
-
-### SP-AUDIT-158 - Acceptance skip switches still certify Passed (P0)
-
-- [ ] `Verify.ps1 -SkipTests` records semantic, package, fuzz, corpus, and
-  performance phases as skipped, then writes top-level `status=passed` and prints
-  that acceptance passed. `-SkipBuild` runs downstream `--no-build` gates against
-  potentially stale binaries with the same success semantics.
-- Certifier impact: partial developer modes can emit evidence indistinguishable
-  at the top level from full release acceptance for current source.
-- Evidence: both switch branches and final evidence projection are unconditional;
-  no caller or test restricts their output to a non-qualifying schema/status.
-- Required closure: make partial runs explicitly non-qualifying and impossible to
-  consume as release evidence; bind source/build identity for no-build reuse. Add
-  each skip combination, stale binary, full run, and status-forging controls.
 
 ### SP-AUDIT-162 - Lowered-body hydration omits producer body invariants (P0)
 
