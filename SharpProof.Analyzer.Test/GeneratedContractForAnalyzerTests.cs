@@ -103,15 +103,118 @@ public sealed class GeneratedContractForAnalyzerTests
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [Test]
+    public async Task GeneratedCompanionBodyIsNotAnalyzedAsAnImplementation()
+    {
+        var diagnostics = await AnalyzeGeneratedAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts
+            {
+                public static int Map(IService receiver, int value)
+                {
+                    Contract.Ensures(true);
+                    Func<int> unsupportedDummy = () => value;
+                    return unsupportedDummy();
+                }
+            }
+            """,
+            """
+            public sealed class IService
+            {
+                public int Map(int value) => value;
+            }
+            """,
+            additionalDiagnosticIds: ["SP0047"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task MixedGeneratedCompanionBodyIsNotAnalyzedAsAnImplementation()
+    {
+        const string input = """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class IService
+            {
+                public int Map(int value) => value;
+            }
+
+            public static partial class ServiceContracts
+            {
+                public static int Map(IService receiver, int value)
+                {
+                    Contract.Ensures(true);
+                    Func<int> unsupportedDummy = () => value;
+                    return unsupportedDummy();
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeGeneratedAsync(
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public static partial class ServiceContracts
+            {
+            }
+            """,
+            input,
+            additionalDiagnosticIds: ["SP0047"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task InvalidGeneratedCompanionReportsOnlyItsContractDiagnostic()
+    {
+        var diagnostics = await AnalyzeGeneratedAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public sealed class ServiceContracts
+            {
+                public static int Map(IService receiver, int value)
+                {
+                    Contract.Ensures(true);
+                    Func<int> unsupportedDummy = () => value;
+                    return unsupportedDummy();
+                }
+            }
+            """,
+            """
+            public sealed class IService
+            {
+                public int Map(int value) => value;
+            }
+            """,
+            additionalDiagnosticIds: ["SP0047"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPCF0003"]));
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeGeneratedAsync(
         string generatedSource,
         string inputSource = Target,
-        string profile = "advisory")
+        string profile = "advisory",
+        IEnumerable<string>? additionalDiagnosticIds = null)
     {
+        var diagnosticIds = Enumerable.Range(1, 8)
+            .Select(static index => $"SPCF{index:D4}")
+            .Concat(additionalDiagnosticIds ?? [])
+            .ToArray();
         var compilation = AnalyzerTestHost.CreateCompilation(
             inputSource,
-            Enumerable.Range(1, 8).Select(static index =>
-                $"SPCF{index:D4}"));
+            diagnosticIds);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new GeneratedCompanionSourceGenerator(generatedSource)
                 .AsSourceGenerator()],

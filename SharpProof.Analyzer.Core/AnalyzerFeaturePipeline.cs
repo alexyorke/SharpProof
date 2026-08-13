@@ -30,7 +30,8 @@ internal static partial class AnalyzerFeaturePipeline
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.OwningSymbol is not IMethodSymbol method ||
             method.DeclaringSyntaxReferences.IsDefaultOrEmpty ||
-            IsNestedCallable(method))
+            IsNestedCallable(method) ||
+            session.IsContractCompanion(method))
         {
             return;
         }
@@ -147,6 +148,11 @@ internal static partial class AnalyzerFeaturePipeline
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.OwningSymbol is not IMethodSymbol method)
+        {
+            return;
+        }
+
+        if (session.IsContractCompanion(method))
         {
             return;
         }

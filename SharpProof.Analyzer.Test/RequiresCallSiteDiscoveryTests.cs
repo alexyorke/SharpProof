@@ -231,6 +231,7 @@ public sealed class RequiresCallSiteDiscoveryTests
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
             """
+            using System;
             using SharpProof.Attributes;
 
             public static class Targets {
@@ -260,10 +261,14 @@ public sealed class RequiresCallSiteDiscoveryTests
 
             [ContractFor(typeof(CompanionTarget))]
             public static class CompanionTargetContracts {
+                private static int state;
+
                 public static int Read(
                     CompanionTarget receiver,
                     int value) {
                     Contract.Requires(value > 0);
+                    Action unsupportedDummy = () => state++;
+                    unsupportedDummy();
                     return value;
                 }
             }
@@ -273,6 +278,11 @@ public sealed class RequiresCallSiteDiscoveryTests
             compilation,
             AnalyzerConfiguration.AdvisoryAll,
             CancellationToken.None);
+        var companionTarget = GetMethod(
+            compilation,
+            "CompanionTarget",
+            "Read");
+        var companionBinding = session.BindRequires(companionTarget);
 
         using (Assert.EnterMultipleScope())
         {
@@ -297,11 +307,11 @@ public sealed class RequiresCallSiteDiscoveryTests
                 Is.True);
             Assert.That(
                 session.HasPotentialCallPreconditions(
-                    GetMethod(
-                        compilation,
-                        "CompanionTarget",
-                        "Read")),
+                    companionTarget),
                 Is.True);
+            Assert.That(companionBinding.Failure, Is.EqualTo(
+                SharpProof.Contracts.ContractBindingFailure.None));
+            Assert.That(companionBinding.Contracts?.Clauses, Has.Length.EqualTo(1));
         }
     }
 

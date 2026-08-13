@@ -1969,6 +1969,44 @@ public sealed class AnalyzerModeAndEffectTests
         }
     }
 
+    [TestCase("contracts")]
+    [TestCase("all")]
+    [TestCase("effects")]
+    public async Task ContractCompanionBodyIsNotAnalyzedAsAnImplementation(
+        string features)
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Service {
+                public int Map(int value) => value;
+            }
+
+            [ContractFor(typeof(Service))]
+            public static class ServiceContracts {
+                private static int state;
+
+                public static int Map(Service receiver, int value) {
+                    Contract.Requires(value > 0);
+                    Action unsupportedDummy = () => state++;
+                    if (value < 0) {
+                        throw new InvalidOperationException();
+                    }
+                    unsupportedDummy();
+                    return value;
+                }
+            }
+
+            """,
+            mode: null,
+            ["SP0027", "SP0047"],
+            features: features);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
     [Test]
     public async Task AbstractAndExternSelectionsCannotDisappearWithoutAnOutcome()
     {

@@ -126,6 +126,14 @@ internal sealed class AnalyzerSession
         return _contractSources.Value.Resolve(method);
     }
 
+    internal bool IsContractCompanion(IMethodSymbol method)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        return ContractForSymbolMatcher.IsCompanionType(
+            _contractSources.Value.Companions,
+            method.ContainingType);
+    }
+
     internal ContractBindingResult BindRequires(IMethodSymbol method)
     {
         return _contractBinder.Value.BindRequires(method);
