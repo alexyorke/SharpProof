@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 97 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 96 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 97 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-092 - Contract companion bodies are analyzed as implementations (fixed)
+
+- [x] Fixed by `abc61e5b1` (`fix: exclude contract companion bodies`).
+- Full and lightweight operation-block analysis now use the shared effective
+  ContractFor companion inventory to exclude companion method bodies from
+  implementation analysis. Symbol/control validation, companion clause
+  extraction, target binding, and target implementation diagnostics remain
+  active.
+- Regression-first tests cover unsupported delegate, write, and throw dummy
+  bodies under contracts/all/effects; retained Requires binding; generated and
+  mixed generated/handwritten companions; and invalid generated companions.
+  Focused tests passed 7/7, Analyzer 293/293, Architecture 178/178, relevant
+  Worker companion-parity tests 4/4, and `git diff --check` passed.
 
 ### SP-AUDIT-083 - Compose projects share one mutable tooling image tag (fixed)
 
@@ -1209,26 +1223,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-092 - Contract companion bodies are analyzed as implementations (P1)
-
-- [ ] Analyzer method/operation-block registration does not exclude methods in
-  validated ContractFor companion types, although compiler discovery treats
-  companions only as contract sources and verifies their matched target
-  implementations.
-- Supported impact: harmless dummy implementation details inside a companion
-  produce SP0047 against the companion itself. A valid companion containing a
-  local delegate received `UnsupportedOperationShape (VariableDeclarator)`,
-  even though its body is not the target program being specified.
-- Reproduction: a temporary contracts-profile Analyzer test created a valid
-  `Service.Map` target and exact companion whose body carried the Ensures clause
-  plus a dummy lambda. It expected no SP0047 and received one at the companion
-  method. The temporary test was removed.
-- Required closure: exclude validated companion methods from implementation
-  analysis while retaining clause extraction, control-attribute validation,
-  and target-method diagnostics. Add valid/invalid companion, target, dummy
-  body, generated/handwritten, nested, explicit-selection, and duplicate-
-  diagnostic controls plus a mutation removing the exclusion.
 
 ### SP-AUDIT-093 - Pilot qualification accepts duplicate and vacuous libraries (P1)
 
