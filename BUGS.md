@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 132 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 131 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 132 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-013 - Mutation qualification trusts a forged summary (fixed)
+
+- [x] Fixed by `fe816fd3c` (`fix: validate reused mutation evidence`).
+- Completed mutation evidence is now reused only after the authoritative
+  catalog validator binds it to exact clean HEAD, all canonical mutation rows,
+  assertion-backed outcomes, selected-test ledgers, and existing SHA-256-bound
+  log/TRX receipts. Newly produced rows now record both receipt digests.
+- Regression-first disposable-repository fixtures reject empty and duplicate
+  arrays, wrong or missing identities, missing paths/digests, and dirty tracked
+  state without launching the campaign; a complete valid receipt remains
+  reusable. The behavioral fixture, full Architecture 110/110, and container
+  contract validation passed in the canonical container. The 136-case campaign
+  was intentionally not rerun for this pre-candidate implementation commit.
 
 ### SP-AUDIT-006 - Publication lock symlinks mutate an unowned target (fixed)
 
@@ -452,32 +466,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   plus a mutation that removes primary-initializer discovery.
 - Consolidated cases: SP-AUDIT-032.
 - Unified closure: Use one type-declaration-to-synthesized-constructor inventory for analyzer and collector, including primary base initialization and every selected callable, claim, and assumption.
-
-### SP-AUDIT-013 - Mutation qualification trusts a forged summary (P0)
-
-- [ ] `Invoke-SharpProofTrustedMutationsParallel.ps1` returns before running
-  the campaign when an existing JSON file repeats eight scalar header fields.
-  The reuse path does not validate the `mutations` array, registered names,
-  individual outcomes, selected tests, logs, TRX files, or a digest/signature
-  over the evidence.
-- Certifier impact: the canonical `tooling mutation` command can report a
-  complete 136-case trusted-boundary campaign even though no mutation was run
-  and the supplied evidence contains zero result rows. A stale or fabricated
-  ignored artifact can therefore satisfy an exact-commit qualification step.
-- Reproduction: the audit temporarily supplied
-  `artifacts/mutation/trusted-mutations.json` with the current commit,
-  configuration, selection, catalog count/hash, `mutationCount = 136`,
-  `killedCount = 136`, and `mutations = []`. `docker compose run --rm tooling
-  mutation -Configuration Release` exited zero in 12 seconds and printed
-  `Mutation evidence is already complete`. The pre-existing ignored evidence
-  file was restored afterward.
-- Required closure: route every reuse candidate through the same exact
-  `Test-SharpProofMutationCatalog.ps1` validation as newly generated evidence;
-  require all 136 canonical rows and names, killed outcomes, selected-test
-  identities, and existing digest-bound log/TRX receipts. Bind the evidence to
-  a clean Git tree and hash the validated record into qualification evidence.
-  Add empty-array, duplicated-row, wrong-name, missing-log, forged-count,
-  dirty-tree, and valid-reuse certifier fixtures.
 
 ### SP-AUDIT-014 - Empty symbol packages pass release validation (P0)
 
