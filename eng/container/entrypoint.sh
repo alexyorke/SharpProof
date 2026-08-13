@@ -50,7 +50,7 @@ fi
 
 requires_clean_exact_commit_source() {
   case "$1" in
-    acceptance|mutation|pack|pilots|release-tag|release-baseline|release-plan|release-qualification|release-publish)
+    acceptance|mutation|fuzz-nightly|pack|pilots|release-tag|release-baseline|release-plan|release-qualification|release-publish)
       return 0
       ;;
     *)

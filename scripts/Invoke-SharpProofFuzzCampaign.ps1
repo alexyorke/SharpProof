@@ -19,6 +19,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'Unable to bind fuzz evidence to the exact source commit.'
+}
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $contract = Get-Content `
     -LiteralPath (Join-Path $repositoryRoot 'eng\acceptance\contract.json') `
@@ -226,6 +230,9 @@ function Invoke-FuzzRun {
         runnerPassed = $runnerPassed
         validationPassed = $null -eq $validationError
         validationError = $validationError
+        resultSha256 = if (Test-Path -LiteralPath $standardOutput -PathType Leaf) {
+            (Get-FileHash -LiteralPath $standardOutput -Algorithm SHA256).Hash.ToLowerInvariant()
+        } else { $null }
         standardOutput = [IO.Path]::GetRelativePath(
             $repositoryRoot,
             $standardOutput).Replace('\', '/')
@@ -250,17 +257,25 @@ foreach ($seed in @($retained.seeds)) {
         -Seed ([int]$seed)))
 }
 $summary = [pscustomobject][ordered]@{
-    schemaVersion = 2
+    schemaVersion = 3
+    status = if (@($runs | Where-Object {
+                $_.exitCode -ne 0 -or -not $_.validationPassed
+            }).Count -eq 0) { 'passed' } else { 'failed' }
+    commit = $sourceCommit
     rotatingSeed = $RotatingSeed
+    rotatingCases = $effectiveRotatingCases
+    retainedCasesPerSeed = $effectiveRetainedCases
+    retainedSeeds = @($retained.seeds | ForEach-Object { [int]$_ })
+    retainedSeedManifestSha256 = (Get-FileHash -LiteralPath (
+        Join-Path $repositoryRoot 'eng\fuzz\retained-seeds.json') `
+        -Algorithm SHA256).Hash.ToLowerInvariant()
     requestedCases = [int](@($runs |
         Measure-Object -Property requestedCases -Sum).Sum)
     totalCases = [int](@($runs |
         Measure-Object -Property observedCases -Sum).Sum)
     runs = @($runs)
-    passed = @($runs |
-        Where-Object {
-            $_.exitCode -ne 0 -or
-            -not $_.validationPassed
+    passed = @($runs | Where-Object {
+            $_.exitCode -ne 0 -or -not $_.validationPassed
         }).Count -eq 0
 }
 $summaryPath = Join-Path $resolvedOutput 'campaign.json'

@@ -1174,6 +1174,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SourceConditionalInvocationAndArgumentsFollowEmission'
     },
     [pscustomobject]@{
+        Name = 'nightly-fuzz-command-connected'
+        File = '.github\workflows\nightly.yml'
+        Original = '          docker compose run --rm tooling fuzz-nightly'
+        Mutated = '          docker compose run --rm tooling acceptance'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~NightlyFuzzCampaignIsContainerConnectedAndEvidenceBound'
+    },
+    [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = '                if (type == FileTypeSymbolicLink)'

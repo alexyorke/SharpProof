@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -300,6 +300,21 @@ switch ($Command) {
             'scripts/Write-SharpProofQualificationReceipt.ps1') `
             -Gate mutation `
             -EvidencePath (Join-Path $repositoryRoot $mutationOutput)
+    }
+    'fuzz-nightly' {
+        if ($Configuration -ne 'Release') {
+            throw 'fuzz-nightly requires -Configuration Release.'
+        }
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+        Invoke-DotNet @(
+            'build', 'SharpProof.sln', '--configuration', 'Release',
+            '--no-restore')
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofFuzzCampaign.ps1') `
+            -OutputDirectory 'artifacts/fuzz/nightly'
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Nightly fuzz campaign failed.'
+        }
     }
     'dependency-audit' {
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')

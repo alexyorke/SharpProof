@@ -88,6 +88,7 @@
   "releaseAuthorityClosure": {
     "paths": [
       ".github/actions/build-tooling/action.yml",
+      ".github/workflows/nightly.yml",
       ".github/workflows/package-consumers.yml",
       "SharpProof.Analyzer.Core/AnalyzerDiagnostic.catalog.json",
       "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
@@ -190,7 +191,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "c0f3660eabfe8809a709a235850f0af7dce4664a2383e8d0dc40be6c89e6d07e",
+    "inventorySha256": "c0c08807fe3eb00bc6417d43a812bb15793beb8f6e6a82de4171cee138fba312",
     "components": [
       {
         "name": "discovery",
@@ -646,6 +647,7 @@
         "name": "releaseAuthorityDerivedLeaves",
         "paths": [
           ".github/actions/build-tooling/action.yml",
+          ".github/workflows/nightly.yml",
           "SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1",
           "SharpProof.Verifier/SharpProof.Verifier.nuspec",
           "eng/coverage/baseline.json",
