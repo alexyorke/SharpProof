@@ -290,6 +290,65 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task LambdaBodiesRequireInvocationOrConservativeEscape()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static void Consume(Func<int> callback) { }
+
+                public static Func<int> Escaped() =>
+                    () => Positive(-4);
+
+                public static int Outer(bool condition) {
+                    Func<int> dead = () => Positive(-1);
+                    Func<int> invoked = () => Positive(-2);
+                    Func<int> conditional = () => Positive(-3);
+                    Func<int> copied = invoked;
+                    Consume(() => Positive(-5));
+
+                    Func<int> deadOuter = () => {
+                        Func<int> nested = () => Positive(-6);
+                        return nested();
+                    };
+                    Func<int> liveOuter = () => {
+                        Func<int> nested = () => Positive(-7);
+                        return nested();
+                    };
+
+                    var result = copied() + liveOuter();
+                    return condition
+                        ? result + conditional()
+                        : result;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 5);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EqualTo(new[]
+            {
+                source.IndexOf("Positive(-4)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-3)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-5)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-7)", StringComparison.Ordinal)
+            }.OrderBy(static position => position)));
+    }
+
+    [Test]
     public async Task UnreferencedLocalFunctionsAreNotAnalyzed()
     {
         const string source =
@@ -526,17 +585,23 @@ public sealed class NestedRequiresCallSiteTests
             using SharpProof.Attributes;
 
             public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
                 public static void Outer() {
                     [SharpProofSuppress("")]
                     void Local() { }
                     Func<int> lambda =
                         [SharpProofTrusted(" ")]
-                        () => 1;
+                        () => Positive(-1);
+                    _ = lambda();
                 }
             }
             """,
             "contracts",
-            ["SP0024"],
+            ["SP0024", "SP0027"],
             filePath: "Fixture.g.cs");
 
         Assert.That(diagnostics, Is.Empty);

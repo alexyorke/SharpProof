@@ -29,7 +29,8 @@ internal static partial class AnalyzerFeaturePipeline
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.OwningSymbol is not IMethodSymbol method ||
-            method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+            method.DeclaringSyntaxReferences.IsDefaultOrEmpty ||
+            IsNestedCallable(method))
         {
             return;
         }
@@ -254,7 +255,8 @@ internal static partial class AnalyzerFeaturePipeline
                     context.CancellationToken));
         }
 
-        if (session.Configuration.ContractsEnabled)
+        if (session.Configuration.ContractsEnabled &&
+            !IsNestedCallable(method))
         {
             var requiresOutcome =
                 RequiresCallSiteAnalyzer.Analyze(
@@ -283,6 +285,12 @@ internal static partial class AnalyzerFeaturePipeline
         }
 
         session.RecordSemanticOutcome(method, outcome);
+    }
+
+    private static bool IsNestedCallable(IMethodSymbol method)
+    {
+        return method.MethodKind is
+            MethodKind.LocalFunction or MethodKind.AnonymousFunction;
     }
 
     internal static void AnalyzePrimaryConstructor(

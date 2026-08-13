@@ -295,14 +295,23 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     ContractClauseInventoryBuilder
                         .NormalizeCallable(
                             anonymous.Symbol);
+                var expressionTree = IsExpressionTree(
+                    anonymous.Syntax);
+                if (!expressionTree &&
+                    !IsAnonymousExecutableOrEscaped(
+                        graph,
+                        anonymous.Syntax))
+                {
+                    _visitedPotentialOwners.Add(method);
+                    continue;
+                }
                 if (seen.Add(method))
                 {
                     result.Add(new(
                         method,
                         anonymous.Syntax,
                         anonymous,
-                        IsExpressionTree(
-                            anonymous.Syntax)));
+                        expressionTree));
                 }
             }
 
@@ -407,7 +416,10 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             }
             foreach (var anonymous in GetAnonymousFunctions(graph))
             {
-                if (IsExpressionTree(anonymous.Syntax))
+                if (IsExpressionTree(anonymous.Syntax) ||
+                    !IsAnonymousExecutableOrEscaped(
+                        graph,
+                        anonymous.Syntax))
                 {
                     continue;
                 }
@@ -437,6 +449,106 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 }
             }
             return true;
+        }
+
+        private bool IsAnonymousExecutableOrEscaped(
+            ControlFlowGraph graph,
+            SyntaxNode declaration)
+        {
+            if (!TryGetLocalDestination(
+                    declaration,
+                    out var initialLocal))
+            {
+                return true;
+            }
+
+            var pending = new Queue<ILocalSymbol>();
+            var tracked = new HashSet<ILocalSymbol>(
+                SymbolEqualityComparer.Default);
+            pending.Enqueue(initialLocal);
+            while (pending.Count != 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var local = pending.Dequeue();
+                if (!tracked.Add(local))
+                {
+                    continue;
+                }
+
+                foreach (var reference in ReachableOperations(graph)
+                             .OfType<ILocalReferenceOperation>()
+                             .Where(reference =>
+                                 SymbolEqualityComparer.Default.Equals(
+                                     reference.Local,
+                                     local)))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (reference.IsDeclaration ||
+                        IsAssignmentTarget(reference.Syntax))
+                    {
+                        continue;
+                    }
+
+                    if (TryGetLocalDestination(
+                            reference.Syntax,
+                            out var alias))
+                    {
+                        pending.Enqueue(alias);
+                        continue;
+                    }
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryGetLocalDestination(
+            SyntaxNode value,
+            out ILocalSymbol local)
+        {
+            foreach (var ancestor in value.Ancestors())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ancestor is EqualsValueClauseSyntax equalsValue &&
+                    equalsValue.Value.Span.Contains(value.Span) &&
+                    equalsValue.Parent is VariableDeclaratorSyntax variable &&
+                    semanticModel.GetDeclaredSymbol(
+                        variable,
+                        cancellationToken) is ILocalSymbol declared)
+                {
+                    local = declared;
+                    return true;
+                }
+
+                if (ancestor is AssignmentExpressionSyntax assignment &&
+                    assignment.Right.Span.Contains(value.Span) &&
+                    semanticModel.GetSymbolInfo(
+                        assignment.Left,
+                        cancellationToken).Symbol is ILocalSymbol assigned)
+                {
+                    local = assigned;
+                    return true;
+                }
+
+                if (ancestor is StatementSyntax or ArrowExpressionClauseSyntax)
+                {
+                    break;
+                }
+            }
+
+            local = null!;
+            return false;
+        }
+
+        private static bool IsAssignmentTarget(
+            SyntaxNode reference)
+        {
+            return reference.Ancestors()
+                .OfType<AssignmentExpressionSyntax>()
+                .Any(assignment =>
+                    assignment.Left.Span.Contains(reference.Span));
         }
 
         private static IEnumerable<IOperation> ReachableOperations(
