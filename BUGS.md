@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 116 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 115 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 116 root-cause rows. Stable IDs are not renumbered; 
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-065 - Release workflow authority is checked as raw substrings (fixed)
+
+- [x] Fixed by `a6956e4b2` (`fix: bind release workflow authority`).
+- The release contract now owns canonical identities for the two publishing
+  jobs. A constrained structural workflow parser rejects duplicate job keys and
+  YAML alias/merge substitutions, isolates the exact job blocks, and binds
+  their guards, environments, needs, permissions/OIDC, variable and secret
+  flow, artifact/login/build/push commands, and step order by SHA-256. No raw
+  whole-workflow substring is accepted as release authority.
+- Regression-first fixtures reject comment and dead-job decoys, wrong
+  environment/guard/secret/OIDC/needs, reordered or missing steps, duplicates,
+  and aliases while preserving the exact workflow. Architecture passed 172/172
+  and release-publication tests passed 18/18.
 
 ### SP-AUDIT-054 - Protected release tags may have unreviewed bypass actors (fixed)
 
@@ -747,33 +761,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   and exact-valid controls plus provenance mutations.
 - Consolidated cases: SP-AUDIT-239.
 - Unified closure: Authenticate every source, IL, specification, and transitive summary dependency at hydration and project the materially used closure into proof evidence.
-
-### SP-AUDIT-065 - Release workflow authority is checked as raw substrings (P0)
-
-- [ ] `Test-SharpProofReleaseConfiguration.ps1` certifies workflow use of
-  release environments, tag tokens, variables, secrets, and OIDC by searching
-  the entire YAML text with `Contains`. It does not parse jobs, expressions,
-  permissions, environments, or data flow, so comments or unrelated jobs can
-  satisfy every required token while the actual publishing jobs use different
-  authority.
-- Certifier impact: owner configuration can be correct while the checked-in
-  workflow publishes outside the reviewed environments or omits job-scoped
-  release controls, yet the canonical release-configuration validator emits
-  passing exact-commit evidence.
-- Reproduction: a disposable workflow mutation changed the private and public
-  publishing jobs to `unrelated-private` and `unrelated-public`, retaining
-  `nuget.private-preview` and `nuget.org` only in inline comments. With local
-  deterministic GitHub-API responses for otherwise valid configuration (and a
-  temporary nonempty-secret workaround for SP-AUDIT-052), the validator exited
-  0 and reported both environments validated. No network or external write was
-  performed; all workflow, contract, and mock changes were removed.
-- Required closure: parse the workflow with a pinned YAML reader or compare a
-  generated semantic release-job model; bind each release tag predicate,
-  `needs`, environment, permissions, secret/variable reference, OIDC login,
-  artifact input, and publication command to the actual authorized job. Add
-  comment/dead-job decoys, wrong environment, missing job permission, wrong
-  secret source, changed guard, and valid workflow controls plus certifier
-  mutations for every semantic field.
 
 ### SP-AUDIT-080 - Compiler feature labels do not bind discovered proof scope (P0)
 
