@@ -536,19 +536,17 @@ internal static class ContractForSymbolMatcher
                    right.ReturnsByRefReadonly, right.Parameters.Length) &&
                TypesMatch(left.ReturnType, right.ReturnType,
                    leftScope, rightScope, normalizeMappedTypeParameters) &&
-               CustomModifiersMatch(
+               FunctionPointerReturnCustomModifiersMatch(
                    left.ReturnTypeCustomModifiers,
-                   right.ReturnTypeCustomModifiers) &&
+                   right.ReturnTypeCustomModifiers,
+                   left.UnmanagedCallingConventionTypes,
+                   right.UnmanagedCallingConventionTypes) &&
                CustomModifiersMatch(
                    left.RefCustomModifiers,
                    right.RefCustomModifiers) &&
-               left.UnmanagedCallingConventionTypes.Length ==
-                   right.UnmanagedCallingConventionTypes.Length &&
-               left.UnmanagedCallingConventionTypes.Select((type, index) =>
-                       SymbolEqualityComparer.Default.Equals(
-                           type,
-                           right.UnmanagedCallingConventionTypes[index]))
-                   .All(static matches => matches) &&
+               UnmanagedCallingConventionTypesMatch(
+                   left.UnmanagedCallingConventionTypes,
+                   right.UnmanagedCallingConventionTypes) &&
                left.Parameters.Select((parameter, index) =>
                        FunctionPointerParametersMatch(
                            parameter,
@@ -557,6 +555,69 @@ internal static class ContractForSymbolMatcher
                            rightScope,
                            normalizeMappedTypeParameters))
                    .All(static matches => matches);
+    }
+
+    private static bool UnmanagedCallingConventionTypesMatch(
+        ImmutableArray<INamedTypeSymbol> left,
+        ImmutableArray<INamedTypeSymbol> right)
+    {
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+
+        var matched = new bool[right.Length];
+        foreach (var leftType in left)
+        {
+            var match = -1;
+            for (var index = 0; index < right.Length; index++)
+            {
+                if (!matched[index] &&
+                    SymbolEqualityComparer.Default.Equals(
+                        leftType,
+                        right[index]))
+                {
+                    match = index;
+                    break;
+                }
+            }
+
+            if (match < 0)
+            {
+                return false;
+            }
+
+            matched[match] = true;
+        }
+
+        return true;
+    }
+
+    private static bool FunctionPointerReturnCustomModifiersMatch(
+        ImmutableArray<CustomModifier> left,
+        ImmutableArray<CustomModifier> right,
+        ImmutableArray<INamedTypeSymbol> leftCallingConventions,
+        ImmutableArray<INamedTypeSymbol> rightCallingConventions)
+    {
+        return CustomModifiersMatch(
+            [.. left.Where(modifier =>
+                !IsCallingConventionModifier(
+                    modifier,
+                    leftCallingConventions))],
+            [.. right.Where(modifier =>
+                !IsCallingConventionModifier(
+                    modifier,
+                    rightCallingConventions))]);
+    }
+
+    private static bool IsCallingConventionModifier(
+        CustomModifier modifier,
+        ImmutableArray<INamedTypeSymbol> callingConventions)
+    {
+        return callingConventions.Any(type =>
+            SymbolEqualityComparer.Default.Equals(
+                modifier.Modifier,
+                type));
     }
 
     private static bool FunctionPointerParametersMatch(

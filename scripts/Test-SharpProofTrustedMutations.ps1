@@ -1238,6 +1238,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~RefReturningExpressionBodiedCompanionHasAnOperationBody'
     },
     [pscustomobject]@{
+        Name = 'contract-function-pointer-conventions-are-unordered'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = '                    match = index;'
+        Mutated = '                    match = left.IndexOf(leftType);'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~UnmanagedFunctionPointerConventionOrderIsInterchangeable'
+    },
+    [pscustomobject]@{
         Name = 'verifier-native-payload-is-build-tool-only'
         File = 'SharpProof.Verifier\SharpProof.Verifier.nuspec'
         Original = 'target="tools/native/linux-x64"'
