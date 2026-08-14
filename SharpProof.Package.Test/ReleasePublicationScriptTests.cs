@@ -155,7 +155,10 @@ public sealed class ReleasePublicationScriptTests
                 absentPlan.RootElement,
                 expectedRepositoryCommit,
                 remoteState: "Absent",
-                action: "Push");
+                mainState: "FixtureAbsent",
+                mainAction: "Push",
+                symbolsState: "FixtureAbsent",
+                symbolsAction: "Push");
         }
 
         var fixtures = feed.Packages
@@ -787,7 +790,10 @@ public sealed class ReleasePublicationScriptTests
         JsonElement root,
         string expectedRepositoryCommit,
         string remoteState,
-        string action)
+        string mainState,
+        string mainAction,
+        string symbolsState,
+        string symbolsAction)
     {
         Assert.That(
             root.GetProperty("schemaVersion").GetInt32(),
@@ -811,12 +817,20 @@ public sealed class ReleasePublicationScriptTests
             Is.All.EqualTo(remoteState));
         Assert.That(
             packages.Select(package =>
+                package.GetProperty("mainState").GetString()),
+            Is.All.EqualTo(mainState));
+        Assert.That(
+            packages.Select(package =>
                 package.GetProperty("mainAction").GetString()),
-            Is.All.EqualTo(action));
+            Is.All.EqualTo(mainAction));
+        Assert.That(
+            packages.Select(package =>
+                package.GetProperty("symbolsState").GetString()),
+            Is.All.EqualTo(symbolsState));
         Assert.That(
             packages.Select(package =>
                 package.GetProperty("symbolsAction").GetString()),
-            Is.All.EqualTo(action));
+            Is.All.EqualTo(symbolsAction));
     }
 
     private static async Task<JsonDocument> RunPlanAsync(

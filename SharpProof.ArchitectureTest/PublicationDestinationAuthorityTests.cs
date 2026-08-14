@@ -20,6 +20,17 @@ public sealed class PublicationDestinationAuthorityTests
     [TestCase("missing-fixture", false)]
     [TestCase("changed-fixture", false)]
     [TestCase("removed-symbol-projection", false)]
+    [TestCase("actions-targetless", true)]
+    [TestCase("actions-fixture", true)]
+    [TestCase("actions-registry-unchecked", true)]
+    [TestCase("actions-registry-absent", true)]
+    [TestCase("actions-symbol-preflight", false)]
+    [TestCase("actions-swapped", false)]
+    [TestCase("actions-removed-projection", false)]
+    [TestCase("mocked-main-missing", true)]
+    [TestCase("mocked-main-exists", false)]
+    [TestCase("mocked-main-error", false)]
+    [TestCase("zero-symbol-preflight", true)]
     public async Task PublicationDestinationModesAreExactAndAuthenticated(
         string mutation,
         bool expectedSuccess)
@@ -38,6 +49,9 @@ public sealed class PublicationDestinationAuthorityTests
             FindRepositoryRoot(), "scripts", "Publish-SharpProofRelease.ps1"));
         Assert.That(text, Does.Contain("New-SharpProofPublicationDestinationAuthority"));
         Assert.That(text, Does.Contain("publicationDestination ="));
+        Assert.That(text, Does.Contain("New-SharpProofPublicationActionAuthority"));
+        Assert.That(text, Does.Contain("Test-SharpProofPublicationActionAuthority"));
+        Assert.That(text, Does.Contain("symbolsAction = $action.symbolsAction"));
         Assert.That(text, Does.Not.Contain("source = if ("));
     }
 

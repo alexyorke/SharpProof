@@ -640,28 +640,6 @@ function Get-V3PackageBaseAddress {
     return $baseUri.AbsoluteUri.TrimEnd('/')
 }
 
-function Get-RemotePackageUrl {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$BaseAddress,
-
-        [Parameter(Mandatory = $true)]
-        [string]$PackageId,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Version
-    )
-
-    $normalizedId = $PackageId.ToLowerInvariant()
-    $normalizedVersion = $Version.ToLowerInvariant()
-    return (
-        $BaseAddress + '/' +
-        [Uri]::EscapeDataString($normalizedId) + '/' +
-        [Uri]::EscapeDataString($normalizedVersion) + '/' +
-        [Uri]::EscapeDataString(
-            "$normalizedId.$normalizedVersion.nupkg"))
-}
-
 function Get-RemotePackageState {
     param(
         [Parameter(Mandatory = $true)]
@@ -699,37 +677,13 @@ function Get-RemotePackageState {
         }
     }
 
-    $remoteUrl = Get-RemotePackageUrl `
+    return Invoke-SharpProofMainPackagePreflight `
+        -Package $Package `
         -BaseAddress $BaseAddress `
-        -PackageId $Package.packageId `
-        -Version $Package.version
-    $temporaryPath = [IO.Path]::GetTempFileName()
-    try {
-        [IO.File]::Delete($temporaryPath)
-        $response = Invoke-V3Get `
-            -Uri $remoteUrl `
-            -OutputPath $temporaryPath
-        $status = [int]$response.StatusCode
-        if ($status -eq 404) {
-            return [pscustomobject][ordered]@{
-                state = 'Absent'
-                remoteUrl = $remoteUrl
-            }
+        -Get {
+            param($uri, $outputPath)
+            Invoke-V3Get -Uri $uri -OutputPath $outputPath
         }
-        if ($status -ne 200) {
-            throw (
-                "NuGet PackageBaseAddress returned HTTP $status for " +
-                "$($Package.packageId) $($Package.version).")
-        }
-        throw (
-            "Remote main package already exists; publication is " +
-            "non-overwriting: $($Package.packageId) $($Package.version).")
-    }
-    finally {
-        if ([IO.File]::Exists($temporaryPath)) {
-            [IO.File]::Delete($temporaryPath)
-        }
-    }
 }
 
 function Invoke-NuGetPush {
@@ -872,6 +826,19 @@ foreach ($package in $release.packages) {
             -BaseAddress $baseAddress `
             -FixtureDirectory $resolvedRemoteDirectory
     }
+    $action = New-SharpProofPublicationActionAuthority `
+        -Mode $publicationDestination.mode `
+        -MainState $(if ($publicationDestination.mode -ceq 'registry') {
+            $remote.state
+        }
+        else { $null })
+    Test-SharpProofPublicationActionAuthority `
+        -Authority $action `
+        -Mode $publicationDestination.mode `
+        -MainState $(if ($publicationDestination.mode -ceq 'registry') {
+            $remote.state
+        }
+        else { $null })
     $entries.Add([pscustomobject][ordered]@{
         packageId = $package.packageId
         version = $package.version
@@ -887,24 +854,10 @@ foreach ($package in $release.packages) {
         }
         else { $null }
         remoteUrl = $remote.remoteUrl
-        mainAction = if ($publicationDestination.mode -ceq 'targetless') {
-            $null
-        }
-        elseif ($remote.state -eq 'Absent') {
-            'Push'
-        }
-        else {
-            'PreflightThenPush'
-        }
-        symbolsAction = if ($publicationDestination.mode -ceq 'targetless') {
-            $null
-        }
-        elseif ($remote.state -eq 'Absent') {
-            'Push'
-        }
-        else {
-            'PreflightThenPush'
-        }
+        mainState = $action.mainState
+        mainAction = $action.mainAction
+        symbolsState = $action.symbolsState
+        symbolsAction = $action.symbolsAction
     })
 }
 

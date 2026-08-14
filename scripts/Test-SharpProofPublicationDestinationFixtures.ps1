@@ -5,7 +5,11 @@ param(
         'registry-inherited','registry-distinct','targetless','fixture','http',
         'relative','userinfo','query','fragment','symbol-without-main',
         'fixture-uri-conflict','missing-fixture','changed-fixture',
-        'removed-symbol-projection')]
+        'removed-symbol-projection','actions-targetless','actions-fixture',
+        'actions-registry-unchecked','actions-registry-absent',
+        'actions-symbol-preflight','actions-swapped',
+        'actions-removed-projection','mocked-main-missing',
+        'mocked-main-exists','mocked-main-error','zero-symbol-preflight')]
     [string]$Mutation
 )
 
@@ -61,6 +65,60 @@ try {
     Test-SharpProofPublicationDestinationAuthority `
         -Authority $authority -Source $main -SymbolSource $symbols `
         -FixtureDirectory $fixturePath -InputSnapshot $snapshot
+    if ($Mutation.StartsWith('actions-', [StringComparison]::Ordinal)) {
+        $mode = switch ($Mutation) {
+            'actions-targetless' { 'targetless' }
+            'actions-fixture' { 'fixture' }
+            default { 'registry' }
+        }
+        $mainState = if ($Mutation -eq 'actions-registry-unchecked') {
+            'Unchecked'
+        }
+        elseif ($mode -ceq 'registry') { 'Absent' }
+        else { $null }
+        $action = New-SharpProofPublicationActionAuthority `
+            -Mode $mode -MainState $mainState
+        if ($Mutation -eq 'actions-symbol-preflight') {
+            $action.symbolsAction = 'PreflightThenPush'
+        }
+        elseif ($Mutation -eq 'actions-swapped') {
+            $temporary = $action.mainAction
+            $action.mainAction = $action.symbolsAction
+            $action.symbolsAction = $temporary
+        }
+        elseif ($Mutation -eq 'actions-removed-projection') {
+            $action.PSObject.Properties.Remove('symbolsState')
+        }
+        Test-SharpProofPublicationActionAuthority `
+            -Authority $action -Mode $mode -MainState $mainState
+    }
+    if ($Mutation.StartsWith('mocked-main-', [StringComparison]::Ordinal) -or
+        $Mutation -eq 'zero-symbol-preflight') {
+        $script:preflightCalls = [Collections.Generic.List[string]]::new()
+        $status = switch ($Mutation) {
+            'mocked-main-exists' { 200 }
+            'mocked-main-error' { 503 }
+            default { 404 }
+        }
+        $package = [pscustomobject]@{
+            packageId = 'SharpProof'
+            version = '1.0.0-preview.1'
+        }
+        $result = Invoke-SharpProofMainPackagePreflight `
+            -Package $package `
+            -BaseAddress 'https://packages.example.test/v3-flatcontainer' `
+            -Get {
+                param($uri, $outputPath)
+                $script:preflightCalls.Add([string]$uri)
+                return [pscustomobject]@{ StatusCode = $status }
+            }
+        if ($result.state -cne 'Absent' -or
+            $script:preflightCalls.Count -ne 1 -or
+            $script:preflightCalls[0] -notmatch '\.nupkg$' -or
+            $script:preflightCalls[0] -match '\.snupkg$') {
+            throw 'Only the exact main package may be preflighted.'
+        }
+    }
     if ($Mutation -eq 'registry-inherited' -and
         [string]$authority.mainDestination -cne
             [string]$authority.symbolDestination) {

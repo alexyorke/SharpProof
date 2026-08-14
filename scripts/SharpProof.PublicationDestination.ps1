@@ -124,3 +124,127 @@ function Test-SharpProofPublicationDestinationAuthority {
         throw 'Publication destination authority is invalid.'
     }
 }
+
+function New-SharpProofPublicationActionAuthority {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('targetless','fixture','registry')]
+        [string]$Mode,
+
+        [AllowNull()][string]$MainState
+    )
+
+    if ($Mode -cne 'registry' -and
+        -not [string]::IsNullOrEmpty($MainState)) {
+        throw 'Only registry publication has a main remote state.'
+    }
+    if ($Mode -ceq 'registry' -and
+        $MainState -cnotin @('Absent', 'Unchecked')) {
+        throw 'Registry main state must be Absent or Unchecked.'
+    }
+    $authority = switch ($Mode) {
+        'targetless' {
+            [pscustomobject][ordered]@{
+                mainState = 'NotTargeted'
+                mainAction = 'None'
+                symbolsState = 'NotTargeted'
+                symbolsAction = 'None'
+            }
+        }
+        'fixture' {
+            [pscustomobject][ordered]@{
+                mainState = 'FixtureAbsent'
+                mainAction = 'Push'
+                symbolsState = 'FixtureAbsent'
+                symbolsAction = 'Push'
+            }
+        }
+        'registry' {
+            [pscustomobject][ordered]@{
+                mainState = $MainState
+                mainAction = if ($MainState -ceq 'Absent') {
+                    'Push'
+                }
+                else { 'PreflightThenPush' }
+                symbolsState = 'Unchecked'
+                symbolsAction = 'CollisionOnPush'
+            }
+        }
+    }
+    return $authority
+}
+
+function Test-SharpProofPublicationActionAuthority {
+    param(
+        [Parameter(Mandatory = $true)][object]$Authority,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('targetless','fixture','registry')]
+        [string]$Mode,
+        [AllowNull()][string]$MainState
+    )
+
+    $expected = New-SharpProofPublicationActionAuthority `
+        -Mode $Mode -MainState $MainState
+    $actualNames = @($Authority.PSObject.Properties.Name)
+    $expectedNames = @($expected.PSObject.Properties.Name)
+    if (($actualNames -join "`0") -cne ($expectedNames -join "`0") -or
+        ($Authority | ConvertTo-Json -Compress) -cne
+            ($expected | ConvertTo-Json -Compress)) {
+        throw 'Publication action authority is invalid.'
+    }
+}
+
+function Get-SharpProofRemoteMainPackageUrl {
+    param(
+        [Parameter(Mandatory = $true)][string]$BaseAddress,
+        [Parameter(Mandatory = $true)][string]$PackageId,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+
+    $normalizedId = $PackageId.ToLowerInvariant()
+    $normalizedVersion = $Version.ToLowerInvariant()
+    return (
+        $BaseAddress.TrimEnd('/') + '/' +
+        [Uri]::EscapeDataString($normalizedId) + '/' +
+        [Uri]::EscapeDataString($normalizedVersion) + '/' +
+        [Uri]::EscapeDataString(
+            "$normalizedId.$normalizedVersion.nupkg"))
+}
+
+function Invoke-SharpProofMainPackagePreflight {
+    param(
+        [Parameter(Mandatory = $true)][object]$Package,
+        [Parameter(Mandatory = $true)][string]$BaseAddress,
+        [Parameter(Mandatory = $true)][scriptblock]$Get
+    )
+
+    $remoteUrl = Get-SharpProofRemoteMainPackageUrl `
+        -BaseAddress $BaseAddress `
+        -PackageId $Package.packageId `
+        -Version $Package.version
+    $temporaryPath = [IO.Path]::GetTempFileName()
+    try {
+        [IO.File]::Delete($temporaryPath)
+        $response = & $Get $remoteUrl $temporaryPath
+        $status = [int]$response.StatusCode
+        if ($status -eq 404) {
+            return [pscustomobject][ordered]@{
+                state = 'Absent'
+                remoteUrl = $remoteUrl
+            }
+        }
+        if ($status -ne 200) {
+            throw (
+                "NuGet PackageBaseAddress returned HTTP $status for " +
+                "$($Package.packageId) $($Package.version).")
+        }
+        throw (
+            "Remote main package already exists; publication is " +
+            "non-overwriting: $($Package.packageId) $($Package.version).")
+    }
+    finally {
+        if ([IO.File]::Exists($temporaryPath)) {
+            [IO.File]::Delete($temporaryPath)
+        }
+    }
+}

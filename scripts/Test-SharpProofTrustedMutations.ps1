@@ -1619,6 +1619,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~PublicationDestinationAuthorityTests'
     },
     [pscustomobject]@{
+        Name = 'release-symbol-publication-action-authority'
+        File = 'scripts\SharpProof.PublicationDestination.ps1'
+        Original = "                symbolsAction = 'CollisionOnPush'"
+        Mutated = "                symbolsAction = 'PreflightThenPush'"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationDestinationModesAreExactAndAuthenticated'
+    },
+    [pscustomobject]@{
         Name = 'release-checksum-byte-comparison'
         File = 'scripts\SharpProof.ReleaseChecksums.ps1'
         Original = '    if ($actual.Length -ne $expected.Length -or'
