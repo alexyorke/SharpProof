@@ -12,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 
 function Get-SpdxPackageId {
     param(
@@ -32,6 +33,9 @@ function Get-SpdxPackageId {
         $suffix -replace '[^A-Za-z0-9.-]', '-')
 }
 
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$releaseVersion = Get-SharpProofReleaseVersion `
+    -RepositoryRoot $repositoryRoot
 $resolvedSource = (Resolve-Path `
     -LiteralPath $PackageSource `
     -ErrorAction Stop).Path
@@ -42,6 +46,10 @@ if ($ExpectedTag -notmatch '^v(?<version>[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]
     throw "Release tag must be v<SemVer>: $ExpectedTag"
 }
 $expectedVersion = $Matches['version']
+Test-SharpProofReleaseVersion `
+    -ExpectedVersion $releaseVersion `
+    -ActualVersion $expectedVersion `
+    -Owner 'Release tag'
 $manifestPath = Join-Path $resolvedSource 'SharpProof.release.json'
 $sumsPath = Join-Path $resolvedSource 'SHA256SUMS'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw |
@@ -54,7 +62,9 @@ if ([string]$manifest.packageVersion -ne $expectedVersion) {
     throw "Release tag '$ExpectedTag' does not match package version " +
         "'$($manifest.packageVersion)'."
 }
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Test-SharpProofReleaseVersionAuthority `
+    -RepositoryRoot $repositoryRoot `
+    -Authority $manifest.versionAuthority
 $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
     throw 'Could not resolve the release checkout commit.'

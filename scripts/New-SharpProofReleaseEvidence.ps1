@@ -18,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 
 function Get-PackageIdentity {
     param(
@@ -523,6 +524,8 @@ if (-not (Test-Path -LiteralPath $resolvedSource -PathType Container)) {
 $repositoryRoot = (Resolve-Path `
     -LiteralPath (Join-Path $PSScriptRoot '..') `
     -ErrorAction Stop).Path
+$releaseVersion = Get-SharpProofReleaseVersion `
+    -RepositoryRoot $repositoryRoot
 if ([string]::IsNullOrWhiteSpace($ThirdPartyManifestPath)) {
     $resolvedThirdPartyManifest = Join-Path `
         $repositoryRoot `
@@ -607,6 +610,10 @@ $versions = @(
 if ($versions.Count -ne 1) {
     throw "NuGet artifact versions must match; found '$($versions -join ', ')'."
 }
+Test-SharpProofReleaseVersionSet `
+    -ExpectedVersion $releaseVersion `
+    -Versions @($identities | ForEach-Object { $_.Identity.Version }) `
+    -Owner 'NuGet artifacts'
 $commits = @(
     $identities |
         ForEach-Object { $_.Identity.RepositoryCommit } |
@@ -892,7 +899,9 @@ $orderedArtifacts = @(
 )
 $manifest = [pscustomobject][ordered]@{
     schemaVersion = 2
-    packageVersion = $versions[0]
+    packageVersion = $releaseVersion
+    versionAuthority = Get-SharpProofReleaseVersionAuthority `
+        -RepositoryRoot $repositoryRoot
     repository = [pscustomobject][ordered]@{
         type = 'git'
         url = 'https://github.com/alexyorke/SharpProof'

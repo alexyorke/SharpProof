@@ -52,6 +52,9 @@ try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/Invoke-SharpProofReleaseContainer.ps1') `
         -Destination (Join-Path $checkout 'scripts/Invoke-SharpProofReleaseContainer.ps1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Get-SharpProofReleaseVersion.ps1') `
+        -Destination (Join-Path $checkout 'scripts/Get-SharpProofReleaseVersion.ps1')
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'SharpProof.Release.props') `
         -Destination (Join-Path $checkout 'SharpProof.Release.props')
     & git -C $checkout add -- .

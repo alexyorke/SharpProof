@@ -1580,6 +1580,14 @@ $mutations = @(
         Mutated = '                Line = source ? span.StartLinePosition.Line : 0,'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerDiagnosticLocationsUseOneBasedMappedCoordinates'
+    },
+    [pscustomobject]@{
+        Name = 'release-version-authority-ordinal-comparison'
+        File = 'scripts\Get-SharpProofReleaseVersion.ps1'
+        Original = '    if (-not $ActualVersion.Equals('
+        Mutated = '    if ($false -and -not $ActualVersion.Equals('
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseVersionAuthorityTests'
     }
 )
 

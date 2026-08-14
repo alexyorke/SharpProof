@@ -40,6 +40,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -68,6 +69,8 @@ function Get-RequiredProperty {
 
 function Get-RepositoryHead {
     $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $releaseVersion = Get-SharpProofReleaseVersion `
+        -RepositoryRoot $repositoryRoot
     if ($null -eq (Get-Command git -ErrorAction SilentlyContinue)) {
         throw 'Git is required to verify the release checkout commit.'
     }
@@ -268,6 +271,14 @@ function Get-ValidatedRelease {
         '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
         throw "Release manifest package version is invalid: '$version'."
     }
+    Test-SharpProofReleaseVersion `
+        -ExpectedVersion $releaseVersion `
+        -ActualVersion $version `
+        -Owner 'Release manifest'
+    Test-SharpProofReleaseVersionAuthority `
+        -RepositoryRoot $repositoryRoot `
+        -Authority (Get-RequiredProperty `
+            $manifest 'versionAuthority' 'Release manifest')
 
     $repository = Get-RequiredProperty `
         $manifest `
@@ -532,6 +543,7 @@ function Get-ValidatedRelease {
 
     return [pscustomobject][ordered]@{
         version = $version
+        versionAuthority = $manifest.versionAuthority
         packages = @($packages)
     }
 }
@@ -864,6 +876,7 @@ $plan = [pscustomobject][ordered]@{
     schemaVersion = 1
     planOnly = [bool]$PlanOnly
     packageVersion = $release.version
+    versionAuthority = $release.versionAuthority
     repositoryCommit = $repositoryHead
     source = if ([string]::IsNullOrWhiteSpace($Source)) {
         $null

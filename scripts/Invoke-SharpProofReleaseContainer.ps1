@@ -20,19 +20,7 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
-
-function Get-ReleaseVersion {
-    [xml]$release = Get-Content -LiteralPath (
-        Join-Path $repositoryRoot 'SharpProof.Release.props') -Raw
-    $prefix = [string]$release.Project.PropertyGroup.SharpProofVersionPrefix
-    $version = ([string]$release.Project.PropertyGroup.SharpProofPackageVersion).
-        Replace('$(SharpProofVersionPrefix)', $prefix)
-    if ($version -notmatch
-        '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
-        throw "Invalid SharpProof package version '$version'."
-    }
-    return $version
-}
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 
 function Require-Environment([string]$Name) {
     $value = [Environment]::GetEnvironmentVariable($Name)
@@ -59,7 +47,8 @@ function Resolve-RepositoryPath([string]$Path) {
 
 switch ($Mode) {
     'ValidateTag' {
-        $version = Get-ReleaseVersion
+        $version = Get-SharpProofReleaseVersion `
+            -RepositoryRoot $repositoryRoot
         $ref = Require-Environment 'GITHUB_REF'
         $refName = Require-Environment 'GITHUB_REF_NAME'
         $commit = Require-Environment 'GITHUB_SHA'
@@ -117,7 +106,8 @@ switch ($Mode) {
         if (@(& git -C $repositoryRoot status --porcelain).Count -ne 0) {
             throw 'Qualification requires a clean checkout.'
         }
-        $version = Get-ReleaseVersion
+        $version = Get-SharpProofReleaseVersion `
+            -RepositoryRoot $repositoryRoot
         if ($tag -cne "v$version") {
             throw "Qualification tag '$tag' does not match package version '$version'."
         }
