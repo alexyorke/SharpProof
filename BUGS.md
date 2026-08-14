@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 68 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 67 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 68 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-119 - SBOM accepts contradictory SHA-256 identities (fixed)
+
+- [x] Fixed by `ad418aac6` (`fix: validate exact SPDX checksums`).
+- A shared SPDX checksum authority now requires the raw `checksums` value to be
+  an array containing exactly one non-null row with exactly `algorithm` and
+  `checksumValue`, case-exact `SHA256`, and the authenticated lowercase digest.
+  Evidence generation, final validation, and publication planning all invoke
+  this authority.
+- Regression-first fixtures cover first- and third-party canonical rows,
+  duplicate same/different digests, extra algorithms, missing/wrong/stale/case
+  values, extra/missing properties, scalar/null/object shapes, every consumer,
+  and a removal mutation. Focused tests passed 14/14, structural plus focused
+  15/15, full Architecture 230/230, and `git diff --check` passed.
 
 ### SP-AUDIT-115 - Methodless scopes hide rejected control attributes (fixed)
 
@@ -2097,21 +2111,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: inventory all selected accessors and require an exact
   effect result or typed abstention. Add auto get/set/init, explicit, abstract,
   extern, suppression, outcome-recording, and mutation controls.
-
-### SP-AUDIT-119 - SBOM accepts contradictory SHA-256 identities (P2)
-
-- [ ] Release evidence generation and final validation filter an SPDX package's
-  checksum rows to the expected SHA-256 and require one matching row, but never
-  authenticate the complete checksum array.
-- Certifier impact: adding a second SHA-256 row containing 64 zeroes left one
-  expected-value match, so both current predicates accepted an SBOM that gives
-  two contradictory immutable identities for the same package bytes.
-- Reproduction: the read-only release auditor mutated an in-memory first-party
-  SPDX package and confirmed two distinct SHA-256 values while both canonical
-  acceptance predicates returned true.
-- Required closure: require exactly one checksum row with the exact algorithm
-  and value in evidence creation, final validation, and publication validation.
-  Add wrong, duplicate, extra-algorithm, missing, stale, and canonical controls.
 
 ### SP-AUDIT-121 - Cache capacity enforcement is not transactional (P2)
 
