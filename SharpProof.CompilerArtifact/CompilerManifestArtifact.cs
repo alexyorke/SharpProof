@@ -403,7 +403,7 @@ internal static class CompilerManifestArtifactJson
     {
         return diagnostics?.All(static item =>
             item != null &&
-            !string.IsNullOrWhiteSpace(item.Code) &&
+            WorkerProtocolJson.IsCompilerDiagnosticCode(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
             item.Location is { Path: not null } location &&
             WorkerProtocolJson.HasValidLocationOrNone(location)) == true;

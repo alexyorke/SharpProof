@@ -339,6 +339,62 @@ public sealed class CompilerManifestArtifactTests
         }
     }
 
+    [TestCase("worker.infrastructure")]
+    [TestCase("SP0001")]
+    [TestCase("compiler.")]
+    [TestCase("Compiler.CS1001")]
+    [TestCase("compiler. CS1001")]
+    [TestCase("compiler.CS1001 ")]
+    [TestCase("compiler.CS-1001")]
+    [TestCase("compiler.CS.1001")]
+    [TestCase(" compiler.CS1001")]
+    [TestCase("compiler.CS/1001")]
+    public void CompilerDiagnosticCodesRequireTheExactReservedNamespace(
+        string code)
+    {
+        var artifact = CreateArtifact();
+        artifact.CompilerDiagnostics = [Diagnostic(
+            "invalid code", length: 1, line: 1, column: 1)];
+        artifact.CompilerDiagnostics[0].Code = code;
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, artifact.CompilerDiagnostics);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
+    public void CompilerDiagnosticCodesRejectControlCharacters()
+    {
+        var artifact = CreateArtifact();
+        artifact.CompilerDiagnostics = [Diagnostic(
+            "invalid code", length: 1, line: 1, column: 1)];
+        artifact.CompilerDiagnostics[0].Code = "compiler.CS" + (char)1;
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, artifact.CompilerDiagnostics);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [TestCase("compiler.CS1001")]
+    [TestCase("compiler.ERR_Test")]
+    [TestCase("compiler.A1_b2")]
+    public void CompilerDiagnosticCodesAcceptCanonicalRoslynIdGrammar(
+        string code)
+    {
+        var artifact = CreateArtifact();
+        artifact.CompilerDiagnostics = [Diagnostic(
+            "canonical code", length: 1, line: 1, column: 1)];
+        artifact.CompilerDiagnostics[0].Code = code;
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, artifact.CompilerDiagnostics);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))));
+    }
+
     [Test]
     public void RelationalEvidenceSchemaVersionsAreExactPins()
     {

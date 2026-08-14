@@ -1654,6 +1654,14 @@ $mutations = @(
         Mutated = "Start-AcceptanceTimingPhase -Name 'static-validation'"
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~AcceptanceScriptOwnsRestoreInsideOuterTimeline'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-diagnostic-reserved-namespace'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '            WorkerProtocolJson.IsCompilerDiagnosticCode(item.Code) &&'
+        Mutated = '            true &&'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerDiagnosticCodesRequireTheExactReservedNamespace'
     }
 )
 

@@ -250,7 +250,7 @@ internal static class WorkerResultAssembler
         {
             return (WorkerRunStatus.Failed, WorkerRunFailureReason.InputUnavailable);
         }
-        if (IsCompilerDiagnosticCode(code))
+        if (WorkerProtocolJson.IsCompilerDiagnosticCode(code))
         {
             return (WorkerRunStatus.Failed, WorkerRunFailureReason.CompilationFailure);
         }
@@ -286,15 +286,4 @@ internal static class WorkerResultAssembler
         return value.StartsWith(prefix, StringComparison.Ordinal);
     }
 
-    private static bool IsCompilerDiagnosticCode(string value)
-    {
-        const string prefix = "compiler.";
-        return value.StartsWith(prefix, StringComparison.Ordinal) &&
-            value.Length > prefix.Length &&
-            value.Skip(prefix.Length).All(static character =>
-                (character >= 'A' && character <= 'Z') ||
-                (character >= 'a' && character <= 'z') ||
-                (character >= '0' && character <= '9') ||
-                character == '_');
-    }
 }

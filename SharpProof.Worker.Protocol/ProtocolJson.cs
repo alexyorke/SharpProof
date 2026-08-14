@@ -8,6 +8,7 @@ namespace SharpProof.Worker.Protocol;
 
 public static partial class WorkerProtocolJson
 {
+    internal const string CompilerDiagnosticCodePrefix = "compiler.";
     internal const int MaximumJsonBytes = 16 * 1024 * 1024;
     internal const int MaximumJsonDepth = 32;
     private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
@@ -15,6 +16,21 @@ public static partial class WorkerProtocolJson
     private static readonly JsonSerializerOptions s_options = CreateOptions();
 
     public static JsonSerializerOptions Options => new(s_options);
+
+    internal static bool IsCompilerDiagnosticCode(string? value)
+    {
+        return value != null &&
+            value.StartsWith(
+                CompilerDiagnosticCodePrefix,
+                StringComparison.Ordinal) &&
+            value.Length > CompilerDiagnosticCodePrefix.Length &&
+            value.Skip(CompilerDiagnosticCodePrefix.Length).All(
+                static character =>
+                    (character >= 'A' && character <= 'Z') ||
+                    (character >= 'a' && character <= 'z') ||
+                    (character >= '0' && character <= '9') ||
+                    character == '_');
+    }
 
     internal static string ReadUtf8File(string path)
     {
