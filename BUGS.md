@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 80 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 79 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 80 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-231 - ContractFor conflates positive and negative zero defaults (fixed)
+
+- [x] Fixed by `1d1fee582` (`fix: compare floating defaults by bits`).
+- Explicit float and double defaults now compare by their exact IEEE bit
+  patterns, preserving the observable distinction between positive and negative
+  zero. Other default-value types retain the existing boxed comparison, and NaN
+  follows the canonical value exposed by Roslyn symbols.
+- Regression-first tests cover both zero directions for float and double,
+  compilation references, generated/current source, ordinary values,
+  infinities, canonical NaN, non-floating defaults, overloads, binder behavior,
+  and float/double comparator-removal mutations. Focused Generator passed 22/22
+  and Contracts 3/3; full Generator 108/108, Contracts 108/108, Analyzer
+  302/302, Architecture 182/182, and `git diff --check` passed.
 
 ### SP-AUDIT-221 - Function-pointer convention order is overconstrained (fixed)
 
@@ -1470,17 +1484,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
-
-### SP-AUDIT-231 - ContractFor conflates positive and negative zero defaults (P1)
-
-- [ ] Optional floating-point defaults are compared through boxed equality, so
-  `+0.0` and `-0.0` are treated as identical despite distinct compiler metadata
-  bits and observable reciprocal behavior.
-- Supported impact: a target and companion with different optional defaults can
-  be accepted as an exact contract surface without `SPCF0005`.
-- Required closure: compare canonical IEEE bit patterns for floating defaults.
-  Add float/double positive/negative zero, NaN payload policy, infinities,
-  ordinary constants, metadata/source, and comparator-removal controls.
 
 ### SP-AUDIT-232 - Implicit base initializers skip precondition replay (P1)
 
