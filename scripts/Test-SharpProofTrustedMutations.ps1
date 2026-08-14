@@ -806,6 +806,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath'
     },
     [pscustomobject]@{
+        Name = 'release-tag-exact-ref-authority'
+        File = 'scripts\Invoke-SharpProofReleaseContainer.ps1'
+        Original = '        if ($ref -cne $expectedRef) {'
+        Mutated = '        if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseTagAuthorityRejectsEveryNonExactIdentity'
+    },
+    [pscustomobject]@{
         Name = 'launcher-timeout-owns-result'
         File = 'SharpProof.Worker.Launcher\Program.cs'
         Original = '        if (exitCode == 124)'

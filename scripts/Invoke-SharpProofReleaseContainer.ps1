@@ -63,21 +63,32 @@ switch ($Mode) {
         $ref = Require-Environment 'GITHUB_REF'
         $refName = Require-Environment 'GITHUB_REF_NAME'
         $commit = Require-Environment 'GITHUB_SHA'
-        if ($ref.StartsWith('refs/tags/v', [StringComparison]::Ordinal)) {
-            if ($refName -cne "v$version") {
-                throw "Release tag '$refName' does not match '$version'."
-            }
-            $tagRef = "refs/tags/$refName"
-            if ((& git cat-file -t $tagRef).Trim() -cne 'tag') {
-                throw 'Release tag must be annotated.'
-            }
-            if ((& git rev-parse "${tagRef}^{commit}").Trim() -cne $commit) {
-                throw 'Release tag does not identify the checked-out commit.'
-            }
-            & git merge-base --is-ancestor $commit origin/master
-            if ($LASTEXITCODE -ne 0) {
-                throw 'Release tags must identify a commit in origin/master.'
-            }
+        $expectedTag = "v$version"
+        $expectedRef = "refs/tags/$expectedTag"
+        if ($ref -cne $expectedRef) {
+            throw "Release ref '$ref' does not match '$expectedRef'."
+        }
+        if ($refName -cne $expectedTag) {
+            throw "Release tag '$refName' does not match '$version'."
+        }
+        $head = (& git -C $repositoryRoot rev-parse HEAD 2>$null).Trim()
+        if ($LASTEXITCODE -ne 0 -or $commit -cne $head) {
+            throw "Release commit '$commit' does not match checkout HEAD '$head'."
+        }
+        $tagType = (& git -C $repositoryRoot cat-file -t $expectedRef `
+                2>$null)
+        if ($LASTEXITCODE -ne 0 -or ([string]$tagType).Trim() -cne 'tag') {
+            throw 'Release tag must exist as an annotated tag object.'
+        }
+        $tagCommit = (& git -C $repositoryRoot rev-parse `
+                "${expectedRef}^{commit}" 2>$null)
+        if ($LASTEXITCODE -ne 0 -or ([string]$tagCommit).Trim() -cne $commit) {
+            throw 'Release tag does not identify the checked-out commit.'
+        }
+        & git -C $repositoryRoot merge-base --is-ancestor `
+            $commit origin/master 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Release tags must identify a commit in origin/master.'
         }
         Write-Host "Release identity is valid for $version at $commit."
     }
