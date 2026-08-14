@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 54 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 53 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 54 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-146 - Diagnostic documentation contradicts rejected-API behavior (fixed)
+
+- [x] Fixed by `127847f05` (`fix: document rejected Contract API behavior`).
+- The maintained diagnostic examples now state the implemented distinction:
+  readable wrong-payload Contract API metadata emits SP0047
+  `ContractApiIdentityRejected`, while unreadable metadata emits SP0050. The
+  wired documentation generator requires that exact language and forbids the
+  stale silent-disable claim.
+- Regression coverage includes a readable hash-mismatched assembly producing
+  exact SP0047, the existing unreadable SP0050 control, stale-language mutation,
+  clean documentation, and a validator-removal mutation. Focused tests passed
+  1/1 and 5/5; Analyzer 319/319 and Architecture 349/349 passed.
 
 ### SP-AUDIT-135 - The documentation support-contract validator is disconnected (fixed)
 
@@ -2569,20 +2582,6 @@ Precision, documentation, and developer-experience debt that does not change a s
 - Required closure: give every named stage the same explicit repository root and
   non-root execution contract. Add direct build/test/package image-command,
   working-directory, UID, and Compose parity fixtures.
-
-### SP-AUDIT-146 - Diagnostic documentation contradicts rejected-API behavior (P3)
-
-- [ ] `docs/diagnostic-examples.md` says a readable wrong-payload Contract API
-  disables analysis without a diagnostic, while implementation and the other
-  public documents emit and promise SP0047 `ContractApiIdentityRejected`.
-- Supported impact: users are told to expect silence for behavior that produces
-  an explicit incomplete-coverage diagnostic, obscuring the distinction from
-  unreadable payloads and SP0050.
-- Evidence: resolver rejection and analyzer diagnostic routing match README and
-  public API text; only the diagnostic example states the opposite.
-- Required closure: add a wrong-hash readable-assembly behavioral test and bind
-  the documentation validator to the result. Forbid the stale silent-analysis
-  claim while retaining the unreadable-payload distinction.
 
 ### SP-AUDIT-181 - Resource and concurrency documentation drifts from catalogs (P3)
 
