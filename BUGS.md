@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 73 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 72 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,22 @@ The active backlog contains 73 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-044 - Release artifact roles are not bound to file types (fixed)
+
+- [x] Fixed by `e6cadcd07` (`fix: bind release package roles`).
+- The shared symbol-package validator now derives exact main and symbol
+  filenames from package ID, version, and role; opens both archives once;
+  rejects duplicate entries; authenticates inner nuspec ID/version/repository
+  commit; enforces main-without-PDB and symbol-with-PDB layout; and then performs
+  exact PDB/DLL/SourceLink pairing. Evidence, final validation, publisher, and
+  package-consumer paths all pass an independently derived version.
+- Regression-first fixtures cover exact valid packages, full byte role swaps,
+  renamed main/symbol files, cross-ID pairs, wrong inner commit, and all release
+  authority call sites, plus a role-validation mutation. Focused fixtures passed
+  7/7, Architecture 203/203, and `git diff --check` passed. An additional
+  end-to-end SBOM fixture was removed after its setup hit a separate restored-
+  assets ownership error; no broad package suite was restarted.
 
 ### SP-AUDIT-039 - Request-bound results accept fabricated runtime provenance (fixed)
 
@@ -1778,32 +1794,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutations restoring each shape-only path.
 - Consolidated cases: SP-AUDIT-217.
 - Unified closure: Share one artifact-aware mapping from proof-core labels to exact manifest assumptions, Used flags, and summary counts in producer and validator.
-
-### SP-AUDIT-044 - Release artifact roles are not bound to file types (P2)
-
-- [ ] `Test-SharpProofReleaseArtifacts.ps1` requires three `package` and three
-  `symbols` rows with the expected IDs, but it never requires a package row to
-  name the ID/version `.nupkg` or a symbols row to name the matching `.snupkg`.
-  Its SBOM package checksum follows whichever row merely says `package`.
-- Certifier impact: the standalone immutable-artifact gate can bless an
-  evidence bundle that treats symbol packages as main products and main
-  packages as symbols, so its success does not establish the stated artifact
-  roles. `Publish-SharpProofRelease.ps1` independently checks file extensions
-  and currently rejects the inverted bundle before planning or publication;
-  that later check mitigates, but does not make the advertised final validator
-  authoritative on its own.
-- Reproduction: a disposable canonical-container copy of the current package
-  bundle swapped `kind` between every main/symbol pair, repointed each SPDX
-  package checksum to the newly labeled main artifact, and recomputed the SBOM
-  hash/size, release manifest, and `SHA256SUMS`. The canonical final validator
-  exited zero and certified the inverted bundle for current HEAD. The temporary
-  copy and probe script were removed.
-- Required closure: derive the exact filename and extension from package ID,
-  version, and role; open each archive and enforce main-versus-symbol layout and
-  matching nuspec identity/commit before using its hash in the SBOM or publish
-  plan. Add role swaps, renamed extensions, cross-ID pairs, duplicate roles,
-  valid controls, plan/publish consumers, and a mutation restoring label-only
-  validation.
 
 ### SP-AUDIT-045 - Lowered IR wire form is not the exact encoder image (P2)
 
