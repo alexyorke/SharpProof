@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 35 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 34 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 35 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-095 - SBOM package URLs are not validated (fixed)
+
+- [x] Fixed by `985e4c99f` (`fix: validate exact SBOM package purls`).
+- The shared SBOM topology authority now derives one canonical NuGet purl from
+  each authenticated first- and third-party package name/version and requires
+  one exact, case-sensitive PACKAGE-MANAGER/purl external reference with no
+  missing, duplicate, encoded-alternate, or extra fields.
+- Focused purl/artifact tests passed 16/16. The full Architecture run reached
+  416/417 with only an older canonical fixture missing the newly required row;
+  after correcting that fixture, the impacted topology matrix passed 12/12.
 
 ### SP-AUDIT-075 - Effective verifier I/O topology is incompletely validated (fixed)
 
@@ -2279,22 +2290,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   generated shadow, ambiguous, missing, exact, mixed handwritten/generated,
   every profile, and non-generated filename controls plus a mutation that
   restores the early empty return.
-
-### SP-AUDIT-095 - SBOM package URLs are not validated (P2)
-
-- [ ] Evidence generation emits canonical NuGet purls in SPDX `externalRefs`,
-  but evidence, artifact, and publication validators never inspect those rows.
-- Certifier impact: a canonical component name, version, checksum, SPDX ID, and
-  relationship graph can carry a purl naming an unrelated package. Package-
-  manager consumers of the accepted SBOM then receive false component identity.
-- Reproduction: a harmless in-memory mutation replaced SharpProof's purl with
-  `pkg:nuget/Fabricated.Package@99.0.0`; every field currently consumed by the
-  validators remained unchanged, and bounded source inspection found no purl
-  validation path.
-- Required closure: derive one exact purl from each already authenticated
-  package name/version, require exactly one matching purl per first- and third-
-  party component in all three release stages, and add substituted, duplicate,
-  omitted, encoded, and canonical controls.
 
 ### SP-AUDIT-102 - Specification-pack configuration is not canonically sealed (P2)
 
