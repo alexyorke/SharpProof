@@ -9,6 +9,131 @@ namespace SharpProof.Worker.Test;
 [Platform("Linux")]
 public sealed class LinuxPublicationSetTests
 {
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(false, true)]
+    [TestCase(true, true)]
+    public void NestedPublicationSetsFailBeforeAnyFilesystemMutation(
+        bool descendantFirst,
+        bool threeLevels)
+    {
+        using var directory = TemporaryDirectory.Create();
+        var parent = Path.Combine(directory.Path, "result.json");
+        var descendant = threeLevels
+            ? Path.Combine(parent, "middle", "child.json")
+            : Path.Combine(parent, "child.json");
+        var paths = descendantFirst
+            ? new[] { descendant, parent }
+            : new[] { parent, descendant };
+
+        var error = Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                paths,
+                TimeSpan.FromSeconds(1));
+        }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("ancestor"));
+            Assert.That(
+                Directory.EnumerateFileSystemEntries(
+                    directory.Path,
+                    "*",
+                    SearchOption.AllDirectories),
+                Is.Empty);
+        }
+    }
+
+    [Test]
+    public void DuplicatePublicationPathsFailBeforeAnyFilesystemMutation()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var output = Path.Combine(directory.Path, "result.json");
+        var alias = Path.Combine(directory.Path, ".", "result.json");
+
+        var error = Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [output, alias],
+                TimeSpan.FromSeconds(1));
+        }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("duplicate"));
+            Assert.That(
+                Directory.EnumerateFileSystemEntries(
+                    directory.Path,
+                    "*",
+                    SearchOption.AllDirectories),
+                Is.Empty);
+        }
+    }
+
+    [Test]
+    public void NestedSetPreservesAPreExistingParentDirectoryWithoutMetadata()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var parent = Directory.CreateDirectory(
+            Path.Combine(directory.Path, "result.json")).FullName;
+        var child = Path.Combine(parent, "child.json");
+
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [child, parent],
+                TimeSpan.FromSeconds(1));
+        }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(Directory.Exists(parent), Is.True);
+            Assert.That(
+                Directory.EnumerateFileSystemEntries(parent),
+                Is.Empty);
+            Assert.That(
+                Directory.EnumerateFileSystemEntries(directory.Path),
+                Is.EqualTo(new[] { parent }));
+        }
+    }
+
+    [Test]
+    public void DisjointPublicationPathsUnderExistingParentsRemainRetryable()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var firstParent = Directory.CreateDirectory(
+            Path.Combine(directory.Path, "first-parent")).FullName;
+        var secondParent = Directory.CreateDirectory(
+            Path.Combine(directory.Path, "second-parent", "nested")).FullName;
+        var paths = new[]
+        {
+            Path.Combine(firstParent, "result.json"),
+            Path.Combine(firstParent, "result.sarif.json"),
+            Path.Combine(secondParent, "manifest.json")
+        };
+
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   paths,
+                   TimeSpan.FromSeconds(1)))
+        {
+        }
+        using var retry = LinuxPathIdentity.AcquirePublicationSet(
+            paths.Reverse(),
+            TimeSpan.FromSeconds(1));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(paths, Has.None.Matches<string>(File.Exists));
+            Assert.That(
+                paths.Select(LinuxPathIdentity.PublicationLockName),
+                Has.All.Matches<string>(File.Exists));
+            Assert.That(
+                paths.Select(LinuxPathIdentity.PublicationMarkerPath),
+                Has.All.Matches<string>(File.Exists));
+        }
+    }
+
     [Test]
     public void InvalidAndNonRegularPublicationPathsFailClosed()
     {

@@ -1816,6 +1816,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~FiniteCommandsRunFromAnArchiveWithoutGit'
     },
     [pscustomobject]@{
+        Name = 'publication-complete-topology-preflight'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '        ValidatePublicationTopology(canonicalPaths);'
+        Mutated = '        _ = canonicalPaths;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~NestedPublicationSetsFailBeforeAnyFilesystemMutation'
+    },
+    [pscustomobject]@{
         Name = 'standalone-build-stage-nonroot-contract'
         File = 'eng\container\Dockerfile'
         Original = "COPY --chown=sharpproof:sharpproof . .`nUSER sharpproof"

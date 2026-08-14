@@ -163,6 +163,7 @@ public static partial class LinuxPathIdentity
         }
 
         var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
+        ValidatePublicationTopology(canonicalPaths);
         ValidatePublicationMetadataAliases(canonicalPaths);
         var lockPaths = canonicalPaths
             .Select(PublicationLockNameForCanonicalPath)
@@ -275,9 +276,45 @@ public static partial class LinuxPathIdentity
     {
         return publicationPaths
             .Select(RequireLocalPath)
-            .Distinct(StringComparer.Ordinal)
             .OrderBy(static path => path, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static void ValidatePublicationTopology(string[] canonicalPaths)
+    {
+        for (var index = 0; index < canonicalPaths.Length; index++)
+        {
+            for (var otherIndex = 0;
+                 otherIndex < index;
+                 otherIndex++)
+            {
+                var other = canonicalPaths[otherIndex];
+                var current = canonicalPaths[index];
+                if (string.Equals(other, current, StringComparison.Ordinal))
+                {
+                    throw new ArgumentException(
+                        "SharpProof publication paths must not contain duplicate canonical paths.");
+                }
+                if (IsStrictPathAncestor(other, current) ||
+                    IsStrictPathAncestor(current, other))
+                {
+                    throw new ArgumentException(
+                        "SharpProof publication paths must not have ancestor or descendant conflicts.");
+                }
+            }
+        }
+    }
+
+    private static bool IsStrictPathAncestor(
+        string possibleAncestor,
+        string possibleDescendant)
+    {
+        return possibleDescendant.Length > possibleAncestor.Length &&
+            possibleDescendant.StartsWith(
+                possibleAncestor,
+                StringComparison.Ordinal) &&
+            possibleDescendant[possibleAncestor.Length] ==
+                Path.DirectorySeparatorChar;
     }
 
     private static string PublicationLockNameForCanonicalPath(
