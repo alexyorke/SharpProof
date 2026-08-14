@@ -43,6 +43,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -354,6 +355,10 @@ function Get-ValidatedRelease {
             throw "Release artifact does not match its manifest: '$fileName'."
         }
     }
+    Test-SharpProofReleaseChecksumFile `
+        -Path (Join-Path $Directory 'SHA256SUMS') `
+        -Artifacts $artifacts `
+        -Owner 'Publication SHA256SUMS'
 
     $packageArtifacts = @(
         $artifacts |

@@ -1617,6 +1617,14 @@ $mutations = @(
         Mutated = '    if ($false) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~PublicationDestinationAuthorityTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-checksum-byte-comparison'
+        File = 'scripts\SharpProof.ReleaseChecksums.ps1'
+        Original = '    if ($actual.Length -ne $expected.Length -or'
+        Mutated = '    if ($false -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseChecksumAuthorityTests'
     }
 )
 

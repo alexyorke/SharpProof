@@ -13,6 +13,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
 
 function Get-SpdxPackageId {
     param(
@@ -309,16 +310,10 @@ Test-SharpProofSbomComponentGraph `
 Test-SharpProofSbomLicenseGraph `
     -SbomPackages $sbomPackages `
     -LicenseGraph $sbomLicenseGraph
-$expectedSums = @(
-    $artifacts |
-        ForEach-Object {
-            [string]$_.sha256 + '  ' + [string]$_.fileName
-        }
-)
-$actualSums = @(Get-Content -LiteralPath $sumsPath)
-if (($actualSums -join "`n") -ne ($expectedSums -join "`n")) {
-    throw 'SHA256SUMS does not match the release evidence manifest.'
-}
+Test-SharpProofReleaseChecksumFile `
+    -Path $sumsPath `
+    -Artifacts $artifacts `
+    -Owner 'SHA256SUMS'
 if (@($manifest.thirdPartyComponents).Count -eq 0 -or
     @($manifest.thirdPartyComponents |
         Where-Object { [string]$_.license -ne 'MIT' }).Count -ne 0) {

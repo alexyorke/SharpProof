@@ -56,8 +56,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 145,
-    "expectedCatalogSha256": "4112df9fb82b4537a545e6ec2626e5843a730a606ab73e7b71426ef9d33a1520"
+    "expectedCatalogCount": 184,
+    "expectedCatalogSha256": "22edd4b53e542efda1e4fbdcf397968353dcda49aeabff68c3f3eeeb03b54c22"
   },
   "worker": {
     "protocolVersion": 11,
@@ -157,6 +157,7 @@
       "scripts/Publish-SharpProofRelease.ps1",
       "scripts/SharpProof.PublicationDestination.ps1",
       "scripts/SharpProof.PublicationPlanTopology.ps1",
+      "scripts/SharpProof.ReleaseChecksums.ps1",
       "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
       "scripts/Resolve-SharpProofContainedPath.ps1",
       "scripts/Test-CompilerArtifactModelGenerator.ps1",
@@ -197,7 +198,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "1830bef7d73a5c8b6341afc7116f40bec7cff0f1d0b59ec60f71c67d7ba4cffe",
+    "inventorySha256": "7dd22962dddb91ee4bc716768695908cd53d16bd78b4b5772d44ac85006205e3",
     "components": [
       {
         "name": "discovery",
@@ -674,6 +675,7 @@
           "scripts/Publish-SharpProofRelease.ps1",
           "scripts/SharpProof.PublicationDestination.ps1",
           "scripts/SharpProof.PublicationPlanTopology.ps1",
+          "scripts/SharpProof.ReleaseChecksums.ps1",
           "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
           "scripts/Test-SharpProofPackageDependencies.ps1",

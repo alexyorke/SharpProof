@@ -15,6 +15,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
@@ -920,21 +921,12 @@ $manifest = [pscustomobject][ordered]@{
 }
 $json = ($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n"
 $json += "`n"
-$sums = (
-    $orderedArtifacts |
-        ForEach-Object {
-            if ($_.fileName -match '[\r\n]') {
-                throw 'Artifact file names must not contain newlines.'
-            }
-            $_.sha256 + '  ' + $_.fileName
-        }
-) -join "`n"
-$sums += "`n"
-
 $manifestPath = Join-Path $resolvedOutput 'SharpProof.release.json'
 $sumsPath = Join-Path $resolvedOutput 'SHA256SUMS'
 Write-AtomicText -Path $manifestPath -Value $json
-Write-AtomicText -Path $sumsPath -Value $sums
+Write-SharpProofReleaseChecksumFile `
+    -Path $sumsPath `
+    -Artifacts $orderedArtifacts
 
 Write-Host "Wrote deterministic SharpProof release evidence for version $($versions[0])."
 [pscustomobject][ordered]@{

@@ -1,0 +1,64 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet(
+        'canonical','bom','utf16le','utf16be','invalid-utf8','crlf','mixed',
+        'cr','missing-terminal','double-terminal','upper-digest','separator',
+        'spacing','reordered','extra','missing','duplicate')]
+    [string]$Mutation
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+
+$root = Join-Path ([IO.Path]::GetTempPath()) (
+    'sharpproof-checksums-' + [Guid]::NewGuid().ToString('N'))
+try {
+    [IO.Directory]::CreateDirectory($root) | Out-Null
+    $artifacts = @(
+        0..6 | ForEach-Object {
+            [pscustomobject][ordered]@{
+                fileName = ('artifact-{0}.nupkg' -f $_)
+                sha256 = ([string]$_) * 64
+            }
+        }
+    )
+    $path = Join-Path $root 'SHA256SUMS'
+    Write-SharpProofReleaseChecksumFile `
+        -Path $path `
+        -Artifacts $artifacts
+    $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
+    $text = $strictUtf8.GetString([IO.File]::ReadAllBytes($path))
+    $lines = @($text.TrimEnd("`n").Split("`n"))
+    $bytes = switch ($Mutation) {
+        'canonical' { [IO.File]::ReadAllBytes($path); break }
+        'bom' { [byte[]]([Text.UTF8Encoding]::new($true).GetPreamble() + $strictUtf8.GetBytes($text)); break }
+        'utf16le' { [byte[]]([Text.Encoding]::Unicode.GetPreamble() + [Text.Encoding]::Unicode.GetBytes($text)); break }
+        'utf16be' { [byte[]]([Text.Encoding]::BigEndianUnicode.GetPreamble() + [Text.Encoding]::BigEndianUnicode.GetBytes($text)); break }
+        'invalid-utf8' { [byte[]](0xff, 0xfe, 0xfd); break }
+        'crlf' { $strictUtf8.GetBytes($text.Replace("`n", "`r`n")); break }
+        'mixed' { $strictUtf8.GetBytes($lines[0] + "`r`n" + (($lines | Select-Object -Skip 1) -join "`n") + "`n"); break }
+        'cr' { $strictUtf8.GetBytes($text.Replace("`n", "`r")); break }
+        'missing-terminal' { $strictUtf8.GetBytes($text.Substring(0, $text.Length - 1)); break }
+        'double-terminal' { $strictUtf8.GetBytes($text + "`n"); break }
+        'upper-digest' { $strictUtf8.GetBytes($lines[0].ToUpperInvariant() + "`n" + (($lines | Select-Object -Skip 1) -join "`n") + "`n"); break }
+        'separator' { $strictUtf8.GetBytes($text.Replace('  ', ' ')); break }
+        'spacing' { $strictUtf8.GetBytes($text.Replace('  ', '   ')); break }
+        'reordered' { $strictUtf8.GetBytes((@($lines[1], $lines[0]) + @($lines | Select-Object -Skip 2) -join "`n") + "`n"); break }
+        'extra' { $strictUtf8.GetBytes($text + (('f' * 64) + '  extra.nupkg' + "`n")); break }
+        'missing' { $strictUtf8.GetBytes((@($lines | Select-Object -Skip 1) -join "`n") + "`n"); break }
+        'duplicate' { $strictUtf8.GetBytes($text + $lines[0] + "`n"); break }
+    }
+    [IO.File]::WriteAllBytes($path, $bytes)
+    Test-SharpProofReleaseChecksumFile `
+        -Path $path `
+        -Artifacts $artifacts `
+        -Owner 'Fixture SHA256SUMS'
+    Write-Host "Release checksum fixture passed: $Mutation"
+}
+finally {
+    if ([IO.Directory]::Exists($root)) {
+        Remove-Item -LiteralPath $root -Recurse -Force
+    }
+}
