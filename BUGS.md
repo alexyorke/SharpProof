@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 58 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 57 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 58 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-189 - Acceptance restore predates its declared timeline (fixed)
+
+- [x] Fixed by `77935d0fc` (`fix: own the acceptance timeline`).
+- `Verify.ps1` now owns the full monotonic timeline and begins it before restore.
+  Every phase records derived UTC boundaries and exact duration under strict
+  containment, ordering, and non-overlap validation; total elapsed is derived
+  from the outer interval. Restore failures emit an accountable failed prefix
+  receipt instead of fabricating an out-of-interval phase.
+- Regression coverage includes zero/nonzero restore duration, boundary equality,
+  restore failure, phase ordering and containment, exact total elapsed, and an
+  ownership-removal mutation. Focused tests passed 15/15 and Architecture
+  333/333. The cumulative mutation catalog pin was reconciled to 187 entries.
 
 ### SP-AUDIT-184 - Release bundle topology is not exact or self-contained (fixed)
 
@@ -2390,17 +2403,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: impose the exact producer-representable upper bound and,
   where launcher context is authoritative, the checked project-wall/grace
   envelope. Add zero, boundary, boundary+1, long-max, and overflow controls.
-
-### SP-AUDIT-189 - Acceptance restore predates its declared timeline (P2)
-
-- [ ] The dispatcher completes and times restore before `Verify.ps1` captures
-  `startedUtc`, but the receipt inserts restore as its first phase and includes
-  it in total elapsed time.
-- Certifier impact: the recorded phase interval is not contained by the
-  receipt's declared start/completion interval.
-- Required closure: give the dispatcher and receipt one timeline owner so start
-  precedes restore. Add controlled zero/nonzero restore-duration and clock-
-  boundary tests.
 
 ### SP-AUDIT-199 - Offline collision checks use case-sensitive filenames (P2)
 
