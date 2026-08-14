@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 74 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 73 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 74 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-039 - Request-bound results accept fabricated runtime provenance (fixed)
+
+- [x] Fixed by `955288300` (`fix: bind worker runtime provenance`).
+- Request-bound response validation now requires an independently supplied
+  authenticated version summary and exactly compares all seven protocol,
+  manifest, cache, worker, API-spec, and content/binary identity fields. The
+  launcher derives this expectation from the staged runtime closure,
+  FileVersionInfo, and the authenticated API-spec table, then threads it through
+  worker results, launcher failures, and publication validation.
+- Regression-first tests cover arbitrary and case-changed values, well-formed
+  wrong hashes and cross-swaps, honest producer/launcher paths, and a removal
+  mutation. Focused provenance passed 5/5, full Worker 473/473, Architecture
+  203/203, launcher validation 3/3, the canonical build completed with zero
+  warnings/errors, and `git diff --check` passed.
 
 ### SP-AUDIT-038 - Final release validation trusts fabricated component inventory (fixed)
 
@@ -1729,30 +1744,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutation cases.
 - Consolidated cases: SP-AUDIT-081, SP-AUDIT-090, SP-AUDIT-139, SP-AUDIT-201, SP-AUDIT-212.
 - Unified closure: Generate one exact capture/fingerprint predicate for canonical strings and paths, module roles/properties, additional-file identity, and empty-tree derivations.
-
-### SP-AUDIT-039 - Request-bound results accept fabricated runtime provenance (P2)
-
-- [ ] `WorkerProtocolJson.ValidateForRequest` binds the request hash, compiler
-  input hash, manifest, and budgets, but `WorkerVerificationSummary.Versions`
-  is checked only for nonblank version strings and syntactically valid hashes.
-  It is never compared with the worker closure and API-spec identities already
-  used to construct the expected input hash.
-- Supported impact: a worker result can claim an arbitrary worker version,
-  API-spec version, worker binary digest, and API-spec content digest while
-  passing the canonical request-bound validator. Published JSON/SARIF and
-  downstream evidence can therefore report false runtime provenance even
-  though the semantic result is bound to a different actual closure.
-- Reproduction: a temporary canonical-container protocol test created an
-  otherwise valid request-bound response, replaced both version strings with
-  `fabricated-*` values and both provenance hashes with different valid
-  lowercase SHA-256 strings, then expected `ValidateForRequest` to reject it.
-  Validation returned `IsValid == true`.
-- Required closure: pass an expected immutable runtime/spec identity into the
-  request-bound validator (or derive and return the exact identity alongside
-  the expected input hash) and compare all version-summary fields exactly.
-  Add independent field mutations, swapped-valid hashes, stale versions,
-  ordinary failure/cancellation responses, cache hits, canonical serialization,
-  launcher publication, and a mutation that restores shape-only validation.
 
 ### SP-AUDIT-041 - Proof evidence and used assumptions are not jointly bound (P2)
 
