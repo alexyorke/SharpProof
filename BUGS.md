@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 70 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 69 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 70 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-052 - An empty release secret set cannot be certified (fixed)
+
+- [x] Fixed by `a6691e61f` (`fix: validate empty release secret sets`).
+- Release configuration set validation now explicitly admits an empty expected
+  array and delegates every variables/secrets comparison to ordinal,
+  duplicate-rejecting exact-set equality. Empty secret contracts are always
+  validated instead of bypassed.
+- Regression-first fixtures cover zero, one, and multiple tags, variables, and
+  secrets; the checked-in public empty-secret contract; and missing, extra,
+  duplicate, case-changed, and unexpected-secret negatives, plus a binder-
+  removal mutation. The focused configuration test passed 1/1, full
+  Architecture 216/216, and `git diff --check` passed. No network or live GitHub
+  writes occurred.
 
 ### SP-AUDIT-047 - SBOM validators accept fabricated topology (fixed)
 
@@ -1880,24 +1894,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   certifier mutation restoring permissive `ConvertFrom-Json` parsing.
 - Consolidated cases: SP-AUDIT-193, SP-AUDIT-214, SP-AUDIT-215, SP-AUDIT-229.
 - Unified closure: Use one duplicate-member-rejecting, token-aware decoder enforcing raw JSON types, flat arrays, exact vocabulary/casing, and canonical serialization.
-
-### SP-AUDIT-052 - An empty release secret set cannot be certified (P2)
-
-- [ ] `Test-SharpProofReleaseConfiguration.ps1` declares the `Expected`
-  parameter of `Require-SetMembers` as a mandatory `object[]` without
-  `AllowEmptyCollection`. The authoritative environment contract intentionally
-  gives public `nuget.org` an empty `secrets` array, so binding that exact
-  valid value throws before evidence can be written.
-- Certifier impact: the checked-in owner-configuration contract cannot pass
-  its own canonical validator. A final release either remains blocked or must
-  bypass/change the asserted configuration outside the reviewed evidence path.
-- Reproduction: the canonical container ran the validator against mocked
-  GitHub responses through the public-environment secret check. PowerShell
-  terminated with `Cannot bind argument to parameter 'Expected' because it is
-  an empty array.` The mock and output were removed.
-- Required closure: admit an empty expected set explicitly and compare sets
-  exactly. Add zero/one/multiple expected member controls for tags, variables,
-  and secrets, including the checked-in public-environment contract.
 
 ### SP-AUDIT-063 - Publication commit is not atomic or crash-durable (P2)
 
