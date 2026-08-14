@@ -10,6 +10,13 @@ param(
         'fabricated-symbol-row',
         'broad-workflow-glob',
         'symbol-workflow-glob',
+        'purl-substituted',
+        'purl-duplicate',
+        'purl-omitted',
+        'purl-encoded',
+        'purl-case',
+        'purl-extra-field',
+        'third-party-purl',
         'checked-in-workflow')]
     [string]$Mutation
 )
@@ -50,6 +57,13 @@ foreach ($id in $ids) {
             algorithm = 'SHA256'
             checksumValue = $mainHash
         })
+        externalRefs = @([pscustomobject][ordered]@{
+            referenceCategory = 'PACKAGE-MANAGER'
+            referenceType = 'purl'
+            referenceLocator = Get-SharpProofNuGetPurl `
+                -Name $id `
+                -Version $version
+        })
     })
     $describes.Add($spdxId)
 }
@@ -86,6 +100,39 @@ switch ($Mutation) {
     'symbol-workflow-glob' {
         $workflow = $workflow.Replace('nupkgs/*.nupkg', 'nupkgs/*.snupkg')
     }
+    'purl-substituted' {
+        $packages[0].externalRefs[0].referenceLocator =
+            'pkg:nuget/Fabricated.Package@99.0.0'
+    }
+    'purl-duplicate' {
+        $packages[0].externalRefs = @(
+            $packages[0].externalRefs[0],
+            $packages[0].externalRefs[0].PSObject.Copy())
+    }
+    'purl-omitted' { $packages[0].externalRefs = @() }
+    'purl-encoded' {
+        $packages[0].externalRefs[0].referenceLocator =
+            'pkg:nuget/Sharp%50roof@1.0.0-preview.1'
+    }
+    'purl-case' {
+        $packages[0].externalRefs[0].referenceType = 'PURL'
+    }
+    'purl-extra-field' {
+        $packages[0].externalRefs[0] |
+            Add-Member -NotePropertyName comment -NotePropertyValue 'decoy'
+    }
+    'third-party-purl' {
+        $thirdParty = [pscustomobject][ordered]@{
+            name = 'Microsoft.Z3'
+            versionInfo = '4.12.2'
+            externalRefs = @([pscustomobject][ordered]@{
+                referenceCategory = 'PACKAGE-MANAGER'
+                referenceType = 'purl'
+                referenceLocator = 'pkg:nuget/Fabricated@4.12.2'
+            })
+        }
+        Test-SharpProofSbomPackageUrls -SbomPackages @($thirdParty)
+    }
     'checked-in-workflow' {
         $workflow = Get-Content -LiteralPath (Join-Path `
             $repositoryRoot '.github/workflows/package-consumers.yml') -Raw
@@ -98,5 +145,6 @@ Test-SharpProofSbomArtifactScope `
     -DocumentDescribes @($describes) `
     -FirstPartyPackageIds $ids `
     -PackageVersion $version
+Test-SharpProofSbomPackageUrls -SbomPackages @($packages)
 Test-SharpProofSbomAttestationWorkflow -Workflow $workflow
 Write-Host "SBOM artifact scope fixture passed: $Mutation"

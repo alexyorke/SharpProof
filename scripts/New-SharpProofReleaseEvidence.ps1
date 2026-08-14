@@ -204,11 +204,9 @@ function New-DeterministicPackageSbom {
                 [pscustomobject][ordered]@{
                     referenceCategory = 'PACKAGE-MANAGER'
                     referenceType = 'purl'
-                    referenceLocator = (
-                        'pkg:nuget/' +
-                        [Uri]::EscapeDataString($id) +
-                        '@' +
-                        [Uri]::EscapeDataString($Version))
+                    referenceLocator = Get-SharpProofNuGetPurl `
+                        -Name $id `
+                        -Version $Version
                 }
             )
         })
@@ -243,11 +241,9 @@ function New-DeterministicPackageSbom {
                     [pscustomobject][ordered]@{
                         referenceCategory = 'PACKAGE-MANAGER'
                         referenceType = 'purl'
-                        referenceLocator = (
-                            'pkg:nuget/' +
-                            [Uri]::EscapeDataString($componentName) +
-                            '@' +
-                            [Uri]::EscapeDataString($componentVersion))
+                        referenceLocator = Get-SharpProofNuGetPurl `
+                            -Name $componentName `
+                            -Version $componentVersion
                     }
                 )
             })

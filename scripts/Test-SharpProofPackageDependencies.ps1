@@ -38,6 +38,55 @@ function Test-SharpProofSpdxPackageChecksum {
     }
 }
 
+function Get-SharpProofNuGetPurl {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Name) -or
+        [string]::IsNullOrWhiteSpace($Version)) {
+        throw 'NuGet purl identity must contain a package name and version.'
+    }
+    return 'pkg:nuget/' + [Uri]::EscapeDataString($Name) + '@' +
+        [Uri]::EscapeDataString($Version)
+}
+
+function Test-SharpProofSbomPackageUrls {
+    param([Parameter(Mandatory = $true)][object[]]$SbomPackages)
+
+    foreach ($package in $SbomPackages) {
+        $identity = ([string]$package.name) + '@' +
+            ([string]$package.versionInfo)
+        $property = $package.PSObject.Properties['externalRefs']
+        if ($null -eq $property -or
+            $null -eq $property.Value -or
+            $property.Value -isnot [array]) {
+            throw "SPDX externalRefs must be an array: $identity"
+        }
+        $rows = @($property.Value)
+        if ($rows.Count -ne 1 -or $null -eq $rows[0]) {
+            throw "SPDX externalRefs must contain exactly one purl: $identity"
+        }
+        $row = $rows[0]
+        $names = @($row.PSObject.Properties.Name)
+        [Array]::Sort($names, [StringComparer]::Ordinal)
+        if (($names -join "`n") -cne
+                "referenceCategory`nreferenceLocator`nreferenceType" -or
+            $row.referenceCategory -isnot [string] -or
+            [string]$row.referenceCategory -cne 'PACKAGE-MANAGER' -or
+            $row.referenceType -isnot [string] -or
+            [string]$row.referenceType -cne 'purl' -or
+            $row.referenceLocator -isnot [string] -or
+            [string]$row.referenceLocator -cne
+                (Get-SharpProofNuGetPurl `
+                    -Name ([string]$package.name) `
+                    -Version ([string]$package.versionInfo))) {
+            throw "SPDX purl is not the exact package identity: $identity"
+        }
+    }
+}
+
 function Get-SharpProofSbomReleaseIdentity {
     param(
         [Parameter(Mandatory = $true)][string]$RepositoryRoot,
@@ -589,6 +638,8 @@ function Test-SharpProofSbomTopology {
         [Parameter(Mandatory = $true)][object[]]$Components,
         [Parameter(Mandatory = $true)][object[]]$DependencyGraph
     )
+
+    Test-SharpProofSbomPackageUrls -SbomPackages $SbomPackages
 
     function PackageIdentity([string]$Name, [string]$Version) {
         return [pscustomobject][ordered]@{

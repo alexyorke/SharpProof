@@ -14,6 +14,13 @@ public sealed class SbomSymbolArtifactScopeTests
     [TestCase("fabricated-symbol-row", false)]
     [TestCase("broad-workflow-glob", false)]
     [TestCase("symbol-workflow-glob", false)]
+    [TestCase("purl-substituted", false)]
+    [TestCase("purl-duplicate", false)]
+    [TestCase("purl-omitted", false)]
+    [TestCase("purl-encoded", false)]
+    [TestCase("purl-case", false)]
+    [TestCase("purl-extra-field", false)]
+    [TestCase("third-party-purl", false)]
     public async Task SymbolPackagesAreProvenanceArtifactsButNotSbomSubjects(
         string mutation,
         bool expectedSuccess)

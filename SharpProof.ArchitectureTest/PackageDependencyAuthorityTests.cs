@@ -717,10 +717,14 @@ public sealed class PackageDependencyAuthorityTests
             "[pscustomobject]@{FromId='SharpProof';ToId='SharpProof.Attributes'}," +
             "[pscustomobject]@{FromId='SharpProof.Verifier';ToId='SharpProof'})\n" +
             "$packages=@($ids|ForEach-Object{[pscustomobject]@{" +
-            "name=$_;versionInfo=$version;SPDXID=(Get-SharpProofDependencySpdxId $_)}})\n" +
+            "name=$_;versionInfo=$version;SPDXID=(Get-SharpProofDependencySpdxId $_);" +
+            "externalRefs=@([pscustomobject][ordered]@{referenceCategory='PACKAGE-MANAGER';" +
+            "referenceType='purl';referenceLocator=(Get-SharpProofNuGetPurl $_ $version)})}})\n" +
             "$packages+=@($components|ForEach-Object{[pscustomobject]@{" +
             "name=$_.id;versionInfo=$_.version;SPDXID=" +
-            "(Get-SharpProofDependencySpdxId ($_.id+'-'+$_.version))}})\n" +
+            "(Get-SharpProofDependencySpdxId ($_.id+'-'+$_.version));" +
+            "externalRefs=@([pscustomobject][ordered]@{referenceCategory='PACKAGE-MANAGER';" +
+            "referenceType='purl';referenceLocator=(Get-SharpProofNuGetPurl $_.id $_.version)})}})\n" +
             "$describes=@($ids|ForEach-Object{Get-SharpProofDependencySpdxId $_})\n" +
             "$rows=@($ids|ForEach-Object{[pscustomobject]@{" +
             "spdxElementId='SPDXRef-DOCUMENT';relationshipType='DESCRIBES';" +

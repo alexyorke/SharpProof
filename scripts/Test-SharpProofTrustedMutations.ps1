@@ -1614,6 +1614,20 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SbomTopologyIsTheExactAuthenticatedProjection'
     },
     [pscustomobject]@{
+        Name = 'release-exact-nuget-purl-authority'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = (@'
+            [string]$row.referenceLocator -cne
+                (Get-SharpProofNuGetPurl `
+'@).TrimEnd()
+        Mutated = (@'
+            $false -and [string]$row.referenceLocator -cne
+                (Get-SharpProofNuGetPurl `
+'@).TrimEnd()
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SymbolPackagesAreProvenanceArtifactsButNotSbomSubjects'
+    },
+    [pscustomobject]@{
         Name = 'release-exact-spdx-checksum-row'
         File = 'scripts\Test-SharpProofPackageDependencies.ps1'
         Original = '    if ($rows.Count -ne 1 -or $null -eq $rows[0]) {'
