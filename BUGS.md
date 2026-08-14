@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 63 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 62 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 63 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-144 - Publication destination and fixture authority are conflated (fixed)
+
+- [x] Fixed by `b4bc0b027` (`fix: bind publication destination authority`).
+- Publication now uses an explicit, mutually exclusive registry, fixture, or
+  targetless authority. Registry plans validate and separately record absolute
+  HTTPS main and effective symbol destinations; fixture plans bind canonical
+  directory and entry identities without representing them as remote state.
+- Regression coverage includes invalid and relative destinations, inherited and
+  distinct symbol targets, targetless plans, registry/fixture conflicts, changed
+  fixtures, projection removal, and an exclusivity-removal mutation. The focused
+  matrix passed 15/15 and the full Architecture command exited successfully.
 
 ### SP-AUDIT-143 - Publication-plan output topology is unsafe (fixed)
 
@@ -2246,22 +2258,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   broad/shallow, shared-node, composition, and charge-removal controls.
 - Consolidated cases: SP-AUDIT-187.
 - Unified closure: Thread one catalog-owned budget through summary dependency discovery, provenance closure, term traversal, substitution, rebuild, and composition.
-
-### SP-AUDIT-144 - Publication destination and fixture authority are conflated (P2)
-
-- [ ] Plan-only records the raw main source without validating its URI and
-  returns before computing the effective symbol source, so symbol destination is
-  absent entirely.
-- Certifier impact: invalid HTTP/relative main targets can receive plan evidence,
-  and two different symbol destinations collapse to identical plans.
-- Evidence: main HTTPS validation and effective symbol-source computation both
-  occur only after the plan-only return.
-- Required closure: validate target syntax in both modes, compute destinations
-  before projection, and record main and symbol destinations separately. Cover
-  invalid schemes, relative values, inherited/distinct symbol targets, targetless
-  plans, and projection-removal mutations.
-- Consolidated cases: SP-AUDIT-198.
-- Unified closure: Make real-destination and fixture modes explicit and exclusive; validate URIs and bind fixture identity without representing fixture state as remote state.
 
 ### SP-AUDIT-152 - Effect certainty and provenance tuples are not jointly validated (P2)
 
