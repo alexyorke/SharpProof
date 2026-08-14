@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 47 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 46 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 47 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-118 - Implicit empty constructors become unmodeled calls (fixed)
+
+- [x] Fixed by `664d8b010` (`fix: model implicit empty constructors`).
+- Construction resolution now peels only provably empty implicit constructor
+  layers, then analyzes any explicit parameterless base constructor through its
+  normal source summary. Instance or static initialization remains fail-closed.
+- Regression coverage includes implicit class, struct, and record constructors,
+  an explicit-empty base, an effectful base, member and static initializers,
+  generated analyzer projection, and a mutation removing the implicit-layer
+  authority. Effects passed 175/175 and Analyzer passed 322/322; the final
+  generated regression and TCB ownership checks also passed after review.
 
 ### SP-AUDIT-110 - Base property access is treated as open virtual dispatch (fixed)
 
@@ -2577,22 +2589,6 @@ Precision, documentation, and developer-experience debt that does not change a s
   effects and property-setter summaries. Add field, property, nested object,
   static side effect, throwing setter, collection-initializer, struct, and fresh
   array parity controls plus a mutation restoring detached initializer scanning.
-
-### SP-AUDIT-118 - Implicit empty constructors become unmodeled calls (P3)
-
-- [ ] Source-call ownership requires a syntax reference. An implicit
-  parameterless constructor has none, so object creation falls through to the
-  external unknown boundary instead of the exact empty-source-constructor path.
-- Supported impact: `new Empty()` for a sealed class with no members produced
-  an incomplete effect projection, while fresh allocation itself is allowed
-  and the equivalent explicit empty constructor is analyzable. This creates a
-  systematic false unknown on an ordinary supported construction form.
-- Reproduction: a temporary canonical-container Effects test required a
-  complete projection for the implicit empty constructor and received false.
-  The test was removed.
-- Required closure: synthesize the exact implicit constructor summary, including
-  the pinned base call and initializers, or typed-abstain consistently. Cover
-  class/struct/record, implicit/explicit, base/member/cctor, and mutation cases.
 
 ### SP-AUDIT-125 - Archive checkouts cannot run container tooling (P3)
 
