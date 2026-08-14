@@ -1222,6 +1222,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~RefReadonlyParameterMatchesExactStaticCompanion'
     },
     [pscustomobject]@{
+        Name = 'contract-ref-expression-uses-declaration-operation-root'
+        File = 'SharpProof.Contracts\ContractClauseInventoryBuilder.cs'
+        Original = 'return expression is RefExpressionSyntax ? declaration : expression;'
+        Mutated = 'return expression;'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~RefReturningExpressionBodiedCompanionHasAnOperationBody'
+    },
+    [pscustomobject]@{
         Name = 'standalone-gate-requires-passing-result'
         File = 'scripts\Assert-SharpProofStandaloneGateResult.ps1'
         Original = '$document.Result.Passed -isnot [bool] -or'

@@ -254,6 +254,123 @@ public sealed class ContractForValidatorGeneratorTests
         Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
     }
 
+    [TestCase("ref", "ref")]
+    [TestCase("ref readonly", "ref")]
+    public void RefReturningExpressionBodiedCompanionHasAnOperationBody(
+        string returnKind,
+        string expressionKind)
+    {
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract {{returnKind}} int Read();
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static {{returnKind}} int Read(Target receiver) =>
+                    {{expressionKind}} storage;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase("ref")]
+    [TestCase("ref readonly")]
+    public void RefReturningBlockBodiedCompanionRemainsValid(string returnKind)
+    {
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract {{returnKind}} int Read();
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static {{returnKind}} int Read(Target receiver) {
+                    return ref storage;
+                }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void OrdinaryExpressionBodyAndMissingBodyClassificationArePreserved()
+    {
+        var ordinary = Run(
+            """
+            using SharpProof.Attributes;
+            public interface Target { int Read(); }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver) => 1;
+            }
+            """);
+        var missing = Run(
+            """
+            using SharpProof.Attributes;
+            public interface Target { int Read(); }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static extern int Read(Target receiver);
+            }
+            """);
+
+        Assert.That(ordinary.Diagnostics, Is.Empty);
+        Assert.That(missing.Diagnostics.Select(static value => value.Id),
+            Does.Contain("SPCF0007"));
+    }
+
+    [Test]
+    public void PartialRefReadonlyImplementationExpressionOwnsTheBody()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract ref readonly int Read();
+            }
+            [ContractFor(typeof(Target))]
+            public static partial class TargetContracts {
+                private static int storage;
+                public static partial ref readonly int Read(Target receiver);
+                public static partial ref readonly int Read(Target receiver) =>
+                    ref storage;
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void GeneratedNamedRefReadonlyExpressionBodyRemainsValid()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public abstract class Target {
+                public abstract ref readonly int Read();
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static ref readonly int Read(Target receiver) =>
+                    ref storage;
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+    }
+
     [Test]
     public void OpenGenericTargetAndMethodConstraintsMatchStructurally()
     {
