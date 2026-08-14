@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 85 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 84 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 85 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-196 - Exact ref-readonly parameters are rejected (fixed)
+
+- [x] Fixed by `f165c6772` (`fix: match ref readonly parameters`).
+- Parameter custom-modifier matching now removes only the compiler-generated
+  InAttribute when both sides are readonly input ref kinds (`in` or
+  `ref readonly`). Exact ref-kind equality still runs first, so `ref`, `out`,
+  `in`, and `ref readonly` remain distinct; scoped, return, and other custom
+  modifiers remain exact.
+- Regression-first tests cover interface, abstract, virtual, metadata, and
+  generated-named methods; scoped exact/mismatch; overload selection; return
+  modifiers; binder clauses; and every ref-kind mismatch. Focused Generator
+  passed 11/11 and binder 1/1; full Generator 70/70, Contracts 102/102,
+  Analyzer 299/299, Architecture 182/182, and `git diff --check` passed.
 
 ### SP-AUDIT-174 - Non-generic wrappers misalign generic ContractFor owners (fixed)
 
@@ -1386,17 +1400,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-196 - Exact ref-readonly parameters are rejected (P1)
-
-- [ ] Roslyn adds a compiler-owned required `InAttribute` modifier to an
-  interface `ref readonly` parameter but not the equivalent static companion;
-  matcher normalization handles only `in` parameters.
-- Supported impact: source-identical target and companion signatures emit
-  `SPCF0005` while `in`, `scoped ref`, and ordinary ref controls pass.
-- Required closure: normalize the compiler-created modifier for
-  `RefReadOnlyParameter` while preserving genuine custom-modifier differences.
-  Add interface/abstract/virtual, metadata, and generated-final controls.
 
 ### SP-AUDIT-197 - Ref-readonly expression bodies appear bodyless (P1)
 
