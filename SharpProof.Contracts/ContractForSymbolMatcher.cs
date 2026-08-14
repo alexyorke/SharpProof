@@ -347,8 +347,35 @@ internal static class ContractForSymbolMatcher
                    right.IsOptional, right.HasExplicitDefaultValue) &&
         CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
         ParameterRefCustomModifiersMatch(left, right) &&
-        (!left.HasExplicitDefaultValue || Equals(left.ExplicitDefaultValue, right.ExplicitDefaultValue)) &&
+        ExplicitDefaultValuesMatch(left, right) &&
         TypesMatch(left.Type, right.Type, left.ContainingSymbol, right.ContainingSymbol);
+    }
+
+    private static bool ExplicitDefaultValuesMatch(
+        IParameterSymbol left,
+        IParameterSymbol right)
+    {
+        if (!left.HasExplicitDefaultValue)
+        {
+            return true;
+        }
+
+        return (left.ExplicitDefaultValue, right.ExplicitDefaultValue) switch
+        {
+            (float leftValue, float rightValue) =>
+                SingleBits(leftValue) == SingleBits(rightValue),
+            (double leftValue, double rightValue) =>
+                BitConverter.DoubleToInt64Bits(leftValue) ==
+                BitConverter.DoubleToInt64Bits(rightValue),
+            _ => Equals(
+                left.ExplicitDefaultValue,
+                right.ExplicitDefaultValue)
+        };
+    }
+
+    private static int SingleBits(float value)
+    {
+        return BitConverter.ToInt32(BitConverter.GetBytes(value), 0);
     }
 
     private static bool ParameterRefCustomModifiersMatch(

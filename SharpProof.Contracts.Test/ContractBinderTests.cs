@@ -11,6 +11,39 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
+    [TestCase("-0.0", "0.0", false)]
+    [TestCase("0.0", "-0.0", false)]
+    [TestCase("-0.0", "-0.0", true)]
+    public void DoubleDefaultBitsControlCompanionResolution(
+        string targetDefault,
+        string companionDefault,
+        bool expectedSuccess)
+    {
+        using var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(double value = {{targetDefault}});
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    double value = {{companionDefault}}) {
+                }
+            }
+            """);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.EqualTo(expectedSuccess));
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(expectedSuccess
+                ? ContractBindingFailure.None
+                : ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
     [Test]
     public void FunctionPointerConventionOrderBindsExactCompanion()
     {

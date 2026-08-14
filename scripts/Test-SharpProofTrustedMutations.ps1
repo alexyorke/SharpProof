@@ -1246,6 +1246,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnmanagedFunctionPointerConventionOrderIsInterchangeable'
     },
     [pscustomobject]@{
+        Name = 'contract-float-default-bits-are-exact'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = '                SingleBits(leftValue) == SingleBits(rightValue),'
+        Mutated = '                SingleBits(leftValue) == SingleBits(rightValue) || leftValue.Equals(rightValue),'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~FloatingDefaultBitsMustMatchExactly'
+    },
+    [pscustomobject]@{
+        Name = 'contract-double-default-bits-are-exact'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = "                BitConverter.DoubleToInt64Bits(leftValue) ==`n                BitConverter.DoubleToInt64Bits(rightValue),"
+        Mutated = "                BitConverter.DoubleToInt64Bits(leftValue) ==`n                BitConverter.DoubleToInt64Bits(rightValue) || leftValue.Equals(rightValue),"
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~FloatingDefaultBitsMustMatchExactly'
+    },
+    [pscustomobject]@{
         Name = 'verifier-native-payload-is-build-tool-only'
         File = 'SharpProof.Verifier\SharpProof.Verifier.nuspec'
         Original = 'target="tools/native/linux-x64"'
