@@ -9,7 +9,11 @@ param(
         'actions-registry-unchecked','actions-registry-absent',
         'actions-symbol-preflight','actions-swapped',
         'actions-removed-projection','mocked-main-missing',
-        'mocked-main-exists','mocked-main-error','zero-symbol-preflight')]
+        'mocked-main-exists','mocked-main-error','zero-symbol-preflight',
+        'fixture-empty','fixture-foreign','fixture-main-case-collision',
+        'fixture-symbol-case-collision','fixture-arbitrary-name',
+        'fixture-wrong-id','fixture-wrong-version','fixture-nested-collision',
+        'fixture-malformed','fixture-cross-role','fixture-duplicate')]
     [string]$Mutation
 )
 
@@ -21,6 +25,42 @@ $root = Join-Path ([IO.Path]::GetTempPath()) (
     'sharpproof-destination-' + [Guid]::NewGuid().ToString('N'))
 $packages = Join-Path $root 'packages'
 $fixture = Join-Path $root 'fixture'
+
+function New-FixtureArchive {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Id,
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('main','symbols','cross')][string]$Role
+    )
+    $content = Join-Path $root ([Guid]::NewGuid().ToString('N'))
+    try {
+        [IO.Directory]::CreateDirectory($content) | Out-Null
+        [IO.File]::WriteAllText(
+            (Join-Path $content "$Id.nuspec"),
+            "<package><metadata><id>$Id</id><version>$Version</version></metadata></package>")
+        if ($Role -in @('main','cross')) {
+            $dll = Join-Path $content 'lib/net8.0/payload.dll'
+            [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($dll)) |
+                Out-Null
+            [IO.File]::WriteAllText($dll, 'managed')
+        }
+        if ($Role -in @('symbols','cross')) {
+            $pdb = Join-Path $content 'lib/net8.0/payload.pdb'
+            [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($pdb)) |
+                Out-Null
+            [IO.File]::WriteAllText($pdb, 'symbols')
+        }
+        [IO.Compression.ZipFile]::CreateFromDirectory($content, $Path)
+    }
+    finally {
+        if (Test-Path -LiteralPath $content) {
+            Remove-Item -LiteralPath $content -Recurse -Force
+        }
+    }
+}
+
 try {
     [IO.Directory]::CreateDirectory($packages) | Out-Null
     [IO.Directory]::CreateDirectory($fixture) | Out-Null
@@ -34,6 +74,60 @@ try {
         'registry-distinct' { $symbols = 'https://symbols.example.test/v3/index.json' }
         'targetless' { $main = $null }
         'fixture' { $main = $null; $fixturePath = $fixture }
+        'fixture-empty' { $main = $null; $fixturePath = $fixture }
+        'fixture-foreign' {
+            $main = $null; $fixturePath = $fixture
+            New-FixtureArchive (Join-Path $fixture 'foreign.nupkg') `
+                Other.Package 9.9.9 main
+        }
+        'fixture-wrong-id' {
+            $main = $null; $fixturePath = $fixture
+            New-FixtureArchive (Join-Path $fixture 'wrong-id.nupkg') `
+                Other.Package 1.0.0-preview.1 main
+        }
+        'fixture-wrong-version' {
+            $main = $null; $fixturePath = $fixture
+            New-FixtureArchive (Join-Path $fixture 'wrong-version.nupkg') `
+                SharpProof 9.9.9 main
+        }
+        'fixture-main-case-collision' {
+            $main = $null; $fixturePath = $fixture
+            New-FixtureArchive (Join-Path $fixture 'renamed.bin.nupkg') `
+                sharpproof 1.0.0-PREVIEW.1 main
+        }
+        'fixture-symbol-case-collision' {
+            $main = $null; $fixturePath = $fixture
+            New-FixtureArchive (Join-Path $fixture 'symbols-any-name.snupkg') `
+                SHARPPROOF 1.0.0-preview.1 symbols
+        }
+        'fixture-arbitrary-name' {
+            $main = $null; $fixturePath = $fixture
+            New-FixtureArchive (Join-Path $fixture 'totally-renamed.nupkg') `
+                SharpProof 1.0.0-preview.1 main
+        }
+        'fixture-nested-collision' {
+            $main = $null; $fixturePath = $fixture
+            $nested = Join-Path $fixture 'nested/feed'
+            [IO.Directory]::CreateDirectory($nested) | Out-Null
+            New-FixtureArchive (Join-Path $nested 'nested-package.nupkg') `
+                SharpProof 1.0.0-preview.1 main
+        }
+        'fixture-malformed' {
+            $main = $null; $fixturePath = $fixture
+            [IO.File]::WriteAllText((Join-Path $fixture 'bad.nupkg'), 'not zip')
+        }
+        'fixture-cross-role' {
+            $main = $null; $fixturePath = $fixture
+            New-FixtureArchive (Join-Path $fixture 'cross.nupkg') `
+                SharpProof 1.0.0-preview.1 cross
+        }
+        'fixture-duplicate' {
+            $main = $null; $fixturePath = $fixture
+            New-FixtureArchive (Join-Path $fixture 'one.nupkg') `
+                SharpProof 1.0.0-preview.1 main
+            New-FixtureArchive (Join-Path $fixture 'two.nupkg') `
+                sharpproof 1.0.0-PREVIEW.1 main
+        }
         'http' { $main = 'http://api.example.test/v3/index.json' }
         'relative' { $main = 'feeds/index.json' }
         'userinfo' { $main = 'https://user:pass@api.example.test/v3/index.json' }
@@ -65,6 +159,43 @@ try {
     Test-SharpProofPublicationDestinationAuthority `
         -Authority $authority -Source $main -SymbolSource $symbols `
         -FixtureDirectory $fixturePath -InputSnapshot $snapshot
+    if ($Mutation.StartsWith('fixture-', [StringComparison]::Ordinal) -and
+        $Mutation -notin @('fixture-uri-conflict')) {
+        $catalog = @($authority.fixture.archives)
+        $state = Get-SharpProofPublicationFixturePackageState `
+            -Catalog $catalog `
+            -PackageId 'SharpProof' `
+            -Version '1.0.0-preview.1'
+        $expectedMain = if ($Mutation -in @(
+                'fixture-main-case-collision','fixture-arbitrary-name',
+                'fixture-nested-collision')) {
+            'FixturePresent'
+        }
+        else { 'FixtureAbsent' }
+        $expectedSymbols = if (
+            $Mutation -eq 'fixture-symbol-case-collision') {
+            'FixturePresent'
+        }
+        else { 'FixtureAbsent' }
+        if ($state.mainState -cne $expectedMain -or
+            $state.symbolsState -cne $expectedSymbols) {
+            throw 'Fixture package identity state was not derived from archive content.'
+        }
+        $fixtureAction = New-SharpProofPublicationActionAuthority `
+            -Mode fixture `
+            -FixtureMainState $state.mainState `
+            -FixtureSymbolsState $state.symbolsState
+        if (($expectedMain -ceq 'FixturePresent' -and
+                $fixtureAction.mainAction -cne 'Collision') -or
+            ($expectedMain -ceq 'FixtureAbsent' -and
+                $fixtureAction.mainAction -cne 'Push') -or
+            ($expectedSymbols -ceq 'FixturePresent' -and
+                $fixtureAction.symbolsAction -cne 'Collision') -or
+            ($expectedSymbols -ceq 'FixtureAbsent' -and
+                $fixtureAction.symbolsAction -cne 'Push')) {
+            throw 'Fixture package identity was not projected into exact actions.'
+        }
+    }
     if ($Mutation.StartsWith('actions-', [StringComparison]::Ordinal)) {
         $mode = switch ($Mutation) {
             'actions-targetless' { 'targetless' }

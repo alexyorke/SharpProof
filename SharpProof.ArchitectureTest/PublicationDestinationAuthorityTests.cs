@@ -31,6 +31,17 @@ public sealed class PublicationDestinationAuthorityTests
     [TestCase("mocked-main-exists", false)]
     [TestCase("mocked-main-error", false)]
     [TestCase("zero-symbol-preflight", true)]
+    [TestCase("fixture-empty", true)]
+    [TestCase("fixture-foreign", true)]
+    [TestCase("fixture-main-case-collision", true)]
+    [TestCase("fixture-symbol-case-collision", true)]
+    [TestCase("fixture-arbitrary-name", true)]
+    [TestCase("fixture-wrong-id", true)]
+    [TestCase("fixture-wrong-version", true)]
+    [TestCase("fixture-nested-collision", true)]
+    [TestCase("fixture-malformed", false)]
+    [TestCase("fixture-cross-role", false)]
+    [TestCase("fixture-duplicate", false)]
     public async Task PublicationDestinationModesAreExactAndAuthenticated(
         string mutation,
         bool expectedSuccess)
@@ -52,6 +63,9 @@ public sealed class PublicationDestinationAuthorityTests
         Assert.That(text, Does.Contain("New-SharpProofPublicationActionAuthority"));
         Assert.That(text, Does.Contain("Test-SharpProofPublicationActionAuthority"));
         Assert.That(text, Does.Contain("symbolsAction = $action.symbolsAction"));
+        Assert.That(text, Does.Contain("-FixtureCatalog $fixtureCatalog"));
+        Assert.That(text, Does.Contain("$remote.mainState"));
+        Assert.That(text, Does.Contain("$remote.symbolsState"));
         Assert.That(text, Does.Not.Contain("source = if ("));
     }
 

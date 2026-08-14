@@ -1689,6 +1689,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~PublicationDestinationAuthorityTests'
     },
     [pscustomobject]@{
+        Name = 'release-fixture-package-identity-case-normalization'
+        File = 'scripts\SharpProof.PublicationDestination.ps1'
+        Original = (@'
+        [string]::Equals(
+            [string]$_.packageId, $PackageId,
+            [StringComparison]::OrdinalIgnoreCase) -and
+'@).TrimEnd()
+        Mutated = (@'
+        [string]::Equals(
+            [string]$_.packageId, $PackageId,
+            [StringComparison]::Ordinal) -and
+'@).TrimEnd()
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationDestinationModesAreExactAndAuthenticated'
+    },
+    [pscustomobject]@{
         Name = 'release-symbol-publication-action-authority'
         File = 'scripts\SharpProof.PublicationDestination.ps1'
         Original = "                symbolsAction = 'CollisionOnPush'"

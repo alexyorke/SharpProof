@@ -47,6 +47,116 @@ function Get-SharpProofPublicationFixtureAuthority {
         fileIdentity = $directoryIdentity
         entryCount = $entries.Count
         entriesSha256 = $digest
+        archives = @(Get-SharpProofPublicationFixtureArchiveCatalog `
+            -FixtureDirectory $canonical)
+    }
+}
+
+function Get-SharpProofPublicationFixtureArchiveCatalog {
+    param(
+        [Parameter(Mandatory = $true)][string]$FixtureDirectory
+    )
+
+    $catalog = [Collections.Generic.List[object]]::new()
+    $identities = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    $archives = @(
+        Get-ChildItem -LiteralPath $FixtureDirectory -File -Recurse |
+            Where-Object {
+                $_.Extension -ieq '.nupkg' -or
+                $_.Extension -ieq '.snupkg'
+            } |
+            Sort-Object FullName)
+    foreach ($file in $archives) {
+        try {
+            $archive = [IO.Compression.ZipFile]::OpenRead($file.FullName)
+        }
+        catch {
+            throw "Fixture archive is malformed: '$($file.FullName)'."
+        }
+        try {
+            $nuspecEntries = @($archive.Entries | Where-Object {
+                $_.FullName.EndsWith(
+                    '.nuspec', [StringComparison]::OrdinalIgnoreCase)
+            })
+            if ($nuspecEntries.Count -ne 1) {
+                throw "Fixture archive must contain exactly one nuspec: '$($file.FullName)'."
+            }
+            $reader = [IO.StreamReader]::new($nuspecEntries[0].Open())
+            try { [xml]$nuspec = $reader.ReadToEnd() }
+            finally { $reader.Dispose() }
+            $namespaces = [Xml.XmlNamespaceManager]::new($nuspec.NameTable)
+            $namespaces.AddNamespace(
+                'n', [string]$nuspec.DocumentElement.NamespaceURI)
+            $metadata = $nuspec.SelectSingleNode(
+                '/n:package/n:metadata', $namespaces)
+            if ($null -eq $metadata) {
+                throw "Fixture archive nuspec identity is incomplete: '$($file.FullName)'."
+            }
+            $ids = @($metadata.SelectNodes('n:id', $namespaces))
+            $versions = @($metadata.SelectNodes('n:version', $namespaces))
+            if ($ids.Count -ne 1 -or $versions.Count -ne 1) {
+                throw "Fixture archive nuspec identity is incomplete: '$($file.FullName)'."
+            }
+            $id = [string]$ids[0].InnerText
+            $version = [string]$versions[0].InnerText
+            if ($id -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or
+                $version -notmatch
+                    '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+                throw "Fixture archive nuspec identity is invalid: '$($file.FullName)'."
+            }
+            $hasDll = @($archive.Entries | Where-Object {
+                $_.FullName.EndsWith(
+                    '.dll', [StringComparison]::OrdinalIgnoreCase)
+            }).Count -gt 0
+            $hasPdb = @($archive.Entries | Where-Object {
+                $_.FullName.EndsWith(
+                    '.pdb', [StringComparison]::OrdinalIgnoreCase)
+            }).Count -gt 0
+            if ($hasDll -eq $hasPdb) {
+                throw "Fixture archive role is ambiguous: '$($file.FullName)'."
+            }
+            $role = if ($hasDll) { 'main' } else { 'symbols' }
+            $key = $id + "`0" + $version + "`0" + $role
+            if (-not $identities.Add($key)) {
+                throw "Fixture archive identity and role are duplicated: '$id $version $role'."
+            }
+            $catalog.Add([pscustomobject][ordered]@{
+                path = [IO.Path]::GetFullPath($file.FullName)
+                packageId = $id
+                version = $version
+                role = $role
+            })
+        }
+        finally { $archive.Dispose() }
+    }
+    return @($catalog)
+}
+
+function Get-SharpProofPublicationFixturePackageState {
+    param(
+        [AllowNull()][AllowEmptyCollection()][object[]]$Catalog,
+        [Parameter(Mandatory = $true)][string]$PackageId,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+
+    $entries = @($Catalog | Where-Object { $null -ne $_ })
+    $matching = @($entries | Where-Object {
+        [string]::Equals(
+            [string]$_.packageId, $PackageId,
+            [StringComparison]::OrdinalIgnoreCase) -and
+        [string]::Equals(
+            [string]$_.version, $Version,
+            [StringComparison]::OrdinalIgnoreCase)
+    })
+    return [pscustomobject][ordered]@{
+        mainState = if (@($matching | Where-Object {
+                    [string]$_.role -ceq 'main'
+                }).Count -eq 1) { 'FixturePresent' } else { 'FixtureAbsent' }
+        symbolsState = if (@($matching | Where-Object {
+                    [string]$_.role -ceq 'symbols'
+                }).Count -eq 1) { 'FixturePresent' } else { 'FixtureAbsent' }
+        remoteUrl = $null
     }
 }
 
@@ -131,7 +241,9 @@ function New-SharpProofPublicationActionAuthority {
         [ValidateSet('targetless','fixture','registry')]
         [string]$Mode,
 
-        [AllowNull()][string]$MainState
+        [AllowNull()][string]$MainState,
+        [AllowNull()][string]$FixtureMainState,
+        [AllowNull()][string]$FixtureSymbolsState
     )
 
     if ($Mode -cne 'registry' -and
@@ -141,6 +253,18 @@ function New-SharpProofPublicationActionAuthority {
     if ($Mode -ceq 'registry' -and
         $MainState -cnotin @('Absent', 'Unchecked')) {
         throw 'Registry main state must be Absent or Unchecked.'
+    }
+    if ($Mode -ceq 'fixture') {
+        if ([string]::IsNullOrEmpty($FixtureMainState)) {
+            $FixtureMainState = 'FixtureAbsent'
+        }
+        if ([string]::IsNullOrEmpty($FixtureSymbolsState)) {
+            $FixtureSymbolsState = 'FixtureAbsent'
+        }
+        if ($FixtureMainState -cnotin @('FixtureAbsent','FixturePresent') -or
+            $FixtureSymbolsState -cnotin @('FixtureAbsent','FixturePresent')) {
+            throw 'Fixture package states are invalid.'
+        }
     }
     $authority = switch ($Mode) {
         'targetless' {
@@ -153,10 +277,14 @@ function New-SharpProofPublicationActionAuthority {
         }
         'fixture' {
             [pscustomobject][ordered]@{
-                mainState = 'FixtureAbsent'
-                mainAction = 'Push'
-                symbolsState = 'FixtureAbsent'
-                symbolsAction = 'Push'
+                mainState = $FixtureMainState
+                mainAction = if ($FixtureMainState -ceq 'FixturePresent') {
+                    'Collision'
+                } else { 'Push' }
+                symbolsState = $FixtureSymbolsState
+                symbolsAction = if ($FixtureSymbolsState -ceq 'FixturePresent') {
+                    'Collision'
+                } else { 'Push' }
             }
         }
         'registry' {
@@ -180,11 +308,15 @@ function Test-SharpProofPublicationActionAuthority {
         [Parameter(Mandatory = $true)]
         [ValidateSet('targetless','fixture','registry')]
         [string]$Mode,
-        [AllowNull()][string]$MainState
+        [AllowNull()][string]$MainState,
+        [AllowNull()][string]$FixtureMainState,
+        [AllowNull()][string]$FixtureSymbolsState
     )
 
     $expected = New-SharpProofPublicationActionAuthority `
-        -Mode $Mode -MainState $MainState
+        -Mode $Mode -MainState $MainState `
+        -FixtureMainState $FixtureMainState `
+        -FixtureSymbolsState $FixtureSymbolsState
     $actualNames = @($Authority.PSObject.Properties.Name)
     $expectedNames = @($expected.PSObject.Properties.Name)
     if (($actualNames -join "`0") -cne ($expectedNames -join "`0") -or

@@ -661,32 +661,17 @@ function Get-RemotePackageState {
         [string]$BaseAddress,
 
         [Parameter()]
-        [string]$FixtureDirectory
+        [string]$FixtureDirectory,
+
+        [AllowNull()][AllowEmptyCollection()]
+        [object[]]$FixtureCatalog
     )
 
     if (-not [string]::IsNullOrWhiteSpace($FixtureDirectory)) {
-        $remoteMainPath = Join-Path `
-            $FixtureDirectory `
-            $Package.mainFileName
-        if (Test-Path -LiteralPath $remoteMainPath -PathType Leaf) {
-            throw (
-                "Remote main package already exists; publication is " +
-                "non-overwriting: $($Package.packageId) " +
-                "$($Package.version).")
-        }
-        $remoteSymbolsPath = Join-Path `
-            $FixtureDirectory `
-            $Package.symbolsFileName
-        if (Test-Path -LiteralPath $remoteSymbolsPath -PathType Leaf) {
-            throw (
-                "Remote symbol package already exists; publication is " +
-                "non-overwriting: $($Package.packageId) " +
-                "$($Package.version).")
-        }
-        return [pscustomobject][ordered]@{
-            state = 'Absent'
-            remoteUrl = $null
-        }
+        return Get-SharpProofPublicationFixturePackageState `
+            -Catalog @($FixtureCatalog) `
+            -PackageId ([string]$Package.packageId) `
+            -Version ([string]$Package.version)
     }
 
     return Invoke-SharpProofMainPackagePreflight `
@@ -821,6 +806,10 @@ if (-not $PlanOnly) {
         -ServiceIndex $publicationDestination.mainDestination
 }
 $entries = [Collections.Generic.List[object]]::new()
+$fixtureCatalog = if ($publicationDestination.mode -ceq 'fixture') {
+    @($publicationDestination.fixture.archives)
+}
+else { @() }
 foreach ($package in $release.packages) {
     $remote = if ($PlanOnly -and
         $publicationDestination.mode -cne 'fixture') {
@@ -836,21 +825,34 @@ foreach ($package in $release.packages) {
         Get-RemotePackageState `
             -Package $package `
             -BaseAddress $baseAddress `
-            -FixtureDirectory $resolvedRemoteDirectory
+            -FixtureDirectory $resolvedRemoteDirectory `
+            -FixtureCatalog $fixtureCatalog
     }
     $action = New-SharpProofPublicationActionAuthority `
         -Mode $publicationDestination.mode `
         -MainState $(if ($publicationDestination.mode -ceq 'registry') {
             $remote.state
         }
-        else { $null })
+        else { $null }) `
+        -FixtureMainState $(if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.mainState
+        } else { $null }) `
+        -FixtureSymbolsState $(if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.symbolsState
+        } else { $null })
     Test-SharpProofPublicationActionAuthority `
         -Authority $action `
         -Mode $publicationDestination.mode `
         -MainState $(if ($publicationDestination.mode -ceq 'registry') {
             $remote.state
         }
-        else { $null })
+        else { $null }) `
+        -FixtureMainState $(if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.mainState
+        } else { $null }) `
+        -FixtureSymbolsState $(if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.symbolsState
+        } else { $null })
     $entries.Add([pscustomobject][ordered]@{
         packageId = $package.packageId
         version = $package.version
@@ -862,7 +864,7 @@ foreach ($package in $release.packages) {
         }
         else { $remote.state }
         fixtureState = if ($publicationDestination.mode -ceq 'fixture') {
-            $remote.state
+            $remote.mainState
         }
         else { $null }
         remoteUrl = $remote.remoteUrl

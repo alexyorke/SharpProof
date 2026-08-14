@@ -69,7 +69,7 @@ function New-SharpProofPublicationInputSnapshot {
             -not (Test-Path -LiteralPath $fixtureRoot -PathType Container)) {
             throw 'RemotePackageDirectory could not be canonically resolved.'
         }
-        foreach ($file in Get-ChildItem -LiteralPath $fixtureRoot -File) {
+        foreach ($file in Get-ChildItem -LiteralPath $fixtureRoot -File -Recurse) {
             $files.Add($file)
         }
     }
