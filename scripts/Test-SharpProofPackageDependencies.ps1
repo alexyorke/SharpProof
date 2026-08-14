@@ -611,6 +611,105 @@ function Test-SharpProofSbomTopology {
     }
 }
 
+function Test-SharpProofSbomArtifactScope {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Artifacts,
+        [Parameter(Mandatory = $true)][object[]]$SbomPackages,
+        [Parameter(Mandatory = $true)][object[]]$DocumentDescribes,
+        [Parameter(Mandatory = $true)][string[]]$FirstPartyPackageIds,
+        [Parameter(Mandatory = $true)][string]$PackageVersion
+    )
+
+    $expectedIds = @($FirstPartyPackageIds | Sort-Object -Unique)
+    if ($expectedIds.Count -ne $FirstPartyPackageIds.Count) {
+        throw 'The SBOM first-party package authority contains duplicates.'
+    }
+    $mainArtifacts = @($Artifacts | Where-Object {
+        [string]$_.kind -ceq 'package'
+    })
+    $symbolArtifacts = @($Artifacts | Where-Object {
+        [string]$_.kind -ceq 'symbols'
+    })
+    foreach ($set in @(
+            @{ Name = 'main'; Rows = $mainArtifacts; Extension = '.nupkg' },
+            @{ Name = 'symbol'; Rows = $symbolArtifacts; Extension = '.snupkg' })) {
+        $ids = @($set.Rows | ForEach-Object { [string]$_.packageId } |
+            Sort-Object)
+        if ($set.Rows.Count -ne $expectedIds.Count -or
+            ($ids -join "`0") -cne ($expectedIds -join "`0")) {
+            throw "The release manifest does not contain the exact $($set.Name) package set."
+        }
+        foreach ($row in $set.Rows) {
+            $expectedName = ([string]$row.packageId) + '.' +
+                $PackageVersion + [string]$set.Extension
+            if ([string]$row.fileName -cne $expectedName -or
+                [string]$row.sha256 -notmatch '^[0-9a-f]{64}$') {
+                throw "The release manifest has an invalid $($set.Name) package identity."
+            }
+        }
+    }
+
+    foreach ($id in $expectedIds) {
+        $main = @($mainArtifacts | Where-Object {
+            [string]$_.packageId -ceq $id
+        })
+        $symbol = @($symbolArtifacts | Where-Object {
+            [string]$_.packageId -ceq $id
+        })
+        $sbomRows = @($SbomPackages | Where-Object {
+            [string]$_.name -ceq $id -and
+            [string]$_.versionInfo -ceq $PackageVersion
+        })
+        $spdxId = Get-SharpProofDependencySpdxId -Name $id
+        if ($main.Count -ne 1 -or $symbol.Count -ne 1 -or
+            $sbomRows.Count -ne 1 -or
+            @($DocumentDescribes | Where-Object {
+                [string]$_ -ceq $spdxId
+            }).Count -ne 1) {
+            throw "The SBOM artifact scope is invalid for '$id'."
+        }
+        Test-SharpProofSpdxPackageChecksum `
+            -Package $sbomRows[0] `
+            -ExpectedSha256 ([string]$main[0].sha256) `
+            -Identity "$id main package"
+    }
+}
+
+function Test-SharpProofSbomAttestationWorkflow {
+    param([Parameter(Mandatory = $true)][string]$Workflow)
+
+    $lines = @($Workflow.Replace("`r`n", "`n").Replace("`r", "`n").Split("`n"))
+    $starts = @(for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index].Trim() -ceq '- name: Attest package SBOM') {
+            $index
+        }
+    })
+    if ($starts.Count -ne 1) {
+        throw 'The release workflow must contain one SBOM attestation step.'
+    }
+    $end = $lines.Count
+    for ($index = $starts[0] + 1; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -match '^      - name:') {
+            $end = $index
+            break
+        }
+    }
+    $block = @($lines[$starts[0]..($end - 1)])
+    $subjects = @($block | Where-Object {
+        $_.TrimStart().StartsWith('subject-path:', [StringComparison]::Ordinal)
+    })
+    $sbomPaths = @($block | Where-Object {
+        $_.TrimStart().StartsWith('sbom-path:', [StringComparison]::Ordinal)
+    })
+    if ($subjects.Count -ne 1 -or
+        $subjects[0].Trim() -cne 'subject-path: nupkgs/*.nupkg' -or
+        $sbomPaths.Count -ne 1 -or
+        $sbomPaths[0].Trim() -cne
+            'sbom-path: nupkgs/SharpProof.spdx.json') {
+        throw 'The SBOM attestation must cover only exact main NuGet packages.'
+    }
+}
+
 function Test-SharpProofSbomLicenseGraph {
     param(
         [Parameter(Mandatory = $true)]

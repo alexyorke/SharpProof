@@ -510,6 +510,15 @@ function Get-ValidatedRelease {
         -PackageVersion $version `
         -Components $catalogComponents `
         -DependencyGraph $dependencyGraph
+    Test-SharpProofSbomArtifactScope `
+        -Artifacts $packageArtifacts `
+        -SbomPackages @($sbom.packages) `
+        -DocumentDescribes @($sbom.documentDescribes) `
+        -FirstPartyPackageIds $packageOrder `
+        -PackageVersion $version
+    Test-SharpProofSbomAttestationWorkflow -Workflow (
+        Get-Content -LiteralPath (Join-Path `
+            $repositoryRoot '.github/workflows/package-consumers.yml') -Raw)
     Test-SharpProofSbomDependencyGraph `
         -Relationships @($sbom.relationships) `
         -DependencyGraph $dependencyGraph

@@ -214,6 +214,15 @@ Test-SharpProofSbomTopology `
     -PackageVersion $expectedVersion `
     -Components $catalogComponents `
     -DependencyGraph $dependencyGraph
+Test-SharpProofSbomArtifactScope `
+    -Artifacts $artifacts `
+    -SbomPackages $sbomPackages `
+    -DocumentDescribes $documentDescribes `
+    -FirstPartyPackageIds $expectedPackageIds `
+    -PackageVersion $expectedVersion
+Test-SharpProofSbomAttestationWorkflow -Workflow (
+    Get-Content -LiteralPath (Join-Path `
+        $repositoryRoot '.github/workflows/package-consumers.yml') -Raw)
 $componentKeys = @(
     $catalogComponents |
         ForEach-Object {

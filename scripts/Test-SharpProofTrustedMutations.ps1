@@ -1564,6 +1564,14 @@ $mutations = @(
         Mutated = '                if (false && published && path != null)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CacheWriteRollsBackPublicationWhenPostValidationIsCanceled'
+    },
+    [pscustomobject]@{
+        Name = 'release-sbom-symbol-checksum-substitution'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = '            -ExpectedSha256 ([string]$main[0].sha256) `'
+        Mutated = '            -ExpectedSha256 ([string]$symbol[0].sha256) `'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SbomSymbolArtifactScopeTests'
     }
 )
 
