@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 81 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 80 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 81 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-221 - Function-pointer convention order is overconstrained (fixed)
+
+- [x] Fixed by `ce98abf91` (`fix: compare function pointer conventions as sets`).
+- Function-pointer unmanaged calling conventions now compare as exact unordered
+  multisets. Roslyn's duplicate convention-owned return modopts are excluded
+  only from their positional modifier comparison; convention identity and
+  multiplicity remain authoritative, and all unrelated return/ref modifiers,
+  ref kinds, types, nullability, and scoped state retain exact matching.
+- Regression-first tests cover reversed return and parameter conventions, three
+  conventions, duplicate cardinality, missing/substituted identities, metadata,
+  generated companions, and existing generic/ref controls. Focused Generator
+  passed 9/9 and Contracts 1/1; full Generator 86/86, Contracts 105/105,
+  Analyzer 302/302, Architecture 182/182, the mutation was killed, and
+  `git diff --check` passed.
 
 ### SP-AUDIT-216 - Parentheses disable direct precondition replay (fixed)
 
@@ -1455,17 +1470,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
-
-### SP-AUDIT-221 - Function-pointer convention order is overconstrained (P1)
-
-- [ ] ContractFor compares unmanaged calling-convention types positionally, but
-  the compiler permits order-interchangeable convention sets such as
-  `[Cdecl, SuppressGCTransition]` and the reverse.
-- Supported impact: compiler-equivalent target and companion signatures emit
-  `SPCF0005`.
-- Required closure: compare convention types as an exact unordered set while
-  retaining identity/cardinality checks. Add reordered return/parameter,
-  genuinely different, duplicate-invalid, metadata, and generator-final controls.
 
 ### SP-AUDIT-231 - ContractFor conflates positive and negative zero defaults (P1)
 
