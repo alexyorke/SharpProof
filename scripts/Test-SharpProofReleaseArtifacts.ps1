@@ -164,6 +164,7 @@ foreach ($packageId in $expectedPackageIds) {
             $resolvedSource `
             ([string]$symbolArtifact.fileName)) `
         -PackageId $packageId `
+        -PackageVersion $expectedVersion `
         -RepositoryCommit $head
 }
 $dependencyGraph = @(Get-SharpProofPackageDependencyGraph `

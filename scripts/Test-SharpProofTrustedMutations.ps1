@@ -1499,6 +1499,19 @@ $mutations = @(
         Mutated = '                response.Summary?.Versions != null,'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~RequestBoundValidationAuthenticatesRuntimeProvenance'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-package-role-filenames'
+        File = 'scripts\SharpProof.SymbolPackageValidator.cs'
+        Original = (@'
+        if (!string.Equals(
+                Path.GetFileName(path),
+                expectedName,
+                StringComparison.Ordinal))
+'@).TrimEnd()
+        Mutated = '        if (false)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ReleasePackageRolesAuthenticateNamesArchivesAndNuspecs'
     }
 )
 

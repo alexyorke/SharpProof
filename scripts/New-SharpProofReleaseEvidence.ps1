@@ -649,6 +649,7 @@ foreach ($packageId in $expectedIds) {
         -PackagePath $main.File.FullName `
         -SymbolPackagePath $symbols.File.FullName `
         -PackageId $packageId `
+        -PackageVersion $versions[0] `
         -RepositoryCommit $checkoutCommit
 }
 

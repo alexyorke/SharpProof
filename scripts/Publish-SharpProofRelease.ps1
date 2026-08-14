@@ -440,6 +440,7 @@ function Get-ValidatedRelease {
             -PackagePath $mainPath `
             -SymbolPackagePath $symbolsPath `
             -PackageId $packageId `
+            -PackageVersion $version `
             -RepositoryCommit $RepositoryCommit
         $null = $packages.Add([pscustomobject][ordered]@{
             packageId = $packageId

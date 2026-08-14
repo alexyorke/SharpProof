@@ -12,6 +12,9 @@ function Test-SharpProofSymbolPackagePair {
         [string]$PackageId,
 
         [Parameter(Mandatory = $true)]
+        [string]$PackageVersion,
+
+        [Parameter(Mandatory = $true)]
         [string]$RepositoryCommit
     )
 
@@ -33,6 +36,7 @@ function Test-SharpProofSymbolPackagePair {
                 $PackagePath,
                 $SymbolPackagePath,
                 $PackageId,
+                $PackageVersion,
                 $RepositoryCommit))
     }
     catch [Reflection.TargetInvocationException] {

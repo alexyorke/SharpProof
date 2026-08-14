@@ -430,6 +430,138 @@ public sealed class ReleasePublicationScriptTests
         }
     }
 
+    [TestCase("valid")]
+    [TestCase("role-swap")]
+    [TestCase("renamed-main")]
+    [TestCase("renamed-symbols")]
+    [TestCase("cross-id")]
+    [TestCase("wrong-commit")]
+    public async Task ReleasePackageRolesAuthenticateNamesArchivesAndNuspecs(
+        string mutation)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PublicationWorkspace.Create();
+        var packageId = PackagedProductFeed.AttributesPackageId;
+        var mainSource = feed.Packages.Single(package =>
+            package.Id == packageId).Path;
+        var symbolsSource = feed.SymbolPackages.Single(package =>
+            package.Id == packageId).Path;
+        var mainPath = Path.Combine(
+            workspace.PackageSource,
+            Path.GetFileName(mainSource));
+        var symbolsPath = Path.Combine(
+            workspace.PackageSource,
+            Path.GetFileName(symbolsSource));
+        File.Copy(mainSource, mainPath);
+        File.Copy(symbolsSource, symbolsPath);
+
+        switch (mutation)
+        {
+            case "valid":
+                break;
+            case "role-swap":
+                var mainBytes = await File.ReadAllBytesAsync(mainPath);
+                var symbolsBytes = await File.ReadAllBytesAsync(symbolsPath);
+                await File.WriteAllBytesAsync(mainPath, symbolsBytes);
+                await File.WriteAllBytesAsync(symbolsPath, mainBytes);
+                break;
+            case "renamed-main":
+                mainPath += ".renamed";
+                File.Move(
+                    Path.Combine(
+                        workspace.PackageSource,
+                        Path.GetFileName(mainSource)),
+                    mainPath);
+                break;
+            case "renamed-symbols":
+                symbolsPath += ".renamed";
+                File.Move(
+                    Path.Combine(
+                        workspace.PackageSource,
+                        Path.GetFileName(symbolsSource)),
+                    symbolsPath);
+                break;
+            case "cross-id":
+                File.Copy(
+                    feed.Packages.Single(package =>
+                        package.Id == PackagedProductFeed.PortablePackageId).Path,
+                    mainPath,
+                    overwrite: true);
+                break;
+            case "wrong-commit":
+                RewriteRepositoryCommit(symbolsPath, new string('0', 40));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(mutation), mutation, "Unknown role mutation.");
+        }
+
+        var probePath = Path.Combine(workspace.Root, "role-probe.ps1");
+        await File.WriteAllTextAsync(
+            probePath,
+            "param($Validator,$Main,$Symbols,$Id,$Version,$Commit)\n" +
+            "$ErrorActionPreference = 'Stop'\n" +
+            ". $Validator\n" +
+            "Test-SharpProofSymbolPackagePair -PackagePath $Main " +
+            "-SymbolPackagePath $Symbols -PackageId $Id " +
+            "-PackageVersion $Version -RepositoryCommit $Commit\n",
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var head = (await RunProcessAsync(
+            FindRepositoryRoot(), "git", "rev-parse", "HEAD")).Output.Trim();
+        var result = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            probePath,
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "Test-SharpProofSymbolPackages.ps1"),
+            mainPath,
+            symbolsPath,
+            packageId,
+            feed.Version,
+            head);
+
+        if (mutation == "valid")
+        {
+            Assert.That(result.ExitCode, Is.Zero, result.Output);
+        }
+        else
+        {
+            Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+        }
+    }
+
+    [Test]
+    public async Task EveryReleaseAuthorityBindsExactPackageRoles()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var scriptName in new[]
+                 {
+                     "New-SharpProofReleaseEvidence.ps1",
+                     "Test-SharpProofReleaseArtifacts.ps1",
+                     "Publish-SharpProofRelease.ps1"
+                 })
+        {
+            var script = await File.ReadAllTextAsync(
+                Path.Combine(root, "scripts", scriptName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofSymbolPackagePair"),
+                    scriptName);
+                Assert.That(
+                    script,
+                    Does.Contain("-PackageVersion"),
+                    scriptName);
+            }
+        }
+    }
+
     [Test]
     public async Task EveryReleaseAuthorityUsesExactPackagePayloadValidation()
     {

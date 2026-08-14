@@ -16,11 +16,13 @@ internal static class SharpProofSymbolPackageValidator
         string packagePath,
         string symbolPackagePath,
         string packageId,
+        string packageVersion,
         string repositoryCommit)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packagePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(symbolPackagePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageVersion);
         if (repositoryCommit.Length != 40 ||
             repositoryCommit.Any(static value => !Uri.IsHexDigit(value)))
         {
@@ -32,6 +34,20 @@ internal static class SharpProofSymbolPackageValidator
         using var symbols = ZipFile.OpenRead(symbolPackagePath);
         RejectDuplicateEntries(package, packagePath);
         RejectDuplicateEntries(symbols, symbolPackagePath);
+        ValidateArchiveIdentity(
+            package,
+            packagePath,
+            packageId,
+            packageVersion,
+            repositoryCommit,
+            isSymbols: false);
+        ValidateArchiveIdentity(
+            symbols,
+            symbolPackagePath,
+            packageId,
+            packageVersion,
+            repositoryCommit,
+            isSymbols: true);
 
         var assemblies = package.Entries
             .Where(static entry =>
@@ -76,6 +92,82 @@ internal static class SharpProofSymbolPackageValidator
                     "Symbol package entry disappeared during validation: " +
                     expectedPdbNames[index]);
             ValidatePair(assemblies[index], pdb, expectedSourceUrl);
+        }
+    }
+
+    private static void ValidateArchiveIdentity(
+        ZipArchive archive,
+        string path,
+        string packageId,
+        string packageVersion,
+        string repositoryCommit,
+        bool isSymbols)
+    {
+        var expectedName = packageId + "." + packageVersion +
+            (isSymbols ? ".snupkg" : ".nupkg");
+        if (!string.Equals(
+                Path.GetFileName(path),
+                expectedName,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"The {(isSymbols ? "symbol" : "main")} package for " +
+                $"'{packageId}' must be named exactly '{expectedName}'.");
+        }
+
+        var nuspecEntries = archive.Entries
+            .Where(static entry => entry.FullName.EndsWith(
+                ".nuspec",
+                StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (nuspecEntries.Length != 1)
+        {
+            throw new InvalidDataException(
+                $"Package '{path}' must contain exactly one nuspec.");
+        }
+
+        using var stream = nuspecEntries[0].Open();
+        using var document = System.Xml.XmlReader.Create(
+            stream,
+            new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Prohibit });
+        var id = default(string);
+        var version = default(string);
+        var commit = default(string);
+        while (document.Read())
+        {
+            if (document.NodeType != System.Xml.XmlNodeType.Element)
+            {
+                continue;
+            }
+            if (document.LocalName == "id")
+            {
+                id = document.ReadElementContentAsString();
+            }
+            else if (document.LocalName == "version")
+            {
+                version = document.ReadElementContentAsString();
+            }
+            else if (document.LocalName == "repository")
+            {
+                commit = document.GetAttribute("commit");
+            }
+        }
+        if (!string.Equals(id, packageId, StringComparison.Ordinal) ||
+            !string.Equals(version, packageVersion, StringComparison.Ordinal) ||
+            !string.Equals(commit, repositoryCommit, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Package '{path}' nuspec identity or repository commit " +
+                "does not match its authenticated release role.");
+        }
+
+        var pdbCount = archive.Entries.Count(static entry =>
+            entry.FullName.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase));
+        if ((!isSymbols && pdbCount != 0) || (isSymbols && pdbCount == 0))
+        {
+            throw new InvalidDataException(
+                $"Package '{path}' has an invalid " +
+                $"{(isSymbols ? "symbol" : "main")} package layout.");
         }
     }
 

@@ -143,6 +143,7 @@ function Resolve-SharpProofPackageSource {
             -PackagePath $main.Path `
             -SymbolPackagePath $symbols.Path `
             -PackageId $packageId `
+            -PackageVersion $versions[0] `
             -RepositoryCommit $repositoryCommit
     }
     return $resolved
