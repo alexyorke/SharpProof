@@ -854,6 +854,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~DeserializationRejectsDocumentsBeyondTheDeclaredDepth'
     },
     [pscustomobject]@{
+        Name = 'protocol-json-nested-shape-authority'
+        File = 'SharpProof.Worker.Protocol\ProtocolJsonSupport.cs'
+        Original = '        EnsureObjectShape(document.RootElement, shape);'
+        Mutated = '        _ = shape;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~OmittedNestedManifestSchemaVersionIsRejectedDuringDeserialization'
+    },
+    [pscustomobject]@{
         Name = 'contract-api-consumer-requires-identity'
         File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
         Original = '            Name: ContractApiCatalog.RequiresMethodName,'

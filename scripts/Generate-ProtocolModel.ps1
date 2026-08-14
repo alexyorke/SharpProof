@@ -622,6 +622,25 @@ foreach ($nameValue in $requiredJsonRoots) {
     $lines.Add('    ];')
 }
 $lines.Add('')
+$lines.Add('    internal static readonly IReadOnlyDictionary<string, WorkerProtocolJsonObjectShape> JsonObjectShapes =')
+$lines.Add('        new Dictionary<string, WorkerProtocolJsonObjectShape>(StringComparer.Ordinal) {')
+foreach ($declaration in $declarations) {
+    if ([string](Get-RequiredMember $declaration 'kind' 'protocol declaration') -ne 'class') {
+        continue
+    }
+    $name = [string](Get-RequiredMember $declaration 'name' 'class declaration')
+    $lines.Add("            [$([char]34)$name$([char]34)] = new([")
+    foreach ($property in @(Get-MemberArray $declaration 'properties')) {
+        $jsonName = [string](Get-RequiredMember $property 'jsonName' "property '$name'")
+        $propertyType = [string](Get-RequiredMember $property 'type' "property '$name.$jsonName'")
+        $lines.Add("                new(" +
+            (ConvertTo-CSharpString $jsonName) + ', ' +
+            (ConvertTo-CSharpString $propertyType) + '),')
+    }
+    $lines.Add('            ]),')
+}
+$lines.Add('        };')
+$lines.Add('')
 $lines.Add('    private static readonly HashSet<Enum> s_knownValues = [')
 $definedEnumNames = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)

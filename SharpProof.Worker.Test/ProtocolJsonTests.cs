@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -619,26 +620,149 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
-    public void OmittedOrNumericClaimOutcomeCannotBecomeProven()
+    public void OmittedOrNumericClaimOutcomeIsRejectedDuringDeserialization()
     {
         var json = WorkerProtocolJson.SerializeResponse(
             CreateResponse(CreateManifest()));
-        var omitted = WorkerProtocolJson.DeserializeResponse(
-            json.Replace(
-                "\"outcome\":\"Proven\",",
-                string.Empty,
-                StringComparison.Ordinal))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<JsonException>((Action)(() =>
+                WorkerProtocolJson.DeserializeResponse(
+                    json.Replace(
+                        "\"outcome\":\"Proven\",",
+                        string.Empty,
+                        StringComparison.Ordinal))));
+            Assert.Throws<JsonException>((Action)(() =>
+                WorkerProtocolJson.DeserializeResponse(
+                    json.Replace(
+                        "\"outcome\":\"Proven\"",
+                        "\"outcome\":1",
+                        StringComparison.Ordinal))));
+        }
+    }
 
-        Assert.That(
-            WorkerProtocolJson.Validate(omitted).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.claim_outcome"));
+    [Test]
+    public void OmittedNestedManifestSchemaVersionIsRejectedDuringDeserialization()
+    {
+        var json = WorkerProtocolJson.SerializeResponse(
+            CreateResponse(CreateManifest()));
+
         Assert.Throws<JsonException>((Action)(() =>
             WorkerProtocolJson.DeserializeResponse(
                 json.Replace(
-                    "\"outcome\":\"Proven\"",
-                    "\"outcome\":1",
+                    $"\"schemaVersion\":{WorkerManifestVersions.Current},",
+                    string.Empty,
                     StringComparison.Ordinal))));
+    }
+
+    [Test]
+    public void EveryReachableNestedProtocolModelRequiresItsExactPropertySet()
+    {
+        var requestJson = WorkerProtocolJson.SerializeRequest(CreateRequest());
+        var response = CreateShapeCoverageResponse();
+        var responseJson = WorkerProtocolJson.SerializeResponse(response);
+        var cases = new (string Json, Func<JsonObject, JsonObject> Select, string Property)[]
+        {
+            (requestJson, static root => root["compilerManifest"]!.AsObject(), "path"),
+            (requestJson, static root => root["budgets"]!.AsObject(), "queryRlimit"),
+            (requestJson, static root => root["cache"]!.AsObject(), "enabled"),
+            (responseJson, static root => root["manifest"]!.AsObject(), "schemaVersion"),
+            (responseJson, static root => root["manifest"]!["callables"]![0]!.AsObject(), "callableId"),
+            (responseJson, static root => root["manifest"]!["callables"]![0]!["location"]!.AsObject(), "path"),
+            (responseJson, static root => root["manifest"]!["callables"]![0]!["assumptions"]![0]!.AsObject(), "id"),
+            (responseJson, static root => root["manifest"]!["claims"]![0]!.AsObject(), "claimId"),
+            (responseJson, static root => root["callableResults"]![0]!.AsObject(), "coverage"),
+            (responseJson, static root => root["claimResults"]![0]!.AsObject(), "outcome"),
+            (responseJson, static root => root["claimResults"]![0]!["effectWitness"]!.AsObject(), "kind"),
+            (responseJson, static root => root["claimResults"]![0]!["model"]![0]!.AsObject(), "variable"),
+            (responseJson, static root => root["summary"]!.AsObject(), "callableCount"),
+            (responseJson, static root => root["summary"]!["outcomeCounts"]![0]!.AsObject(), "outcome"),
+            (responseJson, static root => root["summary"]!["reasonCounts"]![0]!.AsObject(), "reason"),
+            (responseJson, static root => root["summary"]!["assumptions"]!.AsObject(), "total"),
+            (responseJson, static root => root["summary"]!["versions"]!.AsObject(), "protocolVersion"),
+            (responseJson, static root => root["summary"]!["budgets"]!.AsObject(), "queryRlimit"),
+            (responseJson, static root => root["errors"]![0]!.AsObject(), "code")
+        };
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var item in cases)
+            {
+                var root = JsonNode.Parse(item.Json)!.AsObject();
+                Assert.That(item.Select(root).Remove(item.Property), Is.True);
+                Assert.Throws<JsonException>((Action)(() =>
+                    DeserializeByRoot(root.ToJsonString())));
+            }
+        }
+    }
+
+    [Test]
+    public void StrictProtocolShapeRejectsNoncanonicalNestedTokensAndOrdering()
+    {
+        var responseJson = WorkerProtocolJson.SerializeResponse(
+            CreateShapeCoverageResponse());
+        var caseVariant = responseJson.Replace(
+            "\"schemaVersion\"",
+            "\"SchemaVersion\"",
+            StringComparison.Ordinal);
+        var numericString = responseJson.Replace(
+            $"\"schemaVersion\":{WorkerManifestVersions.Current}",
+            $"\"schemaVersion\":\"{WorkerManifestVersions.Current}\"",
+            StringComparison.Ordinal);
+        var enumCaseVariant = responseJson.Replace(
+            "\"outcome\":\"Proven\"",
+            "\"outcome\":\"proven\"",
+            StringComparison.Ordinal);
+
+        var extra = JsonNode.Parse(responseJson)!.AsObject();
+        extra["manifest"]!.AsObject()["futureField"] = true;
+        var nullElement = JsonNode.Parse(responseJson)!.AsObject();
+        nullElement["manifest"]!["callables"]!.AsArray().Insert(0, null);
+        var arraySwap = JsonNode.Parse(responseJson)!.AsObject();
+        arraySwap["summary"]!.AsObject()["budgets"] = new JsonArray();
+        var reordered = JsonNode.Parse(responseJson)!.AsObject();
+        var manifest = reordered["manifest"]!.AsObject();
+        var schemaVersion = manifest["schemaVersion"]!.DeepClone();
+        Assert.That(manifest.Remove("schemaVersion"), Is.True);
+        manifest["schemaVersion"] = schemaVersion;
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var invalid in new[]
+            {
+                caseVariant,
+                numericString,
+                enumCaseVariant,
+                extra.ToJsonString(),
+                nullElement.ToJsonString(),
+                arraySwap.ToJsonString(),
+                reordered.ToJsonString()
+            })
+            {
+                Assert.Throws<JsonException>((Action)(() =>
+                    WorkerProtocolJson.DeserializeResponse(invalid)));
+            }
+        }
+    }
+
+    [Test]
+    public void CanonicalProtocolDocumentsStrictlyRoundTrip()
+    {
+        var requestJson = WorkerProtocolJson.SerializeRequest(CreateRequest());
+        var responseJson = WorkerProtocolJson.SerializeResponse(
+            CreateShapeCoverageResponse());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerProtocolJson.SerializeRequest(
+                    WorkerProtocolJson.DeserializeRequest(requestJson)!),
+                Is.EqualTo(requestJson));
+            Assert.That(
+                WorkerProtocolJson.SerializeResponse(
+                    WorkerProtocolJson.DeserializeResponse(responseJson)!),
+                Is.EqualTo(responseJson));
+        }
     }
 
     [Test]
@@ -1508,6 +1632,45 @@ public sealed class ProtocolJsonTests
             WorkerBinarySha256 = new string('a', 64),
             ApiSpecContentSha256 = new string('b', 64)
         };
+    }
+
+    private static WorkerVerifyResponse CreateShapeCoverageResponse()
+    {
+        var response = CreateResponse(CreateManifest());
+        var claim = response.ClaimResults[0];
+        claim.EffectWitness = CreateEffectWitness(
+            response.Manifest.Claims[0].Location);
+        claim.Model = [
+            new WorkerModelValue
+            {
+                Variable = "result",
+                Kind = "integer",
+                Value = "0"
+            }
+        ];
+        response.Errors = [
+            new WorkerProtocolError
+            {
+                Code = "fixture.error",
+                Message = "Shape coverage fixture."
+            }
+        ];
+        return response;
+    }
+
+    private static void DeserializeByRoot(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.TryGetProperty(
+                "compilerManifest",
+                out _))
+        {
+            _ = WorkerProtocolJson.DeserializeRequest(json);
+        }
+        else
+        {
+            _ = WorkerProtocolJson.DeserializeResponse(json);
+        }
     }
 
     private static void SetUnknown(

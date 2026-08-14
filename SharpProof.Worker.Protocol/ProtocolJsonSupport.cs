@@ -7,11 +7,26 @@ using ErrorBuilder = System.Collections.Immutable.ImmutableArray<SharpProof.Work
 
 namespace SharpProof.Worker.Protocol;
 
+internal readonly struct WorkerProtocolJsonPropertyShape(
+    string name,
+    string type)
+{
+    internal readonly string Name = name;
+    internal readonly string Type = type;
+}
+
+internal sealed class WorkerProtocolJsonObjectShape(
+    WorkerProtocolJsonPropertyShape[] properties)
+{
+    internal WorkerProtocolJsonPropertyShape[] Properties { get; } =
+        properties;
+}
+
 public static partial class WorkerProtocolJson
 {
-    private static void EnsureRootProperties(
+    private static void EnsureJsonShape(
         string json,
-        IEnumerable<string> requiredProperties)
+        string rootType)
     {
         json = json ?? throw new ArgumentNullException(nameof(json));
 
@@ -23,41 +38,153 @@ public static partial class WorkerProtocolJson
             throw new JsonException("A JSON object is required.");
         }
 
-        EnsureUniquePropertyNames(document.RootElement);
-        var names = new HashSet<string>(
-            document.RootElement.EnumerateObject().Select(static property => property.Name),
-            StringComparer.Ordinal);
-        if (requiredProperties.Any(property => !names.Contains(property)))
+        if (!WorkerProtocolMetadata.JsonObjectShapes.TryGetValue(
+                rootType,
+                out var shape))
         {
-            throw new JsonException("A required JSON property is missing.");
+            throw new JsonException("The JSON root type is not declared.");
+        }
+        EnsureObjectShape(document.RootElement, shape);
+    }
+
+    private static void EnsureObjectShape(
+        JsonElement value,
+        WorkerProtocolJsonObjectShape shape)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException("A JSON object is required.");
+        }
+        var properties = value.EnumerateObject().ToArray();
+        if (properties.Length != shape.Properties.Length)
+        {
+            throw new JsonException(
+                "Every declared JSON property is required exactly once.");
+        }
+        for (var index = 0; index < properties.Length; index++)
+        {
+            var expected = shape.Properties[index];
+            var property = properties[index];
+            if (!string.Equals(
+                    property.Name,
+                    expected.Name,
+                    StringComparison.Ordinal))
+            {
+                throw new JsonException(
+                    "JSON properties must use the exact declared name and order.");
+            }
+            EnsureValueShape(property.Value, expected.Type);
         }
     }
 
-    private static void EnsureUniquePropertyNames(JsonElement value)
+    private static void EnsureValueShape(JsonElement value, string declaredType)
     {
-        if (value.ValueKind == JsonValueKind.Array)
+        var allowsNull = declaredType.EndsWith("?", StringComparison.Ordinal);
+        if (allowsNull)
         {
-            foreach (var item in value.EnumerateArray())
+            declaredType = declaredType.Substring(0, declaredType.Length - 1);
+            if (value.ValueKind == JsonValueKind.Null)
             {
-                EnsureUniquePropertyNames(item);
+                return;
             }
-
+        }
+        if (declaredType.EndsWith("[]", StringComparison.Ordinal))
+        {
+            EnsureArrayShape(
+                value,
+                declaredType.Substring(0, declaredType.Length - 2));
             return;
         }
-        if (value.ValueKind != JsonValueKind.Object)
+        const string immutableArrayPrefix = "ImmutableArray<";
+        if (declaredType.StartsWith(
+                immutableArrayPrefix,
+                StringComparison.Ordinal) &&
+            declaredType.EndsWith(">", StringComparison.Ordinal))
         {
+            EnsureArrayShape(
+                value,
+                declaredType.Substring(
+                    immutableArrayPrefix.Length,
+                    declaredType.Length - immutableArrayPrefix.Length - 1));
             return;
         }
-
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var property in value.EnumerateObject())
+        if (WorkerProtocolMetadata.JsonObjectShapes.TryGetValue(
+                declaredType,
+                out var objectShape))
         {
-            if (!names.Add(property.Name))
+            EnsureObjectShape(value, objectShape);
+            return;
+        }
+        if (declaredType == "string")
+        {
+            RequireValueKind(value, JsonValueKind.String);
+            return;
+        }
+        if (declaredType == "bool")
+        {
+            if (value.ValueKind is not (
+                    JsonValueKind.True or JsonValueKind.False))
             {
-                throw new JsonException("Duplicate JSON properties are not permitted.");
+                throw new JsonException("A JSON boolean is required.");
             }
+            return;
+        }
+        if (declaredType is "int" or "uint" or "long")
+        {
+            RequireValueKind(value, JsonValueKind.Number);
+            return;
+        }
+        EnsureCanonicalEnum(value, declaredType);
+    }
 
-            EnsureUniquePropertyNames(property.Value);
+    private static void EnsureArrayShape(
+        JsonElement value,
+        string elementType)
+    {
+        RequireValueKind(value, JsonValueKind.Array);
+        foreach (var item in value.EnumerateArray())
+        {
+            EnsureValueShape(item, elementType);
+        }
+    }
+
+    private static void EnsureCanonicalEnum(
+        JsonElement value,
+        string declaredType)
+    {
+        RequireValueKind(value, JsonValueKind.String);
+        var enumType = typeof(WorkerProtocolJson).Assembly.GetType(
+            typeof(WorkerProtocolJson).Namespace + "." + declaredType,
+            throwOnError: false,
+            ignoreCase: false);
+        var text = value.GetString();
+        if (enumType == null || !enumType.IsEnum || text == null)
+        {
+            throw new JsonException("The declared JSON enum type is invalid.");
+        }
+        object parsed;
+        try
+        {
+            parsed = Enum.Parse(enumType, text, ignoreCase: false);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new JsonException("The JSON enum value is invalid.", exception);
+        }
+        if (!string.Equals(parsed.ToString(), text, StringComparison.Ordinal))
+        {
+            throw new JsonException("The JSON enum spelling is not canonical.");
+        }
+    }
+
+    private static void RequireValueKind(
+        JsonElement value,
+        JsonValueKind expected)
+    {
+        if (value.ValueKind != expected)
+        {
+            throw new JsonException(
+                $"JSON token kind '{expected}' is required.");
         }
     }
 

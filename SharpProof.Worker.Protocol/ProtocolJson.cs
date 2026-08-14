@@ -639,7 +639,8 @@ public static partial class WorkerProtocolJson
 
     private static T? Deserialize<T>(string json, IEnumerable<string> requiredProperties)
     {
-        EnsureRootProperties(json, requiredProperties);
+        _ = requiredProperties;
+        EnsureJsonShape(json, typeof(T).Name);
         return JsonSerializer.Deserialize<T>(json, s_options);
     }
     private static int FindClaimOrdinal(WorkerClaimManifest? manifest, string? id)
