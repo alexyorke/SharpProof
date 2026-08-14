@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 62 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 61 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 62 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-153 - Protocol JSON accepts noncanonical or incomplete producer shapes (fixed)
+
+- [x] Fixed by `49c3c4591` (`fix: enforce canonical protocol JSON shapes`).
+- The protocol generator now emits exact nested object shapes, and one recursive
+  pre-deserialization authority enforces required properties, canonical ordinal
+  names/order and enum spelling, exact token kinds, arrays, nullability, and
+  non-null elements before generated defaults can change wire meaning.
+- Regression coverage spans reachable nested model omissions plus extra,
+  duplicate, case-variant, reordered, token-swapped, null, and array/object
+  shapes, canonical request/response round trips, and an authority-removal
+  mutation. The full Worker suite passed 491/491 and Architecture 279/279.
 
 ### SP-AUDIT-144 - Publication destination and fixture authority are conflated (fixed)
 
@@ -2273,25 +2285,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   unknown controls, and invariant-removal mutation.
 - Consolidated cases: SP-AUDIT-203, SP-AUDIT-234.
 - Unified closure: Validate and produce claim kind, outcome, reason, certainty, vacuity, core, trusted provenance, and used assumption IDs from one authoritative table.
-
-### SP-AUDIT-153 - Protocol JSON accepts noncanonical or incomplete producer shapes (P2)
-
-- [ ] Exact-property presence is checked only at request/response roots. Nested
-  models initialize semantic fields to valid values, so omitted wire properties
-  such as `manifest.schemaVersion` silently become the current version.
-- Certifier impact: removing only the nested schema-version property from an
-  otherwise valid request-bound response survives deserialization, hash/equality
-  checks, and strict validation even though the wire document never declared its
-  schema.
-- Evidence: nested deserialization has no presence map and the generated manifest
-  initializer supplies the accepted current value. The same class reaches budget,
-  vacuity, usage, and summary fields whose defaults are valid.
-- Required closure: enforce recursive exact required-property presence with
-  bounded converters/generated metadata. Add every nested model, absent versus
-  explicit default, unknown/duplicate property, canonical round-trip, and
-  presence-check mutation controls.
-- Consolidated cases: SP-AUDIT-154.
-- Unified closure: Require recursive properties and token types, ordinal spelling, canonical ordering, and exact canonical re-encoding for protocol JSON.
 
 ### SP-AUDIT-155 - Semantic identities and assumption kinds lack a closed producer authority (P2)
 
