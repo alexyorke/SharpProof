@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 52 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 51 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 52 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-182 - `sp check` is not the documented single build (fixed)
+
+- [x] Fixed by `00b499483` (`fix: define the dev check command plan`).
+- One schema-1 authority now derives the exact Debug and Release command graphs
+  from the package-project manifest, drives package `NoBuild` decisions, and is
+  exposed through `-PlanOnly`. Documentation honestly projects the nine-row
+  Debug graph and seven-row Release graph instead of promising one build where
+  required Release packages make reuse unsafe.
+- Regression coverage includes both configurations, exact order/count and
+  package reuse decisions, documentation drift, and an authority-removal
+  mutation. Focused plan/documentation tests passed 17/17; Architecture passed
+  360/361 before the sole TCB pin was corrected, then that test passed 1/1.
 
 ### SP-AUDIT-181 - Resource and concurrency documentation drifts from catalogs (fixed)
 
@@ -2595,17 +2608,6 @@ Precision, documentation, and developer-experience debt that does not change a s
 - Required closure: give every named stage the same explicit repository root and
   non-root execution contract. Add direct build/test/package image-command,
   working-directory, UID, and Compose parity fixtures.
-
-### SP-AUDIT-182 - `sp check` is not the documented single build (P3)
-
-- [ ] README and container-development docs describe one incremental build, but
-  the default Debug path performs another package-test build and three
-  build-capable Release pack operations.
-- Supported impact: the everyday check command is materially slower and does
-  more compilation than its performance/iteration contract states.
-- Required closure: either reuse the initial build outputs with explicit
-  no-build package phases or document and snapshot the intentional command
-  graph. Add an instrumented command-plan regression.
 
 ### SP-AUDIT-209 - Typed outcome and certainty documentation drifts from schema (P3)
 
