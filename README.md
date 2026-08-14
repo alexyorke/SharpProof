@@ -77,10 +77,13 @@ sp package-tests
 sp acceptance -Configuration Release
 ```
 
-`sp test-changed` is the shortest edit-loop check. `sp check` runs one
-incremental build plus duration-aware semantic, Worker, package, and performance
-smoke shards. Disposable `docker compose run --rm tooling ...` commands remain
-the clean qualification path and intentionally discard build outputs.
+`sp test-changed` is the shortest edit-loop check.
+The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
+The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
+Both configurations also run duration-aware semantic, Worker, package, and
+performance smoke shards. Disposable `docker compose run --rm tooling ...`
+commands remain the clean qualification path and intentionally discard build
+outputs.
 
 The default container budget is 16 CPUs and 40960 MiB.
 Test-project concurrency uses 8 lanes (one lane per 2 CPUs).

@@ -14,7 +14,8 @@ param(
         'duplicate-resource-claim',
         'resource-claim-case',
         'resource-claim-spacing',
-        'catalog-resource-drift')]
+        'catalog-resource-drift',
+        'check-plan-drift')]
     [string]$Mutation
 )
 
@@ -107,6 +108,14 @@ try {
             $text = $text.Replace(
                 '"mutationParallelism": 4',
                 '"mutationParallelism": 5',
+                [StringComparison]::Ordinal)
+        }
+        'check-plan-drift' {
+            $text = $text.Replace(
+                ('The default Debug check performs one Debug solution build, ' +
+                 'one additional Debug package-test build, and 3'),
+                ('The default Debug check reuses one build for every package ' +
+                 'and test phase, with 3'),
                 [StringComparison]::Ordinal)
         }
     }

@@ -760,6 +760,71 @@ foreach ($resourceDocument in @(
         }
     }
 }
+$devCheckPlanScript = Get-RepositoryPath (
+    'scripts\Get-SharpProofDevCheckPlan.ps1')
+$debugCheckPlan = & $devCheckPlanScript -Configuration Debug |
+    ConvertFrom-Json
+$releaseCheckPlan = & $devCheckPlanScript -Configuration Release |
+    ConvertFrom-Json
+foreach ($plan in @($debugCheckPlan, $releaseCheckPlan)) {
+    if ([int]$plan.schemaVersion -ne 1 -or
+        [string]$plan.command -cne 'check') {
+        throw 'Developer-check command plan authority is invalid.'
+    }
+}
+$debugCommands = @($debugCheckPlan.commands)
+$releaseCommands = @($releaseCheckPlan.commands)
+$debugPacks = @($debugCommands | Where-Object {
+        [string]$_.id -clike 'package-pack:*'
+    })
+$releasePacks = @($releaseCommands | Where-Object {
+        [string]$_.id -clike 'package-pack:*'
+    })
+if (@($debugCommands | Where-Object {
+            [string]$_.id -ceq 'solution-build' -and
+            [string]$_.configuration -ceq 'Debug'
+        }).Count -ne 1 -or
+    @($debugCommands | Where-Object {
+            [string]$_.id -ceq 'package-test-build' -and
+            [string]$_.configuration -ceq 'Debug'
+        }).Count -ne 1 -or
+    @($debugPacks | Where-Object {
+            [string]$_.configuration -cne 'Release' -or [bool]$_.noBuild
+        }).Count -ne 0 -or
+    @($releaseCommands | Where-Object {
+            [string]$_.id -ceq 'solution-build' -and
+            [string]$_.configuration -ceq 'Release'
+        }).Count -ne 1 -or
+    @($releaseCommands | Where-Object {
+            [string]$_.id -ceq 'package-test-build'
+        }).Count -ne 0 -or
+    @($releasePacks | Where-Object {
+            [string]$_.configuration -cne 'Release' -or -not [bool]$_.noBuild
+        }).Count -ne 0) {
+    throw 'Developer-check command plan has an unsupported build topology.'
+}
+$checkPlanClaims = @(
+    ("The default Debug check performs one Debug solution build, one " +
+        "additional Debug package-test build, and $($debugPacks.Count) " +
+        "build-capable Release pack commands.")
+    ("The Release check performs one Release solution build and " +
+        "$($releasePacks.Count) Release pack commands with ``--no-build``.")
+)
+foreach ($checkPlanDocument in @(
+        'README.md',
+        'docs\container-development.md')) {
+    $checkPlanText = Get-RequiredText $checkPlanDocument
+    foreach ($claim in $checkPlanClaims) {
+        $claimCount = [regex]::Matches(
+            $checkPlanText,
+            [regex]::Escape($claim)).Count
+        if ($claimCount -cne 1) {
+            throw (
+                "$checkPlanDocument must contain exactly one command-plan " +
+                "claim '$claim'; found $claimCount.")
+        }
+    }
+}
 $contractVersions = [ordered]@{
     Protocol = $acceptanceContract.worker.protocolVersion
     Cache = $acceptanceContract.cache.schemaVersion

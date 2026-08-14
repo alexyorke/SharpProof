@@ -4,7 +4,9 @@ param(
     [string]$Configuration = 'Debug',
 
     [ValidateRange(1, 86400)]
-    [int]$TimeoutSeconds = 1800
+    [int]$TimeoutSeconds = 1800,
+
+    [switch]$PlanOnly
 )
 
 Set-StrictMode -Version Latest
@@ -15,6 +17,21 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'The developer check requires the canonical Linux container.'
 }
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+$planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
+$commandPlanJson = & $planScript -Configuration $Configuration
+if ($PlanOnly) {
+    $commandPlanJson
+    return
+}
+$commandPlan = $commandPlanJson | ConvertFrom-Json
+if ([int]$commandPlan.schemaVersion -ne 1 -or
+    [string]$commandPlan.configuration -cne $Configuration) {
+    throw 'Developer-check command plan is invalid.'
+}
+$packagePlanBuild = @($commandPlan.commands | Where-Object {
+        [string]$_.id -ceq 'package-test-build'
+    }).Count -eq 1
+$packagePlanReuse = -not $packagePlanBuild
 $timings = [Collections.Generic.List[object]]::new()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 
@@ -58,9 +75,7 @@ Invoke-TimedPhase -Name 'package-tests' -Action {
         Configuration = $Configuration
         TimeoutSeconds = $TimeoutSeconds
     }
-    if ($Configuration -eq 'Release') {
-        $packageArguments.NoBuild = $true
-    }
+    $packageArguments.NoBuild = $packagePlanReuse
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
 }

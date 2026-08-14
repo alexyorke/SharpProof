@@ -20,6 +20,7 @@ public sealed class DocumentationSupportContractTests
     [TestCase("resource-claim-case", false)]
     [TestCase("resource-claim-spacing", false)]
     [TestCase("catalog-resource-drift", false)]
+    [TestCase("check-plan-drift", false)]
     public async Task DocumentationSupportContractRejectsDrift(
         string mutation,
         bool expectedSuccess)

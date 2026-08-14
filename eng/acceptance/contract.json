@@ -56,8 +56,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 192,
-    "expectedCatalogSha256": "4ee28a3f9cc75d26650242afaf68224b3fb5f4384813f8b8843a2cf8c1947b69"
+    "expectedCatalogCount": 193,
+    "expectedCatalogSha256": "ba871d491e3af949d4cd4c9215cc77ffbb46598b59d6e25e7aaad383c634ba25"
   },
   "worker": {
     "protocolVersion": 11,
@@ -138,6 +138,7 @@
       "scripts/Generate-Readme.ps1",
       "scripts/Generate-ProtocolModel.ps1",
       "scripts/GeneratedFileHelpers.ps1",
+      "scripts/Get-SharpProofDevCheckPlan.ps1",
       "scripts/Get-SharpProofPilotPackageAuthority.ps1",
       "scripts/Get-SharpProofReleaseAuthorityClosure.ps1",
       "scripts/Get-SharpProofReleaseVersion.ps1",
@@ -198,7 +199,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "7dd22962dddb91ee4bc716768695908cd53d16bd78b4b5772d44ac85006205e3",
+    "inventorySha256": "a8e90c31cb59d287f1a37d1acd0b550ff3305328911954ffd09ada21d42b6193",
     "components": [
       {
         "name": "discovery",
@@ -665,6 +666,7 @@
           "eng/release/package-dependency-contract.json",
           "eng/release/third-party-components.json",
           "scripts/Assert-SharpProofStandaloneGateResult.ps1",
+          "scripts/Get-SharpProofDevCheckPlan.ps1",
           "scripts/Get-SharpProofPilotPackageAuthority.ps1",
           "scripts/Get-SharpProofReleaseAuthorityClosure.ps1",
           "scripts/Get-SharpProofReleaseVersion.ps1",

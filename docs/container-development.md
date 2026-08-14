@@ -54,11 +54,13 @@ sp acceptance -Configuration Release
 ```
 
 Use `sp test-changed` during an edit loop. It derives the affected test-project
-closure from Git and project references. Use `sp check` for the coherent Debug
-gate: one incremental build, duration-aware semantic and Worker shards,
-duration-aware package shards, and a short performance smoke. The exact
-release performance protocol remains part of `sp acceptance`; trusted
-mutations remain a separate exact-commit gate.
+closure from Git and project references.
+The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
+The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
+Both run
+duration-aware semantic, Worker, and package shards plus a short performance
+smoke. The exact release performance protocol remains part of `sp acceptance`;
+trusted mutations remain a separate exact-commit gate.
 
 The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
 Roslyn's compiler server. A no-change rebuild is therefore incremental.

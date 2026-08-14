@@ -1694,6 +1694,14 @@ $mutations = @(
         Mutated = '        if ($false) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
+    },
+    [pscustomobject]@{
+        Name = 'dev-check-command-plan-package-build'
+        File = 'scripts\Get-SharpProofDevCheckPlan.ps1'
+        Original = "    Add-Command 'package-test-build' 'package-tests' `$Configuration `$false"
+        Mutated = '    # package-test build removed from command plan'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~CommandPlanOwnsConfigurationSpecificBuildGraph'
     }
 )
 
