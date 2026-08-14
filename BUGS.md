@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 38 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 37 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 38 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-066 - Final worker deadline applies termination grace twice (fixed)
+
+- [x] Fixed by `1f805b0f6` (`fix: enforce one worker termination grace`).
+- The launcher now derives one monotonic termination-start and final deadline;
+  LinuxWorkerProcess carries the original stopwatch through TERM/KILL and bases
+  every wait on the remaining final budget instead of starting a second grace.
+- Regression coverage includes exact TERM-ignoring/cooperative timing,
+  already-exited, cancellation, invalid/equal deadlines, overflow, small and
+  minimum grace, and a reset-clock mutation. Focused tests passed 8/8 plus the
+  real 1 ms lifecycle case; Worker 512/512 and Architecture 410/410 passed.
 
 ### SP-AUDIT-049 - Release JSON decoding accepts noncanonical structures (fixed)
 
@@ -2201,29 +2212,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   restores manifest/request-first publication.
 - Consolidated cases: SP-AUDIT-176.
 - Unified closure: Publish one generation transactionally, sync data and directories, publish the commit member last, and roll back or invalidate the whole set on failure.
-
-### SP-AUDIT-066 - Final worker deadline applies termination grace twice (P2)
-
-- [ ] The launcher computes its worker wait limit as project wall time plus
-  almost the full termination grace, then `LinuxWorkerProcess` starts a second
-  termination phase with another full grace budget. A TERM-ignoring child
-  therefore receives an extra half-grace before forced kill, beyond the
-  documented project-plus-one-grace final boundary.
-- Supported impact: cancellation/timeout cleanup can retain the worker and hold
-  the build longer than the public limit. It still terminates fail-closed, but
-  the configured outer deadline is not the deadline users or package tests are
-  promised.
-- Reproduction: a focused Linux container test launched a direct shell child
-  that ignored SIGTERM, passed `ComputeHardLimit(100, 1000)` and a 1,000 ms
-  termination grace to `WaitForExit`, and required completion within the
-  documented 1,100 ms plus a 200 ms scheduling allowance. Completion was
-  correctly classified `TimedOut` but took 1,523 ms. The temporary regression
-  was removed.
-- Required closure: derive one monotonic project-plus-grace deadline and pass
-  only its remaining duration through graceful and forced termination. Add
-  normal exit, TERM-cooperative, TERM-ignoring, natural-exit race, cancellation,
-  minimum/maximum grace, and loaded-container controls plus a mutation that
-  restores independent wait and termination budgets.
 
 ### SP-AUDIT-074 - Response validation accepts an impossible cache hit (P2)
 
