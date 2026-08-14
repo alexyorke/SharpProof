@@ -1601,6 +1601,14 @@ $mutations = @(
         Mutated = '        if ($false) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~PublicationPlanTopologyTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-publication-destination-mode-exclusivity'
+        File = 'scripts\SharpProof.PublicationDestination.ps1'
+        Original = '    if ($hasFixture -and ($hasMain -or $hasSymbols)) {'
+        Mutated = '    if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationDestinationAuthorityTests'
     }
 )
 

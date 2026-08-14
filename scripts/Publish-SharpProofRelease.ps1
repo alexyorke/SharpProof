@@ -42,6 +42,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -813,18 +814,21 @@ if (-not [string]::IsNullOrWhiteSpace($RemotePackageDirectory)) {
     }
 }
 $resolvedPlanOutputPath = $null
-$publicationInputSnapshot = $null
-if ($PlanOnly -and
-    -not [string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+$publicationInputSnapshot = New-SharpProofPublicationInputSnapshot `
+    -PackageSource $resolvedPackageSource `
+    -FixtureDirectory $resolvedRemoteDirectory
+if ($PlanOnly -and -not [string]::IsNullOrWhiteSpace($PlanOutputPath)) {
     $resolvedPlanOutputPath = Resolve-SharpProofPublicationPlanOutput `
         -Path $PlanOutputPath
-    $publicationInputSnapshot = New-SharpProofPublicationInputSnapshot `
-        -PackageSource $resolvedPackageSource `
-        -FixtureDirectory $resolvedRemoteDirectory
     Assert-SharpProofPublicationPlanTopology `
         -OutputPath $resolvedPlanOutputPath `
         -InputSnapshot $publicationInputSnapshot
 }
+$publicationDestination = New-SharpProofPublicationDestinationAuthority `
+    -Source $Source `
+    -SymbolSource $SymbolSource `
+    -FixtureDirectory $resolvedRemoteDirectory `
+    -InputSnapshot $publicationInputSnapshot
 if (-not $PlanOnly -and
     ([string]::IsNullOrWhiteSpace($Source) -or
      [string]::IsNullOrWhiteSpace($ApiKey))) {
@@ -842,14 +846,18 @@ $release = Get-ValidatedRelease `
     -RepositoryCommit $repositoryHead
 $baseAddress = $null
 if (-not $PlanOnly) {
-    $baseAddress = Get-V3PackageBaseAddress -ServiceIndex $Source
+    $baseAddress = Get-V3PackageBaseAddress `
+        -ServiceIndex $publicationDestination.mainDestination
 }
 $entries = [Collections.Generic.List[object]]::new()
 foreach ($package in $release.packages) {
     $remote = if ($PlanOnly -and
-        [string]::IsNullOrWhiteSpace($resolvedRemoteDirectory)) {
+        $publicationDestination.mode -cne 'fixture') {
         [pscustomobject][ordered]@{
-            state = 'Unchecked'
+            state = if ($publicationDestination.mode -ceq 'registry') {
+                'Unchecked'
+            }
+            else { $null }
             remoteUrl = $null
         }
     }
@@ -864,15 +872,29 @@ foreach ($package in $release.packages) {
         version = $package.version
         mainFileName = $package.mainFileName
         symbolsFileName = $package.symbolsFileName
-        remoteState = $remote.state
+        availabilityMode = $publicationDestination.mode
+        remoteState = if ($publicationDestination.mode -ceq 'fixture') {
+            $null
+        }
+        else { $remote.state }
+        fixtureState = if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.state
+        }
+        else { $null }
         remoteUrl = $remote.remoteUrl
-        mainAction = if ($remote.state -eq 'Absent') {
+        mainAction = if ($publicationDestination.mode -ceq 'targetless') {
+            $null
+        }
+        elseif ($remote.state -eq 'Absent') {
             'Push'
         }
         else {
             'PreflightThenPush'
         }
-        symbolsAction = if ($remote.state -eq 'Absent') {
+        symbolsAction = if ($publicationDestination.mode -ceq 'targetless') {
+            $null
+        }
+        elseif ($remote.state -eq 'Absent') {
             'Push'
         }
         else {
@@ -887,12 +909,7 @@ $plan = [pscustomobject][ordered]@{
     packageVersion = $release.version
     versionAuthority = $release.versionAuthority
     repositoryCommit = $repositoryHead
-    source = if ([string]::IsNullOrWhiteSpace($Source)) {
-        $null
-    }
-    else {
-        $Source
-    }
+    publicationDestination = $publicationDestination
     packages = @($entries)
 }
 if ($PlanOnly) {
@@ -903,12 +920,6 @@ if ($PlanOnly) {
     return
 }
 
-$effectiveSymbolSource = if ([string]::IsNullOrWhiteSpace($SymbolSource)) {
-    $Source
-}
-else {
-    $SymbolSource
-}
 $effectiveSymbolApiKey = if (
     [string]::IsNullOrWhiteSpace($SymbolApiKey)) {
     $ApiKey
@@ -923,7 +934,7 @@ for ($index = 0; $index -lt $release.packages.Count; $index++) {
         "main package.")
     Invoke-NuGetPush `
         -Path $package.mainPath `
-        -Destination $Source `
+        -Destination $publicationDestination.mainDestination `
         -Key $ApiKey `
         -NoSymbols $true
     Write-Host (
@@ -931,7 +942,7 @@ for ($index = 0; $index -lt $release.packages.Count; $index++) {
         "symbol package.")
     Invoke-NuGetPush `
         -Path $package.symbolsPath `
-        -Destination $effectiveSymbolSource `
+        -Destination $publicationDestination.symbolDestination `
         -Key $effectiveSymbolApiKey `
         -NoSymbols $false
 }
