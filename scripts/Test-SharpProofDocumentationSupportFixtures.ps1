@@ -15,7 +15,13 @@ param(
         'resource-claim-case',
         'resource-claim-spacing',
         'catalog-resource-drift',
-        'check-plan-drift')]
+        'check-plan-drift',
+        'missing-vacuous-entry',
+        'wrong-unavailable-meaning',
+        'extra-certainty-member',
+        'certainty-member-case',
+        'certainty-member-order',
+        'protocol-certainty-schema-drift')]
     [string]$Mutation
 )
 
@@ -26,6 +32,17 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $relativePath = switch ($Mutation) {
     'stale-contract-api-silence' { 'docs\diagnostic-examples.md' }
     'catalog-resource-drift' { 'eng\acceptance\contract.json' }
+    'protocol-certainty-schema-drift' {
+        'SharpProof.Worker.Protocol\ProtocolModel.schema.json'
+    }
+    { $_ -in @(
+            'missing-vacuous-entry',
+            'wrong-unavailable-meaning',
+            'extra-certainty-member',
+            'certainty-member-case',
+            'certainty-member-order') } {
+        'docs\unknown-reasons.md'
+    }
     { $_ -in @(
             'old-eight-mutation-lanes',
             'wrong-container-cpu',
@@ -116,6 +133,42 @@ try {
                  'one additional Debug package-test build, and 3'),
                 ('The default Debug check reuses one build for every package ' +
                  'and test phase, with 3'),
+                [StringComparison]::Ordinal)
+        }
+        'missing-vacuous-entry' {
+            $text = $text.Replace(
+                '| `VacuousEntry` | Contradictory entry preconditions prove the effect claim vacuously |',
+                '',
+                [StringComparison]::Ordinal)
+        }
+        'wrong-unavailable-meaning' {
+            $text = $text.Replace(
+                '| `Unavailable` | An `Unknown` effect claim for any schema-admitted unknown reason when no more specific certainty applies |',
+                '| `Unavailable` | Only backend infrastructure failures |',
+                [StringComparison]::Ordinal)
+        }
+        'extra-certainty-member' {
+            $text = $text.Replace(
+                '| `VacuousEntry` | Contradictory entry preconditions prove the effect claim vacuously |',
+                "| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |`n| ``Future`` | Fabricated member |",
+                [StringComparison]::Ordinal)
+        }
+        'certainty-member-case' {
+            $text = $text.Replace(
+                '`VacuousEntry`',
+                '`vacuousEntry`',
+                [StringComparison]::Ordinal)
+        }
+        'certainty-member-order' {
+            $text = $text.Replace(
+                "| ``Unavailable`` | An ``Unknown`` effect claim for any schema-admitted unknown reason when no more specific certainty applies |`n| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |",
+                "| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |`n| ``Unavailable`` | An ``Unknown`` effect claim for any schema-admitted unknown reason when no more specific certainty applies |",
+                [StringComparison]::Ordinal)
+        }
+        'protocol-certainty-schema-drift' {
+            $text = $text.Replace(
+                '["Proven","None","VacuousEntry"],',
+                '["Proven","None","VacuousEntry"],["Unknown","None","Unavailable"],',
                 [StringComparison]::Ordinal)
         }
     }

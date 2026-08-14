@@ -21,6 +21,12 @@ public sealed class DocumentationSupportContractTests
     [TestCase("resource-claim-spacing", false)]
     [TestCase("catalog-resource-drift", false)]
     [TestCase("check-plan-drift", false)]
+    [TestCase("missing-vacuous-entry", false)]
+    [TestCase("wrong-unavailable-meaning", false)]
+    [TestCase("extra-certainty-member", false)]
+    [TestCase("certainty-member-case", false)]
+    [TestCase("certainty-member-order", false)]
+    [TestCase("protocol-certainty-schema-drift", false)]
     public async Task DocumentationSupportContractRejectsDrift(
         string mutation,
         bool expectedSuccess)

@@ -724,6 +724,110 @@ $derivedVersions = [ordered]@{
 }
 $acceptanceContract = Get-RequiredText 'eng\acceptance\contract.json' |
     ConvertFrom-Json
+$protocolSchema = Get-RequiredText (
+    'SharpProof.Worker.Protocol\ProtocolModel.schema.json') |
+    ConvertFrom-Json
+$typedResultDocumentation = $protocolSchema.documentation
+if ($null -eq $typedResultDocumentation) {
+    throw 'Protocol schema is missing typed-result documentation authority.'
+}
+$typedResultEnums = @(
+    'WorkerClaimOutcome',
+    'WorkerEffectEvidenceCertainty'
+)
+$typedResultRows = [ordered]@{}
+foreach ($enumName in $typedResultEnums) {
+    $declarations = @($protocolSchema.declarations | Where-Object {
+            [string]$_.kind -ceq 'enum' -and
+            [string]$_.name -ceq $enumName
+        })
+    $documentationProperty =
+        $typedResultDocumentation.PSObject.Properties[$enumName]
+    if ($declarations.Count -ne 1 -or $null -eq $documentationProperty) {
+        throw "Protocol schema is missing $enumName documentation authority."
+    }
+    $members = @($declarations[0].members | ForEach-Object {
+            [string]$_.name
+        })
+    $documented = @($documentationProperty.Value)
+    $documentedNames = @($documented | ForEach-Object {
+            [string]$_.name
+        })
+    if (($members -join "`n") -cne ($documentedNames -join "`n") -or
+        @($documented | Where-Object {
+                [string]::IsNullOrWhiteSpace([string]$_.meaning) -or
+                ([string]$_.meaning).Contains('|', [StringComparison]::Ordinal) -or
+                ([string]$_.meaning).Contains("`n", [StringComparison]::Ordinal)
+            }).Count -ne 0) {
+        throw (
+            "$enumName documentation must exactly follow schema member " +
+            'order with one safe nonblank meaning per member.')
+    }
+    $typedResultRows[$enumName] = $documented
+}
+$effectCertaintyTables = @($protocolSchema.validationTables | Where-Object {
+        [string]$_.name -ceq 'EffectCertainty'
+    })
+if ($effectCertaintyTables.Count -ne 1) {
+    throw 'Protocol schema must own exactly one EffectCertainty tuple table.'
+}
+$effectCertaintyTable = $effectCertaintyTables[0]
+$effectParameterNames = @($effectCertaintyTable.parameters | ForEach-Object {
+        [string]$_.name
+    })
+if (($effectParameterNames -join ',') -cne 'outcome,reason,certainty' -or
+    @($effectCertaintyTable.rows).Count -eq 0 -or
+    @($effectCertaintyTable.rows | Where-Object {
+            @($_).Count -ne 3 -or
+            @($_ | Where-Object { [string]::IsNullOrWhiteSpace([string]$_) }).Count -ne 0
+        }).Count -ne 0) {
+    throw 'Protocol EffectCertainty tuple authority is malformed.'
+}
+$typedResultLines = [Collections.Generic.List[string]]::new()
+$typedResultLines.Add('<!-- BEGIN SHARPPROOF TYPED EFFECT RESULTS -->')
+foreach ($enumName in $typedResultEnums) {
+    $typedResultLines.Add("### ``$enumName``")
+    $typedResultLines.Add('')
+    $typedResultLines.Add('| Member | Meaning |')
+    $typedResultLines.Add('|---|---|')
+    foreach ($row in @($typedResultRows[$enumName])) {
+        $typedResultLines.Add(
+            "| ``$([string]$row.name)`` | $([string]$row.meaning) |")
+    }
+    $typedResultLines.Add('')
+}
+$typedResultLines.Add('### Allowed effect-result tuples')
+$typedResultLines.Add('')
+$typedResultLines.Add('| Outcome | Reason | Certainty |')
+$typedResultLines.Add('|---|---|---|')
+foreach ($row in @($effectCertaintyTable.rows)) {
+    $typedResultLines.Add(
+        "| ``$([string]$row[0])`` | ``$([string]$row[1])`` | ``$([string]$row[2])`` |")
+}
+$typedResultLines.Add('<!-- END SHARPPROOF TYPED EFFECT RESULTS -->')
+$expectedTypedResultBlock = $typedResultLines -join "`n"
+$unknownReasons = Get-RequiredText 'docs\unknown-reasons.md'
+$typedBlockPattern =
+    [regex]::Escape('<!-- BEGIN SHARPPROOF TYPED EFFECT RESULTS -->') +
+    '[\s\S]*?' +
+    [regex]::Escape('<!-- END SHARPPROOF TYPED EFFECT RESULTS -->')
+$typedBlocks = [regex]::Matches($unknownReasons, $typedBlockPattern)
+if ($typedBlocks.Count -ne 1 -or
+    $typedBlocks[0].Value -cne $expectedTypedResultBlock) {
+    throw (
+        'docs/unknown-reasons.md typed result block must exactly match the ' +
+        'protocol schema member and tuple authority.')
+}
+$typedResultReadmeClaim =
+    'The schema-owned typed result table includes `VacuousEntry` and the full' +
+    "`n" +
+    '`Unavailable` domain; see [unknown reasons]' +
+    '(docs/unknown-reasons.md#worker-verification-records).'
+if ([regex]::Matches(
+        $readme,
+        [regex]::Escape($typedResultReadmeClaim)).Count -ne 1) {
+    throw 'README.md must contain the exact typed-result documentation claim.'
+}
 $containerCpuCount = [int]$acceptanceContract.container.defaultCpuCount
 $containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
 $testProjectCpuDivisor =

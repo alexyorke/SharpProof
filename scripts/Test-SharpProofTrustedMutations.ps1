@@ -1702,6 +1702,14 @@ $mutations = @(
         Mutated = '    # package-test build removed from command plan'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~CommandPlanOwnsConfigurationSpecificBuildGraph'
+    },
+    [pscustomobject]@{
+        Name = 'documentation-typed-effect-result-block'
+        File = 'scripts\Generate-Readme.ps1'
+        Original = '    $typedBlocks[0].Value -cne $expectedTypedResultBlock) {'
+        Mutated = '    $false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
     }
 )
 

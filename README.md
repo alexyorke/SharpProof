@@ -457,6 +457,9 @@ non-vacuous proof records `None`. Proven claims do not enter the disk cache.
 declared `Contract.Assume` and trusted-boundary evidence at the matching
 severity. The advisory default is `allow`; strict defaults to `error`.
 
+The schema-owned typed result table includes `VacuousEntry` and the full
+`Unavailable` domain; see [unknown reasons](docs/unknown-reasons.md#worker-verification-records).
+
 Malformed input, compiler errors, protocol/backend/replay errors, containment
 failure, infrastructure failure, and a hard worker timeout fail the build
 under every policy. The worker uses deterministic query, method, project,
