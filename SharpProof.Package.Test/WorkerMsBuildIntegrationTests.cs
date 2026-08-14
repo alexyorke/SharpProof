@@ -2954,7 +2954,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo(response.Manifest.Hash));
             Assert.That(WorkerProtocolJson.ValidateForRequest(
                 response, response.RequestHash, expectedInputHash,
-                response.Manifest, request.Budgets,
+                response.Manifest, request,
                 response.Summary.Versions).IsValid,
                 Is.True);
         }

@@ -119,15 +119,22 @@ public static partial class WorkerProtocolJson
     }
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
-        WorkerClaimManifest expectedManifest, WorkerBudgets expectedBudgets,
+        WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
         WorkerVersionSummary expectedVersions)
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
         _ = expectedManifest ??
             throw new ArgumentNullException(nameof(expectedManifest));
-        _ = expectedBudgets ?? throw new ArgumentNullException(nameof(expectedBudgets));
+        _ = expectedRequest ?? throw new ArgumentNullException(nameof(expectedRequest));
         _ = expectedVersions ?? throw new ArgumentNullException(nameof(expectedVersions));
+        if (!Validate(expectedRequest).IsValid ||
+            ComputeRequestHash(expectedRequest) != expectedRequestHash)
+        {
+            throw new ArgumentException(
+                "Expected request authority is invalid or does not match its hash.",
+                nameof(expectedRequest));
+        }
         if (!WorkerProtocolMetadata.IsVersionsValid(expectedVersions))
         {
             throw new ArgumentException(
@@ -135,7 +142,7 @@ public static partial class WorkerProtocolJson
                 nameof(expectedVersions));
         }
         return ValidateResponse(response, expectedInputHash, expectedManifest,
-            expectedRequestHash, expectedBudgets, expectedVersions);
+            expectedRequestHash, expectedRequest, expectedVersions);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -189,7 +196,7 @@ public static partial class WorkerProtocolJson
 
     private static WorkerProtocolValidationResult ValidateResponse(
         WorkerVerifyResponse? response, string? expectedInputHash, WorkerClaimManifest? expectedManifest,
-        string? expectedRequestHash, WorkerBudgets? expectedBudgets,
+        string? expectedRequestHash, WorkerVerifyRequest? expectedRequest,
         WorkerVersionSummary? expectedVersions)
     {
         var errors = new Validator();
@@ -231,14 +238,66 @@ public static partial class WorkerProtocolJson
                 VersionsEqual(response.Summary.Versions, expectedVersions),
                 "response.versions_mismatch");
         }
-        if (expectedBudgets != null)
+        if (expectedRequest != null)
         {
             errors.Check(response.Summary?.Budgets != null &&
                 JsonSerializer.Serialize(response.Summary.Budgets, s_options) ==
-                JsonSerializer.Serialize(expectedBudgets, s_options), "response.budgets_mismatch");
+                JsonSerializer.Serialize(expectedRequest.Budgets, s_options), "response.budgets_mismatch");
+            ValidateCacheForRequest(response, expectedRequest, errors);
         }
 
         return errors.Result;
+    }
+
+    private static void ValidateCacheForRequest(
+        WorkerVerifyResponse response,
+        WorkerVerifyRequest request,
+        Validator errors)
+    {
+        if (response.Summary == null)
+        {
+            return;
+        }
+        var status = response.Summary.CacheStatus;
+        var inactive = !request.Cache.Enabled ||
+            request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
+        if (inactive)
+        {
+            errors.Check(status == WorkerCacheStatus.Disabled,
+                "response.cache_request_mismatch");
+            return;
+        }
+
+        var storableShape = response is
+        {
+            RunStatus: WorkerRunStatus.Complete,
+            FailureReason: WorkerRunFailureReason.None,
+            Errors.Length: 0,
+            CallableResults: { Length: > 0 } callables,
+            ClaimResults: { Length: > 0 } claims,
+            Manifest.Claims: { Length: > 0 } manifestClaims
+        } &&
+            callables.All(static result => result is
+            {
+                Coverage: WorkerCallableCoverage.Complete,
+                Reason: WorkerCallableCoverageReason.None
+            }) &&
+            claims.All(static result => result?.Outcome == WorkerClaimOutcome.Refuted) &&
+            manifestClaims.All(static claim =>
+                claim?.Kind == WorkerClaimKind.Postcondition);
+        var valid = status switch
+        {
+            WorkerCacheStatus.Hit or WorkerCacheStatus.Written => storableShape,
+            WorkerCacheStatus.Rejected =>
+                response.RunStatus == WorkerRunStatus.Failed &&
+                response.FailureReason == WorkerRunFailureReason.MalformedResult,
+            WorkerCacheStatus.Miss => !storableShape,
+            WorkerCacheStatus.Unavailable => true,
+            WorkerCacheStatus.Disabled =>
+                response.RunStatus != WorkerRunStatus.Complete,
+            _ => false
+        };
+        errors.Check(valid, "response.cache_request_mismatch");
     }
     private static bool VersionsEqual(
         WorkerVersionSummary actual,

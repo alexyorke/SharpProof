@@ -506,11 +506,11 @@ public sealed class ProtocolJsonTests
             Is.True);
         Assert.That(WorkerProtocolJson.ValidateForRequest(
             response, response.RequestHash, InputHash, expected,
-            request.Budgets, CreateExpectedVersions()).IsValid, Is.True);
+            request, CreateExpectedVersions()).IsValid, Is.True);
         request.VerifyPolicy = WorkerVerifyPolicy.WarnOnUnknown;
         Assert.That(WorkerProtocolJson.ValidateForRequest(
                 response, WorkerProtocolJson.ComputeRequestHash(request),
-                InputHash, expected, request.Budgets,
+                InputHash, expected, request,
                 CreateExpectedVersions())
             .Errors.Select(static error => error.Code),
             Does.Contain("response.request_mismatch"));
@@ -613,7 +613,7 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.ValidateForRequest(
                     response, response.RequestHash, InputHash,
-                    response.Manifest, request.Budgets,
+                    response.Manifest, request,
                     CreateExpectedVersions())
                 .Errors.Select(static error => error.Code),
             Does.Contain("response.budgets_mismatch"));
@@ -957,6 +957,7 @@ public sealed class ProtocolJsonTests
 
         complete.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
         complete.Summary = CreateSummary(complete);
+        complete.Summary.CacheStatus = WorkerCacheStatus.Written;
         Assert.That(ValidateForRequest(complete).IsValid, Is.True);
 
         var unknown = CreateResponse(CreateManifest());
@@ -1009,6 +1010,72 @@ public sealed class ProtocolJsonTests
         complete.Summary.CacheStatus = WorkerCacheStatus.Hit;
         complete.Summary.CacheHit = true;
         Assert.That(ValidateForRequest(complete).IsValid, Is.True);
+    }
+
+    [Test]
+    public void RequestBoundValidationRequiresProducerCompatibleCacheStates()
+    {
+        var activeRequest = CreateRequest();
+        var proven = CreateResponse(CreateManifest());
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Miss, true);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Disabled, false);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Hit, false);
+        AssertCacheState(activeRequest, proven, WorkerCacheStatus.Written, false);
+
+        var inactiveRequest = CreateRequest();
+        inactiveRequest.Cache.Enabled = false;
+        AssertCacheState(inactiveRequest, proven, WorkerCacheStatus.Disabled, true);
+        AssertCacheState(inactiveRequest, proven, WorkerCacheStatus.Miss, false);
+        AssertCacheState(inactiveRequest, proven, WorkerCacheStatus.Unavailable, false);
+
+        var provenOnlyRequest = CreateRequest();
+        provenOnlyRequest.VerifyPolicy = WorkerVerifyPolicy.RequireProven;
+        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Disabled, true);
+        AssertCacheState(provenOnlyRequest, proven, WorkerCacheStatus.Miss, false);
+
+        var refuted = CreateResponse(CreateManifest());
+        refuted.ClaimResults[0].Outcome = WorkerClaimOutcome.Refuted;
+        refuted.Summary = CreateSummary(refuted);
+        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Hit, true);
+        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Written, true);
+        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Unavailable, true);
+        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Miss, false);
+
+        var unknown = CreateResponse(CreateManifest());
+        SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);
+        unknown.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        unknown.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        unknown.Summary = CreateSummary(unknown);
+        AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Miss, true);
+        AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Unavailable, true);
+        AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Hit, false);
+        AssertCacheState(activeRequest, unknown, WorkerCacheStatus.Written, false);
+
+        var earlyFailureManifest = CreateManifest();
+        earlyFailureManifest.Callables = [];
+        earlyFailureManifest.Claims = [];
+        WorkerProtocolJson.SealManifest(earlyFailureManifest);
+        var earlyFailure = CreateResponse(earlyFailureManifest);
+        earlyFailure.RunStatus = WorkerRunStatus.Failed;
+        earlyFailure.FailureReason = WorkerRunFailureReason.InputUnavailable;
+        earlyFailure.Errors = [new WorkerProtocolError {
+            Code = "input.unavailable",
+            Message = "failure"
+        }];
+        AssertCacheState(activeRequest, earlyFailure, WorkerCacheStatus.Disabled, true);
+
+        var malformed = CreateResponse(earlyFailureManifest);
+        malformed.RunStatus = WorkerRunStatus.Failed;
+        malformed.FailureReason = WorkerRunFailureReason.MalformedResult;
+        malformed.Errors = [new WorkerProtocolError {
+            Code = "response.claim_set",
+            Message = "failure"
+        }];
+        AssertCacheState(activeRequest, malformed, WorkerCacheStatus.Rejected, true);
+        malformed.FailureReason = WorkerRunFailureReason.InfrastructureFailure;
+        malformed.Errors[0].Code = "worker.infrastructure";
+        AssertCacheState(activeRequest, malformed, WorkerCacheStatus.Rejected, false);
     }
 
     [Test]
@@ -1289,7 +1356,7 @@ public sealed class ProtocolJsonTests
                 response.RequestHash,
                 InputHash,
                 null!,
-                request.Budgets,
+                request,
                 CreateExpectedVersions())));
 
         response.Manifest.Claims[0].Kind =
@@ -1299,7 +1366,7 @@ public sealed class ProtocolJsonTests
             response.RequestHash,
             InputHash,
             expected,
-            request.Budgets,
+            request,
             CreateExpectedVersions());
 
         using (Assert.EnterMultipleScope())
@@ -1618,7 +1685,7 @@ public sealed class ProtocolJsonTests
                 Trusted = assumptions.Count(static group =>
                     group.First().Kind == WorkerAssumptionKind.TrustedBoundary)
             },
-            CacheStatus = WorkerCacheStatus.Disabled,
+            CacheStatus = WorkerCacheStatus.Miss,
             Versions = CreateExpectedVersions()
         };
     }
@@ -1686,14 +1753,42 @@ public sealed class ProtocolJsonTests
         WorkerVerifyResponse response)
     {
         var request = CreateRequest();
+        return ValidateForRequest(response, request);
+    }
+
+    private static WorkerProtocolValidationResult ValidateForRequest(
+        WorkerVerifyResponse response,
+        WorkerVerifyRequest request)
+    {
         response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
         return WorkerProtocolJson.ValidateForRequest(
             response,
             response.RequestHash,
             InputHash,
             response.Manifest,
-            request.Budgets,
+            request,
             CreateExpectedVersions());
+    }
+
+    private static void AssertCacheState(
+        WorkerVerifyRequest request,
+        WorkerVerifyResponse response,
+        WorkerCacheStatus status,
+        bool expectedValid)
+    {
+        response.Summary.CacheStatus = status;
+        response.Summary.CacheHit = status == WorkerCacheStatus.Hit;
+        var validation = ValidateForRequest(response, request);
+        Assert.That(
+            validation.IsValid,
+            Is.EqualTo(expectedValid),
+            string.Join(", ", validation.Errors.Select(static error => error.Code)));
+        if (!expectedValid)
+        {
+            Assert.That(
+                validation.Errors.Select(static error => error.Code),
+                Does.Contain("response.cache_request_mismatch"));
+        }
     }
 
     private static WorkerEffectViolationWitness CreateEffectWitness(

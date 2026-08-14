@@ -4975,7 +4975,7 @@ public sealed class WorkerTests
                     WorkerProtocolJson.ComputeRequestHash(request),
                     response.InputHash,
                     response.Manifest,
-                    request.Budgets,
+                    request,
                     new WorkerVersionSummary
                     {
                         WorkerVersion = WorkerCacheIdentity.Current.ToolVersion,

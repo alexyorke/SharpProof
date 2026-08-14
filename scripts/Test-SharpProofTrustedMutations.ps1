@@ -1565,6 +1565,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ThirdPartyInventoryMatchesCatalogPayloadAndSbomOwnership'
     },
     [pscustomobject]@{
+        Name = 'protocol-request-bound-cache-state'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = '        var inactive = !request.Cache.Enabled ||'
+        Mutated = '        var inactive = request.Cache.Enabled ||'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestBoundValidationRequiresProducerCompatibleCacheStates'
+    },
+    [pscustomobject]@{
         Name = 'protocol-exact-runtime-provenance'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
         Original = "                response.Summary?.Versions != null &&`n                VersionsEqual(response.Summary.Versions, expectedVersions),"

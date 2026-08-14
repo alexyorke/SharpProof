@@ -350,7 +350,7 @@ internal static class Program
             ? WorkerProtocolJson.Validate(response)
             : WorkerProtocolJson.ValidateForRequest(
                 response, WorkerProtocolJson.ComputeRequestHash(request),
-                expectedInputHash, expectedManifest, request.Budgets,
+                expectedInputHash, expectedManifest, request,
                 expectedVersions ?? throw new InvalidOperationException(
                     "Expected runtime provenance is unavailable."));
         if (!validation.IsValid)
@@ -484,7 +484,7 @@ internal static class Program
             response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
             if (!WorkerProtocolJson.ValidateForRequest(
                     response, response.RequestHash, expectedInputHash,
-                    artifact.Manifest, request.Budgets,
+                    artifact.Manifest, request,
                     expectedVersions).IsValid)
             {
                 throw new IOException("The worker response binding is invalid.");
