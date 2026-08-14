@@ -52,6 +52,12 @@ internal sealed class AnalyzerSession
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _executableAnalyses =
             new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+        _selectedSemicolonAccessors =
+            new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, AnalyzerSemanticOutcome>
+        _semanticOutcomes =
+            new(SymbolEqualityComparer.Default);
 
     internal AnalyzerSession(
         Compilation compilation,
@@ -224,7 +230,29 @@ internal sealed class AnalyzerSession
         IMethodSymbol method,
         AnalyzerSemanticOutcome outcome)
     {
+        method = EffectAnalysisSession.NormalizeMethod(method);
+        _semanticOutcomes.AddOrUpdate(
+            method,
+            outcome,
+            (_, current) => AnalyzerSemanticOutcomes.Combine(current, outcome));
         _outcomeObserver?.Invoke(method, outcome);
+    }
+
+    internal void RegisterSelectedSemicolonAccessor(IMethodSymbol method)
+    {
+        _selectedSemicolonAccessors.TryAdd(
+            EffectAnalysisSession.NormalizeMethod(method),
+            0);
+    }
+
+    internal ImmutableArray<IMethodSymbol> GetUnrecordedSelectedSemicolonAccessors()
+    {
+        return [.. _selectedSemicolonAccessors.Keys
+            .Where(method => !_semanticOutcomes.ContainsKey(method))
+            .OrderBy(static method => method.DeclaringSyntaxReferences
+                .FirstOrDefault()?.SyntaxTree.FilePath, StringComparer.Ordinal)
+            .ThenBy(static method => method.DeclaringSyntaxReferences
+                .FirstOrDefault()?.Span.Start ?? int.MaxValue)];
     }
 
     internal bool TryMarkAttributeValidated(AttributeData attribute)

@@ -102,6 +102,28 @@ internal static partial class AnalyzerFeaturePipeline
         }
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
+        if (IsConcreteSemicolonAccessor(method, context.CancellationToken) &&
+            selection.Any)
+        {
+            var declaration = method.DeclaringSyntaxReferences[0]
+                .GetSyntax(context.CancellationToken);
+            if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                    method,
+                    declaration.SyntaxTree,
+                    context.Compilation,
+                    context.CancellationToken))
+            {
+                return;
+            }
+            if (selection.IsSuppressed)
+            {
+                session.RecordSemanticOutcome(
+                    method,
+                    AnalyzerSemanticOutcome.Suppressed);
+                return;
+            }
+            session.RegisterSelectedSemicolonAccessor(method);
+        }
         if ((!method.IsAbstract && !method.IsExtern) || !selection.Any)
         {
             return;
@@ -151,6 +173,11 @@ internal static partial class AnalyzerFeaturePipeline
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.OwningSymbol is not IMethodSymbol method)
+        {
+            return;
+        }
+
+        if (IsConcreteSemicolonAccessor(method, context.CancellationToken))
         {
             return;
         }
@@ -300,10 +327,50 @@ internal static partial class AnalyzerFeaturePipeline
         session.RecordSemanticOutcome(method, outcome);
     }
 
+    internal static void ReconcileSelectedSemicolonAccessors(
+        CompilationAnalysisContext context,
+        AnalyzerSession session)
+    {
+        foreach (var method in session.GetUnrecordedSelectedSemicolonAccessors())
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            context.ReportDiagnostic(Diagnostic.Create(
+                GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                    method,
+                    context.CancellationToken),
+                method.Name,
+                LanguageSubsetAbstentionReason.MissingOperationRoot));
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+        }
+    }
+
     private static bool IsNestedCallable(IMethodSymbol method)
     {
         return method.MethodKind is
             MethodKind.LocalFunction or MethodKind.AnonymousFunction;
+    }
+
+    private static bool IsConcreteSemicolonAccessor(
+        IMethodSymbol method,
+        CancellationToken cancellationToken)
+    {
+        return !method.IsAbstract &&
+            !method.IsExtern &&
+            method.MethodKind is
+                MethodKind.PropertyGet or
+                MethodKind.PropertySet or
+                MethodKind.EventAdd or
+                MethodKind.EventRemove &&
+            method.DeclaringSyntaxReferences.Any(reference =>
+                reference.GetSyntax(cancellationToken) is AccessorDeclarationSyntax
+                {
+                    Body: null,
+                    ExpressionBody: null,
+                    SemicolonToken.RawKind: not 0
+                });
     }
 
     internal static void AnalyzePrimaryConstructor(

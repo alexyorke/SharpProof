@@ -137,6 +137,11 @@ internal sealed partial class SharpProofAnalyzerEngine
                         session,
                         compilationContext.ReportDiagnostic,
                         compilationContext.CancellationToken));
+            context.RegisterCompilationEndAction(
+                compilationContext =>
+                    AnalyzerFeaturePipeline.ReconcileSelectedSemicolonAccessors(
+                        compilationContext,
+                        session));
         }
         if (activation.RequiresOperationAnalysis)
         {

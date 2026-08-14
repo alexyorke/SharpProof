@@ -1860,6 +1860,19 @@ $mutations = @(
         Mutated = "COPY --chown=sharpproof:sharpproof . .`nUSER root"
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~NamedStagesHaveStandaloneNonRootExecutionContracts'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-selected-semicolon-accessor-operation-owner'
+        File = 'SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs'
+        Original = (@'
+        if (IsConcreteSemicolonAccessor(method, context.CancellationToken))
+        {
+            return;
+        }
+'@).TrimEnd()
+        Mutated = '        if (false) { return; }'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ConcreteSelectedAutoAccessorsAbstainExactlyOnce'
     }
 )
 
