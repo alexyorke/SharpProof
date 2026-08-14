@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 37 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 36 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 37 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-074 - Response validation accepts an impossible cache hit (fixed)
+
+- [x] Fixed by `49400ec27` (`fix: bind cache state to verification requests`).
+- Request-bound validation now authenticates the complete canonical request and
+  rejects cache states that are impossible for its cache/verification policy or
+  response outcome. Disabled, miss, unavailable, hit, written, and rejected
+  states follow the producer's exact transition policy.
+- The request/cache matrix passed 9/9 focused tests; Worker passed 513/513 and
+  Architecture passed 410/410. The request-binding removal mutation was killed
+  directly; unrelated stale mutation targets still block the global runner.
 
 ### SP-AUDIT-066 - Final worker deadline applies termination grace twice (fixed)
 
@@ -2212,28 +2223,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   restores manifest/request-first publication.
 - Consolidated cases: SP-AUDIT-176.
 - Unified closure: Publish one generation transactionally, sync data and directories, publish the commit member last, and roll back or invalidate the whole set on failure.
-
-### SP-AUDIT-074 - Response validation accepts an impossible cache hit (P2)
-
-- [ ] Request-bound response validation checks the request hash, input,
-  manifest, and budgets, but it is not given the expected cache or verification
-  policy. It therefore validates only the response's internal
-  `(CacheStatus, CacheHit)` pair, not whether that state is possible for the
-  bound request.
-- Supported impact: malformed worker or replay evidence can claim a cache hit
-  for a cache-disabled (or otherwise non-cacheable) verification request and be
-  accepted as valid. This makes cache provenance in the certified response
-  unreliable even though the request hash itself is exact.
-- Reproduction: a focused protocol test created a valid complete response for
-  a request with `Cache.Enabled = false`, changed the summary to
-  `CacheStatus=Hit` and `CacheHit=true`, and retained the exact computed request
-  hash. `ValidateForRequest` returned valid. The temporary test was removed.
-- Required closure: validate against the complete canonical request or pass all
-  policy fields needed for cross-document invariants. Reject hits when caching
-  is disabled, when verification policy forbids cache use, and for outcomes the
-  cache cannot store. Add disabled/enabled, hit/miss/written/rejected,
-  require-proven, failed/unknown/refuted, stale-hash, and valid-hit controls plus
-  a protocol mutation that removes request/cache binding.
 
 ### SP-AUDIT-075 - Effective verifier I/O topology is incompletely validated (P2)
 
