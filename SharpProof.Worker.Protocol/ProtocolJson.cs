@@ -92,25 +92,34 @@ public static partial class WorkerProtocolJson
     }
     public static WorkerProtocolValidationResult Validate(WorkerVerifyResponse? response)
     {
-        return ValidateResponse(response, null, null, null, null);
+        return ValidateResponse(response, null, null, null, null, null);
     }
 
     public static WorkerProtocolValidationResult Validate(
         WorkerVerifyResponse? response, string expectedInputHash, WorkerClaimManifest? expectedManifest = null)
     {
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
-        return ValidateResponse(response, expectedInputHash, expectedManifest, null, null);
+        return ValidateResponse(response, expectedInputHash, expectedManifest, null, null, null);
     }
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
-        WorkerClaimManifest expectedManifest, WorkerBudgets expectedBudgets)
+        WorkerClaimManifest expectedManifest, WorkerBudgets expectedBudgets,
+        WorkerVersionSummary expectedVersions)
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
         _ = expectedManifest ??
             throw new ArgumentNullException(nameof(expectedManifest));
         _ = expectedBudgets ?? throw new ArgumentNullException(nameof(expectedBudgets));
-        return ValidateResponse(response, expectedInputHash, expectedManifest, expectedRequestHash, expectedBudgets);
+        _ = expectedVersions ?? throw new ArgumentNullException(nameof(expectedVersions));
+        if (!WorkerProtocolMetadata.IsVersionsValid(expectedVersions))
+        {
+            throw new ArgumentException(
+                "Expected runtime provenance is invalid.",
+                nameof(expectedVersions));
+        }
+        return ValidateResponse(response, expectedInputHash, expectedManifest,
+            expectedRequestHash, expectedBudgets, expectedVersions);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -164,7 +173,8 @@ public static partial class WorkerProtocolJson
 
     private static WorkerProtocolValidationResult ValidateResponse(
         WorkerVerifyResponse? response, string? expectedInputHash, WorkerClaimManifest? expectedManifest,
-        string? expectedRequestHash, WorkerBudgets? expectedBudgets)
+        string? expectedRequestHash, WorkerBudgets? expectedBudgets,
+        WorkerVersionSummary? expectedVersions)
     {
         var errors = new Validator();
         if (response == null)
@@ -198,6 +208,13 @@ public static partial class WorkerProtocolJson
         ValidateRun(response, callables, claims, protocolErrors, errors);
         ValidateUnknownCoverage(callables, claims, response.Manifest, errors);
         ValidateSummary(response.Summary, callables, claims, errors);
+        if (expectedVersions != null)
+        {
+            errors.Check(
+                response.Summary?.Versions != null &&
+                VersionsEqual(response.Summary.Versions, expectedVersions),
+                "response.versions_mismatch");
+        }
         if (expectedBudgets != null)
         {
             errors.Check(response.Summary?.Budgets != null &&
@@ -206,6 +223,18 @@ public static partial class WorkerProtocolJson
         }
 
         return errors.Result;
+    }
+    private static bool VersionsEqual(
+        WorkerVersionSummary actual,
+        WorkerVersionSummary expected)
+    {
+        return actual.ProtocolVersion == expected.ProtocolVersion &&
+            actual.ManifestSchemaVersion == expected.ManifestSchemaVersion &&
+            actual.CacheSchemaVersion == expected.CacheSchemaVersion &&
+            actual.WorkerVersion == expected.WorkerVersion &&
+            actual.ApiSpecVersion == expected.ApiSpecVersion &&
+            actual.WorkerBinarySha256 == expected.WorkerBinarySha256 &&
+            actual.ApiSpecContentSha256 == expected.ApiSpecContentSha256;
     }
     private static void ValidateExpectedManifest(
         WorkerClaimManifest? actual,

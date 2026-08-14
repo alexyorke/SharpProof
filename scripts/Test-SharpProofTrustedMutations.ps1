@@ -1491,6 +1491,14 @@ $mutations = @(
         Mutated = '    if ($false) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~ThirdPartyInventoryMatchesCatalogPayloadAndSbomOwnership'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-exact-runtime-provenance'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = "                response.Summary?.Versions != null &&`n                VersionsEqual(response.Summary.Versions, expectedVersions),"
+        Mutated = '                response.Summary?.Versions != null,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestBoundValidationAuthenticatesRuntimeProvenance'
     }
 )
 

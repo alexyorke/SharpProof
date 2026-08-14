@@ -505,11 +505,12 @@ public sealed class ProtocolJsonTests
             Is.True);
         Assert.That(WorkerProtocolJson.ValidateForRequest(
             response, response.RequestHash, InputHash, expected,
-            request.Budgets).IsValid, Is.True);
+            request.Budgets, CreateExpectedVersions()).IsValid, Is.True);
         request.VerifyPolicy = WorkerVerifyPolicy.WarnOnUnknown;
         Assert.That(WorkerProtocolJson.ValidateForRequest(
                 response, WorkerProtocolJson.ComputeRequestHash(request),
-                InputHash, expected, request.Budgets)
+                InputHash, expected, request.Budgets,
+                CreateExpectedVersions())
             .Errors.Select(static error => error.Code),
             Does.Contain("response.request_mismatch"));
 
@@ -546,6 +547,47 @@ public sealed class ProtocolJsonTests
             Does.Contain("response.input_mismatch"));
     }
 
+    [TestCase(nameof(WorkerVersionSummary.WorkerVersion))]
+    [TestCase(nameof(WorkerVersionSummary.ApiSpecVersion))]
+    [TestCase(nameof(WorkerVersionSummary.WorkerBinarySha256))]
+    [TestCase(nameof(WorkerVersionSummary.ApiSpecContentSha256))]
+    public void RequestBoundValidationAuthenticatesRuntimeProvenance(
+        string propertyName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(propertyName);
+        var response = CreateResponse(CreateManifest());
+        var expected = CreateExpectedVersions();
+        var property = typeof(WorkerVersionSummary).GetProperty(propertyName)!;
+        property.SetValue(
+            response.Summary.Versions,
+            propertyName.EndsWith("Sha256", StringComparison.Ordinal)
+                ? new string('c', 64)
+                : "FABRICATED-version");
+
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.versions_mismatch"));
+
+        property.SetValue(
+            response.Summary.Versions,
+            property.GetValue(expected));
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+    }
+
+    [Test]
+    public void RequestBoundValidationRejectsCrossSwappedRuntimeDigests()
+    {
+        var response = CreateResponse(CreateManifest());
+        (response.Summary.Versions.WorkerBinarySha256,
+            response.Summary.Versions.ApiSpecContentSha256) =
+            (response.Summary.Versions.ApiSpecContentSha256,
+                response.Summary.Versions.WorkerBinarySha256);
+
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.versions_mismatch"));
+    }
+
     [TestCase(nameof(WorkerBudgets.QueryRlimit))]
     [TestCase(nameof(WorkerBudgets.MethodRlimit))]
     [TestCase(nameof(WorkerBudgets.MethodWallTimeMilliseconds))]
@@ -570,7 +612,8 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.ValidateForRequest(
                     response, response.RequestHash, InputHash,
-                    response.Manifest, request.Budgets)
+                    response.Manifest, request.Budgets,
+                    CreateExpectedVersions())
                 .Errors.Select(static error => error.Code),
             Does.Contain("response.budgets_mismatch"));
     }
@@ -1122,7 +1165,8 @@ public sealed class ProtocolJsonTests
                 response.RequestHash,
                 InputHash,
                 null!,
-                request.Budgets)));
+                request.Budgets,
+                CreateExpectedVersions())));
 
         response.Manifest.Claims[0].Kind =
             (WorkerClaimKind)int.MaxValue;
@@ -1131,7 +1175,8 @@ public sealed class ProtocolJsonTests
             response.RequestHash,
             InputHash,
             expected,
-            request.Budgets);
+            request.Budgets,
+            CreateExpectedVersions());
 
         using (Assert.EnterMultipleScope())
         {
@@ -1450,11 +1495,18 @@ public sealed class ProtocolJsonTests
                     group.First().Kind == WorkerAssumptionKind.TrustedBoundary)
             },
             CacheStatus = WorkerCacheStatus.Disabled,
-            Versions = new WorkerVersionSummary
-            {
-                WorkerVersion = "test",
-                ApiSpecVersion = "test"
-            }
+            Versions = CreateExpectedVersions()
+        };
+    }
+
+    private static WorkerVersionSummary CreateExpectedVersions()
+    {
+        return new WorkerVersionSummary
+        {
+            WorkerVersion = "test-worker",
+            ApiSpecVersion = "test-spec",
+            WorkerBinarySha256 = new string('a', 64),
+            ApiSpecContentSha256 = new string('b', 64)
         };
     }
 
@@ -1477,7 +1529,8 @@ public sealed class ProtocolJsonTests
             response.RequestHash,
             InputHash,
             response.Manifest,
-            request.Budgets);
+            request.Budgets,
+            CreateExpectedVersions());
     }
 
     private static WorkerEffectViolationWitness CreateEffectWitness(

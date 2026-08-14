@@ -2760,6 +2760,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 new WorkerVerifyRequest(),
                 null,
                 null,
+                null,
                 out var validResponse,
                 out var validatedResponse);
 
@@ -2781,6 +2782,7 @@ public sealed class WorkerMsBuildIntegrationTests
             exitCode = Program.ValidateAndReport(
                 path,
                 new WorkerVerifyRequest(),
+                null,
                 null,
                 null,
                 out validResponse,
@@ -2952,7 +2954,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo(response.Manifest.Hash));
             Assert.That(WorkerProtocolJson.ValidateForRequest(
                 response, response.RequestHash, expectedInputHash,
-                response.Manifest, request.Budgets).IsValid,
+                response.Manifest, request.Budgets,
+                response.Summary.Versions).IsValid,
                 Is.True);
         }
         return artifact;

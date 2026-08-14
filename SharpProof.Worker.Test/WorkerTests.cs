@@ -4861,7 +4861,16 @@ public sealed class WorkerTests
                     WorkerProtocolJson.ComputeRequestHash(request),
                     response.InputHash,
                     response.Manifest,
-                    request.Budgets).IsValid,
+                    request.Budgets,
+                    new WorkerVersionSummary
+                    {
+                        WorkerVersion = WorkerCacheIdentity.Current.ToolVersion,
+                        ApiSpecVersion = WorkerCacheIdentity.Current.ApiSpecVersion,
+                        WorkerBinarySha256 =
+                            WorkerCacheIdentity.Current.WorkerBinarySha256,
+                        ApiSpecContentSha256 =
+                            WorkerCacheIdentity.Current.ApiSpecContentSha256
+                    }).IsValid,
                 Is.True);
         }
     }

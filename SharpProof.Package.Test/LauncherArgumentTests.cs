@@ -767,6 +767,7 @@ public sealed class LauncherArgumentTests
                 new WorkerVerifyRequest(),
                 null,
                 null,
+                null,
                 out var validResponse,
                 out var validatedResponse);
 
@@ -839,6 +840,7 @@ public sealed class LauncherArgumentTests
 
     [TestCase("input", "response.input_mismatch")]
     [TestCase("budgets", "response.budgets_mismatch")]
+    [TestCase("provenance", "response.versions_mismatch")]
     public void BoundResultValidationRejectsMismatches(
         string mismatch, string expectedError)
     {
@@ -865,13 +867,26 @@ public sealed class LauncherArgumentTests
                 Budgets = new WorkerBudgets()
             }
         };
+        var expectedVersions = new WorkerVersionSummary
+        {
+            WorkerVersion = response.Summary.Versions.WorkerVersion,
+            ApiSpecVersion = response.Summary.Versions.ApiSpecVersion,
+            WorkerBinarySha256 =
+                response.Summary.Versions.WorkerBinarySha256,
+            ApiSpecContentSha256 =
+                response.Summary.Versions.ApiSpecContentSha256
+        };
         if (mismatch == "input")
         {
             response.InputHash = new('b', 64);
         }
-        else
+        else if (mismatch == "budgets")
         {
             response.Summary.Budgets.QueryRlimit++;
+        }
+        else
+        {
+            response.Summary.Versions.WorkerVersion = "fabricated";
         }
 
         var path = Path.Combine(
@@ -886,7 +901,8 @@ public sealed class LauncherArgumentTests
                 path, WorkerProtocolJson.SerializeResponse(response));
             Assert.That(
                 Program.ValidateAndReport(
-                    path, request, inputHash, manifest, out var valid, out _),
+                    path, request, inputHash, manifest,
+                    expectedVersions, out var valid, out _),
                 Is.EqualTo(3));
             Assert.That(valid, Is.False);
             Assert.That(capture.ToString(), Does.Contain(expectedError));
@@ -992,6 +1008,7 @@ public sealed class LauncherArgumentTests
                 request,
                 inputHash,
                 manifest,
+                response.Summary.Versions,
                 out var valid,
                 out _);
 

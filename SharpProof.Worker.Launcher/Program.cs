@@ -42,6 +42,7 @@ internal static class Program
         CompilerManifestArtifact artifact;
         byte[] artifactBytes;
         string expectedInputHash;
+        WorkerVersionSummary expectedVersions;
         WorkerRuntimeClosureSnapshot? runtimeSnapshot = null;
         try
         {
@@ -55,6 +56,7 @@ internal static class Program
                 request,
                 artifactBytes,
                 runtimeSnapshot);
+            expectedVersions = ComputeExpectedVersions(runtimeSnapshot);
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
             {
@@ -115,7 +117,8 @@ internal static class Program
             exitCode = failure.ExitCode;
             Console.Error.WriteLine(failure.ConsoleMessage);
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
-                failure.Status, failure.Reason, failure.Code, failure.Message).ConfigureAwait(false);
+                expectedVersions, failure.Status, failure.Reason,
+                failure.Code, failure.Message).ConfigureAwait(false);
         }
         if (exitCode == 124)
         {
@@ -126,24 +129,28 @@ internal static class Program
             LauncherFailure launcherFailure =
                 LauncherPresentation.NoResultFailure(exitCode);
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
-                launcherFailure.Status, launcherFailure.Reason, launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false);
+                expectedVersions, launcherFailure.Status, launcherFailure.Reason,
+                launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false);
         }
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
-            artifact.Manifest, out var validResponse, out var validatedResponse);
+            artifact.Manifest, expectedVersions,
+            out var validResponse, out var validatedResponse);
         if (!validResponse)
         {
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
-                WorkerRunStatus.Failed, WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
+                expectedVersions, WorkerRunStatus.Failed,
+                WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
                 "The worker result was unavailable or malformed.").ConfigureAwait(false);
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
-                artifact.Manifest, out validResponse, out validatedResponse);
+                artifact.Manifest, expectedVersions,
+                out validResponse, out validatedResponse);
         }
         if (validResponse)
         {
             try
             {
                 PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash,
-                    validatedResponse!);
+                    expectedVersions, validatedResponse!);
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
@@ -274,6 +281,22 @@ internal static class Program
             snapshot);
     }
 
+    internal static WorkerVersionSummary ComputeExpectedVersions(
+        WorkerRuntimeClosureSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var version = FileVersionInfo.GetVersionInfo(snapshot.ExecutionWorkerPath);
+        return new WorkerVersionSummary
+        {
+            WorkerVersion = RequiredVersion(
+                version.ProductVersion,
+                "product version"),
+            ApiSpecVersion = ApiSpecTable.DefaultTableVersion,
+            WorkerBinarySha256 = snapshot.Sha256,
+            ApiSpecContentSha256 = ApiSpecTable.Default.ContentSha256
+        };
+    }
+
     internal static string ComputeExpectedInputHash(
         WorkerVerifyRequest request,
         byte[] artifactBytes,
@@ -297,6 +320,7 @@ internal static class Program
     internal static int ValidateAndReport(
         string resultPath, WorkerVerifyRequest request,
         string? expectedInputHash, WorkerClaimManifest? expectedManifest,
+        WorkerVersionSummary? expectedVersions,
         out bool validResponse, out WorkerVerifyResponse? validatedResponse)
     {
         validResponse = false;
@@ -319,7 +343,9 @@ internal static class Program
             ? WorkerProtocolJson.Validate(response)
             : WorkerProtocolJson.ValidateForRequest(
                 response, WorkerProtocolJson.ComputeRequestHash(request),
-                expectedInputHash, expectedManifest, request.Budgets);
+                expectedInputHash, expectedManifest, request.Budgets,
+                expectedVersions ?? throw new InvalidOperationException(
+                    "Expected runtime provenance is unavailable."));
         if (!validation.IsValid)
         {
             WriteErrors(validation.Errors, "SharpProof ");
@@ -422,6 +448,7 @@ internal static class Program
     private static void PublishOutputs(
         LauncherArguments arguments, WorkerVerifyRequest request,
         CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
+        WorkerVersionSummary expectedVersions,
         WorkerVerifyResponse response)
     {
         if (arguments.PublishRequestPath == null)
@@ -450,7 +477,8 @@ internal static class Program
             response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
             if (!WorkerProtocolJson.ValidateForRequest(
                     response, response.RequestHash, expectedInputHash,
-                    artifact.Manifest, request.Budgets).IsValid)
+                    artifact.Manifest, request.Budgets,
+                    expectedVersions).IsValid)
             {
                 throw new IOException("The worker response binding is invalid.");
             }
@@ -478,7 +506,8 @@ internal static class Program
 
     private static Task WriteLauncherFailureAsync(
         string path, WorkerVerifyRequest request, CompilerManifestArtifact artifact,
-        string expectedInputHash, WorkerRunStatus status,
+        string expectedInputHash, WorkerVersionSummary expectedVersions,
+        WorkerRunStatus status,
         WorkerRunFailureReason reason, string code, string message)
     {
         var timeout = status == WorkerRunStatus.TimedOut;
@@ -489,7 +518,7 @@ internal static class Program
             timeout ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.InfrastructureFailure,
             timeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.InfrastructureFailure,
             [new WorkerProtocolError { Code = code, Message = message }],
-            new WorkerVersionSummary { WorkerVersion = "launcher", ApiSpecVersion = "unavailable" });
+            expectedVersions);
         return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeResponse(response));
     }
 
