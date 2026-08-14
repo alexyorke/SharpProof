@@ -41,6 +41,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -767,28 +768,23 @@ function Invoke-NuGetPush {
 function Write-PublicationPlan {
     param(
         [Parameter(Mandatory = $true)]
-        [object]$Plan
+        [object]$Plan,
+
+        [AllowNull()][string]$OutputPath,
+
+        [AllowNull()][object]$InputSnapshot
     )
 
     $json = ($Plan | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
     $json += "`n"
-    if ([string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+    if ([string]::IsNullOrWhiteSpace($OutputPath)) {
         Write-Output $json.TrimEnd()
         return
     }
-    $fullPath = [IO.Path]::GetFullPath($PlanOutputPath)
-    $directory = [IO.Path]::GetDirectoryName($fullPath)
-    if ([string]::IsNullOrWhiteSpace($directory)) {
-        throw "PlanOutputPath has no parent directory: '$PlanOutputPath'."
-    }
-    if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
-        [IO.Directory]::CreateDirectory($directory) |
-            Out-Null
-    }
-    [IO.File]::WriteAllText(
-        $fullPath,
-        $json,
-        [Text.UTF8Encoding]::new($false))
+    Write-SharpProofPublicationPlanAtomic `
+        -OutputPath $OutputPath `
+        -Json $json `
+        -InputSnapshot $InputSnapshot
 }
 
 $resolvedPackageSource = (Resolve-Path `
@@ -815,6 +811,19 @@ if (-not [string]::IsNullOrWhiteSpace($RemotePackageDirectory)) {
             "RemotePackageDirectory is not a directory: " +
             $resolvedRemoteDirectory)
     }
+}
+$resolvedPlanOutputPath = $null
+$publicationInputSnapshot = $null
+if ($PlanOnly -and
+    -not [string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+    $resolvedPlanOutputPath = Resolve-SharpProofPublicationPlanOutput `
+        -Path $PlanOutputPath
+    $publicationInputSnapshot = New-SharpProofPublicationInputSnapshot `
+        -PackageSource $resolvedPackageSource `
+        -FixtureDirectory $resolvedRemoteDirectory
+    Assert-SharpProofPublicationPlanTopology `
+        -OutputPath $resolvedPlanOutputPath `
+        -InputSnapshot $publicationInputSnapshot
 }
 if (-not $PlanOnly -and
     ([string]::IsNullOrWhiteSpace($Source) -or
@@ -887,7 +896,10 @@ $plan = [pscustomobject][ordered]@{
     packages = @($entries)
 }
 if ($PlanOnly) {
-    Write-PublicationPlan -Plan $plan
+    Write-PublicationPlan `
+        -Plan $plan `
+        -OutputPath $resolvedPlanOutputPath `
+        -InputSnapshot $publicationInputSnapshot
     return
 }
 

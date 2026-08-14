@@ -1588,6 +1588,19 @@ $mutations = @(
         Mutated = '    if ($false -and -not $ActualVersion.Equals('
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~ReleaseVersionAuthorityTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-publication-plan-topology-alias-guard'
+        File = 'scripts\SharpProof.PublicationPlanTopology.ps1'
+        Original = (@'
+        if ([string]$entry.path -ceq $OutputPath -or
+            ($null -ne $outputIdentity -and
+             [string]$entry.fileIdentity -ceq
+                [string]$outputIdentity.fileIdentity)) {
+'@).TrimEnd()
+        Mutated = '        if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationPlanTopologyTests'
     }
 )
 
