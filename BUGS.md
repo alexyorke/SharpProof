@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 32 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 31 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 32 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-233 - Rejected metadata preconditions evade SP0047 (fixed)
+
+- [x] Fixed by `33315ed80` (`fix: report rejected metadata preconditions`).
+- Rejected readable closed-precondition attributes now retain their exact API
+  identity through binding. Every attempted metadata call reports source-located
+  SP0047 and records an accountable Unknown outcome; generated calls remain
+  suppressed and unreadable metadata retains the distinct SP0050 path.
+- The focused matrix passed 4/4, Analyzer passed 337/337, and Architecture
+  passed 428/428.
 
 ### SP-AUDIT-199 - Offline collision checks use case-sensitive filenames (fixed)
 
@@ -2490,18 +2500,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: impose the exact producer-representable upper bound and,
   where launcher context is authoritative, the checked project-wall/grace
   envelope. Add zero, boundary, boundary+1, long-max, and overflow controls.
-
-### SP-AUDIT-233 - Rejected metadata preconditions evade SP0047 (P2)
-
-- [ ] A readable but wrong-payload contract assembly can attach a closed
-  precondition attribute to an external target; advisory activation starts, but
-  call-site binding returns NotApplicable instead of accountable rejection.
-- Supported impact: a call using rejected contract metadata emits neither the
-  expected `SP0047` nor a semantic precondition diagnostic.
-- Required closure: propagate rejected contract-API identity through metadata
-  precondition binding and diagnose every attempted use. Add wrong payload,
-  unreadable payload, trusted metadata, source target, mixed attributes, and
-  no-contract controls.
 
 ## P3 active bugs
 
