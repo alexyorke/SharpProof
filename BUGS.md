@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 57 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 56 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 57 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-226 - Compiler diagnostic namespaces are not validated (fixed)
+
+- [x] Fixed by `6a6ac9c4c` (`fix: validate compiler diagnostic namespaces`).
+- One shared producer/artifact/response predicate now requires the exact ordinal
+  `compiler.` namespace followed by a nonempty ASCII diagnostic ID containing
+  only letters, digits, or underscore. Foreign, bare, case-drifted, whitespace,
+  control, and separator-bearing codes fail before hydration or projection.
+- Regression coverage includes canonical CS and supported non-CS IDs, ten
+  malformed/foreign forms, an explicit control-character case, real collector
+  diagnostics, and a namespace-check mutation. Focused tests passed 14/14 and
+  6/6; Worker 505/505, Analyzer 318/318, and Architecture 333/333 passed.
 
 ### SP-AUDIT-189 - Acceptance restore predates its declared timeline (fixed)
 
@@ -2413,17 +2425,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: enumerate fixture archives and compare canonical nuspec
   identity/version/role independent of filename. Add lowercase, renamed, mixed-
   case, main/symbol, duplicate, and exact-name controls.
-
-### SP-AUDIT-226 - Compiler diagnostic namespaces are not validated (P2)
-
-- [ ] The sole producer emits `compiler.<diagnostic-id>` and the public contract
-  reserves that namespace, but artifact validation accepts any nonblank code.
-- Certifier impact: a resealed compiler diagnostic can masquerade as
-  `worker.infrastructure`, an analyzer diagnostic, or a bare `compiler.` code
-  and is copied verbatim into the worker response.
-- Required closure: require the exact ordinal `compiler.` prefix plus a canonical
-  nonblank diagnostic ID. Add foreign namespace, bare prefix, case/whitespace,
-  honest compiler ID, and prefix-check mutation controls.
 
 ### SP-AUDIT-230 - Publication planning does not validate SBOM semantics (P2)
 
