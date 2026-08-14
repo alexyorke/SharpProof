@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 51 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 50 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 51 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-209 - Typed outcome and certainty documentation drifts from schema (fixed)
+
+- [x] Fixed by `d48c647fb` (`fix: generate protocol certainty documentation`).
+- The protocol schema now owns ordered meanings for all four claim outcomes and
+  seven effect-evidence certainties. The wired documentation validator derives
+  and byte-compares one canonical member/meaning/tuple block, including
+  `VacuousEntry` and the complete wildcard `Unavailable` domain.
+- Regression coverage includes missing `VacuousEntry`, wrong `Unavailable`
+  semantics, extra/case/order drift, schema tuple drift, canonical controls, and
+  a comparison-removal mutation. Docs passed 20/20, protocol tests 69/69, and
+  Architecture 367/367.
 
 ### SP-AUDIT-182 - `sp check` is not the documented single build (fixed)
 
@@ -2608,19 +2620,6 @@ Precision, documentation, and developer-experience debt that does not change a s
 - Required closure: give every named stage the same explicit repository root and
   non-root execution contract. Add direct build/test/package image-command,
   working-directory, UID, and Compose parity fixtures.
-
-### SP-AUDIT-209 - Typed outcome and certainty documentation drifts from schema (P3)
-
-- [ ] The exact effect-certainty reference omits `VacuousEntry`, although the
-  schema admits it and the worker emits it for effects proven from contradictory
-  entry preconditions; the documentation gate does not validate this enum.
-- Supported impact: an integrator can receive a valid protocol value absent from
-  the purported closed reference.
-- Required closure: derive the exact certainty member table and allowed tuples
-  from the protocol schema, document `VacuousEntry`, and reject missing/extra or
-  stale table entries.
-- Consolidated cases: SP-AUDIT-225.
-- Unified closure: Generate the complete public outcome/reason/certainty table from the protocol schema, including VacuousEntry and the full Unavailable domain.
 
 ### SP-AUDIT-222 - API-spec typing loses exact substituted types (P3)
 
