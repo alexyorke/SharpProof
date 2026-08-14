@@ -501,12 +501,17 @@ function Get-ValidatedRelease {
         -Directory $Directory `
         -FileName ([string]$sbomArtifacts[0].fileName)
     $sbom = Get-Content -LiteralPath $sbomPath -Raw |
-        ConvertFrom-Json
+        ConvertFrom-Json -DateKind String
     if ($null -eq $sbom.PSObject.Properties['relationships'] -or
         $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
         $null -eq $sbom.PSObject.Properties['packages']) {
         throw 'Release SBOM has no complete package topology.'
     }
+    Test-SharpProofSbomReleaseIdentity `
+        -Sbom $sbom `
+        -RepositoryRoot $repositoryRoot `
+        -Version $version `
+        -RepositoryCommit $RepositoryCommit
     foreach ($packageId in $packageOrder) {
         $sbomPackages = @($sbom.packages | Where-Object {
             [string]$_.name -ceq $packageId -and

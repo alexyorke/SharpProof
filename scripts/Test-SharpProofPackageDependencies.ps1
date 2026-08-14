@@ -38,6 +38,91 @@ function Test-SharpProofSpdxPackageChecksum {
     }
 }
 
+function Get-SharpProofSbomReleaseIdentity {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][string]$RepositoryCommit
+    )
+
+    if ($RepositoryCommit -cnotmatch '^[0-9a-f]{40}$') {
+        throw 'SBOM repository commit must be canonical lowercase SHA-1.'
+    }
+    $commitTimestamp = (
+        & git -C $RepositoryRoot show `
+            -s `
+            --format=%cI `
+            $RepositoryCommit
+    ).Trim()
+    if ($LASTEXITCODE -ne 0 -or
+        [string]::IsNullOrWhiteSpace($commitTimestamp)) {
+        throw "Could not resolve timestamp for commit $RepositoryCommit."
+    }
+    $created = [DateTimeOffset]::Parse(
+        $commitTimestamp,
+        [Globalization.CultureInfo]::InvariantCulture).UtcDateTime.ToString(
+            'yyyy-MM-ddTHH:mm:ssZ',
+            [Globalization.CultureInfo]::InvariantCulture)
+
+    return [pscustomobject][ordered]@{
+        Name = "SharpProof-$Version"
+        DocumentNamespace = (
+            'https://github.com/alexyorke/SharpProof/sbom/' +
+            "$Version/$RepositoryCommit")
+        Created = $created
+        Creators = @('Tool: SharpProof release evidence')
+        Comment = 'Timestamp is derived from the source commit for reproducibility.'
+    }
+}
+
+function Test-SharpProofSbomReleaseIdentity {
+    param(
+        [Parameter(Mandatory = $true)]$Sbom,
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][string]$RepositoryCommit
+    )
+
+    $expected = Get-SharpProofSbomReleaseIdentity `
+        -RepositoryRoot $RepositoryRoot `
+        -Version $Version `
+        -RepositoryCommit $RepositoryCommit
+    if ($null -eq $Sbom.PSObject.Properties['name'] -or
+        $Sbom.name -isnot [string] -or
+        [string]$Sbom.name -cne [string]$expected.Name -or
+        $null -eq $Sbom.PSObject.Properties['documentNamespace'] -or
+        $Sbom.documentNamespace -isnot [string] -or
+        [string]$Sbom.documentNamespace -cne
+            [string]$expected.DocumentNamespace) {
+        throw 'SPDX SBOM release name or document namespace is not exact.'
+    }
+    if ($null -eq $Sbom.PSObject.Properties['creationInfo'] -or
+        $null -eq $Sbom.creationInfo -or
+        $Sbom.creationInfo -is [Array] -or
+        $Sbom.creationInfo -isnot [psobject]) {
+        throw 'SPDX SBOM creationInfo is not an object.'
+    }
+    $creationInfo = $Sbom.creationInfo
+    $properties = @($creationInfo.PSObject.Properties.Name)
+    [Array]::Sort($properties, [StringComparer]::Ordinal)
+    if (($properties -join "`n") -cne "comment`ncreated`ncreators") {
+        throw 'SPDX SBOM creationInfo does not have the exact schema.'
+    }
+    if ($creationInfo.creators -isnot [Array]) {
+        throw 'SPDX SBOM creators must be an array.'
+    }
+    $creators = @($creationInfo.creators)
+    if ($creators.Count -ne 1 -or
+        $creators[0] -isnot [string] -or
+        [string]$creators[0] -cne [string]$expected.Creators[0] -or
+        $creationInfo.created -isnot [string] -or
+        [string]$creationInfo.created -cne [string]$expected.Created -or
+        $creationInfo.comment -isnot [string] -or
+        [string]$creationInfo.comment -cne [string]$expected.Comment) {
+        throw 'SPDX SBOM creation identity is not exact.'
+    }
+}
+
 function Get-SharpProofNuspecDependencyModel {
     param(
         [Parameter(Mandatory = $true)]

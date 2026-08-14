@@ -162,21 +162,10 @@ function New-DeterministicPackageSbom {
         [string]$RepositoryRoot
     )
 
-    $commitTimestamp = (
-        & git -C $RepositoryRoot show `
-            -s `
-            --format=%cI `
-            $RepositoryCommit
-    ).Trim()
-    if ($LASTEXITCODE -ne 0 -or
-        [string]::IsNullOrWhiteSpace($commitTimestamp)) {
-        throw "Could not resolve timestamp for commit $RepositoryCommit."
-    }
-    $created = [DateTimeOffset]::Parse(
-        $commitTimestamp,
-        [Globalization.CultureInfo]::InvariantCulture).UtcDateTime.ToString(
-            'yyyy-MM-ddTHH:mm:ssZ',
-            [Globalization.CultureInfo]::InvariantCulture)
+    $releaseIdentity = Get-SharpProofSbomReleaseIdentity `
+        -RepositoryRoot $RepositoryRoot `
+        -Version $Version `
+        -RepositoryCommit $RepositoryCommit
 
     $packages = [Collections.Generic.List[object]]::new()
     $relationships = [Collections.Generic.List[object]]::new()
@@ -281,14 +270,12 @@ function New-DeterministicPackageSbom {
         spdxVersion = 'SPDX-2.3'
         dataLicense = 'CC0-1.0'
         SPDXID = 'SPDXRef-DOCUMENT'
-        name = "SharpProof-$Version"
-        documentNamespace = (
-            'https://github.com/alexyorke/SharpProof/sbom/' +
-            "$Version/$RepositoryCommit")
+        name = [string]$releaseIdentity.Name
+        documentNamespace = [string]$releaseIdentity.DocumentNamespace
         creationInfo = [pscustomobject][ordered]@{
-            created = $created
-            creators = @('Tool: SharpProof release evidence')
-            comment = 'Timestamp is derived from the source commit for reproducibility.'
+            created = [string]$releaseIdentity.Created
+            creators = @($releaseIdentity.Creators)
+            comment = [string]$releaseIdentity.Comment
         }
         documentDescribes = @($described)
         packages = @($packages |
@@ -296,6 +283,11 @@ function New-DeterministicPackageSbom {
         relationships = @($relationships |
             Sort-Object spdxElementId, relationshipType, relatedSpdxElement)
     }
+    Test-SharpProofSbomReleaseIdentity `
+        -Sbom $document `
+        -RepositoryRoot $RepositoryRoot `
+        -Version $Version `
+        -RepositoryCommit $RepositoryCommit
     foreach ($item in $PackageItems) {
         $id = [string]$item.Identity.Id
         $matches = @($document.packages | Where-Object {
@@ -778,13 +770,18 @@ if (-not (Test-Path -LiteralPath $resolvedSbom -PathType Leaf)) {
     throw "SbomPath is not a file: $resolvedSbom"
 }
 $sbom = Get-Content -LiteralPath $resolvedSbom -Raw |
-    ConvertFrom-Json
+    ConvertFrom-Json -DateKind String
 if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
     [string]$sbom.spdxVersion -ne 'SPDX-2.3' -or
     $null -eq $sbom.PSObject.Properties['dataLicense'] -or
     [string]$sbom.dataLicense -ne 'CC0-1.0') {
     throw "SbomPath is not a supported SPDX JSON document: $resolvedSbom"
 }
+Test-SharpProofSbomReleaseIdentity `
+    -Sbom $sbom `
+    -RepositoryRoot $repositoryRoot `
+    -Version $versions[0] `
+    -RepositoryCommit $commits[0]
 if ($null -eq $sbom.PSObject.Properties['packages'] -or
     $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
     $null -eq $sbom.PSObject.Properties['relationships']) {

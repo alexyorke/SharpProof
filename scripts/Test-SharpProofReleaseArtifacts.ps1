@@ -208,7 +208,7 @@ $sbomArtifact = @(
 )
 $sbomPath = Join-Path $resolvedSource ([string]$sbomArtifact[0].fileName)
 $sbom = Get-Content -LiteralPath $sbomPath -Raw |
-    ConvertFrom-Json
+    ConvertFrom-Json -DateKind String
 if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
     [string]$sbom.spdxVersion -ne 'SPDX-2.3' -or
     $null -eq $sbom.PSObject.Properties['dataLicense'] -or
@@ -218,6 +218,11 @@ if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
     $null -eq $sbom.PSObject.Properties['relationships']) {
     throw 'Release SBOM is not a complete supported SPDX 2.3 document.'
 }
+Test-SharpProofSbomReleaseIdentity `
+    -Sbom $sbom `
+    -RepositoryRoot $repositoryRoot `
+    -Version $expectedVersion `
+    -RepositoryCommit $head
 $sbomPackages = @($sbom.packages)
 $documentDescribes = @($sbom.documentDescribes)
 $relationships = @($sbom.relationships)

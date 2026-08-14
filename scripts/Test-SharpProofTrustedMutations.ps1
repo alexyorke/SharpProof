@@ -1513,6 +1513,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SbomLicensesMatchTheExactPackageAuthority'
     },
     [pscustomobject]@{
+        Name = 'release-sbom-exact-release-identity'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = '        [string]$Sbom.name -cne [string]$expected.Name -or'
+        Mutated = '        [string]$Sbom.name -ceq [string]$expected.Name -and'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SbomReleaseIdentityIsExact'
+    },
+    [pscustomobject]@{
         Name = 'release-third-party-component-projection'
         File = 'scripts\Test-SharpProofPackageDependencies.ps1'
         Original = (@'
