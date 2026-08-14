@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 76 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 75 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 76 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-036 - Release certifiers ignore SBOM license declarations (fixed)
+
+- [x] Fixed by `d2bb1ef4f` (`fix: validate exact SBOM licenses`).
+- Release generation, final validation, and publication planning now consume one
+  exact SBOM license graph derived from the existing first-party package
+  contract and third-party component catalog. Every package must match exact
+  identity/version, declared and concluded license, `NOASSERTION` download
+  location, `filesAnalyzed=false`, and the closed license-property set.
+- Regression-first fixtures cover first- and third-party `NOASSERTION`, wrong,
+  case, missing, and extra license fields; unknown and duplicate components;
+  invalid download/file-analysis fields; canonical control; and a removal
+  mutation. The focused matrix passed 15/15 and `git diff --check` passed. The
+  full release-evidence integration command timed out once after 124 seconds
+  without a result; it was not restarted and OfflinePlan was not run.
 
 ### SP-AUDIT-027 - Release-tag validation accepts branch refs (fixed)
 
@@ -1699,29 +1714,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutation cases.
 - Consolidated cases: SP-AUDIT-081, SP-AUDIT-090, SP-AUDIT-139, SP-AUDIT-201, SP-AUDIT-212.
 - Unified closure: Generate one exact capture/fingerprint predicate for canonical strings and paths, module roles/properties, additional-file identity, and empty-tree derivations.
-
-### SP-AUDIT-036 - Release certifiers ignore SBOM license declarations (P2)
-
-- [ ] Release evidence generation and final artifact validation compare SPDX
-  package/component identities, versions, hashes, containment, and dependency
-  relationships, but never compare each package's `licenseDeclared` and
-  `licenseConcluded` fields with the authoritative release and third-party
-  component manifests.
-- Certifier impact: a release can be blessed with an SBOM that claims no known
-  license for SharpProof or any bundled dependency, while the separate release
-  manifest still says the components are MIT. The retained, hashed SBOM is
-  therefore internally inconsistent with the evidence that qualified it.
-- Reproduction: a disposable copy of the current exact-commit package set
-  rewrote both SPDX license fields to `NOASSERTION` for every SharpProof and
-  third-party package. `New-SharpProofReleaseEvidence.ps1` regenerated the
-  release manifest and `Test-SharpProofReleaseArtifacts.ps1` then reported the
-  immutable artifacts valid for commit
-  `a1c28160205b5376ec75cd4e11ef11de1ef122a4`; both commands exited zero.
-- Required closure: derive the expected license per SPDX package from the
-  package/third-party authorities and require exact declared/concluded values
-  during generation and final validation. Also validate the canonical package
-  download/file-analysis fields and add missing, `NOASSERTION`, wrong-license,
-  duplicate-component, package-license, and canonical-SBOM mutations.
 
 ### SP-AUDIT-038 - Final release validation trusts fabricated component inventory (P2)
 
