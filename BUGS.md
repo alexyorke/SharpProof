@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 43 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 42 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 43 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-007 - SBOM release identity is not fully bound (fixed)
+
+- [x] Fixed by `122543408` (`fix: bind exact SBOM release identity`).
+- One shared release authority now binds the exact SBOM document name,
+  version/commit namespace, commit-derived canonical UTC timestamp, creator, and
+  creation schema across evidence generation, final validation, and publication.
+  SBOM date parsing preserves strings so equivalent offset or fractional forms
+  cannot pass through automatic date normalization.
+- Regression coverage includes canonical JSON roundtrip, stale commit and time,
+  equivalent noncanonical timestamps, malformed namespace/name/version/creator
+  shapes, all three authority consumers, and a removal mutation. The focused
+  suite passed 15/15 and the pre-correction full Architecture suite passed
+  405/405; parser and diff checks passed after the lexical tightening.
 
 ### SP-AUDIT-073 - Object-initializer writes lose fresh-object ownership (fixed)
 
@@ -2008,28 +2022,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 ## P2 active bugs
 
 Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
-
-### SP-AUDIT-007 - SBOM release identity is not fully bound (P2)
-
-- [ ] `New-SharpProofReleaseEvidence.ps1 -SbomPath` and
-  `Test-SharpProofReleaseArtifacts.ps1` validate the SPDX graph and package
-  hashes but never validate the commit-bearing `documentNamespace` or its
-  commit-derived creation metadata.
-- Certifier impact: release evidence can contain exact packages and an exact
-  release manifest while the SBOM asserts a different source revision. The
-  resulting SBOM hash is then blessed by `SharpProof.release.json` and
-  `SHA256SUMS`, so the final validator cannot distinguish the stale provenance.
-- Reproduction: in a clean detached checkout matching the existing package
-  commit, the audit changed the SBOM namespace suffix to forty zeroes, reran
-  release-evidence generation with that SBOM, and then ran the final artifact
-  validator. Both commands exited zero and reported immutable artifacts valid.
-- Required closure: require the exact deterministic namespace
-  `.../sbom/<version>/<package repository commit>`, validate the commit-derived
-  creation record, and preferably compare a supplied SBOM with a regenerated
-  canonical document. Add stale-commit, stale-timestamp, malformed-namespace,
-  and canonical round-trip certifier fixtures.
-- Consolidated cases: SP-AUDIT-185.
-- Unified closure: Derive and require exact SBOM name, namespace, version, commit, and creation identity from one release authority.
 
 ### SP-AUDIT-010 - Filtered worker tests depend on Z3 test order (P2)
 
