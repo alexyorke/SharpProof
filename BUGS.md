@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 82 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 81 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 82 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-216 - Parentheses disable direct precondition replay (fixed)
+
+- [x] Fixed by `32b02f182` (`fix: replay parenthesized preconditions`).
+- Direct-call ownership now unwraps only transparent parenthesized expressions
+  before comparing the invocation site. Expression bodies, returns, local
+  initializers, assignments, and nested parentheses therefore replay the same
+  preconditions as their unparenthesized equivalents; conversions, checked
+  expressions, and null-forgiving wrappers remain fail closed.
+- Regression-first tests cover every supported owner shape, nested and argument
+  parentheses, plain and valid controls, generated code, nontransparent
+  wrappers, and a mutation that restores the ownership failure. Focused tests
+  passed 3/3, full Analyzer 302/302, Architecture 182/182, the mutation was
+  killed by the focused test, and `git diff --check` passed.
 
 ### SP-AUDIT-204 - Verifier libz3 pollutes application runtime assets (fixed)
 
@@ -1441,17 +1455,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
-
-### SP-AUDIT-216 - Parentheses disable direct precondition replay (P1)
-
-- [ ] Replayable-prefix detection compares raw expression and invocation spans;
-  transparent `ParenthesizedExpressionSyntax` widens the owned expression span.
-- Supported impact: `(Positive(-1))` in an expression body, return, local
-  initializer, or assignment becomes Unknown without `SP0027`, while the
-  unparenthesized equivalent reports the violation.
-- Required closure: strip only transparent parentheses before top-level call
-  comparison. Add all four documented forms, nested parentheses, plain controls,
-  nontransparent conversion/wrapper rejects, and per-shape mutation controls.
 
 ### SP-AUDIT-221 - Function-pointer convention order is overconstrained (P1)
 
