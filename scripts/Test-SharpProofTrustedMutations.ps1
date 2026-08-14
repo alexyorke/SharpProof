@@ -1548,6 +1548,14 @@ $mutations = @(
         Mutated = '    if ($false) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~SbomTopologyIsTheExactAuthenticatedProjection'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-spdx-checksum-row'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = '    if ($rows.Count -ne 1 -or $null -eq $rows[0]) {'
+        Mutated = '    if ($null -eq $rows[0]) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SpdxChecksumRowsAreExact'
     }
 )
 

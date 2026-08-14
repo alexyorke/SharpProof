@@ -294,6 +294,23 @@ function New-DeterministicPackageSbom {
         relationships = @($relationships |
             Sort-Object spdxElementId, relationshipType, relatedSpdxElement)
     }
+    foreach ($item in $PackageItems) {
+        $id = [string]$item.Identity.Id
+        $matches = @($document.packages | Where-Object {
+            [string]$_.name -ceq $id -and
+            [string]$_.versionInfo -ceq $Version
+        })
+        if ($matches.Count -ne 1) {
+            throw "Generated SPDX package identity is invalid: $id"
+        }
+        $expectedHash = (Get-FileHash `
+            -LiteralPath $item.File.FullName `
+            -Algorithm SHA256).Hash.ToLowerInvariant()
+        Test-SharpProofSpdxPackageChecksum `
+            -Package $matches[0] `
+            -ExpectedSha256 $expectedHash `
+            -Identity $id
+    }
     $json = ($document | ConvertTo-Json -Depth 10) -replace "`r`n", "`n"
     Write-AtomicText -Path $Path -Value ($json + "`n")
 }
@@ -799,14 +816,10 @@ foreach ($expectedId in $expectedIds) {
     $expectedHash = (Get-FileHash `
         -LiteralPath $packageItem[0].File.FullName `
         -Algorithm SHA256).Hash.ToLowerInvariant()
-    $checksums = @($matchingPackages[0].checksums |
-        Where-Object {
-            [string]$_.algorithm -eq 'SHA256' -and
-            [string]$_.checksumValue -eq $expectedHash
-        })
-    if ($checksums.Count -ne 1) {
-        throw "SPDX SBOM checksum for '$expectedId' is missing or stale."
-    }
+    Test-SharpProofSpdxPackageChecksum `
+        -Package $matchingPackages[0] `
+        -ExpectedSha256 $expectedHash `
+        -Identity $expectedId
 }
 foreach ($key in $expectedComponentKeys) {
     $parts = $key.Split("`0")

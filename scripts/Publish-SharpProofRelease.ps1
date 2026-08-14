@@ -485,6 +485,23 @@ function Get-ValidatedRelease {
         $null -eq $sbom.PSObject.Properties['packages']) {
         throw 'Release SBOM has no complete package topology.'
     }
+    foreach ($packageId in $packageOrder) {
+        $sbomPackages = @($sbom.packages | Where-Object {
+            [string]$_.name -ceq $packageId -and
+            [string]$_.versionInfo -ceq $version
+        })
+        $manifestPackages = @($packageArtifacts | Where-Object {
+            [string]$_.kind -ceq 'package' -and
+            [string]$_.packageId -ceq $packageId
+        })
+        if ($sbomPackages.Count -ne 1 -or $manifestPackages.Count -ne 1) {
+            throw "Release SBOM package checksum identity is invalid: $packageId"
+        }
+        Test-SharpProofSpdxPackageChecksum `
+            -Package $sbomPackages[0] `
+            -ExpectedSha256 ([string]$manifestPackages[0].sha256) `
+            -Identity $packageId
+    }
     Test-SharpProofSbomTopology `
         -SbomPackages @($sbom.packages) `
         -DocumentDescribes @($sbom.documentDescribes) `

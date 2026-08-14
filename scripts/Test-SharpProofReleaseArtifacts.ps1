@@ -249,13 +249,10 @@ foreach ($packageId in $expectedPackageIds) {
                 [string]$_.packageId -eq $packageId
             }
     )[0].sha256
-    if (@($matches[0].checksums |
-            Where-Object {
-                [string]$_.algorithm -eq 'SHA256' -and
-                [string]$_.checksumValue -eq $expectedHash
-            }).Count -ne 1) {
-        throw "Release SBOM checksum is missing or stale: $packageId"
-    }
+    Test-SharpProofSpdxPackageChecksum `
+        -Package $matches[0] `
+        -ExpectedSha256 $expectedHash `
+        -Identity $packageId
 }
 foreach ($key in $componentKeys) {
     $parts = $key.Split("`0")
