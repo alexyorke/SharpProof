@@ -1572,6 +1572,14 @@ $mutations = @(
         Mutated = '            -ExpectedSha256 ([string]$symbol[0].sha256) `'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~SbomSymbolArtifactScopeTests'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-diagnostic-one-based-location'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerManifestArtifactProducer.cs'
+        Original = '                Line = source ? span.StartLinePosition.Line + 1 : 0,'
+        Mutated = '                Line = source ? span.StartLinePosition.Line : 0,'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerDiagnosticLocationsUseOneBasedMappedCoordinates'
     }
 )
 

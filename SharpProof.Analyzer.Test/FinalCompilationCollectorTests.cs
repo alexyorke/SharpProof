@@ -484,6 +484,62 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
+    [TestCase("?", "first.cs")]
+    [TestCase("class C {\n    void M() {\n        Missing();\n    }\n}", "ordinary.cs")]
+    [TestCase("#line 100 \"mapped.cs\"\nclass C { void M() { Missing(); } }", "physical.cs")]
+    [TestCase("class C {", "end.cs")]
+    [TestCase("class Generated { void M() { Missing(); } }", "Generated.Subject.g.cs")]
+    public async Task CompilerDiagnosticLocationsUseOneBasedMappedCoordinates(
+        string source,
+        string path)
+    {
+        using var workspace = new CollectorWorkspace();
+        var seed = CreateCompilation();
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            (CSharpParseOptions)seed.SyntaxTrees.Single().Options,
+            path,
+            Encoding.UTF8);
+        var compilation = seed.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
+        var expected = compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error &&
+                diagnostic.Location.IsInSource)
+            .Select(static diagnostic =>
+            {
+                var mapped = diagnostic.Location.GetMappedLineSpan();
+                return new
+                {
+                    Code = "compiler." + diagnostic.Id,
+                    Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
+                    diagnostic.Location.SourceSpan.Start,
+                    diagnostic.Location.SourceSpan.Length,
+                    Path = mapped.Path ?? string.Empty,
+                    Line = mapped.StartLinePosition.Line + 1,
+                    Column = mapped.StartLinePosition.Character + 1
+                };
+            })
+            .ToArray();
+        Assert.That(expected, Is.Not.Empty);
+
+        var artifact = await EmitArtifact(
+            compilation,
+            workspace.SealPath("diagnostic-location"));
+        var actual = artifact.CompilerDiagnostics.Select(static diagnostic =>
+            new
+            {
+                diagnostic.Code,
+                diagnostic.Message,
+                diagnostic.Location.Start,
+                diagnostic.Location.Length,
+                diagnostic.Location.Path,
+                diagnostic.Location.Line,
+                diagnostic.Location.Column
+            }).ToArray();
+
+        Assert.That(actual, Is.EquivalentTo(expected));
+    }
+
     [Test]
     public async Task EmissionFailureIsTypedAndDoesNotEscapeAsAd0001()
     {

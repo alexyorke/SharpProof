@@ -66,8 +66,8 @@ internal static class CompilerManifestArtifactProducer
                 Path = span.Path ?? string.Empty,
                 Start = source ? diagnostic.Location.SourceSpan.Start : 0,
                 Length = source ? diagnostic.Location.SourceSpan.Length : 0,
-                Line = source ? span.StartLinePosition.Line : 0,
-                Column = source ? span.StartLinePosition.Character : 0
+                Line = source ? span.StartLinePosition.Line + 1 : 0,
+                Column = source ? span.StartLinePosition.Character + 1 : 0
             }
         };
     }

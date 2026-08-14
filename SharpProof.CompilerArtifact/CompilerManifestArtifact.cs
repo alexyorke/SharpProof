@@ -405,14 +405,8 @@ internal static class CompilerManifestArtifactJson
             item != null &&
             !string.IsNullOrWhiteSpace(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
-            item.Location is
-            {
-                Path: not null,
-                Start: >= 0,
-                Length: >= 0,
-                Line: >= 0,
-                Column: >= 0
-            }) == true;
+            item.Location is { Path: not null } location &&
+            WorkerProtocolJson.HasValidLocationOrNone(location)) == true;
     }
 
     private static bool HasMatchingCallables(

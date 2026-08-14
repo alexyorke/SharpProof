@@ -279,6 +279,67 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void CompilerDiagnosticLocationsUseTheSharedOneBasedOrNoneShape()
+    {
+        var valid = CreateArtifact();
+        valid.CompilerDiagnostics = [Diagnostic(
+            "valid", length: 0, line: 1, column: 1)];
+        valid.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            valid.Compilation, valid.CompilerDiagnostics);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(valid)));
+
+        var none = CreateArtifact();
+        none.CompilerDiagnostics = [new CompilerDiagnosticArtifact
+        {
+            Code = "compiler.NONE",
+            Message = "non-source",
+            Location = new WorkerSourceLocation()
+        }];
+        none.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            none.Compilation, none.CompilerDiagnostics);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(none)));
+
+        foreach (var location in new[]
+                 {
+                     new WorkerSourceLocation
+                     {
+                         Path = "same.cs", Start = 0, Length = 0,
+                         Line = 0, Column = 1
+                     },
+                     new WorkerSourceLocation
+                     {
+                         Path = "same.cs", Start = 0, Length = 0,
+                         Line = 1, Column = 0
+                     },
+                     new WorkerSourceLocation
+                     {
+                         Path = "", Start = 0, Length = 1,
+                         Line = 0, Column = 0
+                     },
+                     new WorkerSourceLocation
+                     {
+                         Path = "", Start = -1, Length = 0,
+                         Line = 0, Column = 0
+                     }
+                 })
+        {
+            var malformed = CreateArtifact();
+            malformed.CompilerDiagnostics = [new CompilerDiagnosticArtifact
+            {
+                Code = "compiler.BAD",
+                Message = "bad geometry",
+                Location = location
+            }];
+            malformed.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+                malformed.Compilation, malformed.CompilerDiagnostics);
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(malformed)));
+        }
+    }
+
+    [Test]
     public void RelationalEvidenceSchemaVersionsAreExactPins()
     {
         Action<CompilerManifestArtifact>[] corruptions =

@@ -511,6 +511,17 @@ public static partial class WorkerProtocolJson
         return value != null && WorkerProtocolMetadata.IsSourceLocationValid(value);
     }
 
+    internal static bool HasValidLocationOrNone(WorkerSourceLocation? value)
+    {
+        return value != null &&
+            (WorkerProtocolMetadata.IsSourceLocationValid(value) ||
+             (value.Path.Length == 0 &&
+              value.Start == 0 &&
+              value.Length == 0 &&
+              value.Line == 0 &&
+              value.Column == 0));
+    }
+
     internal static bool HasKnownEffects(WorkerEffectSet effects, WorkerEffectCapabilitySet capabilities)
     {
         return WorkerProtocolMetadata.HasOnlyKnownFlags(effects) &&
