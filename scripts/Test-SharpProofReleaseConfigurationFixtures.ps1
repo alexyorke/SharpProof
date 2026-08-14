@@ -25,6 +25,9 @@ function Write-Json([string]$Name, [object]$Value) {
 
 function New-State {
     [pscustomobject]@{
+        Contract = Get-Content -LiteralPath (Join-Path $repositoryRoot (
+                'eng/release/environment-contract.json')) -Raw |
+            ConvertFrom-Json
         Rulesets = @([pscustomobject]@{
                 id = 7; target = 'tag'; enforcement = 'active'
             })
@@ -48,6 +51,10 @@ function New-State {
             [pscustomobject]@{ type = 'tag'; name = 'v1.0.0-preview.2' },
             [pscustomobject]@{ type = 'tag'; name = 'v1.0.0-rc.1' },
             [pscustomobject]@{ type = 'tag'; name = 'v1.0.0' })
+        PrivateVariables = @('NUGET_PRIVATE_SOURCE')
+        PublicVariables = @('NUGET_USER')
+        PrivateSecrets = @('NUGET_PRIVATE_API_KEY')
+        PublicSecrets = @()
         Workflow = $canonicalWorkflow
     }
 }
@@ -61,6 +68,9 @@ function Invoke-Case {
 
     $state = New-State
     & $Mutate $state
+    $state.Contract | ConvertTo-Json -Depth 12 | Set-Content `
+        -LiteralPath (Join-Path $fixture 'eng/release/environment-contract.json') `
+        -Encoding utf8NoBOM
     Write-Json rulesets $state.Rulesets
     Write-Json ruleset $state.Ruleset
     Write-Json private-environment ([pscustomobject]@{
@@ -82,15 +92,25 @@ function Invoke-Case {
             branch_policies = @($state.PublicPolicies)
         })
     Write-Json private-variables ([pscustomobject]@{
-            variables = @([pscustomobject]@{ name = 'NUGET_PRIVATE_SOURCE' })
+            variables = @($state.PrivateVariables | ForEach-Object {
+                    [pscustomobject]@{ name = $_ }
+                })
         })
     Write-Json public-variables ([pscustomobject]@{
-            variables = @([pscustomobject]@{ name = 'NUGET_USER' })
+            variables = @($state.PublicVariables | ForEach-Object {
+                    [pscustomobject]@{ name = $_ }
+                })
         })
     Write-Json private-secrets ([pscustomobject]@{
-            secrets = @([pscustomobject]@{ name = 'NUGET_PRIVATE_API_KEY' })
+            secrets = @($state.PrivateSecrets | ForEach-Object {
+                    [pscustomobject]@{ name = $_ }
+                })
         })
-    Write-Json public-secrets ([pscustomobject]@{ secrets = @() })
+    Write-Json public-secrets ([pscustomobject]@{
+            secrets = @($state.PublicSecrets | ForEach-Object {
+                    [pscustomobject]@{ name = $_ }
+                })
+        })
     [IO.File]::WriteAllText(
         (Join-Path $fixture '.github/workflows/package-consumers.yml'),
         [string]$state.Workflow,
@@ -154,6 +174,46 @@ cat "$GH_FIXTURE_ROOT/$file.json"
     $env:GH_FIXTURE_ROOT = $apiRoot
     try {
         Invoke-Case exact-contract { param($state) } $true
+        Invoke-Case empty-tags { param($state)
+            $state.PrivatePolicies = @()
+            ($state.Contract.environments | Where-Object name -eq 'nuget.private-preview').tags = @()
+        } $true
+        Invoke-Case empty-variables { param($state)
+            $state.PublicVariables = @()
+            ($state.Contract.environments | Where-Object name -eq 'nuget.org').variables = @()
+        } $true
+        Invoke-Case multiple-variables { param($state)
+            $state.PublicVariables += 'NUGET_AUDIT_USER'
+            ($state.Contract.environments | Where-Object name -eq 'nuget.org').variables += 'NUGET_AUDIT_USER'
+        } $true
+        Invoke-Case multiple-secrets { param($state)
+            $state.PrivateSecrets += 'NUGET_PRIVATE_AUDIT_KEY'
+            ($state.Contract.environments | Where-Object name -eq 'nuget.private-preview').secrets += 'NUGET_PRIVATE_AUDIT_KEY'
+        } $true
+        Invoke-Case unexpected-public-secret { param($state)
+            $state.PublicSecrets += 'UNEXPECTED_SECRET'
+        } $false
+        Invoke-Case missing-secret { param($state)
+            $state.PrivateSecrets = @()
+        } $false
+        Invoke-Case missing-variable { param($state)
+            $state.PrivateVariables = @()
+        } $false
+        Invoke-Case extra-variable { param($state)
+            $state.PrivateVariables += 'UNEXPECTED_VARIABLE'
+        } $false
+        Invoke-Case duplicate-variable { param($state)
+            $state.PrivateVariables += $state.PrivateVariables[0]
+        } $false
+        Invoke-Case variable-case { param($state)
+            $state.PrivateVariables[0] = 'nuget_private_source'
+        } $false
+        Invoke-Case duplicate-secret { param($state)
+            $state.PrivateSecrets += $state.PrivateSecrets[0]
+        } $false
+        Invoke-Case secret-case { param($state)
+            $state.PrivateSecrets[0] = 'nuget_private_api_key'
+        } $false
         Invoke-Case wildcard { param($state) $state.PrivatePolicies += [pscustomobject]@{ type = 'tag'; name = '*' } } $false
         Invoke-Case extra-exact-tag { param($state) $state.PrivatePolicies += [pscustomobject]@{ type = 'tag'; name = 'v1.0.0-preview.99' } } $false
         Invoke-Case branch-policy { param($state) $state.PrivatePolicies += [pscustomobject]@{ type = 'branch'; name = 'master' } } $false

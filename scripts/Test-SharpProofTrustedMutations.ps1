@@ -814,6 +814,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ReleaseTagAuthorityRejectsEveryNonExactIdentity'
     },
     [pscustomobject]@{
+        Name = 'release-configuration-empty-expected-set'
+        File = 'scripts\Test-SharpProofReleaseConfiguration.ps1'
+        Original = '[Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Expected,'
+        Mutated = '[Parameter(Mandatory = $true)][object[]]$Expected,'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~EffectiveReleaseRefSetsMustEqualTheContract'
+    },
+    [pscustomobject]@{
         Name = 'launcher-timeout-owns-result'
         File = 'SharpProof.Worker.Launcher\Program.cs'
         Original = '        if (exitCode == 124)'

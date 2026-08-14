@@ -34,14 +34,11 @@ function Invoke-GitHubJson {
 function Require-SetMembers {
     param(
         [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Actual,
-        [Parameter(Mandatory = $true)][object[]]$Expected,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Expected,
         [Parameter(Mandatory = $true)][string]$Owner
     )
 
-    $missing = @($Expected | Where-Object { [string]$_ -notin $Actual })
-    if ($missing.Count -ne 0) {
-        throw "$Owner is missing: $($missing -join ', ')."
-    }
+    Require-ExactSet -Actual $Actual -Expected $Expected -Owner $Owner
 }
 
 function Require-ExactSet {
@@ -279,12 +276,10 @@ foreach ($required in $contract.environments) {
     $secrets = Invoke-GitHubJson "repos/$repository/environments/$escapedName/secrets"
     $actualSecrets = @($secrets.secrets | ForEach-Object { [string]$_.name })
     $requiredSecrets = @($required.secrets)
-    if ($requiredSecrets.Count -ne 0) {
-        Require-SetMembers `
-            -Actual $actualSecrets `
-            -Expected $requiredSecrets `
-            -Owner "Environment '$name' secrets"
-    }
+    Require-SetMembers `
+        -Actual $actualSecrets `
+        -Expected $requiredSecrets `
+        -Owner "Environment '$name' secrets"
 
     $environmentEvidence += [pscustomobject]@{
         name = $name
