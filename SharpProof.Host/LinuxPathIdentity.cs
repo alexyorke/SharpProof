@@ -150,6 +150,7 @@ public static partial class LinuxPathIdentity
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
             timeout,
             TimeSpan.Zero);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var requestedPaths = publicationPaths
             .Where(static path => !string.IsNullOrWhiteSpace(path))
@@ -163,22 +164,24 @@ public static partial class LinuxPathIdentity
 
         var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
         ValidatePublicationMetadataAliases(canonicalPaths);
-        var locks = canonicalPaths
+        var lockPaths = canonicalPaths
             .Select(PublicationLockNameForCanonicalPath)
             .OrderBy(static path => path, StringComparer.Ordinal)
-            .Select(static path => new PublicationLock(path))
             .ToArray();
+        var locks = new List<PublicationLock>(lockPaths.Length);
         var acquired = 0;
         var ownershipTransferred = false;
         try
         {
             var stopwatch = Stopwatch.StartNew();
-            while (acquired != locks.Length)
+            foreach (var lockPath in lockPaths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var publicationLock = new PublicationLock(lockPath);
+                locks.Add(publicationLock);
                 var remaining = timeout - stopwatch.Elapsed;
                 if (remaining <= TimeSpan.Zero ||
-                    !locks[acquired].Acquire(remaining, cancellationToken))
+                    !publicationLock.Acquire(remaining, cancellationToken))
                 {
                     throw new IOException(
                         "Timed out waiting for SharpProof publication paths.");
@@ -195,7 +198,7 @@ public static partial class LinuxPathIdentity
                     "SharpProof publication path identity changed while acquiring locks.");
             }
             BindPublicationSet(canonicalPaths);
-            var lease = new PublicationLease(locks);
+            var lease = new PublicationLease([.. locks]);
             ownershipTransferred = true;
             return lease;
         }
@@ -203,7 +206,7 @@ public static partial class LinuxPathIdentity
         {
             if (!ownershipTransferred)
             {
-                ReleaseLocks(locks, acquired);
+                ReleaseLocks([.. locks], acquired);
             }
         }
     }

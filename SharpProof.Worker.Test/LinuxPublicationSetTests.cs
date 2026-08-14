@@ -120,6 +120,99 @@ public sealed class LinuxPublicationSetTests
         Assert.That(error!.Message, Does.Contain("Timed out"));
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(2)]
+    public void ConstructorFailureDisposesEveryEarlierLock(int failureIndex)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+        using var directory = TemporaryDirectory.Create();
+        var ordered = Enumerable.Range(0, 3)
+            .Select(index => Path.Combine(directory.Path, $"output-{index}.json"))
+            .OrderBy(LinuxPathIdentity.PublicationLockName, StringComparer.Ordinal)
+            .ToArray();
+        var lockPaths = ordered.Select(LinuxPathIdentity.PublicationLockName)
+            .ToArray();
+        var metadataDirectory = Path.GetDirectoryName(lockPaths[0])!;
+        Directory.CreateDirectory(metadataDirectory);
+        File.SetUnixFileMode(
+            metadataDirectory,
+            UnixFileMode.UserRead |
+            UnixFileMode.UserWrite |
+            UnixFileMode.UserExecute);
+        Directory.CreateDirectory(lockPaths[failureIndex]);
+        var before = Directory.EnumerateFileSystemEntries("/proc/self/fd").Count();
+
+        for (var attempt = 0; attempt < 32; attempt++)
+        {
+            Assert.Throws<IOException>((Action)(() =>
+            {
+                using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                    ordered,
+                    TimeSpan.FromSeconds(1));
+            }));
+        }
+        var after = Directory.EnumerateFileSystemEntries("/proc/self/fd").Count();
+        Directory.Delete(lockPaths[failureIndex]);
+        using var reacquired = LinuxPathIdentity.AcquirePublicationSet(
+            ordered,
+            TimeSpan.FromSeconds(1));
+
+        Assert.That(after, Is.EqualTo(before));
+    }
+
+    [Test]
+    public void PreCanceledAcquisitionPerformsNoPathIo()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var path = Path.Combine(directory.Path, "canceled.json");
+        var metadataDirectory = Path.GetDirectoryName(
+            LinuxPathIdentity.PublicationLockName(path))!;
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                [path],
+                TimeSpan.FromSeconds(1),
+                cancellation.Token);
+        }));
+
+        Assert.That(Directory.Exists(metadataDirectory), Is.False);
+    }
+
+    [Test]
+    public void MidAcquisitionCancellationReleasesEarlierLocks()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var ordered = new[]
+        {
+            Path.Combine(directory.Path, "first-canceled.json"),
+            Path.Combine(directory.Path, "second-canceled.json")
+        }.OrderBy(LinuxPathIdentity.PublicationLockName, StringComparer.Ordinal)
+            .ToArray();
+        using var blocked = LinuxPathIdentity.AcquirePublicationSet(
+            [ordered[1]],
+            TimeSpan.FromSeconds(1));
+        using var cancellation = new CancellationTokenSource(
+            TimeSpan.FromMilliseconds(100));
+
+        Assert.Throws<OperationCanceledException>((Action)(() =>
+        {
+            using var publication = LinuxPathIdentity.AcquirePublicationSet(
+                ordered,
+                TimeSpan.FromSeconds(2),
+                cancellation.Token);
+        }));
+        using var reacquired = LinuxPathIdentity.AcquirePublicationSet(
+            [ordered[0]],
+            TimeSpan.FromSeconds(1));
+    }
+
     [Test]
     public void PersistentMetadataRejectsSequentialPartialOverlap()
     {

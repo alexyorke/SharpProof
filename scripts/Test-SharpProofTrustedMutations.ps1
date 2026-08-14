@@ -1176,10 +1176,18 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'publication-locks-every-member'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
-        Original = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Select(static path => new PublicationLock(path))"
-        Mutated = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Take(1)`n            .Select(static path => new PublicationLock(path))"
+        Original = "        var lockPaths = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .ToArray();"
+        Mutated = "        var lockPaths = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Take(1)`n            .ToArray();"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
+    },
+    [pscustomobject]@{
+        Name = 'publication-lock-construction-cleanup-ownership'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '                locks.Add(publicationLock);'
+        Mutated = '                _ = publicationLock;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ConstructorFailureDisposesEveryEarlierLock'
     },
     [pscustomobject]@{
         Name = 'publication-set-identity-injective-framing'
