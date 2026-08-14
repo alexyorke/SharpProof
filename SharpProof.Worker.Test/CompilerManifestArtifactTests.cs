@@ -1297,6 +1297,9 @@ public sealed class CompilerManifestArtifactTests
         Assert.That(blockCount, Is.GreaterThan(0));
         var terminal = graph.Blocks[graph.Entry].Instructions[^1];
         Assert.That(terminal.Kind, Is.EqualTo(IrInstructionKind.Return));
+        var terminalOperation = graph.Operations[terminal.Operation];
+        graph.Operations = [terminalOperation];
+        terminal.Operation = 0;
         var blocks = new List<PortableIrBlock>();
         for (var index = 0; index < blockCount; index++)
         {

@@ -207,7 +207,9 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException("A successful lowered callable is incomplete.");
         }
 
-        var decoded = PortableIrGraphCodec.Decode(artifact.Graph);
+        var decoded = PortableIrGraphCodec.Decode(
+            artifact.Graph,
+            ExternalVariableIndices(artifact));
         var summaryRootCount = artifact.Body?.SummaryCalls?.Length ?? 0;
         if (decoded.Roots.Count != artifact.Clauses.Length + summaryRootCount)
         {
@@ -305,6 +307,49 @@ internal static class CompilerLoweredArtifact
             EffectClaims = DecodeEffects(artifact, claims),
             Compilation = compilation
         };
+    }
+
+    private static int[] ExternalVariableIndices(
+        CompilerCallableArtifact artifact)
+    {
+        var indices = new HashSet<int>();
+        void Add(int index)
+        {
+            if (index >= 0)
+            {
+                indices.Add(index);
+            }
+        }
+
+        foreach (var variable in artifact.Variables ?? [])
+        {
+            if (variable != null)
+            {
+                Add(variable.Variable);
+                Add(variable.CurrentStateVariable);
+            }
+        }
+        foreach (var binding in artifact.Body?.ParameterBindings ?? [])
+        {
+            if (binding != null)
+            {
+                Add(binding.Source);
+                Add(binding.Target);
+            }
+        }
+        foreach (var summary in artifact.Body?.SummaryCalls ?? [])
+        {
+            if (summary == null)
+            {
+                continue;
+            }
+            Add(summary.Result);
+            foreach (var existential in summary.ExistentialVariables ?? [])
+            {
+                Add(existential);
+            }
+        }
+        return [.. indices.OrderBy(static index => index)];
     }
     private static ImmutableArray<CompilerEffectClaimArtifact> DecodeEffects(
         CompilerCallableArtifact artifact,

@@ -1512,6 +1512,14 @@ $mutations = @(
         Mutated = '        if (false)'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~ReleasePackageRolesAuthenticateNamesArchivesAndNuspecs'
+    },
+    [pscustomobject]@{
+        Name = 'portable-ir-exact-encoder-image'
+        File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
+        Original = '            actual.SequenceEqual(expected),'
+        Mutated = '            true,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DecoderRejectsMetadataOutsideTheCanonicalEncoderImage'
     }
 )
 

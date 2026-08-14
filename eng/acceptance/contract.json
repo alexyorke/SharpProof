@@ -179,6 +179,7 @@
       "scripts/Test-SharpProofReleaseConfigurationFixtures.ps1",
       "scripts/Test-SharpProofSamples.ps1",
       "scripts/Test-SharpProofSymbolPackages.ps1",
+      "scripts/SharpProof.SymbolPackageValidator.cs",
       "scripts/Test-SharpProofTrustedMutations.ps1",
       "scripts/Write-SharpProofQualificationReceipt.ps1",
       "scripts/package-projects.json"
@@ -193,7 +194,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "85f2bd940fa4ac85911dd7236fb3161c0fa53b5de5722375a55c90bcc5e146de",
+    "inventorySha256": "9755c9028d4707f3018e397ea731dbf2cefb9185f412884d1778deff584e435f",
     "components": [
       {
         "name": "discovery",
@@ -680,6 +681,7 @@
           "scripts/Test-SharpProofSamples.ps1",
           "scripts/Test-SharpProofStandaloneGateEvidence.ps1",
           "scripts/Test-SharpProofSymbolPackages.ps1",
+          "scripts/SharpProof.SymbolPackageValidator.cs",
           "scripts/Write-SharpProofQualificationReceipt.ps1",
           "scripts/package-projects.json",
           "SharpProof.ArchitectureTest/ReleaseAuthorityClosureTests.cs",
