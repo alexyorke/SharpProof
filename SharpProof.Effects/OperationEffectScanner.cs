@@ -9,6 +9,7 @@ internal sealed class OperationEffectScanner
     private readonly EffectCallSiteResolver _callResolver;
     private readonly ConversionEffectClassifier _conversionEffects;
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
+    private readonly CreationFlowCaptures _creationCaptures = new();
     private readonly SyntaxNode? _directSyntax;
     private readonly ImmutableArray<EffectDirectWitness>.Builder _directWitnesses =
         ImmutableArray.CreateBuilder<EffectDirectWitness>();
@@ -387,6 +388,7 @@ internal sealed class OperationEffectScanner
     private EffectSummary ScanFlowCapture(IFlowCaptureOperation capture)
     {
         _coalesceCaptures.Record(capture);
+        _creationCaptures.Record(capture);
         return Scan(capture.Value);
     }
 
@@ -988,6 +990,11 @@ internal sealed class OperationEffectScanner
             IInstanceReferenceOperation => EffectRegionSet.Create(EffectRegionId.Receiver),
             IParameterReferenceOperation parameter => ClassifyParameter(parameter.Parameter),
             ILocalReferenceOperation local => ClassifyLocal(local.Local),
+            IFlowCaptureReferenceOperation capture
+                when _creationCaptures.TryResolve(
+                    capture,
+                    out var creationRegion) =>
+                creationRegion,
             IFlowCaptureReferenceOperation capture
                 when _coalesceCaptures.TryResolve(
                     capture,

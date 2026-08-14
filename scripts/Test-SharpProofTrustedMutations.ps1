@@ -278,6 +278,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ExceptionHandlersContributeEffectsOnlyWhenReachable'
     },
     [pscustomobject]@{
+        Name = 'effect-fresh-initializer-creation-capture-ownership'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '        _creationCaptures.Record(capture);'
+        Mutated = '        _ = _creationCaptures;'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~FreshObjectInitializerOwnershipMatrixIsExact'
+    },
+    [pscustomobject]@{
         Name = 'effect-definitely-null-throw-projection'
         File = 'SharpProof.Effects\EffectExceptionFlow.cs'
         Original = '        if (abstractFlow?.ProvesNull(thrown, thrown.Exception) == true)'

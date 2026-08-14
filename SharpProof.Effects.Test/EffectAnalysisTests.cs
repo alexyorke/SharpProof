@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.FlowAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Ir;
 using SharpProof.Specs;
 
@@ -1193,6 +1195,10 @@ public sealed class EffectAnalysisTests
         {
             Assert.That(
                 objectInitializer.Summary.Writes.IsUnknown,
+                Is.False);
+            Assert.That(
+                objectInitializer.Summary.Writes.Contains(
+                    EffectRegionId.Static()),
                 Is.True);
             Assert.That(
                 collectionInitializer.Summary.Writes.Contains(
@@ -1200,7 +1206,7 @@ public sealed class EffectAnalysisTests
                 Is.True);
             Assert.That(
                 objectInitializer.Projection.IsComplete,
-                Is.False);
+                Is.True);
             Assert.That(
                 collectionInitializer.Projection.Effects &
                 SharpProofEffect.WritesStaticState,
@@ -1210,6 +1216,179 @@ public sealed class EffectAnalysisTests
                 SharpProofEffect.WritesStaticState,
                 Is.EqualTo(SharpProofEffect.WritesStaticState));
         }
+    }
+
+    [Test]
+    public void FreshObjectInitializerOwnershipMatrixIsExact()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Collections;
+
+            public sealed class Value {
+                public int Field;
+                private int _property;
+                public int Property {
+                    get => _property;
+                    set => _property = value;
+                }
+                public int this[int index] { get => 0; set { } }
+            }
+
+            public struct StructValue {
+                public int Field;
+                private int _property;
+                public int Property {
+                    readonly get => _property;
+                    set => _property = value;
+                }
+            }
+
+            public sealed class Nested {
+                public Value Child;
+            }
+
+            public sealed class Values : IEnumerable {
+                public void Add(int value) { }
+                public IEnumerator GetEnumerator() =>
+                    throw new NotSupportedException();
+            }
+
+            public sealed class ThrowingValue {
+                public int Property {
+                    set => throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                private static int SideEffect() {
+                    s_state++;
+                    return 1;
+                }
+
+                public static Value Field() => new() { Field = 1 };
+                public static Value Property() => new() { Property = 1 };
+                public static Value Indexer() => new() { [0] = 1 };
+                public static Nested NestedFresh() =>
+                    new() { Child = new() { Field = 1 } };
+                public static Values Collection() => new() { 1 };
+                public static StructValue StructField() => new() { Field = 1 };
+                public static StructValue StructProperty() => new() { Property = 1 };
+                public static Value StaticEffect() => new() { Field = SideEffect() };
+                public static ThrowingValue ThrowingSetter() => new() { Property = 1 };
+                public static int[] FreshArray() => new[] { 1 };
+                public static Nested ExternalAlias(Value value) {
+                    var result = new Nested { Child = value };
+                    result.Child.Field = 1;
+                    return result;
+                }
+                public static Nested MemberDerived() =>
+                    new() { Child = { Field = 1 } };
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var name in new[] {
+                         "Field", "Property", "Indexer", "NestedFresh",
+                         "Collection", "StructField", "StructProperty", "FreshArray"
+                     })
+            {
+                var result = session.Analyze(Method(compilation, name));
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    name);
+                Assert.That(
+                    EffectContractMappings.IsObservablePure(result.Summary),
+                    Is.True,
+                    name);
+                Assert.That(
+                    result.Summary.Writes.IsUnknown,
+                    Is.False,
+                    name);
+            }
+
+            var staticEffect = session.Analyze(Method(compilation, "StaticEffect"));
+            Assert.That(
+                staticEffect.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                "StaticEffect");
+            Assert.That(
+                staticEffect.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                "StaticEffect");
+
+            var throwing = session.Analyze(Method(compilation, "ThrowingSetter"));
+            Assert.That(
+                throwing.Summary.Throws.Types.Select(static type => type.Name),
+                Does.Contain("InvalidOperationException"),
+                "ThrowingSetter");
+            Assert.That(
+                throwing.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                "ThrowingSetter");
+
+            foreach (var name in new[] { "ExternalAlias", "MemberDerived" })
+            {
+                var result = session.Analyze(Method(compilation, name));
+                Assert.That(
+                    EffectContractMappings.IsObservablePure(result.Summary),
+                    Is.False,
+                    name);
+                Assert.That(
+                    result.Summary.Writes.IsUnknown,
+                    Is.True,
+                    name);
+            }
+        }
+    }
+
+    [Test]
+    public void FreshInitializerCaptureSourcesAreCompilerOwnedCreations()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Value { public int Field; }
+            public struct StructValue {
+                public int Field;
+                public int Property { get; set; }
+            }
+            public static class Sample {
+                public static Value Field() => new() { Field = 1 };
+                public static StructValue StructField() => new() { Field = 1 };
+                public static StructValue StructProperty() => new() { Property = 1 };
+            }
+            """);
+        var shapes = new List<string>();
+        foreach (var name in new[] { "Field", "StructField", "StructProperty" })
+        {
+            var method = Method(compilation, name);
+            var declaration = method.DeclaringSyntaxReferences.Single().GetSyntax();
+            var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+            var body = model.GetOperation(declaration) as IMethodBodyOperation;
+            Assert.That(body, Is.Not.Null, name);
+            var graph = ControlFlowGraph.Create(body!);
+            shapes.AddRange(graph.Blocks
+                .SelectMany(static block => block.Operations)
+                .SelectMany(static operation => operation.DescendantsAndSelf())
+                .OfType<IFlowCaptureOperation>()
+                .Select(capture =>
+                    name + ":" + capture.Value.Kind + ":" +
+                    capture.Value.Syntax.Kind() + ":" +
+                    capture.Value.Type?.ToDisplayString()));
+        }
+
+        Assert.That(
+            string.Join("\n", shapes),
+            Is.EqualTo(
+                "Field:ObjectCreation:ImplicitObjectCreationExpression:Value\n" +
+                "StructField:ObjectCreation:ImplicitObjectCreationExpression:StructValue\n" +
+                "StructProperty:ObjectCreation:ImplicitObjectCreationExpression:StructValue"));
     }
 
     [Test]
