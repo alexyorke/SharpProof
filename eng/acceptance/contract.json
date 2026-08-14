@@ -56,8 +56,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 202,
-    "expectedCatalogSha256": "5ccdf5dfc241e50182fe65f59d465291eefe298aa11d29b61fef2fffe8efa615"
+    "expectedCatalogCount": 203,
+    "expectedCatalogSha256": "eb6981d769d6c2a010e2a6d65b1046bc9520387caceb77ae020773436a5c78cb"
   },
   "worker": {
     "protocolVersion": 11,
@@ -199,7 +199,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "ae589ba14c587d092f22bfc24fb10eace774b22a66a4ac318bc624fd90b4cc0c",
+    "inventorySha256": "a766e53fa5cd40ba05731b3fdeb26c9fb6e5482825f2e55c8016538da675855d",
     "components": [
       {
         "name": "discovery",
@@ -261,6 +261,7 @@
       {
         "name": "execution",
         "paths": [
+          "SharpProof.Worker.Test/ContainerNativeLibrarySetup.cs",
           "SharpProof.Worker/CallableEvidenceBuilder.cs",
           "SharpProof.Worker/CallableEntryFeasibility.cs",
           "SharpProof.Worker/CallableVerifier.cs",
