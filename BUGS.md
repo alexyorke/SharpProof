@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 40 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 39 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 40 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-029 - Publication-lock setup is not failure-atomic (fixed)
+
+- [x] Fixed by `65b209824` (`fix: make publication lock setup atomic`).
+- Publication locks are now constructed and acquired incrementally inside one
+  ownership-aware cleanup scope. Pre-cancellation happens before path I/O, and
+  only successfully constructed/acquired locks are released and disposed before
+  the exact owned array is transferred to a successful lease.
+- Regression coverage includes first/middle/last constructor failures repeated
+  32 times with stable file-descriptor counts, pre- and mid-cancellation,
+  timeout/reacquisition, ordered success, and cleanup mutations. The focused
+  Linux matrix passed 7/7, Worker 512/512, and Architecture 408/408.
 
 ### SP-AUDIT-022 - ContractFor generator resolves profiles differently (fixed)
 
@@ -2047,29 +2059,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 ## P2 active bugs
 
 Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
-
-### SP-AUDIT-029 - Publication-lock setup is not failure-atomic (P2)
-
-- [ ] `LinuxPathIdentity.AcquirePublicationSet` constructs its entire
-  `PublicationLock[]` through a LINQ pipeline before entering the cleanup
-  `try/finally`. If construction of a later lock throws, every earlier
-  `SafeFileHandle` is abandoned without deterministic disposal.
-- Supported impact: repeated ordinary invalid publication configurations can
-  exhaust file descriptors in a long-lived Core MSBuild process, eventually
-  breaking unrelated builds and containment checks. Garbage collection may
-  eventually run the safe-handle finalizers, but the failure path has no
-  bounded cleanup and can accumulate descriptors faster than collection.
-- Reproduction: a temporary canonical-container worker regression used two
-  ordered output paths and made only the second derived lock path a directory,
-  causing its `open(O_RDWR)` to fail. Thirty-two rejected acquisition attempts
-  increased `/proc/self/fd` by exactly 32.
-- Required closure: construct locks incrementally inside an ownership-aware
-  `try/finally`, disposing every successfully created lock when any later
-  constructor or acquisition fails. Add first/middle/last constructor failure,
-  acquisition timeout, cancellation, successful lease, repeated-failure file
-  descriptor, and cleanup mutation cases.
-- Consolidated cases: SP-AUDIT-177.
-- Unified closure: Observe cancellation before I/O, acquire incrementally under cleanup ownership, and release partial acquisitions without leaving directories or lock files.
 
 ### SP-AUDIT-034 - Compilation snapshots are not exact canonical capture images (P2)
 
