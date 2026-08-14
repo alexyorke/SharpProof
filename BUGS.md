@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 75 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 74 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 75 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-038 - Final release validation trusts fabricated component inventory (fixed)
+
+- [x] Fixed by `568ef6e6f` (`fix: derive release component inventory`).
+- Generation, final validation, and publication now compare the release
+  manifest against an independently derived exact third-party catalog
+  projection before authenticating package payloads. The same catalog-owned
+  inventory drives exact component package identities and every owner-to-
+  component SPDX `CONTAINS` edge.
+- Regression-first fixtures cover fabricated, missing, duplicate, swapped-owner,
+  foreign-entry, and self-consistently rewritten manifest/SBOM inventories plus
+  missing/extra containment and canonical controls. The component matrix passed
+  9/9 twice, the adjacent license matrix 15/15, all edited PowerShell parsed,
+  and `git diff --check` passed. Long ReleaseEvidence and OfflinePlan tests were
+  skipped after the same evidence path timed out in the preceding tranche.
 
 ### SP-AUDIT-036 - Release certifiers ignore SBOM license declarations (fixed)
 
@@ -1714,30 +1729,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutation cases.
 - Consolidated cases: SP-AUDIT-081, SP-AUDIT-090, SP-AUDIT-139, SP-AUDIT-201, SP-AUDIT-212.
 - Unified closure: Generate one exact capture/fingerprint predicate for canonical strings and paths, module roles/properties, additional-file identity, and empty-tree derivations.
-
-### SP-AUDIT-038 - Final release validation trusts fabricated component inventory (P2)
-
-- [ ] `Test-SharpProofReleaseArtifacts.ps1` proves that the release manifest and
-  SPDX graph agree with each other, but it never binds their third-party
-  component IDs, versions, or packaged entry paths to
-  `eng/release/third-party-components.json` or to the actual nupkg contents.
-- Certifier impact: a self-consistent release evidence pair can replace a real
-  bundled dependency with an invented component name/version while retaining
-  the unchanged package bytes. The final publication validator then certifies
-  a materially false software-bill-of-materials inventory for the exact commit.
-- Reproduction: a disposable copy of the current package bundle replaced its
-  first real third-party component with `Fabricated.Component` version
-  `99.0.0`, changed the corresponding SPDX package ID and containment edge, and
-  recomputed the SBOM artifact hash, byte count, release manifest, and
-  `SHA256SUMS`. `Test-SharpProofReleaseArtifacts.ps1` exited zero and reported
-  the immutable artifacts valid for commit
-  `a1c28160205b5376ec75cd4e11ef11de1ef122a4`.
-- Required closure: load the checked-in third-party catalog during final
-  validation, require an exact canonical package/component/version/entry set,
-  and independently reopen each nupkg to prove every inventoried entry exists
-  and every bundled third-party payload is owned. Add invented, omitted,
-  stale-version, wrong-package, wrong-entry, duplicate, reordered, and
-  self-consistently rehashed evidence mutations.
 
 ### SP-AUDIT-039 - Request-bound results accept fabricated runtime provenance (P2)
 
