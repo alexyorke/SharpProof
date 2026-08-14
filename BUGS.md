@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 71 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 70 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 71 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-047 - SBOM validators accept fabricated topology (fixed)
+
+- [x] Fixed by `8f83dfa16` (`fix: validate exact SBOM topology`).
+- One shared topology authority now derives the exact canonical first-party and
+  component package identities, globally unique SPDX IDs, first-party
+  `documentDescribes`, and complete `DESCRIBES`/`CONTAINS`/`DEPENDS_ON` triple
+  set from authenticated dependencies and component ownership. Generation,
+  final validation, and publication planning require exact total equality.
+- Regression-first fixtures cover extra, missing, reversed, duplicate, and
+  unknown-type relationships; wrong and colliding SPDX IDs; self-consistent
+  rewrites; extra packages/descriptions; canonical controls; every consumer;
+  and a removal mutation. Focused topology passed 12/12, the final consumer
+  matrix 13/13, full Architecture 215/215, all touched PowerShell parsed, and
+  `git diff --check` passed. No long package/evidence run was performed.
 
 ### SP-AUDIT-045 - Lowered IR wire form is not the exact encoder image (fixed)
 
@@ -1811,38 +1826,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutations restoring each shape-only path.
 - Consolidated cases: SP-AUDIT-217.
 - Unified closure: Share one artifact-aware mapping from proof-core labels to exact manifest assumptions, Used flags, and summary counts in producer and validator.
-
-### SP-AUDIT-047 - SBOM validators accept fabricated topology (P2)
-
-- [ ] `New-SharpProofReleaseEvidence.ps1` and
-  `Test-SharpProofReleaseArtifacts.ps1` require each catalog-owned `CONTAINS`
-  edge to occur once and require exactly two `DEPENDS_ON` edges, but they never
-  reject additional `CONTAINS` relationships or other fabricated relationship
-  rows. Package rows are selected by name/version, but their SPDX IDs are not
-  required to be unique or equal their catalog-derived IDs, and
-  `documentDescribes` is not checked for exact correspondence. Their "exact
-  package/component graph" check is therefore only a partial required-subset
-  check.
-- Certifier impact: an otherwise authentic bundle can falsely claim that a
-  package contains a component owned by another package. The manifest, SBOM,
-  package bytes, and checksums can all remain internally hash-consistent while
-  the final validator certifies materially false supply-chain topology or an
-  ambiguous package identity graph.
-- Reproduction: the audit copied the exact-HEAD release bundle, added
-  `SharpProof.Attributes CONTAINS Microsoft.Z3 4.12.2`, recomputed the SBOM
-  hash/size in `SharpProof.release.json` and `SHA256SUMS`, and ran the canonical
-  final artifact validator. It exited zero with `Validated immutable
-  SharpProof 1.0.0-preview.1 artifacts`. A second rehashed-bundle probe assigned
-  `SharpProof.Attributes` the same SPDX ID as `SharpProof`; it was also
-  accepted. Both disposable bundles were removed.
-- Required closure: derive the complete canonical relationship set from the
-  exact package graph and third-party inventory, require set equality with no
-  duplicate, dangling, unknown-type, or extra edges; require globally unique,
-  canonical SPDX IDs and exact `documentDescribes` membership; and share that
-  validator between evidence generation and final validation. Add extra/
-  dangling/cross-package/duplicate relationship fixtures, duplicated or
-  swapped IDs, orphan descriptions, canonical generated evidence, and a
-  certifier mutation that restores required-edge-only validation.
 
 ### SP-AUDIT-048 - Invocation lifecycle leaks temporary runtime state (P2)
 
