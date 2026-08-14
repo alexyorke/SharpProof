@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 69 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 68 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 69 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-115 - Methodless scopes hide rejected control attributes (fixed)
+
+- [x] Fixed by `7b4018d6c` (`fix: report rejected scope attributes`).
+- Rejected Suppress/Trusted identities are now validated directly on assembly
+  and named-type declarations and reported at the exact attribute syntax.
+  Application tree/span dedup gives one diagnostic per attribute across partial
+  and callable paths; method-owned rejected attributes retain their existing
+  reporting, while enclosing rejected scopes still select/abstain methods.
+- Regression-first tests cover methodless, nested, partial, and method-bearing
+  types; assembly scope; Suppress and Trusted; source-shadowed and referenced-
+  project lookalikes; exact real attributes; generated policy; exact locations;
+  and a removal mutation. Focused tests passed 4/4, full Analyzer 313/313,
+  Architecture 216/216, and `git diff --check` passed.
 
 ### SP-AUDIT-052 - An empty release secret set cannot be certified (fixed)
 
@@ -2067,21 +2081,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   controls; a wire-version decision may be required.
 - Consolidated cases: SP-AUDIT-195.
 - Unified closure: Seal sorted selected pack IDs and exact catalog/version digest even when unused, with one identity predicate from catalog load through hydration.
-
-### SP-AUDIT-115 - Methodless scopes hide rejected control attributes (P2)
-
-- [ ] Rejected SharpProof control-attribute identity is checked only while a
-  method is analyzed. Named-type and assembly scope validation recognizes only
-  the exact trusted symbols and silently ignores same-metadata-name lookalikes.
-- Supported impact: a source-shadowed `SharpProofSuppress` on an empty class
-  emitted no `SP0047`; adding methods made the same rejected attribute visible
-  through method-owned analysis. Methodless type and assembly declarations can
-  therefore evade the documented rejected-API diagnostic.
-- Reproduction: the read-only analyzer auditor confirmed zero diagnostics for
-  the empty-type case and two method-owned `SP0047` diagnostics for its control.
-- Required closure: validate rejected control identity directly at assembly
-  and named-type declaration scopes, once per attribute, while retaining exact
-  method selection behavior. Add suppress/trusted and source/project lookalikes.
 
 ### SP-AUDIT-117 - Selected auto-accessors disappear without an outcome (P2)
 
