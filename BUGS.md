@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 42 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 41 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 42 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-010 - Filtered worker tests depend on Z3 test order (fixed)
+
+- [x] Fixed by `ba9402f6f` (`fix: bootstrap Z3 in worker tests`).
+- The Worker test assembly now installs the contract-validated native Z3 resolver
+  through its own assembly-level setup fixture, independent of Smt test ordering.
+  Repeated installation remains idempotent and missing/invalid native roots fail
+  through the existing required resolver authority.
+- Regression coverage includes direct twice-call installation, missing-root and
+  direct backend proof paths, exact Smt/Worker bootstrap parity, and a removal
+  mutation. The isolated matrix passed 3/3, Worker 507/507, and Architecture
+  408/408.
 
 ### SP-AUDIT-007 - SBOM release identity is not fully bound (fixed)
 
@@ -2022,29 +2034,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 ## P2 active bugs
 
 Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
-
-### SP-AUDIT-010 - Filtered worker tests depend on Z3 test order (P2)
-
-- [ ] The canonical `tooling test -Target SharpProof.Worker.Test` path does
-  not install the contract-pinned native Z3 resolver for the worker test
-  assembly. `SharpProof.Smt.Test` has an assembly-level
-  `ContainerNativeLibrarySetup`, but the worker tests instantiate
-  `IrSmtBackend` directly and rely on some unrelated earlier test to install a
-  process-wide resolver.
-- Developer and certifier impact: selecting the proof-kernel worker tests in
-  the documented disposable container command failed eight cases with
-  `DllNotFoundException: libz3`, while 73 non-Z3 cases in the same filter
-  passed. A full run can hide the defect through test order, and a focused
-  mutation/regression run can fail before exercising its mutant.
-- Reproduction: `docker compose run --rm tooling test -Target
-  SharpProof.Worker.Test -TestFilter
-  "FullyQualifiedName~CompilerManifestArtifactTests|FullyQualifiedName~WorkerTcbEdgeCaseTests|FullyQualifiedName~AcyclicBlockPredicateExecutorTests|FullyQualifiedName~VerificationCacheTests"`
-  produced 73 passes and eight native-load failures. The equivalent SMT test
-  assembly passed 20/20 because it owns explicit resolver setup.
-- Required closure: install and verify the exact container Z3 resolver in a
-  worker-test assembly setup that runs for every filter and ordering, then add
-  an isolated single-test invocation to the container command fixtures. Keep
-  ambient `LD_LIBRARY_PATH` and system Z3 outside the trust boundary.
 
 ### SP-AUDIT-022 - ContractFor generator resolves profiles differently (P2)
 
