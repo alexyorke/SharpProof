@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 84 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 83 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 84 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-197 - Ref-readonly expression bodies appear bodyless (fixed)
+
+- [x] Fixed by `f8cd971c2` (`fix: resolve ref expression bodies`).
+- Contract inventory now resolves a ref expression body through its owning
+  declaration, where Roslyn exposes the method-body operation. Ordinary
+  expression bodies remain expression-rooted, while block bodies, partial
+  implementations, and generated ownership retain their existing paths.
+- Regression-first tests cover ref and ref-readonly expression and block
+  returns, direct inventory body discovery, ordinary expression bodies,
+  genuinely missing bodies, partial implementations, generated-named source,
+  and a mutation restoring the isolated-ref lookup. Focused generator tests
+  passed 7/7 and inventory tests 2/2; full Generator 77/77, Contracts 104/104,
+  Analyzer 299/299, Architecture 182/182, and `git diff --check` passed.
 
 ### SP-AUDIT-196 - Exact ref-readonly parameters are rejected (fixed)
 
@@ -1400,17 +1414,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-197 - Ref-readonly expression bodies appear bodyless (P1)
-
-- [ ] Contract inventory asks Roslyn for an operation on the isolated
-  `RefExpressionSyntax`; Roslyn returns none, so a valid expression-bodied
-  companion is reported as bodyless with `SPCF0007`.
-- Supported impact: `public static ref readonly int Read(...) => ref field;` is
-  rejected while the block-bodied `return ref field` equivalent is accepted.
-- Required closure: resolve the method/arrow body operation rather than the
-  isolated ref expression. Add expression/block ref and ref-readonly returns,
-  ordinary expression bodies, partial declarations, and generated ownership.
 
 ### SP-AUDIT-200 - Effect replay is not bound to full tree identity (P1)
 
