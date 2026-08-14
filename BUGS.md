@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 61 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 60 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 61 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-156 - SHA256SUMS byte canonicality is not validated (fixed)
+
+- [x] Fixed by `d38f9d133` (`fix: validate canonical checksum bytes`).
+- Evidence generation, final validation, and publication planning now share one
+  raw-byte authority for ordinal rows, lowercase SHA-256, the exact separator,
+  strict UTF-8 without BOM, LF-only lines, and exactly one terminal LF.
+- Regression coverage includes UTF-8 BOM, UTF-16LE/BE, invalid UTF-8, CRLF,
+  mixed and CR newlines, missing/double terminal LF, digest casing, spacing,
+  reordered/extra/missing/duplicate rows, canonical bytes, and a comparison-
+  removal mutation. The focused matrix passed 17/17; the corrected independent
+  release-authority closure passed with 100 paths.
 
 ### SP-AUDIT-153 - Protocol JSON accepts noncanonical or incomplete producer shapes (fixed)
 
@@ -2301,20 +2313,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   generated IDs, summary reconstruction, and scope-check mutation controls.
 - Consolidated cases: SP-AUDIT-202, SP-AUDIT-235.
 - Unified closure: Generate exact semantic ID grammar/recomputation, a closed assumption-kind set, and exact trusted-source ownership from one producer authority.
-
-### SP-AUDIT-156 - SHA256SUMS byte canonicality is not validated (P2)
-
-- [ ] Evidence generation emits strict UTF-8 without BOM, LF separators, and a
-  terminal LF, but final validation reads logical lines and rejoins them,
-  erasing encoding and newline differences.
-- Certifier impact: UTF-16LE/BOM or CRLF/no-terminal-newline checksum files with
-  the same displayed seven rows are accepted as canonical release evidence.
-- Evidence: the validator's `Get-Content` comparison cannot distinguish those
-  byte forms; another repository evidence helper already performs strict raw
-  comparison.
-- Required closure: reconstruct and compare exact UTF-8 bytes, rejecting BOM,
-  invalid UTF-8, CR/LF drift, missing/extra terminal newline, and noncanonical
-  digest spelling. Add byte-level mutation fixtures.
 
 ### SP-AUDIT-165 - Z3 query ownership and accounting are incomplete (P2)
 
