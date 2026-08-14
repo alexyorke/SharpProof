@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 60 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 59 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 60 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-183 - Publication plans falsely claim symbol preflight (fixed)
+
+- [x] Fixed by `cf51421a9` (`fix: model symbol publication actions`).
+- Publication now validates separate main and symbol destination state/action
+  tuples. Registry main packages can be preflighted, while symbol packages are
+  explicitly `Unchecked/CollisionOnPush`; targetless and fixture modes cannot
+  claim remote checks. Only canonical main `.nupkg` URLs enter preflight.
+- Regression coverage includes targetless, fixture, inherited/distinct registry
+  destinations, mocked main 404/200/503 responses, exactly one main-only call,
+  illegal tuple swaps, canonical ordering, and a symbol-action mutation. The
+  focused matrix passed 26/26 and Architecture 307/307.
 
 ### SP-AUDIT-156 - SHA256SUMS byte canonicality is not validated (fixed)
 
@@ -2364,17 +2376,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: impose the exact producer-representable upper bound and,
   where launcher context is authoritative, the checked project-wall/grace
   envelope. Add zero, boundary, boundary+1, long-max, and overflow controls.
-
-### SP-AUDIT-183 - Publication plans falsely claim symbol preflight (P2)
-
-- [ ] Targetless plans label symbol actions `PreflightThenPush`, while the real
-  publisher preflights only main-package URLs and the documented NuGet V3
-  limitation makes symbol nonexistence unqueryable.
-- Certifier impact: dry-run evidence promises a collision check the publisher
-  cannot perform.
-- Required closure: model main and symbol destination states separately and use
-  an explicit unchecked/collision-on-push symbol action. Add targetless, mocked
-  main preflight, zero-symbol-preflight, and legal state/action controls.
 
 ### SP-AUDIT-184 - Release bundle topology is not exact or self-contained (P2)
 
