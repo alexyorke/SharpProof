@@ -1726,6 +1726,14 @@ $mutations = @(
         Mutated = '        return expected.HasValue ||'
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~CompileTimeLoopConditionsControlReachabilityAndTermination'
+    },
+    [pscustomobject]@{
+        Name = 'property-symbol-only-dispatch'
+        File = 'SharpProof.Effects\PropertyDispatchFacts.cs'
+        Original = "        return !IsStaticallyBound(property) &&`n               IsSymbolDispatchUncertain(accessor);"
+        Mutated = '        return IsSymbolDispatchUncertain(accessor);'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~PropertyDispatchUsesTheOperationReceiver'
     }
 )
 

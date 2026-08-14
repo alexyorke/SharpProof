@@ -2503,6 +2503,100 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void PropertyDispatchUsesTheOperationReceiver()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public class Base {
+                private int _value;
+                public virtual int Value {
+                    get { return _value; }
+                    set { _value = value; }
+                }
+                public virtual int this[int index] {
+                    get { return _value; }
+                    set { _value = value; }
+                }
+                public virtual int GetValue() => _value;
+            }
+
+            public class Derived : Base {
+                public int BaseGet() => base.Value;
+                public void BaseSet(int value) => base.Value = value;
+                public int BaseIndexerGet() => base[0];
+                public void BaseIndexerSet(int value) => base[0] = value;
+                public int BaseMethod() => base.GetValue();
+                public int ThisVirtual() => this.Value;
+            }
+
+            public sealed class SealedDerived : Base {
+                public override int Value {
+                    get { return base.Value; }
+                    set { base.Value = value; }
+                }
+                public int Read() => Value;
+            }
+
+            public sealed class SealedInherited : Base {
+                public int Read() => Value;
+            }
+
+            public sealed class NonVirtual {
+                private int _value;
+                public int Value {
+                    get { return _value; }
+                    set { _value = value; }
+                }
+                public int Read() => Value;
+            }
+
+            public interface IValue {
+                int Value { get; }
+            }
+
+            public static class Sample {
+                public static int Interface(IValue value) => value.Value;
+                public static int Conditional(Derived? value) => value?.Value ?? 0;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        foreach (var (type, method) in new[] {
+                     ("Derived", "BaseGet"),
+                     ("Derived", "BaseSet"),
+                     ("Derived", "BaseIndexerGet"),
+                     ("Derived", "BaseIndexerSet"),
+                     ("Derived", "BaseMethod"),
+                     ("SealedDerived", "Read"),
+                     ("SealedInherited", "Read"),
+                     ("NonVirtual", "Read")
+                 })
+        {
+            var result = session.Analyze(
+                EffectTestHost.RequireMethod(compilation, type, method));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                type + "." + method);
+            Assert.That(result.Projection.IsComplete, Is.True, type + "." + method);
+        }
+
+        foreach (var (type, method) in new[] {
+                     ("Derived", "ThisVirtual"),
+                     ("Sample", "Interface"),
+                     ("Sample", "Conditional")
+                 })
+        {
+            var result = session.Analyze(
+                EffectTestHost.RequireMethod(compilation, type, method));
+            Assert.That(
+                result.Summary.Uncertainty & EffectUncertainty.Dispatch,
+                Is.EqualTo(EffectUncertainty.Dispatch),
+                type + "." + method);
+            Assert.That(result.Projection.IsComplete, Is.False, type + "." + method);
+        }
+    }
+
+    [Test]
     public void ExplicitAndImplicitExceptionsRemainResolved()
     {
         var compilation = EffectTestHost.CreateCompilation(

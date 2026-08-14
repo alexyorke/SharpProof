@@ -317,7 +317,7 @@ internal sealed class OperationEffectScanner
             property.Arguments,
             arguments,
             actualArguments,
-            IsDispatchUncertain(accessor),
+            PropertyDispatchFacts.IsUncertain(property, accessor),
             property);
     }
 
@@ -1165,16 +1165,6 @@ internal sealed class OperationEffectScanner
     private static bool IsDispatchUncertain(IInvocationOperation invocation)
     {
         return invocation.IsVirtual && IsOpenDispatchTarget(invocation.TargetMethod);
-    }
-
-    private static bool IsDispatchUncertain(IMethodSymbol accessor)
-    {
-        return !accessor.IsStatic &&
-        (accessor.IsVirtual ||
-         accessor.IsAbstract ||
-         accessor.IsOverride ||
-         accessor.ContainingType?.TypeKind == TypeKind.Interface) &&
-        IsOpenDispatchTarget(accessor);
     }
 
     private static bool IsOpenDispatchTarget(IMethodSymbol method)
