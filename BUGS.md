@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 78 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 77 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,22 @@ The active backlog contains 78 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-238 - Definitely-null throws retain an impossible declared type (fixed)
+
+- [x] Fixed by `f2c7c147b` (`fix: project definitely null throws`).
+- Explicit throws whose operand is proven null now project only
+  `NullReferenceException`; proven non-null operands retain the declared type,
+  and unknown operands retain the conservative declared-plus-null union. Catch
+  reachability consumes the same proven-null fact so an impossible declared-type
+  handler is not selected.
+- Regression-first tests cover null literals and locals, branches,
+  conditionals, explicit conversions, null-forgiving syntax, non-null and
+  maybe-null operands, fields, coalescing, catch reachability,
+  AllowedExceptions, generated projection, and a removal mutation. Focused
+  Effects and Analyzer tests passed; full Effects 172/172 and Analyzer 310/310.
+  After extracting the policy, the Architecture complexity check passed 1/1,
+  the mutation was killed, and `git diff --check` passed.
 
 ### SP-AUDIT-232 - Implicit base initializers skip precondition replay (fixed)
 
@@ -1498,19 +1514,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
-
-### SP-AUDIT-238 - Definitely-null throws retain an impossible declared type (P1)
-
-- [ ] Explicit-throw analysis starts with the operand's declared exception type
-  and only unions `NullReferenceException` when non-null is unproven; it does not
-  replace that type when managed flow proves the operand is null.
-- Supported impact: throwing a definitely-null
-  `InvalidOperationException?` reports both `InvalidOperationException` and
-  `NullReferenceException`, causing a false `SP0046` and rejected otherwise exact
-  `AllowedExceptions(typeof(NullReferenceException))` claim.
-- Required closure: consult definite nullness before adding the declared type.
-  Add null literal/local/branch, definitely nonnull, maybe-null, allowed/disallowed
-  contracts, complete-summary, and null-check-removal mutation controls.
 
 ### SP-AUDIT-241 - Constructed generic function pointers lose ref modifiers (P1)
 
