@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 50 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 49 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 50 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-222 - API-spec typing loses exact substituted types (fixed)
+
+- [x] Fixed by `e8172fb24` (`fix: preserve exact API spec null types`).
+- API-spec instantiation now contextualizes string/reference null from its exact
+  substituted equality peer and rejects unequal concrete reference or sequence
+  operand types as `TypeMismatch` before IR construction. Sequence-null remains
+  an explicit typed abstention; no schema or wire change was needed.
+- Regression coverage includes receiver/parameter/result, null on either side,
+  equality/inequality, object/string/user-defined references, compatible and
+  incompatible reference/sequence types, worker projection, and a substitution-
+  type mutation. Specs passed 54/54, Worker 506/506, Architecture 367/367.
 
 ### SP-AUDIT-209 - Typed outcome and certainty documentation drifts from schema (fixed)
 
@@ -2621,20 +2633,6 @@ Precision, documentation, and developer-experience debt that does not change a s
   non-root execution contract. Add direct build/test/package image-command,
   working-directory, UID, and Compose parity fixtures.
 
-### SP-AUDIT-222 - API-spec typing loses exact substituted types (P3)
-
-- [ ] API-spec validation/instantiation admits coarse Reference variables, but
-  materializes every reference null as `object` rather than the concrete
-  substituted reference type.
-- Supported impact: a valid `Widget` result specification `result != null`
-  becomes a `Widget` versus `object` IR comparison, fails instantiation, and
-  causes the worker to abandon an otherwise supported spec application.
-- Required closure: derive null's concrete type from the paired operand/
-  substitution or preserve concrete declarative type. Add object, string, user-
-  defined reference, result/parameter, nullable comparison, and unsupported
-  sequence-null controls.
-- Consolidated cases: SP-AUDIT-228.
-- Unified closure: Preserve and unify exact substituted IR types for null and equality operands, rejecting incompatible reference or sequence types before selection.
 
 ## Current comprehensive audit evidence
 
