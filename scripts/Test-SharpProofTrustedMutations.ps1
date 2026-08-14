@@ -278,6 +278,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ExceptionHandlersContributeEffectsOnlyWhenReachable'
     },
     [pscustomobject]@{
+        Name = 'effect-definitely-null-throw-projection'
+        File = 'SharpProof.Effects\EffectExceptionFlow.cs'
+        Original = '        if (abstractFlow?.ProvesNull(thrown, thrown.Exception) == true)'
+        Mutated = '        if (abstractFlow?.ProvesNull(thrown, thrown.Exception) == false)'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DefinitelyNullThrownExpressionsReplaceTheirDeclaredExceptionType'
+    },
+    [pscustomobject]@{
         Name = 'effect-exact-array-store-compatibility'
         File = 'SharpProof.Effects\OperationEffectScanner.cs'
         Original = "        return _session.Compilation.ClassifyCommonConversion(`n            assignedValue.Type,`n            runtimeType.ElementType).IsImplicit;"

@@ -2685,6 +2685,113 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void DefinitelyNullThrownExpressionsReplaceTheirDeclaredExceptionType()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using System;
+
+            public static class Sample {
+                private static int s_state;
+                private static InvalidOperationException? s_exception;
+
+                public static void NullLiteral() => throw null!;
+
+                public static void NullLocal() {
+                    InvalidOperationException? exception = null;
+                    throw exception!;
+                }
+
+                public static void NullBranch(bool condition) {
+                    InvalidOperationException? exception;
+                    if (condition) {
+                        exception = null;
+                    }
+                    else {
+                        exception = null;
+                    }
+                    throw exception;
+                }
+
+                public static void NonNullLocal() {
+                    InvalidOperationException? exception =
+                        new InvalidOperationException();
+                    throw exception;
+                }
+
+                public static void NullConditional(bool condition) {
+                    InvalidOperationException? left = null;
+                    InvalidOperationException? right = null;
+                    throw (condition ? left : right);
+                }
+
+                public static void NullConversion() {
+                    Exception? exception = null;
+                    throw (InvalidOperationException?)exception;
+                }
+
+                public static void MaybeNull(
+                    InvalidOperationException? exception) =>
+                    throw exception;
+
+                public static void Field() => throw s_exception;
+
+                public static void Coalesced(
+                    InvalidOperationException? exception) =>
+                    throw (exception ?? new InvalidOperationException());
+
+                public static void NullCatchReachability() {
+                    try {
+                        InvalidOperationException? exception = null;
+                        throw exception;
+                    }
+                    catch (InvalidOperationException) {
+                        s_state++;
+                    }
+                    catch (NullReferenceException) {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[]
+                 {
+                     "NullLiteral",
+                     "NullLocal",
+                     "NullBranch",
+                     "NullConditional",
+                     "NullConversion"
+                 })
+        {
+            var summary = session.Analyze(Method(compilation, methodName)).Summary;
+            AssertThrows(summary, "System.NullReferenceException");
+            AssertDoesNotThrow(summary, "System.InvalidOperationException");
+        }
+
+        var nonNull = session.Analyze(Method(compilation, "NonNullLocal")).Summary;
+        AssertThrows(nonNull, "System.InvalidOperationException");
+        AssertDoesNotThrow(nonNull, "System.NullReferenceException");
+
+        AssertThrows(
+            session.Analyze(Method(compilation, "MaybeNull")).Summary,
+            "System.InvalidOperationException",
+            "System.NullReferenceException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "Field")).Summary,
+            "System.InvalidOperationException",
+            "System.NullReferenceException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "Coalesced")).Summary,
+            "System.InvalidOperationException");
+        Assert.That(
+            session.Analyze(Method(compilation, "NullCatchReachability"))
+                .Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.False);
+    }
+
+    [Test]
     public void ApiSpecMakesModeledExternalCallComplete()
     {
         var result = Analyze(

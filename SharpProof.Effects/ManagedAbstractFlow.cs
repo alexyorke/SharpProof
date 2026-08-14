@@ -1191,6 +1191,11 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         return TryEvaluate(origin, value, out var result) && result.IsDefinitelyNonNull;
     }
 
+    internal bool ProvesNull(IOperation origin, IOperation value)
+    {
+        return TryEvaluate(origin, value, out var result) && result.IsDefinitelyNull;
+    }
+
     internal bool ProvesNonZero(IOperation origin, IOperation value)
     {
         return TryEvaluate(origin, value, out var result) && result.IsDefinitelyNonZero;

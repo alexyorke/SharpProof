@@ -49,7 +49,9 @@ internal sealed class OperationEffectScanner
         _allowDirectWitnesses = allowDirectWitnesses;
         _directSyntax = GetDirectSyntax(root.Syntax);
         _exceptionType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
-        _handlerReachability = new ExceptionHandlerReachability(session.Compilation);
+        _handlerReachability = new ExceptionHandlerReachability(
+            session.Compilation,
+            abstractFlow);
         _monitorType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Monitor);
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
         // remain useful in a try body, but absence of a fact cannot prove an
@@ -729,20 +731,10 @@ internal sealed class OperationEffectScanner
 
     private EffectThrowSet ResolveThrownException(IThrowOperation thrown)
     {
-        if (thrown.Exception == null)
-        {
-            return EffectExceptionFlow.ResolveRethrow(thrown);
-        }
-
-        var exceptions = _session.ResolveThrownException(thrown.Exception);
-        if (IsProvenNonNull(thrown.Exception, thrown))
-        {
-            return exceptions;
-        }
-
-        return exceptions.Union(
-            _session.ResolveExceptionSet(
-                FrameworkTypeMetadataNames.NullReferenceException));
+        return EffectExceptionFlow.ResolveThrownException(
+            thrown,
+            _session,
+            _abstractFlow);
     }
 
     private static bool IsDefinitelyNonNegative(IOperation operation)

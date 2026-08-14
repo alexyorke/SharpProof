@@ -2,11 +2,16 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Effects;
 
-internal sealed class ExceptionHandlerReachability(Compilation compilation)
+internal sealed class ExceptionHandlerReachability(
+    Compilation compilation,
+    ManagedFlowResult? abstractFlow)
 {
     private readonly Dictionary<CatchClauseSyntax, CatchReachability> _cache = new();
     private readonly INamedTypeSymbol? _exceptionType =
         compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
+    private readonly INamedTypeSymbol? _nullReferenceExceptionType =
+        compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.NullReferenceException);
 
     internal bool IsReachable(CatchClauseSyntax target, bool inFilter)
     {
@@ -45,7 +50,7 @@ internal sealed class ExceptionHandlerReachability(Compilation compilation)
         return result;
     }
 
-    private static PotentialExceptions GetPotentialExceptions(
+    private PotentialExceptions GetPotentialExceptions(
         IOperation protectedBlock)
     {
         var known = ImmutableHashSet.CreateBuilder<INamedTypeSymbol>(
@@ -63,7 +68,13 @@ internal sealed class ExceptionHandlerReachability(Compilation compilation)
             }
             if (operation is IThrowOperation thrown)
             {
-                if (thrown.Exception is { } exception &&
+                if (thrown.Exception is { } nullException &&
+                    abstractFlow?.ProvesNull(thrown, nullException) == true &&
+                    _nullReferenceExceptionType is { } nullReferenceException)
+                {
+                    known.Add(nullReferenceException);
+                }
+                else if (thrown.Exception is { } exception &&
                     DefiniteOperationFacts.UnwrapHarmlessValue(exception).Type
                     is INamedTypeSymbol type)
                 {
