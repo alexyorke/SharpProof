@@ -105,7 +105,7 @@ public sealed class WorkerProgramTests
                 directory);
             var completion = process.WaitForExit(
                 TimeSpan.FromSeconds(10),
-                TimeSpan.FromSeconds(1));
+                TimeSpan.FromSeconds(11));
 
             var response = WorkerProtocolJson.DeserializeResponse(
                 await File.ReadAllTextAsync(resultPath))!;

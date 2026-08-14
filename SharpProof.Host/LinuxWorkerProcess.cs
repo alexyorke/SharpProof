@@ -85,25 +85,25 @@ public sealed partial class LinuxWorkerProcess : IDisposable
     }
 
     public LinuxWorkerCompletion WaitForExit(
-        TimeSpan hardLimit,
-        TimeSpan terminationGrace,
+        TimeSpan terminationStart,
+        TimeSpan finalLimit,
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
-            hardLimit,
+            terminationStart,
             TimeSpan.Zero);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
-            terminationGrace,
-            TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            finalLimit,
+            terminationStart);
         var process = _process ?? throw new ObjectDisposedException(
             nameof(LinuxWorkerProcess));
         var stopwatch = Stopwatch.StartNew();
         while (!process.WaitForExit(0))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (stopwatch.Elapsed >= hardLimit)
+            if (stopwatch.Elapsed >= terminationStart)
             {
-                Terminate(process, terminationGrace);
+                Terminate(process, stopwatch, finalLimit);
                 return new LinuxWorkerCompletion(
                     LinuxWorkerCompletionKind.TimedOut,
                     124);
@@ -150,12 +150,16 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         }
         if (!process.HasExited)
         {
-            Terminate(process, TimeSpan.FromSeconds(1));
+            var stopwatch = Stopwatch.StartNew();
+            Terminate(process, stopwatch, TimeSpan.FromSeconds(1));
         }
         process.Dispose();
     }
 
-    private static void Terminate(Process process, TimeSpan grace)
+    private static void Terminate(
+        Process process,
+        Stopwatch stopwatch,
+        TimeSpan finalLimit)
     {
         if (process.HasExited)
         {
@@ -167,9 +171,9 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             throw NativeFailure(
                 "SharpProof could not terminate the worker process.");
         }
-        var stopwatch = Stopwatch.StartNew();
+        var remainingForTerminate = finalLimit - stopwatch.Elapsed;
         var terminateWait = checked((int)Math.Min(
-            Math.Max(1, grace.TotalMilliseconds / 2),
+            Math.Max(0, remainingForTerminate.TotalMilliseconds / 2),
             int.MaxValue));
         if (!process.WaitForExit(terminateWait))
         {
@@ -183,9 +187,9 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             catch (InvalidOperationException) when (process.WaitForExit(0))
             {
             }
-            var remaining = grace - stopwatch.Elapsed;
+            var remaining = finalLimit - stopwatch.Elapsed;
             var killWait = checked((int)Math.Min(
-                Math.Max(1, remaining.TotalMilliseconds),
+                Math.Max(0, remaining.TotalMilliseconds),
                 int.MaxValue));
             if (!process.WaitForExit(killWait))
             {

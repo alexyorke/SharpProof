@@ -798,6 +798,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~LinuxWorkerReceivesTheExactStartupRelease'
     },
     [pscustomobject]@{
+        Name = 'launcher-single-termination-grace-deadline'
+        File = 'SharpProof.Host\LinuxWorkerProcess.cs'
+        Original = '                Terminate(process, stopwatch, finalLimit);'
+        Mutated = '                Terminate(process, Stopwatch.StartNew(), finalLimit);'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~LinuxWorkerTimeoutTerminatesTheDirectChild'
+    },
+    [pscustomobject]@{
         Name = 'worker-parent-death-boundary'
         File = 'SharpProof.Host\LinuxWorkerProcess.cs'
         Original = '    private const int ParentDeathSignal = 1;'

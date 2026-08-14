@@ -29,7 +29,7 @@ public sealed class LauncherArgumentTests
             TestContext.CurrentContext.WorkDirectory);
         var completion = process.WaitForExit(
             TimeSpan.FromSeconds(5),
-            TimeSpan.FromSeconds(1));
+            TimeSpan.FromSeconds(6));
 
         using (Assert.EnterMultipleScope())
         {
@@ -53,15 +53,144 @@ public sealed class LauncherArgumentTests
             TestContext.CurrentContext.WorkDirectory);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var completion = process.WaitForExit(
-            TimeSpan.FromMilliseconds(100),
-            TimeSpan.FromMilliseconds(500));
+            TimeSpan.FromMilliseconds(1_000),
+            TimeSpan.FromMilliseconds(1_100));
         stopwatch.Stop();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.TimedOut));
             Assert.That(completion.ExitCode, Is.EqualTo(124));
-            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromMilliseconds(1_350)),
+                "The final deadline must include exactly one termination grace.");
+        }
+    }
+
+    [Test]
+    public void LinuxWorkerCooperatesWithTerminationInsideTheSameDeadline()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "trap 'exit 0' TERM; while :; do sleep 0.05; done"],
+            TestContext.CurrentContext.WorkDirectory);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var completion = process.WaitForExit(
+            TimeSpan.FromMilliseconds(1_000),
+            TimeSpan.FromMilliseconds(1_100));
+        stopwatch.Stop();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.TimedOut));
+            Assert.That(completion.ExitCode, Is.EqualTo(124));
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromMilliseconds(1_300)));
+        }
+    }
+
+    [Test]
+    public void LinuxWorkerCancellationDoesNotWaitForTheDeadline()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "while :; do sleep 1; done"],
+            TestContext.CurrentContext.WorkDirectory);
+        using var cancellation = new CancellationTokenSource(100);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        Assert.That(
+            (Action)(() => process.WaitForExit(
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(6),
+                cancellation.Token)),
+            Throws.TypeOf<OperationCanceledException>());
+        stopwatch.Stop();
+        Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(1)));
+    }
+
+    [Test]
+    public void LinuxWorkerDeadlineBoundariesAreExact()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "exit 0"],
+            TestContext.CurrentContext.WorkDirectory);
+        Assert.That(
+            (Action)(() => process.WaitForExit(
+                TimeSpan.Zero,
+                TimeSpan.FromMilliseconds(1))),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(
+            (Action)(() => process.WaitForExit(
+                TimeSpan.FromMilliseconds(2),
+                TimeSpan.FromMilliseconds(1))),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+        var completion = process.WaitForExit(
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+        Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void LinuxWorkerMinimumGraceDoesNotRestartCleanupBudget()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "trap '' TERM; while :; do sleep 1; done"],
+            TestContext.CurrentContext.WorkDirectory);
+        Exception? failure = null;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            try
+            {
+                _ = process.WaitForExit(
+                    TimeSpan.FromMilliseconds(1),
+                    TimeSpan.FromMilliseconds(1));
+            }
+            catch (InvalidOperationException exception)
+            {
+                failure = exception;
+            }
+        }
+        finally
+        {
+            process.Dispose();
+            stopwatch.Stop();
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failure, Is.Null.Or.TypeOf<InvalidOperationException>());
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromMilliseconds(300)),
+                "The minimum grace and disposal must share the original final deadline.");
         }
     }
 
@@ -717,6 +846,11 @@ public sealed class LauncherArgumentTests
             WorkerLauncherDefaults.TerminationGraceMilliseconds);
 
         Assert.That(action, Throws.TypeOf<OverflowException>());
+        Assert.That(
+            (Action)(() => _ = Program.ComputeFinalLimit(
+                int.MaxValue,
+                WorkerLauncherDefaults.TerminationGraceMilliseconds)),
+            Throws.TypeOf<OverflowException>());
     }
 
     [Test]
@@ -830,12 +964,16 @@ public sealed class LauncherArgumentTests
 
     [TestCase(1_000, 1_000, 1_900)]
     [TestCase(1_000, 100, 1_001)]
+    [TestCase(1_000, 1, 1_001)]
     public void CombinedTimeoutReservesCleanupTime(
         int projectMilliseconds, int graceMilliseconds, int expected)
     {
         Assert.That(
             Program.ComputeHardLimit(projectMilliseconds, graceMilliseconds),
             Is.EqualTo(expected));
+        Assert.That(
+            Program.ComputeFinalLimit(projectMilliseconds, graceMilliseconds),
+            Is.EqualTo(projectMilliseconds + graceMilliseconds));
     }
 
     [TestCase("input", "response.input_mismatch")]

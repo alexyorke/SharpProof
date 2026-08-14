@@ -208,19 +208,20 @@ internal static class Program
         LauncherArguments arguments, WorkerVerifyRequest request,
         string projectDirectory, string workerPath)
     {
-        var hardLimit = TimeSpan.FromMilliseconds(ComputeHardLimit(
+        var terminationStart = TimeSpan.FromMilliseconds(ComputeHardLimit(
             request.Budgets.ProjectWallTimeMilliseconds,
             arguments.TerminationGraceMilliseconds));
-        var terminationGrace = TimeSpan.FromMilliseconds(
-            arguments.TerminationGraceMilliseconds);
+        var finalLimit = TimeSpan.FromMilliseconds(ComputeFinalLimit(
+            request.Budgets.ProjectWallTimeMilliseconds,
+            arguments.TerminationGraceMilliseconds));
         using var process = LinuxWorkerProcess.Start(
             ResolveDotNetHostPath(projectDirectory),
             [workerPath, "verify", "--request", arguments.RequestPath,
                 "--result", arguments.ResultPath, "--start-stdin"],
             projectDirectory);
         var completion = process.WaitForExit(
-            hardLimit,
-            terminationGrace);
+            terminationStart,
+            finalLimit);
         if (completion.Kind == LinuxWorkerCompletionKind.Exited)
         {
             return completion.ExitCode;
@@ -269,6 +270,12 @@ internal static class Program
     {
         return checked(projectMilliseconds + Math.Max(1,
             terminationGraceMilliseconds - TerminationCleanupReserveMilliseconds));
+    }
+
+    internal static int ComputeFinalLimit(
+        int projectMilliseconds, int terminationGraceMilliseconds)
+    {
+        return checked(projectMilliseconds + terminationGraceMilliseconds);
     }
 
     internal static string ComputeExpectedInputHash(
