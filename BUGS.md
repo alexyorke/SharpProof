@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 48 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 47 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 48 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-110 - Base property access is treated as open virtual dispatch (fixed)
+
+- [x] Fixed by `3278a5aa0` (`fix: recognize statically bound property dispatch`).
+- Property effect classification now uses operation receiver facts: explicit
+  `base` access and sealed receiver types are statically bound, while open
+  `this`, interface, unknown, and conditional receivers remain conservative.
+  The predicate is isolated in `PropertyDispatchFacts` to preserve the scanner's
+  structural complexity cap.
+- Regression coverage includes base getter/setter/indexer, an equivalent base
+  method, sealed override/inheritance, nonvirtual access, open/interface/
+  conditional controls, generated projection, and a symbol-only mutation.
+  Effects passed 174/174, Analyzer 321/321, and the failed Architecture cap test
+  passed after extraction.
 
 ### SP-AUDIT-035 - Compile-time-false loops are classified as diverging (fixed)
 
@@ -2563,22 +2577,6 @@ Precision, documentation, and developer-experience debt that does not change a s
   effects and property-setter summaries. Add field, property, nested object,
   static side effect, throwing setter, collection-initializer, struct, and fresh
   array parity controls plus a mutation restoring detached initializer scanning.
-
-### SP-AUDIT-110 - Base property access is treated as open virtual dispatch (P3)
-
-- [ ] Property effect scanning classifies dispatch from the accessor symbol
-  alone, so every open virtual accessor is uncertain. Ordinary invocation uses
-  operation-level `IsVirtual` and correctly recognizes an explicit base call as
-  statically bound.
-- Supported impact: `base.Value` produced an incomplete projection while the
-  equivalent `base.GetValue()` was complete, rejecting an exact supported base
-  property access for no runtime-dispatch reason.
-- Reproduction: a temporary Effects test compared both members on the same
-  derived class; the property assertion expected complete and received false,
-  while the method control was complete. The test was removed.
-- Required closure: pass operation-level property dispatch information into
-  classification. Add base/this/interface/sealed/nonvirtual getter/setter/indexer
-  controls and a mutation restoring symbol-only classification.
 
 ### SP-AUDIT-118 - Implicit empty constructors become unmodeled calls (P3)
 
