@@ -503,7 +503,7 @@ public sealed class ReleasePublicationScriptTests
                 case "z3-byte":
                     {
                         var entry = archive.GetEntry(
-                            "runtimes/linux-x64/native/libz3.so")!;
+                            "tools/native/linux-x64/libz3.so")!;
                         using var image = new MemoryStream();
                         await using (var input = entry.Open())
                         {
@@ -514,7 +514,7 @@ public sealed class ReleasePublicationScriptTests
                         RewriteEntry(
                             archive,
                             entry,
-                            "runtimes/linux-x64/native/libz3.so",
+                            "tools/native/linux-x64/libz3.so",
                             bytes);
                         break;
                     }
@@ -540,7 +540,7 @@ public sealed class ReleasePublicationScriptTests
                     break;
                 case "missing-native":
                     archive.GetEntry(
-                        "runtimes/linux-x64/native/libz3.so")!
+                        "tools/native/linux-x64/libz3.so")!
                         .Delete();
                     break;
                 default:

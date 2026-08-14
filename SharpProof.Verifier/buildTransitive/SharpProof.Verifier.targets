@@ -31,6 +31,8 @@
   <Target Name="_SharpProofValidateRuntimeClosure">
     <Error Condition="'$(_SharpProofToolsDirectory)' != '$(_SharpProofPackageToolsDirectory)' OR '$(_SharpProofWorkerPath)' != '$(_SharpProofPackageWorkerPath)' OR '$(_SharpProofLauncherPath)' != '$(_SharpProofPackageLauncherPath)' OR '$(_SharpProofWorkerProtocolPath)' != '$(_SharpProofPackageWorkerProtocolPath)' OR '$(_SharpProofBuildTasksPath)' != '$(_SharpProofPackageBuildTasksPath)'"
            Text="SharpProof verifier runtime paths must resolve to the exact package-owned runtime closure." />
+    <Error Condition="!Exists('$(_SharpProofPackageNativeZ3Path)')"
+           Text="SharpProof verifier package native payload is missing from its build-tool closure." />
   </Target>
 
   <Target Name="_SharpProofInitializeVerify"

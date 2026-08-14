@@ -127,7 +127,7 @@ public sealed class PackageLayoutSmokeTests
     ];
 
     private static readonly string[] ExpectedNativeZ3Entries = [
-        "runtimes/linux-x64/native/libz3.so"
+        "tools/native/linux-x64/libz3.so"
     ];
     private static readonly string[] ExpectedDependencyAttributes = [
         "id",
@@ -141,6 +141,84 @@ public sealed class PackageLayoutSmokeTests
 
         VerifyPackageGraph(feed);
         VerifyPackageLayouts(feed);
+    }
+
+    [Test]
+    public async Task VerifierNativeToolDoesNotBecomeApplicationRuntimeAsset()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteRuntimeAssetIsolationConsumer(feed.Version);
+        var restore = await RestoreConsumerAsync(workspace, feed);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var assetsPath = Path.Combine(
+            workspace.ConsumerDirectory,
+            "obj",
+            "project.assets.json");
+        using (var assets = JsonDocument.Parse(
+                   await File.ReadAllTextAsync(assetsPath)))
+        {
+            foreach (var target in assets.RootElement
+                         .GetProperty("targets")
+                         .EnumerateObject())
+            {
+                foreach (var library in target.Value.EnumerateObject())
+                {
+                    foreach (var assetKind in new[] {
+                                 "native", "runtime", "runtimeTargets"
+                             })
+                    {
+                        if (!library.Value.TryGetProperty(
+                                assetKind,
+                                out var assetsByPath))
+                        {
+                            continue;
+                        }
+                        Assert.That(
+                            assetsByPath.EnumerateObject()
+                                .Select(static asset => asset.Name),
+                            Has.None.EndsWith("libz3.so"),
+                            target.Name + "/" + library.Name + "/" + assetKind);
+                    }
+                }
+            }
+        }
+
+        var runtimeItems = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-t:CaptureRuntimeAssets",
+            "--nologo",
+            "/nodeReuse:false");
+        Assert.That(runtimeItems.ExitCode, Is.Zero, runtimeItems.Output);
+        Assert.That(
+            await File.ReadAllTextAsync(Path.Combine(
+                workspace.ConsumerDirectory,
+                "obj",
+                "runtime-assets.txt")),
+            Does.Not.Contain("libz3.so"));
+
+        var build = await BuildAnalyzerConsumerAsync(workspace);
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        var publish = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "publish",
+            workspace.ConsumerProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false");
+        Assert.That(publish.ExitCode, Is.Zero, publish.Output);
+        Assert.That(
+            Directory.EnumerateFiles(
+                workspace.ConsumerDirectory,
+                "libz3.so",
+                SearchOption.AllDirectories),
+            Is.Empty);
     }
 
     [Test]
@@ -2122,7 +2200,7 @@ public sealed class PackageLayoutSmokeTests
         var z3 = catalog.RootElement.GetProperty("z3");
         VerifyPackagePayload(
             archive,
-            "runtimes/linux-x64/native/libz3.so",
+            "tools/native/linux-x64/libz3.so",
             z3.GetProperty("libraryBytes").GetInt64(),
             z3.GetProperty("librarySha256").GetString()!);
         VerifyPackagePayload(
@@ -2486,6 +2564,39 @@ public sealed class PackageLayoutSmokeTests
                 """,
                 "all",
                 "SP0045");
+        }
+
+        internal void WriteRuntimeAssetIsolationConsumer(string version)
+        {
+            WriteSource("public static class Subject { public static int Value => 1; }");
+            var escapedVersion = SecurityElement.Escape(version);
+            File.WriteAllText(
+                ConsumerProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+                    <SelfContained>false</SelfContained>
+                    <SharpProofProfile>off</SharpProofProfile>
+                    <SharpProofVerify>false</SharpProofVerify>
+                    <NuGetAudit>false</NuGetAudit>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="SharpProof.Verifier"
+                                      Version="{escapedVersion}"
+                                      PrivateAssets="all" />
+                  </ItemGroup>
+                  <Target Name="CaptureRuntimeAssets"
+                          DependsOnTargets="ResolvePackageAssets">
+                    <WriteLinesToFile
+                        File="$(MSBuildProjectDirectory)/obj/runtime-assets.txt"
+                        Lines="@(RuntimeCopyLocalItems);@(NativeCopyLocalItems)"
+                        Overwrite="true" />
+                  </Target>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
         }
 
         internal void WriteEffectReplayVerifierConsumer(string version)

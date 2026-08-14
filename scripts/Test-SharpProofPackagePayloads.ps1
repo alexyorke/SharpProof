@@ -209,7 +209,7 @@ function Test-SharpProofPackagePayload {
                     }
                 }
             }
-            elseif ($entry.FullName -eq 'runtimes/linux-x64/native/libz3.so') {
+            elseif ($entry.FullName -eq 'tools/native/linux-x64/libz3.so') {
                 $expectedHash = [string]$toolchain.z3.librarySha256
                 if ($entry.Length -ne [int64]$toolchain.z3.libraryBytes) {
                     throw "Package '$PackageId' native payload size is invalid: '$($entry.FullName)'."

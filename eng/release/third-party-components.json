@@ -107,7 +107,7 @@
         "license": "MIT",
         "entries": [
           "tools/net9/Microsoft.Z3.dll",
-          "runtimes/linux-x64/native/libz3.so"
+          "tools/native/linux-x64/libz3.so"
         ]
       },
       {

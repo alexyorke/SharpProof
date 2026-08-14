@@ -1230,6 +1230,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~RefReturningExpressionBodiedCompanionHasAnOperationBody'
     },
     [pscustomobject]@{
+        Name = 'verifier-native-payload-is-build-tool-only'
+        File = 'SharpProof.Verifier\SharpProof.Verifier.nuspec'
+        Original = 'target="tools/native/linux-x64"'
+        Mutated = 'target="runtimes/linux-x64/native"'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~VerifierNativeToolDoesNotBecomeApplicationRuntimeAsset'
+    },
+    [pscustomobject]@{
         Name = 'standalone-gate-requires-passing-result'
         File = 'scripts\Assert-SharpProofStandaloneGateResult.ps1'
         Original = '$document.Result.Passed -isnot [bool] -or'
