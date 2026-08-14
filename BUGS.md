@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 66 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 65 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 66 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-130 - SBOM attestation includes undescribed symbol packages (fixed)
+
+- [x] Fixed by `e8a02a3bc` (`fix: define SBOM symbol package scope`).
+- The release contract now explicitly keeps symbol packages as exact manifest
+  and provenance-attestation artifacts while limiting SBOM subjects and
+  first-party checksums to the three main `.nupkg` files. Evidence generation,
+  final validation, and publication each enforce the exact six-artifact release
+  set and main-only SBOM scope, and the workflow uses `nupkgs/*.nupkg` for its
+  SBOM attestation; the broader provenance step remains unchanged.
+- Regression-first fixtures cover the canonical six-artifact bundle, checked-in
+  workflow, missing/extra/swapped symbols, symbol checksum substitution,
+  fabricated symbol rows, broad and symbol-only globs, every consumer, and a
+  mutation. Focused tests passed 9/9, full Architecture 239/239, all touched
+  PowerShell parsed, and `git diff --check` passed.
 
 ### SP-AUDIT-121 - Cache capacity enforcement is not transactional (fixed)
 
@@ -2164,22 +2179,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   checksum identities, validate the completed plan, and bind it into the exact-
   commit qualification receipt. Add two-bundle, stale-plan, changed-symbol,
   canonical bundle, and projection-removal mutation controls.
-
-### SP-AUDIT-130 - SBOM attestation includes undescribed symbol packages (P2)
-
-- [ ] The workflow attests `nupkgs/*.*nupkg` with the SBOM predicate, selecting
-  both main and symbol packages, while SBOM generation models and hashes only
-  main `.nupkg` files.
-- Certifier impact: the exact current bundle resolved six SBOM-attestation
-  subjects, but only the three main package hashes appeared in the SBOM. Each
-  symbol package is thus associated with a predicate describing different
-  bytes, despite a separate provenance attestation already covering it.
-- Reproduction: the read-only release auditor resolved the workflow glob and
-  compared all six subjects to first-party SPDX checksum rows: 6 subjects, 3
-  represented, 3 absent.
-- Required closure: restrict the SBOM subject set to main packages or explicitly
-  model symbol artifacts in an applicable SBOM. Add exact glob resolution,
-  main/symbol pairs, absent/extra subjects, and workflow-pattern mutations.
 
 ### SP-AUDIT-132 - Source locations lack one source-bound canonical geometry (P2)
 
