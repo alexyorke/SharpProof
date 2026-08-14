@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 59 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 58 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 59 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-184 - Release bundle topology is not exact or self-contained (fixed)
+
+- [x] Fixed by `1a739b78a` (`fix: enforce exact release bundle topology`).
+- One shared recursive authority now requires exactly the manifest,
+  `SHA256SUMS`, three main packages, three symbol packages, and the canonical
+  SBOM, rejecting foreign, nested, missing, empty, case-colliding, directory,
+  symlink/reparse, and hardlink-aliased members. Evidence generation builds and
+  validates all nine files in a private sibling directory before an atomic swap
+  with rollback; final validation and publication use the same authority.
+- Regression coverage includes exact/empty bundles, missing roles, alternate
+  SBOM, top-level and nested extras, directories, aliases, case collisions,
+  staging failure cleanup, workflow ordering, and a guard-removal mutation. The
+  focused suite passed 32/32 and Architecture 322/322.
 
 ### SP-AUDIT-183 - Publication plans falsely claim symbol preflight (fixed)
 
@@ -2376,20 +2390,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: impose the exact producer-representable upper bound and,
   where launcher context is authoritative, the checked project-wall/grace
   envelope. Add zero, boundary, boundary+1, long-max, and overflow controls.
-
-### SP-AUDIT-184 - Release bundle topology is not exact or self-contained (P2)
-
-- [ ] Evidence generation and final validation enumerate packages and the one
-  expected SBOM but ignore every other top-level or nested file, while CI uploads
-  the whole package artifact directory.
-- Certifier impact: foreign files can ship in the release artifact without a
-  manifest row or `SHA256SUMS` entry.
-- Required closure: require the exact regular-file set
-  `{release manifest, checksums} + manifest artifacts` before upload and
-  validation. Add ordinary extra, alternate SBOM, nested, directory, and exact-
-  set controls.
-- Consolidated cases: SP-AUDIT-224, SP-AUDIT-240.
-- Unified closure: Atomically stage exactly the manifest, checksums, and seven canonical artifacts, and make every consumer use one strict topology/semantics validator.
 
 ### SP-AUDIT-189 - Acceptance restore predates its declared timeline (P2)
 
