@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 64 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 63 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 64 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-143 - Publication-plan output topology is unsafe (fixed)
+
+- [x] Fixed by `f06640c8c` (`fix: protect publication plan topology`).
+- Planning now resolves and snapshots every bundle and fixture input before
+  validation, rejects lexical/canonical/inode aliases and reserved evidence
+  names, writes through a same-directory private temporary file, and restores
+  the prior output on failure. A post-write replay verifies that no certified
+  input path, inode, length, or SHA-256 changed during publication.
+- Regression coverage includes every artifact role, relative and absolute
+  aliases, symlink and hardlink aliases, valid and existing disjoint outputs,
+  injected writer failure cleanup, post-write input mutation, and a guard-
+  removal mutation. The focused matrix passed 16/16 and Architecture 264/264.
 
 ### SP-AUDIT-134 - Release version identity has no exact single authority (fixed)
 
@@ -2233,23 +2246,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   broad/shallow, shared-node, composition, and charge-removal controls.
 - Consolidated cases: SP-AUDIT-187.
 - Unified closure: Thread one catalog-owned budget through summary dependency discovery, provenance closure, term traversal, substitution, rebuild, and composition.
-
-### SP-AUDIT-143 - Publication-plan output topology is unsafe (P2)
-
-- [ ] Plan-only validates the bundle, then writes `PlanOutputPath` without
-  checking whether it aliases the release manifest, checksums, SBOM, or any main
-  or symbol package.
-- Certifier impact: planning can exit successfully after replacing the very
-  manifest or package it just certified, leaving a success plan beside a newly
-  invalid source bundle.
-- Evidence: validation precedes an unconditional `WriteAllText`; no input/output
-  topology guard exists on the plan path.
-- Required closure: canonicalize and reject every bundle-input overlap before
-  validation, reserve evidence filenames, and publish the plan atomically. Add
-  every input role, lexical alias, valid disjoint path, and post-plan revalidation
-  controls.
-- Consolidated cases: SP-AUDIT-213.
-- Unified closure: Resolve plan output before validation, reject aliases with bundle or fixture inputs, write atomically, and revalidate the certified topology.
 
 ### SP-AUDIT-144 - Publication destination and fixture authority are conflated (P2)
 
