@@ -623,16 +623,21 @@ internal sealed partial class LauncherArguments
         WorkerRuntimeClosureSnapshot? runtimeSnapshot,
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
-        ValidateDistinctPaths(runtimeSnapshot, Optional("cache-directory"));
+        var cacheEnabled = Boolean("cache-enabled", true);
+        ValidateDistinctPaths(
+            runtimeSnapshot,
+            cacheEnabled ? Optional("cache-directory") : null);
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
         var request = ProjectRequest(compilerManifest);
         ValidateDistinctPaths(
             runtimeSnapshot,
-            WorkerCachePath.Resolve(
-                Optional("cache-directory"),
-                artifact.Compilation.ProjectDirectory));
+            cacheEnabled
+                ? WorkerCachePath.Resolve(
+                    Optional("cache-directory"),
+                    artifact.Compilation.ProjectDirectory)
+                : null);
         return request;
     }
 
@@ -660,26 +665,25 @@ internal sealed partial class LauncherArguments
             ..publicationPaths,
             ..publicationPaths.Select(
                 LinuxPathIdentity.PublicationMarkerPath)];
-        foreach (var candidate in candidates.OfType<string>())
-        {
-            LinuxPathIdentity.Canonicalize(candidate);
-        }
-        var paths = new HashSet<string>(StringComparer.Ordinal);
-        if (candidates.OfType<string>().Any(path => !paths.Add(path)) ||
-            runtimeSnapshot?.ComponentPaths.Any(path =>
+        var paths = candidates.OfType<string>()
+            .Concat(runtimeSnapshot?.ComponentPaths.Where(path =>
                 !runtimeRoots.Contains(path, StringComparer.Ordinal) &&
                 !LauncherArguments.LauncherRuntimePaths.Contains(
-                    path, StringComparer.Ordinal) &&
-                !paths.Add(path)) is true ||
-            candidates
-                .Skip(runtimeRoots.Length +
-                    LauncherArguments.LauncherRuntimePaths.Length)
-                .OfType<string>()
-                .Any(path => LinuxPathIdentity.IsSameOrDescendant(
-                    path,
-                    Path.GetDirectoryName(workerPath)!)))
+                    path, StringComparer.Ordinal)) ?? [])
+            .Select(LinuxPathIdentity.Canonicalize)
+            .ToArray();
+        for (var index = 0; index < paths.Length; index++)
         {
-            throw new ArgumentException("SharpProof I/O paths must be distinct.");
+            for (var otherIndex = 0; otherIndex < index; otherIndex++)
+            {
+                if (LinuxPathIdentity.PathsConflict(
+                        paths[otherIndex],
+                        paths[index]))
+                {
+                    throw new ArgumentException(
+                        "SharpProof I/O paths must be distinct and non-nested.");
+                }
+            }
         }
     }
 

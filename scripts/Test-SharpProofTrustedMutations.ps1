@@ -1824,6 +1824,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~NestedPublicationSetsFailBeforeAnyFilesystemMutation'
     },
     [pscustomobject]@{
+        Name = 'build-task-active-symmetric-topology'
+        File = 'SharpProof.BuildTasks\InvalidatePublishedResult.cs'
+        Original = (@'
+                 .Any(path => LinuxPathIdentity.PathsConflict(
+                     path,
+                     resolvedCachePath)) ||
+'@).TrimEnd()
+        Mutated = (@'
+                 .Any(path => LinuxPathIdentity.IsSameOrDescendant(
+                     path,
+                     resolvedCachePath)) ||
+'@).TrimEnd()
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~InvalidationRejectsSymmetricIoTopologyBeforeMutation'
+    },
+    [pscustomobject]@{
         Name = 'standalone-build-stage-nonroot-contract'
         File = 'eng\container\Dockerfile'
         Original = "COPY --chown=sharpproof:sharpproof . .`nUSER sharpproof"

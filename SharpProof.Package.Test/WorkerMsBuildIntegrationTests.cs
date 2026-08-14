@@ -3806,7 +3806,7 @@ public sealed class WorkerMsBuildIntegrationTests
                         WorkerPath="$(_SharpProofWorkerPath)"
                         LauncherPath="$(_SharpProofLauncherPath)"
                         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
-                        CachePath="$(_SharpProofEffectiveCacheDirectory)" />
+                        CachePath="$(_SharpProofActiveCacheDirectory)" />
                   </Target>
                   <Target Name="_RemoveSharpProofAnalyzersForWorkerTargetTest"
                           BeforeTargets="CoreCompile">

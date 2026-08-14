@@ -495,6 +495,70 @@ public sealed class LauncherArgumentTests
 
     [Test]
     [Platform("Linux")]
+    public void DisabledCachePathDoesNotParticipateInIoTopology()
+    {
+        var requestPath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "disabled-cache-request.json");
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", requestPath,
+            "--result", Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "disabled-cache-result.json"),
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--cache-enabled", "false",
+            "--cache-directory", requestPath,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<FileNotFoundException>());
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    [Platform("Linux")]
+    public void RequestProjectionRejectsNestedCachePathsBeforeManifestRead(
+        bool cacheBelowResult)
+    {
+        var root = TestContext.CurrentContext.WorkDirectory;
+        var result = Path.Combine(root, "nested-cache-result.json");
+        var cache = cacheBelowResult
+            ? Path.Combine(result, "cache")
+            : Path.Combine(root, "cache-root");
+        if (!cacheBelowResult)
+        {
+            result = Path.Combine(cache, "result.json");
+        }
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", Path.Combine(root, "nested-cache-request.json"),
+            "--result", result,
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--cache-enabled", "true",
+            "--cache-directory", cache,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    [Platform("Linux")]
     public void RequestProjectionRejectsWorkerTreeOutputBeforeManifestRead()
     {
         var worker = Path.Combine(

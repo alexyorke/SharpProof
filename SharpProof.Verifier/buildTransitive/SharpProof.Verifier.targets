@@ -47,8 +47,10 @@
       <_SharpProofConfiguredSarifFullPath Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofVerifySarifFile)'))</_SharpProofConfiguredSarifFullPath>
       <_SharpProofEffectiveSarifFile Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(_SharpProofConfiguredSarifFullPath)')), '$(TargetFramework)', $([System.IO.Path]::GetFileName('$(_SharpProofConfiguredSarifFullPath)'))))</_SharpProofEffectiveSarifFile>
       <_SharpProofVerifyCacheDirectoryNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheDirectory)').Trim())</_SharpProofVerifyCacheDirectoryNormalized>
+      <_SharpProofVerifyCacheEnabledNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheEnabled)').Trim().ToLowerInvariant())</_SharpProofVerifyCacheEnabledNormalized>
       <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'cache'))</_SharpProofEffectiveCacheDirectory>
       <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' != ''">$(SharpProofVerifyCacheDirectory)</_SharpProofEffectiveCacheDirectory>
+      <_SharpProofActiveCacheDirectory Condition="'$(_SharpProofVerifyCacheEnabledNormalized)' == 'true'">$(_SharpProofEffectiveCacheDirectory)</_SharpProofActiveCacheDirectory>
       <_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''">$([System.Guid]::NewGuid().ToString('N'))</_SharpProofInvocationId>
       <_SharpProofInvocationDirectory>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'runs', '$(_SharpProofInvocationId)'))</_SharpProofInvocationDirectory>
       <_SharpProofInvocationRequestFile>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'request.json'))</_SharpProofInvocationRequestFile>
@@ -93,7 +95,7 @@
         LauncherPath="$(_SharpProofLauncherPath)"
         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
         CompilerOutputPaths="@(_SharpProofCompilerOwnedOutput)"
-        CachePath="$(_SharpProofEffectiveCacheDirectory)" />
+        CachePath="$(_SharpProofActiveCacheDirectory)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"

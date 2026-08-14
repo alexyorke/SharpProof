@@ -239,6 +239,13 @@ public static partial class LinuxPathIdentity
         return canonicalPath.StartsWith(prefix, StringComparison.Ordinal);
     }
 
+    public static bool PathsConflict(string firstPath, string secondPath)
+    {
+        return IsSameOrDescendant(firstPath, secondPath) ||
+            IsSameOrDescendant(secondPath, firstPath) ||
+            AreSameExistingFile(firstPath, secondPath);
+    }
+
     public static bool DeleteIfUnprotected(
         string path,
         IEnumerable<string> protectedPaths)

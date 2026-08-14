@@ -132,15 +132,21 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
             File.Exists(Path.ChangeExtension(
                 resolvedWorkerPath,
                 ".runtimeconfig.json"));
-        var protectedPaths = Present(
+        var inputPaths = Present(
                 RequestPath,
                 ManifestPath,
                 InvocationRequestPath,
                 InvocationResultPath,
-                InvocationManifestPath,
-                WorkerProtocolPath)
+                InvocationManifestPath)
             .Select(ResolvePath)
-            .Concat(toolPaths.Select(ResolvePath))
+            .ToArray();
+        var resolvedToolPaths = toolPaths
+            .Append(WorkerProtocolPath)
+            .Select(ResolvePath)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var protectedPaths = inputPaths
+            .Concat(resolvedToolPaths)
             .ToArray();
         var resolvedCachePath = string.IsNullOrWhiteSpace(CachePath)
             ? null
@@ -152,29 +158,28 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
                     StringComparison.Ordinal) &&
                 LinuxPathIdentity.AreSameExistingFile(output, input)));
         var aliasesInput = aliasesFileIdentity ||
+            Pairs(inputPaths).Any(static pair =>
+                LinuxPathIdentity.PathsConflict(pair[0], pair[1])) ||
             publicationMutationPaths.Any(output => protectedPaths.Any(input =>
-                string.Equals(
-                    output,
-                    input,
-                    StringComparison.Ordinal)));
+                LinuxPathIdentity.PathsConflict(output, input)));
         var aliasesWorkerTree = workerTreeExists &&
             !string.IsNullOrWhiteSpace(workerDirectory) &&
-            publicationMutationPaths.Any(output =>
-                LinuxPathIdentity.IsSameOrDescendant(
-                    output,
+            publicationPaths
+                .Concat(publicationMarkerPaths)
+                .Concat(inputPaths)
+                .Any(path => LinuxPathIdentity.PathsConflict(
+                    path,
                     workerDirectory));
         var aliasesCache = resolvedCachePath != null &&
-            (publicationMutationPaths.Any(output =>
-                 LinuxPathIdentity.IsSameOrDescendant(
-                     output,
-                     resolvedCachePath)) ||
-             protectedPaths.Any(input =>
-                 LinuxPathIdentity.IsSameOrDescendant(
-                     input,
+            (publicationPaths
+                 .Concat(publicationMarkerPaths)
+                 .Concat(inputPaths)
+                 .Any(path => LinuxPathIdentity.PathsConflict(
+                     path,
                      resolvedCachePath)) ||
              workerTreeExists &&
              !string.IsNullOrWhiteSpace(workerDirectory) &&
-             LinuxPathIdentity.IsSameOrDescendant(
+             LinuxPathIdentity.PathsConflict(
                  resolvedCachePath,
                  workerDirectory));
         var aliasesCompilerOutput = publicationPaths

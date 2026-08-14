@@ -413,6 +413,92 @@ public sealed class BuildTaskTests
         return assemblyPath;
     }
 
+    [Platform("Linux")]
+    [TestCase("cache-below-output")]
+    [TestCase("output-below-cache")]
+    [TestCase("input-below-output")]
+    [TestCase("output-above-runtime")]
+    [TestCase("output-below-runtime")]
+    public void InvalidationRejectsSymmetricIoTopologyBeforeMutation(
+        string collision)
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-topology-");
+        try
+        {
+            var tools = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "tools"));
+            var worker = Path.Combine(tools.FullName, "worker.dll");
+            var launcher = Path.Combine(tools.FullName, "launcher.dll");
+            var protocol = Path.Combine(tools.FullName, "protocol.dll");
+            foreach (var path in new[] { worker, launcher, protocol })
+            {
+                File.WriteAllText(path, "runtime");
+            }
+            var result = Path.Combine(directory.FullName, "result.json");
+            var request = Path.Combine(directory.FullName, "request.json");
+            var manifest = Path.Combine(directory.FullName, "manifest.json");
+            var cache = Path.Combine(directory.FullName, "cache");
+            var invocationRequest = Path.Combine(
+                directory.FullName,
+                "runs",
+                "request.json");
+            switch (collision)
+            {
+                case "cache-below-output":
+                    cache = Path.Combine(result, "cache");
+                    break;
+                case "output-below-cache":
+                    result = Path.Combine(cache, "result.json");
+                    break;
+                case "input-below-output":
+                    invocationRequest = Path.Combine(result, "request.json");
+                    break;
+                case "output-above-runtime":
+                    result = tools.FullName;
+                    break;
+                case "output-below-runtime":
+                    result = Path.Combine(tools.FullName, "result.json");
+                    break;
+                default:
+                    throw new AssertionException("Unknown topology fixture.");
+            }
+            var engine = new RecordingBuildEngine();
+            var task = new InvalidatePublishedResult
+            {
+                BuildEngine = engine,
+                ProjectDirectory = directory.FullName,
+                ResultPath = result,
+                RequestPath = request,
+                ManifestPath = manifest,
+                InvocationRequestPath = invocationRequest,
+                WorkerPath = worker,
+                LauncherPath = launcher,
+                WorkerProtocolPath = protocol,
+                CachePath = cache
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(engine.Errors, Is.Not.Empty);
+                Assert.That(File.Exists(result), Is.False);
+                Assert.That(
+                    new[] { request, manifest, result }
+                        .Select(LinuxPathIdentity.PublicationLockName),
+                    Has.None.Matches<string>(File.Exists));
+                Assert.That(
+                    new[] { request, manifest, result }
+                        .Select(LinuxPathIdentity.PublicationMarkerPath),
+                    Has.None.Matches<string>(File.Exists));
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Test]
     [Platform("Linux")]
     public void InvalidationDeletesOnlyThePublishedOutputs()
