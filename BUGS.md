@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 41 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 40 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 41 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-022 - ContractFor generator resolves profiles differently (fixed)
+
+- [x] Fixed by `26458922c` (`fix: unify ContractFor profile resolution`).
+- The ContractFor generator now consumes the same AnalyzerConfiguration result
+  as the analyzer and compiler collector, including first-nonblank alias order,
+  trimming/case behavior, supported profile/features, and fail-closed invalid,
+  retired, or provider-failure handling.
+- Regression coverage includes alias conflicts/permutations, invalid profile and
+  features, whitespace/case, all supported profile/feature values, final
+  analyzer and collector parity, and an alias-order mutation. Focused matrices
+  passed 12/12 and 8/8; Generator 117/117, Analyzer 331/331, and Architecture
+  408/408 passed.
 
 ### SP-AUDIT-010 - Filtered worker tests depend on Z3 test order (fixed)
 
@@ -2034,32 +2047,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 ## P2 active bugs
 
 Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
-
-### SP-AUDIT-022 - ContractFor generator resolves profiles differently (P2)
-
-- [ ] `AnalyzerConfiguration` and the compiler collector choose the first
-  configured profile alias in their authoritative key order and disable
-  analysis on an invalid value. `ContractForValidatorGenerator.IsProfileOff`
-  instead scans all three aliases and returns off if any one equals `off`; it
-  treats every invalid value as enabled.
-- Supported impact: a custom host that supplies raw `advisory` plus build-
-  property `off` runs analyzer/collector semantics but silently suppresses all
-  ContractFor validation. Supplying an invalid profile disables the analyzer
-  and collector with a configuration diagnostic while the generator continues
-  and emits unrelated SPCF errors. One compilation therefore has no coherent
-  SharpProof profile.
-- Reproduction: a temporary generator regression compared default advisory
-  diagnostics with conflicting `sharpproof_profile=advisory` and
-  `build_property.SharpProofProfile=off`; the default emitted one SPCF error and
-  the conflicting run emitted none. A second regression supplied
-  `sharpproof_profile=invalid`; it expected the generator to remain disabled
-  with the analyzer but received SPCF0004.
-- Required closure: expose one shared profile-resolution result to analyzer,
-  generator, and collector, including alias precedence, trimming, accepted
-  values, provider failures, and invalid/conflicting aliases. Prefer rejecting
-  conflicting nonblank aliases rather than silently selecting one. Add all
-  alias permutations, invalid values, redundant equal values, provider failure,
-  MSBuild-only, and mutation-discriminating parity cases.
 
 ### SP-AUDIT-029 - Publication-lock setup is not failure-atomic (P2)
 
