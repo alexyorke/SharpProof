@@ -1206,6 +1206,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~FuzzRunnerEvidenceUsesStrictSchemaFourDecoder'
     },
     [pscustomobject]@{
+        Name = 'contract-generic-owners-ignore-nongeneric-wrappers'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = ': GetGenericTypeLayers(containingType);'
+        Mutated = ': GetTypeLayers(containingType);'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~GenericOwnersAlignIndependentlyOfNonGenericWrappers'
+    },
+    [pscustomobject]@{
         Name = 'standalone-gate-requires-passing-result'
         File = 'scripts\Assert-SharpProofStandaloneGateResult.ps1'
         Original = '$document.Result.Passed -isnot [bool] -or'

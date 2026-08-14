@@ -890,6 +890,46 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void ConstructedNestedGenericTargetIgnoresNonGenericOwnerWrappers()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Outer<TOuter> where TOuter : class {
+                public sealed class Middle {
+                    public interface ITarget<TInner> where TInner : struct {
+                        void Read(TOuter outer, TInner inner);
+                    }
+                }
+            }
+            public static class CompanionOuter<TOuter> where TOuter : class {
+                [ContractFor(typeof(Outer<>.Middle.ITarget<>))]
+                public static class TargetContracts<TInner> where TInner : struct {
+                    public static void Read(
+                        Outer<TOuter>.Middle.ITarget<TInner> receiver,
+                        TOuter outer,
+                        TInner inner) {
+                        Contract.Requires(outer != null);
+                    }
+                }
+            }
+            public static class Caller {
+                public static void Call(
+                    Outer<string>.Middle.ITarget<int> target,
+                    string outer,
+                    int inner) => target.Read(outer, inner);
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindCallRequires("Caller", "Call", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+    }
+
+    [Test]
     public void NonGenericTargetWrapperDoesNotRequireCompanionWrapper()
     {
         const string source =

@@ -859,6 +859,65 @@ public sealed class ContractForValidatorGeneratorTests
         Assert.That(GetLocatedText(diagnostic), Does.Contain("ContractFor"));
     }
 
+    [TestCase(
+        "public sealed class Middle { public interface ITarget<U> { void Read(T value, U item); } }",
+        "[ContractFor(typeof(Outer<>.Middle.ITarget<>))] public static class TargetContracts<U> { public static void Read(Outer<T>.Middle.ITarget<U> receiver, T value, U item) { } }")]
+    [TestCase(
+        "public interface ITarget<U> { void Read(T value, U item); }",
+        "public static class Middle { [ContractFor(typeof(Outer<>.ITarget<>))] public static class TargetContracts<U> { public static void Read(Outer<T>.ITarget<U> receiver, T value, U item) { } } }")]
+    [TestCase(
+        "public sealed class Middle { public interface ITarget<U> { void Read(T value, U item); } }",
+        "public static class Middle { [ContractFor(typeof(Outer<>.Middle.ITarget<>))] public static class TargetContracts<U> { public static void Read(Outer<T>.Middle.ITarget<U> receiver, T value, U item) { } } }")]
+    [TestCase(
+        "public sealed class First { public sealed class Second { public interface ITarget<U> { void Read(T value, U item); } } }",
+        "public static class First { public static class Second { [ContractFor(typeof(Outer<>.First.Second.ITarget<>))] public static class TargetContracts<U> { public static void Read(Outer<T>.First.Second.ITarget<U> receiver, T value, U item) { } } } }")]
+    public void GenericOwnersAlignIndependentlyOfNonGenericWrappers(
+        string target,
+        string companion)
+    {
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public sealed class Outer<T> where T : class {
+                {{target}}
+            }
+            public static class CompanionOuter<T> where T : class {
+                {{companion}}
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void GeneratedNamedCompanionAlignsAcrossTargetOnlyWrapper()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public sealed class Outer<T> {
+                public sealed class Middle {
+                    public interface ITarget<U> { void Read(T value, U item); }
+                }
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            using SharpProof.Attributes;
+            public static class CompanionOuter<T> {
+                [ContractFor(typeof(Outer<>.Middle.ITarget<>))]
+                public static class TargetContracts<U> {
+                    public static void Read(
+                        Outer<T>.Middle.ITarget<U> receiver,
+                        T value,
+                        U item) { }
+                }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+    }
+
     [Test]
     public void StaticAndInstanceOverloadCollapseIsAmbiguous()
     {

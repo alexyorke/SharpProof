@@ -586,12 +586,45 @@ internal static class ContractForSymbolMatcher
         ISymbol? leftScope,
         ISymbol? rightScope)
     {
+        if (left is INamedTypeSymbol leftType &&
+            right is INamedTypeSymbol rightType)
+        {
+            var leftOwners = GetGenericOwnerLayers(leftScope);
+            var rightOwners = GetGenericOwnerLayers(rightScope);
+            var leftIndex = GetGenericOwnerIndex(leftOwners, leftType);
+            var rightIndex = GetGenericOwnerIndex(rightOwners, rightType);
+            return leftIndex >= 0 && leftIndex == rightIndex;
+        }
+
         return leftScope != null &&
         rightScope != null &&
         (SymbolEqualityComparer.Default.Equals(left, leftScope)
             ? SymbolEqualityComparer.Default.Equals(right, rightScope)
             : !SymbolEqualityComparer.Default.Equals(right, rightScope) &&
               OwnersMatch(left, right, leftScope.ContainingSymbol, rightScope.ContainingSymbol));
+    }
+
+    private static ImmutableArray<INamedTypeSymbol> GetGenericOwnerLayers(
+        ISymbol? scope)
+    {
+        var containingType = scope as INamedTypeSymbol ?? scope?.ContainingType;
+        return containingType == null
+            ? []
+            : GetGenericTypeLayers(containingType);
+    }
+
+    private static int GetGenericOwnerIndex(
+        ImmutableArray<INamedTypeSymbol> owners,
+        INamedTypeSymbol owner)
+    {
+        for (var index = 0; index < owners.Length; index++)
+        {
+            if (SymbolEqualityComparer.Default.Equals(owners[index], owner))
+            {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private static NullableAnnotation GetAnnotation(
