@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 55 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 54 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 55 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-135 - The documentation support-contract validator is disconnected (fixed)
+
+- [x] Fixed by `aeab026d8` (`fix: enforce documentation support contract`).
+- `Generate-Readme.ps1 -Verify` now runs in acceptance static validation, at the
+  start of packaging before build/evidence generation, and at the start of
+  release qualification before its evidence. Existing acceptance and
+  qualification receipts retain exact-commit binding for these command graphs.
+- Regression coverage includes clean documentation, stale Win-x64 support,
+  package-version drift, Windows-support drift, disconnected acceptance/pack/
+  qualification calls, workflow entrypoints, and a disconnection mutation. The
+  focused matrix passed 5/5 and Architecture 348/348.
 
 ### SP-AUDIT-230 - Publication planning does not validate SBOM semantics (fixed)
 
@@ -2543,21 +2555,6 @@ Precision, documentation, and developer-experience debt that does not change a s
   using Git only when available for exact-commit evidence, or explicitly restore
   Git as a documented prerequisite. Add archive/Git, dirty/deleted/untracked,
   executable-bit, contract/build, and evidence-command controls.
-
-### SP-AUDIT-135 - The documentation support-contract validator is disconnected (P3)
-
-- [ ] `Generate-Readme.ps1 -Verify` checks package/version/support text and stale
-  Windows-verifier claims, but acceptance, container dispatch, and all workflows
-  omit it even though every main package embeds the README.
-- Certifier impact: a forbidden `SharpProof.Verifier.Win-x64` support claim was
-  rejected by the dormant validator but remained outside every release-blocking
-  command graph.
-- Evidence: an in-memory documentation mutation triggered the validator; exact
-  caller searches across acceptance, workflows, and the dispatcher returned
-  none.
-- Required closure: run verification during static acceptance and release
-  qualification, then bind its exact-commit outcome. Add stale-platform,
-  package/version drift, disconnected-call, and clean-document controls.
 
 ### SP-AUDIT-142 - The standalone Docker build target cannot run its default command (P3)
 
