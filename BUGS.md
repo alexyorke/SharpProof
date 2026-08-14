@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 83 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 82 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,21 @@ The active backlog contains 83 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-204 - Verifier libz3 pollutes application runtime assets (fixed)
+
+- [x] Fixed by `bb5ec9e3d` (`fix: isolate verifier native tool asset`).
+- The certified native library now lives under the verifier's build-tool
+  closure at `tools/native/linux-x64/libz3.so`, and package targets require
+  that exact payload. It is no longer classified by NuGet as an application
+  runtime asset; the canonical worker continues to load its independently
+  verified container-native root.
+- A regression-first isolated `linux-x64` consumer with `PrivateAssets=all`
+  verifies that project assets, runtime/native copy-local items, build output,
+  and publish output contain no `libz3.so`. Package layout and canonical worker
+  Z3 controls passed 2/2, the focused consumer passed 1/1, Architecture
+  182/182, the container contract, and `git diff --check` passed. The full
+  Package suite was not rerun.
 
 ### SP-AUDIT-197 - Ref-readonly expression bodies appear bodyless (fixed)
 
@@ -1426,17 +1441,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
-
-### SP-AUDIT-204 - Verifier libz3 pollutes application runtime assets (P1)
-
-- [ ] The verifier package places its 31 MiB `libz3.so` under NuGet's
-  conventional `runtimes/linux-x64/native` path, so consumers receive it as an
-  application runtime target even with `PrivateAssets=all`.
-- Supported impact: build/publish graphs can copy a dead verifier-native asset;
-  the worker actually loads the canonical container's verified native root.
-- Required closure: store the package payload under build-tool assets or bind
-  the worker explicitly without runtime classification. Add isolated RID
-  restore, `RuntimeCopyLocalItems`, build/publish output, and worker-load controls.
 
 ### SP-AUDIT-216 - Parentheses disable direct precondition replay (P1)
 
