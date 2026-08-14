@@ -941,17 +941,64 @@ internal sealed class ManagedAbstractFlow
             ControlFlowConditionKind.WhenFalse => false,
             _ => null
         };
+        var constant = block.BranchValue?.ConstantValue is { HasValue: true, Value: bool value }
+            ? value
+            : (bool?)null;
         if (block.FallThroughSuccessor is
-            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null })
+            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null } &&
+            IsFeasible(!expected, constant))
         {
             yield return (block.FallThroughSuccessor!, !expected);
         }
 
         if (block.ConditionalSuccessor is
-            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null })
+            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null } &&
+            IsFeasible(expected, constant))
         {
             yield return (block.ConditionalSuccessor!, expected);
         }
+    }
+
+    private static bool IsFeasible(bool? expected, bool? constant)
+    {
+        return !expected.HasValue ||
+               !constant.HasValue ||
+               expected.Value == constant.Value;
+    }
+
+    internal static bool IsCompileTimeUnreachable(
+        Compilation compilation,
+        IOperation operation)
+    {
+        foreach (var syntax in operation.Syntax.Ancestors())
+        {
+            SyntaxNode? condition = syntax switch
+            {
+                WhileStatementSyntax @while
+                    when @while.Statement.Span.Contains(operation.Syntax.Span) =>
+                    @while.Condition,
+                ForStatementSyntax @for
+                    when @for.Condition != null &&
+                         (@for.Statement.Span.Contains(operation.Syntax.Span) ||
+                          @for.Incrementors.Any(incrementor =>
+                              incrementor.Span.Contains(operation.Syntax.Span))) =>
+                    @for.Condition,
+                _ => null
+            };
+            if (condition == null)
+            {
+                continue;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, condition.SyntaxTree);
+            if (model.GetConstantValue(condition) is { HasValue: true, Value: false })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static EffectAnalysisIncompleteReason CheckBudget(

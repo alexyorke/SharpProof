@@ -3085,6 +3085,104 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void CompileTimeLoopConditionsControlReachabilityAndTermination()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static object? Stored;
+
+                public static void WhileFalse() {
+                    while (false) {
+                        Stored = new object();
+                        throw new System.Exception();
+                    }
+                }
+
+                public static void ForFalse() {
+                    for (; false;) {
+                        Stored = new object();
+                    }
+                }
+
+                public static void WhileTrue() {
+                    while (true) {
+                    }
+                }
+
+                public static void WhileUnknown(bool condition) {
+                    while (condition) {
+                    }
+                }
+
+                public static void DoFalse() {
+                    do {
+                        Stored = new object();
+                    } while (false);
+                }
+
+                public static void DoTrue() {
+                    do {
+                    } while (true);
+                }
+
+                public static void FalseInsideUnknown(bool condition) {
+                    while (condition) {
+                        while (false) {
+                            Stored = new object();
+                            throw new System.Exception();
+                        }
+                    }
+                }
+
+                public static void UnknownInsideFalse(bool condition) {
+                    while (false) {
+                        while (condition) {
+                            Stored = new object();
+                        }
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var whileFalse = session.Analyze(Method(compilation, "WhileFalse")).Summary;
+        var forFalse = session.Analyze(Method(compilation, "ForFalse")).Summary;
+        var whileTrue = session.Analyze(Method(compilation, "WhileTrue")).Summary;
+        var whileUnknown = session.Analyze(Method(compilation, "WhileUnknown")).Summary;
+        var doFalse = session.Analyze(Method(compilation, "DoFalse")).Summary;
+        var doTrue = session.Analyze(Method(compilation, "DoTrue")).Summary;
+        var falseInsideUnknown = session.Analyze(
+            Method(compilation, "FalseInsideUnknown")).Summary;
+        var unknownInsideFalse = session.Analyze(
+            Method(compilation, "UnknownInsideFalse")).Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            AssertNoEffectsAndTerminates(whileFalse);
+            AssertNoEffectsAndTerminates(forFalse);
+            AssertNoEffectsAndTerminates(unknownInsideFalse);
+            Assert.That(whileTrue.Termination, Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(whileUnknown.Termination, Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(doTrue.Termination, Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(doFalse.Termination, Is.EqualTo(EffectTermination.Terminates));
+            Assert.That(doFalse.Writes.IsEmpty, Is.False);
+            Assert.That(doFalse.Allocation, Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(falseInsideUnknown.Termination, Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(falseInsideUnknown.Writes.IsEmpty, Is.True);
+            Assert.That(falseInsideUnknown.Allocation, Is.EqualTo(EffectAllocationKind.None));
+            Assert.That(falseInsideUnknown.Throws.IsEmpty, Is.True);
+        }
+    }
+
+    private static void AssertNoEffectsAndTerminates(EffectSummary summary)
+    {
+        Assert.That(summary.Termination, Is.EqualTo(EffectTermination.Terminates));
+        Assert.That(summary.Writes.IsEmpty, Is.True);
+        Assert.That(summary.Allocation, Is.EqualTo(EffectAllocationKind.None));
+        Assert.That(summary.Throws.IsEmpty, Is.True);
+    }
+
+    [Test]
     public void ScalarImpossibleBranchDoesNotContributeEffects()
     {
         var result = Analyze(

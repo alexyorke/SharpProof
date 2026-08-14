@@ -1718,6 +1718,14 @@ $mutations = @(
         Mutated = '                ? new(factory.Null(factory.ObjectType), null)'
         Project = 'SharpProof.Specs.Test\SharpProof.Specs.Test.csproj'
         Filter = 'FullyQualifiedName~ReferenceNullUsesTheExactSubstitutedOperandType'
+    },
+    [pscustomobject]@{
+        Name = 'managed-flow-raw-syntactic-cycle'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = '        return !expected.HasValue ||'
+        Mutated = '        return expected.HasValue ||'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~CompileTimeLoopConditionsControlReachabilityAndTermination'
     }
 )
 

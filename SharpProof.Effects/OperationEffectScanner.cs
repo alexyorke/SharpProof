@@ -1114,6 +1114,13 @@ internal sealed class OperationEffectScanner
 
     internal bool IsReachable(IOperation operation)
     {
+        if (ManagedAbstractFlow.IsCompileTimeUnreachable(
+                _session.Compilation,
+                operation))
+        {
+            return false;
+        }
+
         var handler = operation.Syntax.AncestorsAndSelf()
             .FirstOrDefault(static syntax =>
                 syntax is CatchClauseSyntax or FinallyClauseSyntax);
