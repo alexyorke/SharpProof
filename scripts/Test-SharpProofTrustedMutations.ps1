@@ -1750,6 +1750,14 @@ $mutations = @(
         Mutated = '    if [[ "true" = "true" ]]; then'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~FiniteCommandsRunFromAnArchiveWithoutGit'
+    },
+    [pscustomobject]@{
+        Name = 'standalone-build-stage-nonroot-contract'
+        File = 'eng\container\Dockerfile'
+        Original = "COPY --chown=sharpproof:sharpproof . .`nUSER sharpproof"
+        Mutated = "COPY --chown=sharpproof:sharpproof . .`nUSER root"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~NamedStagesHaveStandaloneNonRootExecutionContracts'
     }
 )
 

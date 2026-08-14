@@ -52,6 +52,39 @@ public sealed class ContainerAuthorityScriptTests
         }
     }
 
+    [Test]
+    public void NamedStagesHaveStandaloneNonRootExecutionContracts()
+    {
+        var root = RepositoryRoot();
+        var dockerfile = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "Dockerfile"));
+        var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
+        var stages = ParseStages(dockerfile);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                stages["toolchain"],
+                Does.Contain("/home/sharpproof/.local/share/NuGet")
+                    .And.Contain("/home/sharpproof/.nuget/packages")
+                    .And.Contain("useradd --uid \"${USER_UID}\""));
+            AssertStage(stages["dev"], "/workspace/SharpProof", "dev");
+            AssertStage(stages["build"], "/src", "build");
+            AssertStage(stages["test"], "/src", "portable-tests");
+            AssertStage(stages["package"], "/src", "pack");
+            Assert.That(
+                stages["build"],
+                Does.Contain("COPY --chown=sharpproof:sharpproof . ."));
+            Assert.That(
+                compose,
+                Does.Contain("SHARPPROOF_REPO_ROOT: /workspace/SharpProof")
+                    .And.Contain("target: dev"));
+        }
+    }
+
     [TestCaseSource(nameof(DockerfileMutations))]
     public async Task DockerfileAuthorityDecoysAreRejected(
         string _,
@@ -97,6 +130,28 @@ public sealed class ContainerAuthorityScriptTests
             StringComparison.Ordinal));
         yield return Case("unpinned-frontend", value =>
             "# syntax=docker/dockerfile:1.7\n" + value);
+        yield return Case("missing-nuget-state", value => value.Replace(
+            "        /home/sharpproof/.local/share/NuGet \\\n",
+            string.Empty,
+            StringComparison.Ordinal));
+        yield return Case("build-root-mismatch", value => value.Replace(
+            "ENV SHARPPROOF_REPO_ROOT=/src\nWORKDIR /src\n" +
+            "COPY --chown=sharpproof:sharpproof . .",
+            "ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof\nWORKDIR /src\n" +
+            "COPY --chown=sharpproof:sharpproof . .",
+            StringComparison.Ordinal));
+        yield return Case("package-root-inherited-decoy", value => value.Replace(
+            "FROM build AS package\nENV SHARPPROOF_REPO_ROOT=/src",
+            "FROM build AS package\n# ENV SHARPPROOF_REPO_ROOT=/src",
+            StringComparison.Ordinal));
+        yield return Case("test-root-user", value => value.Replace(
+            "FROM build AS test\nENV SHARPPROOF_REPO_ROOT=/src\nWORKDIR /src\nUSER sharpproof",
+            "FROM build AS test\nENV SHARPPROOF_REPO_ROOT=/src\nWORKDIR /src\nUSER root",
+            StringComparison.Ordinal));
+        yield return Case("build-unowned-copy", value => value.Replace(
+            "COPY --chown=sharpproof:sharpproof . .",
+            "COPY . .",
+            StringComparison.Ordinal));
     }
 
     private static IEnumerable<TestCaseData> ComposeMutations()
@@ -133,6 +188,49 @@ public sealed class ContainerAuthorityScriptTests
     private static TestCaseData Case(string name, Func<string, string> mutate)
     {
         return new TestCaseData(name, mutate).SetName($"AuthorityRejects_{name}");
+    }
+
+    private static Dictionary<string, string> ParseStages(string dockerfile)
+    {
+        var stages = new Dictionary<string, string>(StringComparer.Ordinal);
+        string? name = null;
+        var lines = new List<string>();
+        foreach (var line in dockerfile.Replace("\r", "", StringComparison.Ordinal)
+                     .Split('\n'))
+        {
+            if (line.StartsWith("FROM ", StringComparison.Ordinal))
+            {
+                if (name != null)
+                {
+                    stages.Add(name, string.Join("\n", lines));
+                }
+                name = line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[^1];
+                lines.Clear();
+            }
+            else if (name != null)
+            {
+                lines.Add(line);
+            }
+        }
+        if (name != null)
+        {
+            stages.Add(name, string.Join("\n", lines));
+        }
+        return stages;
+    }
+
+    private static void AssertStage(
+        string stage,
+        string repositoryRoot,
+        string command)
+    {
+        Assert.That(
+            stage,
+            Does.Contain("ENV SHARPPROOF_REPO_ROOT=" + repositoryRoot)
+                .And.Contain("WORKDIR " + repositoryRoot)
+                .And.Contain("USER sharpproof")
+                .And.Contain("ENTRYPOINT [\"/usr/local/bin/sharpproof-container\"]")
+                .And.Contain("CMD [\"" + command + "\"]"));
     }
 
     private static async Task<ProcessResult> ValidateAsync(

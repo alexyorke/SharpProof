@@ -12,6 +12,8 @@ FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework
 FROM ${DOTNET_SDK_IMAGE} AS toolchain
 ARG TARGETOS
 ARG TARGETARCH
+ARG USER_UID=1000
+ARG USER_GID=1000
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_NOLOGO=1 \
     NUGET_XMLDOC_MODE=skip \
@@ -53,26 +55,35 @@ RUN chmod 0755 \
     /usr/local/bin/sharpproof-dev-init \
     /usr/local/bin/sp
 
-FROM toolchain AS dev
-ARG USER_UID=1000
-ARG USER_GID=1000
-ENV HOME=/home/sharpproof
+ENV HOME=/home/sharpproof \
+    DOTNET_CLI_HOME=/home/sharpproof/.dotnet \
+    NUGET_PACKAGES=/home/sharpproof/.nuget/packages
 RUN groupadd --gid "${USER_GID}" sharpproof \
     && useradd --uid "${USER_UID}" --gid "${USER_GID}" --create-home --shell /bin/bash sharpproof \
     && install -d -o sharpproof -g sharpproof \
+        /home/sharpproof/.local \
+        /home/sharpproof/.local/share \
+        /home/sharpproof/.local/share/NuGet \
         /home/sharpproof/.nuget \
         /home/sharpproof/.nuget/NuGet \
         /home/sharpproof/.nuget/packages \
         /home/sharpproof/.dotnet \
         /workspace/SharpProof \
-        /workspace/artifacts
+        /workspace/artifacts \
+        /src
+
+FROM toolchain AS dev
+ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof
 WORKDIR /workspace/SharpProof
+USER sharpproof
 ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
 CMD ["dev"]
 
 FROM toolchain AS build
+ENV SHARPPROOF_REPO_ROOT=/src
 WORKDIR /src
-COPY . .
+COPY --chown=sharpproof:sharpproof . .
+USER sharpproof
 RUN dotnet restore SharpProof.sln --locked-mode \
     && dotnet build SharpProof.sln --configuration Debug --no-restore
 ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
@@ -80,10 +91,14 @@ CMD ["build"]
 
 FROM build AS test
 ENV SHARPPROOF_REPO_ROOT=/src
+WORKDIR /src
+USER sharpproof
 ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
 CMD ["portable-tests"]
 
 FROM build AS package
 ENV SHARPPROOF_REPO_ROOT=/src
+WORKDIR /src
+USER sharpproof
 ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
 CMD ["pack"]

@@ -65,6 +65,27 @@ function Assert-SingleMatchingLine {
     }
 }
 
+function Get-DockerfileStageLines {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string[]]$Lines,
+        [Parameter(Mandatory = $true)][string]$FromLine)
+
+    $start = [array]::IndexOf($Lines, $FromLine)
+    if ($start -lt 0) {
+        throw "Dockerfile stage '$FromLine' was not found."
+    }
+    $end = $Lines.Count
+    for ($index = $start + 1; $index -lt $Lines.Count; $index++) {
+        if ($Lines[$index] -cmatch '^FROM\s+') {
+            $end = $index
+            break
+        }
+    }
+    return @($Lines[($start + 1)..($end - 1)])
+}
+
 function Assert-DockerfileAuthority {
     param(
         [Parameter(Mandatory = $true)][string]$Content,
@@ -157,6 +178,85 @@ function Assert-DockerfileAuthority {
                 "found '$($actualStages[$index])'.")
         }
     }
+
+
+    $toolchainLines = Get-DockerfileStageLines `
+        -Lines $lines `
+        -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
+    $toolchainText = $toolchainLines -join "`n"
+    foreach ($required in @(
+            'ARG USER_UID=1000',
+            'ARG USER_GID=1000',
+            'useradd --uid "${USER_UID}"',
+            '/home/sharpproof/.local/share/NuGet',
+            '/home/sharpproof/.nuget/packages',
+            '/home/sharpproof/.dotnet')) {
+        if (-not $toolchainText.Contains(
+                $required,
+                [StringComparison]::Ordinal)) {
+            throw "Dockerfile toolchain stage is missing '$required'."
+        }
+    }
+
+    $stageContracts = @(
+        [pscustomobject]@{
+            From = 'FROM toolchain AS dev'
+            Root = '/workspace/SharpProof'
+            Command = 'dev'
+        },
+        [pscustomobject]@{
+            From = 'FROM toolchain AS build'
+            Root = '/src'
+            Command = 'build'
+        },
+        [pscustomobject]@{
+            From = 'FROM build AS test'
+            Root = '/src'
+            Command = 'portable-tests'
+        },
+        [pscustomobject]@{
+            From = 'FROM build AS package'
+            Root = '/src'
+            Command = 'pack'
+        })
+    foreach ($stage in $stageContracts) {
+        $stageLines = Get-DockerfileStageLines `
+            -Lines $lines `
+            -FromLine $stage.From
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^ENV SHARPPROOF_REPO_ROOT=' `
+            "ENV SHARPPROOF_REPO_ROOT=$($stage.Root)" `
+            "$($stage.Command) repository root"
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^WORKDIR ' `
+            "WORKDIR $($stage.Root)" `
+            "$($stage.Command) working directory"
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^USER ' `
+            'USER sharpproof' `
+            "$($stage.Command) user"
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^ENTRYPOINT ' `
+            'ENTRYPOINT ["/usr/local/bin/sharpproof-container"]' `
+            "$($stage.Command) entrypoint"
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^CMD ' `
+            "CMD [`"$($stage.Command)`"]" `
+            "$($stage.Command) default command"
+    }
+    $buildLines = Get-DockerfileStageLines `
+        -Lines $lines `
+        -FromLine 'FROM toolchain AS build'
+    Assert-SingleMatchingLine `
+        $buildLines `
+        '^COPY .+ \. \.$' `
+        'COPY --chown=sharpproof:sharpproof . .' `
+        'Build source ownership'
 }
 
 function Assert-ComposeAuthority {
@@ -190,6 +290,11 @@ function Assert-ComposeAuthority {
     $expectedImage = '  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}'
     Assert-SingleMatchingLine $commonLines '^  image:' $expectedImage 'Compose tooling image'
     Assert-SingleMatchingLine $commonLines '^  platform:' "  platform: $Platform" 'Compose platform'
+    Assert-SingleMatchingLine `
+        $commonLines `
+        '^    SHARPPROOF_REPO_ROOT:' `
+        '    SHARPPROOF_REPO_ROOT: /workspace/SharpProof' `
+        'Compose repository root'
     Assert-SingleMatchingLine $commonLines '^  build:' '  build:' 'Compose build mapping'
 
     $buildStart = [array]::IndexOf($commonLines, '  build:')
