@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 46 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 45 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 46 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-125 - Archive checkouts cannot run container tooling (fixed)
+
+- [x] Fixed by `3c6dd4afb` (`fix: support archive container sources`).
+- Non-certifying finite commands now materialize Git-less archive snapshots in
+  private task workspaces. Git-backed sources retain clone-plus-overlay behavior
+  for dirty, deleted, untracked, and executable source state, while revision and
+  exact-commit evidence commands reject Git-less input with a controlled error.
+- Regression coverage includes archive and Git sources, clean and dirty overlays,
+  deleted/untracked files, executable bits, ordinary versus certifying commands,
+  and a mutation restoring unconditional cloning. The 22-case focused matrix,
+  real archive `contract`, real archive full build, and Architecture 386/386
+  all passed.
 
 ### SP-AUDIT-118 - Implicit empty constructors become unmodeled calls (fixed)
 
@@ -2589,22 +2602,6 @@ Precision, documentation, and developer-experience debt that does not change a s
   effects and property-setter summaries. Add field, property, nested object,
   static side effect, throwing setter, collection-initializer, struct, and fresh
   array parity controls plus a mutation restoring detached initializer scanning.
-
-### SP-AUDIT-125 - Archive checkouts cannot run container tooling (P3)
-
-- [ ] Documentation supports source obtained as an archive and says Git is not
-  a host prerequisite, but every finite non-dev container command unconditionally
-  performs `git clone --shared` and `git rev-parse HEAD` before dispatch.
-- Supported impact: a canonical source snapshot copied without `.git` failed
-  before `tooling contract` with `fatal: repository ... does not exist`; build,
-  test, and acceptance are equally unreachable from the advertised archive form.
-- Reproduction: a disposable in-container tar copy excluded `.git`, then
-  invoked the canonical entrypoint with that copy as `SHARPPROOF_REPO_ROOT`.
-  No repository files or external state were changed.
-- Required closure: materialize finite tasks directly from a source snapshot,
-  using Git only when available for exact-commit evidence, or explicitly restore
-  Git as a documented prerequisite. Add archive/Git, dirty/deleted/untracked,
-  executable-bit, contract/build, and evidence-command controls.
 
 ### SP-AUDIT-142 - The standalone Docker build target cannot run its default command (P3)
 
