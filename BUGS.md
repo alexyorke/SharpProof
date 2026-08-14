@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 53 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 52 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 53 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-181 - Resource and concurrency documentation drifts from catalogs (fixed)
+
+- [x] Fixed by `e32f3a452` (`fix: derive resource documentation from catalogs`).
+- README and container-development documentation now carry exact claims derived
+  from the acceptance/container contract: 16 CPUs, 40,960 MiB, eight general
+  test-project lanes, and four mutation lanes. The wired documentation validator
+  checks positive/divisible catalog values and requires each computed ordinal
+  claim exactly once in both documents.
+- Regression coverage includes the stale eight-mutation-lane claim, wrong CPU or
+  memory, missing/duplicate/case/spacing drift, catalog mutation, clean controls,
+  and a guard-removal mutation. Focused tests passed 13/13 and Architecture
+  357/357.
 
 ### SP-AUDIT-146 - Diagnostic documentation contradicts rejected-API behavior (fixed)
 
@@ -2582,18 +2595,6 @@ Precision, documentation, and developer-experience debt that does not change a s
 - Required closure: give every named stage the same explicit repository root and
   non-root execution contract. Add direct build/test/package image-command,
   working-directory, UID, and Compose parity fixtures.
-
-### SP-AUDIT-181 - Resource and concurrency documentation drifts from catalogs (P3)
-
-- [ ] Container development documentation promises eight deterministic
-  mutation lanes, while the acceptance contract, implementation, and
-  architecture gate all own the value four.
-- Supported impact: operators size hosts and interpret campaign duration using
-  a nonexistent default concurrency level.
-- Required closure: generate the documented lane count from the acceptance
-  contract and reject documentation/catalog drift in either direction.
-- Consolidated cases: SP-AUDIT-194.
-- Unified closure: Generate CPU/memory and mutation concurrency statements from the acceptance/container catalogs and gate exact documentation parity.
 
 ### SP-AUDIT-182 - `sp check` is not the documented single build (P3)
 
