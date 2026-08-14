@@ -222,6 +222,7 @@ Start-AcceptanceTimingPhase -Name 'static-validation'
 . (Join-Path $repositoryRoot 'scripts\Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainerContract.ps1')
+& (Join-Path $repositoryRoot 'scripts\Generate-Readme.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-ContractApiCatalog.ps1') -Verify

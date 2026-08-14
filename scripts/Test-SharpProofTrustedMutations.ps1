@@ -1670,6 +1670,14 @@ $mutations = @(
         Mutated = '    # strict SBOM topology validation removed'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~PublicationPlanConsumesStrictReleaseSemanticsBeforeActions'
+    },
+    [pscustomobject]@{
+        Name = 'documentation-support-contract-disconnected'
+        File = 'eng\acceptance\Verify.ps1'
+        Original = "& (Join-Path `$repositoryRoot 'scripts\Generate-Readme.ps1') -Verify"
+        Mutated = '# documentation support-contract validation removed'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~DocumentationGatePrecedesPackagingAndReleaseEvidence'
     }
 )
 
