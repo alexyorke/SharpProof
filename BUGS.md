@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 72 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 71 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,23 @@ The active backlog contains 72 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-045 - Lowered IR wire form is not the exact encoder image (fixed)
+
+- [x] Fixed by `b6a98897e` (`fix: require canonical portable IR image`).
+- Portable IR decoding now re-encodes the decoded roots and program together
+  with only independently authenticated external variable slots, preserves the
+  separately authenticated member documentation identities, and byte-compares
+  the entire graph. Unused metadata and non-producer ordering therefore fail
+  before hydration; no schema field changed.
+- Regression-first tests cover unused type, identity, variable, member,
+  operation, and term rows; non-producer ordering/nested arrays; explicit valid
+  external variables; canonical controls; block boundaries; and a closure-
+  removal mutation. Focused tests passed 9/9 and boundaries 2/2; full Worker
+  480/480, Analyzer 310/310, and release closure 96/96 passed. Architecture
+  exposed two TCB/closure bookkeeping gaps, which were corrected, but the full
+  suite was not run a third time under the two-failure rule. `git diff --check`
+  passed.
 
 ### SP-AUDIT-044 - Release artifact roles are not bound to file types (fixed)
 
@@ -1794,32 +1811,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutations restoring each shape-only path.
 - Consolidated cases: SP-AUDIT-217.
 - Unified closure: Share one artifact-aware mapping from proof-core labels to exact manifest assumptions, Used flags, and summary counts in producer and validator.
-
-### SP-AUDIT-045 - Lowered IR wire form is not the exact encoder image (P2)
-
-- [ ] `PortableIrGraphCodec.Decoder` validates and materializes every type,
-  identity, variable, member, operation, and term row, but it never requires
-  the resulting metadata closure to be exactly reachable from the graph roots
-  and program. The compiler encoder builds these tables on demand and cannot
-  emit an unused row.
-- Integrity impact: multiple canonical schema-12 artifacts and hashes can
-  represent the same compiler-lowered callable, and an untrusted artifact can
-  carry arbitrary inert metadata that the worker accepts as compiler-owned.
-  This weakens canonical provenance, cache identity, and resource accounting;
-  later code cannot infer that successful hydration proves the artifact was in
-  the encoder's image.
-- Reproduction: a temporary canonical-container worker test appended one
-  unused `PortableIrOperation("unused")` to an otherwise valid contract graph,
-  serialized and canonically deserialized the artifact, then expected callable
-  hydration to reject it. `DecodeCallables` accepted the artifact without an
-  exception. The temporary test was removed.
-- Required closure: require the exact encoder-reachable metadata closure (or
-  deterministically re-encode and compare every table/slot) before returning a
-  decoded graph. Add unused type, identity, variable, member, operation, term,
-  and block fixtures; duplicated/equality-collapsing and valid shared-row
-  controls; and a mutation that removes the closure check.
-- Consolidated cases: SP-AUDIT-113, SP-AUDIT-164.
-- Unified closure: Require the exact reachable metadata closure, producer ordering/uniqueness, shared type-depth domain, and canonical re-encoding of lowered IR.
 
 ### SP-AUDIT-047 - SBOM validators accept fabricated topology (P2)
 
