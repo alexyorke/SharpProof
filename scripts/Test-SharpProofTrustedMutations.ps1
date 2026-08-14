@@ -1662,6 +1662,14 @@ $mutations = @(
         Mutated = '            true &&'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerDiagnosticCodesRequireTheExactReservedNamespace'
+    },
+    [pscustomobject]@{
+        Name = 'publication-plan-strict-sbom-semantics'
+        File = 'scripts\Publish-SharpProofRelease.ps1'
+        Original = '    Test-SharpProofSbomTopology `'
+        Mutated = '    # strict SBOM topology validation removed'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationPlanConsumesStrictReleaseSemanticsBeforeActions'
     }
 )
 
