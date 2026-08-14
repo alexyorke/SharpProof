@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 79 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 78 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 79 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-232 - Implicit base initializers skip precondition replay (fixed)
+
+- [x] Fixed by `fe3836ea6` (`fix: replay implicit base preconditions`).
+- Source constructors without an explicit initializer now discover the exact
+  compiler-selected parameterless base constructor once and anchor replay to
+  Roslyn's real block or expression body operation. Explicit `base` and `this`
+  initializers retain their existing path; structs, record copy constructors,
+  and synthesized source-less constructors remain excluded.
+- Regression-first tests cover classes and records, multiple constructors,
+  exact-once behavior, valid/object bases, explicit base and this chains,
+  generated and synthesized constructors, source and metadata targets, and a
+  discovery-removal mutation. Focused tests passed 8/8, full Analyzer 309/309,
+  Architecture 182/182, the mutation was killed, and `git diff --check` passed.
 
 ### SP-AUDIT-231 - ContractFor conflates positive and negative zero defaults (fixed)
 
@@ -1484,18 +1498,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
-
-### SP-AUDIT-232 - Implicit base initializers skip precondition replay (P1)
-
-- [ ] Constructor call-site replay adds base/this calls only when an explicit
-  `ConstructorInitializerSyntax` exists, although C# inserts `base()` for an
-  ordinary constructor with no initializer.
-- Supported impact: a derived constructor can silently violate a parameterless
-  base constructor's compiler-bound precondition while the explicit `: base()`
-  equivalent reports `SP0027`.
-- Required closure: analyze the compiler-selected implicit base call exactly
-  once. Add implicit/explicit base, this chaining, object base, generated,
-  inaccessible/unsupported, and discovery-removal controls.
 
 ### SP-AUDIT-238 - Definitely-null throws retain an impossible declared type (P1)
 
