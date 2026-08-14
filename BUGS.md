@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 39 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 38 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 39 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-049 - Release JSON decoding accepts noncanonical structures (fixed)
+
+- [x] Fixed by `6b832b746` (`fix: enforce canonical release JSON`).
+- A shared System.Text.Json authority now rejects duplicate members before
+  PowerShell conversion, enforces exact property order/set/casing, raw token
+  kinds, integral numbers, flat arrays, nested row schemas, fixed vocabulary,
+  and exact LF/no-BOM deterministic bytes for release manifests and SPDX.
+- Generation, supplied-SBOM certification, final validation, and publication
+  planning all use the authority. The 26-case fixture matrix and focused tests
+  passed; impacted Architecture integration tests passed 11/11 after their
+  parser/digest pins were updated, and release-closure checks passed 2/2.
 
 ### SP-AUDIT-029 - Publication-lock setup is not failure-atomic (fixed)
 
@@ -2163,33 +2175,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutation that restores success-only `RemoveDir` placement.
 - Consolidated cases: SP-AUDIT-206.
 - Unified closure: Own one invocation root and remove compiler and staged-worker state on prelaunch failure, success, cancellation, timeout, and bounded abandoned-root recovery.
-
-### SP-AUDIT-049 - Release JSON decoding accepts noncanonical structures (P2)
-
-- [ ] Release evidence and SPDX documents are parsed with PowerShell
-  `ConvertFrom-Json`, then validated only through the resulting object model.
-  The certifier does not reject duplicate JSON member names, require the
-  generator's canonical serialization, or compare a supplied document with a
-  canonical reserialization. PowerShell silently keeps the later duplicate.
-- Certifier impact: one supposedly immutable validated evidence file can assert
-  two conflicting package versions, repository identities, artifact graphs, or
-  SBOM fields. Consumers that retain the first occurrence can make a different
-  release decision from the SharpProof validator, while package bytes and all
-  existing checksums remain unchanged.
-- Reproduction: the audit copied the exact-HEAD release bundle and inserted a
-  forged `"packageVersion":"999.0.0-forged"` immediately before the original
-  `"packageVersion":"1.0.0-preview.1"` in `SharpProof.release.json`.
-  `Test-SharpProofReleaseArtifacts.ps1` exited zero and certified the bundle for
-  current HEAD. The disposable copy was removed.
-- Required closure: parse release and SBOM JSON with a duplicate-property-
-  rejecting reader, reject unmapped fields and noncanonical ordering/format,
-  and validate exact byte equality with the deterministic canonical form where
-  these files are authoritative. Add duplicate top-level/nested/array-row
-  properties with forged-first and forged-last order, unknown properties,
-  reordered/whitespace variants, canonical generated documents, and a
-  certifier mutation restoring permissive `ConvertFrom-Json` parsing.
-- Consolidated cases: SP-AUDIT-193, SP-AUDIT-214, SP-AUDIT-215, SP-AUDIT-229.
-- Unified closure: Use one duplicate-member-rejecting, token-aware decoder enforcing raw JSON types, flat arrays, exact vocabulary/casing, and canonical serialization.
 
 ### SP-AUDIT-063 - Publication commit is not atomic or crash-durable (P2)
 
