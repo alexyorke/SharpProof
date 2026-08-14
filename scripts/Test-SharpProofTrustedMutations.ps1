@@ -1262,6 +1262,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~FloatingDefaultBitsMustMatchExactly'
     },
     [pscustomobject]@{
+        Name = 'requires-discovers-implicit-base-constructor'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
+        Original = '            caller.ContainingType.TypeKind != TypeKind.Class ||'
+        Mutated = '            caller.ContainingType.TypeKind == TypeKind.Class ||'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ImplicitBaseInitializerReplaysParameterlessPrecondition'
+    },
+    [pscustomobject]@{
         Name = 'verifier-native-payload-is-build-tool-only'
         File = 'SharpProof.Verifier\SharpProof.Verifier.nuspec'
         Original = 'target="tools/native/linux-x64"'

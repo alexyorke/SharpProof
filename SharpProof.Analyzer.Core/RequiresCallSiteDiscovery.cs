@@ -69,6 +69,14 @@ internal sealed partial class RequiresCallSiteDiscovery(
             }
         }
 
+        if (TryGetImplicitParameterlessBaseConstructor(out var baseConstructor) &&
+            hasPotentialPreconditions(baseConstructor))
+        {
+            owners.Add(
+                ContractClauseInventoryBuilder
+                    .NormalizeCallable(caller));
+        }
+
         return owners.ToImmutable();
     }
 
@@ -92,6 +100,22 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var flowResult = flowAnalysis.Result;
         var callSites = new List<RequiresCallSiteCandidate>();
         var initializer = (operationRoot as IConstructorBodyOperation)?.Initializer;
+        if (TryGetImplicitParameterlessBaseConstructor(out var baseConstructor))
+        {
+            var constructorBody = operationRoot as IConstructorBodyOperation;
+            var origin = (IOperation?)constructorBody?.BlockBody ??
+                constructorBody?.ExpressionBody ??
+                operationRoot!;
+            callSites.Add(new RequiresCallSiteCandidate(
+                origin,
+                baseConstructor,
+                Instance: null,
+                Arguments: [],
+                ImmutableDictionary<int, IOperation>.Empty,
+                CanReplay: true,
+                Flow: null,
+                ManagedFlowStatus.BudgetExceeded));
+        }
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
             cancellationToken);
@@ -279,6 +303,49 @@ internal sealed partial class RequiresCallSiteDiscovery(
             operationRoot = null!;
             return false;
         }
+    }
+
+    private bool TryGetImplicitParameterlessBaseConstructor(
+        out IMethodSymbol baseConstructor)
+    {
+        baseConstructor = null!;
+        if (declaration is not ConstructorDeclarationSyntax
+            {
+                Initializer: null
+            } ||
+            caller is not
+            {
+                MethodKind: MethodKind.Constructor,
+                IsStatic: false
+            } ||
+            caller.ContainingType.TypeKind != TypeKind.Class ||
+            IsRecordCopyConstructor(caller))
+        {
+            return false;
+        }
+
+        var candidates = caller.ContainingType.BaseType?
+            .InstanceConstructors
+            .Where(static constructor =>
+                constructor.Parameters.IsEmpty)
+            .ToImmutableArray() ?? [];
+        if (candidates.Length != 1)
+        {
+            return false;
+        }
+
+        baseConstructor = candidates[0];
+        return true;
+    }
+
+    private static bool IsRecordCopyConstructor(
+        IMethodSymbol constructor)
+    {
+        return constructor.ContainingType.IsRecord &&
+            constructor.Parameters.Length == 1 &&
+            SymbolEqualityComparer.Default.Equals(
+                constructor.Parameters[0].Type,
+                constructor.ContainingType);
     }
 
     private bool HasReplayablePrefix(

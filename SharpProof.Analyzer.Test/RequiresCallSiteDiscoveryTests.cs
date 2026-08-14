@@ -9,6 +9,93 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class RequiresCallSiteDiscoveryTests
 {
+    [Test]
+    public void ImplicitBaseConstructorProducesOneReplayCandidate()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            public class Base { protected Base() { } }
+            public sealed class Derived : Base {
+                public Derived() { }
+            }
+            """,
+            []);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<ConstructorDeclarationSyntax>()
+            .Single(static constructor =>
+                constructor.Identifier.ValueText == "Derived");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        Assert.That(candidates!.Value, Has.Length.EqualTo(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(candidates.Value[0].TargetMethod.Name, Is.EqualTo(".ctor"));
+            Assert.That(
+                candidates.Value[0].TargetMethod.ContainingType.Name,
+                Is.EqualTo("Base"));
+            Assert.That(candidates.Value[0].Arguments, Is.Empty);
+            Assert.That(candidates.Value[0].CanReplay, Is.True);
+        }
+    }
+
+    [Test]
+    public void ImplicitMetadataBaseConstructorProducesOneReplayCandidate()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            public class MetadataBase {
+                public MetadataBase() { }
+            }
+            """,
+            "ImplicitMetadataBase");
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            public sealed class Derived : MetadataBase {
+                public Derived() { }
+            }
+            """,
+            [],
+            [external]);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<ConstructorDeclarationSyntax>()
+            .Single();
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        Assert.That(candidates!.Value, Has.Length.EqualTo(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                candidates.Value[0].TargetMethod.ContainingType.Name,
+                Is.EqualTo("MetadataBase"));
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    candidates.Value[0].TargetMethod.ContainingAssembly,
+                    compilation.Assembly),
+                Is.False);
+        }
+    }
+
+
     [TestCase(false, 0)]
     [TestCase(true, 1)]
     public async Task SourceConditionalInvocationAndArgumentsFollowEmission(
