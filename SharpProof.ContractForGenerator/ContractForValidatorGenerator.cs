@@ -40,7 +40,9 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
         AnalyzerConfigOptionsProvider optionsProvider)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
-        if (candidates.IsDefaultOrEmpty || IsProfileOff(optionsProvider))
+        if (candidates.IsDefaultOrEmpty ||
+            AnalyzerConfiguration.FromOptions(optionsProvider).Profile ==
+                SharpProofProfile.Off)
         {
             return;
         }
@@ -68,37 +70,4 @@ public sealed class ContractForValidatorGenerator : IIncrementalGenerator
         }
     }
 
-    private static bool IsProfileOff(
-        AnalyzerConfigOptionsProvider optionsProvider)
-    {
-        try
-        {
-            var options = optionsProvider.GlobalOptions;
-            foreach (var key in new[]
-                     {
-                         SharpProofConfigurationCatalog.ProfileKey,
-                         "build_property." +
-                         SharpProofConfigurationCatalog.ProfileKey,
-                         "build_property." +
-                         SharpProofConfigurationCatalog.ProfileBuildPropertyName
-                     })
-            {
-                if (options.TryGetValue(key, out var value) &&
-                    string.Equals(
-                        value.Trim(),
-                        SharpProofConfigurationCatalog.ProfileOff,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-        catch (Exception exception) when (
-            exception is not OperationCanceledException)
-        {
-            return true;
-        }
-    }
 }

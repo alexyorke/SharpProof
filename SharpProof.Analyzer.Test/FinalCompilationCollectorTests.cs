@@ -941,6 +941,32 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
+    [TestCase("advisory", "off", "all", true)]
+    [TestCase("off", "advisory", "all", false)]
+    [TestCase("invalid", "advisory", "all", false)]
+    [TestCase("   ", "off", "all", false)]
+    [TestCase(" AdViSoRy ", "strict", "contracts", true)]
+    [TestCase("advisory", "strict", "effects", true)]
+    [TestCase("advisory", "strict", "invalid", false)]
+    public async Task CollectorUsesAuthoritativeConfigurationAliasOrder(
+        string rawProfile,
+        string buildProfile,
+        string features,
+        bool shouldEmit)
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("profile-alias-order");
+        var options = Options(
+            path,
+            profile: buildProfile,
+            features: features);
+        options["sharpproof_profile"] = rawProfile;
+
+        _ = await AnalyzeCollectorAsync(CreateCompilation(), options);
+
+        Assert.That(File.Exists(path), Is.EqualTo(shouldEmit));
+    }
+
     private static async Task<string> EmitHash(
         CSharpCompilation compilation,
         string path,

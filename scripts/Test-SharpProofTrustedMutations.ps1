@@ -1134,6 +1134,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~GeneratedCompanionIsValidatedFromFinalCompilation'
     },
     [pscustomobject]@{
+        Name = 'configuration-authoritative-alias-order'
+        File = 'SharpProof.Analyzer.Core\Configuration\AnalyzerConfiguration.cs'
+        Original = '        foreach (var key in keys)'
+        Mutated = '        foreach (var key in keys.Reverse())'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~GeneratorUsesTheAuthoritativeConfigurationAliasOrder'
+    },
+    [pscustomobject]@{
         Name = 'requires-accessor-call-site-discovery'
         File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
         Original = "            IPropertyReferenceOperation property =>`n                GetPropertyCalls(property),`n            IEventReferenceOperation eventReference =>`n                GetEventCalls(eventReference),"

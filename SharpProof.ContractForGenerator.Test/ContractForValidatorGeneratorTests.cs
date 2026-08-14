@@ -1818,6 +1818,67 @@ public sealed class ContractForValidatorGeneratorTests
         Assert.That(run.Diagnostics, Is.Empty);
     }
 
+    [TestCase(
+        "sharpproof_profile", "advisory",
+        "build_property.SharpProofProfile", "off", true)]
+    [TestCase(
+        "sharpproof_profile", "off",
+        "build_property.SharpProofProfile", "advisory", false)]
+    [TestCase(
+        "sharpproof_profile", "invalid",
+        "build_property.SharpProofProfile", "advisory", false)]
+    [TestCase(
+        "sharpproof_profile", "   ",
+        "build_property.SharpProofProfile", " OFF ", false)]
+    [TestCase(
+        "build_property.sharpproof_profile", " advisory ",
+        "build_property.SharpProofProfile", "off", true)]
+    [TestCase(
+        "sharpproof_profile", " AdViSoRy ",
+        "sharpproof_features", "contracts", true)]
+    [TestCase(
+        "sharpproof_profile", "strict",
+        "sharpproof_features", "effects", true)]
+    [TestCase(
+        "sharpproof_features", "all",
+        "build_property.SharpProofProfile", "advisory", true)]
+    [TestCase(
+        "sharpproof_features", "invalid",
+        "build_property.SharpProofProfile", "advisory", false)]
+    public void GeneratorUsesTheAuthoritativeConfigurationAliasOrder(
+        string firstKey,
+        string firstValue,
+        string secondKey,
+        string secondValue,
+        bool validationEnabled)
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                void Invoke();
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Ghost(ITarget receiver) { }
+            }
+            """));
+        var run = GeneratorTestHost.Run(
+            compilation,
+            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [firstKey] = firstValue,
+                [secondKey] = secondValue
+            });
+
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            validationEnabled ? Is.EqualTo(["SPCF0004"]) : Is.Empty);
+    }
+
     [Test]
     public void GeneratedTreesAreOwnedByTheFinalCompilationAnalyzer()
     {

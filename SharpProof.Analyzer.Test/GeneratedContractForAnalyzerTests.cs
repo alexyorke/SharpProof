@@ -104,6 +104,41 @@ public sealed class GeneratedContractForAnalyzerTests
     }
 
     [Test]
+    public async Task GeneratedFinalValidationUsesAuthoritativeAliasOrder()
+    {
+        const string malformed = """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts
+            {
+            }
+            """;
+        var conflicting = await AnalyzeGeneratedAsync(
+            malformed,
+            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["sharpproof_profile"] = " advisory ",
+                ["build_property.SharpProofProfile"] = "off"
+            });
+        var invalid = await AnalyzeGeneratedAsync(
+            malformed,
+            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["sharpproof_profile"] = "invalid",
+                ["build_property.SharpProofProfile"] = "advisory"
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                conflicting.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SPCF0004"]));
+            Assert.That(invalid, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task GeneratedCompanionBodyIsNotAnalyzedAsAnImplementation()
     {
         var diagnostics = await AnalyzeGeneratedAsync(
@@ -206,7 +241,8 @@ public sealed class GeneratedContractForAnalyzerTests
         string generatedSource,
         string inputSource = Target,
         string profile = "advisory",
-        IEnumerable<string>? additionalDiagnosticIds = null)
+        IEnumerable<string>? additionalDiagnosticIds = null,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
     {
         var diagnosticIds = Enumerable.Range(1, 8)
             .Select(static index => $"SPCF{index:D4}")
@@ -225,6 +261,17 @@ public sealed class GeneratedContractForAnalyzerTests
             out var generatorDiagnostics);
         Assert.That(generatorDiagnostics, Is.Empty);
 
+        if (globalOptions != null)
+        {
+            var options = globalOptions.ToDictionary(
+                static pair => pair.Key,
+                static pair => pair.Value,
+                StringComparer.Ordinal);
+            options["build_property.SharpProofFeatures"] = "contracts";
+            return await AnalyzerTestHost.AnalyzeAsync(
+                (CSharpCompilation)output,
+                options);
+        }
         return await AnalyzerTestHost.AnalyzeAsync(
             (CSharpCompilation)output,
             mode: "CONTRACTS",
