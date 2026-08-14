@@ -1556,6 +1556,14 @@ $mutations = @(
         Mutated = '    if ($null -eq $rows[0]) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~SpdxChecksumRowsAreExact'
+    },
+    [pscustomobject]@{
+        Name = 'worker-cache-post-publish-rollback'
+        File = 'SharpProof.Worker\VerificationCache.cs'
+        Original = '                if (published && path != null)'
+        Mutated = '                if (false && published && path != null)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CacheWriteRollsBackPublicationWhenPostValidationIsCanceled'
     }
 )
 

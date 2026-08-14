@@ -4274,6 +4274,115 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task CacheHitEnforcesALoweredByteBound()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        var cacheFile = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        request.Cache.MaximumBytes = new FileInfo(cacheFile).Length - 1;
+
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task CacheHitEvictsOlderEntriesUnderTheActiveByteBound()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var firstRequest = project.CreateRequest(
+            cacheEnabled: true,
+            targetFramework: "net8.0-linux");
+        var secondRequest = project.CreateRequest(
+            cacheEnabled: true,
+            targetFramework: "net9.0-linux");
+        await worker.VerifyAsync(firstRequest);
+        var oldest = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        await worker.VerifyAsync(secondRequest);
+        var files = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json");
+        Assert.That(files, Has.Length.EqualTo(2));
+        var newest = files.Single(path => !string.Equals(
+            path,
+            oldest,
+            StringComparison.Ordinal));
+        File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
+        File.SetLastWriteTimeUtc(newest, DateTime.UtcNow);
+        secondRequest.Cache.MaximumBytes = new FileInfo(newest).Length;
+
+        var hit = await worker.VerifyAsync(secondRequest);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(hit.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                Is.EqualTo(new[] { newest }));
+        }
+    }
+
+    [Test]
+    public async Task CanceledCachePublicationCannotBecomeALaterHit()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            VerificationCache.PathValidationOverride = (_, path) =>
+            {
+                if (path.EndsWith(
+                        ".sharp-proof-cache.json",
+                        StringComparison.Ordinal) &&
+                    File.Exists(path))
+                {
+                    cancellation.Cancel();
+                    cancellation.Token.ThrowIfCancellationRequested();
+                }
+            };
+            var canceled = await worker.VerifyAsync(request, cancellation.Token);
+            Assert.That(canceled.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
+            Assert.That(
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
+        finally
+        {
+            VerificationCache.PathValidationOverride = null;
+        }
+
+        var recomputed = await worker.VerifyAsync(request);
+        var cached = await worker.VerifyAsync(request);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(recomputed.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(cached.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
     public async Task CacheEvictionPreservesUnrelatedJsonFiles()
     {
         using var project = TestProject.Create(RefutationSource);
@@ -4450,6 +4559,11 @@ public sealed class WorkerTests
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(File.Exists(cacheFile), Is.True);
             Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
+            Assert.That(
+                Directory.GetFiles(
+                    project.CacheDirectory,
+                    "*.sharp-proof-cache.json"),
+                Is.EqualTo(new[] { cacheFile }));
         }
     }
 
