@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 56 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 55 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 56 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-230 - Publication planning does not validate SBOM semantics (fixed)
+
+- [x] Closed by the strict release authorities added during SP-AUDIT-036, 038,
+  047, 067, 094, 119, 130, 134, 156, and 184, with removal coverage committed
+  by `7a33eacd6` (`test: lock publication plan semantics`).
+- Plan and real publication both call `Get-ValidatedRelease` before action
+  projection. That path authenticates exact bundle/checksum bytes, strictly
+  parses the SBOM, and validates package checksums, topology, artifact scope,
+  dependencies, components, and licenses.
+- Regression coverage includes malformed-but-rebound SBOM bytes, wrong topology,
+  licenses, components, package checksum, artifact scope, inconsistent
+  `SHA256SUMS`, validation removal/reordering, and a canonical bundle. The
+  focused matrix passed 10/10 and Architecture 343/343.
 
 ### SP-AUDIT-226 - Compiler diagnostic namespaces are not validated (fixed)
 
@@ -2425,17 +2439,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: enumerate fixture archives and compare canonical nuspec
   identity/version/role independent of filename. Add lowercase, renamed, mixed-
   case, main/symbol, duplicate, and exact-name controls.
-
-### SP-AUDIT-230 - Publication planning does not validate SBOM semantics (P2)
-
-- [ ] The canonical publication-plan path binds recorded file hashes but does
-  not run the strict SBOM or checksum semantics validator.
-- Certifier impact: replacing the SBOM with non-JSON bytes and rebinding the
-  release manifest/checksum lets plan-only succeed even though the same bundle
-  is rejected by the immutable-artifact validator.
-- Required closure: make publication planning consume the exact strict release-
-  artifact validation result before projecting actions. Add malformed/rebound
-  SBOM, inconsistent checksum, valid bundle, and validation-removal fixtures.
 
 ### SP-AUDIT-233 - Rejected metadata preconditions evade SP0047 (P2)
 
