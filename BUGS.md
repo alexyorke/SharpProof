@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 86 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 85 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 86 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-174 - Non-generic wrappers misalign generic ContractFor owners (fixed)
+
+- [x] Fixed by `ca98966f1` (`fix: align generic ContractFor owners`).
+- Type-parameter owners are now compared by ordinal position within the filtered
+  sequence of generic owner layers, so intervening non-generic lexical wrappers
+  no longer shift ownership. Existing exact arity, order, constraints,
+  nullability, and constructed-type checks remain authoritative.
+- Regression-first tests cover target-only, companion-only, aligned, and
+  multiple wrappers; generated-named sources; constructed binding; and existing
+  reordered, constraint, and closed-type negatives. Focused generator and
+  Contracts tests passed 5/5 each, full Generator 59/59, Contracts 101/101,
+  Analyzer 299/299, Architecture 182/182, and `git diff --check` passed.
 
 ### SP-AUDIT-167 - Fuzz campaign validation accepts non-schema JSON (fixed)
 
@@ -1373,18 +1386,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   each permitted producer tuple.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
-
-### SP-AUDIT-174 - Non-generic wrappers misalign generic ContractFor owners (P1)
-
-- [ ] Companion compatibility intentionally ignores non-generic lexical layers,
-  but type-parameter ownership recursively aligns every containing type layer.
-- Supported impact: a valid companion for
-  `Outer<T>.Middle.ITarget<U>` under `CompanionOuter<T>.TargetContracts<U>`
-  emits `SPCF0005`, while aligned wrappers and the supported omitted-wrapper
-  control are accepted.
-- Required closure: align generic owner layers independently of intervening
-  non-generic wrappers. Add target-only, companion-only, aligned, multiple
-  wrapper, constructed binding, reordered-owner, and generated-tree controls.
 
 ### SP-AUDIT-196 - Exact ref-readonly parameters are rejected (P1)
 
