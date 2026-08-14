@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 44 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 43 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 44 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-073 - Object-initializer writes lose fresh-object ownership (fixed)
+
+- [x] Fixed by `e7fafa0d8` (`fix: preserve fresh initializer ownership`).
+- Effect scanning now records only flow captures whose value is directly a
+  compiler-owned object or array creation and reuses that exact fresh region for
+  detached initializer assignments. External and member-derived aliases remain
+  unknown rather than being generalized as fresh.
+- Regression coverage includes field, property, indexer, nested object,
+  collection, struct, fresh array, static-effect, throwing-setter, external and
+  member-derived controls, compiler capture shapes, generated projection, and a
+  removal mutation. Effects passed 177/177 and Analyzer 323/323; Architecture's
+  corrected TCB authority check passed after the sole digest-pin failure.
 
 ### SP-AUDIT-142 - The standalone Docker build target cannot run its default command (fixed)
 
@@ -2595,26 +2608,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 ## P3 active bugs
 
 Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
-
-### SP-AUDIT-073 - Object-initializer writes lose fresh-object ownership (P3)
-
-- [ ] An object creation is assigned a fresh effect region for its constructor,
-  but the member initializer is scanned independently. Its implicit instance
-  reference is consequently classified as an unknown/method receiver rather
-  than the newly allocated object.
-- Supported impact: an otherwise complete method that only initializes a field
-  of a new object is reported incomplete and observably impure. Selected purity
-  claims are falsely rejected, and the result is inconsistent with equivalent
-  fresh array-element initialization already modeled as fresh-owned.
-- Reproduction: a focused Effects test analyzed
-  `new Value { Number = 1 }`. The write set was `Unknown`, projection
-  completeness was false, and `IsObservablePure` was false instead of a sole
-  fresh-region write and a complete pure result. The temporary test was removed.
-- Required closure: analyze object/member initializers under the enclosing
-  creation's fresh receiver region while still joining initializer-expression
-  effects and property-setter summaries. Add field, property, nested object,
-  static side effect, throwing setter, collection-initializer, struct, and fresh
-  array parity controls plus a mutation restoring detached initializer scanning.
 
 ## Current comprehensive audit evidence
 
