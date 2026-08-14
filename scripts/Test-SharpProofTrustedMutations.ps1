@@ -1734,6 +1734,14 @@ $mutations = @(
         Mutated = '        return IsSymbolDispatchUncertain(accessor);'
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~PropertyDispatchUsesTheOperationReceiver'
+    },
+    [pscustomobject]@{
+        Name = 'implicit-empty-constructor-modeling'
+        File = 'SharpProof.Effects\EffectCallSiteResolver.cs'
+        Original = '        while (EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer('
+        Mutated = '        while (false && EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer('
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ProvablyEmptyImplicitConstructorsAreModeledExactly'
     }
 )
 

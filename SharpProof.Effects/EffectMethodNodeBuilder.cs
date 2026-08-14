@@ -181,6 +181,39 @@ internal sealed class EffectMethodNodeBuilder
         return false;
     }
 
+    internal static bool IsProvablyEmptyImplicitConstructorLayer(
+        IMethodSymbol method,
+        ResolvedApiSpecTable apiSpecs)
+    {
+        var type = method.ContainingType;
+        return method.MethodKind == MethodKind.Constructor &&
+        method.IsImplicitlyDeclared &&
+        method.Parameters.IsDefaultOrEmpty &&
+        type.DeclaringSyntaxReferences.Length != 0 &&
+        !HasPotentialStaticInitialization(type, apiSpecs) &&
+        !HasInstanceMemberInitializer(type);
+    }
+
+    internal static IMethodSymbol? GetUniqueParameterlessBaseConstructor(
+        IMethodSymbol constructor)
+    {
+        var candidates = constructor.ContainingType.BaseType?
+            .InstanceConstructors
+            .Where(static candidate => candidate.Parameters.IsDefaultOrEmpty)
+            .ToImmutableArray() ?? [];
+        return candidates.Length == 1 ? candidates[0] : null;
+    }
+
+    private static bool HasInstanceMemberInitializer(INamedTypeSymbol type)
+    {
+        return type.GetMembers().Any(member =>
+            !member.IsImplicitlyDeclared &&
+            IsInitializableMember(member, staticInitializers: false) &&
+            member.DeclaringSyntaxReferences.Any(reference =>
+                EffectProjections.GetInitializerExpression(
+                    reference.GetSyntax()) != null));
+    }
+
     private static bool HasApprovedSystemObjectConstructor(
         INamedTypeSymbol type,
         ResolvedApiSpecTable apiSpecs)

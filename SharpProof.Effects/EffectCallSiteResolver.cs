@@ -67,9 +67,47 @@ internal sealed class EffectCallSiteResolver(
         ImmutableArray<EffectRegionSet> arguments)
     {
         var constructor = creation.Constructor;
-        return constructor == null
-            ? EffectSummaryOperations.Unsupported()
-            : Resolve(
+        if (constructor == null)
+        {
+            return EffectSummaryOperations.Unsupported();
+        }
+
+        var implicitLayers = EffectSummary.Empty;
+        var implicitDepth = 0;
+        while (EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer(
+                   constructor,
+                   _session.ApiSpecs))
+        {
+            if (implicitDepth++ >= 256)
+            {
+                return EffectSummaryOperations.Join(
+                    implicitLayers,
+                    EffectSummaryOperations.Unsupported());
+            }
+
+            implicitLayers = EffectSummaryOperations.Join(
+                implicitLayers,
+                EffectSummaryOperations.DirectCall());
+            if (constructor.ContainingType.IsValueType)
+            {
+                return implicitLayers;
+            }
+
+            constructor = EffectMethodNodeBuilder
+                .GetUniqueParameterlessBaseConstructor(constructor);
+            if (constructor == null)
+            {
+                return EffectSummaryOperations.Join(
+                    implicitLayers,
+                    EffectSummaryOperations.Unsupported());
+            }
+
+            arguments = [];
+        }
+
+        return EffectSummaryOperations.Join(
+            implicitLayers,
+            Resolve(
                 constructor,
                 receiver,
                 arguments,
@@ -79,7 +117,7 @@ internal sealed class EffectCallSiteResolver(
                 dispatchUncertain: false,
                 creation,
                 instance: null,
-                creation.Arguments);
+                creation.Arguments));
     }
 
     internal static ImmutableArray<IOperation?> AlignActualArguments(

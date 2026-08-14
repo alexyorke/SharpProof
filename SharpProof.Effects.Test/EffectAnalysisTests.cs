@@ -1044,6 +1044,100 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ProvablyEmptyImplicitConstructorsAreModeledExactly()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+                public static int Touch() => ++State;
+            }
+
+            public sealed class ImplicitClass { }
+
+            public sealed class ExplicitClass {
+                public ExplicitClass() { }
+            }
+
+            public class ExplicitEmptyBase {
+                protected ExplicitEmptyBase() { }
+            }
+
+            public sealed class ImplicitEmptyDerived : ExplicitEmptyBase { }
+
+            public struct ImplicitStruct { }
+
+            public sealed record ImplicitRecord;
+
+            public class EffectfulBase {
+                protected EffectfulBase() {
+                    Global.Touch();
+                }
+            }
+
+            public sealed class ImplicitDerived : EffectfulBase { }
+
+            public sealed class MemberInitializer {
+                private readonly int _value = Global.Touch();
+            }
+
+            public sealed class StaticInitializer {
+                private static readonly int Value = Global.Touch();
+            }
+
+            public static class Sample {
+                public static ImplicitClass Class() => new();
+                public static ExplicitClass Explicit() => new();
+                public static ImplicitEmptyDerived EmptyDerived() => new();
+                public static ImplicitStruct Struct() => new();
+                public static ImplicitRecord Record() => new();
+                public static ImplicitDerived Derived() => new();
+                public static MemberInitializer Member() => new();
+                public static StaticInitializer Static() => new();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "Class", "Explicit", "EmptyDerived", "Struct", "Record"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+                Assert.That(
+                    result.Summary.Uncertainty & EffectUncertainty.UnmodeledCall,
+                    Is.EqualTo(EffectUncertainty.None),
+                    methodName);
+            }
+        }
+
+        foreach (var methodName in new[] { "Member", "Static" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete),
+                methodName);
+        }
+
+        var derived = session.Analyze(Method(compilation, "Derived"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                derived.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(
+                derived.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+        }
+    }
+
+    [Test]
     public void ObjectAndCollectionInitializersContributeTheirEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(
