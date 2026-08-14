@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 45 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 44 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 45 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-142 - The standalone Docker build target cannot run its default command (fixed)
+
+- [x] Fixed by `ba0cfa03a` (`fix: align standalone container stages`).
+- The toolchain now owns the non-root user and its NuGet/.NET state, including
+  `/home/sharpproof/.local/share/NuGet`. Every named stage declares its exact
+  repository root, workdir, non-root user, entrypoint, and default command; the
+  build copy is owned by that user and Compose remains bound to the dev root.
+- Regression coverage rejects missing and decoy stage contracts, NuGet state,
+  source ownership, and Compose drift. Architecture passed 392/392; direct
+  build/dev/test/package images built, and the build image's default command
+  completed with zero warnings and errors. The four scratch validation tags
+  were removed afterward and are recoverable from the cached builds.
 
 ### SP-AUDIT-125 - Archive checkouts cannot run container tooling (fixed)
 
@@ -2602,21 +2615,6 @@ Precision, documentation, and developer-experience debt that does not change a s
   effects and property-setter summaries. Add field, property, nested object,
   static side effect, throwing setter, collection-initializer, struct, and fresh
   array parity controls plus a mutation restoring detached initializer scanning.
-
-### SP-AUDIT-142 - The standalone Docker build target cannot run its default command (P3)
-
-- [ ] The Dockerfile `build` stage copies the repository to `/src` and declares
-  `CMD ["build"]`, but unlike later `test` and `package` stages it does not set
-  `SHARPPROOF_REPO_ROOT=/src`. The shared entrypoint defaults to the nonexistent
-  `/workspace/SharpProof`.
-- Supported impact: running the named immutable build image fails during its
-  pre-dispatch Git snapshot instead of executing the build it declares.
-- Evidence: the Dockerfile stage/root/command and entrypoint default form an
-  unconditional path mismatch; Compose avoids it only by using the `dev` stage.
-- Required closure: give every named stage the same explicit repository root and
-  non-root execution contract. Add direct build/test/package image-command,
-  working-directory, UID, and Compose parity fixtures.
-
 
 ## Current comprehensive audit evidence
 
