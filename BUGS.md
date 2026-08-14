@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 77 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 76 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 77 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-027 - Release-tag validation accepts branch refs (fixed)
+
+- [x] Fixed by `7280c988d` (`fix: require exact release tag identity`).
+- Release-tag validation now unconditionally requires the exact
+  `refs/tags/v<version>` ref and name, `GITHUB_SHA` equal to checkout HEAD, an
+  annotated tag object whose peeled commit equals that SHA, and ancestry from
+  `origin/master`.
+- A regression-first disposable local bare-remote fixture covers the exact
+  annotated control; branch, empty, non-version, and wrong-version refs; wrong
+  name/SHA/HEAD/tag commit; missing and lightweight tags; and missing/diverged
+  `origin/master`. The focused fixture passed 1/1, full Architecture 183/183,
+  and `git diff --check` passed. The broader release-publication test command
+  timed out once after 124 seconds without a test result and was not restarted.
 
 ### SP-AUDIT-238 - Definitely-null throws retain an impossible declared type (fixed)
 
@@ -1619,27 +1633,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   conflicting nonblank aliases rather than silently selecting one. Add all
   alias permutations, invalid values, redundant equal values, provider failure,
   MSBuild-only, and mutation-discriminating parity cases.
-
-### SP-AUDIT-027 - Release-tag validation accepts branch refs (P2)
-
-- [ ] `Invoke-SharpProofReleaseContainer.ps1 -Mode ValidateTag` performs its
-  tag name, annotation, commit, and `origin/master` ancestry checks only when
-  `GITHUB_REF` starts with `refs/tags/v`. Every other nonempty ref skips the
-  entire validation block and is reported as a valid release identity.
-- Certifier impact: the authoritative `tooling release-tag` command can certify
-  a branch, a non-version tag, or another arbitrary ref. The current GitHub
-  workflow's tag-only job condition mitigates its normal path, but local
-  qualification and future workflow reuse can accept an invalid release
-  identity instead of failing closed.
-- Reproduction: in the canonical container, `GITHUB_REF=refs/heads/master`,
-  `GITHUB_REF_NAME=master`, and `GITHUB_SHA` equal to the checkout HEAD made
-  `tooling release-tag` exit zero and print `Release identity is valid` for
-  `1.0.0-preview.1`.
-- Required closure: unconditionally require exact
-  `refs/tags/v<SharpProofPackageVersion>`, then require the matching annotated
-  tag object, resolved tag commit equal to `GITHUB_SHA` and checkout HEAD, and
-  ancestry from `origin/master`. Add branch, non-version tag, lightweight tag,
-  wrong-version, wrong-commit, and exact-valid-annotated-tag fixtures.
 
 ### SP-AUDIT-029 - Publication-lock setup is not failure-atomic (P2)
 
