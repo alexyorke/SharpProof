@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 36 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 35 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,20 @@ The active backlog contains 36 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-075 - Effective verifier I/O topology is incompletely validated (fixed)
+
+- [x] Fixed by `969dc2c2e` (`fix: preflight publication path topology`) and
+  `5d93d37ac` (`fix: validate complete verifier path topology`).
+- Complete canonical publication sets now reject duplicates and symmetric
+  ancestor conflicts before metadata creation. Build-task and launcher
+  preflights apply the same exact/inode/ancestor authority across outputs,
+  inputs, enabled cache, and the worker runtime tree; disabled cache paths are
+  excluded.
+- The publication matrix passed 7/7, the active topology matrix passed 10/10,
+  Worker passed 520/520, and Architecture passed 410/410. Both removal
+  mutations were killed directly. The broad Package attempt remained blocked
+  by unrelated native-payload and stale-fixture prerequisites.
 
 ### SP-AUDIT-074 - Response validation accepts an impossible cache hit (fixed)
 
@@ -2223,30 +2237,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   restores manifest/request-first publication.
 - Consolidated cases: SP-AUDIT-176.
 - Unified closure: Publish one generation transactionally, sync data and directories, publish the commit member last, and roll back or invalidate the whole set on failure.
-
-### SP-AUDIT-075 - Effective verifier I/O topology is incompletely validated (P2)
-
-- [ ] Publication lock objects create each lock's parent directory before the
-  complete destination set is proven structurally valid. If one destination is
-  nested beneath another destination filename, preparing the child's lock
-  creates the parent destination itself as a directory; ownership binding then
-  rejects the set but does not undo that filesystem mutation.
-- Supported impact: an ordinary invalid configuration fails as intended yet
-  leaves a configured output path behind as an unowned directory. Subsequent
-  corrected builds can remain blocked, and fail-closed validation has mutated
-  the publication namespace it was supposed to preserve.
-- Reproduction: a focused Linux host test acquired a set containing
-  `result.json` and `result.json/child.json`. Acquisition threw `IOException`,
-  but `result.json` existed afterward as a directory. The temporary test was
-  removed.
-- Required closure: validate ancestor/descendant conflicts for the complete
-  canonical set before constructing locks or directories, and make all
-  pre-acquisition metadata setup failure-atomic. Add both nesting orders,
-  three-level paths, pre-existing parent directories, siblings, lock/marker
-  residue, retry, and valid disjoint controls plus a containment mutation that
-  removes the structural preflight.
-- Consolidated cases: SP-AUDIT-085, SP-AUDIT-103, SP-AUDIT-205.
-- Unified closure: Derive active paths once and reject duplicate or symmetric ancestor conflicts across the complete publication, input, cache, and runtime topology before mutation.
 
 ### SP-AUDIT-089 - Compiler callable state differs across producer and hydrator (P2)
 
