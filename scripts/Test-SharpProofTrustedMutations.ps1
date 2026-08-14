@@ -1889,6 +1889,14 @@ $mutations = @(
         Mutated = '        if (false) { return; }'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ConcreteSelectedAutoAccessorsAbstainExactlyOnce'
+    },
+    [pscustomobject]@{
+        Name = 'rejected-metadata-precondition-accountability'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteAnalyzer.cs'
+        Original = '            if (session.HasRejectedMetadataPrecondition(contractTarget))'
+        Mutated = '            if (false && session.HasRejectedMetadataPrecondition(contractTarget))'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ReadableRejectedMetadataPreconditionsAreReportedAtEveryCallSite'
     }
 )
 

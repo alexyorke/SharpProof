@@ -98,6 +98,21 @@ internal sealed class ContractSelectionInventory
         Is(attribute, InRange);
     }
 
+    internal bool IsRejectedClosedContract(AttributeData attribute)
+    {
+        if (!_identity.TryGetRejectedAttributeMetadataName(
+                attribute,
+                out var metadataName))
+        {
+            return false;
+        }
+
+        return metadataName is
+            ContractApiMetadata.NotNull or
+            ContractApiMetadata.Positive or
+            ContractApiMetadata.InRange;
+    }
+
     internal bool IsEffectContract(AttributeData attribute)
     {
         return Is(attribute, EnforcePure) ||

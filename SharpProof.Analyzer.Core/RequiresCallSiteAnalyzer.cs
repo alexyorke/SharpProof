@@ -203,6 +203,15 @@ internal static partial class RequiresCallSiteAnalyzer
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
+            if (session.HasRejectedMetadataPrecondition(contractTarget))
+            {
+                SharpProofControlAttributePolicy.ReportRejectedContractApi(
+                    contractTarget.Name,
+                    candidate.Operation.Syntax.GetLocation(),
+                    reportDiagnostic);
+                return AnalyzerSemanticOutcome.Unknown;
+            }
+
             var binding = session.BindRequires(contractTarget);
             if (binding is not { IsSuccess: true, Contracts: not null })
             {

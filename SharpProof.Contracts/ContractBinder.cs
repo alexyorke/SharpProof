@@ -271,11 +271,16 @@ public sealed class ContractBinder(
     {
         foreach (var attribute in attributes)
         {
+            if (_api!.Selections.IsRejectedClosedContract(attribute))
+            {
+                return ContractBindingFailure.InvalidClosedAttribute;
+            }
+
             var validation = ClosedContractAttributeValidator.Validate(
                 attribute,
                 sourceType,
                 refKind,
-                _api!.Selections);
+                _api.Selections);
             if (!validation.IsRecognized)
             {
                 continue;

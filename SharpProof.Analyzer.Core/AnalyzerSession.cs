@@ -172,6 +172,15 @@ internal sealed class AnalyzerSession
                 clause.Kind == BoundContractKind.Requires);
     }
 
+    internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
+    {
+        method = EffectAnalysisSession.NormalizeMethod(method);
+        return method.DeclaringSyntaxReferences.IsEmpty &&
+            method.Parameters.Any(parameter =>
+                parameter.GetAttributes().Any(attribute =>
+                    Attributes.IsRejectedClosedContract(attribute)));
+    }
+
     internal bool TryBeginRequiresCallSiteAnalysis(
         IMethodSymbol method)
     {
