@@ -1678,6 +1678,14 @@ $mutations = @(
         Mutated = '# documentation support-contract validation removed'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~DocumentationGatePrecedesPackagingAndReleaseEvidence'
+    },
+    [pscustomobject]@{
+        Name = 'documentation-contract-api-silence-guard'
+        File = 'scripts\Generate-Readme.ps1'
+        Original = "    'disable contract analysis without a diagnostic',"
+        Mutated = "    'unrelated stale claim',"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
     }
 )
 

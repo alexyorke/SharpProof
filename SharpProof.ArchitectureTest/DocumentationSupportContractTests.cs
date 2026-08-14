@@ -11,6 +11,7 @@ public sealed class DocumentationSupportContractTests
     [TestCase("stale-win-x64", false)]
     [TestCase("package-version-drift", false)]
     [TestCase("support-drift", false)]
+    [TestCase("stale-contract-api-silence", false)]
     public async Task DocumentationSupportContractRejectsDrift(
         string mutation,
         bool expectedSuccess)

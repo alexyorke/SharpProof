@@ -504,6 +504,54 @@ foreach ($launcherDiagnostic in @('SP0047', 'SP0048')) {
     }
 }
 
+$contractApiDescriptors = @(
+    $analyzerDescriptorOutput[0].diagnostics |
+        Where-Object { $_.id -in @('SP0047', 'SP0050') }
+)
+if ($contractApiDescriptors.Count -ne 2 -or
+    @($contractApiDescriptors | ForEach-Object { [string]$_.id } |
+        Sort-Object) -join ',' -cne 'SP0047,SP0050') {
+    throw 'Diagnostic authority must contain exactly SP0047 and SP0050.'
+}
+$rejectedIdentitySource = Get-RequiredText (
+    'SharpProof.Analyzer.Core\SharpProofControlAttributePolicy.cs')
+if ([regex]::Matches(
+        $rejectedIdentitySource,
+        '"ContractApiIdentityRejected"').Count -ne 1) {
+    throw (
+        'Rejected contract API behavior must have one canonical ' +
+        'ContractApiIdentityRejected reason.')
+}
+$requiredContractApiDocumentation = @(
+    'SP0047 also reports `ContractApiIdentityRejected`',
+    'A readable payload whose hash does not match the pin is rejected and every',
+    'attempted use reports SP0047 `ContractApiIdentityRejected`',
+    'SP0050 is reserved for a payload that cannot be read.'
+)
+foreach ($required in $requiredContractApiDocumentation) {
+    if (-not $diagnosticReference.Contains(
+            $required,
+            [StringComparison]::Ordinal)) {
+        throw (
+            'Diagnostic documentation does not match rejected contract API ' +
+            "behavior: missing '$required'.")
+    }
+}
+$forbiddenContractApiSilenceClaims = @(
+    'disable contract analysis without a diagnostic',
+    'disables contract analysis without a diagnostic',
+    'continues to disable contract analysis without a diagnostic'
+)
+foreach ($forbidden in $forbiddenContractApiSilenceClaims) {
+    if ($diagnosticReference.Contains(
+            $forbidden,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw (
+            'Diagnostic documentation contains the stale readable-payload ' +
+            "silence claim: '$forbidden'.")
+    }
+}
+
 $architecture = Get-RequiredText 'docs\architecture.md'
 $architectureAnchors = Get-MarkdownAnchors $architecture
 if (-not $architectureAnchors.Contains('mechanized-boundaries')) {

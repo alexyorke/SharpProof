@@ -253,16 +253,14 @@ was built against. SP0050 is emitted when that assembly is referenced and
 located but cannot be read to check the pin -- a sharing violation, an
 antivirus scanner, a permission failure, or an unreadable network share.
 
-The diagnostic exists because the failure is otherwise invisible. An
+The diagnostic exists because the failure would otherwise be invisible. An
 unverifiable contract API leaves every `Contract.Requires`, `Contract.Ensures`,
-and closed contract attribute unresolvable, so the whole contract surface
-silently disappears and the analyzer reports nothing at all -- which is
-indistinguishable from code that has no contracts. It is an infrastructure
-failure, never a contract or proof outcome.
+and closed contract attribute unresolvable. SP0050 makes that infrastructure
+failure explicit; it is never a contract or proof outcome.
 
-A payload that reads successfully but does not match the pin is not SP0050.
-That is a genuine identity mismatch rather than an environment fault, and it
-continues to disable contract analysis without a diagnostic.
+A readable payload whose hash does not match the pin is rejected and every
+attempted use reports SP0047 `ContractApiIdentityRejected`; the rejected symbol
+supplies no proof fact. SP0050 is reserved for a payload that cannot be read.
 
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor generator diagnostics

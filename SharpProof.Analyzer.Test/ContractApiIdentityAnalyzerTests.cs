@@ -413,4 +413,85 @@ public sealed class ContractApiIdentityAnalyzerTests
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain("SP0050"));
     }
+
+    [Test]
+    public async Task ReadableWrongPayloadReportsRejectedIdentityInsteadOfSilence()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """;
+        var attributesPath =
+            typeof(SharpProof.Attributes.Contract).Assembly.Location;
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProofWrongPayload-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var copied = Path.Combine(directory, "SharpProof.Attributes.dll");
+        File.Copy(attributesPath, copied);
+        await using (var stream = new FileStream(
+                         copied,
+                         FileMode.Append,
+                         FileAccess.Write,
+                         FileShare.None))
+        {
+            await stream.WriteAsync(new byte[] { 0x5a });
+        }
+
+        try
+        {
+            var wrongPayload = MetadataReference.CreateFromFile(copied);
+            var trustedPlatformAssemblies =
+                (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
+                throw new InvalidOperationException(
+                    "Trusted platform assemblies are unavailable.");
+            var references = trustedPlatformAssemblies
+                .Split(Path.PathSeparator)
+                .Where(static path => !string.Equals(
+                    Path.GetFileName(path),
+                    "SharpProof.Attributes.dll",
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(static path => MetadataReference.CreateFromFile(path))
+                .Cast<MetadataReference>()
+                .Append(wrongPayload);
+            var compilation = CSharpCompilation.Create(
+                "WrongPayloadContractApiFixture",
+                [CSharpSyntaxTree.ParseText(source)],
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                    .WithSpecificDiagnosticOptions(
+                        new SharpProofAnalyzer().SupportedDiagnostics
+                            .ToImmutableDictionary(
+                                static descriptor => descriptor.Id,
+                                static descriptor => descriptor.Id == "SP0047"
+                                    ? ReportDiagnostic.Warn
+                                    : ReportDiagnostic.Suppress,
+                                StringComparer.Ordinal)));
+
+            var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+                compilation,
+                mode: null,
+                profile: "advisory",
+                features: "contracts");
+
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+            Assert.That(
+                diagnostics.Single().GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture),
+                Does.Contain("Identity")
+                    .And.Contain("ContractApiIdentityRejected"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

@@ -5,7 +5,8 @@ param(
         'clean',
         'stale-win-x64',
         'package-version-drift',
-        'support-drift')]
+        'support-drift',
+        'stale-contract-api-silence')]
     [string]$Mutation
 )
 
@@ -13,7 +14,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$readmePath = Join-Path $repositoryRoot 'README.md'
+$relativePath = if ($Mutation -eq 'stale-contract-api-silence') {
+    'docs\diagnostic-examples.md'
+}
+else {
+    'README.md'
+}
+$readmePath = Join-Path $repositoryRoot $relativePath
 $originalBytes = [IO.File]::ReadAllBytes($readmePath)
 try {
     $text = [Text.Encoding]::UTF8.GetString($originalBytes)
@@ -34,6 +41,11 @@ try {
         }
         'support-drift' {
             $text += "`nThe verifier is supported only on Windows x64.`n"
+        }
+        'stale-contract-api-silence' {
+            $text += (
+                "`nA readable wrong-payload SharpProof.Attributes assembly " +
+                "disables contract analysis without a diagnostic.`n")
         }
     }
     [IO.File]::WriteAllText(
