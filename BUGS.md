@@ -2192,9 +2192,17 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Reproduction: the read-only compiler auditor produced both artifacts and
   confirmed the source span remained correct while only display coordinates
   violated the shared model.
+- Partial remediation (04d933623): compiler diagnostics now emit one-based
+  mapped coordinates and share the protocol's positive-location/all-zero
+  non-source predicate. Regression coverage includes first position, multiline,
+  `#line`, generated source, exact-end zero-length spans, malformed mixed-zero
+  shapes, and a conversion-removal mutation. The row remains active because
+  schema 12 has no syntax-tree ordinal/hash, source text, or line-map authority
+  with which hydration could recompute and authenticate mapped geometry.
 - Required closure: add one to mapped source coordinates, allow the all-zero
-  sentinel only for genuinely non-source diagnostics, and cover first position,
-  multiline, `#line`, sentinel, and conversion-removal mutations.
+  sentinel only for genuinely non-source diagnostics, then version the artifact
+  so hydration can bind every location to its physical tree, checked source
+  extent, and authenticated line map.
 - Consolidated cases: SP-AUDIT-179, SP-AUDIT-220, SP-AUDIT-236.
 - Unified closure: Bind every location to a physical tree and line-map identity; validate checked spans, sealed source length, and recomputed one-based mapped coordinates together.
 
