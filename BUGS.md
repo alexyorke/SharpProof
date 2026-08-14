@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 33 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 32 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 33 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-199 - Offline collision checks use case-sensitive filenames (fixed)
+
+- [x] Fixed by `b61380af3` (`fix: detect semantic offline package collisions`).
+- Fixture feeds are now recursively cataloged by strict nuspec ID/version and
+  DLL-versus-PDB package role. Duplicate or malformed semantic identities fail
+  closed, while main and symbol collisions use NuGet's case-insensitive
+  identity semantics independently of archive filenames.
+- The focused destination matrix passed 37/37 and Architecture passed 428/428;
+  all modified PowerShell scripts parsed in the canonical container.
 
 ### SP-AUDIT-117 - Selected auto-accessors disappear without an outcome (fixed)
 
@@ -2480,16 +2490,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: impose the exact producer-representable upper bound and,
   where launcher context is authoritative, the checked project-wall/grace
   envelope. Add zero, boundary, boundary+1, long-max, and overflow controls.
-
-### SP-AUDIT-199 - Offline collision checks use case-sensitive filenames (P2)
-
-- [ ] Fixture simulation probes only the exact local artifact filename, whereas
-  NuGet identity and real V3 lookup normalize package ID/version casing.
-- Certifier impact: the same package stored under a lowercase or otherwise
-  renamed flat-container filename is missed on Linux and planned as `Push`.
-- Required closure: enumerate fixture archives and compare canonical nuspec
-  identity/version/role independent of filename. Add lowercase, renamed, mixed-
-  case, main/symbol, duplicate, and exact-name controls.
 
 ### SP-AUDIT-233 - Rejected metadata preconditions evade SP0047 (P2)
 
