@@ -1479,6 +1479,18 @@ $mutations = @(
         Mutated = '            $false -and [string]$matches[0].licenseDeclared -cne'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~SbomLicensesMatchTheExactPackageAuthority'
+    },
+    [pscustomobject]@{
+        Name = 'release-third-party-component-projection'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = (@'
+    if ($actual.Count -ne $expected.Count -or
+        ($actual | ConvertTo-Json -Depth 4 -Compress) -cne
+            ($expected | ConvertTo-Json -Depth 4 -Compress)) {
+'@).TrimEnd()
+        Mutated = '    if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ThirdPartyInventoryMatchesCatalogPayloadAndSbomOwnership'
     }
 )
 

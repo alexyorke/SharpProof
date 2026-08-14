@@ -335,9 +335,98 @@ function Get-SharpProofThirdPartyComponentGraph {
                 id = [string]$_.id
                 version = [string]$_.version
                 license = [string]$_.license
+                entries = @(@($_.entries) |
+                    ForEach-Object { [string]$_ } |
+                    Sort-Object)
             }
         }
     })
+}
+
+function Test-SharpProofThirdPartyComponentProjection {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$ActualComponents,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$ExpectedComponents
+    )
+
+    $propertyNames = @('entries', 'id', 'license', 'packageId', 'version')
+    foreach ($component in $ActualComponents) {
+        $actualPropertyNames = @($component.PSObject.Properties.Name |
+            Sort-Object)
+        if (($actualPropertyNames -join '|') -cne
+            ($propertyNames -join '|')) {
+            throw 'Third-party component inventory has an invalid schema.'
+        }
+    }
+    function ConvertTo-ComponentRecord([object]$Component) {
+        return [pscustomobject][ordered]@{
+            packageId = [string]$Component.packageId
+            id = [string]$Component.id
+            version = [string]$Component.version
+            license = [string]$Component.license
+            entries = @(@($Component.entries) |
+                ForEach-Object { [string]$_ } |
+                Sort-Object)
+        }
+    }
+    $actual = @($ActualComponents |
+        ForEach-Object { ConvertTo-ComponentRecord $_ } |
+        Sort-Object packageId, id, version)
+    $expected = @($ExpectedComponents |
+        ForEach-Object { ConvertTo-ComponentRecord $_ } |
+        Sort-Object packageId, id, version)
+    if ($actual.Count -ne $expected.Count -or
+        ($actual | ConvertTo-Json -Depth 4 -Compress) -cne
+            ($expected | ConvertTo-Json -Depth 4 -Compress)) {
+        throw 'Third-party component inventory does not match the authenticated catalog projection.'
+    }
+}
+
+function Test-SharpProofSbomComponentGraph {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$SbomPackages,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$Relationships,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$Components
+    )
+
+    $componentIdentities = @($Components |
+        ForEach-Object { [string]$_.id + "`0" + [string]$_.version } |
+        Sort-Object -Unique)
+    $actualComponents = @($SbomPackages | Where-Object {
+        $key = [string]$_.name + "`0" + [string]$_.versionInfo
+        $componentIdentities -ccontains $key
+    })
+    if ($actualComponents.Count -ne $componentIdentities.Count) {
+        throw 'SPDX SBOM third-party component package graph is not exact.'
+    }
+    $contains = @($Relationships | Where-Object {
+        [string]$_.relationshipType -ceq 'CONTAINS'
+    })
+    if ($contains.Count -ne $Components.Count) {
+        throw 'SPDX SBOM third-party containment graph is not exact.'
+    }
+    foreach ($component in $Components) {
+        $owner = Get-SharpProofDependencySpdxId `
+            -Name ([string]$component.packageId)
+        $componentId = Get-SharpProofDependencySpdxId `
+            -Name (([string]$component.id) + '-' + ([string]$component.version))
+        if (@($contains | Where-Object {
+                [string]$_.spdxElementId -ceq $owner -and
+                [string]$_.relatedSpdxElement -ceq $componentId
+            }).Count -ne 1) {
+            throw "SPDX SBOM containment is invalid: $($component.packageId)/$($component.id)"
+        }
+    }
 }
 
 function Test-SharpProofSbomDependencyGraph {

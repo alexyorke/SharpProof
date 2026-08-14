@@ -685,10 +685,15 @@ foreach ($item in $identities |
         })
     }
 }
+$catalogComponents = @(Get-SharpProofThirdPartyComponentGraph `
+    -ContractPath $resolvedThirdPartyManifest)
+Test-SharpProofThirdPartyComponentProjection `
+    -ActualComponents @($thirdPartyComponents) `
+    -ExpectedComponents $catalogComponents
 $sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
     -PackageLicenseGraph $licenseGraph `
     -PackageVersion $versions[0] `
-    -ThirdPartyComponents @($thirdPartyComponents))
+    -ThirdPartyComponents $catalogComponents)
 
 $artifacts = [Collections.Generic.List[object]]::new()
 foreach ($item in $identities) {
@@ -831,6 +836,10 @@ foreach ($component in $thirdPartyComponents) {
 Test-SharpProofSbomDependencyGraph `
     -Relationships $relationships `
     -DependencyGraph $dependencyGraph
+Test-SharpProofSbomComponentGraph `
+    -SbomPackages $sbomPackages `
+    -Relationships $relationships `
+    -Components @($thirdPartyComponents)
 Test-SharpProofSbomLicenseGraph `
     -SbomPackages $sbomPackages `
     -LicenseGraph $sbomLicenseGraph

@@ -121,6 +121,10 @@ if ($payloadSets.Count -ne $expectedPackageIds.Count -or
         ($expectedPackageIds -join '|'))) {
     throw 'Release evidence does not contain the exact package payload graph.'
 }
+$catalogComponents = @(Get-SharpProofThirdPartyComponentGraph)
+Test-SharpProofThirdPartyComponentProjection `
+    -ActualComponents @($manifest.thirdPartyComponents) `
+    -ExpectedComponents $catalogComponents
 foreach ($packageId in $expectedPackageIds) {
     $mainArtifact = @(
         $artifacts |
@@ -137,7 +141,7 @@ foreach ($packageId in $expectedPackageIds) {
             }
     )[0]
     $components = @(
-        $manifest.thirdPartyComponents |
+        $catalogComponents |
             Where-Object { [string]$_.packageId -eq $packageId }
     )
     $null = Test-SharpProofPackagePayload `
@@ -181,7 +185,7 @@ $licenseGraph = @(Get-SharpProofPackageLicenseGraph `
 $sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
     -PackageLicenseGraph $licenseGraph `
     -PackageVersion $expectedVersion `
-    -ThirdPartyComponents @(Get-SharpProofThirdPartyComponentGraph))
+    -ThirdPartyComponents $catalogComponents)
 $sbomArtifact = @(
     $artifacts |
         Where-Object { [string]$_.kind -eq 'sbom' }
@@ -202,7 +206,7 @@ $sbomPackages = @($sbom.packages)
 $documentDescribes = @($sbom.documentDescribes)
 $relationships = @($sbom.relationships)
 $componentKeys = @(
-    $manifest.thirdPartyComponents |
+    $catalogComponents |
         ForEach-Object {
             [string]$_.id + "`0" + [string]$_.version
         } |
@@ -254,7 +258,7 @@ foreach ($key in $componentKeys) {
         throw "Release SBOM component identity is invalid: $($parts[0])"
     }
 }
-foreach ($component in $manifest.thirdPartyComponents) {
+foreach ($component in $catalogComponents) {
     $containerId = Get-SpdxPackageId -Name ([string]$component.packageId)
     $componentId = Get-SpdxPackageId `
         -Name ([string]$component.id) `
@@ -273,6 +277,10 @@ foreach ($component in $manifest.thirdPartyComponents) {
 Test-SharpProofSbomDependencyGraph `
     -Relationships $relationships `
     -DependencyGraph $dependencyGraph
+Test-SharpProofSbomComponentGraph `
+    -SbomPackages $sbomPackages `
+    -Relationships $relationships `
+    -Components $catalogComponents
 Test-SharpProofSbomLicenseGraph `
     -SbomPackages $sbomPackages `
     -LicenseGraph $sbomLicenseGraph

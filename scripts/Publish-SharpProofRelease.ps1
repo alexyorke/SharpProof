@@ -367,6 +367,10 @@ function Get-ValidatedRelease {
             (@($packageOrder | Sort-Object) -join '|'))) {
         throw 'Release manifest has an invalid package payload graph.'
     }
+    $catalogComponents = @(Get-SharpProofThirdPartyComponentGraph)
+    Test-SharpProofThirdPartyComponentProjection `
+        -ActualComponents @($manifest.thirdPartyComponents) `
+        -ExpectedComponents $catalogComponents
     foreach ($packageId in $packageOrder) {
         $main = @(
             $packageArtifacts |
@@ -419,7 +423,7 @@ function Get-ValidatedRelease {
                 "'$RepositoryCommit' for '$packageId'.")
         }
         $components = @(
-            $manifest.thirdPartyComponents |
+            $catalogComponents |
                 Where-Object { [string]$_.packageId -eq $packageId }
         )
         $null = Test-SharpProofPackagePayload `
@@ -469,7 +473,7 @@ function Get-ValidatedRelease {
     $sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
         -PackageLicenseGraph $licenseGraph `
         -PackageVersion $version `
-        -ThirdPartyComponents @(Get-SharpProofThirdPartyComponentGraph))
+        -ThirdPartyComponents $catalogComponents)
     $sbomPath = Get-ArtifactPath `
         -Directory $Directory `
         -FileName ([string]$sbomArtifacts[0].fileName)
@@ -484,6 +488,10 @@ function Get-ValidatedRelease {
     if ($null -eq $sbom.PSObject.Properties['packages']) {
         throw 'Release SBOM has no package graph.'
     }
+    Test-SharpProofSbomComponentGraph `
+        -SbomPackages @($sbom.packages) `
+        -Relationships @($sbom.relationships) `
+        -Components $catalogComponents
     Test-SharpProofSbomLicenseGraph `
         -SbomPackages @($sbom.packages) `
         -LicenseGraph $sbomLicenseGraph
