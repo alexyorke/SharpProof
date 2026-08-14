@@ -1174,6 +1174,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SourceConditionalInvocationAndArgumentsFollowEmission'
     },
     [pscustomobject]@{
+        Name = 'requires-parenthesized-call-ownership'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
+        Original = '            expression = parenthesized.Expression;'
+        Mutated = '            expression = null;'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ParenthesizedDirectCallsReplayPreconditionsInEveryOwnedShape'
+    },
+    [pscustomobject]@{
         Name = 'nightly-fuzz-command-connected'
         File = '.github\workflows\nightly.yml'
         Original = '          docker compose run --rm tooling fuzz-nightly'

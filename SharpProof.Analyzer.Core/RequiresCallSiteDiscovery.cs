@@ -290,7 +290,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 declaration);
         if (body is ExpressionSyntax expression)
         {
-            return expression.Span == callSite.Syntax.Span;
+            return IsOwnedCallSiteExpression(
+                expression,
+                callSite.Syntax);
         }
 
         if (declaration is ConstructorDeclarationSyntax constructor &&
@@ -354,7 +356,6 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IOperation callSite,
         DefiniteOperationFacts operationFacts)
     {
-        var span = callSite.Syntax.Span;
         return statement switch
         {
             ExpressionStatementSyntax
@@ -362,23 +363,45 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 Expression: AssignmentExpressionSyntax assignment
             } when assignment.IsKind(
                 SyntaxKind.SimpleAssignmentExpression) =>
-                assignment.Right.Span == span &&
+                IsOwnedCallSiteExpression(
+                    assignment.Right,
+                    callSite.Syntax) &&
                 operationFacts.CompletesNormally(
                     semanticModel.GetOperation(
                         assignment.Left,
                         cancellationToken)),
             ExpressionStatementSyntax expression =>
-                expression.Expression.Span == span,
+                IsOwnedCallSiteExpression(
+                    expression.Expression,
+                    callSite.Syntax),
             LocalDeclarationStatementSyntax local =>
                 local.Declaration.Variables.Count == 1 &&
-                local.Declaration.Variables[0]
-                    .Initializer?.Value.Span == span,
+                IsOwnedCallSiteExpression(
+                    local.Declaration.Variables[0]
+                        .Initializer?.Value,
+                    callSite.Syntax),
             ReturnStatementSyntax returned =>
-                returned.Expression?.Span == span,
+                IsOwnedCallSiteExpression(
+                    returned.Expression,
+                    callSite.Syntax),
             ThrowStatementSyntax thrown =>
-                thrown.Expression?.Span == span,
+                IsOwnedCallSiteExpression(
+                    thrown.Expression,
+                    callSite.Syntax),
             _ => false
         };
+    }
+
+    private static bool IsOwnedCallSiteExpression(
+        ExpressionSyntax? expression,
+        SyntaxNode callSiteSyntax)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        return expression?.Span == callSiteSyntax.Span;
     }
 
     private static ImmutableArray<RequiresCallTarget> GetCalls(
