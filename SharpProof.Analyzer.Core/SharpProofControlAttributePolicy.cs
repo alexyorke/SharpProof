@@ -23,6 +23,37 @@ internal static class SharpProofControlAttributePolicy
     {
         _ = ValidateScope(
             symbol, session, reportDiagnostic, cancellationToken);
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!session.Attributes.IsRejectedControlAttribute(attribute) ||
+                !session.TryMarkRejectedControlAttributeReported(attribute))
+            {
+                continue;
+            }
+
+            var location = attribute.ApplicationSyntaxReference?
+                .GetSyntax(cancellationToken).GetLocation() ??
+                symbol.Locations.FirstOrDefault(static candidate =>
+                    candidate.IsInSource) ??
+                Location.None;
+            ReportRejectedContractApi(
+                symbol.Name,
+                location,
+                reportDiagnostic);
+        }
+    }
+
+    internal static void ReportRejectedContractApi(
+        string ownerName,
+        Location location,
+        Action<Diagnostic> reportDiagnostic)
+    {
+        reportDiagnostic(Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+            location,
+            ownerName,
+            "ContractApiIdentityRejected"));
     }
 
     internal static void ValidateNestedCallableDeclaration(

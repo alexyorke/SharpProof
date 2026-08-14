@@ -139,6 +139,22 @@ internal sealed class ContractSelectionInventory
     internal ContractSelectionFeatures GetRejectedSelectionFeatures(
         IMethodSymbol method)
     {
+        var selected = GetRejectedCallableSelectionFeatures(method);
+        for (var type = method.ContainingType;
+             type != null;
+             type = type.ContainingType)
+        {
+            selected |= GetRejectedControlFeatures(type.GetAttributes());
+        }
+
+        selected |= GetRejectedControlFeatures(
+            method.ContainingAssembly.GetAttributes());
+        return selected;
+    }
+
+    internal ContractSelectionFeatures GetRejectedCallableSelectionFeatures(
+        IMethodSymbol method)
+    {
         var selected = ContractSelectionFeatures.None;
         foreach (var attribute in GetCallableAttributes(method))
         {
@@ -157,17 +173,17 @@ internal sealed class ContractSelectionInventory
         {
             selected |= GetRejectedFeature(attribute);
         }
-
-        for (var type = method.ContainingType;
-             type != null;
-             type = type.ContainingType)
-        {
-            selected |= GetRejectedControlFeatures(type.GetAttributes());
-        }
-
-        selected |= GetRejectedControlFeatures(
-            method.ContainingAssembly.GetAttributes());
         return selected;
+    }
+
+    internal bool IsRejectedControlAttribute(AttributeData attribute)
+    {
+        return _identity.TryGetRejectedAttributeMetadataName(
+                attribute,
+                out var metadataName) &&
+            metadataName is
+                ContractApiMetadata.Trusted or
+                ContractApiMetadata.Suppress;
     }
 
     private ContractSelectionFeatures GetRejectedControlFeatures(
@@ -176,12 +192,7 @@ internal sealed class ContractSelectionInventory
         var selected = ContractSelectionFeatures.None;
         foreach (var attribute in attributes)
         {
-            if (_identity.TryGetRejectedAttributeMetadataName(
-                    attribute,
-                    out var metadataName) &&
-                metadataName is
-                    ContractApiMetadata.Trusted or
-                    ContractApiMetadata.Suppress)
+            if (IsRejectedControlAttribute(attribute))
             {
                 selected |= ContractSelectionFeatures.Contracts |
                     ContractSelectionFeatures.Effects;

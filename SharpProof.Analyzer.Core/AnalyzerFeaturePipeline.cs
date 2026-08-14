@@ -89,7 +89,10 @@ internal static partial class AnalyzerFeaturePipeline
         var rejectedContractApi =
             session.Attributes.GetRejectedSelectionFeatures(method) !=
             ContractSelectionFeatures.None;
-        if (rejectedContractApi &&
+        var rejectedCallableApi =
+            session.Attributes.GetRejectedCallableSelectionFeatures(method) !=
+            ContractSelectionFeatures.None;
+        if (rejectedCallableApi &&
             session.TryMarkRejectedContractApiReported(method))
         {
             ReportRejectedContractApi(
@@ -429,13 +432,12 @@ internal static partial class AnalyzerFeaturePipeline
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        reportDiagnostic(Diagnostic.Create(
-            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+        SharpProofControlAttributePolicy.ReportRejectedContractApi(
+            method.Name,
             AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
                 method,
                 cancellationToken),
-            method.Name,
-            "ContractApiIdentityRejected"));
+            reportDiagnostic);
     }
 
     private static IEnumerable<IMethodSymbol> GetNestedOwners(

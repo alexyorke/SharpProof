@@ -526,6 +526,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SelectedGeneratedMethodIsAnalyzedAndReported'
     },
     [pscustomobject]@{
+        Name = 'rejected-control-declaration-scope'
+        File = 'SharpProof.Analyzer.Core\SharpProofControlAttributePolicy.cs'
+        Original = '            if (!session.Attributes.IsRejectedControlAttribute(attribute) ||'
+        Mutated = '            if (true ||'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~SourceShadowedControlAttributesReportOnEveryDeclaredScope'
+    },
+    [pscustomobject]@{
         Name = 'advisory-lazy-state-creation'
         File = 'SharpProof.Analyzer.Core\AnalyzerSession.cs'
         Original = '_callPreconditions = new('

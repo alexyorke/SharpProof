@@ -44,6 +44,8 @@ internal sealed class AnalyzerSession
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _reportedRejectedContractApis =
             new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
+        _reportedRejectedControlAttributes = new();
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _requiresCallSiteAnalyses =
             new(SymbolEqualityComparer.Default);
@@ -256,5 +258,15 @@ internal sealed class AnalyzerSession
         return _reportedRejectedContractApis.TryAdd(
             ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
+    }
+
+    internal bool TryMarkRejectedControlAttributeReported(
+        AttributeData attribute)
+    {
+        var reference = attribute.ApplicationSyntaxReference;
+        return reference == null ||
+            _reportedRejectedControlAttributes.TryAdd(
+                (reference.SyntaxTree, reference.Span),
+                0);
     }
 }

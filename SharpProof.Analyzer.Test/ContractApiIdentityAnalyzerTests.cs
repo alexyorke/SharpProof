@@ -129,6 +129,151 @@ public sealed class ContractApiIdentityAnalyzerTests
     }
 
     [Test]
+    public async Task SourceShadowedControlAttributesReportOnEveryDeclaredScope()
+    {
+        const string source =
+            """
+            [assembly: SharpProof.Attributes.SharpProofTrusted("assembly")]
+
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(
+                    System.AttributeTargets.Assembly |
+                    System.AttributeTargets.Class |
+                    System.AttributeTargets.Method,
+                    AllowMultiple = true)]
+                public sealed class SharpProofSuppressAttribute :
+                    System.Attribute {
+                    public SharpProofSuppressAttribute(string reason) { }
+                }
+
+                [System.AttributeUsage(
+                    System.AttributeTargets.Assembly |
+                    System.AttributeTargets.Class |
+                    System.AttributeTargets.Method,
+                    AllowMultiple = true)]
+                public sealed class SharpProofTrustedAttribute :
+                    System.Attribute {
+                    public SharpProofTrustedAttribute(string reason) { }
+                }
+            }
+
+            [SharpProof.Attributes.SharpProofSuppress("empty")]
+            public sealed class Empty { }
+
+            [SharpProof.Attributes.SharpProofTrusted("outer")]
+            public sealed class Outer {
+                [SharpProof.Attributes.SharpProofSuppress("nested")]
+                public sealed class Nested { }
+            }
+
+            [SharpProof.Attributes.SharpProofSuppress("partial-one")]
+            public partial class Partial { }
+            [SharpProof.Attributes.SharpProofTrusted("partial-two")]
+            public partial class Partial { }
+
+            [SharpProof.Attributes.SharpProofSuppress("with-method")]
+            public sealed class WithMethod {
+                public void Method() { }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(Enumerable.Repeat("SP0047", 7)));
+            Assert.That(
+                diagnostics.Select(diagnostic => diagnostic.GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture)),
+                Has.All.Contain("ContractApiIdentityRejected"));
+        }
+    }
+
+    [Test]
+    public async Task ReferencedLookalikeControlAttributesReportWithoutMethods()
+    {
+        var lookalike = AnalyzerTestHost.EmitReference(
+            """
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(
+                    System.AttributeTargets.Assembly |
+                    System.AttributeTargets.Class)]
+                public sealed class SharpProofSuppressAttribute :
+                    System.Attribute {
+                    public SharpProofSuppressAttribute(string reason) { }
+                }
+
+                [System.AttributeUsage(
+                    System.AttributeTargets.Assembly |
+                    System.AttributeTargets.Class)]
+                public sealed class SharpProofTrustedAttribute :
+                    System.Attribute {
+                    public SharpProofTrustedAttribute(string reason) { }
+                }
+            }
+            """,
+            "ShadowControlAttributes").WithAliases(["shadow"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            extern alias shadow;
+            [assembly: shadow::SharpProof.Attributes.SharpProofTrusted("assembly")]
+
+            [shadow::SharpProof.Attributes.SharpProofSuppress("type")]
+            public sealed class Empty { }
+            """,
+            mode: null,
+            enabledIds: ["SP0047"],
+            additionalReferences: [lookalike],
+            profile: "advisory",
+            features: "contracts");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047", "SP0047"]));
+    }
+
+    [Test]
+    public async Task ExactAndGeneratedControlAttributePoliciesRemainStable()
+    {
+        var exact = await Analyze(
+            """
+            using SharpProof.Attributes;
+            [assembly: SharpProofTrusted("assembly")]
+
+            [SharpProofSuppress("type")]
+            public sealed class Empty { }
+            """);
+        var generatedLookalike = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            namespace SharpProof.Attributes {
+                [System.AttributeUsage(System.AttributeTargets.Class)]
+                public sealed class SharpProofSuppressAttribute :
+                    System.Attribute {
+                    public SharpProofSuppressAttribute(string reason) { }
+                }
+            }
+
+            [SharpProof.Attributes.SharpProofSuppress("generated")]
+            internal sealed class GeneratedEmpty { }
+            """,
+            mode: null,
+            enabledIds: ["SP0047"],
+            profile: "advisory",
+            features: "contracts",
+            filePath: "Generated.Control.g.cs");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exact, Is.Empty);
+            Assert.That(
+                generatedLookalike.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+        }
+    }
+
+    [Test]
     public async Task RejectedReturnAttributeCannotProveCallerEffectTransitively()
     {
         const string source =
