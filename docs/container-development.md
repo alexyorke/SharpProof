@@ -64,9 +64,14 @@ trusted mutations remain a separate exact-commit gate.
 
 The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
 Roslyn's compiler server. A no-change rebuild is therefore incremental.
-Finite `docker compose run --rm tooling ...` commands deliberately clone into
-a clean temporary workspace and pay a cold build; use them for qualification,
-not for every edit.
+Finite `docker compose run --rm tooling ...` commands materialize the current
+source snapshot in a private temporary workspace and pay a cold build; use them
+for qualification, not for every edit. `contract`, `build`, and ordinary test
+commands work when the source directory came from an archive without `.git`.
+Commands that compare revisions or certify exact-commit evidence (`test-changed`,
+acceptance, mutation, packaging, pilots, fuzz, coverage, and release commands)
+require a Git-backed source workspace. Start the persistent Dev Container to
+obtain that workspace using container Git; Git remains unnecessary on the host.
 
 `portable-tests`, broad coverage, and acceptance run independent test projects
 through MSBuild's project scheduler.

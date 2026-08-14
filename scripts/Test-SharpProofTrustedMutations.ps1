@@ -1742,6 +1742,14 @@ $mutations = @(
         Mutated = '        while (false && EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer('
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~ProvablyEmptyImplicitConstructorsAreModeledExactly'
+    },
+    [pscustomobject]@{
+        Name = 'container-archive-source-materialization'
+        File = 'eng\container\entrypoint.sh'
+        Original = '    if [[ "${source_has_git}" = "true" ]]; then'
+        Mutated = '    if [[ "true" = "true" ]]; then'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FiniteCommandsRunFromAnArchiveWithoutGit'
     }
 )
 

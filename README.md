@@ -97,9 +97,12 @@ Compose derives its default project name from the source directory. Put a
 distinct `COMPOSE_PROJECT_NAME` and optional `SHARPPROOF_DEV_REF` in each
 checkout's untracked `.env` file. The persistent source volume, NuGet cache,
 and .NET home are then private to that Compose project. Finite task commands
-clone into a temporary container workspace instead of writing host `bin` or
-`obj` trees; only deliberate evidence is copied to the mounted checkout's
-`artifacts` folder.
+materialize the current source snapshot in a temporary container workspace
+instead of writing host `bin` or `obj` trees; only deliberate evidence is
+copied to the mounted checkout's `artifacts` folder. Archive sources without
+`.git` support contract, build, and ordinary test commands. Revision comparison
+and exact-commit evidence commands require the Git-backed persistent workspace,
+which the container creates without requiring host Git.
 
 The coordinates below are the intended preview packages, but no SharpProof
 package has been promoted to the public NuGet feed yet. Until the first
