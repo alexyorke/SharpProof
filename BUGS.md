@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 49 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 48 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,19 @@ The active backlog contains 49 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-035 - Compile-time-false loops are classified as diverging (fixed)
+
+- [x] Fixed by `66a09c788` (`fix: prune constant-infeasible loop edges`).
+- Abstract flow now excludes compiler-proven infeasible conditional CFG edges
+  from cycle detection/dataflow, and effect scanning suppresses unreachable
+  while/for bodies and incrementors even inside an unknown enclosing cycle.
+  `do/while(false)` still executes once; true and unknown loops remain
+  conservatively divergent.
+- Regression coverage includes while/for/do true, false, and unknown forms,
+  nested loop directions, unreachable write/allocation/throw effects, generated
+  projection, and a raw-cycle mutation. Effects passed 173/173, Analyzer
+  320/320, and Architecture 367/367.
 
 ### SP-AUDIT-222 - API-spec typing loses exact substituted types (fixed)
 
@@ -2530,26 +2543,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 ## P3 active bugs
 
 Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
-
-### SP-AUDIT-035 - Compile-time-false loops are classified as diverging (P3)
-
-- [ ] Termination classification calls `ManagedAbstractFlow.IsAcyclic` over
-  reachable Roslyn CFG blocks, but follows every regular successor from each
-  starting block without excluding a constant-infeasible edge. A syntactic
-  loop therefore supplies a back edge even when its condition is the constant
-  `false` and the body can never execute.
-- Supported impact: a complete effect summary for `while (false) { }` reported
-  `EffectTermination.MayDiverge` instead of `Terminates`. A valid selected
-  termination claim can consequently be rejected for an exact, bounded
-  control-flow shape.
-- Reproduction: a temporary canonical-container Effects regression analyzed a
-  method containing only `while (false) { }`; the focused assertion expected
-  `Terminates` and received `MayDiverge`.
-- Required closure: perform cycle detection over feasible CFG edges, at least
-  folding compiler constants before following conditional successors, while
-  remaining conservative for unknown conditions. Add while/for/do forms,
-  false/true/unknown conditions, unreachable-body effects, nested loops, and a
-  mutation that restores raw syntactic-cycle classification.
 
 ### SP-AUDIT-073 - Object-initializer writes lose fresh-object ownership (P3)
 
