@@ -480,15 +480,22 @@ function Get-ValidatedRelease {
         -FileName ([string]$sbomArtifacts[0].fileName)
     $sbom = Get-Content -LiteralPath $sbomPath -Raw |
         ConvertFrom-Json
-    if ($null -eq $sbom.PSObject.Properties['relationships']) {
-        throw 'Release SBOM has no relationship graph.'
+    if ($null -eq $sbom.PSObject.Properties['relationships'] -or
+        $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
+        $null -eq $sbom.PSObject.Properties['packages']) {
+        throw 'Release SBOM has no complete package topology.'
     }
+    Test-SharpProofSbomTopology `
+        -SbomPackages @($sbom.packages) `
+        -DocumentDescribes @($sbom.documentDescribes) `
+        -Relationships @($sbom.relationships) `
+        -FirstPartyPackageIds $packageOrder `
+        -PackageVersion $version `
+        -Components $catalogComponents `
+        -DependencyGraph $dependencyGraph
     Test-SharpProofSbomDependencyGraph `
         -Relationships @($sbom.relationships) `
         -DependencyGraph $dependencyGraph
-    if ($null -eq $sbom.PSObject.Properties['packages']) {
-        throw 'Release SBOM has no package graph.'
-    }
     Test-SharpProofSbomComponentGraph `
         -SbomPackages @($sbom.packages) `
         -Relationships @($sbom.relationships) `

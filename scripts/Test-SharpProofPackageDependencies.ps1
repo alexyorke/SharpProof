@@ -456,6 +456,123 @@ function Test-SharpProofSbomDependencyGraph {
     }
 }
 
+function Test-SharpProofSbomTopology {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$SbomPackages,
+        [Parameter(Mandatory = $true)][object[]]$DocumentDescribes,
+        [Parameter(Mandatory = $true)][object[]]$Relationships,
+        [Parameter(Mandatory = $true)][string[]]$FirstPartyPackageIds,
+        [Parameter(Mandatory = $true)][string]$PackageVersion,
+        [Parameter(Mandatory = $true)][object[]]$Components,
+        [Parameter(Mandatory = $true)][object[]]$DependencyGraph
+    )
+
+    function PackageIdentity([string]$Name, [string]$Version) {
+        return [pscustomobject][ordered]@{
+            name = $Name
+            version = $Version
+            spdxId = Get-SharpProofDependencySpdxId `
+                -Name $(if ($Version -ceq $PackageVersion -and
+                    $FirstPartyPackageIds -ccontains $Name) {
+                        $Name
+                    }
+                    else {
+                        "$Name-$Version"
+                    })
+        }
+    }
+    $expectedPackages = [Collections.Generic.List[object]]::new()
+    foreach ($id in @($FirstPartyPackageIds | Sort-Object -Unique)) {
+        $expectedPackages.Add((PackageIdentity $id $PackageVersion))
+    }
+    foreach ($group in @($Components | Group-Object {
+                [string]$_.id + "`0" + [string]$_.version
+            })) {
+        $expectedPackages.Add((PackageIdentity `
+            ([string]$group.Group[0].id) `
+            ([string]$group.Group[0].version)))
+    }
+    $expectedPackages = @($expectedPackages | Sort-Object name, version)
+    if ($expectedPackages.Count -ne
+            @($expectedPackages.spdxId | Sort-Object -Unique).Count) {
+        throw 'SPDX SBOM canonical package identities collide.'
+    }
+    $actualPackages = @($SbomPackages | ForEach-Object {
+        [pscustomobject][ordered]@{
+            name = [string]$_.name
+            version = [string]$_.versionInfo
+            spdxId = [string]$_.SPDXID
+        }
+    } | Sort-Object name, version)
+    if ($actualPackages.Count -ne $expectedPackages.Count -or
+        ($actualPackages | ConvertTo-Json -Compress) -cne
+            ($expectedPackages | ConvertTo-Json -Compress)) {
+        throw 'SPDX SBOM package identities are not the exact canonical graph.'
+    }
+
+    $expectedDescribes = @($FirstPartyPackageIds |
+        ForEach-Object { Get-SharpProofDependencySpdxId -Name $_ } |
+        Sort-Object)
+    $actualDescribes = @($DocumentDescribes |
+        ForEach-Object { [string]$_ } | Sort-Object)
+    if ($actualDescribes.Count -ne $expectedDescribes.Count -or
+        ($actualDescribes -join '|') -cne ($expectedDescribes -join '|')) {
+        throw 'SPDX documentDescribes is not the exact first-party package graph.'
+    }
+
+    $expectedRelationships = [Collections.Generic.List[object]]::new()
+    foreach ($id in $FirstPartyPackageIds) {
+        $expectedRelationships.Add([pscustomobject][ordered]@{
+            from = 'SPDXRef-DOCUMENT'
+            type = 'DESCRIBES'
+            to = Get-SharpProofDependencySpdxId -Name $id
+        })
+    }
+    foreach ($component in $Components) {
+        $expectedRelationships.Add([pscustomobject][ordered]@{
+            from = Get-SharpProofDependencySpdxId `
+                -Name ([string]$component.packageId)
+            type = 'CONTAINS'
+            to = Get-SharpProofDependencySpdxId `
+                -Name (([string]$component.id) + '-' +
+                    ([string]$component.version))
+        })
+    }
+    foreach ($dependency in $DependencyGraph) {
+        $expectedRelationships.Add([pscustomobject][ordered]@{
+            from = Get-SharpProofDependencySpdxId `
+                -Name ([string]$dependency.FromId)
+            type = 'DEPENDS_ON'
+            to = Get-SharpProofDependencySpdxId `
+                -Name ([string]$dependency.ToId)
+        })
+    }
+    $expectedRelationships = @($expectedRelationships |
+        Sort-Object from, type, to)
+    $expectedRelationshipKeys = @($expectedRelationships |
+        ForEach-Object { $_.from + "`0" + $_.type + "`0" + $_.to } |
+        Sort-Object -Unique)
+    if ($expectedRelationshipKeys.Count -ne $expectedRelationships.Count) {
+        throw 'Authenticated SPDX relationship inputs contain duplicates.'
+    }
+    $actualRelationships = @($Relationships | ForEach-Object {
+        if ((@($_.PSObject.Properties.Name | Sort-Object) -join '|') -cne
+            'relatedSpdxElement|relationshipType|spdxElementId') {
+            throw 'SPDX relationship rows have an invalid schema.'
+        }
+        [pscustomobject][ordered]@{
+            from = [string]$_.spdxElementId
+            type = [string]$_.relationshipType
+            to = [string]$_.relatedSpdxElement
+        }
+    } | Sort-Object from, type, to)
+    if ($actualRelationships.Count -ne $expectedRelationships.Count -or
+        ($actualRelationships | ConvertTo-Json -Compress) -cne
+            ($expectedRelationships | ConvertTo-Json -Compress)) {
+        throw 'SPDX relationships are not the exact canonical topology.'
+    }
+}
+
 function Test-SharpProofSbomLicenseGraph {
     param(
         [Parameter(Mandatory = $true)]

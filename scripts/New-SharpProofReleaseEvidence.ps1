@@ -752,6 +752,14 @@ if ($null -eq $sbom.PSObject.Properties['packages'] -or
 $sbomPackages = @($sbom.packages)
 $documentDescribes = @($sbom.documentDescribes)
 $relationships = @($sbom.relationships)
+Test-SharpProofSbomTopology `
+    -SbomPackages $sbomPackages `
+    -DocumentDescribes $documentDescribes `
+    -Relationships $relationships `
+    -FirstPartyPackageIds $expectedIds `
+    -PackageVersion $versions[0] `
+    -Components @($thirdPartyComponents) `
+    -DependencyGraph $dependencyGraph
 $expectedComponentKeys = @(
     $thirdPartyComponents |
         ForEach-Object {

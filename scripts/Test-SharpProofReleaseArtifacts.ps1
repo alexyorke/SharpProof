@@ -206,6 +206,14 @@ if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
 $sbomPackages = @($sbom.packages)
 $documentDescribes = @($sbom.documentDescribes)
 $relationships = @($sbom.relationships)
+Test-SharpProofSbomTopology `
+    -SbomPackages $sbomPackages `
+    -DocumentDescribes $documentDescribes `
+    -Relationships $relationships `
+    -FirstPartyPackageIds $expectedPackageIds `
+    -PackageVersion $expectedVersion `
+    -Components $catalogComponents `
+    -DependencyGraph $dependencyGraph
 $componentKeys = @(
     $catalogComponents |
         ForEach-Object {

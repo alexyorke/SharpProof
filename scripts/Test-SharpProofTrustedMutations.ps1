@@ -1520,6 +1520,18 @@ $mutations = @(
         Mutated = '            true,'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DecoderRejectsMetadataOutsideTheCanonicalEncoderImage'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-spdx-topology'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = (@'
+    if ($actualRelationships.Count -ne $expectedRelationships.Count -or
+        ($actualRelationships | ConvertTo-Json -Compress) -cne
+            ($expectedRelationships | ConvertTo-Json -Compress)) {
+'@).TrimEnd()
+        Mutated = '    if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SbomTopologyIsTheExactAuthenticatedProjection'
     }
 )
 

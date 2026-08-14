@@ -220,6 +220,60 @@ public sealed class PackageDependencyAuthorityTests
         }
     }
 
+    [TestCase("canonical", true)]
+    [TestCase("extra-contains", false)]
+    [TestCase("extra-depends", false)]
+    [TestCase("other-type", false)]
+    [TestCase("missing", false)]
+    [TestCase("reversed", false)]
+    [TestCase("duplicate", false)]
+    [TestCase("wrong-spdx", false)]
+    [TestCase("self-consistent-spdx", false)]
+    [TestCase("id-collision", false)]
+    [TestCase("extra-package", false)]
+    [TestCase("extra-describes", false)]
+    public async Task SbomTopologyIsTheExactAuthenticatedProjection(
+        string mutation,
+        bool expectedSuccess)
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-sbom-topology-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var result = await RunSbomTopologyAuthorityAsync(root, mutation);
+            Assert.That(
+                result.ExitCode == 0,
+                Is.EqualTo(expectedSuccess),
+                result.Output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task EveryReleaseAuthorityUsesTheExactSbomTopology()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var scriptName in new[]
+                 {
+                     "New-SharpProofReleaseEvidence.ps1",
+                     "Test-SharpProofReleaseArtifacts.ps1",
+                     "Publish-SharpProofRelease.ps1"
+                 })
+        {
+            var script = await File.ReadAllTextAsync(
+                Path.Combine(root, "scripts", scriptName));
+            Assert.That(
+                script,
+                Does.Contain("Test-SharpProofSbomTopology"),
+                scriptName);
+        }
+    }
+
     private static string[] WritePackageGraph(string root, string mutation)
     {
         var paths = new List<string>();
@@ -610,6 +664,62 @@ public sealed class PackageDependencyAuthorityTests
             "-ActualComponents $actual -ExpectedComponents $expected\n" +
             "Test-SharpProofSbomComponentGraph -SbomPackages $packages " +
             "-Relationships $relationships -Components $expected\n",
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        return await RunPowerShellAsync(repositoryRoot, runner, mutation);
+    }
+
+    private static async Task<ProcessResult> RunSbomTopologyAuthorityAsync(
+        string root,
+        string mutation)
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var runner = Path.Combine(root, "run-sbom-topology-authority.ps1");
+        await File.WriteAllTextAsync(
+            runner,
+            "param([string]$Helper,[string]$Mutation)\n" +
+            ". $Helper\n" +
+            "$ids=@('SharpProof.Attributes','SharpProof','SharpProof.Verifier')\n" +
+            "$version='1.0.0-preview.1'\n" +
+            "$components=@(" +
+            "[pscustomobject]@{packageId='SharpProof';id='Component.A';version='1'}," +
+            "[pscustomobject]@{packageId='SharpProof.Verifier';id='Component.B';version='2'})\n" +
+            "$graph=@(" +
+            "[pscustomobject]@{FromId='SharpProof';ToId='SharpProof.Attributes'}," +
+            "[pscustomobject]@{FromId='SharpProof.Verifier';ToId='SharpProof'})\n" +
+            "$packages=@($ids|ForEach-Object{[pscustomobject]@{" +
+            "name=$_;versionInfo=$version;SPDXID=(Get-SharpProofDependencySpdxId $_)}})\n" +
+            "$packages+=@($components|ForEach-Object{[pscustomobject]@{" +
+            "name=$_.id;versionInfo=$_.version;SPDXID=" +
+            "(Get-SharpProofDependencySpdxId ($_.id+'-'+$_.version))}})\n" +
+            "$describes=@($ids|ForEach-Object{Get-SharpProofDependencySpdxId $_})\n" +
+            "$rows=@($ids|ForEach-Object{[pscustomobject]@{" +
+            "spdxElementId='SPDXRef-DOCUMENT';relationshipType='DESCRIBES';" +
+            "relatedSpdxElement=(Get-SharpProofDependencySpdxId $_)}})\n" +
+            "$rows+=@($components|ForEach-Object{[pscustomobject]@{" +
+            "spdxElementId=(Get-SharpProofDependencySpdxId $_.packageId);" +
+            "relationshipType='CONTAINS';relatedSpdxElement=" +
+            "(Get-SharpProofDependencySpdxId ($_.id+'-'+$_.version))}})\n" +
+            "$rows+=@($graph|ForEach-Object{[pscustomobject]@{" +
+            "spdxElementId=(Get-SharpProofDependencySpdxId $_.FromId);" +
+            "relationshipType='DEPENDS_ON';relatedSpdxElement=" +
+            "(Get-SharpProofDependencySpdxId $_.ToId)}})\n" +
+            "switch($Mutation){\n" +
+            " 'extra-contains' {$rows+=[pscustomobject]@{spdxElementId=$rows[3].spdxElementId;relationshipType='CONTAINS';relatedSpdxElement=$rows[4].relatedSpdxElement}}\n" +
+            " 'extra-depends' {$rows+=[pscustomobject]@{spdxElementId=$rows[5].spdxElementId;relationshipType='DEPENDS_ON';relatedSpdxElement=$rows[6].relatedSpdxElement}}\n" +
+            " 'other-type' {$rows[0].relationshipType='GENERATED_FROM'}\n" +
+            " 'missing' {$rows=@($rows[1..($rows.Count-1)])}\n" +
+            " 'reversed' {$v=$rows[5].spdxElementId;$rows[5].spdxElementId=$rows[5].relatedSpdxElement;$rows[5].relatedSpdxElement=$v}\n" +
+            " 'duplicate' {$rows+=$rows[0]}\n" +
+            " 'wrong-spdx' {$packages[0].SPDXID='SPDXRef-Package-Wrong'}\n" +
+            " 'self-consistent-spdx' {$packages[3].SPDXID='SPDXRef-Package-Fabricated';$rows[3].relatedSpdxElement='SPDXRef-Package-Fabricated'}\n" +
+            " 'id-collision' {$packages[3].SPDXID=$packages[0].SPDXID}\n" +
+            " 'extra-package' {$packages+=[pscustomobject]@{name='Extra';versionInfo='1';SPDXID='SPDXRef-Package-Extra'}}\n" +
+            " 'extra-describes' {$describes+='SPDXRef-Package-Extra'}\n" +
+            "}\n" +
+            "Test-SharpProofSbomTopology -SbomPackages $packages " +
+            "-DocumentDescribes $describes -Relationships $rows " +
+            "-FirstPartyPackageIds $ids -PackageVersion $version " +
+            "-Components $components -DependencyGraph $graph\n",
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         return await RunPowerShellAsync(repositoryRoot, runner, mutation);
     }
