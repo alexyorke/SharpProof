@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 34 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 33 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 34 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-117 - Selected auto-accessors disappear without an outcome (fixed)
+
+- [x] Fixed by `85ce7973c` (`fix: reconcile selected auto-accessors`).
+- Concrete semicolon accessors can no longer be owned by synthesized operation
+  callbacks. Selected accessors are inventoried by syntax and reconciled at
+  compilation end, producing one typed MissingOperationRoot abstention when no
+  semantic outcome exists; suppression and generated-code policy remain exact.
+- The focused accessor matrix passed 4/4, Analyzer passed 335/335, and
+  Architecture passed 417/417.
 
 ### SP-AUDIT-095 - SBOM package URLs are not validated (fixed)
 
@@ -2310,22 +2320,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   controls; a wire-version decision may be required.
 - Consolidated cases: SP-AUDIT-195.
 - Unified closure: Seal sorted selected pack IDs and exact catalog/version digest even when unused, with one identity predicate from catalog load through hydration.
-
-### SP-AUDIT-117 - Selected auto-accessors disappear without an outcome (P2)
-
-- [ ] Symbol validation returns early for every concrete non-extern method and
-  relies on operation-block callbacks. A semicolon auto-accessor has no source
-  body that enters the normal effect pipeline, and no end-of-compilation check
-  reconciles selected methods with recorded outcomes.
-- Supported impact: an `[EnforcePure]` auto-property setter, whose generated
-  implementation writes receiver state, emitted neither a purity diagnostic
-  nor typed `MissingOperationRoot` abstention.
-- Reproduction: a temporary canonical-container analyzer test required any
-  selected-accessor outcome and received an empty diagnostic set. The test was
-  removed.
-- Required closure: inventory all selected accessors and require an exact
-  effect result or typed abstention. Add auto get/set/init, explicit, abstract,
-  extern, suppression, outcome-recording, and mutation controls.
 
 ### SP-AUDIT-122 - Clean cannot recover publication-set metadata (P2)
 
