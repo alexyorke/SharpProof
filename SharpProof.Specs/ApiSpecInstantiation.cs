@@ -192,21 +192,78 @@ public static partial class ApiSpecInstantiator
 
         private TermResult Binary(SpecBinaryDeclaration binary)
         {
-            var left = Term(binary.Left);
+            var isEquality = binary.Operator is
+                IrBinaryOperator.Equal or IrBinaryOperator.NotEqual;
+            TermResult left;
+            TermResult right;
+            if (isEquality &&
+                binary.Left is SpecNullDeclaration leftNull &&
+                binary.Right is not SpecNullDeclaration)
+            {
+                right = Term(binary.Right);
+                if (right.Failure != null)
+                {
+                    return right;
+                }
+
+                left = Null(leftNull, right);
+            }
+            else
+            {
+                left = Term(binary.Left);
+                right = default;
+            }
+
             if (left.Failure != null)
             {
                 return left;
             }
 
-            var right = Term(binary.Right);
+            if (right.Term == null)
+            {
+                right = isEquality &&
+                        binary.Right is SpecNullDeclaration rightNull &&
+                        binary.Left is not SpecNullDeclaration
+                    ? Null(rightNull, left)
+                    : Term(binary.Right);
+            }
             if (right.Failure != null)
             {
                 return right;
             }
 
+            if (isEquality && left.Term!.Type != right.Term!.Type)
+            {
+                return Failure(
+                    SpecInstantiationFailureKind.TypeMismatch,
+                    null,
+                    "The exact instantiated equality operand types do not match.");
+            }
+
             return new(
                 factory.Binary(binary.Operator, left.Term!, right.Term!),
                 null);
+        }
+
+        private TermResult Null(SpecNullDeclaration value, TermResult peer)
+        {
+            if (peer.Failure != null)
+            {
+                return peer;
+            }
+
+            var peerType = factory.GetTypeInfo(peer.Term!.Type);
+            if (value.Type == IrTypeKind.Sequence)
+            {
+                return Failure(SpecInstantiationFailureKind.UnsupportedValueType, null,
+                    "A factory-independent sequence null needs a concrete sequence type substitution.");
+            }
+
+            return peerType.Kind == value.Type &&
+                   value.Type is IrTypeKind.String or IrTypeKind.Reference
+                ? new(factory.Null(peer.Term.Type), null)
+                : Failure(SpecInstantiationFailureKind.TypeMismatch, null,
+                    "The exact instantiated null operand type does not match its peer.");
         }
 
         private TermResult Conditional(SpecConditionalDeclaration conditional)

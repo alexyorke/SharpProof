@@ -1710,6 +1710,14 @@ $mutations = @(
         Mutated = '    $false) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
+    },
+    [pscustomobject]@{
+        Name = 'api-spec-exact-null-substitution-type'
+        File = 'SharpProof.Specs\ApiSpecInstantiation.cs'
+        Original = '                ? new(factory.Null(peer.Term.Type), null)'
+        Mutated = '                ? new(factory.Null(factory.ObjectType), null)'
+        Project = 'SharpProof.Specs.Test\SharpProof.Specs.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferenceNullUsesTheExactSubstitutedOperandType'
     }
 )
 
