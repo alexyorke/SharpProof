@@ -58,6 +58,202 @@ public sealed class ContractForValidatorGeneratorTests
         Assert.That(run.Diagnostics, Is.Empty);
     }
 
+    [TestCase("interface", "void Read(ref readonly int value);")]
+    [TestCase("abstract class", "public abstract void Read(ref readonly int value);")]
+    public void RefReadonlyParameterMatchesExactStaticCompanion(
+        string targetKind,
+        string member)
+    {
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public {{targetKind}} Target {
+                {{member}}
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value) { }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void VirtualRefReadonlyParameterMatchesExactStaticCompanion()
+    {
+        var run = Run(
+            """
+            using SharpProof.Attributes;
+            public class Target {
+                public virtual void Read(ref readonly int value) { }
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value) { }
+            }
+            """);
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    [TestCase("ref readonly", "ref")]
+    [TestCase("ref readonly", "in")]
+    [TestCase("ref readonly", "out")]
+    [TestCase("ref", "ref readonly")]
+    public void RefReadonlyDoesNotCollapseOtherParameterRefKinds(
+        string targetRefKind,
+        string companionRefKind)
+    {
+        var companionAssignment = companionRefKind == "out"
+            ? "value = 0;"
+            : string.Empty;
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read({{targetRefKind}} int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    {{companionRefKind}} int value) { {{companionAssignment}} }
+            }
+            """);
+
+        Assert.That(run.Diagnostics.Select(static value => value.Id),
+            Does.Contain("SPCF0005"));
+    }
+
+    [Test]
+    public void ScopedRefReadonlyMustMatchExactly()
+    {
+        var exact = Run(
+            """
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(scoped ref readonly int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    scoped ref readonly int value) { }
+            }
+            """);
+        var mismatch = Run(
+            """
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(scoped ref readonly int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value) { }
+            }
+            """);
+
+        Assert.That(exact.Diagnostics, Is.Empty);
+        Assert.That(mismatch.Diagnostics.Select(static value => value.Id),
+            Does.Contain("SPCF0005"));
+    }
+
+    [Test]
+    public void RefReadonlyParameterDoesNotRelaxReturnOrOverloadSelection()
+    {
+        var exact = Run(
+            """
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract ref readonly int Read(ref readonly int value);
+                public abstract void Read(ref readonly int value, int other);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static ref readonly int Read(
+                    Target receiver,
+                    ref readonly int value) { return ref storage; }
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value,
+                    int other) { }
+            }
+            """);
+        var returnMismatch = Run(
+            """
+            using SharpProof.Attributes;
+            public abstract class Target {
+                public abstract ref readonly int Read(ref readonly int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                private static int storage;
+                public static ref int Read(
+                    Target receiver,
+                    ref readonly int value) { return ref storage; }
+            }
+            """);
+
+        Assert.That(exact.Diagnostics, Is.Empty);
+        Assert.That(returnMismatch.Diagnostics.Select(static value => value.Id),
+            Does.Contain("SPCF0005"));
+    }
+
+    [Test]
+    public void MetadataTargetRefReadonlyParameterMatchesCurrentCompanion()
+    {
+        var compilation = GeneratorTestHost.CreateCompilationWithReference(
+            """
+            public interface IReferencedTarget {
+                void Read(ref readonly int value);
+            }
+            """,
+            ("CurrentContracts.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(IReferencedTarget))]
+            public static class TargetContracts {
+                public static void Read(
+                    IReferencedTarget receiver,
+                    ref readonly int value) { }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void GeneratedNamedRefReadonlyCompanionRemainsValid()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Target.cs",
+            """
+            public interface ITarget {
+                void Read(ref readonly int value);
+            }
+            """),
+            ("GeneratedContracts.g.cs",
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Read(
+                    ITarget receiver,
+                    ref readonly int value) { }
+            }
+            """));
+
+        Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
+    }
+
     [Test]
     public void OpenGenericTargetAndMethodConstraintsMatchStructurally()
     {

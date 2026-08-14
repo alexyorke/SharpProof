@@ -12,6 +12,33 @@ namespace SharpProof.Contracts.Test;
 public sealed class ContractBinderTests
 {
     [Test]
+    public void RefReadonlyParameterBindsExactCompanionWithoutRefKindCollapse()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(ref readonly int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value) {
+                    Contract.Requires(value >= 0);
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+    }
+
+    [Test]
     public void DirectCompilerBoundContractWinsAndSymbolIdentityRejectsShadows()
     {
         var source =

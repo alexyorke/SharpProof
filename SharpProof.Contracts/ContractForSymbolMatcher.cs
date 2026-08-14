@@ -355,7 +355,8 @@ internal static class ContractForSymbolMatcher
         IParameterSymbol left,
         IParameterSymbol right)
     {
-        if (left.RefKind != RefKind.In || right.RefKind != RefKind.In)
+        if (!IsCompilerReadOnlyInput(left.RefKind) ||
+            !IsCompilerReadOnlyInput(right.RefKind))
         {
             return CustomModifiersMatch(
                 left.RefCustomModifiers,
@@ -369,6 +370,11 @@ internal static class ContractForSymbolMatcher
         return CustomModifiersMatch(
             RemoveCompilerInAttribute(left.RefCustomModifiers),
             RemoveCompilerInAttribute(right.RefCustomModifiers));
+    }
+
+    private static bool IsCompilerReadOnlyInput(RefKind refKind)
+    {
+        return refKind is RefKind.In or RefKind.RefReadOnlyParameter;
     }
 
     private static ImmutableArray<CustomModifier> RemoveCompilerInAttribute(

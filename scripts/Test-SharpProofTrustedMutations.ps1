@@ -1214,6 +1214,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~GenericOwnersAlignIndependentlyOfNonGenericWrappers'
     },
     [pscustomobject]@{
+        Name = 'contract-ref-readonly-normalizes-compiler-in-modifier'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = 'return refKind is RefKind.In or RefKind.RefReadOnlyParameter;'
+        Mutated = 'return refKind is RefKind.In;'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~RefReadonlyParameterMatchesExactStaticCompanion'
+    },
+    [pscustomobject]@{
         Name = 'standalone-gate-requires-passing-result'
         File = 'scripts\Assert-SharpProofStandaloneGateResult.ps1'
         Original = '$document.Result.Passed -isnot [bool] -or'
