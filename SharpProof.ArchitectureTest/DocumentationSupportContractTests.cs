@@ -12,6 +12,14 @@ public sealed class DocumentationSupportContractTests
     [TestCase("package-version-drift", false)]
     [TestCase("support-drift", false)]
     [TestCase("stale-contract-api-silence", false)]
+    [TestCase("old-eight-mutation-lanes", false)]
+    [TestCase("wrong-container-cpu", false)]
+    [TestCase("wrong-container-memory", false)]
+    [TestCase("missing-resource-claim", false)]
+    [TestCase("duplicate-resource-claim", false)]
+    [TestCase("resource-claim-case", false)]
+    [TestCase("resource-claim-spacing", false)]
+    [TestCase("catalog-resource-drift", false)]
     public async Task DocumentationSupportContractRejectsDrift(
         string mutation,
         bool expectedSuccess)

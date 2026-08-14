@@ -724,6 +724,42 @@ $derivedVersions = [ordered]@{
 }
 $acceptanceContract = Get-RequiredText 'eng\acceptance\contract.json' |
     ConvertFrom-Json
+$containerCpuCount = [int]$acceptanceContract.container.defaultCpuCount
+$containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
+$testProjectCpuDivisor =
+    [int]$acceptanceContract.automation.testProjectCpuDivisor
+$mutationParallelism =
+    [int]$acceptanceContract.automation.mutationParallelism
+if ($containerCpuCount -le 0 -or
+    $containerMemoryMiB -le 0 -or
+    $testProjectCpuDivisor -le 0 -or
+    $containerCpuCount % $testProjectCpuDivisor -ne 0 -or
+    $mutationParallelism -le 0) {
+    throw 'Acceptance resource and concurrency authority is invalid.'
+}
+$testProjectLanes = $containerCpuCount / $testProjectCpuDivisor
+$resourceClaims = @(
+    ("The default container budget is $containerCpuCount CPUs and " +
+        "$containerMemoryMiB MiB.")
+    ("Test-project concurrency uses $testProjectLanes lanes " +
+        "(one lane per $testProjectCpuDivisor CPUs).")
+    ("Trusted mutations use $mutationParallelism deterministic weighted lanes.")
+)
+foreach ($resourceDocument in @(
+        'README.md',
+        'docs\container-development.md')) {
+    $resourceText = Get-RequiredText $resourceDocument
+    foreach ($claim in $resourceClaims) {
+        $claimCount = [regex]::Matches(
+            $resourceText,
+            [regex]::Escape($claim)).Count
+        if ($claimCount -cne 1) {
+            throw (
+                "$resourceDocument must contain exactly one catalog-derived " +
+                "resource claim '$claim'; found $claimCount.")
+        }
+    }
+}
 $contractVersions = [ordered]@{
     Protocol = $acceptanceContract.worker.protocolVersion
     Cache = $acceptanceContract.cache.schemaVersion

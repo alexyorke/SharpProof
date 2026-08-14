@@ -1686,6 +1686,14 @@ $mutations = @(
         Mutated = "    'unrelated stale claim',"
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
+    },
+    [pscustomobject]@{
+        Name = 'documentation-resource-concurrency-claim-count'
+        File = 'scripts\Generate-Readme.ps1'
+        Original = '        if ($claimCount -cne 1) {'
+        Mutated = '        if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
     }
 )
 

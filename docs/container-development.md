@@ -67,10 +67,13 @@ a clean temporary workspace and pay a cold build; use them for qualification,
 not for every edit.
 
 `portable-tests`, broad coverage, and acceptance run independent test projects
-through MSBuild's project scheduler. The default 16-CPU container uses eight
-project lanes. Worker fixtures and package integration methods run in isolated
-duration-weighted processes. Trusted mutations use eight deterministic
-weighted lanes. Override the
+through MSBuild's project scheduler.
+
+The default container budget is 16 CPUs and 40960 MiB.
+Test-project concurrency uses 8 lanes (one lane per 2 CPUs).
+Trusted mutations use 4 deterministic weighted lanes. Worker fixtures and
+package integration methods run in isolated duration-weighted processes.
+Override the
 Docker budget with
 `SHARPPROOF_CONTAINER_CPU_LIMIT` and `SHARPPROOF_CONTAINER_MEMORY_LIMIT`; the
 lane count follows the CPUs visible to .NET. Use

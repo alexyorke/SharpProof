@@ -82,11 +82,13 @@ incremental build plus duration-aware semantic, Worker, package, and performance
 smoke shards. Disposable `docker compose run --rm tooling ...` commands remain
 the clean qualification path and intentionally discard build outputs.
 
-The default container budget is 16 CPUs and 40 GiB. Test-project concurrency is
-derived from the CPUs visible inside the container (one lane per two CPUs), so
-changing `SHARPPROOF_CONTAINER_CPU_LIMIT` also changes orchestration without a
-second hardcoded worker count. `SHARPPROOF_TEST_PROJECT_PARALLELISM` is an
-explicit diagnostic override and cannot exceed the visible CPU count.
+The default container budget is 16 CPUs and 40960 MiB.
+Test-project concurrency uses 8 lanes (one lane per 2 CPUs).
+Trusted mutations use 4 deterministic weighted lanes. Changing
+`SHARPPROOF_CONTAINER_CPU_LIMIT` also changes test-project orchestration without
+a second hardcoded worker count. `SHARPPROOF_TEST_PROJECT_PARALLELISM` is an
+explicit diagnostic override and cannot exceed the visible CPU count; mutation
+parallelism remains catalog-owned.
 
 Compose derives its default project name from the source directory. Put a
 distinct `COMPOSE_PROJECT_NAME` and optional `SHARPPROOF_DEV_REF` in each
