@@ -15,14 +15,71 @@ $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+$contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+
+# BEGIN ACCEPTANCE TIMELINE AUTHORITY
+function Test-AcceptanceTimingTimeline {
+    param(
+        [Parameter(Mandatory = $true)][DateTime]$StartedUtc,
+        [Parameter(Mandatory = $true)][DateTime]$CompletedUtc,
+        [Parameter(Mandatory = $true)][long]$TotalElapsedMilliseconds,
+        [Parameter(Mandatory = $true)][object[]]$Phases,
+        [Parameter(Mandatory = $true)][string[]]$ExpectedPhaseNames,
+        [Parameter(Mandatory = $true)][bool]$RequireComplete
+    )
+
+    $outerTicks = ($CompletedUtc - $StartedUtc).Ticks
+    if ($StartedUtc.Kind -ne [DateTimeKind]::Utc -or
+        $CompletedUtc.Kind -ne [DateTimeKind]::Utc -or
+        $outerTicks -lt 0 -or
+        $outerTicks % [TimeSpan]::TicksPerMillisecond -ne 0 -or
+        $TotalElapsedMilliseconds -ne
+            [long]($outerTicks / [TimeSpan]::TicksPerMillisecond) -or
+        ($RequireComplete -and $Phases.Count -ne $ExpectedPhaseNames.Count) -or
+        (-not $RequireComplete -and
+            ($Phases.Count -lt 1 -or
+             $Phases.Count -gt $ExpectedPhaseNames.Count))) {
+        throw 'Acceptance outer timing interval is invalid.'
+    }
+    $previousCompleted = $StartedUtc
+    for ($index = 0; $index -lt $Phases.Count; $index++) {
+        $phase = $Phases[$index]
+        $phaseStart = [DateTime]::Parse(
+            [string]$phase.startedUtc,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::RoundtripKind)
+        $phaseCompleted = [DateTime]::Parse(
+            [string]$phase.completedUtc,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::RoundtripKind)
+        $phaseTicks = ($phaseCompleted - $phaseStart).Ticks
+        if ([string]$phase.name -cne $ExpectedPhaseNames[$index] -or
+            [string]$phase.status -cnotin @('passed','failed','skipped') -or
+            $phaseStart.Kind -ne [DateTimeKind]::Utc -or
+            $phaseCompleted.Kind -ne [DateTimeKind]::Utc -or
+            $phaseStart -lt $StartedUtc -or
+            $phaseCompleted -gt $CompletedUtc -or
+            $phaseStart -lt $previousCompleted -or
+            $phaseTicks -lt 0 -or
+            $phaseTicks % [TimeSpan]::TicksPerMillisecond -ne 0 -or
+            [long]$phase.elapsedMilliseconds -ne
+                [long]($phaseTicks / [TimeSpan]::TicksPerMillisecond)) {
+            throw "Acceptance timing phase '$index' is invalid."
+        }
+        $previousCompleted = $phaseCompleted
+    }
+}
+# END ACCEPTANCE TIMELINE AUTHORITY
 
 $timingDirectory = Join-Path $repositoryRoot 'artifacts\timings'
 $timingOutput = Join-Path $timingDirectory (
     'acceptance-' + $Configuration.ToLowerInvariant() + '.json')
 $timingStartedUtc = [DateTime]::UtcNow
+$timingStopwatch = [Diagnostics.Stopwatch]::StartNew()
 $timingPhases = [Collections.Generic.List[object]]::new()
 $activeTimingName = $null
 $activeTimingStopwatch = $null
+$activeTimingStartedMilliseconds = $null
 $timingWritten = $false
 
 function Add-AcceptanceTimingPhase {
@@ -38,8 +95,17 @@ function Add-AcceptanceTimingPhase {
         [string]$Status
     )
 
-    $timingPhases.Add([pscustomobject]@{
+    $completedMilliseconds = [long]$timingStopwatch.Elapsed.TotalMilliseconds
+    $startedMilliseconds = $completedMilliseconds - $ElapsedMilliseconds
+    if ($ElapsedMilliseconds -lt 0 -or $startedMilliseconds -lt 0) {
+        throw "Acceptance timing phase '$Name' has an invalid duration."
+    }
+    $timingPhases.Add([pscustomobject][ordered]@{
         name = $Name
+        startedUtc = $timingStartedUtc.AddMilliseconds(
+            $startedMilliseconds).ToString('o')
+        completedUtc = $timingStartedUtc.AddMilliseconds(
+            $completedMilliseconds).ToString('o')
         elapsedMilliseconds = $ElapsedMilliseconds
         status = $Status
     })
@@ -52,6 +118,8 @@ function Start-AcceptanceTimingPhase {
         throw "Acceptance timing phase '$activeTimingName' is still active."
     }
     $script:activeTimingName = $Name
+    $script:activeTimingStartedMilliseconds =
+        [long]$timingStopwatch.Elapsed.TotalMilliseconds
     $script:activeTimingStopwatch = [Diagnostics.Stopwatch]::StartNew()
 }
 
@@ -65,12 +133,20 @@ function Complete-AcceptanceTimingPhase {
         throw 'No acceptance timing phase is active.'
     }
     $activeTimingStopwatch.Stop()
-    Add-AcceptanceTimingPhase `
-        -Name $activeTimingName `
-        -ElapsedMilliseconds ([long]$activeTimingStopwatch.Elapsed.TotalMilliseconds) `
-        -Status $Status
+    $completedMilliseconds = [long]$timingStopwatch.Elapsed.TotalMilliseconds
+    $timingPhases.Add([pscustomobject][ordered]@{
+        name = $activeTimingName
+        startedUtc = $timingStartedUtc.AddMilliseconds(
+            $activeTimingStartedMilliseconds).ToString('o')
+        completedUtc = $timingStartedUtc.AddMilliseconds(
+            $completedMilliseconds).ToString('o')
+        elapsedMilliseconds =
+            $completedMilliseconds - $activeTimingStartedMilliseconds
+        status = $Status
+    })
     $script:activeTimingName = $null
     $script:activeTimingStopwatch = $null
+    $script:activeTimingStartedMilliseconds = $null
 }
 
 function Write-AcceptanceTimingEvidence {
@@ -100,15 +176,23 @@ function Write-AcceptanceTimingEvidence {
     $script:timingWritten = $true
     [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
     $temporary = $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-    $totalMilliseconds = [long](
-        ($timingPhases | Measure-Object elapsedMilliseconds -Sum).Sum)
+    $totalMilliseconds = [long]$timingStopwatch.Elapsed.TotalMilliseconds
+    $timingCompletedUtc = $timingStartedUtc.AddMilliseconds(
+        $totalMilliseconds)
+    Test-AcceptanceTimingTimeline `
+        -StartedUtc $timingStartedUtc `
+        -CompletedUtc $timingCompletedUtc `
+        -TotalElapsedMilliseconds $totalMilliseconds `
+        -Phases @($timingPhases) `
+        -ExpectedPhaseNames @($contract.automation.acceptanceTimingPhases) `
+        -RequireComplete ($Status -in @('passed','incomplete'))
     [pscustomobject]@{
         schemaVersion = 1
         command = 'acceptance'
         configuration = $Configuration
         commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
         startedUtc = $timingStartedUtc.ToString('o')
-        completedUtc = [DateTime]::UtcNow.ToString('o')
+        completedUtc = $timingCompletedUtc.ToString('o')
         status = $Status
         failure = $Failure
         totalElapsedMilliseconds = $totalMilliseconds
@@ -116,21 +200,6 @@ function Write-AcceptanceTimingEvidence {
     } | ConvertTo-Json -Depth 5 |
         Set-Content -LiteralPath $temporary -Encoding utf8NoBOM
     Move-Item -LiteralPath $temporary -Destination $timingOutput -Force
-}
-
-$restoreMilliseconds = 0L
-if (-not [string]::IsNullOrWhiteSpace(
-        $env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS) -and
-    -not [long]::TryParse(
-        $env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS,
-        [ref]$restoreMilliseconds)) {
-    throw 'The acceptance restore timing is invalid.'
-}
-if ($restoreMilliseconds -gt 0) {
-    Add-AcceptanceTimingPhase `
-        -Name 'restore' `
-        -ElapsedMilliseconds $restoreMilliseconds `
-        -Status passed
 }
 
 trap {
@@ -142,6 +211,11 @@ trap {
         -Failure $_.Exception.Message
     throw
 }
+
+Start-AcceptanceTimingPhase -Name 'restore'
+Invoke-SharpProofDotnet -Arguments @(
+    'restore', 'SharpProof.sln', '--locked-mode')
+Complete-AcceptanceTimingPhase
 
 Start-AcceptanceTimingPhase -Name 'static-validation'
 . (Join-Path $repositoryRoot 'scripts\Get-SharpProofTcbPaths.ps1')
@@ -171,7 +245,6 @@ Start-AcceptanceTimingPhase -Name 'static-validation'
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofPilotAuthorityFixtures.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainedPathFixtures.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
-$contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $previewEvidence = Get-Content -LiteralPath (
     Join-Path $acceptanceRoot 'preview-evidence.v1.json') -Raw |
     ConvertFrom-Json

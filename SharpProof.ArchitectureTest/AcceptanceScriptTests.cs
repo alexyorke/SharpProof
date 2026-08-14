@@ -8,6 +8,67 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class AcceptanceScriptTests
 {
+    [TestCase("canonical", true)]
+    [TestCase("zero-restore", true)]
+    [TestCase("nonzero-restore", true)]
+    [TestCase("boundary-equality", true)]
+    [TestCase("restore-failure", true)]
+    [TestCase("phase-order", false)]
+    [TestCase("phase-overlap", false)]
+    [TestCase("before-start", false)]
+    [TestCase("after-completion", false)]
+    [TestCase("wrong-total", false)]
+    public async Task AcceptanceTimelineIsExactAndRestoreOwned(
+        string mutation,
+        bool expectedSuccess)
+    {
+        var result = await RunAsync(
+            RepositoryRoot(),
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            Path.Combine(
+                RepositoryRoot(),
+                "scripts",
+                "Test-SharpProofAcceptanceTimingFixtures.ps1"),
+            "-Mutation",
+            mutation);
+        Assert.That(
+            result.ExitCode == 0,
+            Is.EqualTo(expectedSuccess),
+            result.Output + Environment.NewLine + result.Error);
+    }
+
+    [Test]
+    public async Task AcceptanceScriptOwnsRestoreInsideOuterTimeline()
+    {
+        var verify = await File.ReadAllTextAsync(Path.Combine(
+            RepositoryRoot(), "eng", "acceptance", "Verify.ps1"));
+        var started = verify.IndexOf(
+            "$timingStartedUtc =", StringComparison.Ordinal);
+        var restore = verify.IndexOf(
+            "Start-AcceptanceTimingPhase -Name 'restore'",
+            StringComparison.Ordinal);
+        var staticValidation = verify.IndexOf(
+            "Start-AcceptanceTimingPhase -Name 'static-validation'",
+            StringComparison.Ordinal);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(restore, Is.GreaterThan(started));
+            Assert.That(staticValidation, Is.GreaterThan(restore));
+            Assert.That(
+                verify,
+                Does.Contain("Test-AcceptanceTimingTimeline"));
+        }
+
+        var dispatcher = await File.ReadAllTextAsync(Path.Combine(
+            RepositoryRoot(), "scripts", "Invoke-SharpProofContainer.ps1"));
+        Assert.That(
+            dispatcher,
+            Does.Not.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
+    }
+
     [TestCase(false, false, "passed", "SharpProof acceptance checks passed.")]
     [TestCase(true, false, "incomplete", "non-qualifying partial mode")]
     [TestCase(false, true, "incomplete", "non-qualifying partial mode")]
@@ -91,7 +152,7 @@ public sealed class AcceptanceScriptTests
             "acceptance",
             "Verify.ps1"));
         var prefixEnd = source.IndexOf(
-            "$restoreMilliseconds = 0L",
+            "Start-AcceptanceTimingPhase -Name 'restore'",
             StringComparison.Ordinal);
         Assert.That(prefixEnd, Is.GreaterThan(0));
         var completionStart = source.LastIndexOf(

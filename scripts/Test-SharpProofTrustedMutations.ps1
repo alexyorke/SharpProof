@@ -1646,6 +1646,14 @@ $mutations = @(
         Mutated = '    # release bundle topology validation removed'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~ReleaseBundleAuthorityGuardsEveryReleaseConsumerAndUpload'
+    },
+    [pscustomobject]@{
+        Name = 'acceptance-restore-timeline-owner'
+        File = 'eng\acceptance\Verify.ps1'
+        Original = "Start-AcceptanceTimingPhase -Name 'restore'"
+        Mutated = "Start-AcceptanceTimingPhase -Name 'static-validation'"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~AcceptanceScriptOwnsRestoreInsideOuterTimeline'
     }
 )
 

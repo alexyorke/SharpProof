@@ -327,21 +327,10 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) { throw 'Dependency audit failed.' }
     }
     'acceptance' {
-        $restoreTimer = [Diagnostics.Stopwatch]::StartNew()
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        $restoreTimer.Stop()
-        $env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS =
-            [string][long]$restoreTimer.Elapsed.TotalMilliseconds
-        try {
-            & (Join-Path $repositoryRoot 'eng/acceptance/Verify.ps1') `
-                -Configuration $Configuration
-            if ($LASTEXITCODE -ne 0) {
-                throw 'Acceptance validation failed.'
-            }
-        }
-        finally {
-            Remove-Item Env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS `
-                -ErrorAction SilentlyContinue
+        & (Join-Path $repositoryRoot 'eng/acceptance/Verify.ps1') `
+            -Configuration $Configuration
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Acceptance validation failed.'
         }
         & (Join-Path $repositoryRoot `
             'scripts/Write-SharpProofQualificationReceipt.ps1') `

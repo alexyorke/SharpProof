@@ -1326,7 +1326,7 @@ public sealed class ArchitectureTests
                 Does.Contain("Move-Item -LiteralPath $temporary"));
             Assert.That(
                 container,
-                Does.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
+                Does.Not.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
         }
     }
 
