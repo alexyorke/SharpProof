@@ -16,6 +16,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
@@ -307,6 +308,9 @@ function New-DeterministicPackageSbom {
     }
     $json = ($document | ConvertTo-Json -Depth 10) -replace "`r`n", "`n"
     Write-AtomicText -Path $Path -Value ($json + "`n")
+    $null = Read-SharpProofCanonicalReleaseJson `
+        -Path $Path `
+        -DocumentType Spdx
 }
 
 function Get-ArchiveText {
@@ -769,8 +773,9 @@ else {
 if (-not (Test-Path -LiteralPath $resolvedSbom -PathType Leaf)) {
     throw "SbomPath is not a file: $resolvedSbom"
 }
-$sbom = Get-Content -LiteralPath $resolvedSbom -Raw |
-    ConvertFrom-Json -DateKind String
+$sbom = Read-SharpProofCanonicalReleaseJson `
+    -Path $resolvedSbom `
+    -DocumentType Spdx
 if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
     [string]$sbom.spdxVersion -ne 'SPDX-2.3' -or
     $null -eq $sbom.PSObject.Properties['dataLicense'] -or
@@ -937,6 +942,9 @@ $json += "`n"
 $manifestPath = Join-Path $resolvedOutput 'SharpProof.release.json'
 $sumsPath = Join-Path $resolvedOutput 'SHA256SUMS'
 Write-AtomicText -Path $manifestPath -Value $json
+$null = Read-SharpProofCanonicalReleaseJson `
+    -Path $manifestPath `
+    -DocumentType ReleaseManifest
 Write-SharpProofReleaseChecksumFile `
     -Path $sumsPath `
     -Artifacts $orderedArtifacts

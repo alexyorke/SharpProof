@@ -6,8 +6,9 @@ namespace SharpProof.ArchitectureTest;
 public sealed class PublicationPlanSemanticAuthorityTests
 {
     private const string SbomParseAuthority =
-        "    $sbom = Get-Content -LiteralPath $sbomPath -Raw |\n" +
-        "        ConvertFrom-Json";
+        "    $sbom = Read-SharpProofCanonicalReleaseJson `\n" +
+        "        -Path $sbomPath `\n" +
+        "        -DocumentType Spdx";
 
     [TestCase("canonical", true)]
     [TestCase("malformed-rebound", false)]

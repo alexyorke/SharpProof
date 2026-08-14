@@ -159,6 +159,7 @@
       "scripts/SharpProof.PublicationDestination.ps1",
       "scripts/SharpProof.PublicationPlanTopology.ps1",
       "scripts/SharpProof.ReleaseChecksums.ps1",
+      "scripts/SharpProof.ReleaseJson.ps1",
       "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
       "scripts/Resolve-SharpProofContainedPath.ps1",
       "scripts/Test-CompilerArtifactModelGenerator.ps1",
@@ -199,7 +200,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "a766e53fa5cd40ba05731b3fdeb26c9fb6e5482825f2e55c8016538da675855d",
+    "inventorySha256": "48e036351c5d68c51f70902045f2d7de092a8fae90d0a2567663fb7511896626",
     "components": [
       {
         "name": "discovery",
@@ -681,6 +682,7 @@
           "scripts/SharpProof.PublicationDestination.ps1",
           "scripts/SharpProof.PublicationPlanTopology.ps1",
           "scripts/SharpProof.ReleaseChecksums.ps1",
+          "scripts/SharpProof.ReleaseJson.ps1",
           "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
           "scripts/Test-SharpProofPackageDependencies.ps1",

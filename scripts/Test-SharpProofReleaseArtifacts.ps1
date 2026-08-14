@@ -14,6 +14,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
 function Get-SpdxPackageId {
     param(
@@ -53,8 +54,9 @@ Test-SharpProofReleaseVersion `
     -Owner 'Release tag'
 $manifestPath = Join-Path $resolvedSource 'SharpProof.release.json'
 $sumsPath = Join-Path $resolvedSource 'SHA256SUMS'
-$manifest = Get-Content -LiteralPath $manifestPath -Raw |
-    ConvertFrom-Json
+$manifest = Read-SharpProofCanonicalReleaseJson `
+    -Path $manifestPath `
+    -DocumentType ReleaseManifest
 if ($manifest.schemaVersion -ne 2 -or
     [string]$manifest.hashAlgorithm -ne 'SHA256') {
     throw 'Unsupported release evidence schema or hash algorithm.'
@@ -207,8 +209,9 @@ $sbomArtifact = @(
         Where-Object { [string]$_.kind -eq 'sbom' }
 )
 $sbomPath = Join-Path $resolvedSource ([string]$sbomArtifact[0].fileName)
-$sbom = Get-Content -LiteralPath $sbomPath -Raw |
-    ConvertFrom-Json -DateKind String
+$sbom = Read-SharpProofCanonicalReleaseJson `
+    -Path $sbomPath `
+    -DocumentType Spdx
 if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
     [string]$sbom.spdxVersion -ne 'SPDX-2.3' -or
     $null -eq $sbom.PSObject.Properties['dataLicense'] -or

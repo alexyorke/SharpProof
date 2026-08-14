@@ -44,6 +44,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -256,8 +257,9 @@ function Get-ValidatedRelease {
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
         throw "Release manifest is missing: $manifestPath"
     }
-    $manifest = Get-Content -LiteralPath $manifestPath -Raw |
-        ConvertFrom-Json
+    $manifest = Read-SharpProofCanonicalReleaseJson `
+        -Path $manifestPath `
+        -DocumentType ReleaseManifest
     if ((Get-RequiredProperty $manifest 'schemaVersion' 'Release manifest') -ne
             2 -or
         [string](Get-RequiredProperty `
@@ -500,8 +502,9 @@ function Get-ValidatedRelease {
     $sbomPath = Get-ArtifactPath `
         -Directory $Directory `
         -FileName ([string]$sbomArtifacts[0].fileName)
-    $sbom = Get-Content -LiteralPath $sbomPath -Raw |
-        ConvertFrom-Json -DateKind String
+    $sbom = Read-SharpProofCanonicalReleaseJson `
+        -Path $sbomPath `
+        -DocumentType Spdx
     if ($null -eq $sbom.PSObject.Properties['relationships'] -or
         $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
         $null -eq $sbom.PSObject.Properties['packages']) {

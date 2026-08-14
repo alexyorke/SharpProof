@@ -1675,6 +1675,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ReleaseChecksumAuthorityTests'
     },
     [pscustomobject]@{
+        Name = 'release-strict-json-canonical-byte-comparison'
+        File = 'scripts\SharpProof.ReleaseJson.ps1'
+        Original = '    if ($text -cne $canonical) {'
+        Mutated = '    if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseJsonAuthorityTests'
+    },
+    [pscustomobject]@{
         Name = 'release-exact-bundle-topology-consumer'
         File = 'scripts\Publish-SharpProofRelease.ps1'
         Original = (@'
