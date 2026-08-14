@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 65 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 64 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,18 @@ The active backlog contains 65 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-134 - Release version identity has no exact single authority (fixed)
+
+- [x] Fixed by `ccdc496af` (`fix: bind exact release version authority`).
+- One shared authority now derives the exact ordinal package version and
+  authenticated `SharpProof.Release.props` identity. Evidence generation, final
+  artifact validation, tag qualification, and publication planning require
+  exact equality across package filenames/nuspecs, manifest, SBOM, tag, and plan.
+- Regression coverage includes a self-consistent six-package foreign version,
+  case-only prerelease drift, mixed versions, stale manifest/SBOM/plan evidence,
+  a stale authority hash, and a comparison-removal mutation. The focused matrix
+  passed 9/9 and the full Architecture suite passed 248/248.
 
 ### SP-AUDIT-130 - SBOM attestation includes undescribed symbol packages (fixed)
 
@@ -2205,24 +2217,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   extent, and authenticated line map.
 - Consolidated cases: SP-AUDIT-179, SP-AUDIT-220, SP-AUDIT-236.
 - Unified closure: Bind every location to a physical tree and line-map identity; validate checked spans, sealed source length, and recomputed one-based mapped coordinates together.
-
-### SP-AUDIT-134 - Release version identity has no exact single authority (P2)
-
-- [ ] Evidence generation requires only that all six package versions agree,
-  and plan-only publication accepts any matching SemVer. Neither path requires
-  equality with `SharpProof.Release.props`, the frozen version owner.
-- Certifier impact: a same-commit bundle consistently labeled
-  `9.9.9-preview.9` satisfies the evidence and plan predicates even though the
-  checked-in candidate is `1.0.0-preview.1`. The later tag-aware wrapper mitigates
-  actual promotion but does not repair the dry-run certificate.
-- Evidence: the release auditor evaluated the exact predicates with the foreign
-  version; every internal bundle predicate passed and the publisher contains no
-  release-property comparison.
-- Required closure: derive one ordinal version from the release props, require it
-  in evidence and planning, and record the authority identity. Add override,
-  case-only, mixed-package, canonical, and comparison-removal fixtures.
-- Consolidated cases: SP-AUDIT-157.
-- Unified closure: Use one release-version authority with ordinal equality across filenames, nuspecs, manifests, SBOM, tag, and publication plan.
 
 ### SP-AUDIT-140 - Relational-summary work lacks an end-to-end resource budget (P2)
 
