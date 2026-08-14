@@ -685,6 +685,10 @@ foreach ($item in $identities |
         })
     }
 }
+$sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
+    -PackageLicenseGraph $licenseGraph `
+    -PackageVersion $versions[0] `
+    -ThirdPartyComponents @($thirdPartyComponents))
 
 $artifacts = [Collections.Generic.List[object]]::new()
 foreach ($item in $identities) {
@@ -829,7 +833,7 @@ Test-SharpProofSbomDependencyGraph `
     -DependencyGraph $dependencyGraph
 Test-SharpProofSbomLicenseGraph `
     -SbomPackages $sbomPackages `
-    -LicenseGraph $licenseGraph
+    -LicenseGraph $sbomLicenseGraph
 $sbomFile = Get-Item -LiteralPath $resolvedSbom
 $sbomHash = Get-FileHash `
     -LiteralPath $resolvedSbom `

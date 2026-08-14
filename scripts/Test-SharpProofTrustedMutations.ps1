@@ -1471,6 +1471,14 @@ $mutations = @(
 '@).TrimEnd()
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
         Filter = 'FullyQualifiedName~BareRethrowBelongsOnlyToItsNearestCatch'
+    },
+    [pscustomobject]@{
+        Name = 'release-sbom-exact-license-authority'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = '            [string]$matches[0].licenseDeclared -cne'
+        Mutated = '            $false -and [string]$matches[0].licenseDeclared -cne'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SbomLicensesMatchTheExactPackageAuthority'
     }
 )
 

@@ -126,9 +126,20 @@ public sealed class PackageDependencyAuthorityTests
     }
 
     [TestCase("canonical", true)]
-    [TestCase("license-apache", false)]
-    [TestCase("license-missing", false)]
-    [TestCase("license-case", false)]
+    [TestCase("first-noassertion", false)]
+    [TestCase("first-wrong", false)]
+    [TestCase("first-case", false)]
+    [TestCase("first-missing", false)]
+    [TestCase("first-extra", false)]
+    [TestCase("third-noassertion", false)]
+    [TestCase("third-wrong", false)]
+    [TestCase("third-case", false)]
+    [TestCase("third-missing", false)]
+    [TestCase("third-extra", false)]
+    [TestCase("unknown-component", false)]
+    [TestCase("duplicate-component", false)]
+    [TestCase("wrong-download", false)]
+    [TestCase("files-analyzed", false)]
     public async Task SbomLicensesMatchTheExactPackageAuthority(
         string mutation,
         bool expectedSuccess)
@@ -487,19 +498,42 @@ public sealed class PackageDependencyAuthorityTests
             runner,
             "param([string]$Helper, [string]$Mutation)\n" +
             ". $Helper\n" +
-            "$graph=@('SharpProof.Attributes','SharpProof'," +
+            "$packages=@('SharpProof.Attributes','SharpProof'," +
             "'SharpProof.Verifier') | ForEach-Object {" +
             "[pscustomobject]@{PackageId=$_;LicenseExpression='MIT'}}\n" +
+            "$components=@([pscustomobject]@{id='Microsoft.Z3';" +
+            "version='4.12.2';license='MIT'})\n" +
+            "$graph=@(Get-SharpProofSbomLicenseGraph " +
+            "-PackageLicenseGraph $packages -PackageVersion '1.0.0' " +
+            "-ThirdPartyComponents $components)\n" +
             "$rows=@($graph | ForEach-Object {" +
-            "[pscustomobject]@{name=$_.PackageId;licenseDeclared='MIT';" +
-            "licenseConcluded='MIT'}})\n" +
+            "[pscustomobject]@{name=$_.Name;versionInfo=$_.Version;" +
+            "downloadLocation='NOASSERTION';filesAnalyzed=$false;" +
+            "licenseDeclared='MIT';licenseConcluded='MIT'}})\n" +
+            "$first=@($rows | Where-Object name -eq 'SharpProof')[0]\n" +
+            "$third=@($rows | Where-Object name -eq 'Microsoft.Z3')[0]\n" +
             "switch ($Mutation) {\n" +
-            " 'license-apache' {$rows[1].licenseDeclared='Apache-2.0';" +
-            "$rows[1].licenseConcluded='Apache-2.0'}\n" +
-            " 'license-missing' {$rows[1].PSObject.Properties.Remove(" +
+            " 'first-noassertion' {$first.licenseDeclared='NOASSERTION'}\n" +
+            " 'first-wrong' {$first.licenseConcluded='Apache-2.0'}\n" +
+            " 'first-case' {$first.licenseDeclared='mit'}\n" +
+            " 'first-missing' {$first.PSObject.Properties.Remove(" +
             "'licenseDeclared')}\n" +
-            " 'license-case' {$rows[1].licenseDeclared='mit';" +
-            "$rows[1].licenseConcluded='mit'}\n" +
+            " 'first-extra' {$first | Add-Member NoteProperty " +
+            "licenseComments extra}\n" +
+            " 'third-noassertion' {$third.licenseConcluded='NOASSERTION'}\n" +
+            " 'third-wrong' {$third.licenseDeclared='BSD-3-Clause'}\n" +
+            " 'third-case' {$third.licenseConcluded='mit'}\n" +
+            " 'third-missing' {$third.PSObject.Properties.Remove(" +
+            "'licenseConcluded')}\n" +
+            " 'third-extra' {$third | Add-Member NoteProperty " +
+            "licenseInfoFromFiles @('MIT')}\n" +
+            " 'unknown-component' {$rows += [pscustomobject]@{" +
+            "name='Foreign';versionInfo='1';downloadLocation='NOASSERTION';" +
+            "filesAnalyzed=$false;licenseDeclared='MIT';" +
+            "licenseConcluded='MIT'}}\n" +
+            " 'duplicate-component' {$rows += $third}\n" +
+            " 'wrong-download' {$rows[0].downloadLocation='https://invalid'}\n" +
+            " 'files-analyzed' {$rows[0].filesAnalyzed=$true}\n" +
             "}\n" +
             "Test-SharpProofSbomLicenseGraph " +
             "-SbomPackages $rows -LicenseGraph $graph\n",

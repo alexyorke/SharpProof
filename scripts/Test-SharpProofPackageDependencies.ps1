@@ -274,6 +274,72 @@ function Get-SharpProofDependencySpdxId {
     return 'SPDXRef-Package-' + ($Name -replace '[^A-Za-z0-9.-]', '-')
 }
 
+function Get-SharpProofSbomLicenseGraph {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$PackageLicenseGraph,
+
+        [Parameter(Mandatory = $true)]
+        [string]$PackageVersion,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$ThirdPartyComponents
+    )
+
+    $licenses = [Collections.Generic.List[object]]::new()
+    foreach ($license in $PackageLicenseGraph) {
+        $licenses.Add([pscustomobject][ordered]@{
+            Name = [string]$license.PackageId
+            Version = $PackageVersion
+            LicenseExpression = [string]$license.LicenseExpression
+        })
+    }
+    foreach ($group in @($ThirdPartyComponents | Group-Object {
+                [string]$_.id + "`0" + [string]$_.version
+            })) {
+        $expressions = @($group.Group |
+            ForEach-Object { [string]$_.license } |
+            Sort-Object -Unique)
+        if ($expressions.Count -ne 1 -or
+            [string]::IsNullOrWhiteSpace($expressions[0])) {
+            throw "Third-party SBOM license authority is invalid: $($group.Name)"
+        }
+        $licenses.Add([pscustomobject][ordered]@{
+            Name = [string]$group.Group[0].id
+            Version = [string]$group.Group[0].version
+            LicenseExpression = $expressions[0]
+        })
+    }
+    return @($licenses | Sort-Object Name, Version)
+}
+
+function Get-SharpProofThirdPartyComponentGraph {
+    param(
+        [Parameter()]
+        [string]$ContractPath = (Join-Path `
+            (Join-Path $PSScriptRoot '..') `
+            'eng/release/third-party-components.json')
+    )
+
+    $contract = Get-Content -LiteralPath $ContractPath -Raw |
+        ConvertFrom-Json
+    if ($contract.schemaVersion -ne 1 -or
+        $null -eq $contract.PSObject.Properties['packages']) {
+        throw 'Unsupported third-party component license authority.'
+    }
+    return @($contract.packages.PSObject.Properties | ForEach-Object {
+        $packageId = $_.Name
+        @($_.Value) | ForEach-Object {
+            [pscustomobject][ordered]@{
+                packageId = $packageId
+                id = [string]$_.id
+                version = [string]$_.version
+                license = [string]$_.license
+            }
+        }
+    })
+}
+
 function Test-SharpProofSbomDependencyGraph {
     param(
         [Parameter(Mandatory = $true)]
@@ -310,21 +376,46 @@ function Test-SharpProofSbomLicenseGraph {
         [object[]]$LicenseGraph
     )
 
+    if ($SbomPackages.Count -ne $LicenseGraph.Count) {
+        throw 'SPDX SBOM license package graph is not exact.'
+    }
     foreach ($license in $LicenseGraph) {
+        $name = if ($null -ne $license.PSObject.Properties['Name']) {
+            [string]$license.Name
+        }
+        else {
+            [string]$license.PackageId
+        }
+        $version = if ($null -ne $license.PSObject.Properties['Version']) {
+            [string]$license.Version
+        }
+        else {
+            $null
+        }
         $matches = @($SbomPackages | Where-Object {
-            [string]$_.name -eq [string]$license.PackageId
+            [string]$_.name -ceq $name -and
+            ($null -eq $version -or [string]$_.versionInfo -ceq $version)
         })
         if ($matches.Count -ne 1 -or
             $null -eq $matches[0].PSObject.Properties['licenseDeclared'] -or
-            $null -eq $matches[0].PSObject.Properties['licenseConcluded']) {
-            throw "SPDX SBOM license is invalid: $($license.PackageId)"
+            $null -eq $matches[0].PSObject.Properties['licenseConcluded'] -or
+            $null -eq $matches[0].PSObject.Properties['downloadLocation'] -or
+            $null -eq $matches[0].PSObject.Properties['filesAnalyzed']) {
+            throw "SPDX SBOM license is invalid: $name"
         }
         if (
             [string]$matches[0].licenseDeclared -cne
                 [string]$license.LicenseExpression -or
             [string]$matches[0].licenseConcluded -cne
-                [string]$license.LicenseExpression) {
-            throw "SPDX SBOM license is invalid: $($license.PackageId)"
+                [string]$license.LicenseExpression -or
+            [string]$matches[0].downloadLocation -cne 'NOASSERTION' -or
+            $matches[0].filesAnalyzed -isnot [bool] -or
+            [bool]$matches[0].filesAnalyzed -or
+            @($matches[0].PSObject.Properties | Where-Object {
+                    $_.Name -like 'license*' -and
+                    $_.Name -cnotin @('licenseDeclared', 'licenseConcluded')
+                }).Count -ne 0) {
+            throw "SPDX SBOM license is invalid: $name"
         }
     }
 }

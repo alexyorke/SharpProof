@@ -178,6 +178,10 @@ $licenseGraph = @(Get-SharpProofPackageLicenseGraph `
                 Join-Path $resolvedSource ([string]$_.fileName)
             }
     ))
+$sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
+    -PackageLicenseGraph $licenseGraph `
+    -PackageVersion $expectedVersion `
+    -ThirdPartyComponents @(Get-SharpProofThirdPartyComponentGraph))
 $sbomArtifact = @(
     $artifacts |
         Where-Object { [string]$_.kind -eq 'sbom' }
@@ -271,7 +275,7 @@ Test-SharpProofSbomDependencyGraph `
     -DependencyGraph $dependencyGraph
 Test-SharpProofSbomLicenseGraph `
     -SbomPackages $sbomPackages `
-    -LicenseGraph $licenseGraph
+    -LicenseGraph $sbomLicenseGraph
 $expectedSums = @(
     $artifacts |
         ForEach-Object {

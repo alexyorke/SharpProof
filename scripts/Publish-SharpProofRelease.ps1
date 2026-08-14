@@ -466,6 +466,10 @@ function Get-ValidatedRelease {
             $_.mainPath
             $_.symbolsPath
         }))
+    $sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
+        -PackageLicenseGraph $licenseGraph `
+        -PackageVersion $version `
+        -ThirdPartyComponents @(Get-SharpProofThirdPartyComponentGraph))
     $sbomPath = Get-ArtifactPath `
         -Directory $Directory `
         -FileName ([string]$sbomArtifacts[0].fileName)
@@ -482,7 +486,7 @@ function Get-ValidatedRelease {
     }
     Test-SharpProofSbomLicenseGraph `
         -SbomPackages @($sbom.packages) `
-        -LicenseGraph $licenseGraph
+        -LicenseGraph $sbomLicenseGraph
 
     return [pscustomobject][ordered]@{
         version = $version
