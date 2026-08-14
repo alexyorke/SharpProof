@@ -84,6 +84,10 @@ if ($artifacts.Count -ne 7 -or
     @($artifacts | Where-Object { $_.kind -eq 'sbom' }).Count -ne 1) {
     throw 'Release evidence must contain three packages, three symbol packages, and one SBOM.'
 }
+Test-SharpProofReleaseBundleTopology `
+    -Directory $resolvedSource `
+    -Artifacts $artifacts `
+    -Owner 'Release artifact bundle'
 $expectedPackageIds = @(
     'SharpProof',
     'SharpProof.Attributes',

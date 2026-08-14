@@ -548,7 +548,7 @@ Test-ThirdPartyComponentVersions `
     -RepositoryRoot $repositoryRoot `
     -Manifest $thirdPartyManifest
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $resolvedOutput = $resolvedSource
+    $finalOutput = $resolvedSource
 }
 else {
     $outputPath = [IO.Path]::GetFullPath($OutputDirectory)
@@ -556,14 +556,24 @@ else {
         New-Item -ItemType Directory -Path $outputPath |
             Out-Null
     }
-    $resolvedOutput = (Resolve-Path `
+    $finalOutput = (Resolve-Path `
         -LiteralPath $outputPath `
         -ErrorAction Stop).Path
     if (-not (Test-Path `
-            -LiteralPath $resolvedOutput `
+            -LiteralPath $finalOutput `
             -PathType Container)) {
-        throw "OutputDirectory is not a directory: $resolvedOutput"
+        throw "OutputDirectory is not a directory: $finalOutput"
     }
+}
+$resolvedOutput = Join-Path ([IO.Path]::GetDirectoryName($finalOutput)) (
+    '.' + [IO.Path]::GetFileName($finalOutput) + '.' +
+    [Guid]::NewGuid().ToString('N') + '.staging')
+[IO.Directory]::CreateDirectory($resolvedOutput) | Out-Null
+trap {
+    if ([IO.Directory]::Exists($resolvedOutput)) {
+        [IO.Directory]::Delete($resolvedOutput, $true)
+    }
+    throw
 }
 
 $packageFiles = @(
@@ -576,6 +586,10 @@ $packageFiles = @(
 if ($packageFiles.Count -ne 6) {
     throw "Release evidence requires exactly six NuGet artifacts; found $($packageFiles.Count)."
 }
+Test-SharpProofExactRegularFileSet `
+    -Directory $resolvedSource `
+    -ExpectedFileNames @($packageFiles.Name) `
+    -Owner 'Release package input'
 
 $expectedIds = @(
     'SharpProof',
@@ -754,9 +768,11 @@ if ([string]::IsNullOrWhiteSpace($SbomPath)) {
         -RepositoryRoot $repositoryRoot
 }
 else {
-    $resolvedSbom = (Resolve-Path `
+    $suppliedSbom = (Resolve-Path `
         -LiteralPath $SbomPath `
         -ErrorAction Stop).Path
+    $resolvedSbom = Join-Path $resolvedOutput ([IO.Path]::GetFileName($suppliedSbom))
+    [IO.File]::Copy($suppliedSbom, $resolvedSbom, $false)
 }
 if (-not (Test-Path -LiteralPath $resolvedSbom -PathType Leaf)) {
     throw "SbomPath is not a file: $resolvedSbom"
@@ -927,6 +943,23 @@ Write-AtomicText -Path $manifestPath -Value $json
 Write-SharpProofReleaseChecksumFile `
     -Path $sumsPath `
     -Artifacts $orderedArtifacts
+foreach ($packageFile in $packageFiles) {
+    [IO.File]::Copy(
+        $packageFile.FullName,
+        (Join-Path $resolvedOutput $packageFile.Name),
+        $false)
+}
+Test-SharpProofReleaseBundleTopology `
+    -Directory $resolvedOutput `
+    -Artifacts $orderedArtifacts `
+    -Owner 'Generated release bundle staging'
+Publish-SharpProofReleaseBundleAtomically `
+    -StagingDirectory $resolvedOutput `
+    -DestinationDirectory $finalOutput `
+    -Artifacts $orderedArtifacts `
+    -Owner 'Generated release bundle'
+$manifestPath = Join-Path $finalOutput 'SharpProof.release.json'
+$sumsPath = Join-Path $finalOutput 'SHA256SUMS'
 
 Write-Host "Wrote deterministic SharpProof release evidence for version $($versions[0])."
 [pscustomobject][ordered]@{

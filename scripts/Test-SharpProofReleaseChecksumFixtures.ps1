@@ -4,7 +4,13 @@ param(
     [ValidateSet(
         'canonical','bom','utf16le','utf16be','invalid-utf8','crlf','mixed',
         'cr','missing-terminal','double-terminal','upper-digest','separator',
-        'spacing','reordered','extra','missing','duplicate')]
+        'spacing','reordered','extra','missing','duplicate',
+        'bundle-canonical','bundle-extra','bundle-nested-extra',
+        'bundle-alternate-sbom','bundle-symlink','bundle-empty',
+        'bundle-missing-manifest','bundle-missing-checksums',
+        'bundle-missing-package','bundle-case-collision',
+        'bundle-empty-directory','bundle-hardlink-alias',
+        'bundle-atomic-replacement','bundle-atomic-failure-cleanup')]
     [string]$Mutation
 )
 
@@ -20,10 +26,106 @@ try {
         0..6 | ForEach-Object {
             [pscustomobject][ordered]@{
                 fileName = ('artifact-{0}.nupkg' -f $_)
+                kind = if ($_ -lt 3) { 'package' }
+                    elseif ($_ -lt 6) { 'symbols' }
+                    else { 'sbom' }
                 sha256 = ([string]$_) * 64
             }
         }
     )
+    if ($Mutation.StartsWith('bundle-', [StringComparison]::Ordinal)) {
+        $artifacts[6].fileName = 'SharpProof.spdx.json'
+        foreach ($artifact in $artifacts) {
+            [IO.File]::WriteAllText(
+                (Join-Path $root $artifact.fileName),
+                $artifact.fileName)
+        }
+        [IO.File]::WriteAllText(
+            (Join-Path $root 'SharpProof.release.json'), '{}')
+        [IO.File]::WriteAllText((Join-Path $root 'SHA256SUMS'), 'sums')
+        switch ($Mutation) {
+            'bundle-extra' {
+                [IO.File]::WriteAllText((Join-Path $root 'foreign.txt'), 'x')
+            }
+            'bundle-nested-extra' {
+                $nested = Join-Path $root 'nested'
+                [IO.Directory]::CreateDirectory($nested) | Out-Null
+                [IO.File]::WriteAllText((Join-Path $nested 'foreign.txt'), 'x')
+            }
+            'bundle-alternate-sbom' {
+                [IO.File]::WriteAllText((Join-Path $root 'other.spdx.json'), '{}')
+            }
+            'bundle-symlink' {
+                New-Item -ItemType SymbolicLink `
+                    -Path (Join-Path $root 'alias') `
+                    -Target (Join-Path $root $artifacts[0].fileName) | Out-Null
+            }
+            'bundle-empty' {
+                Get-ChildItem -LiteralPath $root -Force |
+                    Remove-Item -Recurse -Force
+            }
+            'bundle-missing-manifest' {
+                Remove-Item -LiteralPath (Join-Path $root 'SharpProof.release.json')
+            }
+            'bundle-missing-checksums' {
+                Remove-Item -LiteralPath (Join-Path $root 'SHA256SUMS')
+            }
+            'bundle-missing-package' {
+                Remove-Item -LiteralPath (Join-Path $root $artifacts[0].fileName)
+            }
+            'bundle-case-collision' {
+                [IO.File]::WriteAllText(
+                    (Join-Path $root $artifacts[0].fileName.ToUpperInvariant()),
+                    'collision')
+            }
+            'bundle-empty-directory' {
+                [IO.Directory]::CreateDirectory((Join-Path $root 'empty')) | Out-Null
+            }
+            'bundle-hardlink-alias' {
+                & ln -- (Join-Path $root $artifacts[0].fileName) `
+                    (Join-Path $root 'hardlink-alias.nupkg')
+                if ($LASTEXITCODE -ne 0) { throw 'Could not create hardlink fixture.' }
+            }
+        }
+        if ($Mutation -in @(
+                'bundle-atomic-replacement',
+                'bundle-atomic-failure-cleanup')) {
+            $staging = $root + '.staging'
+            [IO.Directory]::CreateDirectory($staging) | Out-Null
+            Get-ChildItem -LiteralPath $root -File | ForEach-Object {
+                [IO.File]::Copy(
+                    $_.FullName,
+                    (Join-Path $staging $_.Name))
+            }
+            if ($Mutation -eq 'bundle-atomic-failure-cleanup') {
+                [IO.File]::WriteAllText((Join-Path $staging 'foreign'), 'x')
+                $failed = $false
+                try {
+                    Publish-SharpProofReleaseBundleAtomically `
+                        -StagingDirectory $staging `
+                        -DestinationDirectory $root `
+                        -Artifacts $artifacts `
+                        -Owner 'Fixture atomic bundle'
+                }
+                catch { $failed = $true }
+                if (-not $failed -or [IO.Directory]::Exists($staging)) {
+                    throw 'Invalid staging did not fail and clean up.'
+                }
+            }
+            else {
+                Publish-SharpProofReleaseBundleAtomically `
+                    -StagingDirectory $staging `
+                    -DestinationDirectory $root `
+                    -Artifacts $artifacts `
+                    -Owner 'Fixture atomic bundle'
+            }
+        }
+        Test-SharpProofReleaseBundleTopology `
+            -Directory $root -Artifacts $artifacts `
+            -Owner 'Fixture release bundle'
+        Write-Host "Release bundle fixture passed: $Mutation"
+        return
+    }
     $path = Join-Path $root 'SHA256SUMS'
     Write-SharpProofReleaseChecksumFile `
         -Path $path `

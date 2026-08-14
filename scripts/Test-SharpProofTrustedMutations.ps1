@@ -1633,6 +1633,19 @@ $mutations = @(
         Mutated = '    if ($false -or'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~ReleaseChecksumAuthorityTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-bundle-topology-consumer'
+        File = 'scripts\Publish-SharpProofRelease.ps1'
+        Original = (@'
+    Test-SharpProofReleaseBundleTopology `
+        -Directory $Directory `
+        -Artifacts $artifacts `
+        -Owner 'Publication release bundle'
+'@).TrimEnd()
+        Mutated = '    # release bundle topology validation removed'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseBundleAuthorityGuardsEveryReleaseConsumerAndUpload'
     }
 )
 

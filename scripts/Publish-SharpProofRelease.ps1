@@ -315,6 +315,10 @@ function Get-ValidatedRelease {
     if ($artifacts.Count -ne 7) {
         throw 'Release manifest must contain exactly seven artifacts.'
     }
+    Test-SharpProofReleaseBundleTopology `
+        -Directory $Directory `
+        -Artifacts $artifacts `
+        -Owner 'Publication release bundle'
     $seenFileNames = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::OrdinalIgnoreCase)
     foreach ($artifact in $artifacts) {
