@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 67 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 66 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,23 @@ The active backlog contains 67 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-121 - Cache capacity enforcement is not transactional (fixed)
+
+- [x] Fixed by `a71ae6a6b` (`fix: make cache writes transactional`).
+- Cache operations now hold the directory lock across active-cap enforcement,
+  replay, exact-key publication, staged LRU eviction, commit, and rollback.
+  Attempt-owned writes are removed on every later failure/cancellation, any
+  pre-existing exact-key bytes and staged entries are restored, and reads evict
+  oversized/stale LRU state before admitting a hit. Competing instances cannot
+  observe staged or newly published state during rollback.
+- Regression-first tests cover cancellation after publish and later backend
+  rerun/hit, pre-existing exact bytes, lowered single- and multi-entry caps,
+  symlink eviction failure, cross-instance rollback isolation, unrelated files,
+  concurrency, and a removal mutation. Transaction tests passed 5/5, cache
+  matrix 36/36, full Worker 486/486, final concurrency discriminator 1/1, prior
+  Architecture 230/230, and `git diff --check` passed.
+- Consolidated case fixed: SP-AUDIT-123.
 
 ### SP-AUDIT-119 - SBOM accepts contradictory SHA-256 identities (fixed)
 
@@ -2111,25 +2128,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: inventory all selected accessors and require an exact
   effect result or typed abstention. Add auto get/set/init, explicit, abstract,
   extern, suppression, outcome-recording, and mutation controls.
-
-### SP-AUDIT-121 - Cache capacity enforcement is not transactional (P2)
-
-- [ ] Cache writing atomically publishes the exact-key file before post-write
-  path validation and eviction. Failure or cancellation after that rename has
-  no rollback path.
-- Supported impact: a run canceled at the deterministic post-publication
-  validation point returned `Canceled` but retained its cache JSON; a later
-  identical run can replay it as a hit. Ordinary post-publication failure can
-  similarly report cache unavailable while exceeding the configured byte cap.
-- Reproduction: a temporary canonical-container worker test canceled through
-  the existing path-validation hook after the exact cache file appeared. The
-  response was canceled and the file remained. The test was removed.
-- Required closure: make publish, validation, and eviction transactional; remove
-  only the newly committed owned entry on every later failure/cancellation.
-  Add cancellation, invalid sibling, eviction, pre-existing valid entry, byte-
-  bound, later-hit, and rollback-removal mutation controls.
-- Consolidated cases: SP-AUDIT-123.
-- Unified closure: Under the cache lock, enforce the active cap and make publish, post-validation, eviction, rollback, cancellation, and replay one ownership transaction.
 
 ### SP-AUDIT-122 - Clean cannot recover publication-set metadata (P2)
 
