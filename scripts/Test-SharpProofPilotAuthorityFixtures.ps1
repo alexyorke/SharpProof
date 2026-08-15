@@ -110,11 +110,13 @@ try {
             claimEvidence=@($manifestClaims | ForEach-Object {
                     [pscustomobject]@{ claimId=$_.claimId; kind=$_.kind; outcome='Proven' }
                 })
+            diagnostics=@()
+            falsePositiveReports=$null
             evidence=$evidence
         }
     })
     $report = [pscustomobject]@{
-        schemaVersion=2; runId=('1' * 32); commit=$commit; packageVersion=$version; pilotCount=5
+        schemaVersion=3; reviewStatus='Unreviewed'; runId=('1' * 32); commit=$commit; packageVersion=$version; pilotCount=5
         packageArtifacts=$artifacts
         pilots=$reportPilots
     }
@@ -190,6 +192,51 @@ try {
     if ($valid[0].sha256 -eq (Get-FileHash (Join-Path $fixture 'ambient/sharpproof/1.0.0-preview.1/SharpProof.dll')).Hash.ToLowerInvariant()) {
         throw 'Ambient collision test is invalid.'
     }
+
+    $sourcePath = Join-Path $fixture 'report.json'
+    $ledgerPath = Join-Path $fixture 'review-ledger.json'
+    $reviewedPath = Join-Path $fixture 'reviewed-report.json'
+    [IO.File]::WriteAllText($sourcePath, ($canonicalReport | ConvertTo-Json -Depth 20) + "`n")
+    $reviewRows = @($canonicalReport.pilots | ForEach-Object {
+        $pilot = $_
+        @($pilot.claimEvidence | ForEach-Object {
+            [ordered]@{ pilotId=$pilot.id; kind='Claim'; id=$_.claimId; disposition='TruePositive' }
+        })
+    })
+    $ledger = [ordered]@{
+        schemaVersion=1
+        sourceReportSha256=(Get-FileHash $sourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        commit=$commit
+        packageArtifacts=$canonicalReport.packageArtifacts
+        reviews=$reviewRows
+    }
+    function Write-Ledger($Value) {
+        [IO.File]::WriteAllText($ledgerPath, ($Value | ConvertTo-Json -Depth 20) + "`n")
+    }
+    function Complete-Review {
+        & (Join-Path $PSScriptRoot 'Complete-SharpProofPilotReview.ps1') `
+            -SourceReportPath $sourcePath -ReviewLedgerPath $ledgerPath `
+            -OutputPath $reviewedPath -RepositoryRoot $fixture -CatalogPath $catalogPath
+    }
+    Write-Ledger $ledger
+    Complete-Review
+    $reviewed = Get-Content $reviewedPath -Raw | ConvertFrom-Json
+    if ([string]$reviewed.reviewStatus -cne 'Reviewed' -or
+        @($reviewed.pilots | Where-Object falsePositiveReports -ne 0).Count -ne 0) {
+        throw 'Honest zero false-positive review failed.'
+    }
+    $ledger.reviews[0].disposition = 'FalsePositive'; Write-Ledger $ledger
+    Complete-Review
+    $reviewed = Get-Content $reviewedPath -Raw | ConvertFrom-Json
+    if ([int]$reviewed.pilots[0].falsePositiveReports -ne 1) {
+        throw 'False-positive disposition was not derived.'
+    }
+    $ledger.reviews = @($ledger.reviews | Select-Object -Skip 1); Write-Ledger $ledger
+    Require-Failure { Complete-Review } incomplete-review
+    $ledger.reviews = @($reviewRows + $reviewRows[0]); Write-Ledger $ledger
+    Require-Failure { Complete-Review } duplicate-review
+    $ledger.reviews = @($reviewRows); $ledger.reviews[0].id = 'unknown'; Write-Ledger $ledger
+    Require-Failure { Complete-Review } unknown-review
     Write-Host 'Pilot package/output authority fixtures passed.'
 }
 finally { if (Test-Path $fixture) { Remove-Item $fixture -Recurse -Force } }

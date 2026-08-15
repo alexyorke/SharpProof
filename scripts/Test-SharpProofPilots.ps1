@@ -305,7 +305,7 @@ foreach ($pilot in $catalog.pilots) {
             ForEach-Object { [pscustomobject]@{ id = $_.Name; count = $_.Count } })
         elapsedMilliseconds = [long]$build.elapsedMilliseconds
         observedPeakWorkingSetBytes = [long]$build.observedPeakWorkingSetBytes
-        falsePositiveReports = 0
+        falsePositiveReports = $null
         negativeProbePassed = $negativeProbePassed
         setupFriction = [string]$pilot.setupFriction
         resultPath = [IO.Path]::GetRelativePath($repositoryRoot, $resultPath).Replace('\', '/')
@@ -344,7 +344,8 @@ if (@($results | Where-Object {
 }
 
 $report = [ordered]@{
-    schemaVersion = 2
+    schemaVersion = 3
+    reviewStatus = 'Unreviewed'
     runId = $runId
     runStartedUtc = $qualificationStartedUtc.ToString('O')
     commit = $head

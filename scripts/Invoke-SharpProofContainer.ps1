@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -395,10 +395,17 @@ switch ($Command) {
         }
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPilots.ps1') -PackageSource $PackageSource
         if ($LASTEXITCODE -ne 0) { throw 'Pilot validation failed.' }
+    }
+    'pilot-review' {
+        & (Join-Path $repositoryRoot 'scripts/Complete-SharpProofPilotReview.ps1') `
+            -SourceReportPath (Join-Path $repositoryRoot 'artifacts/pilots/report.json') `
+            -ReviewLedgerPath (Join-Path $repositoryRoot 'artifacts/pilots/review-ledger.json') `
+            -OutputPath (Join-Path $repositoryRoot 'artifacts/pilots/reviewed-report.json')
+        if ($LASTEXITCODE -ne 0) { throw 'Pilot review validation failed.' }
         & (Join-Path $repositoryRoot `
             'scripts/Write-SharpProofQualificationReceipt.ps1') `
             -Gate pilots `
-            -EvidencePath (Join-Path $repositoryRoot 'artifacts/pilots/report.json')
+            -EvidencePath (Join-Path $repositoryRoot 'artifacts/pilots/reviewed-report.json')
     }
     'release-tag' {
         & (Join-Path $repositoryRoot `

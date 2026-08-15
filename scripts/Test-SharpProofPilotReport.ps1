@@ -55,7 +55,8 @@ function Test-SharpProofPilotReport {
     }
     catch { return $false }
 
-    if ([int]$Report.schemaVersion -ne 2 -or
+    if ([int]$Report.schemaVersion -ne 3 -or
+        @('Unreviewed', 'Reviewed') -cnotcontains [string]$Report.reviewStatus -or
         [string]$Report.runId -cnotmatch '^[0-9a-f]{32}$' -or
         [string]$Report.commit -cne $ExpectedCommit -or
         [int]$Report.pilotCount -ne 5 -or @($Report.pilots).Count -ne 5 -or
@@ -81,7 +82,12 @@ function Test-SharpProofPilotReport {
     }
     foreach ($pilot in @($Report.pilots)) {
         if (@($pilot.PSObject.Properties.Name) -cnotcontains 'project' -or
-            @($pilot.PSObject.Properties.Name) -cnotcontains 'claimEvidence') { return $false }
+            @($pilot.PSObject.Properties.Name) -cnotcontains 'claimEvidence' -or
+            @($pilot.PSObject.Properties.Name) -cnotcontains 'falsePositiveReports') { return $false }
+        if (([string]$Report.reviewStatus -ceq 'Unreviewed' -and
+                $null -ne $pilot.falsePositiveReports) -or
+            ([string]$Report.reviewStatus -ceq 'Reviewed' -and
+                ([int]$pilot.falsePositiveReports -lt 0))) { return $false }
         if (-not $catalogRows.ContainsKey([string]$pilot.id)) { return $false }
         $expectedPilot = $catalogRows[[string]$pilot.id]
         if ([string]$pilot.project -cne $expectedPilot.project -or

@@ -1302,6 +1302,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~GenericOwnersAlignIndependentlyOfNonGenericWrappers'
     },
     [pscustomobject]@{
+        Name = 'pilot-source-report-remains-unreviewed'
+        File = 'scripts\Test-SharpProofPilots.ps1'
+        Original = '        falsePositiveReports = $null'
+        Mutated = '        falsePositiveReports = 0'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PilotAuthorityTests'
+    },
+    [pscustomobject]@{
         Name = 'contract-ref-readonly-normalizes-compiler-in-modifier'
         File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
         Original = 'return refKind is RefKind.In or RefKind.RefReadOnlyParameter;'
