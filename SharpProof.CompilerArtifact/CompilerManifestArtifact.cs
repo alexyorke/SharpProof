@@ -431,11 +431,12 @@ internal static class CompilerManifestArtifactJson
             StringComparer.Ordinal);
         foreach (var lowered in loweredCallables)
         {
-            if (lowered == null ||
-                !loweredById.TryAdd(lowered.CallableId, lowered))
+            if (lowered == null || loweredById.ContainsKey(lowered.CallableId))
             {
                 return false;
             }
+
+            loweredById.Add(lowered.CallableId, lowered);
         }
 
         foreach (var callable in manifestCallables)
