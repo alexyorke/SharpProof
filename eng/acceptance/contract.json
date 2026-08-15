@@ -57,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 228,
-    "expectedCatalogSha256": "efb4b7c99345206d503fd7b3e72143ebbe970ef98c8ebdf0db984e7ff7c6cc52"
+    "expectedCatalogCount": 230,
+    "expectedCatalogSha256": "09d77237f85fbef93a202b1091826f58bd0333a0663da1a0a701e61265c4c952"
   },
   "worker": {
     "protocolVersion": 11,
@@ -208,7 +208,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "c144e669b890850a7bae70518c752dd90efc95eb2b4ae9486e9d73e21d3660de",
+    "inventorySha256": "8ae2f5facd1998cc989214d552544d72b85e57662e9c782512491f9e342197ce",
     "components": [
       {
         "name": "discovery",
@@ -240,6 +240,7 @@
         "paths": [
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs",
+          "SharpProof.CompilerArtifact/CompilerEffectAuthority.cs",
           "SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs",
           "SharpProof.CompilerArtifact/PortableIrGraphCodec.cs",
           "SharpProof.Contracts/ClosedContractAttributeValidator.cs",
