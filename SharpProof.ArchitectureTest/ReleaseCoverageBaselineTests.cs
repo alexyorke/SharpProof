@@ -304,7 +304,7 @@ public sealed class ReleaseCoverageBaselineTests
                     result.Output + result.Error);
             }
             Assert.That(
-                File.Exists(Path.Combine(receiptDirectory, "acceptance.json")),
+                File.Exists(Path.Combine(receiptDirectory, "acceptance-release.json")),
                 Is.True);
         }
         finally
