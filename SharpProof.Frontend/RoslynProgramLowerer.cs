@@ -39,15 +39,20 @@ public sealed class RoslynProgramLowerer(
             return false;
         }
 
-        for (var index = 0; index < invocation.Arguments.Length; index++)
+        var ordinals = new HashSet<int>();
+        foreach (var argument in invocation.Arguments)
         {
-            var argument = invocation.Arguments[index];
-            if (argument.ArgumentKind != ArgumentKind.Explicit || argument.Parameter?.Ordinal != index)
+            var ordinal = argument.Parameter?.Ordinal ?? -1;
+            if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                ordinal < 0 ||
+                ordinal >= invocation.TargetMethod.Parameters.Length ||
+                !ordinals.Add(ordinal))
             {
                 return false;
             }
         }
-        return true;
+
+        return ordinals.Count == invocation.TargetMethod.Parameters.Length;
     }
 
     private sealed class LoweringSession(
@@ -251,7 +256,13 @@ public sealed class RoslynProgramLowerer(
             bool wantsResult)
         {
             var receiver = LowerOptionalValue(block, operation, invocation.Instance);
-            var arguments = LowerValues(block, operation, invocation.Arguments.Select(static argument => argument.Value));
+            var arguments = invocation.Arguments
+                .Select(argument => (
+                    Ordinal: argument.Parameter?.Ordinal ?? int.MaxValue,
+                    Value: LowerValue(block, operation, argument.Value)))
+                .OrderBy(static argument => argument.Ordinal)
+                .Select(static argument => argument.Value)
+                .ToArray();
             var resultType = _expressions.GetTypeId(invocation.Type);
             var member = _expressions.GetMember(invocation.TargetMethod, receiver, "call:", invocation.Type, arguments);
             var isDirect = IsDirectInvocation(invocation);

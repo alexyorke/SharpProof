@@ -276,7 +276,7 @@ public sealed class ProgramLoweringTests
     {
         var lowered = Lower(
             """
-            private static long Select(long first, long second) => first;
+            private static T Select<T>(T first, T second) => first;
             public static long Target(long first, long second) =>
                 Select(second: second, first: first);
             """);
