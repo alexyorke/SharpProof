@@ -196,7 +196,7 @@ public sealed class ClaimManifestBuilderTests
             assumptions.Select(static assumption => assumption.Id),
             Is.All.Matches("^spa1:[0-9a-f]{64}$"));
         Assert.That(
-            assumptions.Select(static assumption => assumption.Id).Distinct(),
+            assumptions.Select(static assumption => assumption.Id).Distinct().ToArray(),
             Has.Length.EqualTo(2));
     }
 
