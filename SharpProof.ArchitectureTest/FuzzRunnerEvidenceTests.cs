@@ -47,6 +47,56 @@ public sealed class FuzzRunnerEvidenceTests
         }
     }
 
+    [Test]
+    public void FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic()
+    {
+        var root = RepositoryRoot();
+        var start = new ProcessStartInfo
+        {
+            FileName = "pwsh",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        start.ArgumentList.Add("-NoLogo");
+        start.ArgumentList.Add("-NoProfile");
+        start.ArgumentList.Add("-File");
+        start.ArgumentList.Add(Path.Combine(
+            root,
+            "scripts",
+            "Test-SharpProofFuzzEvidenceLifecycle.ps1"));
+        using var process = Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.That(
+            process.ExitCode,
+            Is.Zero,
+            output + Environment.NewLine + error);
+
+        var campaign = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofFuzzCampaign.ps1"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                campaign,
+                Does.Contain("Initialize-SharpProofFuzzEvidence"));
+            Assert.That(
+                campaign,
+                Does.Contain("Publish-SharpProofFuzzEvidence"));
+            Assert.That(
+                campaign.IndexOf(
+                    "Initialize-SharpProofFuzzEvidence",
+                    StringComparison.Ordinal),
+                Is.LessThan(campaign.IndexOf(
+                    "retained-seeds.json",
+                    StringComparison.Ordinal)));
+        }
+    }
+
     private static string RepositoryRoot()
     {
         var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);

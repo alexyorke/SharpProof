@@ -56,8 +56,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 216,
-    "expectedCatalogSha256": "55b34d6dfe637e8e543930f6ffb13514687c48b9ac17e670cf4934261a827dbe"
+    "expectedCatalogCount": 217,
+    "expectedCatalogSha256": "e40c4493c21a87decd977d13b1e7ae440426bfe5f9cc48f4a10a84f858180637"
   },
   "worker": {
     "protocolVersion": 11,
@@ -160,6 +160,7 @@
       "scripts/SharpProof.PublicationPlanTopology.ps1",
       "scripts/SharpProof.ReleaseChecksums.ps1",
       "scripts/SharpProof.ReleaseJson.ps1",
+      "scripts/SharpProof.FuzzEvidenceLifecycle.ps1",
       "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
       "scripts/Resolve-SharpProofContainedPath.ps1",
       "scripts/Test-CompilerArtifactModelGenerator.ps1",
@@ -200,7 +201,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "48e036351c5d68c51f70902045f2d7de092a8fae90d0a2567663fb7511896626",
+    "inventorySha256": "452c17537afbc7b4af1d8c492ea146a7c1699db761f850052e3e2d22dda11d5c",
     "components": [
       {
         "name": "discovery",
@@ -708,6 +709,8 @@
         "paths": [
           "SharpProof.ArchitectureTest/FuzzRunnerEvidenceTests.cs",
           "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
+          "scripts/SharpProof.FuzzEvidenceLifecycle.ps1",
+          "scripts/Test-SharpProofFuzzEvidenceLifecycle.ps1",
           "scripts/Test-SharpProofFuzzRunnerResult.ps1"
         ]
       },

@@ -19,12 +19,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.FuzzEvidenceLifecycle.ps1')
+$resolvedOutput = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $OutputDirectory `
+    -ParameterName 'OutputDirectory'
+Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput
 $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'Unable to bind fuzz evidence to the exact source commit.'
 }
-. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
-. (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
 $contract = Get-Content `
     -LiteralPath (Join-Path $repositoryRoot 'eng\acceptance\contract.json') `
     -Raw |
@@ -55,12 +60,6 @@ $effectiveRetainedCases = if ($RetainedCases -gt 0) {
 else {
     [int]$retained.casesPerSeed
 }
-$resolvedOutput = Resolve-SharpProofContainedPath `
-    -Root $repositoryRoot -Path $OutputDirectory `
-    -ParameterName 'OutputDirectory'
-New-Item -ItemType Directory -Force -Path $resolvedOutput |
-    Out-Null
-
 function Invoke-FuzzRun {
     param(
         [Parameter(Mandatory = $true)]
@@ -207,11 +206,10 @@ $summary = [pscustomobject][ordered]@{
 }
 $summaryPath = Join-Path $resolvedOutput 'campaign.json'
 $json = ($summary | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
-[IO.File]::WriteAllText(
-    $summaryPath,
-    $json + "`n",
-    [Text.UTF8Encoding]::new($false))
 $summary | ConvertTo-Json -Depth 6
 if (-not $summary.passed) {
     throw "SharpProof fuzz campaign failed. Evidence: $summaryPath"
 }
+Publish-SharpProofFuzzEvidence `
+    -OutputDirectory $resolvedOutput `
+    -Json ($json + "`n")

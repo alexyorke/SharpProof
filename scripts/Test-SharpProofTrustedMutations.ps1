@@ -1913,6 +1913,14 @@ $mutations = @(
         Mutated = '        return Is(attribute, ContractFor) &&'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~PeerGeneratedRejectedContractForIsReported'
+    },
+    [pscustomobject]@{
+        Name = 'fuzz-campaign-stale-evidence-invalidation'
+        File = 'scripts\Invoke-SharpProofFuzzCampaign.ps1'
+        Original = 'Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput'
+        Mutated = '# Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic'
     }
 )
 
