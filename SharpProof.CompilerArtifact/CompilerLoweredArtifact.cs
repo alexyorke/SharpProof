@@ -42,6 +42,8 @@ internal static class CompilerLoweredArtifact
             .Distinct()
             .ToArray();
         var encoded = PortableIrGraphCodec.Encode(preparation.Factory, body?.Program, roots, variables);
+        var canonicalByVariable = preparation.Variables.ToDictionary(
+            static variable => variable.Variable);
         var artifact = new CompilerCallableArtifact
         {
             CallableId = preparation.Entry.CallableId,
@@ -55,13 +57,24 @@ internal static class CompilerLoweredArtifact
                     PredicateSha256 = PredicateSha256(preparation.Factory, clause)
                 })],
             Variables = [.. preparation.Variables.Select(variable => {
-                var interval = variable.SourceIntegerInterval;
+                var source = variable.SourceIntegerInterval;
+                var sourceOrdinal = -1;
+                if (variable.Role == CompilerVariableRole.PreState &&
+                    variable.CurrentStateVariable is { } current &&
+                    canonicalByVariable.TryGetValue(current, out var currentVariable))
+                {
+                    source = currentVariable.SourceIntegerInterval;
+                    sourceOrdinal = currentVariable.Ordinal;
+                }
                 return new CompilerVariableArtifact {
                     Role = variable.Role, Ordinal = variable.Ordinal,
                     Variable = encoded.VariableIndices[variable.Variable],
                     CurrentStateVariable = variable.CurrentStateVariable.HasValue
                         ? encoded.VariableIndices[variable.CurrentStateVariable.Value] : -1,
-                    Minimum = interval?.Minimum, Maximum = interval?.Maximum,
+                    SourceOrdinal = sourceOrdinal,
+                    Minimum = variable.SourceIntegerInterval?.Minimum,
+                    Maximum = variable.SourceIntegerInterval?.Maximum,
+                    ScalarDomain = ScalarDomain(source),
                     ModelLabel = variable.ModelLabel
                 };
             })]
@@ -79,9 +92,17 @@ internal static class CompilerLoweredArtifact
 
         artifact.Body.ParameterBindings = [.. body.ParameterBindings
             .OrderBy(static item => item.Key.Value)
-            .Select(item => new CompilerVariableMappingArtifact {
-                Source = encoded.VariableIndices[item.Key],
-                Target = encoded.VariableIndices[item.Value]
+            .Select(item => {
+                var sourceIndex = encoded.VariableIndices[item.Key];
+                var sourceInfo = preparation.Factory.GetVariableInfo(item.Key);
+                var target = canonicalByVariable[item.Value];
+                return new CompilerVariableMappingArtifact {
+                    Source = sourceIndex,
+                    SourceOrdinal = target.Ordinal,
+                    SourceType = encoded.Graph.Variables[sourceIndex].Type,
+                    SourceName = preparation.Factory.GetString(sourceInfo.Name),
+                    Target = encoded.VariableIndices[item.Value]
+                };
             })];
         var instructions = encoded.Graph.Blocks.SelectMany(static block => block.Instructions).ToArray();
         var allCalls = body.SpecCalls.Values
@@ -133,6 +154,29 @@ internal static class CompilerLoweredArtifact
                     })]
             })];
         return artifact;
+    }
+
+    private static CompilerScalarDomain ScalarDomain(
+        CompilerIntegerInterval? interval)
+    {
+        return interval switch
+        {
+            null => CompilerScalarDomain.None,
+            { Minimum: sbyte.MinValue, Maximum: sbyte.MaxValue } =>
+                CompilerScalarDomain.SByte,
+            { Minimum: byte.MinValue, Maximum: byte.MaxValue } =>
+                CompilerScalarDomain.Byte,
+            { Minimum: short.MinValue, Maximum: short.MaxValue } =>
+                CompilerScalarDomain.Short,
+            { Minimum: ushort.MinValue, Maximum: ushort.MaxValue } =>
+                CompilerScalarDomain.UShort,
+            { Minimum: int.MinValue, Maximum: int.MaxValue } =>
+                CompilerScalarDomain.Int,
+            { Minimum: uint.MinValue, Maximum: uint.MaxValue } =>
+                CompilerScalarDomain.UInt,
+            _ => throw new InvalidDataException(
+                "A compiler integer interval is not a primitive scalar domain.")
+        };
     }
     internal static ImmutableArray<CompilerCallablePreparation> Decode(
         CompilerCallableArtifact[] artifacts,
@@ -291,7 +335,7 @@ internal static class CompilerLoweredArtifact
                 ? new CompilerIntegerInterval(row.Minimum.Value, row.Maximum!.Value) : null;
             return new CompilerCanonicalVariable(row.Role, row.Ordinal, variable, current, interval, row.ModelLabel);
         }).ToImmutableArray();
-        ValidateVariables(decoded.Factory, variables);
+        ValidateVariables(decoded.Factory, variables, artifact.Variables);
         var body = DecodeBody(
             artifact.Body,
             artifact.Graph,
@@ -382,7 +426,10 @@ internal static class CompilerLoweredArtifact
         }
         return [.. artifact.EffectClaims];
     }
-    private static void ValidateVariables(IrFactory factory, ImmutableArray<CompilerCanonicalVariable> variables)
+    private static void ValidateVariables(
+        IrFactory factory,
+        ImmutableArray<CompilerCanonicalVariable> variables,
+        CompilerVariableArtifact[] artifactRows)
     {
         var canonical = new HashSet<IrVarId>(variables.Select(static item => item.Variable));
         var parameters = variables.Where(static item => item.Role == CompilerVariableRole.Parameter)
@@ -399,10 +446,25 @@ internal static class CompilerLoweredArtifact
         var current = new HashSet<IrVarId>(variables
             .Where(static item => item.Role is CompilerVariableRole.Receiver or CompilerVariableRole.Parameter)
             .Select(static item => item.Variable));
-        foreach (var item in variables)
+        var currentByVariable = variables
+            .Where(static item => item.Role is CompilerVariableRole.Receiver or CompilerVariableRole.Parameter)
+            .ToDictionary(static item => item.Variable);
+        for (var index = 0; index < variables.Length; index++)
         {
+            var item = variables[index];
+            var row = artifactRows[index];
             var info = factory.GetVariableInfo(item.Variable);
             var label = factory.GetString(info.Name);
+            var sourceOrdinal = -1;
+            var sourceInterval = item.SourceIntegerInterval;
+            if (item.Role == CompilerVariableRole.PreState &&
+                item.CurrentStateVariable is { } currentState &&
+                currentByVariable.TryGetValue(currentState, out var currentVariable))
+            {
+                sourceOrdinal = currentVariable.Ordinal;
+                sourceInterval = currentVariable.SourceIntegerInterval;
+            }
+            var scalarDomain = ScalarDomain(sourceInterval);
             var shape = item.Role switch
             {
                 CompilerVariableRole.Receiver =>
@@ -419,6 +481,8 @@ internal static class CompilerLoweredArtifact
                 _ => false
             };
             if (!shape || item.ModelLabel != label ||
+                row.SourceOrdinal != sourceOrdinal ||
+                row.ScalarDomain != scalarDomain ||
                 item.CurrentStateVariable.HasValue && factory.GetVariableInfo(item.CurrentStateVariable.Value).Type != info.Type ||
                 item.SourceIntegerInterval is { } interval &&
                     (item.Role == CompilerVariableRole.PreState || info.Type != factory.IntegerType || !IsPrimitiveInterval(interval)))
@@ -486,11 +550,13 @@ internal static class CompilerLoweredArtifact
         ValidateExecutableBody(graph.Program, variables);
 
         var canonical = new HashSet<IrVarId>(variables.Select(static item => item.Variable));
-        var parameters = new HashSet<IrVarId>(variables
+        var parameters = variables
             .Where(static item => item.Role == CompilerVariableRole.Parameter)
-            .Select(static item => item.Variable));
+            .ToDictionary(static item => item.Variable);
         var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
         var targets = new HashSet<IrVarId>();
+        var sourceOrdinals = new HashSet<int>();
+        var programVariables = CollectProgramVariables(graph.Program);
         foreach (var item in row.ParameterBindings)
         {
             if (item == null)
@@ -500,9 +566,18 @@ internal static class CompilerLoweredArtifact
 
             var source = At(graph.Variables, item.Source, "variable");
             var target = At(graph.Variables, item.Target, "variable");
-            if (canonical.Contains(source) || !parameters.Contains(target) || source == target ||
-                graph.Factory.GetVariableInfo(source).Type != graph.Factory.GetVariableInfo(target).Type ||
-                bindings.ContainsKey(source) || !targets.Add(target))
+            var sourceInfo = graph.Factory.GetVariableInfo(source);
+            var targetInfo = graph.Factory.GetVariableInfo(target);
+            var sourceName = graph.Factory.GetString(sourceInfo.Name);
+            var portableSource = At(portable.Variables, item.Source, "variable");
+            if (canonical.Contains(source) || !parameters.TryGetValue(target, out var parameter) ||
+                source == target || item.SourceOrdinal != parameter.Ordinal ||
+                item.SourceType < 0 || item.SourceType >= portable.Types.Length ||
+                portableSource.Type != item.SourceType || item.SourceName != sourceName ||
+                !sourceName.StartsWith("Parameter:", StringComparison.Ordinal) ||
+                !programVariables.Contains(source) || sourceInfo.Type != targetInfo.Type ||
+                bindings.ContainsKey(source) || !targets.Add(target) ||
+                !sourceOrdinals.Add(item.SourceOrdinal))
             {
                 throw new InvalidDataException("A lowered parameter binding is invalid.");
             }
@@ -512,7 +587,6 @@ internal static class CompilerLoweredArtifact
         var specs = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSpecCall>();
         var summaries = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
         var calls = graph.Instructions.OfType<IrCallInstruction>().ToArray();
-        var programVariables = CollectProgramVariables(graph.Program);
         var summaryVariables = new HashSet<IrVarId>();
         var portableCalls = portable.Blocks.SelectMany(static block => block.Instructions).Where(
             static instruction => instruction.Kind == IrInstructionKind.Call).ToArray();

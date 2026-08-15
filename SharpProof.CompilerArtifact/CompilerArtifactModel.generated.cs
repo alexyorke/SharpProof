@@ -11,7 +11,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 12;
+    internal const int Current = 13;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -44,6 +44,17 @@ internal enum CompilerVariableRole
     Parameter = 1,
     Result = 2,
     PreState = 3
+}
+
+internal enum CompilerScalarDomain
+{
+    None = 0,
+    SByte = 1,
+    Byte = 2,
+    Short = 3,
+    UShort = 4,
+    Int = 5,
+    UInt = 6
 }
 
 internal enum CompilerPreparedBodyKind
@@ -243,8 +254,10 @@ internal sealed class CompilerVariableArtifact
     public int Ordinal { get; set; }
     public int Variable { get; set; } = -1;
     public int CurrentStateVariable { get; set; } = -1;
+    public int SourceOrdinal { get; set; } = -1;
     public long? Minimum { get; set; }
     public long? Maximum { get; set; }
+    public CompilerScalarDomain ScalarDomain { get; set; }
     public string ModelLabel { get; set; } = string.Empty;
 }
 
@@ -260,6 +273,9 @@ internal sealed class CompilerBodyArtifact
 internal sealed class CompilerVariableMappingArtifact
 {
     public int Source { get; set; } = -1;
+    public int SourceOrdinal { get; set; } = -1;
+    public int SourceType { get; set; } = -1;
+    public string SourceName { get; set; } = string.Empty;
     public int Target { get; set; } = -1;
 }
 
