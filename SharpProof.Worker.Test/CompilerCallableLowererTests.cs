@@ -162,7 +162,9 @@ public sealed class CompilerCallableLowererTests
                 Is.EqualTo(CompilerSummaryOrigin.Source));
             Assert.That(descriptor.CallIdentity, Does.Contain(".Read("));
             Assert.That(descriptor.EvidenceSha256, Has.Length.EqualTo(64));
-            Assert.That(descriptor.EvidenceIdentity, Is.Empty);
+            Assert.That(
+                descriptor.EvidenceIdentity,
+                Is.EqualTo(descriptor.CallIdentity));
             Assert.That(descriptor.NormalRelation.Type, Is.EqualTo(preparation.Factory.BooleanType));
             Assert.That(call.Id, Is.EqualTo(descriptor.Instruction));
         }

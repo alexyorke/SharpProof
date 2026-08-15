@@ -47,7 +47,8 @@ public sealed class IrSummaryProvenance
     public IrSummaryProvenance(
         IrSummaryOrigin origin,
         string evidenceSha256,
-        string evidenceIdentity = "")
+        string evidenceIdentity = "",
+        string evidenceCallIdentity = "")
     {
         if (!Enum.IsDefined(typeof(IrSummaryOrigin), origin))
         {
@@ -64,16 +65,30 @@ public sealed class IrSummaryProvenance
         if (evidenceIdentity == null ||
             (origin == IrSummaryOrigin.SpecificationPack
                 ? string.IsNullOrWhiteSpace(evidenceIdentity)
-                : evidenceIdentity.Length != 0))
+                : evidenceIdentity.Length > 256 ||
+                    evidenceIdentity.Any(static character =>
+                        char.IsControl(character))))
         {
             throw new ArgumentException(
-                "Only specification-pack summaries require a nonblank evidence identity.",
+                "Summary evidence identity is invalid.",
                 nameof(evidenceIdentity));
+        }
+
+        if (evidenceCallIdentity == null ||
+            evidenceCallIdentity.Length > 256 ||
+            evidenceCallIdentity.Any(static character =>
+                char.IsControl(character)))
+        {
+            throw new ArgumentException(
+                "Summary evidence call identity is invalid.",
+                nameof(evidenceCallIdentity));
         }
 
         Origin = origin;
         EvidenceSha256 = evidenceSha256;
         EvidenceIdentity = evidenceIdentity;
+        EvidenceCallIdentity = evidenceCallIdentity ??
+            throw new ArgumentNullException(nameof(evidenceCallIdentity));
     }
 
     public IrSummaryOrigin Origin { get; }
@@ -81,6 +96,13 @@ public sealed class IrSummaryProvenance
     public string EvidenceSha256 { get; }
 
     public string EvidenceIdentity { get; }
+
+    /// <summary>
+    /// Identifies the summarized member that owns this evidence.  It is
+    /// separate from <see cref="EvidenceIdentity"/> because a specification
+    /// pack identity identifies the audited pack rather than the member.
+    /// </summary>
+    public string EvidenceCallIdentity { get; }
 
     private static bool IsSha256(string? value)
     {

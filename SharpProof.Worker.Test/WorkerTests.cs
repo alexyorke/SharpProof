@@ -2930,7 +2930,7 @@ public sealed class WorkerTests
                     targetName);
                 Assert.That(
                     summary.EvidenceIdentity,
-                    Is.Empty,
+                    Is.EqualTo(summary.CallIdentity),
                     targetName);
             }
             successful++;

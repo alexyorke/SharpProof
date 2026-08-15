@@ -51,7 +51,70 @@ internal static class CompilationFingerprint
         ValidOptions(value.Options) &&
         All(value.SyntaxTrees, ValidTree) &&
         ValidReferences(value.References) &&
-        ValidAdditionalFiles(value.AdditionalFiles);
+        ValidAdditionalFiles(value.AdditionalFiles) &&
+        ValidSummaryEvidence(value.SummaryEvidence);
+    }
+
+    private static bool ValidSummaryEvidence(
+        CompilerSummaryEvidenceSnapshot[]? values)
+    {
+        return values != null &&
+            All(values, ValidSummaryEvidenceRow) &&
+            values.Zip(values.Skip(1), static (left, right) =>
+                StringComparer.Ordinal.Compare(
+                    SummaryEvidenceKey(left),
+                    SummaryEvidenceKey(right)) < 0)
+                .All(static ordered => ordered);
+    }
+
+    private static bool ValidSummaryEvidenceRow(
+        CompilerSummaryEvidenceSnapshot? value)
+    {
+        if (value == null ||
+            !Enum.IsDefined(typeof(CompilerSummaryOrigin), value.Origin) ||
+            !HasText(value.CallIdentity) ||
+            value.CallIdentity.Any(static character => char.IsControl(character)) ||
+            !WorkerProtocolJson.IsSha256(value.EvidenceSha256) ||
+            !HasText(value.EvidenceIdentity))
+        {
+            return false;
+        }
+
+        if (value.Origin == CompilerSummaryOrigin.ImplementationIl)
+        {
+            return HasText(value.OwningModuleName) &&
+                Guid.TryParseExact(value.OwningModuleMvid, "D", out _) &&
+                WorkerProtocolJson.IsSha256(value.OwningModuleSha256) &&
+                value.OwningModuleSha256 == value.EvidenceSha256;
+        }
+
+        return value.OwningModuleName is { Length: 0 } &&
+            value.OwningModuleMvid is { Length: 0 } &&
+            value.OwningModuleSha256 is { Length: 0 } &&
+            (value.Origin is not (CompilerSummaryOrigin.Source or
+                CompilerSummaryOrigin.ImplementationIl) ||
+                value.EvidenceIdentity == value.CallIdentity) &&
+            (value.Origin != CompilerSummaryOrigin.SpecificationPack ||
+                ValidSpecificationPackIdentity(value.EvidenceIdentity));
+    }
+
+    private static bool ValidSpecificationPackIdentity(string value)
+    {
+        return value.Length is > 0 and <= 128 &&
+            value.Contains('@') &&
+            value.All(static character =>
+                character is >= 'a' and <= 'z' or
+                >= '0' and <= '9' or '.' or '-' or '@');
+    }
+
+    private static string SummaryEvidenceKey(
+        CompilerSummaryEvidenceSnapshot value)
+    {
+        return ((int)value.Origin).ToString(
+                System.Globalization.CultureInfo.InvariantCulture) + "|" +
+            value.CallIdentity + "|" + value.EvidenceIdentity + "|" +
+            value.EvidenceSha256 + "|" + value.OwningModuleName + "|" +
+            value.OwningModuleMvid + "|" + value.OwningModuleSha256;
     }
 
     private static bool ValidReferences(

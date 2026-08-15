@@ -16,6 +16,16 @@ internal sealed class CompilerRelationalSummaryProvider
         new(SymbolEqualityComparer.Default);
     private readonly HashSet<IMethodSymbol> _active =
         new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<IMethodSymbol, CompilerSummaryEvidenceAuthority>
+        _authorities = new(SymbolEqualityComparer.Default);
+
+    internal ImmutableArray<CompilerSummaryEvidenceAuthority> EvidenceAuthorities =>
+        [.. _authorities.Values
+            .OrderBy(static value => (int)value.Origin)
+            .ThenBy(static value => value.CallIdentity, StringComparer.Ordinal)
+            .ThenBy(static value => value.EvidenceIdentity, StringComparer.Ordinal)
+            .ThenBy(static value => value.EvidenceSha256, StringComparer.Ordinal)
+            .ThenBy(static value => value.OwningModuleName, StringComparer.Ordinal)];
 
     internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention
     {
@@ -110,6 +120,17 @@ internal sealed class CompilerRelationalSummaryProvider
             }
 
             _summaries.Add(method, summary!);
+            _authorities.Add(
+                method,
+                new CompilerSummaryEvidenceAuthority(
+                    ToCompilerOrigin(summary!.Signature.Provenance.Origin),
+                    summary.Signature.Provenance.EvidenceCallIdentity,
+                    summary.Signature.Provenance.EvidenceSha256,
+                    summary.Signature.Provenance.EvidenceIdentity,
+                    summary.Signature.Provenance.Origin ==
+                        IrSummaryOrigin.ImplementationIl
+                        ? method.ContainingModule.Name
+                        : string.Empty));
             return true;
         }
         finally
@@ -236,7 +257,9 @@ internal sealed class CompilerRelationalSummaryProvider
             result,
             new IrSummaryProvenance(
                 IrSummaryOrigin.Source,
-                EvidenceSha256(declaration, cancellationToken)));
+                EvidenceSha256(declaration, cancellationToken),
+                method.GetDocumentationCommentId() ?? string.Empty,
+                method.GetDocumentationCommentId() ?? string.Empty));
         var built = IrRelationalSummaryBuilder.Build(
             selected.Lowering.Program,
             signature,
@@ -289,4 +312,26 @@ internal sealed class CompilerRelationalSummaryProvider
         return string.Concat(bytes.Select(static value =>
             value.ToString("x2", CultureInfo.InvariantCulture)));
     }
+
+    private static CompilerSummaryOrigin ToCompilerOrigin(
+        IrSummaryOrigin origin)
+    {
+        return origin switch
+        {
+            IrSummaryOrigin.Source => CompilerSummaryOrigin.Source,
+            IrSummaryOrigin.ImplementationIl =>
+                CompilerSummaryOrigin.ImplementationIl,
+            IrSummaryOrigin.SpecificationPack =>
+                CompilerSummaryOrigin.SpecificationPack,
+            _ => throw new InvalidOperationException(
+                "A relational summary has an unsupported origin.")
+        };
+    }
 }
+
+internal sealed record CompilerSummaryEvidenceAuthority(
+    CompilerSummaryOrigin Origin,
+    string CallIdentity,
+    string EvidenceSha256,
+    string EvidenceIdentity,
+    string OwningModuleName);

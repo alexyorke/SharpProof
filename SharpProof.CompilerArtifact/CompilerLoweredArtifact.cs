@@ -170,6 +170,7 @@ internal static class CompilerLoweredArtifact
                     static evidence => new CompilerSummaryEvidenceArtifact
                     {
                         Origin = evidence.Origin,
+                        CallIdentity = evidence.CallIdentity,
                         EvidenceSha256 = evidence.EvidenceSha256,
                         EvidenceIdentity = evidence.EvidenceIdentity
                     })],
@@ -705,6 +706,7 @@ internal static class CompilerLoweredArtifact
                     summary.Origin,
                     summary.EvidenceSha256,
                     summary.EvidenceIdentity,
+                    identity,
                     compilation) ||
                 !ValidDependencyEvidence(
                     summary.DependencyEvidence,
@@ -772,6 +774,7 @@ internal static class CompilerLoweredArtifact
                 [.. summary.DependencyEvidence.Select(static evidence =>
                     new CompilerPreparedSummaryEvidence(
                         evidence.Origin,
+                        evidence.CallIdentity,
                         evidence.EvidenceSha256,
                         evidence.EvidenceIdentity))])
             {
@@ -1024,7 +1027,8 @@ internal static class CompilerLoweredArtifact
 
         if (origin != CompilerSummaryOrigin.SpecificationPack)
         {
-            return identity.Length == 0;
+            return identity.Length is > 0 and <= 256 &&
+                identity.Any(static character => !char.IsControl(character));
         }
 
         return identity.Length is > 0 and <= 128 &&
@@ -1038,16 +1042,47 @@ internal static class CompilerLoweredArtifact
         CompilerSummaryOrigin origin,
         string? sha256,
         string? identity,
+        string? callIdentity,
         CompilerCompilationSnapshot compilation)
     {
-        return Enum.IsDefined(typeof(CompilerSummaryOrigin), origin) &&
-            WorkerProtocolJson.IsSha256(sha256) &&
-            ValidSummaryEvidenceIdentity(origin, identity) &&
-            (origin != CompilerSummaryOrigin.ImplementationIl ||
-                (compilation.References ?? []).SelectMany(
-                        static reference => reference?.Modules ?? [])
-                    .Any(module => module != null &&
-                        module.Sha256 == sha256));
+        if (!Enum.IsDefined(typeof(CompilerSummaryOrigin), origin) ||
+            !WorkerProtocolJson.IsSha256(sha256) ||
+            !ValidSummaryEvidenceIdentity(origin, identity) ||
+            callIdentity is not { Length: > 0 and <= 256 } ||
+            callIdentity.Any(static character => char.IsControl(character)))
+        {
+            return false;
+        }
+
+        var authority = (compilation.SummaryEvidence ?? [])
+            .Where(item => item != null &&
+                item.Origin == origin &&
+                item.EvidenceSha256 == sha256 &&
+                item.EvidenceIdentity == identity &&
+                (callIdentity == null || item.CallIdentity == callIdentity))
+            .ToArray();
+        if (authority.Length != 1)
+        {
+            return false;
+        }
+
+        var row = authority[0];
+        if (origin != CompilerSummaryOrigin.ImplementationIl)
+        {
+            return row.OwningModuleName is { Length: 0 } &&
+                row.OwningModuleMvid is { Length: 0 } &&
+                row.OwningModuleSha256 is { Length: 0 };
+        }
+
+        return row.OwningModuleName is { Length: > 0 } &&
+            Guid.TryParseExact(row.OwningModuleMvid, "D", out _) &&
+            row.OwningModuleSha256 == sha256 &&
+            (compilation.References ?? [])
+                .SelectMany(static reference => reference?.Modules ?? [])
+                .Count(module => module != null &&
+                    module.Name == row.OwningModuleName &&
+                    module.Mvid == row.OwningModuleMvid &&
+                    module.Sha256 == row.OwningModuleSha256) == 1;
     }
 
     private static bool ValidDependencyEvidence(
@@ -1067,6 +1102,7 @@ internal static class CompilerLoweredArtifact
                     item.Origin,
                     item.EvidenceSha256,
                     item.EvidenceIdentity,
+                    item.CallIdentity,
                     compilation))
             {
                 return false;
@@ -1074,6 +1110,7 @@ internal static class CompilerLoweredArtifact
 
             var key = ((int)item.Origin).ToString(
                     CultureInfo.InvariantCulture) + "|" +
+                item.CallIdentity + "|" +
                 item.EvidenceIdentity + "|" + item.EvidenceSha256;
             if (previous != null &&
                 StringComparer.Ordinal.Compare(previous, key) >= 0)
