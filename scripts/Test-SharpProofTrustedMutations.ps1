@@ -1613,6 +1613,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ResponseElapsedTimeUsesTheProducerRepresentableEnvelope'
     },
     [pscustomobject]@{
+        Name = 'summary-unique-term-budget'
+        File = 'SharpProof.Summaries\IrRelationalSummaryBuilder.cs'
+        Original = '            if (!Charge(term))'
+        Mutated = '            if (false)'
+        Project = 'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj'
+        Filter = 'FullyQualifiedName~SymbolicBudgetRejectsBroadUniqueTermDag'
+    },
+    [pscustomobject]@{
         Name = 'release-exact-package-role-filenames'
         File = 'scripts\SharpProof.SymbolPackageValidator.cs'
         Original = (@'

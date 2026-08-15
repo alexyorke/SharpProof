@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -368,6 +369,62 @@ public sealed class IrRelationalSummaryTests
                 limits: new IrRelationalSummaryBuildLimits(
                     maximumExpressionDepth: 1)).Reason,
             Is.EqualTo(IrSummaryAbstentionReason.ExpressionDepth));
+    }
+
+    [Test]
+    public void SymbolicBudgetRejectsBroadUniqueTermDag()
+    {
+        const int leafCount = 32;
+        var factory = new IrFactory();
+        var declaringType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "WideFunctions");
+        var parameterTypes = Enumerable.Repeat(factory.IntegerType, leafCount).ToArray();
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(), declaringType, "Wide", factory.IntegerType,
+            isStatic: true, parameterTypes);
+        var parameters = Enumerable.Range(0, leafCount)
+            .Select(index => factory.CreateVariable(
+                "parameter:" + index.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture),
+                factory.IntegerType))
+            .ToImmutableArray();
+        var resultVariable = factory.CreateVariable("result", factory.IntegerType);
+        var signature = new IrSummarySignature(
+            member, receiver: null, parameters, resultVariable, Provenance('b'));
+        var environment = ImmutableDictionary.CreateBuilder<IrVarId, IrTerm>();
+        var leaves = new List<IrTerm>();
+        for (var index = 0; index < leafCount; index++)
+        {
+            var bodyParameter = factory.CreateVariable(
+                "body:" + index.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture),
+                factory.IntegerType);
+            environment.Add(bodyParameter, factory.Variable(parameters[index]));
+            leaves.Add(factory.Variable(bodyParameter));
+        }
+        while (leaves.Count > 1)
+        {
+            var next = new List<IrTerm>();
+            for (var index = 0; index < leaves.Count; index += 2)
+            {
+                next.Add(index + 1 == leaves.Count
+                    ? leaves[index]
+                    : factory.Binary(
+                        IrBinaryOperator.Add, leaves[index], leaves[index + 1]));
+            }
+            leaves = next;
+        }
+
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(entry, factory.CreateOperation("return"), leaves[0]);
+        var result = IrRelationalSummaryBuilder.Build(
+            builder.Build(), signature, environment.ToImmutable(),
+            limits: new IrRelationalSummaryBuildLimits(
+                maximumSymbolicOperations: 8));
+
+        Assert.That(result.Reason,
+            Is.EqualTo(IrSummaryAbstentionReason.ResourceLimit));
     }
 
     [Test]

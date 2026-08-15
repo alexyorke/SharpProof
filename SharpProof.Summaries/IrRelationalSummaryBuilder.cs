@@ -189,6 +189,7 @@ public static class IrRelationalSummaryBuilder
         private readonly HashSet<IrMemberId> _dependencies = [];
         private readonly Dictionary<string, IrSummaryProvenance>
             _dependencyProvenance = new(StringComparer.Ordinal);
+        private readonly HashSet<IrId> _visitedTerms = [];
         private int _remainingOperations;
         private bool _mayThrow;
         private IrSummaryAbstentionReason _reason;
@@ -214,6 +215,14 @@ public static class IrRelationalSummaryBuilder
 
         internal IrRelationalSummaryBuildResult Execute()
         {
+            foreach (var term in _initialEnvironment.Values)
+            {
+                if (!Supported(term))
+                {
+                    return Failure();
+                }
+            }
+
             var order = CreateOrder();
             if (order.IsDefault)
             {
@@ -432,6 +441,11 @@ public static class IrRelationalSummaryBuilder
             IrSummaryInstantiation instantiated;
             try
             {
+                if (!Supported(dependency.NormalCompletion) ||
+                    !Supported(dependency.NormalRelation))
+                {
+                    return null;
+                }
                 instantiated = IrRelationalSummaryInstantiator.Instantiate(
                     dependency,
                     receiver,
@@ -728,6 +742,10 @@ public static class IrRelationalSummaryBuilder
             IrTerm term,
             IReadOnlyDictionary<IrVarId, IrTerm> environment)
         {
+            if (!Supported(term))
+            {
+                return null;
+            }
             if (!IrTermAnalysis.CollectVariables(term).All(
                     environment.ContainsKey))
             {
@@ -752,6 +770,10 @@ public static class IrRelationalSummaryBuilder
 
         private bool Supported(IrTerm term)
         {
+            if (!Charge(term))
+            {
+                return false;
+            }
             if (IrTermAnalysis.GetDepth(term) <=
                 _limits.MaximumExpressionDepth)
             {
@@ -760,6 +782,60 @@ public static class IrRelationalSummaryBuilder
 
             _reason = IrSummaryAbstentionReason.ExpressionDepth;
             return false;
+        }
+
+        private bool Charge(IrTerm root)
+        {
+            var pending = new Stack<IrTerm>();
+            pending.Push(root);
+            while (pending.Count != 0)
+            {
+                var term = pending.Pop();
+                if (!_visitedTerms.Add(term.Id))
+                {
+                    continue;
+                }
+                if (!Spend())
+                {
+                    return false;
+                }
+                switch (term)
+                {
+                    case IrOpaqueTerm opaque:
+                        foreach (var argument in opaque.Arguments)
+                        {
+                            pending.Push(argument);
+                        }
+                        if (opaque.Receiver != null)
+                        {
+                            pending.Push(opaque.Receiver);
+                        }
+                        break;
+                    case IrUnaryTerm unary:
+                        pending.Push(unary.Operand);
+                        break;
+                    case IrBinaryTerm binary:
+                        pending.Push(binary.Left);
+                        pending.Push(binary.Right);
+                        break;
+                    case IrConditionalTerm conditional:
+                        pending.Push(conditional.Condition);
+                        pending.Push(conditional.WhenTrue);
+                        pending.Push(conditional.WhenFalse);
+                        break;
+                    case IrCastTerm cast:
+                        pending.Push(cast.Operand);
+                        break;
+                    case IrLengthTerm length:
+                        pending.Push(length.Value);
+                        break;
+                    case IrSequenceAccessTerm access:
+                        pending.Push(access.Sequence);
+                        pending.Push(access.Index);
+                        break;
+                }
+            }
+            return true;
         }
 
         private void AddIncoming(
