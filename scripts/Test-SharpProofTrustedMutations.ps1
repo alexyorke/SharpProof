@@ -1262,6 +1262,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication'
     },
     [pscustomobject]@{
+        Name = 'invocation-cleanup-not-success-only'
+        File = 'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
+        Original = '    <CallTarget Targets="_SharpProofCleanupInvocation" />'
+        Mutated = '    <CallTarget Targets="_SharpProofCleanupInvocation" Condition="''$(_SharpProofVerifierExitCode)'' == ''0''" />'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerManifestPropertiesAreVisibleBeforeEditorConfigGeneration'
+    },
+    [pscustomobject]@{
         Name = 'requires-skips-compiler-elided-invocations'
         File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
         Original = "        if (operation is IInvocationOperation invocation &&`n            _invocationEmission.IsElided(invocation))"

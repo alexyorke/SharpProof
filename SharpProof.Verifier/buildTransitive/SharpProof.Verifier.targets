@@ -98,6 +98,12 @@
         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
         CompilerOutputPaths="@(_SharpProofCompilerOwnedOutput)"
         CachePath="$(_SharpProofActiveCacheDirectory)" />
+    <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
+  </Target>
+
+  <Target Name="_SharpProofCleanupInvocation"
+          Condition="'$(_SharpProofInvocationDirectory)' != ''">
+    <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"
@@ -172,7 +178,6 @@
       <Output TaskParameter="HasStructuredError"
               PropertyName="_SharpProofVerifierHasStructuredError" />
     </SharpProof.BuildTasks.RunVerifier>
-    <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
     <Error Condition="'$(_SharpProofVerifierExitCode)' != '0' AND '$(_SharpProofVerifierHasStructuredError)' != 'true'"
            Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
     <SharpProof.BuildTasks.ValidatePublishedVerificationResult
@@ -184,12 +189,16 @@
     <Message Condition="'$(_SharpProofEffectiveSarifFile)' != ''"
              Importance="High"
              Text="SharpProof verifier SARIF result: $(_SharpProofEffectiveSarifFile)" />
+    <CallTarget Targets="_SharpProofCleanupInvocation" />
+    <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
   </Target>
 
   <Target Name="SharpProofVerify"
           AfterTargets="CoreCompile"
           DependsOnTargets="_SharpProofInitializeVerify;_SharpProofVerifyCore"
-          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'" />
+          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
+  </Target>
 
   <Target Name="SharpProofResetPublishedVerification"
           BeforeTargets="Clean"
