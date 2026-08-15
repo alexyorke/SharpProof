@@ -852,6 +852,9 @@ public sealed class WorkerTests
                     WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
             Assert.That(result.Assumptions.Select(static item => item.Kind),
                 Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+            Assert.That(result.Assumptions.Single(static item =>
+                    item.Kind == WorkerAssumptionKind.TrustedBoundary).Used,
+                Is.True);
             Assert.That(response.CallableResults.Single().Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(backend.CallCount, Is.Zero);

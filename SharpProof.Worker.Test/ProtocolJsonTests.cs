@@ -579,10 +579,8 @@ public sealed class ProtocolJsonTests
                 .Select(static error => error.Code),
             Does.Contain("response.effect_evidence"));
 
-        foreach (var assumption in response.CallableResults
+        foreach (var assumption in response.ClaimResults
                      .SelectMany(static result => result.Assumptions)
-                     .Concat(response.ClaimResults.SelectMany(
-                         static result => result.Assumptions))
                      .Where(static value =>
                          value.Kind == WorkerAssumptionKind.TrustedBoundary))
         {
@@ -612,6 +610,19 @@ public sealed class ProtocolJsonTests
             WorkerProtocolJson.Validate(response).Errors
                 .Select(static error => error.Code),
             Does.Contain("response.effect_evidence"));
+    }
+
+    [Test]
+    public void CallableAssumptionUsageMustRemainClaimAuthoritative()
+    {
+        var response = CreateResponse(CreateManifest());
+        response.CallableResults[0].Assumptions[0].Used = true;
+        response.Summary = CreateSummary(response);
+
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.callable_assumption_usage"));
     }
 
     [Test]

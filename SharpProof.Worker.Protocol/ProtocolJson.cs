@@ -372,9 +372,12 @@ public static partial class WorkerProtocolJson
         foreach (var callable in callables)
         {
             errors.Check(HasValidLocation(callable.Location), prefix + ".callable_location")
-                .Rules(callable, WorkerProtocolMetadata.ManifestCallableRules, prefix + ".");
+                .Rules(callable, WorkerProtocolMetadata.ManifestCallableRules, prefix + ".")
+                .Check(HasProducerAssumptionKinds(callable.Assumptions),
+                    prefix + ".assumption_kind");
             ValidateClaimMembership(callable, claims, prefix, errors);
         }
+        ValidateManifestAssumptionIdentity(callables, prefix, errors);
         foreach (var claim in claims)
         {
             errors.Check(callableIds.Contains(claim.CallableId), prefix + ".claim_callable")
@@ -445,6 +448,20 @@ public static partial class WorkerProtocolJson
                 ? HasValidEffectCertainty(value.Outcome, value.Reason, value.EffectCertainty)
                 : value.EffectCertainty == WorkerEffectEvidenceCertainty.Unspecified,
             "response.effect_certainty")
+            .Check(!effectClaim || WorkerProtocolMetadata.MatchesEffectEvidenceTuple(
+                value.Outcome,
+                value.Reason,
+                value.EffectCertainty,
+                value.Vacuity,
+                value.ProofCore is { Length: > 0 },
+                (value.Assumptions ?? []).Any(static assumption =>
+                    assumption != null &&
+                    assumption.Kind == WorkerAssumptionKind.TrustedBoundary),
+                (value.Assumptions ?? []).Any(static assumption =>
+                    assumption != null &&
+                    assumption.Kind == WorkerAssumptionKind.TrustedBoundary &&
+                    assumption.Used)),
+                "response.effect_evidence")
             .Check(effectClaim && value.Outcome == WorkerClaimOutcome.Refuted
                 ? HasValidEffectWitness(value.EffectWitness)
                 : value.EffectWitness == null, "response.effect_witness");
@@ -646,6 +663,28 @@ public static partial class WorkerProtocolJson
         return CompleteUnique(values,
                 WorkerProtocolMetadata.IsAssumptionValid,
                 static value => value.Id);
+    }
+
+    private static bool HasProducerAssumptionKinds(WorkerAssumptionEvidence[]? values)
+    {
+        return values != null && values.All(static value =>
+            value != null && WorkerProtocolMetadata.MatchesAssumptionKind(value.Kind));
+    }
+
+    private static void ValidateManifestAssumptionIdentity(
+        WorkerCallableManifestEntry[] callables, string prefix, Validator errors)
+    {
+        var groups = callables
+            .Where(static callable => callable != null)
+            .SelectMany(static callable => (callable.Assumptions ?? [])
+                .Where(static assumption => assumption != null &&
+                    !string.IsNullOrWhiteSpace(assumption.Id))
+                .Select(assumption => (CallableId: callable.CallableId, Assumption: assumption)))
+            .GroupBy(static item => item.Assumption.Id, s_ordinal);
+        errors.Check(groups.All(static group => group
+                .Select(static item => (item.CallableId, item.Assumption.Kind))
+                .Distinct()
+                .Count() == 1), prefix + ".assumption_identity");
     }
 
     private static T[] ValidateResultSet<T>(T[]? values, IEnumerable<string?> expectedIds,

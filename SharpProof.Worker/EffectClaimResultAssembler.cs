@@ -112,6 +112,16 @@ internal static class EffectClaimResultAssembler
         result.ProofCore = evidence.Outcome == WorkerClaimOutcome.Proven
             ? ["compiler-effect:" + evidence.EvidenceSha256]
             : [];
+        if (evidence.Certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+        {
+            result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(
+                target,
+                target.Entry.Assumptions
+                    .Where(static assumption =>
+                        assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+                    .Select(static assumption => assumption.Id)
+                    .ToHashSet(StringComparer.Ordinal));
+        }
         return result;
     }
 }

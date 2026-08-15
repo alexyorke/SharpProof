@@ -176,6 +176,27 @@
       ]
     },
     {
+      "name": "EffectEvidenceTuple",
+      "parameters": [
+        {"name":"outcome","type":"WorkerClaimOutcome"},
+        {"name":"reason","type":"WorkerClaimReason"},
+        {"name":"certainty","type":"WorkerEffectEvidenceCertainty"},
+        {"name":"vacuity","type":"WorkerVacuityKind"},
+        {"name":"hasProofCore","type":"bool"},
+        {"name":"hasTrustedProvenance","type":"bool"},
+        {"name":"trustedProvenanceUsed","type":"bool"}
+      ],
+      "rows": [
+        ["Proven","None","CompleteMayEffectSummary","None","*","*","*"],
+        ["Proven","None","TrustedCompleteBoundary","None","*",true,true],
+        ["Proven","None","VacuousEntry","ContradictoryPreconditions",true,"*","*"],
+        ["Refuted","None","DefiniteViolation","None",false,"*","*"],
+        ["Unknown","EffectSummaryIncomplete","IncompleteMayEffectSummary","None",false,"*","*"],
+        ["Unknown","EffectContractNotEstablished","CompleteMayEffectSummary","None",false,"*","*"],
+        ["Unknown","*","Unavailable","None",false,"*","*"]
+      ]
+    },
+    {
       "name": "Vacuity",
       "parameters": [
         {"name":"kind","type":"WorkerClaimKind"},
@@ -236,6 +257,17 @@
         ["Proven","*",false],
         ["Refuted",false,"*"],
         ["Unknown",false,false]
+      ]
+    },
+    {
+      "name": "AssumptionKind",
+      "parameters": [
+        {"name":"kind","type":"WorkerAssumptionKind"}
+      ],
+      "rows": [
+        ["Precondition"],
+        ["UserAssume"],
+        ["TrustedBoundary"]
       ]
     }
   ],
@@ -318,7 +350,9 @@
       "rules": [
         {"code":"valid","condition":{"op":"all","conditions":[
           {"op":"nonBlank","property":"Id"},
-          {"op":"defined","property":"Kind","unspecified":"WorkerAssumptionKind.Unspecified"}
+          {"op":"stateTable","table":"AssumptionKind","arguments":[
+            {"op":"property","property":"Kind"}
+          ]}
         ]}}
       ]
     },
@@ -331,7 +365,8 @@
           {"op":"property","property":"Coverage"},
           {"op":"property","property":"Reason"}
         ]}},
-        {"code":"response.callable_assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}}
+        {"code":"response.callable_assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}},
+        {"code":"response.callable_assumption_usage","condition":{"op":"assumptionsUnused","property":"Assumptions"}}
       ]
     },
     {
