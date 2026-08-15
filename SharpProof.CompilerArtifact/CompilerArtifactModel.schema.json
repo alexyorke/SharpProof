@@ -3021,6 +3021,16 @@
           }
         },
         {
+          "name": "FeatureScopeSha256",
+          "jsonName": "featureScopeSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
           "name": "CompilationSha256",
           "jsonName": "compilationSha256",
           "type": "string",

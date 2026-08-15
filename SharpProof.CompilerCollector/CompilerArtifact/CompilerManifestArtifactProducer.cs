@@ -52,6 +52,8 @@ internal static class CompilerManifestArtifactProducer
             CompilerDiagnostics = diagnosticArtifacts,
             Callables = callables
         };
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
         CompilerManifestArtifactJson.Validate(artifact);
         return artifact;
     }

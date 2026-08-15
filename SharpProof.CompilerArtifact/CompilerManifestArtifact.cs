@@ -362,6 +362,7 @@ internal static class CompilerManifestArtifactJson
     {
         if (!HasValidDiagnostics(value.CompilerDiagnostics) ||
             !HasValidEnvelope(value) ||
+            !HasValidFeatureScope(value) ||
             !HasMatchingCallables(value.Callables, value.Manifest) ||
             !HasValidCallableStates(
                 value.Callables,
@@ -393,6 +394,170 @@ internal static class CompilerManifestArtifactJson
         value.CompilationSha256 == CompilationFingerprint.ComputeSha256(
             value.Compilation, value.CompilerDiagnostics) &&
         WorkerProtocolJson.ValidateManifest(value.Manifest).IsValid;
+    }
+
+    private static bool HasValidFeatureScope(CompilerManifestArtifact? value)
+    {
+        return value != null &&
+            WorkerProtocolJson.IsSha256(value.FeatureScopeSha256) &&
+            HasFeatureScopeParity(value) &&
+            value.FeatureScopeSha256 ==
+                CompilerFeatureScopeFingerprint.ComputeSha256(value);
+    }
+
+    private static bool HasFeatureScopeParity(CompilerManifestArtifact value)
+    {
+        if (value.Manifest?.Callables is not { } manifestCallables ||
+            value.Manifest.Claims is not { } manifestClaims ||
+            value.Callables is not { } loweredCallables)
+        {
+            return false;
+        }
+
+        var allowEffects = value.Features is WorkerFeatureSet.Effects or WorkerFeatureSet.All;
+        var allowContracts = value.Features is WorkerFeatureSet.Contracts or WorkerFeatureSet.All;
+        var loweredById = loweredCallables
+            .Where(static item => item != null)
+            .GroupBy(static item => item!.CallableId, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.Single(), StringComparer.Ordinal);
+
+        foreach (var callable in manifestCallables)
+        {
+            if (callable == null ||
+                !loweredById.TryGetValue(callable.CallableId, out var lowered) ||
+                lowered == null)
+            {
+                return false;
+            }
+
+            var claims = manifestClaims
+                .Where(claim => claim != null && claim.CallableId == callable.CallableId)
+                .OrderBy(static claim => claim!.Ordinal)
+                .ToArray();
+            var postconditions = claims
+                .Where(static claim => claim!.Kind == WorkerClaimKind.Postcondition)
+                .ToArray();
+            var effects = claims
+                .Where(static claim => claim!.Kind == WorkerClaimKind.Effect)
+                .ToArray();
+            var selectedEffects = callable.SelectedFeatures.Contains(WorkerSelectedFeature.Effects);
+            var selectedContracts = callable.SelectedFeatures.Contains(WorkerSelectedFeature.Contracts);
+
+            if ((selectedEffects && !allowEffects) ||
+                (selectedContracts && !allowContracts) ||
+                (effects.Length != 0 && (!selectedEffects || !allowEffects)) ||
+                (postconditions.Length != 0 && (!selectedContracts || !allowContracts)) ||
+                callable.Assumptions.Any(assumption =>
+                    assumption != null &&
+                    assumption.Kind is (WorkerAssumptionKind.Precondition or WorkerAssumptionKind.UserAssume) &&
+                    (!selectedContracts || !allowContracts)))
+            {
+                return false;
+            }
+
+            var hasExplicitReason = callable.SelectionReasons.Contains(
+                WorkerSelectionReason.ExplicitAnnotation);
+            var hasDiscoveredReason = callable.SelectionReasons.Contains(
+                WorkerSelectionReason.DiscoveredPostcondition);
+            var hasContractAssumptions = callable.Assumptions.Any(assumption =>
+                assumption != null &&
+                assumption.Kind is (WorkerAssumptionKind.Precondition or WorkerAssumptionKind.UserAssume));
+            if (hasDiscoveredReason != (postconditions.Length != 0) ||
+                (hasExplicitReason &&
+                 callable.SelectedFeatures.Length == 0 &&
+                 callable.Assumptions.Length == 0) ||
+                (!hasContractAssumptions && !selectedContracts &&
+                 !selectedEffects &&
+                 !hasDiscoveredReason && callable.SelectionReasons.Length != 0))
+            {
+                return false;
+            }
+
+            var loweredEffects = lowered.EffectClaims;
+            if (loweredEffects == null ||
+                loweredEffects.Length != effects.Length ||
+                !loweredEffects.Select(static effect => effect?.ClaimId)
+                    .SequenceEqual(effects.Select(static claim => claim!.ClaimId), StringComparer.Ordinal) ||
+                !loweredEffects.Select(static effect => effect!.ContractKind)
+                    .SequenceEqual(effects.Select(static claim => claim!.EffectContractKind)))
+            {
+                return false;
+            }
+
+            foreach (var effect in loweredEffects)
+            {
+                if (effect == null)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    CompilerEffectClaimArtifactCodec.Validate(effect);
+                }
+                catch (InvalidDataException)
+                {
+                    return false;
+                }
+            }
+
+            if (lowered.FailureReason != CompilerCallableArtifactReasonCatalog.SuccessReason)
+            {
+                continue;
+            }
+
+            if (lowered.Clauses is not { } clauses)
+            {
+                return false;
+            }
+
+            var loweredPostconditions = clauses
+                .Where(static clause => clause?.Kind == CompilerContractKind.Ensures)
+                .ToArray();
+            if (loweredPostconditions.Length != postconditions.Length ||
+                !loweredPostconditions.Select(static clause => clause?.ClaimId)
+                    .SequenceEqual(postconditions.Select(static claim => claim!.ClaimId), StringComparer.Ordinal) ||
+                !loweredPostconditions.Select(static clause => ManifestEvidence(clause!.Evidence))
+                    .SequenceEqual(postconditions.Select(static claim => claim!.Evidence)))
+            {
+                return false;
+            }
+
+            var declaredAssumptions = callable.Assumptions
+                .Where(static assumption => assumption != null &&
+                    assumption.Kind is WorkerAssumptionKind.Precondition or WorkerAssumptionKind.UserAssume)
+                .Select(static assumption => (assumption!.Id, assumption.Kind))
+                .OrderBy(static item => item.Id, StringComparer.Ordinal)
+                .ToArray();
+            var loweredAssumptions = clauses
+                .Where(static clause => clause?.Kind != CompilerContractKind.Ensures)
+                .Select(static clause => clause == null
+                    ? (string.Empty, WorkerAssumptionKind.Unspecified)
+                    : (clause.AssumptionId ?? string.Empty,
+                        clause.Kind == CompilerContractKind.Requires
+                            ? WorkerAssumptionKind.Precondition
+                            : WorkerAssumptionKind.UserAssume))
+                .OrderBy(static item => item.Item1, StringComparer.Ordinal)
+                .ToArray();
+            if (!declaredAssumptions.SequenceEqual(loweredAssumptions))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static WorkerClaimEvidence ManifestEvidence(
+        CompilerContractEvidence value)
+    {
+        return value switch
+        {
+            CompilerContractEvidence.CompilerBoundInvocation => WorkerClaimEvidence.DirectClause,
+            CompilerContractEvidence.ClosedAttribute => WorkerClaimEvidence.ReturnAttribute,
+            CompilerContractEvidence.Companion => WorkerClaimEvidence.CompanionClause,
+            _ => WorkerClaimEvidence.Unspecified
+        };
     }
 
     private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics)

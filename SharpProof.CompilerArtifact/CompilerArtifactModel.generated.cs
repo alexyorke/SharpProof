@@ -380,6 +380,7 @@ internal sealed class CompilerManifestArtifact
     public int RelationalSummarySchemaVersion { get; set; } = CompilerRelationalSummaryVersions.Current;
     public int SpecificationPackSchemaVersion { get; set; } = CompilerSpecificationPackVersions.Current;
     public WorkerFeatureSet Features { get; set; }
+    public string FeatureScopeSha256 { get; set; } = string.Empty;
     public string CompilationSha256 { get; set; } = string.Empty;
     public CompilerCompilationSnapshot Compilation { get; set; } = new();
     public WorkerClaimManifest Manifest { get; set; } = new();

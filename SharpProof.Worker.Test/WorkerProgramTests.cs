@@ -259,6 +259,8 @@ public sealed class WorkerProgramTests
                 CompilationSha256 = CompilationFingerprint.ComputeSha256(compilation, []),
                 Manifest = manifest
             };
+            artifact.FeatureScopeSha256 =
+                CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
             await File.WriteAllTextAsync(
                 manifestPath,
                 CompilerManifestArtifactJson.Serialize(artifact));
