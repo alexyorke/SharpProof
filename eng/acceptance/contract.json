@@ -469,7 +469,6 @@
         "name": "compilerWireCatalog",
         "paths": [
           "SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json",
-          "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
           "scripts/Generate-CompilerArtifactModel.ps1",
           "scripts/Test-CompilerArtifactModelGenerator.ps1",
           "SharpProof.CompilerArtifact/PortableIrModel.generated.cs",
