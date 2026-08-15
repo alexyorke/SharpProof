@@ -42,6 +42,7 @@
       "SharpProof.Contracts.Test\\SharpProof.Contracts.Test.csproj": 2,
       "SharpProof.ContractForGenerator.Test\\SharpProof.ContractForGenerator.Test.csproj": 2,
       "SharpProof.Frontend.Test\\SharpProof.Frontend.Test.csproj": 2,
+      "SharpProof.Gates.Test\\SharpProof.Gates.Test.csproj": 2,
       "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj": 2,
       "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj": 2,
       "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj": 2,
@@ -56,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 219,
-    "expectedCatalogSha256": "2b96e3cf7c654b9ac1975df30c98369c49c4161451d4e151d1b04fb91656c5f4"
+    "expectedCatalogCount": 220,
+    "expectedCatalogSha256": "5a572c003442ae7e37e04f748459890ccc01cd3086c8b72314cb8b01957eab71"
   },
   "worker": {
     "protocolVersion": 11,
@@ -202,7 +203,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "ecedc3e5c54eaf7f31569b6a5f94c0bd0a9f8c43a41b5a63d2d7644c066998c5",
+    "inventorySha256": "0bd9cee9a59c363c46460564839c95c97adc252bb23b4896a0acc95fe8284070",
     "components": [
       {
         "name": "discovery",
@@ -715,6 +716,14 @@
           "scripts/Test-SharpProofFuzzEvidenceLifecycle.ps1",
           "scripts/Test-SharpProofFuzzRunnerResult.ps1"
         ]
+      },
+      {
+        "name": "corpusEvidenceAuthority",
+        "paths": [
+          "SharpProof.Gates/Corpus/CorpusGate.cs",
+          "SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs"
+        ],
+        "rationale": "These files emit and strictly authenticate the canonical schema-3 corpus snapshot used by the certifying corpus gate."
       },
       {
         "name": "containedPathAuthority",

@@ -1302,6 +1302,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~GenericOwnersAlignIndependentlyOfNonGenericWrappers'
     },
     [pscustomobject]@{
+        Name = 'corpus-snapshot-loader-requires-schema-header'
+        File = 'SharpProof.Gates\Corpus\CorpusSnapshotFormat.cs'
+        Original = '        return data;'
+        Mutated = '        return lines;'
+        Project = 'SharpProof.Gates.Test\SharpProof.Gates.Test.csproj'
+        Filter = 'FullyQualifiedName~CorpusSnapshotFormatRequiresExactSchemaThreeBytes'
+    },
+    [pscustomobject]@{
         Name = 'pilot-source-report-remains-unreviewed'
         File = 'scripts\Test-SharpProofPilots.ps1'
         Original = '        falsePositiveReports = $null'

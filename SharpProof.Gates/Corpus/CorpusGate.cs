@@ -283,11 +283,7 @@ internal static class CorpusGate
     {
         repositoryRoot ??= RepositoryLayout.FindRoot();
         var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
-        var lines = new List<string> {
-            "# SharpProof analyzer corpus snapshot schema 3",
-            "# case-id|verdict|semantic-outcome|sorted-diagnostics",
-            "# diagnostic=id@effective-severity@normalized-location@base64-invariant-message"
-        };
+        var lines = new List<string>();
         foreach (var item in CorpusCatalog.CreateCases(repositoryRoot)
                      .Where(static item =>
                          item.Origin ==
@@ -304,7 +300,7 @@ internal static class CorpusGate
                     cancellationToken)
                 .ConfigureAwait(false))
             .Select(static observation => observation.ToCanonicalLine()));
-        return string.Join("\n", lines) + "\n";
+        return CorpusSnapshotFormat.Render(lines);
     }
 
     public static async Task WriteActualSnapshotAsync(
@@ -473,13 +469,9 @@ internal static class CorpusGate
         var result = ImmutableDictionary.CreateBuilder<
             string,
             SnapshotExpectation>(StringComparer.Ordinal);
-        foreach (var rawLine in File.ReadAllLines(path))
+        foreach (var rawLine in CorpusSnapshotFormat.ReadDataLines(path))
         {
-            var line = rawLine.Trim();
-            if (line.Length == 0 || line.StartsWith('#'))
-            {
-                continue;
-            }
+            var line = rawLine;
 
             var parts = line.Split('|');
             if (parts.Length != 4 ||
