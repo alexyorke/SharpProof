@@ -256,13 +256,7 @@ public sealed class RoslynProgramLowerer(
             bool wantsResult)
         {
             var receiver = LowerOptionalValue(block, operation, invocation.Instance);
-            var arguments = invocation.Arguments
-                .Select(argument => (
-                    Ordinal: argument.Parameter?.Ordinal ?? int.MaxValue,
-                    Value: LowerValue(block, operation, argument.Value)))
-                .OrderBy(static argument => argument.Ordinal)
-                .Select(static argument => argument.Value)
-                .ToArray();
+            var arguments = LowerInvocationArguments(block, operation, invocation);
             var resultType = _expressions.GetTypeId(invocation.Type);
             var member = _expressions.GetMember(invocation.TargetMethod, receiver, "call:", invocation.Type, arguments);
             var isDirect = IsDirectInvocation(invocation);
@@ -307,6 +301,19 @@ public sealed class RoslynProgramLowerer(
                 return _factory.Variable(missing);
             }
             return null;
+        }
+
+        private IrTerm[] LowerInvocationArguments(
+            IrBlockId block,
+            OperationId operation,
+            IInvocationOperation invocation)
+        {
+            return [.. invocation.Arguments
+                .Select(argument => (
+                    Ordinal: argument.Parameter?.Ordinal ?? int.MaxValue,
+                    Value: LowerValue(block, operation, argument.Value)))
+                .OrderBy(static argument => argument.Ordinal)
+                .Select(static argument => argument.Value)];
         }
 
         private LocationLowering LowerLocation(
