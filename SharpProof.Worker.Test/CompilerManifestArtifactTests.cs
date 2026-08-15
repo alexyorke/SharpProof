@@ -965,6 +965,49 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void ResealedEffectVerdictsCannotChangeCompilerOutcome()
+    {
+        const string refutedSource =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [ZeroAllocations]
+                internal static object Allocate() => new object();
+            }
+            """;
+        const string unknownSource =
+            """
+            using System;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static AggregateException Create() =>
+                    new AggregateException((IEnumerable<Exception>)null!);
+            }
+            """;
+
+        foreach (var source in new[] { refutedSource, unknownSource })
+        {
+            var artifact = CreateContractArtifact(source);
+            var evidence = artifact.Callables.Single().EffectClaims.Single();
+            Assert.That(evidence.Outcome,
+                Is.Not.EqualTo(WorkerClaimOutcome.Proven));
+
+            evidence.Outcome = WorkerClaimOutcome.Proven;
+            evidence.Reason = WorkerClaimReason.None;
+            evidence.Certainty =
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+            evidence.Witness = null;
+            evidence.Replay = null;
+            CompilerEffectClaimArtifactCodec.Seal(evidence);
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        }
+    }
+
+    [Test]
     public void UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay()
     {
         var artifact = CreateContractArtifact(
