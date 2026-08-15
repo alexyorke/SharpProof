@@ -2347,7 +2347,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 
 ### SP-AUDIT-122 - Clean cannot recover publication-set metadata (P2)
 
-- [ ] Publication-set markers persist beside every member, but the verifier
+- [x] Publication-set markers persist beside every member, but the verifier
   registers no Clean hook or `FileWrites` entries for them. The failure message
   instructs users to clean before changing paths even though `dotnet clean`
   does not remove the metadata.
@@ -2362,6 +2362,11 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   provide an explicit safe reset target that removes a complete matching set
   under its locks. Add clean/no-clean, changed member, partial failure,
   unrelated-neighbor, incremental, and mutation controls.
+- Resolution: the Clean path now invokes an owned-set reset task under the
+  exact publication locks. It requires a complete marker set before mutation,
+  removes all owned outputs and markers, is idempotent when absent, preserves
+  unrelated neighbors, and rejects partial ownership. Direct Host/BuildTask,
+  mutation, and TCB controls pass; a packaged consumer fixture was unavailable.
 
 ### SP-AUDIT-129 - Publication plans omit immutable artifact identities (P2)
 
