@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 31 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 30 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 31 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-089 - Compiler callable state differs across producer and hydrator (fixed)
+
+- [x] Fixed by `d1a1cbc7a` (`fix: close compiler callable reason states`).
+- The compiler-artifact schema now owns the exact success, diagnostic-failure,
+  and lowering-failure reason sets. Collector production and artifact hydration
+  use distinct generated catalogs, so runtime-only reasons such as
+  MethodTimeout cannot be represented as compiler abstention evidence.
+- Generator verification and the focused matrix passed 5/5; Worker passed
+  522/522, Analyzer 337/337, and Architecture 428/428.
 
 ### SP-AUDIT-233 - Rejected metadata preconditions evade SP0047 (fixed)
 
@@ -2278,27 +2288,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   restores manifest/request-first publication.
 - Consolidated cases: SP-AUDIT-176.
 - Unified closure: Publish one generation transactionally, sync data and directories, publish the commit member last, and roll back or invalidate the whole set on failure.
-
-### SP-AUDIT-089 - Compiler callable state differs across producer and hydrator (P2)
-
-- [ ] Failed callable hydration accepts any defined worker claim reason except
-  `Unspecified`, although compiler lowering can emit only its small closed set
-  of unsupported compiler reasons. Runtime-only reasons such as
-  `MethodTimeout` therefore pass as canonical compiler evidence.
-- Certifier impact: a compiler artifact for an unsupported loop was changed
-  from `UnsupportedBody` to `MethodTimeout`; hydration accepted it and can
-  manufacture an internally consistent TimedOut result even though no solver
-  deadline elapsed.
-- Reproduction: a temporary Worker test created the real unsupported-loop
-  artifact, performed that one-field mutation, and expected
-  `InvalidDataException`. No exception was thrown. The temporary test was
-  removed.
-- Required closure: validate failed callables against a generated compiler-
-  producer reason catalog, separate compiler abstention from runtime outcomes,
-  and table-test every allowed compiler reason and every rejected runtime
-  reason. Add a mutation restoring broad enum-defined acceptance.
-- Consolidated cases: SP-AUDIT-211.
-- Unified closure: Generate one tagged compiler-callable state machine for diagnostics, success/failure, compiler reason sets, deep body validation, and worker projection.
 
 ### SP-AUDIT-091 - Peer-generated rejected ContractFor attributes evade validation (P2)
 
