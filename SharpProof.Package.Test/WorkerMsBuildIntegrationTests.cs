@@ -616,6 +616,10 @@ public sealed class WorkerMsBuildIntegrationTests
         var resultPath = Path.Combine(publicationDirectory, "result.json");
         var manifestPath = Path.Combine(publicationDirectory, "manifest.json");
         var sarifPath = Path.Combine(publicationDirectory, "result.sarif");
+        var effectiveSarifPath = Path.Combine(
+            publicationDirectory,
+            "netstandard2.0",
+            Path.GetFileName(sarifPath));
         var cachePath = Path.Combine(publicationDirectory, "cache");
         Assert.That(resultPath.Length, Is.GreaterThan(260));
 
@@ -632,7 +636,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(File.Exists(requestPath), Is.True);
             Assert.That(File.Exists(resultPath), Is.True);
             Assert.That(File.Exists(manifestPath), Is.True);
-            Assert.That(File.Exists(sarifPath), Is.True);
+            Assert.That(File.Exists(effectiveSarifPath), Is.True);
         }
     }
 
@@ -677,6 +681,10 @@ public sealed class WorkerMsBuildIntegrationTests
         var sarifPath = Path.Combine(
             publicationDirectory.FullName,
             new string('s', 220) + ".sarif");
+        var effectiveSarifPath = Path.Combine(
+            publicationDirectory.FullName,
+            "netstandard2.0",
+            Path.GetFileName(sarifPath));
         Assert.That(Path.GetFileName(sarifPath).Length, Is.EqualTo(226));
 
         var first = await project.BuildAsync(
@@ -699,7 +707,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(File.Exists(requestPath), Is.True, second.Output);
             Assert.That(File.Exists(resultPath), Is.True, second.Output);
             Assert.That(File.Exists(manifestPath), Is.True, second.Output);
-            Assert.That(File.Exists(sarifPath), Is.True, second.Output);
+            Assert.That(File.Exists(effectiveSarifPath), Is.True, second.Output);
         }
 
         var request = WorkerProtocolJson.DeserializeRequest(
@@ -3977,6 +3985,8 @@ public sealed class WorkerMsBuildIntegrationTests
             IEnumerable<(string Name, string Value)> properties)
         {
             var repository = FindRepositoryRoot();
+            var nativeZ3 = SecurityElement.Escape(
+                ContainerContract.ResolveZ3LibraryRequired());
             var attributes = SecurityElement.Escape(
                 ProductBuildOutputs.AttributesAssemblyPath());
             var props = SecurityElement.Escape(
@@ -4075,7 +4085,6 @@ public sealed class WorkerMsBuildIntegrationTests
                     <_SharpProofSharedDirectory>{collectorDirectory}</_SharpProofSharedDirectory>
                     <SharpProofCollectorDirectory>{collectorDirectory}</SharpProofCollectorDirectory>
                     <SharpProofCompilerCollectorPath>{collectorDirectory}/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
-                     <TargetFramework Condition="'$(TargetFrameworks)' == '' and '$(TargetFramework)' == ''">net8.0</TargetFramework>
                     <LangVersion>12.0</LangVersion>
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{worker}</SharpProofWorkerPath>
@@ -4088,6 +4097,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     <_SharpProofPackageWorkerProtocolPath>{protocol}</_SharpProofPackageWorkerProtocolPath>
                     <_SharpProofPackageBuildTasksPath>{buildTasks}</_SharpProofPackageBuildTasksPath>
                 {nativeZ3Property}{configuredProperties}
+                    <TargetFramework Condition="'$(TargetFrameworks)' == '' and '$(TargetFramework)' == ''">net8.0</TargetFramework>
                   </PropertyGroup>
                   <ItemGroup>
                     <Reference Include="SharpProof.Attributes">
