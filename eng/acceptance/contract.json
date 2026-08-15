@@ -57,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 226,
-    "expectedCatalogSha256": "76b7e0944a18190f99bb08db52e15c323b4266c92b3c8ad9df768088aeae5370"
+    "expectedCatalogCount": 227,
+    "expectedCatalogSha256": "58c8f12539a6a1cb1fc8127632f2bd43935d6c4c682b41012772ac59224f60f2"
   },
   "worker": {
     "protocolVersion": 11,
@@ -208,7 +208,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "00689b12c9b6f81bbce90a229b0c3d896a827a2fdced41392917fa88924d0f69",
+    "inventorySha256": "7b6b17ad5df9b61848ea436c013aa116382ec73c16dc718fc4d8ffd75ee69257",
     "components": [
       {
         "name": "discovery",
