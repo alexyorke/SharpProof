@@ -3563,7 +3563,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
                     <OutputType>Exe</OutputType>
-                     <TargetFramework Condition="'$(TargetFrameworks)' == '' and '$(TargetFramework)' == ''">net8.0</TargetFramework>
+                     <TargetFramework Condition="'$(TargetFrameworks)' == ''">net8.0</TargetFramework>
                   </PropertyGroup>
                 </Project>
                 """,
@@ -4075,7 +4075,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     <_SharpProofSharedDirectory>{collectorDirectory}</_SharpProofSharedDirectory>
                     <SharpProofCollectorDirectory>{collectorDirectory}</SharpProofCollectorDirectory>
                     <SharpProofCompilerCollectorPath>{collectorDirectory}/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
-                    <TargetFramework Condition="'$(TargetFrameworks)' == ''">net8.0</TargetFramework>
+                     <TargetFramework Condition="'$(TargetFrameworks)' == '' and '$(TargetFramework)' == ''">net8.0</TargetFramework>
                     <LangVersion>12.0</LangVersion>
                     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
                     <SharpProofWorkerPath>{worker}</SharpProofWorkerPath>

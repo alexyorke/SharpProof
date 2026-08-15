@@ -607,8 +607,9 @@ internal static class Program
             }
         }
         catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or
-                ArgumentException or System.ComponentModel.Win32Exception)
+            exception is not OperationCanceledException and
+            exception is not OutOfMemoryException and
+            exception is not StackOverflowException)
         {
             TryInvalidatePublication(members);
         }
@@ -651,8 +652,9 @@ internal static class Program
             InvalidatePublication(members);
         }
         catch (Exception exception) when (
-            exception is IOException or UnauthorizedAccessException or
-                ArgumentException or System.ComponentModel.Win32Exception)
+            exception is not OperationCanceledException and
+            exception is not OutOfMemoryException and
+            exception is not StackOverflowException)
         {
         }
     }
