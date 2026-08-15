@@ -63,6 +63,30 @@
     },
     {
       "kind": "staticClass",
+      "name": "CompilerSpecificationPackCatalogVersions",
+      "constants": [
+        {
+          "accessibility": "internal",
+          "name": "Current",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "accessibility": "internal",
+          "name": "Sha256",
+          "type": "string",
+          "value": "14d0e3b98982e7f19d90a90624caf95fa444f6131e7543518b3bfd7ff9198c22"
+        },
+        {
+          "accessibility": "internal",
+          "name": "PackIds",
+          "type": "string",
+          "value": "dotnet.scalar"
+        }
+      ]
+    },
+    {
+      "kind": "staticClass",
       "name": "CompilerSpecificationPackVersions",
       "constants": [
         {
@@ -1335,6 +1359,44 @@
     },
     {
       "kind": "class",
+      "name": "CompilerSpecificationPackAuthority",
+      "properties": [
+        {
+          "name": "SpecificationPackIds",
+          "jsonName": "specificationPackIds",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "SpecificationPackCatalogVersion",
+          "jsonName": "specificationPackCatalogVersion",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerSpecificationPackCatalogVersions.Current"
+          }
+        },
+        {
+          "name": "SpecificationPackCatalogSha256",
+          "jsonName": "specificationPackCatalogSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerSpecificationPackCatalogVersions.Sha256"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
       "name": "CompilerCallableArtifact",
       "properties": [
         {
@@ -2522,6 +2584,38 @@
           }
         },
         {
+          "name": "SpecificationPackIds",
+          "jsonName": "specificationPackIds",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "SpecificationPackCatalogVersion",
+          "jsonName": "specificationPackCatalogVersion",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerSpecificationPackCatalogVersions.Current"
+          }
+        },
+        {
+          "name": "SpecificationPackCatalogSha256",
+          "jsonName": "specificationPackCatalogSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerSpecificationPackCatalogVersions.Sha256"
+          }
+        },
+        {
           "name": "Options",
           "jsonName": "options",
           "type": "CompilerCompilationOptionsSnapshot",
@@ -3177,6 +3271,38 @@
           "default": {
             "kind": "member",
             "value": "CompilerSpecificationPackVersions.Current"
+          }
+        },
+        {
+          "name": "SpecificationPackIds",
+          "jsonName": "specificationPackIds",
+          "type": "string[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "SpecificationPackCatalogVersion",
+          "jsonName": "specificationPackCatalogVersion",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerSpecificationPackCatalogVersions.Current"
+          }
+        },
+        {
+          "name": "SpecificationPackCatalogSha256",
+          "jsonName": "specificationPackCatalogSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "member",
+            "value": "CompilerSpecificationPackCatalogVersions.Sha256"
           }
         },
         {

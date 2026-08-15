@@ -1,4 +1,5 @@
 using System.Text;
+using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -560,6 +561,42 @@ public sealed class CompilerManifestArtifactTests
             Assert.Throws<JsonException>((Action)(() =>
                 CompilerManifestArtifactJson.Serialize(artifact)));
         }
+    }
+
+    [Test]
+    public void SpecificationPackAuthorityIsSealedWhenUnusedAndFingerprintBound()
+    {
+        var unused = CreateArtifact(specificationPacks: ["dotnet.scalar"]);
+        var unset = CreateArtifact();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(unused.SpecificationPackIds,
+                Is.EqualTo(["dotnet.scalar"]));
+            Assert.That(unused.Compilation.SpecificationPackIds,
+                Is.EqualTo(["dotnet.scalar"]));
+            Assert.That(unused.SpecificationPackCatalogVersion,
+                Is.EqualTo(CompilerSpecificationPackCatalogVersions.Current));
+            Assert.That(unused.SpecificationPackCatalogSha256,
+                Is.EqualTo(CompilerSpecificationPackCatalogVersions.Sha256));
+            Assert.That(unused.CompilerDiagnostics, Is.Empty);
+            Assert.That(unused.CompilationSha256,
+                Is.Not.EqualTo(unset.CompilationSha256));
+        }
+
+        unused.SpecificationPackIds = [];
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(unused)));
+
+        var tamperedCatalog = CreateArtifact(
+            specificationPacks: ["dotnet.scalar"]);
+        tamperedCatalog.Compilation.SpecificationPackCatalogSha256 =
+            new string('0', 64);
+        tamperedCatalog.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            tamperedCatalog.Compilation,
+            tamperedCatalog.CompilerDiagnostics);
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(tamperedCatalog)));
     }
 
     [Test]
@@ -2005,7 +2042,8 @@ public sealed class CompilerManifestArtifactTests
 
     private static CompilerManifestArtifact CreateArtifact(
         CSharpParseOptions? parse = null,
-        string source = "internal sealed class Subject {}\n")
+        string source = "internal sealed class Subject {}\n",
+        ImmutableArray<string> specificationPacks = default)
     {
         var compilation = CreateCompilation(
             parse ?? new CSharpParseOptions(LanguageVersion.CSharp12),
@@ -2018,7 +2056,8 @@ public sealed class CompilerManifestArtifactTests
             WorkerFeatureSet.All,
             new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            CancellationToken.None,
+            specificationPacks: specificationPacks);
     }
 
     private static PortableIrInstruction FindCall(

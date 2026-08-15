@@ -335,6 +335,7 @@ internal static class CompilerManifestArtifactJson
     internal static CompilerManifestArtifact Deserialize(string json)
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
+        RequireSpecificationPackAuthorityProperties(json);
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, WorkerProtocolJson.Options) ??
@@ -400,6 +401,7 @@ internal static class CompilerManifestArtifactJson
             Compilation: not null,
             MaximumExpressionDepth: >= 1 and <= 256
         } &&
+        CompilerSpecificationPackAuthorityValidation.Matches(value) &&
         WorkerProtocolJson.IsDefined(value.Features, WorkerFeatureSet.Unspecified) &&
         WorkerProtocolJson.IsSha256(value.CompilationSha256) &&
         value.CompilationSha256 == CompilationFingerprint.ComputeSha256(
@@ -577,6 +579,31 @@ internal static class CompilerManifestArtifactJson
             CompilerContractEvidence.Companion => WorkerClaimEvidence.CompanionClause,
             _ => WorkerClaimEvidence.Unspecified
         };
+    private static void RequireSpecificationPackAuthorityProperties(string json)
+    {
+        using var document = JsonDocument.Parse(
+            json,
+            new JsonDocumentOptions { MaxDepth = WorkerProtocolJson.MaximumJsonDepth });
+        var root = document.RootElement;
+        RequireProperty(root, "specificationPackIds");
+        RequireProperty(root, "specificationPackCatalogVersion");
+        RequireProperty(root, "specificationPackCatalogSha256");
+        var compilation = RequireProperty(root, "compilation");
+        RequireProperty(compilation, "specificationPackIds");
+        RequireProperty(compilation, "specificationPackCatalogVersion");
+        RequireProperty(compilation, "specificationPackCatalogSha256");
+    }
+
+    private static JsonElement RequireProperty(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(name, out var value))
+        {
+            throw new JsonException(
+                "The compiler manifest is missing '" + name + "'.");
+        }
+
+        return value;
     }
 
     private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics)

@@ -9,8 +9,16 @@ internal static class CompilerManifestArtifactProducer
         ImmutableArray<AdditionalText> additionalFiles = default,
         ImmutableArray<string> specificationPacks = default)
     {
+        var specificationPackAuthority =
+            CompilerSpecificationPackProvider.ResolveAuthority(
+                specificationPacks.IsDefault ? [] : specificationPacks);
         var snapshot = CompilerCompilationCapture.Capture(
             compilation, projectDirectory, targetFramework, additionalFiles, cancellationToken);
+        snapshot.SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds];
+        snapshot.SpecificationPackCatalogVersion =
+            specificationPackAuthority.SpecificationPackCatalogVersion;
+        snapshot.SpecificationPackCatalogSha256 =
+            specificationPackAuthority.SpecificationPackCatalogSha256;
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item.Severity == DiagnosticSeverity.Error)
             .Select(CreateDiagnostic);
@@ -39,7 +47,7 @@ internal static class CompilerManifestArtifactProducer
             var lowerer = new CompilerCallableLowerer(
                 compilation,
                 new IrFactory(),
-                specificationPacks.IsDefault ? [] : specificationPacks);
+                specificationPackAuthority);
             callables = [.. targets.Select(item => {
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));
@@ -57,6 +65,11 @@ internal static class CompilerManifestArtifactProducer
         }
         var artifact = new CompilerManifestArtifact
         {
+            SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds],
+            SpecificationPackCatalogVersion =
+                specificationPackAuthority.SpecificationPackCatalogVersion,
+            SpecificationPackCatalogSha256 =
+                specificationPackAuthority.SpecificationPackCatalogSha256,
             Features = features,
             CompilationSha256 = CompilationFingerprint.ComputeSha256(
                 snapshot, diagnosticArtifacts),

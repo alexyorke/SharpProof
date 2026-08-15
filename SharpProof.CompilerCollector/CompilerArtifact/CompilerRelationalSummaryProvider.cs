@@ -28,6 +28,19 @@ internal sealed class CompilerRelationalSummaryProvider
         IrFactory factory,
         ResolvedApiSpecTable apiSpecs,
         IEnumerable<string>? specificationPacks = null)
+        : this(
+            compilation,
+            factory,
+            apiSpecs,
+            CompilerSpecificationPackProvider.ResolveAuthority(specificationPacks))
+    {
+    }
+
+    internal CompilerRelationalSummaryProvider(
+        CSharpCompilation compilation,
+        IrFactory factory,
+        ResolvedApiSpecTable apiSpecs,
+        CompilerSpecificationPackAuthority specificationPackAuthority)
     {
         _compilation = ArgumentNullGuard.NotNull(
             compilation,
@@ -36,7 +49,7 @@ internal sealed class CompilerRelationalSummaryProvider
         _apiSpecs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
         _specificationPacks = new CompilerSpecificationPackProvider(
             factory,
-            specificationPacks);
+            specificationPackAuthority);
     }
 
     internal bool IsAdmissiblePureCall(IMethodSymbol method)

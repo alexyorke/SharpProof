@@ -265,11 +265,11 @@ public sealed class CompilerSpecificationPackProviderTests
                     new IrFactory(),
                     ["unknown.pack"])));
             Assert.That(unknownPack!.Message, Does.Contain("Unknown"));
-            Assert.That(
-                new CompilerSpecificationPackProvider(
+            var duplicatePack = Assert.Throws<InvalidOperationException>(
+                (Action)(() => _ = new CompilerSpecificationPackProvider(
                     new IrFactory(),
-                    [null!, " ", "dotnet.scalar", "dotnet.scalar"]),
-                Is.Not.Null);
+                    [null!, " ", "dotnet.scalar", "dotnet.scalar"])));
+            Assert.That(duplicatePack!.Message, Does.Contain("unique"));
 
             var provider = new CompilerSpecificationPackProvider(
                 new IrFactory(),
@@ -302,6 +302,32 @@ public sealed class CompilerSpecificationPackProviderTests
                     [array.RootElement, "term", KindProperty])),
                 Throws.TypeOf<InvalidDataException>());
         }
+    }
+
+    [Test]
+    public void SelectionAuthorityIsExplicitCanonicalAndCatalogBound()
+    {
+        var unset = CompilerSpecificationPackProvider.ResolveAuthority(null);
+        var selected = CompilerSpecificationPackProvider.ResolveAuthority(
+            [" dotnet.scalar "]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(unset.SpecificationPackIds, Is.Empty);
+            Assert.That(selected.SpecificationPackIds,
+                Is.EqualTo(["dotnet.scalar"]));
+            Assert.That(unset.SpecificationPackCatalogVersion,
+                Is.EqualTo(CompilerSpecificationPackCatalogVersions.Current));
+            Assert.That(unset.SpecificationPackCatalogSha256,
+                Is.EqualTo(CompilerSpecificationPackCatalogVersions.Sha256));
+        }
+
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            CompilerSpecificationPackProvider.ResolveAuthority(
+                ["dotnet.scalar", "dotnet.scalar"])));
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            CompilerSpecificationPackProvider.ResolveAuthority(
+                ["dotnet.scalar", "missing.pack"])));
     }
 
     private static string Binary(

@@ -25,6 +25,9 @@ internal sealed class CompilerCompilationSnapshot
     public string CompilerMvid { get; set; } = string.Empty;
     public string CSharpCompilerVersion { get; set; } = string.Empty;
     public string CSharpCompilerMvid { get; set; } = string.Empty;
+    public string[] SpecificationPackIds { get; set; } = [];
+    public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
+    public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
     public CompilerCompilationOptionsSnapshot Options { get; set; } = new();
     public CompilerSyntaxTreeSnapshot[] SyntaxTrees { get; set; } = [];
     public CompilerReferenceSnapshot[] References { get; set; } = [];

@@ -16,6 +16,17 @@ internal sealed class CompilerCallableLowerer
         CSharpCompilation compilation,
         IrFactory factory,
         IEnumerable<string>? specificationPacks = null)
+        : this(
+            compilation,
+            factory,
+            CompilerSpecificationPackProvider.ResolveAuthority(specificationPacks))
+    {
+    }
+
+    internal CompilerCallableLowerer(
+        CSharpCompilation compilation,
+        IrFactory factory,
+        CompilerSpecificationPackAuthority specificationPackAuthority)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -25,7 +36,7 @@ internal sealed class CompilerCallableLowerer
             compilation,
             factory,
             _apiSpecs,
-            specificationPacks);
+            specificationPackAuthority);
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)

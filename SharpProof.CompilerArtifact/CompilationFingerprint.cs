@@ -44,6 +44,10 @@ internal static class CompilationFingerprint
         Guid.TryParseExact(value.CompilerMvid, "D", out _) &&
         HasText(value.CSharpCompilerVersion) &&
         Guid.TryParseExact(value.CSharpCompilerMvid, "D", out _) &&
+        CompilerSpecificationPackAuthorityValidation.IsValid(
+            value.SpecificationPackIds,
+            value.SpecificationPackCatalogVersion,
+            value.SpecificationPackCatalogSha256) &&
         ValidOptions(value.Options) &&
         All(value.SyntaxTrees, ValidTree) &&
         ValidReferences(value.References) &&

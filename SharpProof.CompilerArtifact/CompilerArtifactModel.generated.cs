@@ -19,6 +19,13 @@ internal static class CompilerRelationalSummaryVersions
     internal const int Current = 2;
 }
 
+internal static class CompilerSpecificationPackCatalogVersions
+{
+    internal const int Current = 1;
+    internal const string Sha256 = "14d0e3b98982e7f19d90a90624caf95fa444f6131e7543518b3bfd7ff9198c22";
+    internal const string PackIds = "dotnet.scalar";
+}
+
 internal static class CompilerSpecificationPackVersions
 {
     internal const int Current = 1;
@@ -163,6 +170,13 @@ internal sealed record CompilerPreparedSummaryCall(
 )
 {
     internal string InstantiationSha256 { get; init; } = string.Empty;
+}
+
+internal sealed class CompilerSpecificationPackAuthority
+{
+    public string[] SpecificationPackIds { get; set; } = [];
+    public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
+    public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
 }
 
 internal sealed class CompilerCallableArtifact
@@ -401,6 +415,9 @@ internal sealed class CompilerManifestArtifact
     public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
     public int RelationalSummarySchemaVersion { get; set; } = CompilerRelationalSummaryVersions.Current;
     public int SpecificationPackSchemaVersion { get; set; } = CompilerSpecificationPackVersions.Current;
+    public string[] SpecificationPackIds { get; set; } = [];
+    public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
+    public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
     public WorkerFeatureSet Features { get; set; }
     public string FeatureScopeSha256 { get; set; } = string.Empty;
     public string CompilationSha256 { get; set; } = string.Empty;
