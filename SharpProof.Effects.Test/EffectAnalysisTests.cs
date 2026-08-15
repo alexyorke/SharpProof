@@ -3410,8 +3410,8 @@ public sealed class EffectAnalysisTests
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
-            public struct Counter : IBox {
-                public int Number { get; set; }
+            public struct Counter {
+                public int Number;
             }
 
             public sealed class Box {
@@ -3424,6 +3424,10 @@ public sealed class EffectAnalysisTests
 
             public interface IBox {
                 int Number { get; set; }
+            }
+
+            public struct InterfaceCounter : IBox {
+                public int Number { get; set; }
             }
 
             public sealed class BoxWithInterface : IBox {
@@ -3461,7 +3465,7 @@ public sealed class EffectAnalysisTests
                     alias.Number = 1;
                 }
 
-                public static object InterfaceBoxing(Counter value) => (IBox)value;
+                public static object InterfaceBoxing(InterfaceCounter value) => (IBox)value;
 
                 public static void ByValue(Counter value) => value.Number = 1;
                 public static void ByRef(ref Counter value) => value.Number = 1;
@@ -3503,6 +3507,12 @@ public sealed class EffectAnalysisTests
         Assert.That(
             byReference.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
             Is.True);
+
+        var interfaceBoxing = session.Analyze(
+            Method(compilation, "InterfaceBoxing"));
+        Assert.That(interfaceBoxing.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(interfaceBoxing.Summary.Writes.IsEmpty, Is.True);
     }
 
     [Test]

@@ -977,10 +977,10 @@ internal sealed class OperationEffectScanner
     private EffectRegionSet ClassifyRegion(
         IOperation? operation, bool aliasSource = false)
     {
-        while (operation is IConversionOperation conversion &&
-               conversion.OperatorMethod == null)
+        if (operation is IConversionOperation conversion &&
+            conversion.OperatorMethod == null)
         {
-            operation = conversion.Operand;
+            return ClassifyConversionRegion(conversion, aliasSource);
         }
 
         return operation switch
@@ -1016,6 +1016,61 @@ internal sealed class OperationEffectScanner
             IParenthesizedOperation parenthesized when aliasSource => ClassifyRegion(parenthesized.Operand, true),
             _ => EffectRegionSet.Unknown
         };
+    }
+
+    private EffectRegionSet ClassifyConversionRegion(
+        IConversionOperation operation, bool aliasSource)
+    {
+        if (!string.Equals(
+                operation.Syntax.Language,
+                LanguageNames.CSharp,
+                StringComparison.Ordinal))
+        {
+            return EffectRegionSet.Unknown;
+        }
+
+        var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+            .GetConversion(operation);
+        if (!conversion.Exists || conversion.IsDynamic)
+        {
+            return EffectRegionSet.Unknown;
+        }
+
+        // Reference conversions preserve the object identity of their operand.
+        // Keep walking so a chain such as (Box)(object)value still maps back to
+        // the caller-owned parameter (or receiver).
+        if (conversion.IsReference &&
+            operation.Operand.Type?.IsReferenceType == true &&
+            operation.Type?.IsReferenceType == true)
+        {
+            return ClassifyRegion(operation.Operand, aliasSource);
+        }
+
+        // Boxing creates a new object containing a copy of the value. The box is
+        // locally owned, even when the source is a ref parameter, so mutations
+        // through an interface/object view must not be attributed to the caller.
+        if (conversion.IsBoxing)
+        {
+            return EffectRegionSet.Create(
+                EffectRegionId.Fresh(operation.Syntax.SpanStart));
+        }
+
+        // Unboxing, nullable, numeric, enum, and identity conversions whose
+        // result is a value type all produce a by-value copy. A mutation of that
+        // copy is local state and therefore has no caller-owned region.
+        if (operation.Type?.IsValueType == true)
+        {
+            return EffectRegionSet.Empty;
+        }
+
+        // Null/default literals have no object identity to preserve. Keep the
+        // previous empty-region behavior for these harmless built-in forms.
+        if (conversion.IsNullLiteral || conversion.IsDefaultLiteral)
+        {
+            return EffectRegionSet.Empty;
+        }
+
+        return EffectRegionSet.Unknown;
     }
 
     private EffectRegionSet ClassifyParameter(IParameterSymbol parameter)
