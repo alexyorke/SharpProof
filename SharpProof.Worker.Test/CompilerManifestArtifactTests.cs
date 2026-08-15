@@ -1475,6 +1475,69 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void SummaryCallBindsSameTypedArgumentPermutationAndDuplicate()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                private static bool Select(bool first, bool second) => first;
+
+                internal static bool Call(bool left, bool right) {
+                    Contract.Ensures(Contract.Result<bool>() == left);
+                    return Select(left, right);
+                }
+            }
+            """;
+        Action<CompilerCallableArtifact>[] corruptions = [
+            callable => {
+                var call = FindCall(callable);
+                (call.Items[0], call.Items[1]) = (call.Items[1], call.Items[0]);
+            },
+            callable => {
+                var call = FindCall(callable);
+                call.Items[1] = call.Items[0];
+            }
+        ];
+
+        foreach (var corrupt in corruptions)
+        {
+            var artifact = CreateContractArtifact(source);
+            corrupt(artifact.Callables[0]);
+            var resealed = CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact));
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+        }
+    }
+
+    [Test]
+    public void SummaryCallBindsDifferentTypedArgumentPermutation()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                private static int Select(int first, bool second) => first;
+
+                internal static int Call(int value, bool flag) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Select(value, flag);
+                }
+            }
+            """;
+        var artifact = CreateContractArtifact(source);
+        var call = FindCall(artifact.Callables[0]);
+        (call.Items[0], call.Items[1]) = (call.Items[1], call.Items[0]);
+        var resealed = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(artifact));
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+    }
+
+    [Test]
     public void SameShapedMemberSubstitutionFailsClosed()
     {
         const string source =
@@ -1547,6 +1610,15 @@ public sealed class CompilerManifestArtifactTests
             new ClaimManifestBuilder(compilation).Build(),
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
+    }
+
+    private static PortableIrInstruction FindCall(
+        CompilerCallableArtifact callable)
+    {
+        return callable.Graph!.Blocks
+            .SelectMany(static block => block.Instructions)
+            .Single(static instruction =>
+                instruction.Kind == IrInstructionKind.Call);
     }
 
     private static CompilerManifestArtifact CreateContractArtifact(string? source = null)
