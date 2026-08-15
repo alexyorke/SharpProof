@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 30 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 29 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 30 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-091 - Peer-generated rejected ContractFor attributes evade validation (fixed)
+
+- [x] Fixed by `430cd05e9` (`fix: discover rejected generated ContractFor candidates`).
+- Final-compilation discovery no longer requires successful trusted-symbol
+  resolution before enumerating candidates. Exact and rejected metadata-name
+  ContractFor attributes share one candidate classifier, after which the
+  existing validator emits SPCF0001 for rejected peer-generated companions.
+- The focused profile/feature and generated-source matrix passed 18/18;
+  Analyzer passed 348/348 and Architecture passed 428/428.
 
 ### SP-AUDIT-089 - Compiler callable state differs across producer and hydrator (fixed)
 
@@ -2288,27 +2298,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   restores manifest/request-first publication.
 - Consolidated cases: SP-AUDIT-176.
 - Unified closure: Publish one generation transactionally, sync data and directories, publish the commit member last, and roll back or invalidate the whole set on failure.
-
-### SP-AUDIT-091 - Peer-generated rejected ContractFor attributes evade validation (P2)
-
-- [ ] Final-compilation candidate discovery first resolves the one exact
-  trusted `ContractForAttribute` symbol and returns no candidates when that
-  resolution is rejected or ambiguous. The incremental validator cannot see
-  a peer generator's output, so a peer-generated source-defined lookalike is
-  owned by neither validation path.
-- Supported impact: a generator emitted a conventional `.g.cs` companion with
-  a source `SharpProof.Attributes.ContractForAttribute` lookalike. Final
-  contracts-profile analysis emitted no SPCF0001, although the same rejected
-  handwritten attribute is required to fail closed.
-- Reproduction: a temporary generated-companion analyzer test supplied the
-  trusted Attributes reference, emitted the lookalike and attributed companion,
-  and expected SPCF0001. The diagnostic set was empty. The test was removed.
-- Required closure: discover syntactic/metadata-name candidates in the final
-  compilation independently of successful trusted-symbol resolution, then
-  classify each against the exact symbol and diagnose rejection. Add peer-
-  generated shadow, ambiguous, missing, exact, mixed handwritten/generated,
-  every profile, and non-generated filename controls plus a mutation that
-  restores the early empty return.
 
 ### SP-AUDIT-102 - Specification-pack configuration is not canonically sealed (P2)
 
