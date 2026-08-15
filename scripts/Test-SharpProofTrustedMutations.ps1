@@ -1488,10 +1488,18 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'relational-spec-pack-explicit-opt-in'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerSpecificationPackProvider.cs'
-        Original = '        var selected = (enabledPacks ?? [])'
-        Mutated = '        var selected = (enabledPacks ?? []).Concat(catalog.Packs.Keys)'
+        Original = '        var selected = CanonicalizeSelection(enabledPacks, catalog);'
+        Mutated = '        var selected = catalog.Packs.Keys.OrderBy(static value => value, StringComparer.Ordinal).ToArray();'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~AuditedSpecificationPackRequiresExplicitOptIn'
+    },
+    [pscustomobject]@{
+        Name = 'relational-spec-pack-authority-validation'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        CompilerSpecificationPackAuthorityValidation.Matches(value) &&'
+        Mutated = '        true &&'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SpecificationPackAuthorityIsSealedWhenUnusedAndFingerprintBound'
     },
     [pscustomobject]@{
         Name = 'relational-transitive-provenance'
