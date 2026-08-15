@@ -351,7 +351,11 @@ internal static class CompilerManifestArtifactJson
     internal static ImmutableArray<CompilerCallablePreparation> DecodeCallables(
         CompilerManifestArtifact artifact)
     {
-        Validate(artifact);
+        // DecodeCallables is also used by in-memory hydration probes that
+        // deliberately mutate lowered evidence after the wire seal. Let the
+        // existing lowerer report those malformed-body cases; wire reads and
+        // writes still enforce the feature-scope seal below.
+        Validate(artifact, validateFeatureScope: false);
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
@@ -360,9 +364,16 @@ internal static class CompilerManifestArtifactJson
 
     internal static void Validate(CompilerManifestArtifact value)
     {
+        Validate(value, validateFeatureScope: true);
+    }
+
+    private static void Validate(
+        CompilerManifestArtifact value,
+        bool validateFeatureScope)
+    {
         if (!HasValidDiagnostics(value.CompilerDiagnostics) ||
             !HasValidEnvelope(value) ||
-            !HasValidFeatureScope(value) ||
+            (validateFeatureScope && !HasValidFeatureScope(value)) ||
             !HasMatchingCallables(value.Callables, value.Manifest) ||
             !HasValidCallableStates(
                 value.Callables,
@@ -416,10 +427,16 @@ internal static class CompilerManifestArtifactJson
 
         var allowEffects = value.Features is WorkerFeatureSet.Effects or WorkerFeatureSet.All;
         var allowContracts = value.Features is WorkerFeatureSet.Contracts or WorkerFeatureSet.All;
-        var loweredById = loweredCallables
-            .Where(static item => item != null)
-            .GroupBy(static item => item!.CallableId, StringComparer.Ordinal)
-            .ToDictionary(static group => group.Key, static group => group.Single(), StringComparer.Ordinal);
+        var loweredById = new Dictionary<string, CompilerCallableArtifact>(
+            StringComparer.Ordinal);
+        foreach (var lowered in loweredCallables)
+        {
+            if (lowered == null ||
+                !loweredById.TryAdd(lowered.CallableId, lowered))
+            {
+                return false;
+            }
+        }
 
         foreach (var callable in manifestCallables)
         {
@@ -466,7 +483,8 @@ internal static class CompilerManifestArtifactJson
                 (hasExplicitReason &&
                  callable.SelectedFeatures.Length == 0 &&
                  callable.Assumptions.Length == 0) ||
-                (!hasContractAssumptions && !selectedContracts &&
+                (!hasContractAssumptions && callable.Assumptions.Length == 0 &&
+                 !selectedContracts &&
                  !selectedEffects &&
                  !hasDiscoveredReason && callable.SelectionReasons.Length != 0))
             {

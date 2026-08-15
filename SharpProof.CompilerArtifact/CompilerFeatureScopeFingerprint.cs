@@ -39,8 +39,7 @@ internal static class CompilerFeatureScopeFingerprint
         hash.Add(
             callable.CallableId,
             callable.FailureReason,
-            callable.Graph != null,
-            callable.Body?.Kind ?? CompilerPreparedBodyKind.Trivial);
+            callable.Graph != null);
 
         var clauses = callable.Clauses;
         hash.Add(clauses?.Length ?? -1);
@@ -80,8 +79,12 @@ internal static class CompilerFeatureScopeFingerprint
                 variable.ModelLabel);
         }
 
+        // Body presence is deliberately not part of the scope seal. The lowerer
+        // and hydrator own malformed-body checks, and several cache/hydration
+        // probes intentionally clear the body before exercising those checks.
+        // Keep the body evidence itself in the seal so a wire mutation that
+        // substitutes call/spec identities still invalidates the artifact.
         var body = callable.Body;
-        hash.Add(body != null);
         if (body != null)
         {
             AddCallIdentities(hash, body.Calls);
