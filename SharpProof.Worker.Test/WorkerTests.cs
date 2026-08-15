@@ -1203,8 +1203,13 @@ public sealed class WorkerTests
                 request.CompilerManifest.Path));
         var evidence = artifact.Callables.Single()
             .EffectClaims.Single();
+        var authority = artifact.Callables.Single()
+            .EffectAuthorities.Single();
         evidence.Witness!.Effects = WorkerEffectSet.Throws;
+        authority.Witness!.Effects = WorkerEffectSet.Throws;
         CompilerEffectClaimArtifactCodec.Seal(evidence);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
         var bytes = System.Text.Encoding.UTF8.GetBytes(
             CompilerManifestArtifactJson.Serialize(artifact));
         await File.WriteAllBytesAsync(
