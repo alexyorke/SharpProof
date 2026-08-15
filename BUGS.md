@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 28 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 27 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 28 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-241 - Constructed generic function pointers lose ref modifiers (fixed)
+
+- [x] Fixed by `8d252411d` (`fix: preserve constructed function pointer modifiers`).
+- Contract specialization now maps exact original-definition signature type
+  nodes to Roslyn's compiler-constructed counterparts recursively through
+  arrays, pointers, named types, and nested function pointers. Ref custom
+  modifiers survive while unmatched nodes retain existing reconstruction.
+- Focused Contracts passed 2/2; full Contracts 109/109, Generator 117/117,
+  Analyzer 348/348, and Architecture 429/429 all passed.
 
 ### SP-AUDIT-168 - Failed gate runs preserve stale passing evidence (fixed)
 
@@ -2144,20 +2154,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
-
-### SP-AUDIT-241 - Constructed generic function pointers lose ref modifiers (P1)
-
-- [ ] Generic contract canonicalization recreates function-pointer types with ref
-  kinds and calling conventions but omits parameter ref custom modifiers such as
-  the compiler-owned `RequiresLocationAttribute` on `ref readonly` parameters.
-- Supported impact: an exact constructed generic
-  `delegate*<ref readonly T, void>` contract specializes to `T=int` but binding
-  fails `UnsupportedExpression`; the equivalent plain function-pointer generic
-  succeeds.
-- Required closure: preserve return and parameter custom modifiers during
-  reconstruction, or avoid rebuilding when the symbol factory cannot preserve
-  them. Add constructed/unconstructed ref-readonly, plain ref/in/out, return
-  modifiers, calling conventions, ordinary generic, and modifier-loss controls.
 
 ### SP-AUDIT-242 - Pilot reports fabricate zero false-positive review counts (P1)
 
