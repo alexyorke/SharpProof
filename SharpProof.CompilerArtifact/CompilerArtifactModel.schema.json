@@ -3502,6 +3502,16 @@
       ]
     }
   ],
+  "compilerCallableReasons": {
+    "success": "None",
+    "diagnosticFailure": "UnsupportedCallable",
+    "failures": [
+      "UnsupportedCallable",
+      "UnsupportedContract",
+      "UnsupportedBody",
+      "UnsupportedExpression"
+    ]
+  },
   "effectEvidence": {
     "domain": "SharpProof.CompilerEffectClaimEvidence",
     "version": 8,

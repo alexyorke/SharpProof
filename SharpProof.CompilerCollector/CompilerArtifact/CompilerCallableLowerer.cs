@@ -585,13 +585,20 @@ internal sealed class CompilerCallableLowerer
         CompilerPreparedBody? body)
     {
         return new(_factory, target.Entry,
-            clauses.IsDefault ? [] : clauses, variables.IsDefault ? [] : variables, WorkerClaimReason.None, body);
+            clauses.IsDefault ? [] : clauses, variables.IsDefault ? [] : variables,
+            CompilerCallableProducerReasonCatalog.SuccessReason, body);
     }
 
     private CompilerCallablePreparation Fail(ManifestCallableTarget target, WorkerClaimReason reason,
         ImmutableArray<CompilerPreparedClause> clauses = default,
         ImmutableArray<CompilerCanonicalVariable> variables = default)
     {
+        if (!CompilerCallableProducerReasonCatalog.IsFailureReason(reason))
+        {
+            throw new InvalidOperationException(
+                "The compiler callable failure reason is not producer-owned.");
+        }
+
         return new(_factory, target.Entry,
             clauses.IsDefault ? [] : clauses, variables.IsDefault ? [] : variables, reason, null);
     }

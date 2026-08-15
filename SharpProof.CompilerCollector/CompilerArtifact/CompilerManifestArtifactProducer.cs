@@ -21,7 +21,9 @@ internal static class CompilerManifestArtifactProducer
         if (diagnosticArtifacts.Length != 0)
         {
             callables = [.. targets.Select(static item => new CompilerCallableArtifact {
-                CallableId = item.Entry.CallableId, FailureReason = WorkerClaimReason.UnsupportedCallable,
+                CallableId = item.Entry.CallableId,
+                FailureReason =
+                    CompilerCallableProducerReasonCatalog.DiagnosticFailureReason,
                 EffectClaims = [.. item.EffectClaims.Select(static claim => claim.Evidence)]
             })];
         }

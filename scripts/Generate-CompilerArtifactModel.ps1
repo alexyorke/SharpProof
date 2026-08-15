@@ -1352,6 +1352,27 @@ foreach ($owner in $collectorOwners) {
     $collectorLines.Add('}')
 }
 
+$callableReasons = Get-RequiredMember `
+    $schema 'compilerCallableReasons' 'schema'
+$callableSuccessReason = [string](Get-RequiredMember `
+    $callableReasons 'success' 'compilerCallableReasons')
+$callableDiagnosticFailure = [string](Get-RequiredMember `
+    $callableReasons 'diagnosticFailure' 'compilerCallableReasons')
+$callableFailureReasons = @(Get-RequiredMember `
+    $callableReasons 'failures' 'compilerCallableReasons')
+foreach ($reason in @(
+        $callableSuccessReason,
+        $callableDiagnosticFailure) + $callableFailureReasons) {
+    Assert-Identifier $reason 'Compiler callable reason'
+}
+if ($callableFailureReasons.Count -eq 0 -or
+        $callableFailureReasons -contains $callableSuccessReason -or
+        $callableFailureReasons -notcontains $callableDiagnosticFailure -or
+        @($callableFailureReasons | Select-Object -Unique).Count -ne
+            $callableFailureReasons.Count) {
+    throw 'Compiler callable reason catalog is invalid.'
+}
+
 $evidence = Get-RequiredMember $schema 'effectEvidence' 'schema'
 $domain = [string](Get-RequiredMember $evidence 'domain' 'effect evidence')
 $evidenceVersion = [int](Get-RequiredMember $evidence 'version' 'effect evidence')
@@ -1454,6 +1475,35 @@ foreach ($kind in $supportedReplayEventKinds) {
 }
 $modelLines.Add('    ];')
 $modelLines.Add('}')
+$modelLines.Add('')
+$modelLines.Add('internal static class CompilerCallableArtifactReasonCatalog {')
+$modelLines.Add(
+    "    internal const WorkerClaimReason SuccessReason = WorkerClaimReason.$callableSuccessReason;")
+$modelLines.Add(
+    "    internal const WorkerClaimReason DiagnosticFailureReason = WorkerClaimReason.$callableDiagnosticFailure;")
+$modelLines.Add('    internal static readonly WorkerClaimReason[] FailureReasons = [')
+foreach ($reason in $callableFailureReasons) {
+    $modelLines.Add("        WorkerClaimReason.$reason,")
+}
+$modelLines.Add('    ];')
+$modelLines.Add('    internal static bool IsFailureReason(WorkerClaimReason reason) =>')
+$modelLines.Add('        Array.IndexOf(FailureReasons, reason) >= 0;')
+$modelLines.Add('}')
+
+$collectorLines.Add('')
+$collectorLines.Add('internal static class CompilerCallableProducerReasonCatalog {')
+$collectorLines.Add(
+    "    internal const WorkerClaimReason SuccessReason = WorkerClaimReason.$callableSuccessReason;")
+$collectorLines.Add(
+    "    internal const WorkerClaimReason DiagnosticFailureReason = WorkerClaimReason.$callableDiagnosticFailure;")
+$collectorLines.Add('    internal static readonly WorkerClaimReason[] FailureReasons = [')
+foreach ($reason in $callableFailureReasons) {
+    $collectorLines.Add("        WorkerClaimReason.$reason,")
+}
+$collectorLines.Add('    ];')
+$collectorLines.Add('    internal static bool IsFailureReason(WorkerClaimReason reason) =>')
+$collectorLines.Add('        Array.IndexOf(FailureReasons, reason) >= 0;')
+$collectorLines.Add('}')
 
 $outputs = [ordered]@{
     $ModelOutputPath = $modelLines

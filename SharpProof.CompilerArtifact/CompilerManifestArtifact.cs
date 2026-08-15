@@ -363,6 +363,9 @@ internal static class CompilerManifestArtifactJson
         if (!HasValidDiagnostics(value.CompilerDiagnostics) ||
             !HasValidEnvelope(value) ||
             !HasMatchingCallables(value.Callables, value.Manifest) ||
+            !HasValidCallableStates(
+                value.Callables,
+                value.CompilerDiagnostics.Length != 0) ||
             !HasValidEffectReplayTrees(value.Callables, value.Compilation))
         {
             throw new JsonException("The compiler manifest artifact is invalid.");
@@ -417,6 +420,21 @@ internal static class CompilerManifestArtifactJson
         callables.Select(static item => item?.CallableId).SequenceEqual(
             manifest.Callables.Select(static item => item.CallableId),
             StringComparer.Ordinal);
+    }
+
+    private static bool HasValidCallableStates(
+        CompilerCallableArtifact[]? callables,
+        bool hasCompilerDiagnostics)
+    {
+        return callables?.All(callable =>
+            callable != null &&
+            (!hasCompilerDiagnostics ||
+             callable.FailureReason ==
+                CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason) &&
+            (callable.FailureReason ==
+                CompilerCallableArtifactReasonCatalog.SuccessReason ||
+             CompilerCallableArtifactReasonCatalog.IsFailureReason(
+                 callable.FailureReason))) == true;
     }
 
     private static bool HasValidEffectReplayTrees(

@@ -98,6 +98,77 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void CompilerCallableFailuresUseOnlyProducerReasons()
+    {
+        var allowed = new HashSet<WorkerClaimReason>
+        {
+            WorkerClaimReason.UnsupportedCallable,
+            WorkerClaimReason.UnsupportedContract,
+            WorkerClaimReason.UnsupportedBody,
+            WorkerClaimReason.UnsupportedExpression
+        };
+        var rejected = Enum.GetValues<WorkerClaimReason>()
+            .Where(reason => reason is not (
+                WorkerClaimReason.Unspecified or
+                WorkerClaimReason.None) &&
+                !allowed.Contains(reason))
+            .ToArray();
+        Assert.That(rejected, Does.Contain(WorkerClaimReason.MethodTimeout));
+
+        foreach (var reason in allowed)
+        {
+            var artifact = CreateUnsupportedLoopArtifact();
+            artifact.Callables.Single().FailureReason = reason;
+            Assert.That(
+                CompilerManifestArtifactJson.DecodeCallables(artifact)
+                    .Single().FailureReason,
+                Is.EqualTo(reason),
+                reason.ToString());
+        }
+
+        foreach (var reason in rejected)
+        {
+            var artifact = CreateUnsupportedLoopArtifact();
+            artifact.Callables.Single().FailureReason = reason;
+            Assert.Throws<JsonException>(
+                (Action)(() =>
+                    CompilerManifestArtifactJson.DecodeCallables(artifact)),
+                reason.ToString());
+        }
+    }
+
+    [Test]
+    public void CompilerDiagnosticCallableStateIsProducerCanonical()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return;
+                }
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.CompilerDiagnostics, Is.Not.Empty);
+            Assert.That(artifact.Callables, Is.Not.Empty);
+            Assert.That(
+                artifact.Callables.Select(static callable =>
+                    callable.FailureReason),
+                Is.All.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        }
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+
+        artifact.Callables[0].FailureReason = WorkerClaimReason.UnsupportedBody;
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
     public void RecomputedOuterHashCannotHideMalformedNestedEvidence()
     {
         Action<CompilerCompilationSnapshot>[] corruptions = [
@@ -1396,6 +1467,21 @@ public sealed class CompilerManifestArtifactTests
             internal static class Subject {
                 [DoesNotThrow]
                 internal static int Identity(int value) => value;
+            }
+            """);
+    }
+
+    private static CompilerManifestArtifact CreateUnsupportedLoopArtifact()
+    {
+        return CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    while (value > 0) { value--; }
+                    return value;
+                }
             }
             """);
     }

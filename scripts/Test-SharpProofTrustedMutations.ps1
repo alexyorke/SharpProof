@@ -1897,6 +1897,14 @@ $mutations = @(
         Mutated = '            if (false && session.HasRejectedMetadataPrecondition(contractTarget))'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~ReadableRejectedMetadataPreconditionsAreReportedAtEveryCallSite'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-callable-runtime-reason-acceptance'
+        File = 'SharpProof.CompilerArtifact\CompilerLoweredArtifact.cs'
+        Original = '            !CompilerCallableArtifactReasonCatalog.IsFailureReason('
+        Mutated = '            !Enum.IsDefined(typeof(WorkerClaimReason),'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerCallableFailuresUseOnlyProducerReasons'
     }
 )
 

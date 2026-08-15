@@ -414,3 +414,17 @@ internal static class CompilerEffectEvidenceCatalog
         CompilerEffectReplayEventKind.ManagedArrayAllocation,
     ];
 }
+
+internal static class CompilerCallableArtifactReasonCatalog
+{
+    internal const WorkerClaimReason SuccessReason = WorkerClaimReason.None;
+    internal const WorkerClaimReason DiagnosticFailureReason = WorkerClaimReason.UnsupportedCallable;
+    internal static readonly WorkerClaimReason[] FailureReasons = [
+        WorkerClaimReason.UnsupportedCallable,
+        WorkerClaimReason.UnsupportedContract,
+        WorkerClaimReason.UnsupportedBody,
+        WorkerClaimReason.UnsupportedExpression,
+    ];
+    internal static bool IsFailureReason(WorkerClaimReason reason) =>
+        Array.IndexOf(FailureReasons, reason) >= 0;
+}

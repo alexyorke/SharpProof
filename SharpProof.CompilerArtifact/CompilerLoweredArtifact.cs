@@ -181,13 +181,16 @@ internal static class CompilerLoweredArtifact
         ImmutableArray<WorkerClaimManifestEntry> claims,
         CompilerCompilationSnapshot compilation)
     {
-        if (!Enum.IsDefined(typeof(WorkerClaimReason), artifact.FailureReason) ||
-            artifact.FailureReason == WorkerClaimReason.Unspecified)
+        if (artifact.FailureReason !=
+                CompilerCallableArtifactReasonCatalog.SuccessReason &&
+            !CompilerCallableArtifactReasonCatalog.IsFailureReason(
+                artifact.FailureReason))
         {
             throw new InvalidDataException("A lowered callable reason is invalid.");
         }
 
-        if (artifact.FailureReason != WorkerClaimReason.None)
+        if (artifact.FailureReason !=
+            CompilerCallableArtifactReasonCatalog.SuccessReason)
         {
             if (artifact.Graph != null || artifact.Body != null || artifact.Clauses is not { Length: 0 } ||
                 artifact.Variables is not { Length: 0 })
