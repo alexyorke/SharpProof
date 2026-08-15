@@ -494,6 +494,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~IncompleteReasonCoversEveryDefinedFlagCombination'
     },
     [pscustomobject]@{
+        Name = 'effect-resource-limit-tuple-removal'
+        File = 'SharpProof.Worker.Protocol\ProtocolModel.generated.cs'
+        Original = '            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)'
+        Mutated = ''
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ResourceLimitIncompleteEffectTupleIsAProtocolState'
+    },
+    [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
         File = 'SharpProof.Frontend\ContractApiMetadata.generated.cs'
         Original = '            "Ensures",'

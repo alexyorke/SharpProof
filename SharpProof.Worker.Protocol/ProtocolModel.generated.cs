@@ -759,8 +759,16 @@ internal static class WorkerProtocolMetadata
             or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry)
             or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract, WorkerEffectEvidenceCertainty.Unavailable)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable, WorkerEffectEvidenceCertainty.Unavailable)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Unknown, _, WorkerEffectEvidenceCertainty.Unavailable);
     internal static bool MatchesVacuity(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerVacuityKind vacuity) =>
         (kind, outcome, vacuity) is

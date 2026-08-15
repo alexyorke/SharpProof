@@ -400,7 +400,42 @@ internal static class CompilerEffectEvidenceCatalog
         WorkerClaimReason.CounterexampleNotReplayable,
         WorkerClaimReason.EffectSummaryIncomplete,
         WorkerClaimReason.EffectContractNotEstablished,
+        WorkerClaimReason.ResourceLimit,
+        WorkerClaimReason.UnsupportedBody,
     ];
+    internal static readonly (WorkerClaimOutcome Outcome, WorkerClaimReason Reason,
+        WorkerEffectEvidenceCertainty Certainty)[] SupportedEffectTuples = [
+        (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
+        (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+        (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry),
+        (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract, WorkerEffectEvidenceCertainty.Unavailable),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable, WorkerEffectEvidenceCertainty.Unavailable),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+    ];
+    internal static bool HasValidEffectTuple(
+        WorkerClaimOutcome outcome, WorkerClaimReason reason,
+        WorkerEffectEvidenceCertainty certainty)
+    {
+        foreach (var tuple in SupportedEffectTuples)
+        {
+            if (tuple.Outcome == outcome && tuple.Reason == reason &&
+                tuple.Certainty == certainty)
+            {
+                return true;
+            }
+        }
+        return outcome == WorkerClaimOutcome.Unknown &&
+            certainty == WorkerEffectEvidenceCertainty.Unavailable &&
+            UnknownReasons.Contains(reason);
+    }
     internal static readonly CompilerEffectConstraintRule[] ConstraintRules = [
         new(WorkerEffectContractKind.EnforcePure, true, true, true),
         new(WorkerEffectContractKind.ZeroAllocations, true, true, true),

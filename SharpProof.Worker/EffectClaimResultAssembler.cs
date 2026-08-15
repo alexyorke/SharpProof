@@ -31,6 +31,13 @@ internal static class EffectClaimResultAssembler
         CallableEntryFeasibility entryFeasibility,
         CancellationToken cancellationToken)
     {
+        if (!WorkerProtocolJson.HasValidEffectCertainty(
+                evidence.Outcome, evidence.Reason, evidence.Certainty))
+        {
+            throw new InvalidDataException(
+                "Compiler effect-claim evidence has an unsupported result tuple.");
+        }
+
         if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
             evidence.Reason == WorkerClaimReason.UnsupportedContract)
         {

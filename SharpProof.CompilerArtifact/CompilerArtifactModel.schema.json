@@ -3515,12 +3515,6 @@
   "effectEvidence": {
     "domain": "SharpProof.CompilerEffectClaimEvidence",
     "version": 8,
-    "unknownReasons": [
-      "UnsupportedContract",
-      "CounterexampleNotReplayable",
-      "EffectSummaryIncomplete",
-      "EffectContractNotEstablished"
-    ],
     "constraintKinds": {
       "capabilities": "AllowedCapabilities",
       "exceptions": "AllowedExceptions",

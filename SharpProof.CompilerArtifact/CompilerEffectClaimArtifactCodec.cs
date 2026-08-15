@@ -33,7 +33,8 @@ internal static class CompilerEffectClaimArtifactCodec
 
     private static bool HasValidOutcome(CompilerEffectClaimArtifact value)
     {
-        return WorkerProtocolJson.HasValidEffectCertainty(value.Outcome, value.Reason, value.Certainty) &&
+        return CompilerEffectEvidenceCatalog.HasValidEffectTuple(
+            value.Outcome, value.Reason, value.Certainty) &&
         (value.Outcome, value.Reason, value.Certainty, value.Witness, value.Replay) switch
         {
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null, null) => true,

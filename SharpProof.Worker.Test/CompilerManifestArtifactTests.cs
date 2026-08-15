@@ -927,6 +927,36 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void EffectEvidenceRejectsInvalidReasonCertaintyCrossProducts()
+    {
+        var invalidTuples = new[]
+        {
+            (WorkerClaimReason.ResourceLimit,
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
+            (WorkerClaimReason.ResourceLimit,
+                WorkerEffectEvidenceCertainty.DefiniteViolation),
+            (WorkerClaimReason.UnsupportedBody,
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
+        };
+
+        foreach (var (reason, certainty) in invalidTuples)
+        {
+            var artifact = CreateEffectArtifact();
+            var evidence = artifact.Callables.Single().EffectClaims.Single();
+            evidence.Outcome = WorkerClaimOutcome.Unknown;
+            evidence.Reason = reason;
+            evidence.Certainty = certainty;
+            evidence.Witness = null;
+            evidence.Replay = null;
+            CompilerEffectClaimArtifactCodec.Seal(evidence);
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(artifact)),
+                $"{reason}/{certainty} must remain invalid.");
+        }
+    }
+
+    [Test]
     public void UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay()
     {
         var artifact = CreateContractArtifact(

@@ -433,6 +433,38 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void ResourceLimitIncompleteEffectTupleIsAProtocolState()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerProtocolJson.HasValidEffectCertainty(
+                    WorkerClaimOutcome.Unknown,
+                    WorkerClaimReason.ResourceLimit,
+                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
+                Is.True);
+            Assert.That(
+                WorkerProtocolJson.HasValidEffectCertainty(
+                    WorkerClaimOutcome.Unknown,
+                    WorkerClaimReason.ResourceLimit,
+                    WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+                Is.True);
+            Assert.That(
+                WorkerProtocolJson.HasValidEffectCertainty(
+                    WorkerClaimOutcome.Unknown,
+                    WorkerClaimReason.ResourceLimit,
+                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
+                Is.False);
+            Assert.That(
+                WorkerProtocolJson.HasValidEffectCertainty(
+                    WorkerClaimOutcome.Unknown,
+                    WorkerClaimReason.ResourceLimit,
+                    WorkerEffectEvidenceCertainty.DefiniteViolation),
+                Is.False);
+        }
+    }
+
+    [Test]
     public void VacuityEvidenceIsClosedAndRequiresProofCore()
     {
         var response = CreateResponse(CreateManifest());

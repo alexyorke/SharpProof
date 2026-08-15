@@ -5,6 +5,7 @@
     "SharpProof.Analyzer.Core/ContractForValidation/ContractForDiagnosticDescriptors.generated.cs",
     "SharpProof.Analyzer.Core/DeclarativeModels.generated.cs",
     "SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs",
+    "SharpProof.Analyzer.Core/EffectEvaluationProducerTupleCatalog.generated.cs",
     "SharpProof.Analyzer.Core/GeneratedDiagnosticDescriptors.generated.cs",
     "SharpProof.BuildTasks/LauncherRuntimeCompanionInventory.generated.cs",
     "SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs",
