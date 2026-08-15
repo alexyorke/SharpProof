@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 29 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 28 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 29 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-168 - Failed gate runs preserve stale passing evidence (fixed)
+
+- [x] Fixed by `517c95f4e` (`fix: make fuzz evidence lifecycle fail closed`).
+- Each fuzz run now invalidates its owned stable receipt and obsolete seed logs
+  before Git, manifest, or process prerequisites. A passing campaign receipt is
+  written privately and atomically published only after every phase succeeds;
+  unrelated output files are preserved.
+- The lifecycle fixture, direct release closure (103 paths), and targeted TCB
+  ownership passed; full Architecture passed 429/429.
 
 ### SP-AUDIT-091 - Peer-generated rejected ContractFor attributes evade validation (fixed)
 
@@ -2455,18 +2465,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Required closure: make the schema/header part of the parsed canonical format.
   Add exact-schema, missing, duplicate, conflicting, older, newer, and malformed
   header controls plus a validator-removal mutation.
-
-### SP-AUDIT-168 - Failed gate runs preserve stale passing evidence (P2)
-
-- [ ] The fuzz output directory is reused without invalidating `campaign.json`
-  or obsolete per-seed logs before manifest validation and process launch.
-- Certifier impact: an early validation or launch failure can leave a prior
-  `passed: true` receipt and removed-seed evidence looking current.
-- Required closure: make each campaign output transactional or start by
-  removing/stale-marking prior owned evidence. Add pre-launch failure, launch
-  failure, changed seed set, successful replacement, and unrelated-file controls.
-- Consolidated cases: SP-AUDIT-188.
-- Unified closure: Create a run-private incomplete receipt before prerequisites and atomically replace stable evidence only after every phase succeeds.
 
 ### SP-AUDIT-180 - Response validation accepts impossible elapsed times (P2)
 
