@@ -600,6 +600,19 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void SpecificationPackAuthorityFieldsCannotSilentlyDefaultOnWire()
+    {
+        var json = CompilerManifestArtifactJson.Serialize(CreateArtifact());
+        var withoutCatalogVersion = json.Replace(
+            "\"specificationPackCatalogVersion\":1,",
+            string.Empty,
+            StringComparison.Ordinal);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(withoutCatalogVersion)));
+    }
+
+    [Test]
     public void CompilerDiagnosticsHaveTotalCanonicalOrderingAndFingerprint()
     {
         var diagnostics = new[]
