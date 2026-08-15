@@ -660,6 +660,56 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task PublicationStagesAFullSetBeforeCommittingLongSarifBasename()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            ("TargetFrameworks", "netstandard2.0"));
+        var publicationDirectory = Directory.CreateDirectory(
+            Path.Combine(project.Root, "long-basename-publication"));
+        var requestPath = Path.Combine(
+            publicationDirectory.FullName, "request.json");
+        var resultPath = Path.Combine(
+            publicationDirectory.FullName, "result.json");
+        var manifestPath = Path.Combine(
+            publicationDirectory.FullName, "compiler-manifest.json");
+        var sarifPath = Path.Combine(
+            publicationDirectory.FullName,
+            new string('s', 220) + ".sarif");
+        Assert.That(Path.GetFileName(sarifPath).Length, Is.EqualTo(226));
+
+        var first = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyRequestFile", requestPath),
+            ("SharpProofVerifyResultFile", resultPath),
+            ("SharpProofCompilerManifestFile", manifestPath),
+            ("SharpProofVerifySarifFile", sarifPath));
+        var second = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyRequestFile", requestPath),
+            ("SharpProofVerifyResultFile", resultPath),
+            ("SharpProofCompilerManifestFile", manifestPath),
+            ("SharpProofVerifySarifFile", sarifPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.ExitCode, Is.Zero, first.Output);
+            Assert.That(second.ExitCode, Is.Zero, second.Output);
+            Assert.That(File.Exists(requestPath), Is.True, second.Output);
+            Assert.That(File.Exists(resultPath), Is.True, second.Output);
+            Assert.That(File.Exists(manifestPath), Is.True, second.Output);
+            Assert.That(File.Exists(sarifPath), Is.True, second.Output);
+        }
+
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(requestPath))!;
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(resultPath))!;
+        await AssertPublicationBindingAsync(request, response);
+    }
+
+    [Test]
     public void PublicationLockPathIsStableAcrossReplacement()
     {
         RequireContainerWorker();
@@ -3513,7 +3563,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
                     <OutputType>Exe</OutputType>
-                    <TargetFramework Condition="'$(TargetFrameworks)' == ''">net8.0</TargetFramework>
+                     <TargetFramework Condition="'$(TargetFrameworks)' == '' and '$(TargetFramework)' == ''">net8.0</TargetFramework>
                   </PropertyGroup>
                 </Project>
                 """,

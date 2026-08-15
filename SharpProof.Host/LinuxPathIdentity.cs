@@ -10,6 +10,7 @@ namespace SharpProof.Host;
 public static partial class LinuxPathIdentity
 {
     private const int ErrorNoEntry = 2;
+    private const int ErrorInterrupted = 4;
     private const int ErrorWouldBlock = 11;
     private const int ErrorNotDirectory = 20;
     private const uint FileTypeMask = 0xF000;
@@ -22,6 +23,7 @@ public static partial class LinuxPathIdentity
     private const int OpenReadOnly = 0;
     private const int OpenReadWrite = 2;
     private const int OpenCreate = 0x40;
+    private const int OpenDirectory = 0x10000;
     private const int OpenNoFollow = 0x20000;
     private const int OpenCloseOnExec = 0x80000;
     private const uint OwnerReadWrite = 0x180;
@@ -139,6 +141,34 @@ public static partial class LinuxPathIdentity
             publicationPaths,
             timeout,
             CancellationToken.None);
+    }
+
+    internal static void SyncDirectory(string directory)
+    {
+        EnsureLinux();
+        var canonical = Canonicalize(directory);
+        var descriptor = NativeMethods.Open(
+            canonical,
+            OpenReadOnly | OpenDirectory | OpenCloseOnExec,
+            mode: 0);
+        if (descriptor < 0)
+        {
+            throw new IOException(
+                $"SharpProof could not open a publication directory (errno {Marshal.GetLastPInvokeError()}).");
+        }
+
+        using var handle = new SafeFileHandle(
+            new IntPtr(descriptor), ownsHandle: true);
+        while (NativeMethods.Fsync(descriptor) != 0)
+        {
+            var error = Marshal.GetLastPInvokeError();
+            if (error == ErrorInterrupted)
+            {
+                continue;
+            }
+            throw new IOException(
+                $"SharpProof could not synchronize a publication directory (errno {error}).");
+        }
     }
 
     public static void ResetPublicationSet(
@@ -492,6 +522,12 @@ public static partial class LinuxPathIdentity
                 {
                     ValidatePublicationMarker(item.MarkerPath, marker);
                 }
+            }
+            foreach (var directory in created
+                         .Select(static path => Path.GetDirectoryName(path)!)
+                         .Distinct(StringComparer.Ordinal))
+            {
+                SyncDirectory(directory);
             }
             completed = true;
         }
@@ -900,6 +936,10 @@ public static partial class LinuxPathIdentity
         [LibraryImport("libc", EntryPoint = "fstat", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int FStat(int descriptor, out LinuxStat information);
+
+        [LibraryImport("libc", EntryPoint = "fsync", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int Fsync(int descriptor);
 
         [LibraryImport("libc", EntryPoint = "open", SetLastError = true,
             StringMarshalling = StringMarshalling.Utf8)]

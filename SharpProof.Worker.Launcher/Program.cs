@@ -476,44 +476,246 @@ internal static class Program
                 arguments.PublishSarifPath
             }.OfType<string>(),
             TimeSpan.FromSeconds(30));
+
+        request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        if (!WorkerProtocolJson.ValidateForRequest(
+                response, response.RequestHash, expectedInputHash,
+                artifact.Manifest, request,
+                expectedVersions,
+                arguments.TerminationGraceMilliseconds).IsValid)
+        {
+            throw new IOException("The worker response binding is invalid.");
+        }
+
+        var members = new List<PublicationMember>
+        {
+            new(
+                arguments.PublishCompilerManifestPath!,
+                artifactBytes),
+            new(
+                arguments.PublishRequestPath,
+                Encoding.UTF8.GetBytes(
+                    WorkerProtocolJson.SerializeRequest(request)))
+        };
+        if (arguments.PublishSarifPath != null)
+        {
+            members.Add(new PublicationMember(
+                arguments.PublishSarifPath,
+                Encoding.UTF8.GetBytes(
+                    SarifProjection.Serialize(request, response))));
+        }
+        members.Add(new PublicationMember(
+            arguments.PublishResultPath!,
+            Encoding.UTF8.GetBytes(
+                WorkerProtocolJson.SerializeResponse(response))));
+
+        var previous = CapturePreviousPublication(members);
+        var commitStarted = false;
         try
         {
-            DeleteIfExists(arguments.PublishResultPath);
-            DeleteIfExists(arguments.PublishSarifPath);
-            AtomicFile.WriteBytesAsync(arguments.PublishCompilerManifestPath!, artifactBytes)
-                .GetAwaiter().GetResult();
-            request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
-            AtomicFile.WriteUtf8(
-                arguments.PublishRequestPath, WorkerProtocolJson.SerializeRequest(request));
-            response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
-            if (!WorkerProtocolJson.ValidateForRequest(
-                    response, response.RequestHash, expectedInputHash,
-                    artifact.Manifest, request,
-                    expectedVersions,
-                    arguments.TerminationGraceMilliseconds).IsValid)
+            StagePublication(members);
+            foreach (var member in members.Take(members.Count - 1))
             {
-                throw new IOException("The worker response binding is invalid.");
+                commitStarted = true;
+                PublishMember(member);
             }
-
-            if (arguments.PublishSarifPath != null)
-            {
-                AtomicFile.WriteUtf8(
-                    arguments.PublishSarifPath, SarifProjection.Serialize(request, response));
-            }
-
-            AtomicFile.WriteUtf8(
-                arguments.PublishResultPath!, WorkerProtocolJson.SerializeResponse(response));
+            commitStarted = true;
+            PublishMember(members[^1]);
         }
-        catch (OperationCanceledException)
+        catch (Exception exception) when (
+            exception is not OperationCanceledException)
         {
+            if (commitStarted)
+            {
+                TryRollbackPublication(members, previous);
+            }
             throw;
         }
-        catch
+        finally
         {
-            DeleteIfExists(arguments.PublishResultPath);
-            DeleteIfExists(arguments.PublishSarifPath);
-            throw;
+            foreach (var member in members)
+            {
+                if (member.Temporary != null)
+                {
+                    AtomicFile.TryDeleteStaged(member.Temporary);
+                }
+            }
         }
+    }
+
+    private static PreviousPublication CapturePreviousPublication(
+        IReadOnlyList<PublicationMember> members)
+    {
+        var content = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        var complete = true;
+        foreach (var member in members)
+        {
+            if (File.Exists(member.Path))
+            {
+                content.Add(member.Path, File.ReadAllBytes(member.Path));
+                continue;
+            }
+
+            if (Directory.Exists(member.Path))
+            {
+                throw new IOException(
+                    "SharpProof publication members must be regular files.");
+            }
+
+            complete = false;
+        }
+
+        return new PreviousPublication(complete, content);
+    }
+
+    private static void StagePublication(
+        IReadOnlyList<PublicationMember> members)
+    {
+        foreach (var member in members)
+        {
+            member.Temporary = AtomicFile.PrepareStaged(member.Path);
+            AtomicFile.WriteStagedBytes(member.Temporary, member.Content);
+            LinuxPathIdentity.SyncDirectory(
+                Path.GetDirectoryName(member.Path)!);
+        }
+    }
+
+    private static void PublishMember(PublicationMember member)
+    {
+        var temporary = member.Temporary ??
+            throw new IOException("SharpProof publication staging is incomplete.");
+        AtomicFile.PublishStaged(temporary, member.Path);
+        member.Temporary = null;
+        LinuxPathIdentity.SyncDirectory(
+            Path.GetDirectoryName(member.Path)!);
+    }
+
+    private static void TryRollbackPublication(
+        IReadOnlyList<PublicationMember> members,
+        PreviousPublication previous)
+    {
+        try
+        {
+            if (previous.IsComplete)
+            {
+                RestorePreviousPublication(members, previous);
+            }
+            else
+            {
+                InvalidatePublication(members);
+            }
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+                ArgumentException or System.ComponentModel.Win32Exception)
+        {
+            TryInvalidatePublication(members);
+        }
+    }
+
+    private static void RestorePreviousPublication(
+        IReadOnlyList<PublicationMember> members,
+        PreviousPublication previous)
+    {
+        var restoreMembers = members
+            .Select(member => new PublicationMember(
+                member.Path,
+                previous.Content[member.Path]))
+            .ToArray();
+        try
+        {
+            StagePublication(restoreMembers);
+            foreach (var member in restoreMembers)
+            {
+                PublishMember(member);
+            }
+        }
+        finally
+        {
+            foreach (var member in restoreMembers)
+            {
+                if (member.Temporary != null)
+                {
+                    AtomicFile.TryDeleteStaged(member.Temporary);
+                }
+            }
+        }
+    }
+
+    private static void TryInvalidatePublication(
+        IReadOnlyList<PublicationMember> members)
+    {
+        try
+        {
+            InvalidatePublication(members);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+                ArgumentException or System.ComponentModel.Win32Exception)
+        {
+        }
+    }
+
+    private static void InvalidatePublication(
+        IReadOnlyList<PublicationMember> members)
+    {
+        Exception? failure = null;
+        foreach (var member in members)
+        {
+            try
+            {
+                if (Directory.Exists(member.Path))
+                {
+                    throw new IOException(
+                        "SharpProof publication members must be regular files.");
+                }
+                if (File.Exists(member.Path))
+                {
+                    File.Delete(member.Path);
+                    LinuxPathIdentity.SyncDirectory(
+                        Path.GetDirectoryName(member.Path)!);
+                }
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException or
+                    ArgumentException or System.ComponentModel.Win32Exception)
+            {
+                failure ??= exception;
+            }
+        }
+
+        if (failure != null)
+        {
+            throw failure;
+        }
+    }
+
+    private sealed class PublicationMember
+    {
+        internal PublicationMember(string path, byte[] content)
+        {
+            Path = path;
+            Content = content;
+        }
+
+        internal string Path { get; }
+        internal byte[] Content { get; }
+        internal string? Temporary { get; set; }
+    }
+
+    private sealed class PreviousPublication
+    {
+        internal PreviousPublication(
+            bool isComplete,
+            Dictionary<string, byte[]> content)
+        {
+            IsComplete = isComplete;
+            Content = content;
+        }
+
+        internal bool IsComplete { get; }
+        internal Dictionary<string, byte[]> Content { get; }
     }
 
     private static Task WriteLauncherFailureAsync(
