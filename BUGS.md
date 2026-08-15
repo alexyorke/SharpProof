@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 26 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 25 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,15 @@ The active backlog contains 26 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-166 - Corpus snapshot schema labels are not validated (fixed)
+
+- [x] Fixed by `19c0fef48` (`fix: validate canonical corpus snapshot format`).
+- Corpus writing and loading now share one strict byte-format authority requiring
+  the exact three-line schema-3 header, UTF-8 without BOM, LF-only bytes, one
+  terminal LF, and nonblank noncomment data rows without trimming.
+- Authority ownership passed 2/2, the 15-case format matrix passed, and full
+  Architecture passed 429/429.
 
 ### SP-AUDIT-242 - Pilot reports fabricate zero false-positive review counts (fixed)
 
@@ -2446,16 +2455,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   controls against the pinned Z3 build.
 - Consolidated cases: SP-AUDIT-186.
 - Unified closure: Give every Z3 query one ownership/accounting scope covering temporary ASTs, solve, model/core extraction, cancellation, exceptional exit, disposal, and final statistics.
-
-### SP-AUDIT-166 - Corpus snapshot schema labels are not validated (P2)
-
-- [ ] The corpus writer emits schema 3, but the loader discards comment/header
-  rows and never requires one exact schema declaration.
-- Certifier impact: missing, duplicated, contradictory, schema 2, and schema 999
-  snapshots are accepted whenever their data rows still parse.
-- Required closure: make the schema/header part of the parsed canonical format.
-  Add exact-schema, missing, duplicate, conflicting, older, newer, and malformed
-  header controls plus a validator-removal mutation.
 
 ### SP-AUDIT-180 - Response validation accepts impossible elapsed times (P2)
 
