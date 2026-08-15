@@ -251,6 +251,7 @@ public sealed class CompilerArtifactModelSchemaTests
             .EnumerateArray()
             .Where(row => row[0].GetString() == "Unknown" && row[1].GetString() != "*")
             .Select(row => Enum.Parse<WorkerClaimReason>(row[1].GetString()!))
+            .Distinct()
             .ToArray();
         var catalogType = s_artifactAssembly.GetType(
             "SharpProof.CompilerArtifact.CompilerEffectEvidenceCatalog",
