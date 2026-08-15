@@ -2160,7 +2160,7 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 
 ### SP-AUDIT-088 - Compiler effect and callable reason mapping is incomplete (P1)
 
-- [ ] Compiler capture can emit an unknown effect claim with reason
+- [x] Compiler capture can emit an unknown effect claim with reason
   `ResourceLimit` and certainty `IncompleteMayEffectSummary`, but the compiler
   artifact effect codec's closed reason list omits `ResourceLimit` and the
   protocol certainty predicate accepts that certainty only for
@@ -2180,6 +2180,11 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   exact and boundary resource-budget capture through worker response, adjacent
   unsupported-body controls, malformed tuple rejection, and mutations removing
   each permitted producer tuple.
+- Resolution: one generated tuple catalog now drives analyzer production,
+  compiler-artifact hydration, protocol validation, and result assembly. The
+  exact ResourceLimit and UnsupportedBody tuples, invalid cross-products, and
+  tuple-removal mutation are covered; combined Worker, Analyzer, and Effects
+  suites pass.
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
 
@@ -2278,7 +2283,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 
 ### SP-AUDIT-048 - Invocation lifecycle leaks temporary runtime state (P2)
 
-- [ ] Every build allocates a GUID-scoped
+- [x] Every build allocates a GUID-scoped
   `obj/.../SharpProof/runs/<invocation>` directory for its compiler manifest.
   `_SharpProofVerifyCore` removes that directory only after `RunVerifier`.
   Configuration, manifest, launcher, worker, and other MSBuild `<Error>` paths
@@ -2302,6 +2307,10 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutation that restores success-only `RemoveDir` placement.
 - Consolidated cases: SP-AUDIT-206.
 - Unified closure: Own one invocation root and remove compiler and staged-worker state on prelaunch failure, success, cancellation, timeout, and bounded abandoned-root recovery.
+- Resolution: one authoritative invocation root is cleaned through an MSBuild
+  finally-equivalent target on prelaunch and launch failure, cancellation,
+  timeout, success, cleanup failure/recovery, and repeated builds. Diagnostics
+  remain available until classification, and placement/removal controls pass.
 
 ### SP-AUDIT-063 - Publication commit is not atomic or crash-durable (P2)
 
@@ -2443,7 +2452,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 
 ### SP-AUDIT-152 - Effect certainty and provenance tuples are not jointly validated (P2)
 
-- [ ] Response validation independently accepts `EffectCertainty=VacuousEntry`
+- [x] Response validation independently accepts `EffectCertainty=VacuousEntry`
   and `Vacuity=None`; it never enforces the producer invariant that vacuous
   effect proof carries contradictory-precondition evidence and a core.
 - Certifier impact: changing only a valid non-vacuous proven effect result's
@@ -2455,10 +2464,14 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   unknown controls, and invariant-removal mutation.
 - Consolidated cases: SP-AUDIT-203, SP-AUDIT-234.
 - Unified closure: Validate and produce claim kind, outcome, reason, certainty, vacuity, core, trusted provenance, and used assumption IDs from one authoritative table.
+- Resolution: the generated protocol authority now jointly validates outcome,
+  reason, certainty, vacuity, proof-core presence, trusted provenance, and used
+  assumptions; producer assembly uses the same closed tuple and the full Worker
+  suite passes.
 
 ### SP-AUDIT-155 - Semantic identities and assumption kinds lack a closed producer authority (P2)
 
-- [ ] Manifest validation enforces assumption identity/kind only per callable,
+- [x] Manifest validation enforces assumption identity/kind only per callable,
   while response summarization groups globally and rejects one ID carrying two
   kinds.
 - Certifier impact: a sealed manifest with `shared` as `Precondition` in one
@@ -2471,6 +2484,10 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   generated IDs, summary reconstruction, and scope-check mutation controls.
 - Consolidated cases: SP-AUDIT-202, SP-AUDIT-235.
 - Unified closure: Generate exact semantic ID grammar/recomputation, a closed assumption-kind set, and exact trusted-source ownership from one producer authority.
+- Resolution: assumption kinds and generated IDs are closed and canonical,
+  identity/kind consistency is global, callable declarations remain unused,
+  and claim-owned proof/trusted evidence exclusively determines `Used` flags.
+  Summary reconstruction and generated-identity regressions pass.
 
 ### SP-AUDIT-165 - Z3 query ownership and accounting are incomplete (P2)
 
