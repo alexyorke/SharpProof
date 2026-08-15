@@ -15,6 +15,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repositoryPrefix = $repositoryRoot.TrimEnd(
+    [IO.Path]::DirectorySeparatorChar,
+    [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
@@ -43,6 +46,21 @@ New-Item `
     -Force `
     -Path $resolvedResultsDirectory |
     Out-Null
+
+# Establish the denominator and module/source authority before any collector
+# can instrument or merge binaries. The validator independently recomputes the
+# same portable-PDB universe; this file is evidence, not the source of truth.
+$coverageAuthorityPath = Join-Path `
+    $resolvedResultsDirectory `
+    'coverage-authority.json'
+& (Join-Path $PSScriptRoot 'Get-SharpProofCoverageAuthority.ps1') `
+    -RepositoryRoot $repositoryRoot `
+    -BaselinePath (Join-Path $repositoryRoot 'eng/coverage/baseline.json') `
+    -Configuration Release `
+    -OutputPath $coverageAuthorityPath
+if ($LASTEXITCODE -ne 0) {
+    throw 'Coverage authority derivation failed before collection.'
+}
 
 $dotnetWrapper = Join-Path `
     $repositoryRoot `
@@ -167,6 +185,13 @@ $coverageReports = @(
         -Filter '*.cobertura.xml' `
         -File `
         -ErrorAction Stop)
+$coverageAuthority = Get-Content `
+    -LiteralPath $coverageAuthorityPath `
+    -Raw | ConvertFrom-Json
+$coverageModuleHashes = @(
+    $coverageAuthority.modules |
+        ForEach-Object { [string]$_.assemblySha256 } |
+        Sort-Object)
 foreach ($coverageReport in $coverageReports) {
     [xml]$coverageDocument = Get-Content `
         -LiteralPath $coverageReport.FullName `
@@ -188,6 +213,24 @@ foreach ($coverageReport in $coverageReports) {
             $fullPath.Substring($repositoryPrefix.Length).Replace('\', '/'))
         $changed = $true
     }
+    $authorityNodes = @(
+        $coverageDocument.SelectNodes('/coverage/sharpProofAuthority'))
+    if ($authorityNodes.Count -ne 0) {
+        throw (
+            "Coverage report already contains authority metadata: " +
+            $coverageReport.FullName)
+    }
+    $authorityNode = $coverageDocument.CreateElement('sharpProofAuthority')
+    $authorityNode.SetAttribute('schemaVersion', '1')
+    $authorityNode.SetAttribute('commit', [string]$coverageAuthority.commit)
+    $authorityNode.SetAttribute(
+        'universeSha256',
+        [string]$coverageAuthority.universeSha256)
+    $authorityNode.SetAttribute(
+        'modules',
+        ($coverageModuleHashes -join ','))
+    [void]$coverageDocument.DocumentElement.AppendChild($authorityNode)
+    $changed = $true
     if ($changed) {
         $writerSettings = [Xml.XmlWriterSettings]::new()
         $writerSettings.Encoding = [Text.UTF8Encoding]::new($false)

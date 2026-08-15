@@ -298,7 +298,7 @@ public sealed class CoverageScriptTests
     {
         RequireLinuxFileNames();
         var upper = "Project/Trusted.cs";
-        var lower = "Project/trusted.cs";
+        var lower = "Project/trusted-lower.cs";
         var result = await RunCoverageIdentityFixtureAsync(
             [
                 new CoverageEntry(upper, upper, 1),
@@ -343,9 +343,9 @@ public sealed class CoverageScriptTests
         "Project/Ordinary.cs",
         TestName = "ExactGitAndCoveragePathControl")]
     [TestCase(
-        "Project/Trüsted\tCase.cs",
-        "Project/Trüsted\tCase.cs",
-        TestName = "GitQuotedUnicodeAndControlPathIsDecoded")]
+        "Project/Trüsted-Case.cs",
+        "Project/Trüsted-Case.cs",
+        TestName = "GitQuotedUnicodePathIsDecoded")]
     [TestCase(
         "Project/WindowsReport.cs",
         "Project\\WindowsReport.cs",
@@ -381,6 +381,40 @@ public sealed class CoverageScriptTests
             Assert.That(
                 changed.GetProperty("passed").GetBoolean(),
                 Is.False);
+        }
+    }
+
+    [TestCase("one-line")]
+    [TestCase("truncated")]
+    [TestCase("missing-project")]
+    [TestCase("wrong-assembly")]
+    [TestCase("foreign-source")]
+    [TestCase("duplicate-report")]
+    public async Task AuthenticatedCoverageRejectsReportMutations(string mutation)
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            await PrepareCoverageFixtureAsync(repository);
+            var reportPath = Path.Combine(
+                repository,
+                "coverage",
+                "fixture.cobertura.xml");
+            ApplyCoverageMutation(reportPath, mutation);
+
+            var result = await RunCoverageScriptOnlyAsync(
+                repository,
+                comparisonRef: null,
+                reportOnly: true);
+
+            Assert.That(
+                result.ExitCode,
+                Is.Not.Zero,
+                mutation + ": " + result.Error + result.Output);
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
         }
     }
 
@@ -474,6 +508,8 @@ public sealed class CoverageScriptTests
                 "--porcelain"));
             Assert.That(status.Output, Does.Contain("README.md"));
 
+            await PrepareCoverageFixtureAsync(repository);
+
             var result = await RunAsync(
                 repository,
                 "pwsh",
@@ -531,6 +567,8 @@ public sealed class CoverageScriptTests
                 await WriteSourceAsync(repository, entry.SourcePath, value: 1);
             }
             await CommitAllAsync(repository, "change trusted sources");
+
+            await PrepareCoverageFixtureAsync(repository);
 
             return await RunAsync(
                 repository,
@@ -680,12 +718,17 @@ public sealed class CoverageScriptTests
         Directory.CreateDirectory(coverage);
         Directory.CreateDirectory(project);
 
+        await WriteCoverageProjectAsync(repository);
+
         File.Copy(
             Path.Combine(root, "scripts", "Test-SharpProofCoverage.ps1"),
             Path.Combine(scripts, "Test-SharpProofCoverage.ps1"));
         File.Copy(
             Path.Combine(root, "scripts", "Get-SharpProofTcbPaths.ps1"),
             Path.Combine(scripts, "Get-SharpProofTcbPaths.ps1"));
+        File.Copy(
+            Path.Combine(root, "scripts", "Get-SharpProofCoverageAuthority.ps1"),
+            Path.Combine(scripts, "Get-SharpProofCoverageAuthority.ps1"));
         await File.WriteAllTextAsync(
             Path.Combine(acceptance, "contract.json"),
             JsonSerializer.Serialize(new
@@ -784,7 +827,21 @@ public sealed class CoverageScriptTests
         return repository;
     }
 
-    private static Task<ProcessResult> RunCoverageAsync(
+    private static async Task<ProcessResult> RunCoverageAsync(
+        string repository,
+        string? comparisonRef,
+        bool reportOnly,
+        bool includeWorkingTree = false)
+    {
+        await PrepareCoverageFixtureAsync(repository);
+        return await RunCoverageScriptOnlyAsync(
+            repository,
+            comparisonRef,
+            reportOnly,
+            includeWorkingTree);
+    }
+
+    private static Task<ProcessResult> RunCoverageScriptOnlyAsync(
         string repository,
         string? comparisonRef,
         bool reportOnly,
@@ -830,9 +887,13 @@ public sealed class CoverageScriptTests
         var scripts = Path.Combine(repository, "scripts");
         var acceptance = Path.Combine(repository, "eng", "acceptance");
         var coverage = Path.Combine(repository, "coverage");
+        var project = Path.Combine(repository, "Project");
         Directory.CreateDirectory(scripts);
         Directory.CreateDirectory(acceptance);
         Directory.CreateDirectory(coverage);
+        Directory.CreateDirectory(project);
+
+        await WriteCoverageProjectAsync(repository);
 
         File.Copy(
             Path.Combine(root, "scripts", "Test-SharpProofCoverage.ps1"),
@@ -840,6 +901,9 @@ public sealed class CoverageScriptTests
         File.Copy(
             Path.Combine(root, "scripts", "Get-SharpProofTcbPaths.ps1"),
             Path.Combine(scripts, "Get-SharpProofTcbPaths.ps1"));
+        File.Copy(
+            Path.Combine(root, "scripts", "Get-SharpProofCoverageAuthority.ps1"),
+            Path.Combine(scripts, "Get-SharpProofCoverageAuthority.ps1"));
 
         await File.WriteAllTextAsync(
             Path.Combine(acceptance, "contract.json"),
@@ -909,12 +973,218 @@ public sealed class CoverageScriptTests
             repository,
             relativePath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var className = "Trusted" + relativePath
+            .Replace('/', '_')
+            .Replace('\\', '_')
+            .Replace('.', '_')
+            .Replace('-', '_');
         return File.WriteAllTextAsync(
             path,
-            "public static class Trusted\n" +
+            "public static class " + className + "\n" +
             "{\n" +
-            "    public const int Value = " + value + ";\n" +
+            "    public static int Covered() => " + value + ";\n" +
             "}\n");
+    }
+
+    private static Task WriteCoverageProjectAsync(string repository)
+    {
+        return File.WriteAllTextAsync(
+            Path.Combine(repository, "Project", "Project.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\">\n" +
+            "  <PropertyGroup>\n" +
+            "    <TargetFramework>net8.0</TargetFramework>\n" +
+            "    <AssemblyName>Project</AssemblyName>\n" +
+            "    <DebugType>portable</DebugType>\n" +
+            "    <DebugSymbols>true</DebugSymbols>\n" +
+            "    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>\n" +
+            "  </PropertyGroup>\n" +
+            "  <ItemGroup>\n" +
+            "    <Compile Include=\"**/*.cs\" />\n" +
+            "  </ItemGroup>\n" +
+            "</Project>\n");
+    }
+
+    private static void ApplyCoverageMutation(
+        string reportPath,
+        string mutation)
+    {
+        if (mutation == "truncated")
+        {
+            File.WriteAllText(reportPath, "<coverage><packages>");
+            return;
+        }
+        if (mutation == "duplicate-report")
+        {
+            File.Copy(
+                reportPath,
+                Path.Combine(
+                    Path.GetDirectoryName(reportPath)!,
+                    "duplicate.cobertura.xml"));
+            return;
+        }
+
+        var document = XDocument.Load(reportPath);
+        var root = document.Root!;
+        switch (mutation)
+        {
+            case "one-line":
+            case "missing-project":
+                root.Descendants("line").Remove();
+                break;
+            case "wrong-assembly":
+                root.Element("sharpProofAuthority")!
+                    .SetAttributeValue("modules", new string('0', 64));
+                break;
+            case "foreign-source":
+                root.Descendants("class")
+                    .First()
+                    .SetAttributeValue("filename", "Foreign.cs");
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+        document.Save(reportPath, SaveOptions.DisableFormatting);
+    }
+
+    private static async Task PrepareCoverageFixtureAsync(string repository)
+    {
+        await AssertSuccessAsync(RunAsync(
+            repository,
+            "dotnet",
+            "restore",
+            "Project/Project.csproj",
+            "--ignore-failed-sources"));
+        await AssertSuccessAsync(RunAsync(
+            repository,
+            "dotnet",
+            "build",
+            "Project/Project.csproj",
+            "--configuration",
+            "Release",
+            "--no-restore"));
+        var coverage = Path.Combine(repository, "coverage");
+        var authorityPath = Path.Combine(coverage, "coverage-authority.json");
+        await AssertSuccessAsync(RunAsync(
+            repository,
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            Path.Combine(repository, "scripts", "Get-SharpProofCoverageAuthority.ps1"),
+            "-RepositoryRoot",
+            repository,
+            "-BaselinePath",
+            Path.Combine(repository, "baseline.json"),
+            "-Configuration",
+            "Release",
+            "-OutputPath",
+            authorityPath));
+
+        using var authority = JsonDocument.Parse(
+            await File.ReadAllTextAsync(authorityPath));
+        var moduleHashes = authority.RootElement
+            .GetProperty("modules")
+            .EnumerateArray()
+            .Select(static module => module
+                .GetProperty("assemblySha256")
+                .GetString()!)
+            .OrderBy(static hash => hash, StringComparer.Ordinal)
+            .ToArray();
+        var sourceHits = new Dictionary<string, Dictionary<int, int>>(
+            StringComparer.Ordinal);
+        foreach (var reportPath in Directory.EnumerateFiles(
+                     coverage,
+                     "*.cobertura.xml",
+                     SearchOption.AllDirectories))
+        {
+            var document = XDocument.Load(reportPath, LoadOptions.PreserveWhitespace);
+            var root = document.Root!;
+            foreach (var existingClass in root.Descendants("class"))
+            {
+                var existingPath = existingClass
+                    .Attribute("filename")?
+                    .Value
+                    .Replace('\\', '/');
+                if (existingPath != null)
+                {
+                    if (!sourceHits.TryGetValue(existingPath, out var lines))
+                    {
+                        lines = new Dictionary<int, int>();
+                        sourceHits[existingPath] = lines;
+                    }
+                    foreach (var existingLine in existingClass
+                                 .Descendants("line"))
+                    {
+                        if (int.TryParse(
+                                existingLine.Attribute("number")?.Value,
+                                out var lineNumber) &&
+                            int.TryParse(
+                                existingLine.Attribute("hits")?.Value,
+                                out var existingHits))
+                        {
+                            lines[lineNumber] = existingHits;
+                        }
+                    }
+                }
+            }
+            var classesContainer = root.Descendants("classes").First();
+            classesContainer.RemoveNodes();
+            root.Descendants("sharpProofAuthority").Remove();
+            var sequenceClassOrdinal = 0;
+            foreach (var module in authority.RootElement
+                         .GetProperty("modules")
+                         .EnumerateArray())
+            {
+                foreach (var sourceDocument in module
+                             .GetProperty("documents")
+                             .EnumerateArray())
+                {
+                    var sourcePath = sourceDocument
+                        .GetProperty("path")
+                        .GetString()!;
+                    var lines = sourceDocument
+                        .GetProperty("sequencePoints")
+                        .EnumerateArray()
+                        .Select(line =>
+                        {
+                            var lineNumber = line.GetInt32();
+                            var hits = sourceHits.TryGetValue(
+                                    sourcePath,
+                                    out var configuredLines) &&
+                                configuredLines.TryGetValue(
+                                    lineNumber,
+                                    out var configuredHits)
+                                ? configuredHits
+                                : 0;
+                            return new XElement(
+                                "line",
+                                new XAttribute("number", lineNumber),
+                                new XAttribute("hits", hits));
+                        });
+                    classesContainer.Add(new XElement(
+                        "class",
+                        new XAttribute(
+                            "name",
+                            "Trusted" + sequenceClassOrdinal++),
+                        new XAttribute("filename", sourcePath),
+                        new XElement("lines", lines)));
+                }
+            }
+            root.Add(new XElement(
+                "sharpProofAuthority",
+                new XAttribute("schemaVersion", "1"),
+                new XAttribute(
+                    "commit",
+                    authority.RootElement.GetProperty("commit").GetString()!),
+                new XAttribute(
+                    "universeSha256",
+                    authority.RootElement
+                        .GetProperty("universeSha256")
+                        .GetString()!),
+                new XAttribute("modules", string.Join(',', moduleHashes))));
+            document.Save(reportPath, SaveOptions.DisableFormatting);
+        }
     }
 
     private static void RequireLinuxFileNames()
@@ -938,12 +1208,17 @@ public sealed class CoverageScriptTests
         Directory.CreateDirectory(coverage);
         Directory.CreateDirectory(Path.Combine(repository, "Project"));
 
+        await WriteCoverageProjectAsync(repository);
+
         File.Copy(
             Path.Combine(root, "scripts", "Test-SharpProofCoverage.ps1"),
             Path.Combine(scripts, "Test-SharpProofCoverage.ps1"));
         File.Copy(
             Path.Combine(root, "scripts", "Get-SharpProofTcbPaths.ps1"),
             Path.Combine(scripts, "Get-SharpProofTcbPaths.ps1"));
+        File.Copy(
+            Path.Combine(root, "scripts", "Get-SharpProofCoverageAuthority.ps1"),
+            Path.Combine(scripts, "Get-SharpProofCoverageAuthority.ps1"));
 
         await File.WriteAllTextAsync(
             Path.Combine(acceptance, "contract.json"),
@@ -1000,7 +1275,7 @@ public sealed class CoverageScriptTests
             Path.Combine(repository, "Project", "Trusted.cs"),
             "public static class Trusted\n" +
             "{\n" +
-            "    public const int Value = " + value + ";\n" +
+            "    public static int Covered() => " + value + ";\n" +
             "}\n");
     }
 

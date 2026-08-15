@@ -23,6 +23,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repositoryPrefix = $repositoryRoot.TrimEnd(
+    [IO.Path]::DirectorySeparatorChar,
+    [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
 
 function ConvertTo-OrdinalSortedArray {
@@ -227,9 +230,82 @@ else {
     Resolve-DurableComparisonCommit -Reference $ComparisonRef
 }
 
-$lineHits = [Collections.Generic.Dictionary[string,
+$coverageAuthorityPath = Join-Path `
+    $resolvedCoverageRoot `
+    'coverage-authority.json'
+if (-not (Test-Path -LiteralPath $coverageAuthorityPath -PathType Leaf)) {
+    throw (
+        "Coverage authority evidence is missing: '$coverageAuthorityPath'.")
+}
+$recordedAuthority = Get-Content `
+    -LiteralPath $coverageAuthorityPath `
+    -Raw | ConvertFrom-Json
+$authorityScript = Join-Path `
+    $PSScriptRoot `
+    'Get-SharpProofCoverageAuthority.ps1'
+$recomputedAuthorityJson = & $authorityScript `
+    -RepositoryRoot $repositoryRoot `
+    -BaselinePath $resolvedBaselinePath `
+    -Configuration Release
+if ($LASTEXITCODE -ne 0) {
+    throw 'Coverage authority could not be recomputed from current PDBs.'
+}
+$recomputedAuthority = ($recomputedAuthorityJson -join "`n") |
+    ConvertFrom-Json
+if ($recordedAuthority.schemaVersion -ne 1 -or
+    $recordedAuthority.commit -cne $recomputedAuthority.commit -or
+    $recordedAuthority.commit -cne (& git -C $repositoryRoot rev-parse HEAD).Trim() -or
+    $recordedAuthority.configuration -cne 'Release' -or
+    $recordedAuthority.universeSha256 -cne $recomputedAuthority.universeSha256) {
+    throw (
+        'Coverage authority evidence does not match the exact current ' +
+        'commit, binaries, and portable-PDB source universe.')
+}
+$expectedAuthorityModules = @($recomputedAuthority.modules | Sort-Object project)
+$expectedModuleHashes = @(
+    $expectedAuthorityModules |
+        ForEach-Object { [string]$_.assemblySha256 } |
+        Sort-Object)
+$expectedModuleHashText = $expectedModuleHashes -join ','
+$expectedLineHits = [Collections.Generic.Dictionary[string,
     Collections.Generic.Dictionary[int, int]]]::new(
         [StringComparer]::Ordinal)
+$expectedSequencePointCount = 0
+foreach ($module in $expectedAuthorityModules) {
+    foreach ($document in @($module.documents | Sort-Object path)) {
+        $path = [string]$document.path
+        if ($expectedLineHits.ContainsKey($path)) {
+            $fileLines = $expectedLineHits[$path]
+        }
+        else {
+            $fileLines = [Collections.Generic.Dictionary[int, int]]::new()
+            $expectedLineHits[$path] = $fileLines
+        }
+        foreach ($value in @($document.sequencePoints | Sort-Object)) {
+            $number = [int]$value
+            if ($number -le 0 -or $fileLines.ContainsKey($number)) {
+                if ($number -le 0) {
+                    throw (
+                        "Coverage authority has an invalid sequence point " +
+                        "'${path}:$number'.")
+                }
+                continue
+            }
+            $fileLines[$number] = 0
+            $expectedSequencePointCount++
+        }
+    }
+}
+if ($expectedLineHits.Count -eq 0 -or $expectedSequencePointCount -eq 0) {
+    throw 'Coverage authority contains no production sequence points.'
+}
+
+$lineHits = $expectedLineHits
+$observedLineNumbers = [Collections.Generic.Dictionary[string,
+    Collections.Generic.HashSet[int]]]::new([StringComparer]::Ordinal)
+foreach ($path in $expectedLineHits.Keys) {
+    $observedLineNumbers[$path] = [Collections.Generic.HashSet[int]]::new()
+}
 
 function Resolve-CoverageSourcePath {
     param(
@@ -266,41 +342,133 @@ function Resolve-CoverageSourcePath {
                 Replace('\', '/')
         }
     }
-    return $null
+    throw (
+        "Coverage report source document is foreign or missing: '$FileName'.")
 }
 
+$seenReportHashes = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+$reportHashes = [Collections.Generic.List[object]]::new()
 foreach ($report in $reports) {
+    $reportHash = ([Security.Cryptography.SHA256]::HashData(
+        [IO.File]::ReadAllBytes($report.FullName)) |
+        ForEach-Object { $_.ToString('x2') }) -join ''
+    if (-not $seenReportHashes.Add($reportHash)) {
+        throw (
+            "Coverage report is duplicated by content: '$($report.FullName)'.")
+    }
+    $reportHashes.Add([pscustomobject][ordered]@{
+            path = [IO.Path]::GetRelativePath(
+                $resolvedCoverageRoot,
+                $report.FullName).Replace('\', '/')
+            sha256 = $reportHash
+        })
     [xml]$document = Get-Content -LiteralPath $report.FullName -Raw
+    $authorityNodes = @(
+        $document.SelectNodes('/coverage/sharpProofAuthority'))
+    if ($authorityNodes.Count -ne 1) {
+        throw (
+            "Coverage report must contain exactly one authority envelope: " +
+            $report.FullName)
+    }
+    $authorityNode = $authorityNodes[0]
+    if ([string]$authorityNode.schemaVersion -cne '1' -or
+        [string]$authorityNode.commit -cne [string]$recomputedAuthority.commit -or
+        [string]$authorityNode.universeSha256 -cne
+            [string]$recomputedAuthority.universeSha256) {
+        throw (
+            "Coverage report authority does not match current commit/universe: " +
+            $report.FullName)
+    }
+    $reportModuleHashes = @(
+        ([string]$authorityNode.modules).Split(',', [StringSplitOptions]::RemoveEmptyEntries) |
+            Sort-Object)
+    $reportModuleHashText = $reportModuleHashes -join ','
+    if ($reportModuleHashText -cne $expectedModuleHashText) {
+        throw (
+            "Coverage report module identity does not match current assemblies: " +
+            $report.FullName)
+    }
     $sourceRoots = @(
         $document.SelectNodes('/coverage/sources/source') |
             ForEach-Object { [string]$_.InnerText }
     )
-    foreach ($class in $document.SelectNodes('//class[@filename]')) {
+    $classes = @($document.SelectNodes('//class'))
+    if ($classes.Count -eq 0) {
+        throw "Coverage report has no classes: $($report.FullName)"
+    }
+    $reportLineCount = 0
+    foreach ($class in $classes) {
+        if (-not $class.HasAttribute('filename')) {
+            throw "Coverage report class has no source filename: $($report.FullName)"
+        }
         $relativePath = Resolve-CoverageSourcePath `
             -FileName ([string]$class.filename) `
             -SourceRoots $sourceRoots
-        if ($null -eq $relativePath -or
-            -not $relativePath.EndsWith(
+        if (-not $relativePath.EndsWith(
                 '.cs',
                 [StringComparison]::OrdinalIgnoreCase) -or
             $relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or
             $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) {
             continue
         }
-        if (-not $lineHits.ContainsKey($relativePath)) {
-            $lineHits[$relativePath] =
-                [Collections.Generic.Dictionary[int, int]]::new()
+        if (-not $expectedLineHits.ContainsKey($relativePath)) {
+            throw (
+                "Coverage report source is outside the authenticated source " +
+                "universe: '$relativePath'.")
         }
         $fileHits = $lineHits[$relativePath]
-        foreach ($line in $class.SelectNodes('.//line[@number][@hits]')) {
-            $number = [int]$line.number
-            $hits = [int]$line.hits
-            if (-not $fileHits.ContainsKey($number) -or
-                $hits -gt $fileHits[$number]) {
+        $lines = @($class.SelectNodes('.//line'))
+        foreach ($line in $lines) {
+            $number = 0
+            $hits = 0
+            if (-not $line.HasAttribute('number') -or
+                -not $line.HasAttribute('hits') -or
+                -not [int]::TryParse(
+                    [string]$line.number,
+                    [Globalization.NumberStyles]::Integer,
+                    [Globalization.CultureInfo]::InvariantCulture,
+                    [ref]$number) -or
+                -not [int]::TryParse(
+                    [string]$line.hits,
+                    [Globalization.NumberStyles]::Integer,
+                    [Globalization.CultureInfo]::InvariantCulture,
+                    [ref]$hits) -or
+                $number -le 0 -or
+                $hits -lt 0) {
+                throw (
+                    "Coverage report contains a malformed sequence point: " +
+                    $report.FullName)
+            }
+            if (-not $fileHits.ContainsKey($number)) {
+                throw (
+                    "Coverage report sequence point is outside the authenticated " +
+                    "PDB universe: '${relativePath}:$number'.")
+            }
+            if ($hits -gt $fileHits[$number]) {
                 $fileHits[$number] = $hits
             }
+            [void]$observedLineNumbers[$relativePath].Add($number)
+            $reportLineCount++
         }
     }
+    if ($reportLineCount -eq 0) {
+        throw "Coverage report has no production sequence points: $($report.FullName)"
+    }
+}
+
+$missingSequencePoints = [Collections.Generic.List[string]]::new()
+foreach ($path in $expectedLineHits.Keys) {
+    foreach ($number in $expectedLineHits[$path].Keys) {
+        if (-not $observedLineNumbers[$path].Contains($number)) {
+            $missingSequencePoints.Add("${path}:$number")
+        }
+    }
+}
+if ($missingSequencePoints.Count -ne 0) {
+    throw (
+        'Coverage reports omit authenticated sequence points: ' +
+        (($missingSequencePoints | Sort-Object) -join ', '))
 }
 
 function Measure-Coverage {
@@ -604,6 +772,14 @@ $summary = [pscustomobject][ordered]@{
     schemaVersion = 1
     commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
     reportCount = $reports.Count
+    reportHashes = @($reportHashes | Sort-Object path)
+    authority = [pscustomobject][ordered]@{
+        schemaVersion = 1
+        commit = [string]$recomputedAuthority.commit
+        universeSha256 = [string]$recomputedAuthority.universeSha256
+        moduleCount = $expectedAuthorityModules.Count
+        sequencePointCount = $expectedSequencePointCount
+    }
     aggregate = [pscustomobject][ordered]@{
         coveredLines = $aggregate.coveredLines
         coverableLines = $aggregate.coverableLines
