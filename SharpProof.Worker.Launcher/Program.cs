@@ -607,9 +607,9 @@ internal static class Program
             }
         }
         catch (Exception exception) when (
-            exception is not OperationCanceledException and
             exception is not OutOfMemoryException and
-            exception is not StackOverflowException)
+            not StackOverflowException and
+            not OperationCanceledException)
         {
             TryInvalidatePublication(members);
         }
@@ -652,9 +652,9 @@ internal static class Program
             InvalidatePublication(members);
         }
         catch (Exception exception) when (
-            exception is not OperationCanceledException and
             exception is not OutOfMemoryException and
-            exception is not StackOverflowException)
+            not StackOverflowException and
+            not OperationCanceledException)
         {
         }
     }
