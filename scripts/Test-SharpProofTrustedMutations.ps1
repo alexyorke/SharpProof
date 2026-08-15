@@ -1326,6 +1326,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnmanagedFunctionPointerConventionOrderIsInterchangeable'
     },
     [pscustomobject]@{
+        Name = 'contract-constructed-function-pointer-preserves-ref-modifiers'
+        File = 'SharpProof.Contracts\ContractCanonicalization.cs'
+        Original = '            if (signatureTypes.TryGetValue(type, out var signatureType))'
+        Mutated = '            if (false && signatureTypes.TryGetValue(type, out var signatureType))'
+        Project = 'SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj'
+        Filter = 'FullyQualifiedName~FunctionPointerRefReadonlyModifiersSurviveConstruction'
+    },
+    [pscustomobject]@{
         Name = 'contract-float-default-bits-are-exact'
         File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
         Original = '                SingleBits(leftValue) == SingleBits(rightValue),'

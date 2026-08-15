@@ -192,6 +192,37 @@ public sealed class ConstructedGenericContractTests
             expectedClauses: 1);
     }
 
+    [Test]
+    public void FunctionPointerRefReadonlyModifiersSurviveConstruction()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public unsafe interface IReader<T> where T : unmanaged {
+                void Read(delegate*<ref readonly T, void> callback);
+            }
+
+            [ContractFor(typeof(IReader<>))]
+            public static unsafe class ReaderContracts<T>
+                where T : unmanaged {
+                public static void Read(
+                    IReader<T> receiver,
+                    delegate*<ref readonly T, void> callback) {
+                    Contract.Requires(callback != null);
+                }
+            }
+
+            public static unsafe class Caller {
+                public static void Call(
+                    IReader<int> reader,
+                    delegate*<ref readonly int, void> callback) =>
+                    reader.Read(callback);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
     private static void AssertBinds(string source, int expectedClauses)
     {
         var compilation = CreateCompilation(source);
