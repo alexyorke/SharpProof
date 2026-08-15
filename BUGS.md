@@ -2474,7 +2474,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 
 ### SP-AUDIT-165 - Z3 query ownership and accounting are incomplete (P2)
 
-- [ ] SMT encoding creates many temporary `MkInt`, comparison, Boolean,
+- [x] SMT encoding creates many temporary `MkInt`, comparison, Boolean,
   conditional, and division wrapper objects without disposing them. The encoder
   owns cached roots but cannot reach those intermediate wrappers.
 - Supported impact: a long-lived solver lane accumulates native references until
@@ -2489,6 +2489,10 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   controls against the pinned Z3 build.
 - Consolidated cases: SP-AUDIT-186.
 - Unified closure: Give every Z3 query one ownership/accounting scope covering temporary ASTs, solve, model/core extraction, cancellation, exceptional exit, disposal, and final statistics.
+- Resolution: each query now has one `Z3ExpressionOwner` that owns every
+  `Context.Mk*` wrapper through solving, model/core extraction, statistics,
+  cancellation, exceptions, and disposal. Pinned-Z3 lifecycle regressions and
+  the complete SMT and verification suites pass.
 
 ## P3 active bugs
 
