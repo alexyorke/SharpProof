@@ -3406,6 +3406,106 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void UnboxingCreatesAValueOwnedCopyWithoutDroppingReferenceAliases()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public struct Counter : IBox {
+                public int Number { get; set; }
+            }
+
+            public sealed class Box {
+                public int Number;
+            }
+
+            public sealed class Holder {
+                public object Value = null!;
+            }
+
+            public interface IBox {
+                int Number { get; set; }
+            }
+
+            public sealed class BoxWithInterface : IBox {
+                public int Number { get; set; }
+            }
+
+            public static class Sample {
+                public static void BoxedArgument(object value) {
+                    var copy = (Counter)value;
+                    copy.Number = 1;
+                }
+
+                public static void BoxedField(Holder value) {
+                    var copy = (Counter)value.Value;
+                    copy.Number = 1;
+                }
+
+                public static void NullableUnbox(Counter? value) {
+                    var copy = (Counter)value;
+                    copy.Number = 1;
+                }
+
+                public static void RefUnbox(ref object value) {
+                    var copy = (Counter)value;
+                    copy.Number = 1;
+                }
+
+                public static void ReferenceCast(Box value) {
+                    var alias = (Box)(object)value;
+                    alias.Number = 1;
+                }
+
+                public static void InterfaceReferenceCast(BoxWithInterface value) {
+                    var alias = (BoxWithInterface)(IBox)value;
+                    alias.Number = 1;
+                }
+
+                public static object InterfaceBoxing(Counter value) => (IBox)value;
+
+                public static void ByValue(Counter value) => value.Number = 1;
+                public static void ByRef(ref Counter value) => value.Number = 1;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var valueOwned = new[]
+        {
+            "BoxedArgument",
+            "BoxedField",
+            "NullableUnbox",
+            "RefUnbox",
+            "ByValue"
+        };
+        foreach (var methodName in valueOwned)
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Writes.IsEmpty,
+                Is.True,
+                methodName);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.True,
+                methodName);
+        }
+
+        foreach (var methodName in new[] { "ReferenceCast", "InterfaceReferenceCast" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True,
+                methodName);
+        }
+
+        var byReference = session.Analyze(Method(compilation, "ByRef"));
+        Assert.That(
+            byReference.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+            Is.True);
+    }
+
+    [Test]
     public void RecursiveSccStartsConservative()
     {
         var result = Analyze(
