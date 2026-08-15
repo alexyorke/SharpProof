@@ -18,6 +18,8 @@
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
   <UsingTask TaskName="SharpProof.BuildTasks.ValidatePublishedVerificationResult"
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
+  <UsingTask TaskName="SharpProof.BuildTasks.ResetPublishedVerification"
+             AssemblyFile="$(_SharpProofBuildTasksPath)" />
 
   <PropertyGroup>
     <SharpProofVerifyPolicy Condition="'$(SharpProofVerifyPolicy)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">require-proven</SharpProofVerifyPolicy>
@@ -188,6 +190,25 @@
           AfterTargets="CoreCompile"
           DependsOnTargets="_SharpProofInitializeVerify;_SharpProofVerifyCore"
           Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'" />
+
+  <Target Name="SharpProofResetPublishedVerification"
+          BeforeTargets="Clean"
+          Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <_SharpProofCleanVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofCleanVerifyDirectory>
+      <_SharpProofCleanRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'request.json'))</_SharpProofCleanRequestFile>
+      <_SharpProofCleanRequestFile Condition="'$(SharpProofVerifyRequestFile)' != ''">$(SharpProofVerifyRequestFile)</_SharpProofCleanRequestFile>
+      <_SharpProofCleanResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'result.json'))</_SharpProofCleanResultFile>
+      <_SharpProofCleanResultFile Condition="'$(SharpProofVerifyResultFile)' != ''">$(SharpProofVerifyResultFile)</_SharpProofCleanResultFile>
+      <_SharpProofCleanManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'compiler-manifest.json'))</_SharpProofCleanManifestFile>
+      <_SharpProofCleanManifestFile Condition="'$(SharpProofCompilerManifestFile)' != ''">$(SharpProofCompilerManifestFile)</_SharpProofCleanManifestFile>
+    </PropertyGroup>
+    <SharpProof.BuildTasks.ResetPublishedVerification
+        RequestPath="$(_SharpProofCleanRequestFile)"
+        ResultPath="$(_SharpProofCleanResultFile)"
+        ManifestPath="$(_SharpProofCleanManifestFile)"
+        SarifPath="$(SharpProofVerifySarifFile)" />
+  </Target>
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"

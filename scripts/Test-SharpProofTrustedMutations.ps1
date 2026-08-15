@@ -1214,6 +1214,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~PublicationSetIdentityUsesCanonicalInjectiveUtf8Framing'
     },
     [pscustomobject]@{
+        Name = 'publication-reset-removes-owned-markers'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '            File.Delete(markerPath);'
+        Mutated = '            _ = markerPath;'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~PublicationResetRemovesOnlyCompleteOwnedSet'
+    },
+    [pscustomobject]@{
         Name = 'publication-metadata-fixed-size-hash-name'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
         Original = "            PublicationMetadataDirectory,`n            identity + extension);"

@@ -141,6 +141,60 @@ public static partial class LinuxPathIdentity
             CancellationToken.None);
     }
 
+    public static void ResetPublicationSet(
+        IEnumerable<string> publicationPaths,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(publicationPaths);
+        var requestedPaths = publicationPaths
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .ToArray();
+        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
+        ValidatePublicationTopology(canonicalPaths);
+        ValidatePublicationMetadataAliases(canonicalPaths);
+        var markerPaths = canonicalPaths
+            .Select(PublicationMarkerPath)
+            .ToArray();
+        var markerCount = markerPaths.Count(File.Exists);
+        if (markerCount == 0 &&
+            canonicalPaths.All(static path =>
+                !File.Exists(path) && !Directory.Exists(path)))
+        {
+            return;
+        }
+        if (markerCount != markerPaths.Length)
+        {
+            throw new IOException(
+                "SharpProof cannot reset an incomplete publication set.");
+        }
+
+        using var lease = AcquirePublicationSet(
+            canonicalPaths,
+            timeout,
+            cancellationToken);
+        if (markerPaths.Any(static path => !File.Exists(path)))
+        {
+            throw new IOException(
+                "SharpProof publication ownership changed during reset.");
+        }
+        foreach (var path in canonicalPaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Directory.Exists(path))
+            {
+                throw new IOException(
+                    "SharpProof publication members must be regular files.");
+            }
+            File.Delete(path);
+        }
+        foreach (var markerPath in markerPaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Delete(markerPath);
+        }
+    }
+
     public static IDisposable AcquirePublicationSet(
         IEnumerable<string> publicationPaths,
         TimeSpan timeout,

@@ -57,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 224,
-    "expectedCatalogSha256": "dcde52a04f4586711587c52bb49083ee85633e545d2cab37f55f5664e11d1c6d"
+    "expectedCatalogCount": 225,
+    "expectedCatalogSha256": "35c7b22af3d2e483e209c1250003ff5954a4a69194e1dbf3467b66560d65adb4"
   },
   "worker": {
     "protocolVersion": 11,
@@ -208,7 +208,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "9df906936b7e7ed2cdb352a36064d064135a3a8b2d1d8bc32c6a57da4d76c8f4",
+    "inventorySha256": "c144e669b890850a7bae70518c752dd90efc95eb2b4ae9486e9d73e21d3660de",
     "components": [
       {
         "name": "discovery",
@@ -608,6 +608,7 @@
         "paths": [
           "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
+          "SharpProof.BuildTasks/ResetPublishedVerification.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",

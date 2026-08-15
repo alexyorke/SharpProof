@@ -675,6 +675,120 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    public async System.Threading.Tasks.Task PublicationResetRemovesOnlyCompleteOwnedSet()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-");
+        try
+        {
+            var request = Path.Combine(directory.FullName, "request.json");
+            var oldResult = Path.Combine(directory.FullName, "result-a.json");
+            var newResult = Path.Combine(directory.FullName, "result-b.json");
+            var manifest = Path.Combine(directory.FullName, "manifest.json");
+            var unrelated = Path.Combine(directory.FullName, "neighbor.txt");
+            var setA = new[] { request, oldResult, manifest };
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       setA,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in setA.Append(unrelated))
+            {
+                await File.WriteAllTextAsync(path, Path.GetFileName(path));
+            }
+            var setB = new[] { request, newResult, manifest };
+            Assert.That(
+                (Action)(() =>
+                {
+                    using var unexpected =
+                        LinuxPathIdentity.AcquirePublicationSet(
+                            setB,
+                            TimeSpan.FromSeconds(1));
+                }),
+                Throws.TypeOf<IOException>());
+
+            var reset = new ResetPublishedVerification
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                RequestPath = request,
+                ResultPath = oldResult,
+                ManifestPath = manifest
+            };
+            Assert.That(reset.Execute(), Is.True);
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       setB,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(File.Exists(oldResult), Is.False);
+                Assert.That(
+                    File.Exists(LinuxPathIdentity.PublicationMarkerPath(
+                        oldResult)),
+                    Is.False);
+                Assert.That(
+                    setB.All(path => File.Exists(
+                        LinuxPathIdentity.PublicationMarkerPath(path))),
+                    Is.True);
+                Assert.That(File.Exists(unrelated), Is.True);
+            }
+            Assert.That(reset.Execute(), Is.False, "set A is no longer complete");
+
+            LinuxPathIdentity.ResetPublicationSet(
+                setB,
+                TimeSpan.FromSeconds(5));
+            LinuxPathIdentity.ResetPublicationSet(
+                setB,
+                TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void PublicationResetRejectsPartialOwnershipWithoutDeletingMembers()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-partial-");
+        try
+        {
+            var set = new[]
+            {
+                Path.Combine(directory.FullName, "request.json"),
+                Path.Combine(directory.FullName, "result.json"),
+                Path.Combine(directory.FullName, "manifest.json")
+            };
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       set,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in set)
+            {
+                File.WriteAllText(path, Path.GetFileName(path));
+            }
+            File.Delete(LinuxPathIdentity.PublicationMarkerPath(set[1]));
+
+            Assert.That(
+                (Action)(() => LinuxPathIdentity.ResetPublicationSet(
+                    set,
+                    TimeSpan.FromSeconds(5))),
+                Throws.TypeOf<IOException>());
+            Assert.That(set.All(File.Exists), Is.True);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public async System.Threading.Tasks.Task InvalidationCancellationInterruptsPublicationLockWait()
     {
         var directory = Directory.CreateTempSubdirectory(
