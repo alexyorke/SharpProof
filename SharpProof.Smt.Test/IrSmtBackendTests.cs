@@ -517,33 +517,25 @@ public sealed class IrSmtBackendTests
     public void QueryExpressionOwnerDisposesOnExceptionalAndCanceledExit()
     {
         using var context = new Z3Context();
-        var owner = new Z3ExpressionOwner();
         Z3Expr? exceptional = null;
-        Action exceptionalAction = () =>
-        {
-            using (owner)
-            {
-                exceptional = owner.Own(context.MkInt(7));
-                throw new InvalidOperationException("pinned query failure");
-            }
-        };
+        Action exceptionalAction = () => ThrowAfterOwning(
+            context,
+            expression => exceptional = expression);
         Assert.Throws<InvalidOperationException>(exceptionalAction);
-        Assert.That(NativeObject(exceptional!), Is.Zero);
+        Assert.That(NativeObject(exceptional!), Is.EqualTo(IntPtr.Zero));
 
         using var cancellation = new CancellationTokenSource();
-        var canceledOwner = new Z3ExpressionOwner();
         Z3Expr? canceled = null;
-        Action canceledAction = () =>
-        {
-            using (canceledOwner)
+        Action canceledAction = () => ThrowAfterOwning(
+            context,
+            expression =>
             {
-                canceled = canceledOwner.Own(context.MkInt(11));
+                canceled = expression;
                 cancellation.Cancel();
                 cancellation.Token.ThrowIfCancellationRequested();
-            }
-        };
+            });
         Assert.Throws<OperationCanceledException>(canceledAction);
-        Assert.That(NativeObject(canceled!), Is.Zero);
+        Assert.That(NativeObject(canceled!), Is.EqualTo(IntPtr.Zero));
     }
 
     [Test]
@@ -745,6 +737,16 @@ public sealed class IrSmtBackendTests
             System.Reflection.BindingFlags.Public);
         Assert.That(property, Is.Not.Null);
         return (IntPtr)property!.GetValue(expression)!;
+    }
+
+    private static void ThrowAfterOwning(
+        Z3Context context,
+        Action<Z3Expr> afterOwn)
+    {
+        using var owner = new Z3ExpressionOwner();
+        var expression = owner.Own(context.MkInt(7));
+        afterOwn(expression);
+        throw new InvalidOperationException("pinned query failure");
     }
 
     private sealed class DisposableLabel(string label) : IDisposable
