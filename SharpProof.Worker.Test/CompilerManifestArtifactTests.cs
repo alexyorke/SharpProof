@@ -78,6 +78,79 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void CompilerFeatureSetCannotBeExpandedPastDiscoveredScope()
+    {
+        var artifact = CreateFeatureArtifact(
+            WorkerFeatureSet.Effects,
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """);
+
+        Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
+        Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind),
+            Is.All.EqualTo(WorkerClaimKind.Effect));
+
+        artifact.Features = WorkerFeatureSet.All;
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
+    public void CompilerFeatureSetCannotBeReducedPastDiscoveredScope()
+    {
+        var artifact = CreateFeatureArtifact(
+            WorkerFeatureSet.All,
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """);
+
+        Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind),
+            Has.Some.EqualTo(WorkerClaimKind.Postcondition));
+        Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind),
+            Has.Some.EqualTo(WorkerClaimKind.Effect));
+
+        artifact.Features = WorkerFeatureSet.Effects;
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
+    public void ReSealedFeatureSelectionCannotEscapeTheGlobalProfile()
+    {
+        var artifact = CreateFeatureArtifact(
+            WorkerFeatureSet.Effects,
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static int Identity(int value) => value;
+            }
+            """);
+        var callable = artifact.Manifest.Callables.Single();
+        callable.SelectedFeatures = [WorkerSelectedFeature.Contracts];
+        WorkerProtocolJson.SealManifest(artifact.Manifest);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
     public void CompilerIdentityIsProvenanceRatherThanWorkerGate()
     {
         var artifact = CreateArtifact();
@@ -1501,6 +1574,29 @@ public sealed class CompilerManifestArtifactTests
             TestContext.CurrentContext.WorkDirectory,
             "net8.0",
             WorkerFeatureSet.All,
+            discovery,
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
+    }
+
+    private static CompilerManifestArtifact CreateFeatureArtifact(
+        WorkerFeatureSet features,
+        string source)
+    {
+        var parse = new CSharpParseOptions(LanguageVersion.CSharp12);
+        var compilation = CreateCompilation(
+            parse,
+            source,
+            includeContractReference: true);
+        var discovery = new ClaimManifestBuilder(
+            compilation,
+            features,
+            CancellationToken.None).Build();
+        return CompilerManifestArtifactProducer.Create(
+            compilation,
+            TestContext.CurrentContext.WorkDirectory,
+            "net8.0",
+            features,
             discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None);
