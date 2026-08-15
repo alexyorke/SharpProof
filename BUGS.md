@@ -2045,7 +2045,7 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 
 ### SP-AUDIT-004 - Release qualification matrix is incomplete (P1)
 
-- [ ] The tag-only `release-qualification` job in
+- [x] The tag-only `release-qualification` job in
   `.github/workflows/package-consumers.yml` runs acceptance, mutation,
   coverage, package consumers, publication planning, and qualification
   binding, but never runs `tooling pilots`. Qualification evidence also does
@@ -2060,6 +2060,12 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   package-mismatched pilot evidence.
 - Consolidated cases: SP-AUDIT-082, SP-AUDIT-133, SP-AUDIT-145, SP-AUDIT-161, SP-AUDIT-171.
 - Unified closure: Generate one authoritative qualification matrix and exact-commit receipt set covering pilots, Debug, release configuration, portable OS consumers, repeated cancellation, and minimum SDK.
+- Resolution: the catalog now owns an exact 12-row qualification matrix that
+  projects to 10 exact-commit receipts, including reviewed pilots, Debug and
+  Release acceptance, release configuration, portable Linux/Windows/macOS
+  package consumers, repeated termination, minimum SDK, coverage, mutation,
+  and package-consumer evidence. Local stale, wrong-OS, and package-mismatch
+  controls plus workflow/receipt removal mutation coverage pass.
 
 ### SP-AUDIT-024 - Normal-completion sequencing is modeled inconsistently (P1)
 
