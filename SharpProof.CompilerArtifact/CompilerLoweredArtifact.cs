@@ -104,7 +104,12 @@ internal static class CompilerLoweredArtifact
                     Target = encoded.VariableIndices[item.Value]
                 };
             })];
-        var instructions = encoded.Graph.Blocks.SelectMany(static block => block.Instructions).ToArray();
+        var encodedInstructions = encoded.Graph.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var programInstructions = body.Program!.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToDictionary(static instruction => instruction.Id);
         var allCalls = body.SpecCalls.Values
             .Select(static call => (
                 call.Instruction,
@@ -116,7 +121,8 @@ internal static class CompilerLoweredArtifact
             .ToArray();
         foreach (var call in allCalls)
         {
-            var instruction = instructions[encoded.InstructionIndices[call.Instruction]];
+            var instruction = encodedInstructions[
+                encoded.InstructionIndices[call.Instruction]];
             var member = encoded.Graph.Members[instruction.B];
             if (member.DocumentationCommentId is { } existing && existing != call.CallIdentity)
             {
@@ -135,7 +141,22 @@ internal static class CompilerLoweredArtifact
                 ConsumesMemoryHavoc = item.ConsumesMemoryHavoc
             })];
         artifact.Body.SummaryCalls = [.. orderedSummaryCalls.Select((item, index) =>
-            new CompilerSummaryCallArtifact {
+            BuildSummaryCallArtifact(item, index))];
+        return artifact;
+
+        CompilerSummaryCallArtifact BuildSummaryCallArtifact(
+            CompilerPreparedSummaryCall item,
+            int index)
+        {
+            if (!programInstructions.TryGetValue(item.Instruction, out var instruction) ||
+                instruction is not IrCallInstruction call)
+            {
+                throw new InvalidDataException(
+                    "A prepared summary call does not reference a call instruction.");
+            }
+
+            return new CompilerSummaryCallArtifact
+            {
                 Instruction = encoded.InstructionIndices[item.Instruction],
                 Identity = item.CallIdentity,
                 Origin = item.Origin,
@@ -151,9 +172,15 @@ internal static class CompilerLoweredArtifact
                         Origin = evidence.Origin,
                         EvidenceSha256 = evidence.EvidenceSha256,
                         EvidenceIdentity = evidence.EvidenceIdentity
-                    })]
-            })];
-        return artifact;
+                    })],
+                InstantiationSha256 = SummaryInstantiationSha256(
+                    preparation.Factory,
+                    call,
+                    item.Result,
+                    item.ExistentialVariables,
+                    item.NormalRelation)
+            };
+        }
     }
 
     private static CompilerScalarDomain ScalarDomain(
@@ -661,6 +688,7 @@ internal static class CompilerLoweredArtifact
                 !ValidDependencyEvidence(
                     summary.DependencyEvidence,
                     compilation) ||
+                !WorkerProtocolJson.IsSha256(summary.InstantiationSha256) ||
                 summary.NormalRelationRoot != clauseRootCount + index ||
                 !WorkerProtocolJson.IsSha256(summary.EvidenceSha256) ||
                 summary.ExistentialVariables == null ||
@@ -693,7 +721,18 @@ internal static class CompilerLoweredArtifact
                 free.Any(canonical.Contains) ||
                 free.Any(programVariables.Contains) ||
                 free.Any(summaryVariables.Contains) ||
-                relation.Type != graph.Factory.BooleanType)
+                relation.Type != graph.Factory.BooleanType ||
+                !HasValidSummaryFreeVariableRoles(
+                    call,
+                    result,
+                    existentials,
+                    relation) ||
+                summary.InstantiationSha256 != SummaryInstantiationSha256(
+                    graph.Factory,
+                    call,
+                    result,
+                    existentials,
+                    relation))
             {
                 throw new InvalidDataException(
                     "A lowered source-call relation is invalid.");
@@ -713,7 +752,10 @@ internal static class CompilerLoweredArtifact
                     new CompilerPreparedSummaryEvidence(
                         evidence.Origin,
                         evidence.EvidenceSha256,
-                        evidence.EvidenceIdentity))]));
+                        evidence.EvidenceIdentity))])
+            {
+                InstantiationSha256 = summary.InstantiationSha256
+            });
         }
 
         if (specs.Count + summaries.Count != calls.Length)
@@ -727,6 +769,70 @@ internal static class CompilerLoweredArtifact
             bindings.ToImmutable(),
             specs.ToImmutable(),
             summaries.ToImmutable());
+    }
+
+    private static bool HasValidSummaryFreeVariableRoles(
+        IrCallInstruction call,
+        IrVarId result,
+        IReadOnlyList<IrVarId> existentials,
+        IrTerm relation)
+    {
+        var relationVariables = IrTermAnalysis.CollectVariables(relation);
+        var freeVariables = existentials.ToImmutableHashSet().Add(result);
+        if (!freeVariables.IsSubsetOf(relationVariables))
+        {
+            return false;
+        }
+
+        var inputVariables = ImmutableHashSet.CreateBuilder<IrVarId>();
+        if (call.Receiver != null)
+        {
+            inputVariables.UnionWith(
+                IrTermAnalysis.CollectVariables(call.Receiver));
+        }
+
+        foreach (var argument in call.Arguments)
+        {
+            inputVariables.UnionWith(IrTermAnalysis.CollectVariables(argument));
+        }
+
+        return relationVariables
+            .Where(variable => !freeVariables.Contains(variable))
+            .All(inputVariables.Contains);
+    }
+
+    private static string SummaryInstantiationSha256(
+        IrFactory factory,
+        IrCallInstruction call,
+        IrVarId result,
+        IReadOnlyList<IrVarId> existentials,
+        IrTerm relation)
+    {
+        var roots = new List<IrTerm>(
+            (call.Receiver == null ? 0 : 1) +
+            call.Arguments.Length +
+            existentials.Count +
+            2);
+        if (call.Receiver != null)
+        {
+            roots.Add(call.Receiver);
+        }
+
+        roots.AddRange(call.Arguments);
+        roots.Add(factory.Variable(result));
+        roots.AddRange(existentials.Select(factory.Variable));
+        roots.Add(relation);
+        var graph = PortableIrGraphCodec.Encode(factory, null, roots).Graph;
+        using var hash = new CanonicalHashWriter();
+        return hash
+            .Add("SharpProofCompilerSummaryCallInstantiation/v1")
+            .Add(call.Receiver != null)
+            .Add(call.Arguments.Length)
+            .Add(existentials.Count)
+            .Add(JsonSerializer.SerializeToUtf8Bytes(
+                graph,
+                WorkerProtocolJson.Options))
+            .Finish();
     }
 
     private static void ValidateExecutableBody(

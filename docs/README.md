@@ -113,7 +113,7 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During container verification, the production analyzer emits a deterministic
-schema-12 compiler artifact from the final post-generator Roslyn
+schema-13 compiler artifact from the final post-generator Roslyn
 `Compilation`. It contains the selected-claim manifest and portable lowered
 whole-body CFG/IR for supported selected callables, plus bounded relational
 source/implementation-IL/audited-pack calls, bound contract/spec
@@ -130,12 +130,12 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body postcondition-counterexample replay is implemented for
 the admitted scalar program subset. The proof kernel checks exact model closure
 and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Schema 12 retains the independently
+compiler-produced whole-body CFG. Schema 13 retains the independently
 replayable event for an unconditional definite managed object/array allocation.
 The worker can use it to refute `ZeroAllocations` or an `EffectContract`
 excluding `Allocates`; other effect candidates still fail closed as typed
 `Unknown`. Effect results remain noncacheable. Worker protocol 11, cache schema
-13, relational-summary schema version 1, and specification-pack schema version
+13, relational-summary schema version 2, and specification-pack schema version
 1 carry the
 current wire contract. The three-package split, portable SourceLink symbols,
 package validation, deterministic hashes, SPDX 2.3 package/component SBOM

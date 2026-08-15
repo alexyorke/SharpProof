@@ -124,8 +124,8 @@ IDE analyzer performance paths reference neither SMT nor Z3.
 Worker/package tests also exercise protocol version 11 manifest equality,
 stable claim IDs, policy-controlled SP0047/SP0048 output, cache validation
 against the current manifest, fatal run handling, and compiler artifact schema
-version 12, including generated contracts, portable whole-body CFG/IR,
-schema-1 relational source/implementation-IL/audited-pack summaries,
+version 13, including generated contracts, portable whole-body CFG/IR,
+schema-2 relational source/implementation-IL/audited-pack summaries,
 compiler diagnostics, exact lowered-callable hydration, and independent
 whole-body counterexample replay. Package tests also cover deterministic,
 policy-aware SARIF 2.1.0 projection of validated responses.

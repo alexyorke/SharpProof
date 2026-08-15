@@ -1581,6 +1581,79 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void SummaryCallBindsReceiverInstantiation()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            internal sealed class Box { }
+            internal static class Subject {
+                private static bool Select(bool value) => value;
+
+                internal static bool Call(Box box, bool value) {
+                    Contract.Requires(box != null);
+                    Contract.Ensures(Contract.Result<bool>() == value);
+                    return Select(value);
+                }
+            }
+            """;
+        var artifact = CreateContractArtifact(source);
+        var callable = artifact.Callables.Single(static value =>
+            value.Body?.SummaryCalls.Length == 1);
+        var call = FindCall(callable);
+        var boxIndex = Array.FindIndex(callable.Graph!.Variables, static value =>
+            value.Name == "parameter:0");
+        Assert.That(boxIndex, Is.GreaterThanOrEqualTo(0));
+        call.C = Array.FindIndex(callable.Graph.Terms, value =>
+            value.Kind == IrTermKind.Variable && value.A == boxIndex);
+        Assert.That(call.C, Is.GreaterThanOrEqualTo(0));
+        var resealed = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(artifact));
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+    }
+
+    [Test]
+    public void SummaryCallBindsExistentialRolesAndRequiresDigest()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                private static int Identity(int value) => value;
+                private static int Compose(int value) => Identity(Identity(value));
+
+                internal static int Call(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Compose(value);
+                }
+            }
+            """;
+        Action<CompilerCallableArtifact>[] corruptions = [
+            callable => {
+                var summary = callable.Body!.SummaryCalls.Single();
+                Assert.That(summary.ExistentialVariables, Has.Length.EqualTo(2));
+                (summary.ExistentialVariables[0], summary.ExistentialVariables[1]) =
+                    (summary.ExistentialVariables[1], summary.ExistentialVariables[0]);
+            },
+            callable => callable.Body!.SummaryCalls.Single().InstantiationSha256 =
+                string.Empty
+        ];
+
+        foreach (var corrupt in corruptions)
+        {
+            var artifact = CreateContractArtifact(source);
+            corrupt(artifact.Callables.Single());
+            var resealed = CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact));
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+        }
+    }
+
+    [Test]
     public void SameShapedMemberSubstitutionFailsClosed()
     {
         const string source =

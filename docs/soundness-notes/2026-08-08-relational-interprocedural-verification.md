@@ -41,8 +41,8 @@ Every summary call seals origin, SHA-256 evidence, pack identity when present,
 and a canonical transitive dependency-evidence closure. The worker rejects
 missing, reordered, malformed, identity-inconsistent, or implementation-IL
 evidence whose digest is absent from the sealed reference-module set.
-Compiler artifact schema 11, worker protocol 10, cache schema 12,
-relational-summary schema 1, and specification-pack schema 1 form a deliberate
+Compiler artifact schema 13, worker protocol 10, cache schema 12,
+relational-summary schema 2, and specification-pack schema 1 form a deliberate
 wire break.
 
 Counterexample replay still executes only concrete whole-body IR. An executed

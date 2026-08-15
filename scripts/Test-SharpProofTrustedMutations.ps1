@@ -1524,6 +1524,37 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ExecutedRelationalSummaryCallIsNotAReplayableCounterexample'
     },
     [pscustomobject]@{
+        Name = 'relational-roslyn-parameter-ordinal-binding'
+        File = 'SharpProof.Frontend\RoslynProgramLowerer.cs'
+        Original = '                .OrderBy(static argument => argument.Ordinal)'
+        Mutated = '                .OrderBy(static _ => 0)'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~InvocationLoweringOrdersArgumentsByRoslynParameterOrdinal'
+    },
+    [pscustomobject]@{
+        Name = 'relational-summary-instantiation-binding'
+        File = 'SharpProof.CompilerArtifact\CompilerLoweredArtifact.cs'
+        Original = (@'
+                summary.InstantiationSha256 != SummaryInstantiationSha256(
+                    graph.Factory,
+                    call,
+                    result,
+                    existentials,
+                    relation))
+'@).Trim()
+        Mutated = '                false'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SummaryCallBindsSameTypedArgumentPermutationAndDuplicate'
+    },
+    [pscustomobject]@{
+        Name = 'relational-summary-instantiation-digest-required'
+        File = 'SharpProof.CompilerArtifact\CompilerLoweredArtifact.cs'
+        Original = '                !WorkerProtocolJson.IsSha256(summary.InstantiationSha256) ||'
+        Mutated = '                false ||'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SummaryCallBindsExistentialRolesAndRequiresDigest'
+    },
+    [pscustomobject]@{
         Name = 'analyzer-partial-executable-owner'
         File = 'SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs'
         Original = (@'

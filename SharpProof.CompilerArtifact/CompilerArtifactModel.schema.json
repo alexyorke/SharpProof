@@ -57,7 +57,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 1
+          "value": 2
         }
       ]
     },
@@ -435,6 +435,18 @@
         {
           "name": "DependencyEvidence",
           "type": "ImmutableArray<CompilerPreparedSummaryEvidence>"
+        }
+      ],
+      "members": [
+        {
+          "kind": "property",
+          "accessibility": "internal",
+          "name": "InstantiationSha256",
+          "type": "string",
+          "set": "init",
+          "default": {
+            "kind": "stringEmpty"
+          }
         }
       ]
     },
@@ -2264,6 +2276,16 @@
           "set": "set",
           "default": {
             "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "InstantiationSha256",
+          "jsonName": "instantiationSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
           }
         }
       ]

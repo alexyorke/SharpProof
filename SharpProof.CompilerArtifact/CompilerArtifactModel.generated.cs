@@ -16,7 +16,7 @@ internal static class CompilerManifestArtifactVersions
 
 internal static class CompilerRelationalSummaryVersions
 {
-    internal const int Current = 1;
+    internal const int Current = 2;
 }
 
 internal static class CompilerSpecificationPackVersions
@@ -160,7 +160,10 @@ internal sealed record CompilerPreparedSummaryCall(
     string EvidenceSha256,
     string EvidenceIdentity,
     ImmutableArray<CompilerPreparedSummaryEvidence> DependencyEvidence
-);
+)
+{
+    internal string InstantiationSha256 { get; init; } = string.Empty;
+}
 
 internal sealed class CompilerCallableArtifact
 {
@@ -310,6 +313,7 @@ internal sealed class CompilerSummaryCallArtifact
     public string EvidenceSha256 { get; set; } = string.Empty;
     public string EvidenceIdentity { get; set; } = string.Empty;
     public CompilerSummaryEvidenceArtifact[] DependencyEvidence { get; set; } = [];
+    public string InstantiationSha256 { get; set; } = string.Empty;
 }
 
 internal enum CompilerOutputKind

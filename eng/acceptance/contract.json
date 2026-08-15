@@ -57,17 +57,17 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 225,
-    "expectedCatalogSha256": "35c7b22af3d2e483e209c1250003ff5954a4a69194e1dbf3467b66560d65adb4"
+    "expectedCatalogCount": 228,
+    "expectedCatalogSha256": "efb4b7c99345206d503fd7b3e72143ebbe970ef98c8ebdf0db984e7ff7c6cc52"
   },
   "worker": {
     "protocolVersion": 11,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 12,
+    "compilerArtifactSchemaVersion": 13,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
-    "relationalSummarySchemaVersion": 1,
+    "relationalSummarySchemaVersion": 2,
     "specificationPackSchemaVersion": 1,
     "maximumParallelism": 4,
     "maximumExpressionDepth": 64,
