@@ -2403,7 +2403,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 
 ### SP-AUDIT-140 - Relational-summary work lacks an end-to-end resource budget (P2)
 
-- [ ] The summary builder charges fixed CFG actions but traverses, substitutes,
+- [x] The summary builder charges fixed CFG actions but traverses, substitutes,
   rebuilds, merges, and composes arbitrarily wide term DAGs without charging
   their nodes. The separate depth check does not bound shallow width.
 - Supported impact: a one-block caller can instantiate a dependency containing
@@ -2416,6 +2416,10 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   broad/shallow, shared-node, composition, and charge-removal controls.
 - Consolidated cases: SP-AUDIT-187.
 - Unified closure: Thread one catalog-owned budget through summary dependency discovery, provenance closure, term traversal, substitution, rebuild, and composition.
+- Resolution: one run-scoped IR-identity set now charges each unique term across
+  inputs, substitution, dependency completion, merging, rebuilding, and final
+  composition; exact boundary, broad unique-leaf, shared-node, and mutation
+  controls pass with the full Summaries, Analyzer, Worker, and Architecture suites.
 
 ### SP-AUDIT-152 - Effect certainty and provenance tuples are not jointly validated (P2)
 
