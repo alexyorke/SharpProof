@@ -527,6 +527,138 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void EffectEvidenceTupleRequiresVacuousEntryContradictionAndCore()
+    {
+        var manifest = CreateEffectManifest();
+        var response = CreateResponse(manifest);
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.VacuousEntry;
+        response.ClaimResults[0].Vacuity = WorkerVacuityKind.None;
+        response.ClaimResults[0].ProofCore = [];
+        response.Summary = CreateSummary(response);
+
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.effect_evidence"));
+
+        response.ClaimResults[0].Vacuity =
+            WorkerVacuityKind.ContradictoryPreconditions;
+        response.ClaimResults[0].ProofCore = ["requires:0"];
+        response.Summary = CreateSummary(response);
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+    }
+
+    [Test]
+    public void EffectEvidenceTupleRejectsNonVacuousContradiction()
+    {
+        var response = CreateResponse(CreateEffectManifest());
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+        response.ClaimResults[0].Vacuity =
+            WorkerVacuityKind.ContradictoryPreconditions;
+        response.ClaimResults[0].ProofCore = ["requires:0"];
+        response.Summary = CreateSummary(response);
+
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.effect_evidence"));
+    }
+
+    [Test]
+    public void TrustedEffectEvidenceRequiresUsedTrustedBoundary()
+    {
+        var response = CreateResponse(CreateEffectManifest());
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.TrustedCompleteBoundary;
+        response.Summary = CreateSummary(response);
+
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.effect_evidence"));
+
+        foreach (var assumption in response.CallableResults
+                     .SelectMany(static result => result.Assumptions)
+                     .Concat(response.ClaimResults.SelectMany(
+                         static result => result.Assumptions))
+                     .Where(static value =>
+                         value.Kind == WorkerAssumptionKind.TrustedBoundary))
+        {
+            assumption.Used = true;
+        }
+        response.Summary = CreateSummary(response);
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+    }
+
+    [Test]
+    public void TrustedEffectEvidenceRequiresTrustedBoundaryDeclaration()
+    {
+        var manifest = CreateEffectManifest();
+        manifest.Callables[0].Assumptions = [
+            new WorkerAssumptionEvidence {
+                Id = "spa1:1",
+                Kind = WorkerAssumptionKind.UserAssume
+            }
+        ];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        response.ClaimResults[0].EffectCertainty =
+            WorkerEffectEvidenceCertainty.TrustedCompleteBoundary;
+        response.Summary = CreateSummary(response);
+
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.effect_evidence"));
+    }
+
+    [Test]
+    public void AssumptionIdentityIsGlobalAcrossCallables()
+    {
+        var manifest = CreateTwoCallableManifest();
+        manifest.Callables[1].Assumptions[0].Id =
+            manifest.Callables[0].Assumptions[0].Id;
+        WorkerProtocolJson.SealManifest(manifest);
+
+        Assert.That(
+            WorkerProtocolJson.ValidateManifest(manifest).Errors
+                .Select(static error => error.Code),
+            Does.Contain("manifest.assumption_identity"));
+    }
+
+    [Test]
+    public void AssumptionIdentityRejectsKindMutationAcrossCallables()
+    {
+        var manifest = CreateTwoCallableManifest();
+        manifest.Callables[1].Assumptions[0].Id =
+            manifest.Callables[0].Assumptions[0].Id;
+        manifest.Callables[1].Assumptions[0].Kind =
+            WorkerAssumptionKind.TrustedBoundary;
+        WorkerProtocolJson.SealManifest(manifest);
+
+        Assert.That(
+            WorkerProtocolJson.ValidateManifest(manifest).Errors
+                .Select(static error => error.Code),
+            Does.Contain("manifest.assumption_identity"));
+    }
+
+    [Test]
+    public void ManifestAssumptionKindMustRemainProducerClosed()
+    {
+        var manifest = CreateManifest();
+        manifest.Callables[0].Assumptions[0].Kind =
+            WorkerAssumptionKind.ApiSpecification;
+        WorkerProtocolJson.SealManifest(manifest);
+
+        Assert.That(
+            WorkerProtocolJson.ValidateManifest(manifest).Errors
+                .Select(static error => error.Code),
+            Does.Contain("manifest.assumption_kind"));
+    }
+
+    [Test]
     public void StrictResponseValidationRequiresExactManifestAndResultSets()
     {
         var expected = CreateManifest();
@@ -1576,6 +1708,53 @@ public sealed class ProtocolJsonTests
                 optimizationLevel: OptimizationLevel.Release,
                 deterministic: true,
                 concurrentBuild: false));
+    }
+
+    private static WorkerClaimManifest CreateEffectManifest()
+    {
+        var manifest = CreateManifest();
+        manifest.Callables[0].SelectedFeatures = [WorkerSelectedFeature.Effects];
+        manifest.Callables[0].SelectionReasons = [
+            WorkerSelectionReason.ExplicitAnnotation
+        ];
+        manifest.Claims[0].Kind = WorkerClaimKind.Effect;
+        manifest.Claims[0].Evidence = WorkerClaimEvidence.Attribute;
+        manifest.Claims[0].EffectContractKind =
+            WorkerEffectContractKind.DoesNotThrow;
+        WorkerProtocolJson.SealManifest(manifest);
+        return manifest;
+    }
+
+    private static WorkerClaimManifest CreateTwoCallableManifest()
+    {
+        var manifest = CreateManifest();
+        var location = manifest.Callables[0].Location;
+        manifest.Callables = [
+            manifest.Callables[0],
+            new WorkerCallableManifestEntry {
+                CallableId = "M:Subject.Other(System.Int64)",
+                SelectedFeatures = [WorkerSelectedFeature.Contracts],
+                SelectionReasons = [
+                    WorkerSelectionReason.DiscoveredPostcondition
+                ],
+                Location = new WorkerSourceLocation {
+                    Path = location.Path,
+                    Start = location.Start + 1,
+                    Length = location.Length,
+                    Line = location.Line,
+                    Column = location.Column
+                },
+                ClaimIds = [],
+                Assumptions = [
+                    new WorkerAssumptionEvidence {
+                        Id = "spa1:other",
+                        Kind = WorkerAssumptionKind.UserAssume
+                    }
+                ]
+            }
+        ];
+        WorkerProtocolJson.SealManifest(manifest);
+        return manifest;
     }
 
     private static WorkerClaimManifest CreateManifest()
