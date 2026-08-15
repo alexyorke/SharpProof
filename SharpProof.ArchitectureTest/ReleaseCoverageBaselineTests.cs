@@ -34,7 +34,7 @@ public sealed class ReleaseCoverageBaselineTests
             {
                 Assert.That(workflow, Does.Contain(job), job);
             }
-            Assert.That(workflow, Does.Not.Contain("portable-consumer"));
+            Assert.That(workflow, Does.Contain("portable-consumers"));
             Assert.That(workflow, Does.Not.Contain("minimum-sdk-consumer"));
         }
     }
@@ -130,19 +130,21 @@ public sealed class ReleaseCoverageBaselineTests
             Assert.That(writer, Does.Contain("annotated tag at checkout HEAD"));
             foreach (var gate in new[]
                      {
-                         "acceptance",
                          "coverage",
                          "mutation",
                          "package-consumers",
                          "pilots"
                      })
             {
-                Assert.That(writer, Does.Contain("'" + gate + "'"), gate);
                 Assert.That(
                     workflow,
                     Does.Contain("tooling " + gate),
                     gate);
             }
+            Assert.That(
+                writer,
+                Does.Contain("releaseQualificationMatrix")
+                    .And.Contain("requiredGates"));
             Assert.That(writer, Does.Contain("status -cne 'passed'"));
             Assert.That(writer, Does.Contain("evidence.sha256"));
             Assert.That(
@@ -291,7 +293,7 @@ public sealed class ReleaseCoverageBaselineTests
                         "scripts",
                         "Write-SharpProofQualificationReceipt.ps1"),
                     "-Gate",
-                    "acceptance",
+                    "acceptance-release",
                     "-EvidencePath",
                     evidencePath,
                     "-ReceiptDirectory",

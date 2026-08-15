@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('acceptance', 'coverage', 'mutation', 'package-consumers', 'pilots')]
+    [ValidateSet('acceptance-debug', 'acceptance-release', 'coverage', 'mutation',
+        'package-consumers', 'pilots', 'release-configuration',
+        'portable-linux', 'portable-windows', 'portable-macos')]
     [string]$Gate,
 
     [Parameter(Mandatory = $true)]
@@ -27,7 +29,9 @@ if ($relativeEvidence.StartsWith('../', [StringComparison]::Ordinal) -or
 $evidence = Get-Content -LiteralPath $resolvedEvidence -Raw |
     ConvertFrom-Json -ErrorAction Stop
 $packageArtifacts = @()
-if ($Gate -in @('package-consumers', 'pilots')) {
+if ($Gate -in @(
+        'package-consumers', 'pilots', 'portable-linux',
+        'portable-windows', 'portable-macos')) {
     $packageArtifacts = @($evidence.packageArtifacts | ForEach-Object {
         $fileName = [string]$_.fileName
         $sha256 = [string]$_.sha256
@@ -49,10 +53,21 @@ if ($Gate -in @('package-consumers', 'pilots')) {
         throw 'Qualification evidence must bind exactly six unique package artifacts.'
     }
 }
-$valid = switch ($Gate) {
-    'acceptance' {
+$valid = switch -Regex ($Gate) {
+    '^acceptance-(?:debug|release)$' {
         [int]$evidence.schemaVersion -eq 1 -and
         [string]$evidence.status -ceq 'passed' -and
+        [string]$evidence.commit -ceq $commit
+    }
+    '^portable-(?:linux|windows|macos)$' {
+        [int]$evidence.schemaVersion -eq 1 -and
+        [string]$evidence.status -ceq 'passed' -and
+        [string]$evidence.commit -ceq $commit -and
+        [string]$evidence.osFamily -ceq $Gate.Substring(9) -and
+        $packageArtifacts.Count -eq 6
+    }
+    '^release-configuration$' {
+        [int]$evidence.schemaVersion -eq 1 -and
         [string]$evidence.commit -ceq $commit
     }
     'coverage' {

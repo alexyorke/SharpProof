@@ -535,12 +535,6 @@ $isSupportedWorkerHost = $IsLinux -and
         [System.Runtime.InteropServices.Architecture]::X64 -and
     [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
         [System.Runtime.InteropServices.Architecture]::X64
-if (-not $isSupportedWorkerHost) {
-    throw (
-        'SharpProof package consumers must run in the canonical Linux ' +
-        'amd64 container.')
-}
-
 if ([string]::IsNullOrWhiteSpace($PackageSource)) {
     $PackageSource = [Environment]::GetEnvironmentVariable(
         'SHARPPROOF_PACKAGE_SOURCE',
@@ -576,6 +570,11 @@ if ($FrameworkConsumersOnly) {
         "SharpProof package-backed framework consumers passed with actual " +
         "SDK '$ConsumerSdkVersion'.")
     return
+}
+if (-not $isSupportedWorkerHost) {
+    throw (
+        'SharpProof package consumers must run in the canonical Linux ' +
+        'amd64 container.')
 }
 $previousPackageSource = [Environment]::GetEnvironmentVariable(
     'SHARPPROOF_PACKAGE_SOURCE',

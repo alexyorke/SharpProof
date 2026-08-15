@@ -123,6 +123,40 @@ jobs:
           -Configuration Release
           -PackageSource nupkgs
 
+  portable-consumers:
+    name: Portable exact-package consumer (${{ matrix.os }})
+    if: >-
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.repository == 'alexyorke/SharpProof'
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            family: linux
+          - os: windows-latest
+            family: windows
+          - os: macos-latest
+            family: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
+          path: nupkgs
+      - name: Run portable-consumer against exact packages
+        run: >-
+          pwsh scripts/Test-SharpProofPortableConsumer.ps1
+          -PackageSource nupkgs -OsFamily ${{ matrix.family }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: portable-receipt-${{ matrix.family }}-${{ github.sha }}
+          path: artifacts/release-qualification
+          if-no-files-found: error
+
   release-qualification:
     name: Qualify the exact release SHA in-container
     if: >-
@@ -134,6 +168,7 @@ jobs:
       - container-verifier
       - security
       - attest
+      - portable-consumers
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -172,6 +207,31 @@ jobs:
         run: >-
           docker compose run --rm tooling acceptance
           -Configuration Release
+
+      - name: Run exact-commit Debug solution gate
+        run: >-
+          docker compose run --rm tooling acceptance
+          -Configuration Debug
+
+      - name: Certify live release configuration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          pwsh ./scripts/Test-SharpProofReleaseConfiguration.ps1
+          -OutputPath artifacts/release-qualification/release-configuration.json
+
+      - name: Bind release-configuration receipt
+        run: >-
+          pwsh ./scripts/Write-SharpProofQualificationReceipt.ps1
+          -Gate release-configuration
+          -EvidencePath artifacts/release-qualification/release-configuration.json
+
+      - name: Download portable OS receipts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: portable-receipt-*-${{ github.sha }}
+          path: artifacts/release-qualification
+          merge-multiple: true
 
       - name: Run exact-commit trusted mutations
         run: >-

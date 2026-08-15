@@ -854,6 +854,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~EffectiveReleaseRefSetsMustEqualTheContract'
     },
     [pscustomobject]@{
+        Name = 'release-qualification-matrix-receipt-projection'
+        File = 'scripts\Invoke-SharpProofReleaseContainer.ps1'
+        Original = '        $requiredGates = @($matrix.releaseQualificationMatrix |'
+        Mutated = '        $requiredGates = @() # mutation removes qualification rows'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~WorkflowExecutesTheExactCatalogOwnedQualificationMatrix'
+    },
+    [pscustomobject]@{
         Name = 'launcher-timeout-owns-result'
         File = 'SharpProof.Worker.Launcher\Program.cs'
         Original = '        if (exitCode == 124)'

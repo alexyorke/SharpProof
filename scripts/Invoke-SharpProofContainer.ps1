@@ -332,9 +332,16 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) {
             throw 'Acceptance validation failed.'
         }
+        if ($Configuration -ceq 'Release') {
+            Invoke-DotNet @(
+                'test', 'SharpProof.Gates.Test/SharpProof.Gates.Test.csproj',
+                '--configuration', 'Release', '--no-build', '--no-restore',
+                '--filter',
+                'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
+        }
         & (Join-Path $repositoryRoot `
             'scripts/Write-SharpProofQualificationReceipt.ps1') `
-            -Gate acceptance `
+            -Gate ('acceptance-' + $Configuration.ToLowerInvariant()) `
             -EvidencePath (Join-Path `
                 $repositoryRoot `
                 ('artifacts/timings/acceptance-' +

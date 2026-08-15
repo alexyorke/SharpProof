@@ -8,5 +8,19 @@
     "exact-commit-release-artifacts",
     "debug-solution-gate",
     "release-acceptance-gate"
+  ],
+  "releaseQualificationMatrix": [
+    { "id": "debug-solution", "receipt": "acceptance-debug" },
+    { "id": "release-acceptance", "receipt": "acceptance-release" },
+    { "id": "release-configuration", "receipt": "release-configuration" },
+    { "id": "portable-linux", "receipt": "portable-linux" },
+    { "id": "portable-windows", "receipt": "portable-windows" },
+    { "id": "portable-macos", "receipt": "portable-macos" },
+    { "id": "repeated-forced-termination", "receipt": "acceptance-release" },
+    { "id": "minimum-sdk", "receipt": "package-consumers" },
+    { "id": "coverage", "receipt": "coverage" },
+    { "id": "mutation", "receipt": "mutation" },
+    { "id": "package-consumers", "receipt": "package-consumers" },
+    { "id": "pilots", "receipt": "pilots" }
   ]
 }

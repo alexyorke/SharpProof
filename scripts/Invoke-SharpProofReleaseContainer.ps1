@@ -149,12 +149,16 @@ switch ($Mode) {
                 }
             })
         $packageArtifactJson = $packageArtifacts | ConvertTo-Json -Compress
-        $requiredGates = @(
-            'acceptance',
-            'coverage',
-            'mutation',
-            'package-consumers',
-            'pilots')
+        $matrixPath = Join-Path $repositoryRoot `
+            'eng/acceptance/preview-evidence.v1.json'
+        $matrix = Get-Content -LiteralPath $matrixPath -Raw |
+            ConvertFrom-Json -ErrorAction Stop
+        $requiredGates = @($matrix.releaseQualificationMatrix |
+            ForEach-Object { [string]$_.receipt } |
+            Select-Object -Unique)
+        if ($requiredGates.Count -ne 10) {
+            throw 'Release qualification matrix must project exactly ten receipts.'
+        }
         $receiptDirectory = Join-Path `
             $repositoryRoot `
             'artifacts/release-qualification/qualification-receipts'
@@ -179,7 +183,9 @@ switch ($Mode) {
                     [string]$receipt.evidence.sha256) {
                 throw "Qualification gate receipt is stale or failed: '$gate'."
             }
-            if ($gate -in @('package-consumers', 'pilots') -and
+            if ($gate -in @(
+                    'package-consumers', 'pilots', 'portable-linux',
+                    'portable-windows', 'portable-macos') -and
                 (@($receipt.packageArtifacts) |
                     Sort-Object fileName |
                     ConvertTo-Json -Compress) -cne $packageArtifactJson) {
@@ -189,7 +195,7 @@ switch ($Mode) {
                 -LiteralPath $receiptPath `
                 -Algorithm SHA256).Hash.ToLowerInvariant()
         }
-        $files = @($inputPaths) + @($packages.FullName)
+        $files = @($inputPaths) + @($matrixPath) + @($packages.FullName)
         $record = [ordered]@{
             schemaVersion = 2
             status = 'passed'

@@ -57,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 223,
-    "expectedCatalogSha256": "f2cd318b94f08f554612ab9b8c54b47edcc769feb8d1f65d806ac1c8b3e08e95"
+    "expectedCatalogCount": 224,
+    "expectedCatalogSha256": "dcde52a04f4586711587c52bb49083ee85633e545d2cab37f55f5664e11d1c6d"
   },
   "worker": {
     "protocolVersion": 11,
@@ -110,6 +110,7 @@
       "SharpProof.Worker.Launcher/LauncherArguments.catalog.json",
       "SharpProof.Worker.Protocol/ProtocolModel.schema.json",
       "eng/acceptance/Verify.ps1",
+      "eng/acceptance/preview-evidence.v1.json",
       "eng/container/entrypoint.sh",
       "eng/container/toolchain.json",
       "eng/coverage/baseline.json",
@@ -176,6 +177,7 @@
       "scripts/Test-SharpProofMutationEvidence.ps1",
       "scripts/Test-SharpProofMutationScheduling.ps1",
       "scripts/Test-SharpProofPackageConsumers.ps1",
+      "scripts/Test-SharpProofPortableConsumer.ps1",
       "scripts/Test-SharpProofPackageDependencies.ps1",
       "scripts/Test-SharpProofPackagePayloads.ps1",
       "scripts/Test-SharpProofPublicationPlan.ps1",
@@ -206,7 +208,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "892240312ced7f40e8e11d4716bc3e0487092a74d977ccfeaa703769d9c6938e",
+    "inventorySha256": "9df906936b7e7ed2cdb352a36064d064135a3a8b2d1d8bc32c6a57da4d76c8f4",
     "components": [
       {
         "name": "discovery",
@@ -659,7 +661,8 @@
           "scripts/Invoke-SharpProofPackageTests.ps1",
           "scripts/Invoke-SharpProofSemanticTests.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
-          "scripts/Test-SharpProofPackageConsumers.ps1"
+          "scripts/Test-SharpProofPackageConsumers.ps1",
+          "scripts/Test-SharpProofPortableConsumer.ps1"
         ]
       },
       {
