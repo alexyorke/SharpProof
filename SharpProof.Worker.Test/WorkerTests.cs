@@ -3217,6 +3217,127 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public void SummaryProvenanceRejectsWrongPackAuthority()
+    {
+        using var project = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Maximum(int left, int right) {
+                    Contract.Ensures(
+                        Contract.Result<int>() ==
+                        (left >= right ? left : right));
+                    return Math.Max(left, right);
+                }
+            }
+            """);
+        project.UseNetCoreReferencePack();
+        var request = project.CreateRequest(
+            cacheEnabled: false,
+            specificationPacks: ["dotnet.scalar"]);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            File.ReadAllText(request.CompilerManifest.Path));
+        var summary = artifact.Callables.Single().Body!.SummaryCalls.Single();
+        var originalDigest = summary.EvidenceSha256;
+        var originalIdentity = summary.EvidenceIdentity;
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+
+        summary.EvidenceSha256 = new string('b', 64);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+
+        summary.EvidenceSha256 = originalDigest;
+        summary.EvidenceIdentity = originalIdentity.Replace(
+            "@1", "@2", StringComparison.Ordinal);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+    }
+
+    [Test]
+    public void SummaryProvenanceRejectsWrongSourceBodyDigest()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static bool Read(bool value) => value;
+
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return Read(value);
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            File.ReadAllText(request.CompilerManifest.Path));
+        var summary = artifact.Callables.Single().Body!.SummaryCalls.Single();
+
+        Assert.That(summary.Origin, Is.EqualTo(CompilerSummaryOrigin.Source));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+
+        summary.EvidenceSha256 = new string('b', 64);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+    }
+
+    [Test]
+    public void SummaryProvenanceRejectsUnrelatedImplementationModuleDigest()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return ExternalFirst.Read(value);
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            public static class ExternalFirst {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            public static class ExternalSecond {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        var compilation = project.CreateCompilation();
+        var unrelatedModuleName = compilation
+            .GetTypeByMetadataName("ExternalSecond")!
+            .ContainingModule
+            .Name;
+        var request = project.CreateRequest(cacheEnabled: false);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            File.ReadAllText(request.CompilerManifest.Path));
+        var summary = artifact.Callables.Single().Body!.SummaryCalls.Single();
+        var unrelatedModuleDigest = artifact.Compilation.References
+            .SelectMany(static reference => reference.Modules)
+            .Single(module => module.Name == unrelatedModuleName)
+            .Sha256;
+
+        Assert.That(
+            summary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.ImplementationIl));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+
+        summary.EvidenceSha256 = unrelatedModuleDigest;
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+    }
+
+    [Test]
     public void UnknownSpecificationPackFailsClosed()
     {
         using var project = TestProject.Create(
