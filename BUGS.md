@@ -2359,7 +2359,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 
 ### SP-AUDIT-129 - Publication plans omit immutable artifact identities (P2)
 
-- [ ] Plan-only publication validates package hashes transiently, then emits
+- [x] Plan-only publication validates package hashes transiently, then emits
   only package IDs, versions, paths, and filenames. It records no package hash
   or size and no release-manifest, SBOM, or checksum-file identity; nothing
   subsequently validates the plan.
@@ -2374,6 +2374,11 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   checksum identities, validate the completed plan, and bind it into the exact-
   commit qualification receipt. Add two-bundle, stale-plan, changed-symbol,
   canonical bundle, and projection-removal mutation controls.
+- Resolution: publication-plan schema 2 records canonical role, path, filename,
+  byte length, and SHA-256 identities for all six packages and the manifest,
+  SBOM, and checksum file. Both emission and standalone replay reopen and hash
+  current bytes under the exact release-authority closure; stale and changed
+  bundle fixtures and the removal mutation are covered.
 
 ### SP-AUDIT-132 - Source locations lack one source-bound canonical geometry (P2)
 
