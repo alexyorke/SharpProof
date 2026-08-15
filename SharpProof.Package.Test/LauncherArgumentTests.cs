@@ -1040,6 +1040,81 @@ public sealed class LauncherArgumentTests
             Is.EqualTo(projectMilliseconds + graceMilliseconds));
     }
 
+    [TestCase(1)]
+    [TestCase(100)]
+    [TestCase(1000)]
+    public void BoundResultUsesTheConfiguredTerminationGrace(
+        int terminationGraceMilliseconds)
+    {
+        var request = new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler.manifest.json",
+                Sha256 = new('c', 64)
+            }
+        };
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        const string inputHash =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var expectedVersions = new WorkerVersionSummary
+        {
+            WorkerVersion = "launcher-test",
+            ApiSpecVersion = "launcher-test"
+        };
+        var response = new WorkerVerifyResponse
+        {
+            RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+            InputHash = inputHash,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
+            {
+                CacheStatus = WorkerCacheStatus.Miss,
+                Versions = expectedVersions,
+                Budgets = request.Budgets,
+                ElapsedMilliseconds =
+                    WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+                        request, terminationGraceMilliseconds)
+            }
+        };
+
+        var direct = WorkerProtocolJson.ValidateForRequest(
+            response, response.RequestHash, inputHash, manifest, request,
+            expectedVersions, terminationGraceMilliseconds);
+        Assert.That(direct.IsValid, Is.True,
+            string.Join(Environment.NewLine,
+                direct.Errors.Select(static error => error.Code)));
+
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, WorkerProtocolJson.SerializeResponse(response));
+            Assert.That(Program.ValidateAndReport(
+                path, request, inputHash, manifest, expectedVersions,
+                out var valid, out _, terminationGraceMilliseconds), Is.Not.EqualTo(3));
+            Assert.That(valid, Is.True);
+
+            response.Summary.ElapsedMilliseconds++;
+            var over = WorkerProtocolJson.ValidateForRequest(
+                response, response.RequestHash, inputHash, manifest, request,
+                expectedVersions, terminationGraceMilliseconds);
+            Assert.That(over.Errors.Select(static error => error.Code),
+                Does.Contain("response.elapsed_request_envelope"));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
     [TestCase("input", "response.input_mismatch")]
     [TestCase("budgets", "response.budgets_mismatch")]
     [TestCase("provenance", "response.versions_mismatch")]

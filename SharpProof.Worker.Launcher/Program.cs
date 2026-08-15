@@ -134,7 +134,8 @@ internal static class Program
         }
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
             artifact.Manifest, expectedVersions,
-            out var validResponse, out var validatedResponse);
+            out var validResponse, out var validatedResponse,
+            arguments.TerminationGraceMilliseconds);
         if (!validResponse)
         {
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
@@ -143,7 +144,8 @@ internal static class Program
                 "The worker result was unavailable or malformed.").ConfigureAwait(false);
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
                 artifact.Manifest, expectedVersions,
-                out validResponse, out validatedResponse);
+                out validResponse, out validatedResponse,
+                arguments.TerminationGraceMilliseconds);
         }
         if (validResponse)
         {
@@ -328,7 +330,8 @@ internal static class Program
         string resultPath, WorkerVerifyRequest request,
         string? expectedInputHash, WorkerClaimManifest? expectedManifest,
         WorkerVersionSummary? expectedVersions,
-        out bool validResponse, out WorkerVerifyResponse? validatedResponse)
+        out bool validResponse, out WorkerVerifyResponse? validatedResponse,
+        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
     {
         validResponse = false;
         validatedResponse = null;
@@ -352,7 +355,8 @@ internal static class Program
                 response, WorkerProtocolJson.ComputeRequestHash(request),
                 expectedInputHash, expectedManifest, request,
                 expectedVersions ?? throw new InvalidOperationException(
-                    "Expected runtime provenance is unavailable."));
+                    "Expected runtime provenance is unavailable."),
+                terminationGraceMilliseconds);
         if (!validation.IsValid)
         {
             WriteErrors(validation.Errors, "SharpProof ");
@@ -485,7 +489,8 @@ internal static class Program
             if (!WorkerProtocolJson.ValidateForRequest(
                     response, response.RequestHash, expectedInputHash,
                     artifact.Manifest, request,
-                    expectedVersions).IsValid)
+                    expectedVersions,
+                    arguments.TerminationGraceMilliseconds).IsValid)
             {
                 throw new IOException("The worker response binding is invalid.");
             }

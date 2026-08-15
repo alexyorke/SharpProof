@@ -1379,6 +1379,90 @@ public sealed class ProtocolJsonTests
         }
     }
 
+    [TestCase(0L, true)]
+    [TestCase(922337203685477L, true)]
+    [TestCase(922337203685478L, false)]
+    [TestCase(long.MaxValue, false)]
+    [TestCase(-1L, false)]
+    public void ResponseElapsedTimeUsesTheProducerRepresentableEnvelope(
+        long elapsedMilliseconds,
+        bool expectedValid)
+    {
+        var response = CreateResponse(CreateManifest());
+        response.Summary.ElapsedMilliseconds = elapsedMilliseconds;
+
+        var validation = WorkerProtocolJson.Validate(response);
+        var elapsedErrors = validation.Errors
+            .Where(static error => error.Code is
+                "response.elapsed_unrepresentable" or "summary.elapsed")
+            .ToArray();
+
+        Assert.That(elapsedErrors.Length == 0, Is.EqualTo(expectedValid));
+    }
+
+    [TestCase(WorkerRunStatus.Complete)]
+    [TestCase(WorkerRunStatus.TimedOut)]
+    [TestCase(WorkerRunStatus.Canceled)]
+    [TestCase(WorkerRunStatus.Failed)]
+    public void ProducerElapsedEnvelopeAppliesToEveryRunStatus(
+        WorkerRunStatus status)
+    {
+        var response = CreateResponse(CreateManifest());
+        response.RunStatus = status;
+        response.Summary.ElapsedMilliseconds =
+            WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds + 1;
+
+        Assert.That(
+            WorkerProtocolJson.Validate(response).Errors
+                .Select(static error => error.Code),
+            Does.Contain("response.elapsed_unrepresentable"));
+    }
+
+    [TestCase(1, 300001L)]
+    [TestCase(100, 300001L)]
+    [TestCase(1000, 300900L)]
+    public void RequestBoundElapsedTimeUsesTheActualLauncherGrace(
+        int terminationGraceMilliseconds,
+        long exactMaximum)
+    {
+        var request = CreateRequest();
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        response.Summary.ElapsedMilliseconds = exactMaximum;
+
+        var exact = WorkerProtocolJson.ValidateForRequest(
+            response, response.RequestHash, InputHash, manifest, request,
+            CreateExpectedVersions(), terminationGraceMilliseconds);
+        Assert.That(exact.IsValid, Is.True,
+            string.Join(Environment.NewLine,
+                exact.Errors.Select(static error => error.Code)));
+
+        response.Summary.ElapsedMilliseconds++;
+        var over = WorkerProtocolJson.ValidateForRequest(
+            response, response.RequestHash, InputHash, manifest, request,
+            CreateExpectedVersions(), terminationGraceMilliseconds);
+        Assert.That(over.Errors.Select(static error => error.Code),
+            Does.Contain("response.elapsed_request_envelope"));
+    }
+
+    [Test]
+    public void RequestElapsedEnvelopeRejectsInvalidAuthority()
+    {
+        var request = CreateRequest();
+        request.Budgets.ProjectWallTimeMilliseconds = int.MaxValue;
+        request.Budgets.MethodWallTimeMilliseconds = int.MaxValue;
+
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            WorkerExecutionEnvelope.MaximumElapsedMilliseconds(request, 0)));
+        Assert.That(
+            WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+                request, WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds),
+            Is.EqualTo((long)int.MaxValue +
+                WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds -
+                WorkerExecutionEnvelope.CleanupReserveMilliseconds));
+    }
+
     [Test]
     public void ManifestHashAndExpectedInputHashValidateBoundaryValues()
     {

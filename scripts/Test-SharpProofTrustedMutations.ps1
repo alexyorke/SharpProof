@@ -1605,6 +1605,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~RequestBoundValidationAuthenticatesRuntimeProvenance'
     },
     [pscustomobject]@{
+        Name = 'protocol-response-elapsed-envelope'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = '                    WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds,'
+        Mutated = '                    long.MaxValue,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ResponseElapsedTimeUsesTheProducerRepresentableEnvelope'
+    },
+    [pscustomobject]@{
         Name = 'release-exact-package-role-filenames'
         File = 'scripts\SharpProof.SymbolPackageValidator.cs'
         Original = (@'

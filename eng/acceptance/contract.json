@@ -57,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 220,
-    "expectedCatalogSha256": "5a572c003442ae7e37e04f748459890ccc01cd3086c8b72314cb8b01957eab71"
+    "expectedCatalogCount": 221,
+    "expectedCatalogSha256": "9e88ca48485dd5112546c7c406fb4726067fed3464301a03cd8c3dbffe4cdb8f"
   },
   "worker": {
     "protocolVersion": 11,
@@ -203,7 +203,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "0bd9cee9a59c363c46460564839c95c97adc252bb23b4896a0acc95fe8284070",
+    "inventorySha256": "7877d0f3c689058e61de5f875444cccd0a9281d69fabcde08b43eaece216654e",
     "components": [
       {
         "name": "discovery",
@@ -584,7 +584,8 @@
           "SharpProof.Worker.Protocol/ProtocolManifest.cs",
           "SharpProof.Worker.Protocol/ProtocolManifestPayload.cs",
           "SharpProof.Worker.Protocol/ProtocolJson.cs",
-          "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs"
+          "SharpProof.Worker.Protocol/ProtocolJsonSupport.cs",
+          "SharpProof.Worker.Protocol/WorkerExecutionEnvelope.cs"
         ],
         "rationale": "The protocol schema and generator define the declarative security vocabulary; the checked-in generated model and runtime validator are the reviewed, coverlet-visible runtime boundary, and CI verifies the projection is current."
       },

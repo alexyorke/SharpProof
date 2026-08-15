@@ -120,7 +120,8 @@ public static partial class WorkerProtocolJson
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
-        WorkerVersionSummary expectedVersions)
+        WorkerVersionSummary expectedVersions,
+        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
@@ -141,8 +142,11 @@ public static partial class WorkerProtocolJson
                 "Expected runtime provenance is invalid.",
                 nameof(expectedVersions));
         }
+        var maximumElapsedMilliseconds = WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+            expectedRequest, terminationGraceMilliseconds);
         return ValidateResponse(response, expectedInputHash, expectedManifest,
-            expectedRequestHash, expectedRequest, expectedVersions);
+            expectedRequestHash, expectedRequest, expectedVersions,
+            maximumElapsedMilliseconds);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -197,7 +201,8 @@ public static partial class WorkerProtocolJson
     private static WorkerProtocolValidationResult ValidateResponse(
         WorkerVerifyResponse? response, string? expectedInputHash, WorkerClaimManifest? expectedManifest,
         string? expectedRequestHash, WorkerVerifyRequest? expectedRequest,
-        WorkerVersionSummary? expectedVersions)
+        WorkerVersionSummary? expectedVersions,
+        long? maximumElapsedMilliseconds = null)
     {
         var errors = new Validator();
         if (response == null)
@@ -231,6 +236,19 @@ public static partial class WorkerProtocolJson
         ValidateRun(response, callables, claims, protocolErrors, errors);
         ValidateUnknownCoverage(callables, claims, response.Manifest, errors);
         ValidateSummary(response.Summary, callables, claims, errors);
+        if (response.Summary != null)
+        {
+            errors.Check(
+                response.Summary.ElapsedMilliseconds <=
+                    WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds,
+                "response.elapsed_unrepresentable");
+            if (maximumElapsedMilliseconds.HasValue)
+            {
+                errors.Check(
+                    response.Summary.ElapsedMilliseconds <= maximumElapsedMilliseconds.Value,
+                    "response.elapsed_request_envelope");
+            }
+        }
         if (expectedVersions != null)
         {
             errors.Check(
