@@ -79,95 +79,11 @@ internal static class CompilerFeatureScopeFingerprint
                 variable.ModelLabel);
         }
 
-        // Body presence is deliberately not part of the scope seal. The lowerer
-        // and hydrator own malformed-body checks, and several cache/hydration
-        // probes intentionally clear the body before exercising those checks.
-        // Keep the body evidence itself in the seal so a wire mutation that
-        // substitutes call/spec identities still invalidates the artifact.
-        var body = callable.Body;
-        if (body != null)
-        {
-            AddCallIdentities(hash, body.Calls);
-            AddSpecCalls(hash, body.SpecCalls);
-            AddSummaryCalls(hash, body.SummaryCalls);
-        }
-
         var effects = callable.EffectClaims;
         hash.Add(effects?.Length ?? -1);
         foreach (var effect in effects ?? [])
         {
             AddJson(hash, effect);
-        }
-    }
-
-    private static void AddCallIdentities(
-        CanonicalHashWriter hash,
-        CompilerCallIdentityArtifact[]? calls)
-    {
-        hash.Add(calls?.Length ?? -1);
-        foreach (var call in calls ?? [])
-        {
-            if (call == null)
-            {
-                hash.Add((string?)null);
-                continue;
-            }
-
-            hash.Add(call.Instruction, call.Identity);
-        }
-    }
-
-    private static void AddSpecCalls(
-        CanonicalHashWriter hash,
-        CompilerSpecCallArtifact[]? calls)
-    {
-        hash.Add(calls?.Length ?? -1);
-        foreach (var call in calls ?? [])
-        {
-            if (call == null)
-            {
-                hash.Add((string?)null);
-                continue;
-            }
-
-            hash.Add(call.Instruction, call.WitnessIdentifier, call.ConsumesMemoryHavoc);
-        }
-    }
-
-    private static void AddSummaryCalls(
-        CanonicalHashWriter hash,
-        CompilerSummaryCallArtifact[]? calls)
-    {
-        hash.Add(calls?.Length ?? -1);
-        foreach (var call in calls ?? [])
-        {
-            if (call == null)
-            {
-                hash.Add((string?)null);
-                continue;
-            }
-
-            hash.Add(
-                call.Instruction,
-                call.Identity,
-                call.Origin,
-                call.EvidenceSha256,
-                call.EvidenceIdentity);
-            var dependencies = call.DependencyEvidence;
-            hash.Add(dependencies?.Length ?? -1);
-            foreach (var dependency in dependencies ?? [])
-            {
-                if (dependency == null)
-                {
-                    hash.Add((string?)null);
-                    continue;
-                }
-
-                hash.Add(
-                    dependency.Origin,
-                    dependency.EvidenceSha256,
-                    dependency.EvidenceIdentity);
-            }
         }
     }
 
