@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 25 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 24 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,16 @@ The active backlog contains 25 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-180 - Response validation accepts impossible elapsed times (fixed)
+
+- [x] Fixed by `ad6ae22eb` (`fix: bound worker response elapsed time`).
+- Generic validation now enforces the exact producer-representable millisecond
+  ceiling. Request-bound validation additionally computes the checked project
+  wall-time plus `max(1, terminationGrace - 100)` envelope using the launcher's
+  actual grace value.
+- TCB ownership passed 1/1, focused protocol 13/13, launcher 3/3, Worker
+  535/535, and Architecture 429/429.
 
 ### SP-AUDIT-166 - Corpus snapshot schema labels are not validated (fixed)
 
@@ -2455,17 +2465,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   controls against the pinned Z3 build.
 - Consolidated cases: SP-AUDIT-186.
 - Unified closure: Give every Z3 query one ownership/accounting scope covering temporary ASTs, solve, model/core extraction, cancellation, exceptional exit, disposal, and final statistics.
-
-### SP-AUDIT-180 - Response validation accepts impossible elapsed times (P2)
-
-- [ ] `ElapsedMilliseconds` is constrained only to be nonnegative and is not
-  bounded by the producer's representable `TimeSpan` or supported execution
-  envelope.
-- Certifier impact: changing an otherwise valid request-bound response to
-  `long.MaxValue` remains valid canonical evidence.
-- Required closure: impose the exact producer-representable upper bound and,
-  where launcher context is authoritative, the checked project-wall/grace
-  envelope. Add zero, boundary, boundary+1, long-max, and overflow controls.
 
 ## P3 active bugs
 
