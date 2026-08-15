@@ -1310,6 +1310,53 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void SameTypedParameterBindingSwapFailsClosed()
+    {
+        const string parameterSource =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Sum(int left, int right) {
+                    Contract.Ensures(Contract.Result<int>() == left);
+                    return left >= right ? left : right;
+                }
+            }
+            """;
+        var parameterSwap = CreateContractArtifact(parameterSource);
+        var bindings = parameterSwap.Callables[0].Body!.ParameterBindings;
+        Assert.That(bindings, Has.Length.EqualTo(2));
+        (bindings[0].Target, bindings[1].Target) =
+            (bindings[1].Target, bindings[0].Target);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(parameterSwap)));
+    }
+
+    [Test]
+    public void SameTypedPreStateAssociationSwapFailsClosed()
+    {
+        const string preStateSource =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Sum(int left, int right) {
+                    Contract.Ensures(Contract.Result<int>() == Contract.Old(left));
+                    Contract.Ensures(Contract.Old(right) == Contract.Old(right));
+                    return left;
+                }
+            }
+            """;
+        var preStateSwap = CreateContractArtifact(preStateSource);
+        var preStates = preStateSwap.Callables[0].Variables
+            .Where(static item => item.Role == CompilerVariableRole.PreState)
+            .ToArray();
+        Assert.That(preStates, Has.Length.EqualTo(2));
+        (preStates[0].CurrentStateVariable, preStates[1].CurrentStateVariable) =
+            (preStates[1].CurrentStateVariable, preStates[0].CurrentStateVariable);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(preStateSwap)));
+    }
+
+    [Test]
     public void SummaryFreeVariablesAreFreshFromProgramAndCanonicalVariables()
     {
         const string source =
