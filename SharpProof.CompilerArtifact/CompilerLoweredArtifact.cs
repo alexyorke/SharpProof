@@ -272,7 +272,7 @@ internal static class CompilerLoweredArtifact
             return new CompilerCallablePreparation(
                 new IrFactory(), entry, [], [], artifact.FailureReason, null)
             {
-                EffectClaims = DecodeEffects(artifact, claims),
+                EffectClaims = DecodeEffects(artifact, claims, compilation),
                 Compilation = compilation
             };
         }
@@ -378,7 +378,7 @@ internal static class CompilerLoweredArtifact
         return new CompilerCallablePreparation(
             decoded.Factory, entry, clauses, variables, WorkerClaimReason.None, body)
         {
-            EffectClaims = DecodeEffects(artifact, claims),
+            EffectClaims = DecodeEffects(artifact, claims, compilation),
             Compilation = compilation
         };
     }
@@ -427,17 +427,26 @@ internal static class CompilerLoweredArtifact
     }
     private static ImmutableArray<CompilerEffectClaimArtifact> DecodeEffects(
         CompilerCallableArtifact artifact,
-        ImmutableArray<WorkerClaimManifestEntry> claims)
+        ImmutableArray<WorkerClaimManifestEntry> claims,
+        CompilerCompilationSnapshot compilation)
     {
         if (artifact.EffectClaims == null)
         {
             throw new InvalidDataException("Compiler effect-claim evidence is missing.");
         }
 
+        if (artifact.EffectAuthorities == null)
+        {
+            throw new InvalidDataException("Compiler effect authority is missing.");
+        }
+
         var expected = claims.Where(static item => item.Kind == WorkerClaimKind.Effect).ToArray();
         if (artifact.EffectClaims.Length != expected.Length ||
+            artifact.EffectAuthorities.Length != expected.Length ||
             artifact.EffectClaims.Select(static item => item?.ClaimId)
-                .Distinct(StringComparer.Ordinal).Count() != artifact.EffectClaims.Length)
+                .Distinct(StringComparer.Ordinal).Count() != artifact.EffectClaims.Length ||
+            artifact.EffectAuthorities.Select(static item => item?.ClaimId)
+                .Distinct(StringComparer.Ordinal).Count() != artifact.EffectAuthorities.Length)
         {
             throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");
         }
@@ -445,10 +454,22 @@ internal static class CompilerLoweredArtifact
         for (var index = 0; index < expected.Length; index++)
         {
             var evidence = artifact.EffectClaims[index];
+            var authority = artifact.EffectAuthorities[index];
             CompilerEffectClaimArtifactCodec.Validate(evidence);
             if (evidence.ClaimId != expected[index].ClaimId || evidence.ContractKind != expected[index].EffectContractKind)
             {
                 throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");
+            }
+
+            var authorityMatches = CompilerEffectAuthority.Matches(
+                evidence,
+                authority,
+                expected[index],
+                compilation);
+            if (!authorityMatches)
+            {
+                throw new InvalidDataException(
+                    "Compiler effect evidence does not equal its compiler authority.");
             }
         }
         return [.. artifact.EffectClaims];

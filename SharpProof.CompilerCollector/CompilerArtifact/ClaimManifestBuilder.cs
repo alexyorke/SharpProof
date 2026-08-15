@@ -332,7 +332,14 @@ internal sealed partial class ClaimManifestBuilder(
                 var evidence = CreateEffectEvidence(
                     claimId, evaluation, isSupported);
                 CompilerEffectClaimArtifactCodec.Seal(evidence);
-                claims.Add(new ManifestEffectClaim(entry, evidence));
+                var sourceTreePath = attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath;
+                claims.Add(new ManifestEffectClaim(
+                    entry,
+                    evidence,
+                    CompilerEffectAuthority.Create(
+                        entry,
+                        evidence,
+                        sourceTreePath)));
             }
         }
 

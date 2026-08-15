@@ -1406,6 +1406,16 @@
           "default": {
             "kind": "emptyArray"
           }
+        },
+        {
+          "name": "EffectAuthorities",
+          "jsonName": "effectAuthorities",
+          "type": "CompilerEffectAuthorityArtifact[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
         }
       ]
     },
@@ -1506,6 +1516,143 @@
         {
           "name": "EvidenceSha256",
           "jsonName": "evidenceSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerEffectAuthorityArtifact",
+      "properties": [
+        {
+          "name": "ClaimId",
+          "jsonName": "claimId",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "ContractKind",
+          "jsonName": "contractKind",
+          "type": "WorkerEffectContractKind",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Outcome",
+          "jsonName": "outcome",
+          "type": "WorkerClaimOutcome",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Reason",
+          "jsonName": "reason",
+          "type": "WorkerClaimReason",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Certainty",
+          "jsonName": "certainty",
+          "type": "WorkerEffectEvidenceCertainty",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Constraint",
+          "jsonName": "constraint",
+          "type": "CompilerEffectConstraintArtifact",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
+          }
+        },
+        {
+          "name": "Witness",
+          "jsonName": "witness",
+          "type": "WorkerEffectViolationWitness?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Replay",
+          "jsonName": "replay",
+          "type": "CompilerEffectReplayArtifact?",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "Evidence",
+          "jsonName": "evidence",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "Source",
+          "jsonName": "source",
+          "type": "WorkerSourceLocation",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "new"
+          }
+        },
+        {
+          "name": "SourceTreeOrdinal",
+          "jsonName": "sourceTreeOrdinal",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "SourceTreePath",
+          "jsonName": "sourceTreePath",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "SourceTreeSha256",
+          "jsonName": "sourceTreeSha256",
           "type": "string",
           "accessibility": "public",
           "set": "set",

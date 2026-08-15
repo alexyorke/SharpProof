@@ -696,6 +696,227 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void EffectEvidenceMustMatchIndependentCompilerAuthority()
+    {
+        const string refutedSource =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [ZeroAllocations]
+                internal static object Allocate() => new object();
+            }
+            """;
+        const string unknownSource =
+            """
+            using System;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [DoesNotThrow]
+                internal static AggregateException Create() =>
+                    new AggregateException((IEnumerable<Exception>)null!);
+            }
+            """;
+
+        var refuted = CreateContractArtifact(refutedSource);
+        var refutedEvidence = refuted.Callables.Single().EffectClaims.Single();
+        Assert.That(refutedEvidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+        Assert.That(refutedEvidence.Replay, Is.Not.Null);
+
+        var unknown = CreateContractArtifact(unknownSource);
+        var unknownEvidence = unknown.Callables.Single().EffectClaims.Single();
+        Assert.That(unknownEvidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+        Assert.That(unknownEvidence.Reason, Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
+
+        Action<CompilerEffectClaimArtifact>[] transitions =
+        [
+            evidence =>
+            {
+                evidence.Outcome = WorkerClaimOutcome.Proven;
+                evidence.Reason = WorkerClaimReason.None;
+                evidence.Certainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+                evidence.Witness = null;
+                evidence.Replay = null;
+            },
+            evidence =>
+            {
+                evidence.Outcome = WorkerClaimOutcome.Proven;
+                evidence.Reason = WorkerClaimReason.None;
+                evidence.Certainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+                evidence.Witness = null;
+                evidence.Replay = null;
+            }
+        ];
+
+        foreach (var transition in transitions)
+        {
+            var artifact = transition == transitions[0]
+                ? CreateContractArtifact(refutedSource)
+                : CreateContractArtifact(unknownSource);
+            transition(artifact.Callables.Single().EffectClaims.Single());
+            CompilerEffectClaimArtifactCodec.Seal(
+                artifact.Callables.Single().EffectClaims.Single());
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        }
+    }
+
+    [Test]
+    public void EffectAuthorityBindsConstraintsEvidenceAndSourceTreeOrigin()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [EffectContract(SharpProofEffect.None, Complete = true)]
+                internal static void First() { }
+
+                [EffectContract(SharpProofEffect.Allocates, Complete = true)]
+                internal static void Second() { }
+            }
+            """;
+        var honest = CreateContractArtifact(source);
+        var honestCallables = honest.Callables
+            .SelectMany(static callable => callable.EffectClaims)
+            .Where(static evidence =>
+                evidence.ContractKind == WorkerEffectContractKind.EffectContract)
+            .ToArray();
+        Assert.That(honestCallables, Has.Length.EqualTo(2));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(honest)));
+
+        var changedConstraint = CreateContractArtifact(source);
+        var changedConstraintEvidence = changedConstraint.Callables
+            .SelectMany(static callable => callable.EffectClaims)
+            .First(static evidence =>
+                evidence.ContractKind == WorkerEffectContractKind.EffectContract);
+        changedConstraintEvidence.Constraint.AllowedEffects =
+            changedConstraintEvidence.Constraint.AllowedEffects == WorkerEffectSet.Allocates
+                ? WorkerEffectSet.ReadsReceiverState
+                : WorkerEffectSet.Allocates;
+        CompilerEffectClaimArtifactCodec.Seal(changedConstraintEvidence);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(changedConstraint)));
+
+        var swappedEvidence = CreateContractArtifact(source);
+        var swapped = swappedEvidence.Callables
+            .SelectMany(static callable => callable.EffectClaims)
+            .Where(static evidence =>
+                evidence.ContractKind == WorkerEffectContractKind.EffectContract)
+            .ToArray();
+        CopyEffectPayload(swapped[1], swapped[0]);
+        CompilerEffectClaimArtifactCodec.Seal(swapped[0]);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(swappedEvidence)));
+
+        var changedOrigin = CreateContractArtifact(source);
+        var originEvidence = changedOrigin.Callables
+            .SelectMany(static callable => callable.EffectClaims)
+            .First(static evidence =>
+                evidence.ContractKind == WorkerEffectContractKind.EffectContract);
+        var authority = changedOrigin.Callables
+            .SelectMany(static callable => callable.EffectAuthorities)
+            .Single(item => item.ClaimId == originEvidence.ClaimId);
+        authority.SourceTreeSha256 = new string('a', 64);
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(changedOrigin)));
+    }
+
+    [Test]
+    public void HonestEffectAuthorityPreservesWorkerResultClassification()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [ZeroAllocations]
+                internal static object Allocate() => new object();
+            }
+            """);
+        var target = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
+        var result = EffectClaimResultAssembler.Assemble(
+            target, target.EffectClaims.Single());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(result.EffectWitness, Is.Not.Null);
+        }
+    }
+
+    private static void CopyEffectPayload(
+        CompilerEffectClaimArtifact source,
+        CompilerEffectClaimArtifact destination)
+    {
+        destination.ContractKind = source.ContractKind;
+        destination.Outcome = source.Outcome;
+        destination.Reason = source.Reason;
+        destination.Certainty = source.Certainty;
+        destination.Constraint = new CompilerEffectConstraintArtifact
+        {
+            AllowedEffects = source.Constraint.AllowedEffects,
+            AllowedCapabilities = source.Constraint.AllowedCapabilities,
+            AllowedExceptionTypes = [.. source.Constraint.AllowedExceptionTypes]
+        };
+        destination.Witness = source.Witness == null
+            ? null
+            : new WorkerEffectViolationWitness
+            {
+                Kind = source.Witness.Kind,
+                Detail = source.Witness.Detail,
+                Effects = source.Witness.Effects,
+                Capabilities = source.Witness.Capabilities,
+                ExactExceptionTypeHierarchy =
+                    [.. source.Witness.ExactExceptionTypeHierarchy],
+                Location = new WorkerSourceLocation
+                {
+                    Path = source.Witness.Location.Path,
+                    Start = source.Witness.Location.Start,
+                    Length = source.Witness.Location.Length,
+                    Line = source.Witness.Location.Line,
+                    Column = source.Witness.Location.Column
+                }
+            };
+        destination.Replay = source.Replay == null
+            ? null
+            : new CompilerEffectReplayArtifact
+            {
+                PathKind = source.Replay.PathKind,
+                ConstraintSha256 = source.Replay.ConstraintSha256,
+                Events = [.. source.Replay.Events.Select(static value =>
+                    new CompilerEffectReplayEventArtifact
+                    {
+                        Ordinal = value.Ordinal,
+                        Kind = value.Kind,
+                        SyntaxTreeOrdinal = value.SyntaxTreeOrdinal,
+                        SyntaxTreeSha256 = value.SyntaxTreeSha256,
+                        SyntaxStart = value.SyntaxStart,
+                        SyntaxLength = value.SyntaxLength,
+                        OperationIdentitySha256 = value.OperationIdentitySha256,
+                        MemberIdentity = value.MemberIdentity,
+                        MemberDocumentationId = value.MemberDocumentationId,
+                        TypeIdentity = value.TypeIdentity,
+                        TypeDocumentationId = value.TypeDocumentationId,
+                        SpecWitnessIdentifier = value.SpecWitnessIdentifier,
+                        ScalarOperands = [.. value.ScalarOperands],
+                        ExactExceptionTypeHierarchy =
+                            [.. value.ExactExceptionTypeHierarchy],
+                        Location = new WorkerSourceLocation
+                        {
+                            Path = value.Location.Path,
+                            Start = value.Location.Start,
+                            Length = value.Location.Length,
+                            Line = value.Location.Line,
+                            Column = value.Location.Column
+                        }
+                    })]
+            };
+        destination.Evidence = source.Evidence;
+    }
+
+    [Test]
     public void MalformedLoweredCallableFailsDuringHydration()
     {
         var artifact = CreateContractArtifact();

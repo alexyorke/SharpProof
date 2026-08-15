@@ -174,6 +174,7 @@ internal sealed class CompilerCallableArtifact
     public CompilerVariableArtifact[] Variables { get; set; } = [];
     public CompilerBodyArtifact? Body { get; set; }
     public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
+    public CompilerEffectAuthorityArtifact[] EffectAuthorities { get; set; } = [];
 }
 
 internal sealed class CompilerEffectClaimArtifact
@@ -188,6 +189,23 @@ internal sealed class CompilerEffectClaimArtifact
     public CompilerEffectReplayArtifact? Replay { get; set; }
     public string Evidence { get; set; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
+}
+
+internal sealed class CompilerEffectAuthorityArtifact
+{
+    public string ClaimId { get; set; } = string.Empty;
+    public WorkerEffectContractKind ContractKind { get; set; }
+    public WorkerClaimOutcome Outcome { get; set; }
+    public WorkerClaimReason Reason { get; set; }
+    public WorkerEffectEvidenceCertainty Certainty { get; set; }
+    public CompilerEffectConstraintArtifact Constraint { get; set; } = new();
+    public WorkerEffectViolationWitness? Witness { get; set; }
+    public CompilerEffectReplayArtifact? Replay { get; set; }
+    public string Evidence { get; set; } = string.Empty;
+    public WorkerSourceLocation Source { get; set; } = new();
+    public int SourceTreeOrdinal { get; set; } = -1;
+    public string SourceTreePath { get; set; } = string.Empty;
+    public string SourceTreeSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerEffectConstraintArtifact

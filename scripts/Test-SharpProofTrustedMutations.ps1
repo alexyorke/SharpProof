@@ -646,6 +646,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay'
     },
     [pscustomobject]@{
+        Name = 'effect-authority-verdict-binding'
+        File = 'SharpProof.CompilerArtifact\CompilerLoweredArtifact.cs'
+        Original = '            if (!authorityMatches)'
+        Mutated = '            if (false)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~EffectEvidenceMustMatchIndependentCompilerAuthority'
+    },
+    [pscustomobject]@{
+        Name = 'effect-authority-source-tree-binding'
+        File = 'SharpProof.CompilerArtifact\CompilerEffectAuthority.cs'
+        Original = '                authority.SourceTreeSha256 == tree.Sha256;'
+        Mutated = '                true;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~EffectAuthorityBindsConstraintsEvidenceAndSourceTreeOrigin'
+    },
+    [pscustomobject]@{
         Name = 'effect-replay-object-event-kind'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerEffectReplayLowerer.cs'
         Original = "                eventKind =`n                    CompilerEffectReplayEventKind.ManagedObjectAllocation;"

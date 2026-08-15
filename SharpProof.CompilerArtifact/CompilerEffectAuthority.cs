@@ -1,0 +1,312 @@
+namespace SharpProof.CompilerArtifact;
+
+internal static class CompilerEffectAuthority
+{
+    internal static CompilerEffectAuthorityArtifact Create(
+        WorkerClaimManifestEntry entry,
+        CompilerEffectClaimArtifact evidence,
+        string? sourceTreePath)
+    {
+        entry = ArgumentNullGuard.NotNull(entry, nameof(entry));
+        evidence = ArgumentNullGuard.NotNull(evidence, nameof(evidence));
+
+        return new CompilerEffectAuthorityArtifact
+        {
+            ClaimId = entry.ClaimId,
+            ContractKind = evidence.ContractKind,
+            Outcome = evidence.Outcome,
+            Reason = evidence.Reason,
+            Certainty = evidence.Certainty,
+            Constraint = CopyConstraint(evidence.Constraint),
+            Witness = CopyWitness(evidence.Witness),
+            Replay = CopyReplay(evidence.Replay),
+            Evidence = evidence.Evidence,
+            Source = CopyLocation(entry.Location),
+            SourceTreePath = sourceTreePath ?? string.Empty
+        };
+    }
+
+    internal static void BindSourceTree(
+        CompilerEffectAuthorityArtifact authority,
+        CompilerCompilationSnapshot compilation)
+    {
+        authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+
+        var treePath = string.IsNullOrWhiteSpace(authority.SourceTreePath)
+            ? authority.Source.Path
+            : authority.SourceTreePath;
+        var ordinal = Array.FindIndex(
+            compilation.SyntaxTrees,
+            tree => tree != null &&
+                string.Equals(tree.Path, treePath, StringComparison.Ordinal));
+        if (ordinal < 0)
+        {
+            throw new InvalidDataException(
+                "A compiler effect authority does not name its source tree.");
+        }
+
+        authority.SourceTreeOrdinal = ordinal;
+        authority.SourceTreePath = compilation.SyntaxTrees[ordinal].Path;
+        authority.SourceTreeSha256 = compilation.SyntaxTrees[ordinal].Sha256;
+    }
+
+    internal static bool Matches(
+        CompilerEffectClaimArtifact evidence,
+        CompilerEffectAuthorityArtifact authority,
+        WorkerClaimManifestEntry expected,
+        CompilerCompilationSnapshot compilation)
+    {
+        try
+        {
+            if (evidence == null || authority == null || expected == null ||
+                compilation is not { SyntaxTrees: not null })
+            {
+                return false;
+            }
+
+            if (!HasValidAuthorityPayload(authority) ||
+                authority.Source == null ||
+                authority.Constraint == null ||
+                authority.SourceTreePath == null ||
+                authority.SourceTreeSha256 == null ||
+                authority.ClaimId != expected.ClaimId ||
+                authority.ClaimId != evidence.ClaimId ||
+                authority.ContractKind != expected.EffectContractKind ||
+                authority.ContractKind != evidence.ContractKind ||
+                authority.Outcome != evidence.Outcome ||
+                authority.Reason != evidence.Reason ||
+                authority.Certainty != evidence.Certainty ||
+                authority.Evidence != evidence.Evidence ||
+                !LocationsEqual(authority.Source, expected.Location) ||
+                !ConstraintsEqual(authority.Constraint, evidence.Constraint) ||
+                !WitnessesEqual(authority.Witness, evidence.Witness) ||
+                !ReplaysEqual(authority.Replay, evidence.Replay))
+            {
+                return false;
+            }
+
+            if (authority.SourceTreeOrdinal < 0 ||
+                authority.SourceTreeOrdinal >= compilation.SyntaxTrees.Length)
+            {
+                return false;
+            }
+
+            var tree = compilation.SyntaxTrees[authority.SourceTreeOrdinal];
+            return tree != null &&
+                authority.SourceTreePath == tree.Path &&
+                authority.SourceTreeSha256 == tree.Sha256;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidDataException or
+            InvalidOperationException or NullReferenceException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasValidAuthorityPayload(
+        CompilerEffectAuthorityArtifact authority)
+    {
+        try
+        {
+            var evidence = ToEvidence(authority);
+            CompilerEffectClaimArtifactCodec.Seal(evidence);
+            CompilerEffectClaimArtifactCodec.Validate(evidence);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidDataException or
+            InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static CompilerEffectClaimArtifact ToEvidence(
+        CompilerEffectAuthorityArtifact authority)
+    {
+        return new CompilerEffectClaimArtifact
+        {
+            ClaimId = authority.ClaimId,
+            ContractKind = authority.ContractKind,
+            Outcome = authority.Outcome,
+            Reason = authority.Reason,
+            Certainty = authority.Certainty,
+            Constraint = CopyConstraint(authority.Constraint),
+            Witness = CopyWitness(authority.Witness),
+            Replay = CopyReplay(authority.Replay),
+            Evidence = authority.Evidence
+        };
+    }
+
+    private static bool ConstraintsEqual(
+        CompilerEffectConstraintArtifact left,
+        CompilerEffectConstraintArtifact right)
+    {
+        return left != null && right != null &&
+            left.AllowedEffects == right.AllowedEffects &&
+            left.AllowedCapabilities == right.AllowedCapabilities &&
+            left.AllowedExceptionTypes.SequenceEqual(
+                right.AllowedExceptionTypes,
+                StringComparer.Ordinal);
+    }
+
+    private static bool WitnessesEqual(
+        WorkerEffectViolationWitness? left,
+        WorkerEffectViolationWitness? right)
+    {
+        if (left == null || right == null)
+        {
+            return left == null && right == null;
+        }
+
+        return left.Kind == right.Kind &&
+            left.Detail == right.Detail &&
+            left.Effects == right.Effects &&
+            left.Capabilities == right.Capabilities &&
+            left.ExactExceptionTypeHierarchy.SequenceEqual(
+                right.ExactExceptionTypeHierarchy,
+                StringComparer.Ordinal) &&
+            LocationsEqual(left.Location, right.Location);
+    }
+
+    private static bool ReplaysEqual(
+        CompilerEffectReplayArtifact? left,
+        CompilerEffectReplayArtifact? right)
+    {
+        if (left == null || right == null)
+        {
+            return left == null && right == null;
+        }
+
+        return left.PathKind == right.PathKind &&
+            left.ConstraintSha256 == right.ConstraintSha256 &&
+            left.Events.SequenceEqual(right.Events, ReplayEventComparer.Instance);
+    }
+
+    private static bool LocationsEqual(
+        WorkerSourceLocation left,
+        WorkerSourceLocation right)
+    {
+        return left != null && right != null &&
+            (left.Path, left.Start, left.Length, left.Line, left.Column) ==
+            (right.Path, right.Start, right.Length, right.Line, right.Column);
+    }
+
+    private static CompilerEffectConstraintArtifact CopyConstraint(
+        CompilerEffectConstraintArtifact value)
+    {
+        return new CompilerEffectConstraintArtifact
+        {
+            AllowedEffects = value?.AllowedEffects ?? WorkerEffectSet.None,
+            AllowedCapabilities = value?.AllowedCapabilities ??
+                WorkerEffectCapabilitySet.None,
+            AllowedExceptionTypes = [.. value?.AllowedExceptionTypes ?? []]
+        };
+    }
+
+    private static WorkerEffectViolationWitness? CopyWitness(
+        WorkerEffectViolationWitness? value)
+    {
+        return value == null
+            ? null
+            : new WorkerEffectViolationWitness
+            {
+                Kind = value.Kind,
+                Detail = value.Detail,
+                Effects = value.Effects,
+                Capabilities = value.Capabilities,
+                ExactExceptionTypeHierarchy = [.. value.ExactExceptionTypeHierarchy],
+                Location = CopyLocation(value.Location)
+            };
+    }
+
+    private static CompilerEffectReplayArtifact? CopyReplay(
+        CompilerEffectReplayArtifact? value)
+    {
+        return value == null
+            ? null
+            : new CompilerEffectReplayArtifact
+            {
+                PathKind = value.PathKind,
+                ConstraintSha256 = value.ConstraintSha256,
+                Events = [.. value.Events.Select(CopyReplayEvent)]
+            };
+    }
+
+    private static CompilerEffectReplayEventArtifact CopyReplayEvent(
+        CompilerEffectReplayEventArtifact value)
+    {
+        return new CompilerEffectReplayEventArtifact
+        {
+            Ordinal = value.Ordinal,
+            Kind = value.Kind,
+            SyntaxTreeOrdinal = value.SyntaxTreeOrdinal,
+            SyntaxTreeSha256 = value.SyntaxTreeSha256,
+            SyntaxStart = value.SyntaxStart,
+            SyntaxLength = value.SyntaxLength,
+            OperationIdentitySha256 = value.OperationIdentitySha256,
+            MemberIdentity = value.MemberIdentity,
+            MemberDocumentationId = value.MemberDocumentationId,
+            TypeIdentity = value.TypeIdentity,
+            TypeDocumentationId = value.TypeDocumentationId,
+            SpecWitnessIdentifier = value.SpecWitnessIdentifier,
+            ScalarOperands = [.. value.ScalarOperands],
+            ExactExceptionTypeHierarchy = [.. value.ExactExceptionTypeHierarchy],
+            Location = CopyLocation(value.Location)
+        };
+    }
+
+    private static WorkerSourceLocation CopyLocation(
+        WorkerSourceLocation value)
+    {
+        return new WorkerSourceLocation
+        {
+            Path = value?.Path ?? string.Empty,
+            Start = value?.Start ?? 0,
+            Length = value?.Length ?? 0,
+            Line = value?.Line ?? 0,
+            Column = value?.Column ?? 0
+        };
+    }
+
+    private sealed class ReplayEventComparer : IEqualityComparer<CompilerEffectReplayEventArtifact>
+    {
+        internal static readonly ReplayEventComparer Instance = new();
+
+        public bool Equals(
+            CompilerEffectReplayEventArtifact? left,
+            CompilerEffectReplayEventArtifact? right)
+        {
+            if (left == null || right == null)
+            {
+                return left == null && right == null;
+            }
+
+            return left.Ordinal == right.Ordinal &&
+                left.Kind == right.Kind &&
+                left.SyntaxTreeOrdinal == right.SyntaxTreeOrdinal &&
+                left.SyntaxTreeSha256 == right.SyntaxTreeSha256 &&
+                left.SyntaxStart == right.SyntaxStart &&
+                left.SyntaxLength == right.SyntaxLength &&
+                left.OperationIdentitySha256 == right.OperationIdentitySha256 &&
+                left.MemberIdentity == right.MemberIdentity &&
+                left.MemberDocumentationId == right.MemberDocumentationId &&
+                left.TypeIdentity == right.TypeIdentity &&
+                left.TypeDocumentationId == right.TypeDocumentationId &&
+                left.SpecWitnessIdentifier == right.SpecWitnessIdentifier &&
+                left.ScalarOperands.SequenceEqual(right.ScalarOperands) &&
+                left.ExactExceptionTypeHierarchy.SequenceEqual(
+                    right.ExactExceptionTypeHierarchy,
+                    StringComparer.Ordinal) &&
+                LocationsEqual(left.Location, right.Location);
+        }
+
+        public int GetHashCode(
+            CompilerEffectReplayEventArtifact value)
+        {
+            return value.Ordinal;
+        }
+    }
+}

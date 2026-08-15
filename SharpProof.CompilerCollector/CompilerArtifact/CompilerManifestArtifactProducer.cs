@@ -20,11 +20,18 @@ internal static class CompilerManifestArtifactProducer
         CompilerCallableArtifact[] callables;
         if (diagnosticArtifacts.Length != 0)
         {
-            callables = [.. targets.Select(static item => new CompilerCallableArtifact {
+            callables = [.. targets.Select(item => new CompilerCallableArtifact {
                 CallableId = item.Entry.CallableId,
                 FailureReason =
                     CompilerCallableProducerReasonCatalog.DiagnosticFailureReason,
-                EffectClaims = [.. item.EffectClaims.Select(static claim => claim.Evidence)]
+                EffectClaims = [.. item.EffectClaims.Select(static claim => claim.Evidence)],
+                EffectAuthorities = [.. item.EffectClaims.Select(claim =>
+                {
+                    CompilerEffectAuthority.BindSourceTree(
+                        claim.Authority,
+                        snapshot);
+                    return claim.Authority;
+                })]
             })];
         }
         else
@@ -38,6 +45,13 @@ internal static class CompilerManifestArtifactProducer
                     lowerer.Prepare(item, cancellationToken));
                 artifact.EffectClaims = [.. item.EffectClaims.Select(
                     static claim => claim.Evidence)];
+                artifact.EffectAuthorities = [.. item.EffectClaims.Select(claim =>
+                {
+                    CompilerEffectAuthority.BindSourceTree(
+                        claim.Authority,
+                        snapshot);
+                    return claim.Authority;
+                })];
                 return artifact;
             })];
         }

@@ -206,7 +206,8 @@
           "name": "ManifestEffectClaim",
           "parameters": [
             {"type": "WorkerClaimManifestEntry", "name": "Entry"},
-            {"type": "CompilerEffectClaimArtifact", "name": "Evidence"}
+            {"type": "CompilerEffectClaimArtifact", "name": "Evidence"},
+            {"type": "CompilerEffectAuthorityArtifact", "name": "Authority"}
           ]
         }
       ],
