@@ -1905,6 +1905,14 @@ $mutations = @(
         Mutated = '            !Enum.IsDefined(typeof(WorkerClaimReason),'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerCallableFailuresUseOnlyProducerReasons'
+    },
+    [pscustomobject]@{
+        Name = 'generated-rejected-contractfor-candidate-discovery'
+        File = 'SharpProof.Contracts\ContractSelectionInventory.cs'
+        Original = '        return Is(attribute, ContractFor) ||'
+        Mutated = '        return Is(attribute, ContractFor) &&'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~PeerGeneratedRejectedContractForIsReported'
     }
 )
 

@@ -73,12 +73,8 @@ internal static class ContractForValidationEngine
         Func<SyntaxTree, bool> includeTree,
         CancellationToken cancellationToken)
     {
-        var contractFor = ContractSelectionInventory.ForCompilation(
-            compilation).ContractFor;
-        if (contractFor == null)
-        {
-            return [];
-        }
+        var selections = ContractSelectionInventory.ForCompilation(
+            compilation);
 
         var candidates = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
         foreach (var tree in compilation.SyntaxTrees)
@@ -100,9 +96,8 @@ internal static class ContractForValidationEngine
                 if (model.GetDeclaredSymbol(
                         declaration,
                         cancellationToken) is INamedTypeSymbol symbol &&
-                    ContractForSymbolMatcher.GetAttributes(
-                        symbol,
-                        contractFor).Length != 0)
+                    symbol.GetAttributes().Any(
+                        selections.IsContractForCandidate))
                 {
                     candidates.Add(symbol);
                 }

@@ -46,6 +46,15 @@ internal sealed class ContractSelectionInventory
     {
         get;
     }
+
+    internal bool IsContractForCandidate(AttributeData attribute)
+    {
+        return Is(attribute, ContractFor) ||
+            _identity.TryGetRejectedAttributeMetadataName(
+                attribute,
+                out var metadataName) &&
+            metadataName == ContractApiMetadata.ContractFor;
+    }
     internal INamedTypeSymbol? EnforcePure
     {
         get;
