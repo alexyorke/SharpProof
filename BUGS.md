@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 27 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 26 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -109,6 +109,17 @@ The active backlog contains 27 root-cause rows. Stable IDs are not renumbered; m
 - SP-AUDIT-061 removed from the supported-preview backlog: The reproducer requires ref/out calls, which the documented verifier subset rejects before effect proof.
 
 ## Fixed during remediation
+
+### SP-AUDIT-242 - Pilot reports fabricate zero false-positive review counts (fixed)
+
+- [x] Fixed by `8c810da5c` (`fix: require reviewed pilot evidence`).
+- Pilot execution emits schema-3 Unreviewed evidence with null review counts and
+  cannot write a qualification receipt. The pilot-review command requires a
+  complete ledger bound to source-report bytes, commit, six package identities,
+  five pilots, claims, and diagnostics; it derives counts and only then emits
+  Reviewed evidence and the receipt.
+- Focused pilot authority passed 1/1; corrected TCB/pilot authority passed 2/2,
+  and all changed PowerShell scripts parsed successfully.
 
 ### SP-AUDIT-241 - Constructed generic function pointers lose ref modifiers (fixed)
 
@@ -2154,22 +2165,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
-
-### SP-AUDIT-242 - Pilot reports fabricate zero false-positive review counts (P1)
-
-- [ ] `Test-SharpProofPilots.ps1` unconditionally writes
-  `falsePositiveReports = 0`, but the command accepts no review ledger or other
-  evidence from which that count could be derived.
-- Certifier impact: an unreviewed pilot run is represented identically to a
-  completed review that found no false positives, contradicting the required
-  five reviewed pilot reports and allowing incomplete qualification to appear
-  complete.
-- Required closure: define strict review evidence bound to pilot ID, candidate
-  commit, package hashes, and diagnostic or claim identity; derive counts from
-  reviewed dispositions; represent missing or incomplete review as
-  `Unreviewed`, never zero; bind the review receipt into qualification. Add one
-  false-positive, honest zero, missing, incomplete, contradictory, stale-byte,
-  and review-binding-removal controls.
 
 ## P2 active bugs
 
