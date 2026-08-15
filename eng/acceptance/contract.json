@@ -57,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 222,
-    "expectedCatalogSha256": "3058187d7d37fb81b2bfbcab2b37226ea3696230e9214224922ee7d00771d549"
+    "expectedCatalogCount": 223,
+    "expectedCatalogSha256": "f2cd318b94f08f554612ab9b8c54b47edcc769feb8d1f65d806ac1c8b3e08e95"
   },
   "worker": {
     "protocolVersion": 11,
@@ -159,6 +159,7 @@
       "scripts/Publish-SharpProofRelease.ps1",
       "scripts/SharpProof.PublicationDestination.ps1",
       "scripts/SharpProof.PublicationPlanTopology.ps1",
+      "scripts/SharpProof.PublicationPlanIdentity.psm1",
       "scripts/SharpProof.ReleaseChecksums.ps1",
       "scripts/SharpProof.ReleaseJson.ps1",
       "scripts/SharpProof.FuzzEvidenceLifecycle.ps1",
@@ -177,6 +178,8 @@
       "scripts/Test-SharpProofPackageConsumers.ps1",
       "scripts/Test-SharpProofPackageDependencies.ps1",
       "scripts/Test-SharpProofPackagePayloads.ps1",
+      "scripts/Test-SharpProofPublicationPlan.ps1",
+      "scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1",
       "scripts/Complete-SharpProofPilotReview.ps1",
       "scripts/Test-SharpProofPilotAuthorityFixtures.ps1",
       "scripts/Test-SharpProofPilots.ps1",
@@ -203,7 +206,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "7877d0f3c689058e61de5f875444cccd0a9281d69fabcde08b43eaece216654e",
+    "inventorySha256": "892240312ced7f40e8e11d4716bc3e0487092a74d977ccfeaa703769d9c6938e",
     "components": [
       {
         "name": "discovery",
@@ -685,12 +688,15 @@
           "scripts/Publish-SharpProofRelease.ps1",
           "scripts/SharpProof.PublicationDestination.ps1",
           "scripts/SharpProof.PublicationPlanTopology.ps1",
+          "scripts/SharpProof.PublicationPlanIdentity.psm1",
           "scripts/SharpProof.ReleaseChecksums.ps1",
           "scripts/SharpProof.ReleaseJson.ps1",
           "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
           "scripts/Test-SharpProofPackageDependencies.ps1",
           "scripts/Test-SharpProofPackagePayloads.ps1",
+          "scripts/Test-SharpProofPublicationPlan.ps1",
+          "scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1",
           "scripts/Complete-SharpProofPilotReview.ps1",
           "scripts/Test-SharpProofPilotAuthorityFixtures.ps1",
           "scripts/Test-SharpProofPilots.ps1",

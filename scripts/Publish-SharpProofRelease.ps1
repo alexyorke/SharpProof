@@ -42,6 +42,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanIdentity.psm1') -Force
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
@@ -876,19 +877,29 @@ foreach ($package in $release.packages) {
 }
 
 $plan = [pscustomobject][ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     planOnly = [bool]$PlanOnly
     packageVersion = $release.version
     versionAuthority = $release.versionAuthority
     repositoryCommit = $repositoryHead
     publicationDestination = $publicationDestination
     packages = @($entries)
+    artifacts = @(New-SharpProofPublicationPlanIdentities `
+        -Packages @($release.packages) `
+        -Directory $resolvedPackageSource `
+        -Version $release.version `
+        -RepositoryCommit $repositoryHead)
 }
 if ($PlanOnly) {
+    Test-SharpProofPublicationPlanIdentity -Plan $plan
     Write-PublicationPlan `
         -Plan $plan `
         -OutputPath $resolvedPlanOutputPath `
         -InputSnapshot $publicationInputSnapshot
+    if (-not [string]::IsNullOrWhiteSpace($resolvedPlanOutputPath)) {
+        & (Join-Path $PSScriptRoot 'Test-SharpProofPublicationPlan.ps1') `
+            -PlanPath $resolvedPlanOutputPath
+    }
     return
 }
 

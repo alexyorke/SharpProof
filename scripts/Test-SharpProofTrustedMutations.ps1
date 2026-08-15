@@ -1721,6 +1721,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~PublicationPlanTopologyTests'
     },
     [pscustomobject]@{
+        Name = 'release-publication-plan-identity-replay'
+        File = 'scripts\Publish-SharpProofRelease.ps1'
+        Original = '    Test-SharpProofPublicationPlanIdentity -Plan $plan'
+        Mutated = '    # Test-SharpProofPublicationPlanIdentity -Plan $plan'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublisherValidatesCurrentIdentitiesBeforeAndAfterWritingPlan'
+    },
+    [pscustomobject]@{
         Name = 'release-publication-destination-mode-exclusivity'
         File = 'scripts\SharpProof.PublicationDestination.ps1'
         Original = '    if ($hasFixture -and ($hasMain -or $hasSymbols)) {'

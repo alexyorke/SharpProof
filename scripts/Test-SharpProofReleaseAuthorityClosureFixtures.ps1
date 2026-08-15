@@ -54,7 +54,10 @@ $manifest = 'SharpProof.Verifier/SharpProof.Verifier.nuspec'
     foreach ($leaf in @(
             'scripts/New-SharpProofReleaseEvidence.ps1',
             'scripts/Test-SharpProofReleaseArtifacts.ps1',
-            'scripts/Publish-SharpProofRelease.ps1')) {
+            'scripts/Publish-SharpProofRelease.ps1',
+            'scripts/SharpProof.PublicationPlanIdentity.psm1',
+            'scripts/Test-SharpProofPublicationPlan.ps1',
+            'scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1')) {
         Write-FixtureFile $leaf "# $leaf`n"
     }
     Write-FixtureFile 'SharpProof.Verifier/SharpProof.Verifier.nuspec' '<package />'
@@ -71,6 +74,9 @@ $manifest = 'SharpProof.Verifier/SharpProof.Verifier.nuspec'
         'scripts/New-SharpProofReleaseEvidence.ps1',
         'scripts/Test-SharpProofReleaseArtifacts.ps1',
         'scripts/Publish-SharpProofRelease.ps1',
+        'scripts/SharpProof.PublicationPlanIdentity.psm1',
+        'scripts/Test-SharpProofPublicationPlan.ps1',
+        'scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1',
         'SharpProof.Verifier/SharpProof.Verifier.nuspec')
     foreach ($leaf in $requiredLeaves) {
         if ($canonical -cnotcontains $leaf) { throw "Canonical closure omitted '$leaf'." }

@@ -19,6 +19,9 @@ function Get-SharpProofReleaseAuthorityClosure {
         '.github/workflows/package-consumers.yml',
         'eng/container/entrypoint.sh',
         'scripts/Get-SharpProofReleaseAuthorityClosure.ps1',
+        'scripts/SharpProof.PublicationPlanIdentity.psm1',
+        'scripts/Test-SharpProofPublicationPlan.ps1',
+        'scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1',
         'scripts/Invoke-SharpProofContainer.ps1',
         'scripts/Invoke-SharpProofReleaseContainer.ps1',
         'SharpProof.Verifier/SharpProof.Verifier.nuspec')
@@ -39,7 +42,8 @@ function Get-SharpProofReleaseAuthorityClosure {
         }
 
         $references = [Collections.Generic.List[string]]::new()
-        if ($path.EndsWith('.ps1', [StringComparison]::Ordinal)) {
+        if ($path.EndsWith('.ps1', [StringComparison]::Ordinal) -or
+            $path.EndsWith('.psm1', [StringComparison]::Ordinal)) {
             $tokens = $null
             $errors = $null
             $ast = [Management.Automation.Language.Parser]::ParseFile(
