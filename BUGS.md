@@ -2134,7 +2134,7 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 
 ### SP-AUDIT-086 - Unboxed struct copies retain boxed-argument ownership (P1)
 
-- [ ] Region classification strips every built-in conversion without
+- [x] Region classification strips every built-in conversion without
   distinguishing representation-preserving reference conversions from
   unboxing. A local initialized by `(Value)boxed` therefore inherits the
   reference parameter's region even though unboxing creates a by-value struct
@@ -2153,6 +2153,10 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   argument, boxed field, interface boxing, nullable unboxing, failed-cast
   exceptions, reference casts, `ref` unbox controls, and by-value/ref struct
   parity plus a mutation restoring conversion-blind alias propagation.
+- Resolution: conversion ownership is now classified by representation:
+  reference-preserving conversions retain aliases, value-producing conversions
+  receive local ownership, and boxing receives a fresh region. The focused
+  conversion matrix and the complete Effects suite pass.
 
 ### SP-AUDIT-088 - Compiler effect and callable reason mapping is incomplete (P1)
 
