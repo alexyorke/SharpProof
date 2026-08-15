@@ -35,8 +35,8 @@
   "versions": {
     "workerProtocol": 11,
     "workerManifest": 4,
-    "compilerArtifact": 12,
-    "relationalSummary": 1,
+    "compilerArtifact": 13,
+    "relationalSummary": 2,
     "specificationPack": 1,
     "workerCache": 13
   }
