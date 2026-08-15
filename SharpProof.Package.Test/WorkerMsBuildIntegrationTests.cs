@@ -1036,18 +1036,22 @@ public sealed class WorkerMsBuildIntegrationTests
             ("_SharpProofCompilerManifestPath",
                 project.CompilerManifestPath + ".missing"));
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".invocation"),
             ("SharpProofLauncherPath",
                 project.CompilerManifestPath + ".missing-launcher.dll"));
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".invocation"),
             ("SharpProofWorkerPath",
                 project.CompilerManifestPath + ".missing-worker.dll"));
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".invocation"),
             ("SharpProofVerifyPolicy", "invalid"));
         await AssertInvalidatedAsync(
-            ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
+            ("_SharpProofCompilerManifestPath",
+                project.CompilerManifestPath + ".invocation"),
             ("SharpProofVerifyQueryRlimit", "0"));
 
         async Task AssertInvalidatedAsync(
@@ -3175,9 +3179,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(response.InputHash, Is.EqualTo(expectedInputHash));
             Assert.That(
                 response.Summary.Versions.WorkerBinarySha256,
-                Is.EqualTo(response.RunStatus == WorkerRunStatus.Complete
-                    ? workerBinarySha256
-                    : WorkerProtocolVersions.EmptySha256));
+                Is.EqualTo(workerBinarySha256));
             Assert.That(
                 artifact.ManifestHash,
                 Is.EqualTo(response.Manifest.Hash));

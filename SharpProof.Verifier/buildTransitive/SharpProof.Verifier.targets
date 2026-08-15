@@ -30,7 +30,8 @@
     <_SharpProofAssumptionPolicyNormalized>$([System.String]::Copy('$(SharpProofAssumptionPolicy)').ToLowerInvariant())</_SharpProofAssumptionPolicyNormalized>
   </PropertyGroup>
 
-  <Target Name="_SharpProofValidateRuntimeClosure">
+  <Target Name="_SharpProofValidateRuntimeClosure"
+          DependsOnTargets="_SharpProofInitializeVerify">
     <Error Condition="'$(_SharpProofToolsDirectory)' != '$(_SharpProofPackageToolsDirectory)' OR '$(_SharpProofWorkerPath)' != '$(_SharpProofPackageWorkerPath)' OR '$(_SharpProofLauncherPath)' != '$(_SharpProofPackageLauncherPath)' OR '$(_SharpProofWorkerProtocolPath)' != '$(_SharpProofPackageWorkerProtocolPath)' OR '$(_SharpProofBuildTasksPath)' != '$(_SharpProofPackageBuildTasksPath)'"
            Text="SharpProof verifier runtime paths must resolve to the exact package-owned runtime closure." />
     <Error Condition="!Exists('$(_SharpProofPackageNativeZ3Path)')"
@@ -38,7 +39,6 @@
   </Target>
 
   <Target Name="_SharpProofInitializeVerify"
-          DependsOnTargets="_SharpProofValidateRuntimeClosure"
           BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile">
     <PropertyGroup>
       <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofVerifyDirectory>
@@ -211,12 +211,15 @@
       <_SharpProofCleanResultFile Condition="'$(SharpProofVerifyResultFile)' != ''">$(SharpProofVerifyResultFile)</_SharpProofCleanResultFile>
       <_SharpProofCleanManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'compiler-manifest.json'))</_SharpProofCleanManifestFile>
       <_SharpProofCleanManifestFile Condition="'$(SharpProofCompilerManifestFile)' != ''">$(SharpProofCompilerManifestFile)</_SharpProofCleanManifestFile>
+      <_SharpProofCleanSarifFile>$(SharpProofVerifySarifFile)</_SharpProofCleanSarifFile>
+      <_SharpProofCleanConfiguredSarifFullPath Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofVerifySarifFile)'))</_SharpProofCleanConfiguredSarifFullPath>
+      <_SharpProofCleanSarifFile Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(_SharpProofCleanConfiguredSarifFullPath)')), '$(TargetFramework)', $([System.IO.Path]::GetFileName('$(_SharpProofCleanConfiguredSarifFullPath)'))))</_SharpProofCleanSarifFile>
     </PropertyGroup>
     <SharpProof.BuildTasks.ResetPublishedVerification
         RequestPath="$(_SharpProofCleanRequestFile)"
         ResultPath="$(_SharpProofCleanResultFile)"
         ManifestPath="$(_SharpProofCleanManifestFile)"
-        SarifPath="$(SharpProofVerifySarifFile)" />
+        SarifPath="$(_SharpProofCleanSarifFile)" />
   </Target>
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
