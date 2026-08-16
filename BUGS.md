@@ -2338,9 +2338,14 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   timeout, success, cleanup failure/recovery, and repeated builds. Diagnostics
   remain available until classification, and placement/removal controls pass.
 
-### SP-AUDIT-063 - Publication commit is not atomic or crash-durable (P2)
+### SP-AUDIT-063 - Publication commit is not atomic or crash-durable (fixed)
 
-- [ ] `PublishOutputs` replaces the compiler manifest and request before it
+- [x] Fixed by `81e82fd8e`, `cb14be810`, `62c7abc2d`, `b70dd7566`, and
+  `c0515c5d1`. Publication now stages and synchronizes every member, removes
+  the old result commit first, publishes prerequisites, and publishes and
+  directory-syncs the result commit last; caught failures invalidate the owned
+  generation rather than exposing a partial commit.
+- `PublishOutputs` previously replaced the compiler manifest and request before it
   writes optional SARIF and the result commit marker. Its failure cleanup
   deletes only result and SARIF, so an ordinary late write failure preserves
   the new request/manifest beside missing or older remaining outputs.
@@ -2363,6 +2368,8 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   restores manifest/request-first publication.
 - Consolidated cases: SP-AUDIT-176.
 - Unified closure: Publish one generation transactionally, sync data and directories, publish the commit member last, and roll back or invalidate the whole set on failure.
+- Transaction ordering/removal controls passed 3/3 and atomic staging,
+  cancellation, failure cleanup, and stable-name controls passed 5/5.
 
 ### SP-AUDIT-102 - Specification-pack configuration is not canonically sealed (fixed)
 
