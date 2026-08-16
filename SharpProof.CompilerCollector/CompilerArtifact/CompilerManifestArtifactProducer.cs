@@ -160,7 +160,7 @@ internal static class CompilerManifestArtifactProducer
     {
         if (identity.Length == 0 ||
             !CompilerSpecificationPackCatalogVersions.PackIdentities
-                .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
                 .Contains(identity, StringComparer.Ordinal))
         {
             return false;

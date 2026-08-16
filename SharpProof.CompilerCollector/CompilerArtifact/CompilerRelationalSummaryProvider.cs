@@ -377,7 +377,7 @@ internal sealed class CompilerRelationalSummaryProvider
                     string.Empty,
                     -1,
                     -1,
-                    moduleName,
+                    moduleName!,
                     method.MetadataToken);
         }
 
