@@ -26,7 +26,10 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
     public IEnumerable<string> Validate(WorkerVerifyResponse response)
     {
-        ArgumentNullException.ThrowIfNull(response);
+        if (response == null)
+        {
+            throw new ArgumentNullException(nameof(response));
+        }
 
         var errors = new HashSet<string>(StringComparer.Ordinal);
         var claims = (response.ClaimResults ?? [])
@@ -143,7 +146,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
             return;
         }
 
-        var used = expectedUsed.ToHashSet(StringComparer.Ordinal);
+        var used = new HashSet<string>(expectedUsed, StringComparer.Ordinal);
         foreach (var assumption in actual ?? [])
         {
             if (assumption.Used != used.Contains(assumption.Id))
