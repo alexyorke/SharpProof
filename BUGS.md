@@ -1964,9 +1964,14 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
 - Consolidated cases: SP-AUDIT-120, SP-AUDIT-148, SP-AUDIT-149, SP-AUDIT-150.
 - Unified closure: Independently derive the complete production project/source/parse-option/generator universe and make coverage, complexity, generated exclusions, and TCB consume it.
 
-### SP-AUDIT-058 - Summary provenance is unauthenticated or incompletely projected (P0)
+### SP-AUDIT-058 - Summary provenance is unauthenticated or incompletely projected (fixed)
 
-- [ ] `CompilerLoweredArtifact.ValidSummaryEvidence` validates source and
+- [x] Fixed by the provenance authority series `a0dedc689` through
+  `4f0398d1b`, with tamper coverage in `2bbb579bd`. Source summaries bind the
+  owning callee/tree/span, IL summaries bind module/MVID/SHA/token, pack
+  summaries bind exact catalog identity/digest, and transitive dependencies
+  are authenticated and projected into proof evidence.
+- `CompilerLoweredArtifact.ValidSummaryEvidence` previously validated source and
   specification-pack provenance as only a syntactically valid SHA-256 plus an
   origin-shaped identity. It never binds a specification-pack digest to the
   catalog content identified by `pack@version`, nor a source-summary digest to
@@ -1988,6 +1993,8 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   and exact-valid controls plus provenance mutations.
 - Consolidated cases: SP-AUDIT-239.
 - Unified closure: Authenticate every source, IL, specification, and transitive summary dependency at hydration and project the materially used closure into proof evidence.
+- The source/IL/pack/transitive tamper matrix passed 1/1 on the merged root;
+  the valid 257-parameter IL discriminator also passed 1/1.
 
 ### SP-AUDIT-080 - Compiler feature labels do not bind discovered proof scope (fixed)
 
