@@ -2364,9 +2364,13 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Consolidated cases: SP-AUDIT-176.
 - Unified closure: Publish one generation transactionally, sync data and directories, publish the commit member last, and roll back or invalidate the whole set on failure.
 
-### SP-AUDIT-102 - Specification-pack configuration is not canonically sealed (P2)
+### SP-AUDIT-102 - Specification-pack configuration is not canonically sealed (fixed)
 
-- [ ] Selected pack IDs are passed only into callable lowering. Schema 12 stores
+- [x] Fixed by `0e6fb3921`, `af53520e8`, `16078c207`, and reconciliation
+  `0f2813170`. Schema 13 seals sorted selected pack IDs plus the exact catalog
+  version/digest in both the envelope and compilation fingerprint, including
+  the unused-pack case, and hydration rejects missing authority properties.
+- Selected pack IDs were previously passed only into callable lowering. Schema 12 stored
   a pack/catalog identity only in summaries that actually use a pack; the
   artifact envelope contains no configured selection set.
 - Supported impact: the same call-free contract project produced byte-identical
@@ -2383,6 +2387,8 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   controls; a wire-version decision may be required.
 - Consolidated cases: SP-AUDIT-195.
 - Unified closure: Seal sorted selected pack IDs and exact catalog/version digest even when unused, with one identity predicate from catalog load through hydration.
+- Deterministic model verification and the focused authority/omission matrix
+  passed 6/6; the full post-merge Worker suite passed 564/564.
 
 ### SP-AUDIT-122 - Clean cannot recover publication-set metadata (fixed)
 
