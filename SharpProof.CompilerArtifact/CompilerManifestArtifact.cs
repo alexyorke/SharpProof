@@ -579,6 +579,8 @@ internal static class CompilerManifestArtifactJson
             CompilerContractEvidence.Companion => WorkerClaimEvidence.CompanionClause,
             _ => WorkerClaimEvidence.Unspecified
         };
+    }
+
     private static void RequireSpecificationPackAuthorityProperties(string json)
     {
         using var document = JsonDocument.Parse(
