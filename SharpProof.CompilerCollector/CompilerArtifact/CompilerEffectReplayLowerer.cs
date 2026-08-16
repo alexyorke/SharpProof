@@ -68,7 +68,8 @@ internal static class CompilerEffectReplayLowerer
                 witness.Origin,
                 cancellationToken,
                 out var treeOrdinal,
-                out var treeSha256))
+                out var treeSha256,
+                out var treeSnapshotSha256))
         {
             return false;
         }
@@ -143,6 +144,7 @@ internal static class CompilerEffectReplayLowerer
             Kind = eventKind,
             SyntaxTreeOrdinal = treeOrdinal,
             SyntaxTreeSha256 = treeSha256,
+            SyntaxTreeSnapshotSha256 = treeSnapshotSha256,
             SyntaxStart = syntax.SpanStart,
             SyntaxLength = syntax.Span.Length,
             MemberIdentity = memberIdentity,
@@ -179,7 +181,8 @@ internal static class CompilerEffectReplayLowerer
         IOperation operation,
         CancellationToken cancellationToken,
         out int treeOrdinal,
-        out string treeSha256)
+        out string treeSha256,
+        out string treeSnapshotSha256)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var trees = compilation.SyntaxTrees;
@@ -187,19 +190,27 @@ internal static class CompilerEffectReplayLowerer
         if (treeOrdinal < 0)
         {
             treeSha256 = string.Empty;
+            treeSnapshotSha256 = string.Empty;
             return false;
         }
 
-        var text = operation.Syntax.SyntaxTree.GetText(cancellationToken);
+        var tree = operation.Syntax.SyntaxTree;
+        var text = tree.GetText(cancellationToken);
         if (operation.Syntax.SpanStart < 0 ||
             operation.Syntax.Span.End > text.Length)
         {
             treeSha256 = string.Empty;
+            treeSnapshotSha256 = string.Empty;
             return false;
         }
 
         treeSha256 =
             CompilerCompilationCapture.ComputeTextSha256(text);
+        treeSnapshotSha256 = CompilationFingerprint
+            .ComputeSyntaxTreeSnapshotSha256(
+                CompilerCompilationCapture.CaptureTree(
+                    tree,
+                    cancellationToken));
         return true;
     }
 }

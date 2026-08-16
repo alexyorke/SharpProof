@@ -260,6 +260,7 @@ internal sealed class CompilerEffectReplayEventArtifact
     public CompilerEffectReplayEventKind Kind { get; set; }
     public int SyntaxTreeOrdinal { get; set; } = -1;
     public string SyntaxTreeSha256 { get; set; } = string.Empty;
+    public string SyntaxTreeSnapshotSha256 { get; set; } = string.Empty;
     public int SyntaxStart { get; set; } = -1;
     public int SyntaxLength { get; set; } = -1;
     public string OperationIdentitySha256 { get; set; } = string.Empty;

@@ -1113,6 +1113,8 @@ public sealed class CompilerManifestArtifactTests
                         Kind = value.Kind,
                         SyntaxTreeOrdinal = value.SyntaxTreeOrdinal,
                         SyntaxTreeSha256 = value.SyntaxTreeSha256,
+                        SyntaxTreeSnapshotSha256 =
+                            value.SyntaxTreeSnapshotSha256,
                         SyntaxStart = value.SyntaxStart,
                         SyntaxLength = value.SyntaxLength,
                         OperationIdentitySha256 = value.OperationIdentitySha256,

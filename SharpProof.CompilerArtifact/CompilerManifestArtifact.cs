@@ -675,6 +675,8 @@ internal static class CompilerManifestArtifactJson
             var tree = compilation.SyntaxTrees[effectEvent.SyntaxTreeOrdinal];
             if (tree == null ||
                 effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
+                effectEvent.SyntaxTreeSnapshotSha256 !=
+                    CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
                 effectEvent.SyntaxStart < 0 ||
                 effectEvent.SyntaxLength <= 0 ||
                 effectEvent.SyntaxStart > tree.TextLength ||

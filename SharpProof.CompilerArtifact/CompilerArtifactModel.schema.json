@@ -1895,6 +1895,16 @@
           }
         },
         {
+          "name": "SyntaxTreeSnapshotSha256",
+          "jsonName": "syntaxTreeSnapshotSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
           "name": "SyntaxStart",
           "jsonName": "syntaxStart",
           "type": "int",

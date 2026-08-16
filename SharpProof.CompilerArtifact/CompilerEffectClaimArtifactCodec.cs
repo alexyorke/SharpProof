@@ -95,6 +95,7 @@ internal static class CompilerEffectClaimArtifactCodec
             !CompilerEffectEvidenceCatalog.SupportedReplayEventKinds.Contains(value.Kind) ||
             value.SyntaxTreeOrdinal < 0 ||
             !WorkerProtocolJson.IsSha256(value.SyntaxTreeSha256) ||
+            !WorkerProtocolJson.IsSha256(value.SyntaxTreeSnapshotSha256) ||
             value.SyntaxStart < 0 || value.SyntaxLength <= 0 ||
             value.SyntaxStart > int.MaxValue - value.SyntaxLength ||
             value.OperationIdentitySha256 != ComputeReplayOperationSha256(value) ||
@@ -211,7 +212,7 @@ internal static class CompilerEffectClaimArtifactCodec
         }
 
         hash.Add(value.Kind, value.SyntaxTreeOrdinal, value.SyntaxTreeSha256,
-            value.SyntaxStart, value.SyntaxLength);
+            value.SyntaxTreeSnapshotSha256, value.SyntaxStart, value.SyntaxLength);
         if (includeOperationIdentity)
         {
             hash.Add(value.OperationIdentitySha256);

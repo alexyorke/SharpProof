@@ -454,12 +454,21 @@ public sealed class EffectCounterexampleReplayTests
         var isObject =
             kind ==
             CompilerEffectReplayEventKind.ManagedObjectAllocation;
+        var snapshot = new CompilerSyntaxTreeSnapshot
+        {
+            Path = "Subject.cs",
+            Sha256 = TreeSha256,
+            TextLength = 100
+        };
         var effectEvent = new CompilerEffectReplayEventArtifact
         {
             Ordinal = 0,
             Kind = kind,
             SyntaxTreeOrdinal = 0,
             SyntaxTreeSha256 = TreeSha256,
+            SyntaxTreeSnapshotSha256 =
+                CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(
+                    snapshot),
             SyntaxStart = location.Start,
             SyntaxLength = location.Length,
             MemberIdentity = isObject
@@ -532,12 +541,7 @@ public sealed class EffectCounterexampleReplayTests
             Compilation = new CompilerCompilationSnapshot
             {
                 SyntaxTrees = [
-                    new CompilerSyntaxTreeSnapshot
-                    {
-                        Path = "Subject.cs",
-                        Sha256 = TreeSha256,
-                        TextLength = 100
-                    }
+                    snapshot
                 ]
             }
         };

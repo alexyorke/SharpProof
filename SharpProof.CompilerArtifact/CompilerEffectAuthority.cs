@@ -244,6 +244,7 @@ internal static class CompilerEffectAuthority
             Kind = value.Kind,
             SyntaxTreeOrdinal = value.SyntaxTreeOrdinal,
             SyntaxTreeSha256 = value.SyntaxTreeSha256,
+            SyntaxTreeSnapshotSha256 = value.SyntaxTreeSnapshotSha256,
             SyntaxStart = value.SyntaxStart,
             SyntaxLength = value.SyntaxLength,
             OperationIdentitySha256 = value.OperationIdentitySha256,
@@ -288,6 +289,7 @@ internal static class CompilerEffectAuthority
                 left.Kind == right.Kind &&
                 left.SyntaxTreeOrdinal == right.SyntaxTreeOrdinal &&
                 left.SyntaxTreeSha256 == right.SyntaxTreeSha256 &&
+                left.SyntaxTreeSnapshotSha256 == right.SyntaxTreeSnapshotSha256 &&
                 left.SyntaxStart == right.SyntaxStart &&
                 left.SyntaxLength == right.SyntaxLength &&
                 left.OperationIdentitySha256 == right.OperationIdentitySha256 &&

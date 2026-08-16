@@ -7,6 +7,25 @@ internal static class CompilationFingerprint
     private const string RuntimeContractEvaluationSymbol =
         "SHARPPROOF_CONTRACTS";
 
+    private const string SyntaxTreeSnapshotDomain =
+        "SharpProof.CompilerSyntaxTreeSnapshot";
+    private const int SyntaxTreeSnapshotVersion = 1;
+
+    internal static string ComputeSyntaxTreeSnapshotSha256(
+        CompilerSyntaxTreeSnapshot snapshot)
+    {
+        snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
+
+        using var hash = new CanonicalHashWriter();
+        hash.Add(
+            SyntaxTreeSnapshotDomain,
+            SyntaxTreeSnapshotVersion,
+            JsonSerializer.SerializeToUtf8Bytes(
+                snapshot,
+                WorkerProtocolJson.Options));
+        return hash.Finish();
+    }
+
     internal static string ComputeSha256(
         CompilerCompilationSnapshot snapshot,
         CompilerDiagnosticArtifact[] diagnostics)

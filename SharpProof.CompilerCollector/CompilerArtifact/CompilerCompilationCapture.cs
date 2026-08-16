@@ -110,7 +110,9 @@ internal static class CompilerCompilationCapture
                 .ThenBy(static file => file.Sha256, StringComparer.Ordinal)]
         };
     }
-    private static CompilerSyntaxTreeSnapshot CaptureTree(SyntaxTree tree, CancellationToken cancellationToken)
+    internal static CompilerSyntaxTreeSnapshot CaptureTree(
+        SyntaxTree tree,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var parse = (CSharpParseOptions)tree.Options;

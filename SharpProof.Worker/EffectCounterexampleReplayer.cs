@@ -82,6 +82,8 @@ internal static class EffectCounterexampleReplayer
         var tree = trees[effectEvent.SyntaxTreeOrdinal];
         if (tree == null ||
             effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
+            effectEvent.SyntaxTreeSnapshotSha256 !=
+                CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
             effectEvent.SyntaxStart < 0 ||
             effectEvent.SyntaxLength <= 0 ||
             effectEvent.SyntaxStart > tree.TextLength ||
@@ -241,6 +243,7 @@ internal static class EffectCounterexampleReplayer
             effectEvent.Kind,
             effectEvent.SyntaxTreeOrdinal,
             effectEvent.SyntaxTreeSha256,
+            effectEvent.SyntaxTreeSnapshotSha256,
             effectEvent.SyntaxStart,
             effectEvent.SyntaxLength,
             effectEvent.MemberIdentity,
