@@ -1240,6 +1240,13 @@ public sealed class CompilerManifestArtifactTests
         evidence.Witness = null;
         evidence.Replay = null;
         CompilerEffectClaimArtifactCodec.Seal(evidence);
+        var authority = artifact.Callables.Single().EffectAuthorities
+            .Single(item => item.ClaimId == evidence.ClaimId);
+        authority.Outcome = evidence.Outcome;
+        authority.Reason = evidence.Reason;
+        authority.Certainty = evidence.Certainty;
+        authority.Witness = null;
+        authority.Replay = null;
 
         var target = CompilerManifestArtifactJson.DecodeCallables(artifact)
             .Single();
