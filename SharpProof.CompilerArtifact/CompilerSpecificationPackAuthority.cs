@@ -2,6 +2,8 @@ namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerSpecificationPackAuthorityValidation
 {
+    private static readonly char[] PackIdentitySeparators = [';'];
+
     internal static bool IsValid(
         string[]? packIds,
         int catalogVersion,
@@ -18,7 +20,7 @@ internal static class CompilerSpecificationPackAuthorityValidation
         }
 
         var knownPackIds = CompilerSpecificationPackCatalogVersions.PackIds
-            .Split([';'], StringSplitOptions.RemoveEmptyEntries);
+            .Split(PackIdentitySeparators, StringSplitOptions.RemoveEmptyEntries);
         return packIds.All(packId =>
             knownPackIds.Contains(packId, StringComparer.Ordinal));
     }
@@ -41,7 +43,7 @@ internal static class CompilerSpecificationPackAuthorityValidation
         if (identity is not { Length: > 0 and <= 128 } ||
             selectedPackIds == null ||
             !CompilerSpecificationPackCatalogVersions.PackIdentities
-                .Split([';'], StringSplitOptions.RemoveEmptyEntries)
+                .Split(PackIdentitySeparators, StringSplitOptions.RemoveEmptyEntries)
                 .Contains(identity, StringComparer.Ordinal))
         {
             return false;

@@ -3,6 +3,8 @@ namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerManifestArtifactProducer
 {
+    private static readonly char[] PackIdentitySeparators = [';'];
+
     internal static CompilerManifestArtifact Create(CSharpCompilation compilation, string projectDirectory,
         string targetFramework, WorkerFeatureSet features, ClaimManifestBuildResult discovery,
         int maximumExpressionDepth, CancellationToken cancellationToken,
@@ -160,7 +162,7 @@ internal static class CompilerManifestArtifactProducer
     {
         if (identity.Length == 0 ||
             !CompilerSpecificationPackCatalogVersions.PackIdentities
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Split(PackIdentitySeparators, StringSplitOptions.RemoveEmptyEntries)
                 .Contains(identity, StringComparer.Ordinal))
         {
             return false;
