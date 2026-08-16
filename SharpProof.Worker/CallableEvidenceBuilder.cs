@@ -131,11 +131,14 @@ internal static class CallableEvidenceBuilder
                 ? summaryPrefix + ":" +
                     summaryAssumption.EvidenceIdentity
                 : summaryPrefix;
+            var dependencyEvidence = BuildDependencyEvidenceLabel(
+                summaryAssumption.DependencyEvidence);
 
             ProofJustification justification = new LoweredJustification(
                 factory.CreateOperation(
                     summaryEvidence + ":" +
-                    summaryAssumption.EvidenceSha256));
+                    summaryAssumption.EvidenceSha256 +
+                    dependencyEvidence));
             assumptions.Add(new Assumption(
                 factory,
                 predicate,
@@ -143,7 +146,8 @@ internal static class CallableEvidenceBuilder
             labels.Add(
                 justification,
                 summaryEvidence + ":" +
-                summaryAssumption.CallIdentity);
+                summaryAssumption.CallIdentity +
+                dependencyEvidence);
         }
 
         if (!TryAddSourceDomainAssumptions(
@@ -216,6 +220,29 @@ internal static class CallableEvidenceBuilder
             _ => string.Empty
         };
         return prefix.Length != 0;
+    }
+
+    private static string BuildDependencyEvidenceLabel(
+        ImmutableArray<CompilerPreparedSummaryEvidence> evidence)
+    {
+        if (evidence.IsDefaultOrEmpty)
+        {
+            return string.Empty;
+        }
+
+        var values = evidence.Select(item =>
+        {
+            var prefix = item.Origin switch
+            {
+                CompilerSummaryOrigin.Source => "source-summary",
+                CompilerSummaryOrigin.ImplementationIl => "il-summary",
+                CompilerSummaryOrigin.SpecificationPack => "spec-pack:" + item.EvidenceIdentity,
+                _ => throw new InvalidDataException(
+                    "A summary dependency has an unsupported origin.")
+            };
+            return prefix + ":" + item.CallIdentity + ":" + item.EvidenceSha256;
+        });
+        return ":deps=" + string.Join(";", values);
     }
 
     internal static CallableEntryEvidenceBuildResult BuildEntry(

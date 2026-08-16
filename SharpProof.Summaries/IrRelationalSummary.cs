@@ -47,7 +47,8 @@ public sealed class IrSummaryProvenance
     public IrSummaryProvenance(
         IrSummaryOrigin origin,
         string evidenceSha256,
-        string evidenceIdentity = "")
+        string evidenceIdentity = "",
+        string evidenceCallIdentity = "")
     {
         if (!Enum.IsDefined(typeof(IrSummaryOrigin), origin))
         {
@@ -74,6 +75,8 @@ public sealed class IrSummaryProvenance
         Origin = origin;
         EvidenceSha256 = evidenceSha256;
         EvidenceIdentity = evidenceIdentity;
+        EvidenceCallIdentity = evidenceCallIdentity ?? throw new ArgumentNullException(
+            nameof(evidenceCallIdentity));
     }
 
     public IrSummaryOrigin Origin { get; }
@@ -81,6 +84,8 @@ public sealed class IrSummaryProvenance
     public string EvidenceSha256 { get; }
 
     public string EvidenceIdentity { get; }
+
+    public string EvidenceCallIdentity { get; }
 
     private static bool IsSha256(string? value)
     {

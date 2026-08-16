@@ -478,6 +478,7 @@
             {"type": "CompilerSummaryOrigin", "name": "Origin"},
             {"type": "string", "name": "EvidenceSha256"},
             {"type": "string", "name": "EvidenceIdentity"},
+            {"type": "ImmutableArray<CompilerPreparedSummaryEvidence>", "name": "DependencyEvidence"},
             {"type": "IrTerm", "name": "Guard"},
             {"type": "IrTerm", "name": "Predicate"}
           ]
