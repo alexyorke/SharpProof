@@ -6066,6 +6066,64 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void TemporaryEffectStepBaselineProbe()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global {
+                public static int State;
+
+                public static int Fail() =>
+                    throw new InvalidOperationException();
+
+                public static int Mutate() {
+                    State++;
+                    return 1;
+                }
+            }
+
+            public sealed class Target {
+                public void Touch() => Global.State++;
+
+                public void Pair(int first, int second) => Global.State++;
+            }
+
+            public static class Sample {
+                public static void NullReceiver() {
+                    Target? target = null;
+                    target.Touch();
+                }
+
+                public static void FirstArgumentThrows() {
+                    var target = new Target();
+                    target.Pair(Global.Fail(), Global.Mutate());
+                }
+
+                public static void NullLock() {
+                    object? gate = null;
+                    lock (gate) {
+                        Global.State++;
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "NullReceiver", "FirstArgumentThrows", "NullLock"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False,
+                methodName);
+        }
+    }
+
+    [Test]
     public void DeeplyNestedExpressionsAbstainInsteadOfExhaustingTheStack()
     {
         var chain = string.Join(" + ", Enumerable.Repeat("value", 400));

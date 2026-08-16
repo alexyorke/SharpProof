@@ -9,6 +9,7 @@ internal sealed class OperationEffectScanner
     private readonly EffectCallSiteResolver _callResolver;
     private readonly ConversionEffectClassifier _conversionEffects;
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
+    private readonly DefiniteOperationFacts _completionFacts;
     private readonly CreationFlowCaptures _creationCaptures = new();
     private readonly SyntaxNode? _directSyntax;
     private readonly ImmutableArray<EffectDirectWitness>.Builder _directWitnesses =
@@ -46,6 +47,9 @@ internal sealed class OperationEffectScanner
                 calls,
                 abstractFlow);
         _conversionEffects = new ConversionEffectClassifier(session, abstractFlow);
+        _completionFacts = new DefiniteOperationFacts(
+            session.Compilation,
+            CancellationToken.None);
         _conversionOwnership = new ConversionOwnershipClassifier(
             _method,
             _coalesceCaptures,
@@ -208,8 +212,7 @@ internal sealed class OperationEffectScanner
                 ResolveOperatorEffects(increment.OperatorMethod, [increment.Target], increment)),
             IInvocationOperation invocation => ScanInvocation(invocation),
             IObjectCreationOperation creation => ScanObjectCreation(creation),
-            IArrayCreationOperation array => EffectSummaryOperations.Join(ScanChildren(array),
-                EffectSummaryOperations.Allocate(EffectAllocationKind.Managed), ArrayCreationExceptions(array)),
+            IArrayCreationOperation array => ScanArrayCreation(array),
             IOperation allocation when allocation is
                 IDelegateCreationOperation or IAnonymousObjectCreationOperation =>
                 EffectSummaryOperations.Join(
@@ -225,10 +228,9 @@ internal sealed class OperationEffectScanner
             IBinaryOperation binary => ScanBinary(binary),
             IUnaryOperation unary => ScanUnary(unary),
             IConversionOperation conversion => ScanConversion(conversion),
-            ILockOperation @lock => EffectSummaryOperations.Join(
-                ScanChildren(@lock),
-                PotentialNullLock(@lock.LockedValue, @lock),
-                EffectSummaryOperations.Capability(EffectCapabilityKind.Synchronization)),
+            IConditionalAccessOperation conditional =>
+                ScanConditionalAccess(conditional),
+            ILockOperation @lock => ScanLock(@lock),
             ILoopOperation loop => EffectSummaryOperations.Join(
                 ScanChildren(loop), EffectSummaryOperations.MayDiverge()),
             IInvalidOperation or IDynamicInvocationOperation or
@@ -248,14 +250,32 @@ internal sealed class OperationEffectScanner
             return EffectSummary.Empty;
         }
 
+        var instance = field.Instance == null
+            ? EffectStep.Empty
+            : ScanStep(field.Instance);
+        if (!instance.CompletesNormally)
+        {
+            return instance.Summary;
+        }
+
+        var receiverCheck = field.Instance == null
+            ? EffectStep.Empty
+            : new EffectStep(
+                PotentialNullReceiver(field.Instance, field),
+                !IsProvenNull(field.Instance, field));
+        var evaluation = instance.Then(receiverCheck);
+        if (!evaluation.CompletesNormally)
+        {
+            return evaluation.Summary;
+        }
+
         var region = field.Field.IsStatic
             ? EffectRegionSet.Create(EffectRegionId.Static())
             : _conversionOwnership.ClassifyRegion(field.Instance);
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         return EffectSummaryOperations.Join(
-            ScanInstance(field.Instance),
-            PotentialNullReceiver(field.Instance, field),
+            evaluation.Summary,
             accessSummary,
             field.Field.IsVolatile
                 ? EffectSummaryOperations.Capability(EffectCapabilityKind.Synchronization)
@@ -299,8 +319,13 @@ internal sealed class OperationEffectScanner
         {
             return access == EffectAccess.Write
                 ? EffectSummaryOperations.Unsupported()
-                : EffectSummaryOperations.Join(
-                    ScanCallChildren(property.Instance, property.Arguments, property),
+                : EffectSummaryDomain.Instance.Join(
+                    ScanSequence(
+                        (property.Instance == null
+                            ? property.Arguments.Select(static argument => argument.Value)
+                            : new[] { property.Instance }.Concat(
+                                property.Arguments.Select(static argument => argument.Value))))
+                        .Summary,
                     EffectSummaryOperations.Unsupported());
         }
 
@@ -333,13 +358,35 @@ internal sealed class OperationEffectScanner
         EffectAccess access,
         IOperation? assignedValue = null)
     {
+        var array = ScanStep(element.ArrayReference);
+        if (!array.CompletesNormally)
+        {
+            return array.Summary;
+        }
+
+        var indices = ScanSequence(element.Indices);
+        var evaluation = array.Then(indices);
+        if (!evaluation.CompletesNormally)
+        {
+            return evaluation.Summary;
+        }
+
         var region = _conversionOwnership.ClassifyRegion(element.ArrayReference);
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         var exceptions = EffectSummary.Empty;
+        if (IsProvenNull(element.ArrayReference, element))
+        {
+            return EffectSummaryDomain.Instance.Join(
+                evaluation.Summary,
+                Throw(FrameworkTypeMetadataNames.NullReferenceException));
+        }
+
         if (!IsProvenNonNull(element.ArrayReference, element))
         {
-            exceptions = EffectSummaryOperations.Join(exceptions, Throw(FrameworkTypeMetadataNames.NullReferenceException));
+            exceptions = EffectSummaryOperations.Join(
+                exceptions,
+                Throw(FrameworkTypeMetadataNames.NullReferenceException));
         }
 
         if (_abstractFlow?.ProvesArrayAccess(element) != true)
@@ -356,8 +403,7 @@ internal sealed class OperationEffectScanner
         }
 
         return EffectSummaryOperations.Join(
-            Scan(element.ArrayReference),
-            ScanMany(element.Indices),
+            evaluation.Summary,
             accessSummary,
             exceptions);
     }
@@ -531,26 +577,70 @@ internal sealed class OperationEffectScanner
         IOperation origin,
         EffectRegionSet? receiver = null)
     {
-        return EffectSummaryOperations.Join(
-            ScanCallChildren(instance, arguments, origin),
-            _callResolver.Resolve(
-                method,
-                receiver ?? _conversionOwnership.ClassifyRegion(instance),
-                argumentRegions,
-                actualArguments,
-                dispatchUncertain,
-                origin,
-                instance,
-                arguments));
+        return ScanCallStep(
+            method,
+            instance,
+            arguments,
+            argumentRegions,
+            actualArguments,
+            dispatchUncertain,
+            origin,
+            receiver).Summary;
     }
 
-    private EffectSummary ScanCallChildren(
-        IOperation? instance, IEnumerable<IArgumentOperation> arguments, IOperation origin)
+    private EffectStep ScanCallStep(
+        IMethodSymbol method,
+        IOperation? instance,
+        ImmutableArray<IArgumentOperation> arguments,
+        ImmutableArray<EffectRegionSet> argumentRegions,
+        ImmutableArray<IOperation?> actualArguments,
+        bool dispatchUncertain,
+        IOperation origin,
+        EffectRegionSet? receiver = null)
     {
-        return EffectSummaryOperations.Join(
-            ScanInstance(instance),
-            ScanArgumentValues(arguments),
-            PotentialNullReceiver(instance, origin));
+        var result = EffectStep.Empty;
+        if (instance != null)
+        {
+            result = result.Then(ScanStep(instance));
+            if (!result.CompletesNormally)
+            {
+                return result;
+            }
+        }
+
+        if (instance != null && method.ReducedFrom == null)
+        {
+            var receiverCheck = new EffectStep(
+                PotentialNullReceiver(instance, origin),
+                !IsProvenNull(instance, origin));
+            result = result.Then(receiverCheck);
+            if (!result.CompletesNormally)
+            {
+                return result;
+            }
+        }
+
+        foreach (var argument in arguments)
+        {
+            result = result.Then(ScanStep(argument.Value));
+            if (!result.CompletesNormally)
+            {
+                return result;
+            }
+        }
+
+        var call = _callResolver.Resolve(
+            method,
+            receiver ?? _conversionOwnership.ClassifyRegion(instance),
+            argumentRegions,
+            actualArguments,
+            dispatchUncertain,
+            origin,
+            instance,
+            arguments);
+        return result.Then(new EffectStep(
+            call,
+            CanCompleteInvocation(method, instance, origin)));
     }
 
     private EffectSummary ScanInstance(IOperation? instance)
@@ -561,25 +651,114 @@ internal sealed class OperationEffectScanner
     private EffectSummary ScanArgumentValues(
         IEnumerable<IArgumentOperation> arguments)
     {
-        return ScanMany(arguments.Select(static argument => argument.Value));
+        return ScanSequence(arguments.Select(static argument => argument.Value))
+            .Summary;
     }
 
     private EffectSummary ScanObjectCreation(IObjectCreationOperation creation)
     {
         var receiver = EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart));
-        return EffectSummaryOperations.Join(
-            ScanArgumentValues(creation.Arguments),
-            creation.Initializer == null
-                ? EffectSummary.Empty
-                : ScanChildren(creation.Initializer),
-            creation.Type?.IsValueType == true ? EffectSummary.Empty : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed),
-            _callResolver.ResolveConstruction(
-                creation,
-                receiver,
-                ClassifyArguments(
-                    creation.Arguments,
-                    creation.Constructor?.Parameters.Length ??
-                    0)));
+        var arguments = ScanSequence(
+            creation.Arguments.Select(static argument => argument.Value));
+        var allocation = creation.Type?.IsValueType == true
+            ? EffectSummary.Empty
+            : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
+        if (!arguments.CompletesNormally)
+        {
+            return EffectSummaryDomain.Instance.Join(
+                arguments.Summary,
+                allocation);
+        }
+
+        var construction = _callResolver.ResolveConstruction(
+            creation,
+            receiver,
+            ClassifyArguments(
+                creation.Arguments,
+                creation.Constructor?.Parameters.Length ?? 0));
+        var constructor = new EffectStep(
+            EffectSummaryDomain.Instance.Join(allocation, construction),
+            CanCompleteConstruction(creation));
+        var result = arguments.Then(constructor);
+        if (creation.Initializer != null && result.CompletesNormally)
+        {
+            result = result.Then(ScanStep(creation.Initializer));
+        }
+
+        return result.Summary;
+    }
+
+    private EffectSummary ScanArrayCreation(IArrayCreationOperation array)
+    {
+        var dimensions = ScanSequence(array.DimensionSizes);
+        var allocation = EffectSummaryOperations.Join(
+            EffectSummaryOperations.Allocate(EffectAllocationKind.Managed),
+            ArrayCreationExceptions(array));
+        if (!dimensions.CompletesNormally)
+        {
+            return dimensions.Summary;
+        }
+
+        var result = dimensions.Then(new EffectStep(allocation, true));
+        if (array.Initializer != null && result.CompletesNormally)
+        {
+            result = result.Then(ScanStep(array.Initializer));
+        }
+        return result.Summary;
+    }
+
+    private EffectSummary ScanConditionalAccess(
+        IConditionalAccessOperation conditional)
+    {
+        var receiver = ScanStep(conditional.Operation);
+        if (!receiver.CompletesNormally)
+        {
+            return receiver.Summary;
+        }
+
+        if (IsProvenNull(conditional.Operation, conditional))
+        {
+            return receiver.Summary;
+        }
+
+        if (conditional.WhenNotNull is not { } whenNotNull)
+        {
+            return receiver.Summary;
+        }
+
+        var whenNotNullStep = ScanStep(whenNotNull);
+        if (IsProvenNonNull(conditional.Operation, conditional))
+        {
+            return receiver.Then(whenNotNullStep).Summary;
+        }
+
+        // A nullable receiver gives two paths: the null path completes without
+        // evaluating WhenNotNull, while the non-null path evaluates it.
+        return EffectSummaryDomain.Instance.Join(
+            receiver.Summary,
+            whenNotNullStep.Summary);
+    }
+
+    private EffectSummary ScanLock(ILockOperation @lock)
+    {
+        var receiver = ScanStep(@lock.LockedValue);
+        if (!receiver.CompletesNormally)
+        {
+            return receiver.Summary;
+        }
+
+        var entry = new EffectStep(
+            EffectSummaryOperations.Join(
+                PotentialNullLock(@lock.LockedValue, @lock),
+                EffectSummaryOperations.Capability(
+                    EffectCapabilityKind.Synchronization)),
+            !IsProvenNull(@lock.LockedValue, @lock));
+        var result = receiver.Then(entry);
+        if (@lock.Body != null && result.CompletesNormally)
+        {
+            result = result.Then(ScanStep(@lock.Body));
+        }
+        return result.Summary;
     }
 
     private EffectSummary ScanBinary(IBinaryOperation binary)
@@ -701,7 +880,231 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanMany(IEnumerable<IOperation> operations)
     {
-        return EffectSummaryOperations.JoinFrom(EffectSummary.Empty, operations.Select(Scan));
+        return ScanSequence(operations).Summary;
+    }
+
+    internal EffectStep ScanSequence(IEnumerable<IOperation> operations)
+    {
+        var result = EffectStep.Empty;
+        foreach (var operation in operations)
+        {
+            result = result.Then(ScanStep(operation));
+            if (!result.CompletesNormally)
+            {
+                break;
+            }
+        }
+        return result;
+    }
+
+    private EffectStep ScanStep(IOperation operation)
+    {
+        return new(Scan(operation), CanCompleteNormally(operation));
+    }
+
+    private bool CanCompleteNormally(IOperation? operation)
+    {
+        if (operation == null)
+        {
+            return true;
+        }
+
+        return operation switch
+        {
+            IThrowOperation => false,
+            IInvocationOperation invocation => CanCompleteInvocation(
+                invocation.TargetMethod,
+                invocation.Instance,
+                invocation),
+            IPropertyReferenceOperation property =>
+                CanCompleteProperty(property),
+            IFieldReferenceOperation field =>
+                CanCompleteField(field),
+            IArrayElementReferenceOperation element =>
+                CanCompleteArrayElement(element),
+            IObjectCreationOperation creation =>
+                CanCompleteConstruction(creation),
+            IArrayCreationOperation array =>
+                CanCompleteArrayCreation(array),
+            IConditionalAccessOperation conditional =>
+                CanCompleteConditionalAccess(conditional),
+            ILockOperation @lock => CanCompleteLock(@lock),
+            IFlowCaptureOperation capture =>
+                CanCompleteNormally(capture.Value),
+            IArgumentOperation argument =>
+                CanCompleteNormally(argument.Value),
+            IParenthesizedOperation parenthesized =>
+                CanCompleteNormally(parenthesized.Operand),
+            IConversionOperation conversion =>
+                CanCompleteConversion(conversion),
+            IBinaryOperation binary => CanCompleteBinary(binary),
+            IUnaryOperation unary =>
+                ChildrenCanComplete(unary),
+            IIncrementOrDecrementOperation increment =>
+                CanCompleteNormally(increment.Target),
+            IConditionalOperation conditional =>
+                CanCompleteConditional(conditional),
+            IBlockOperation or IExpressionStatementOperation or
+                IReturnOperation or IVariableDeclarationGroupOperation or
+                IVariableDeclarationOperation or IVariableDeclaratorOperation or
+                IVariableInitializerOperation or IObjectOrCollectionInitializerOperation =>
+                ChildrenCanComplete(operation),
+            _ => true
+        };
+    }
+
+    private bool CanCompleteInvocation(
+        IMethodSymbol method,
+        IOperation? instance,
+        IOperation origin,
+        IEnumerable<IArgumentOperation>? arguments = null)
+    {
+        if (instance != null &&
+            (!CanCompleteNormally(instance) ||
+             method.ReducedFrom == null && IsProvenNull(instance, origin)))
+        {
+            return false;
+        }
+
+        if (arguments != null &&
+            arguments.Any(argument => !CanCompleteNormally(argument.Value)))
+        {
+            return false;
+        }
+
+        return method.DeclaringSyntaxReferences.Length == 0 ||
+            _completionFacts.MethodCanCompleteNormally(method);
+    }
+
+    private bool CanCompleteProperty(IPropertyReferenceOperation property)
+    {
+        var accessor = property.Property.GetMethod;
+        if (accessor == null ||
+            property.Instance != null &&
+            (!CanCompleteNormally(property.Instance) ||
+             IsProvenNull(property.Instance, property)))
+        {
+            return false;
+        }
+
+        return property.Arguments.All(argument =>
+                   CanCompleteNormally(argument.Value)) &&
+               (accessor.DeclaringSyntaxReferences.Length == 0 ||
+                _completionFacts.MethodCanCompleteNormally(accessor));
+    }
+
+    private bool CanCompleteField(IFieldReferenceOperation field)
+    {
+        return (field.Instance == null ||
+                CanCompleteNormally(field.Instance) &&
+                !IsProvenNull(field.Instance, field));
+    }
+
+    private bool CanCompleteArrayElement(IArrayElementReferenceOperation element)
+    {
+        return CanCompleteNormally(element.ArrayReference) &&
+            !IsProvenNull(element.ArrayReference, element) &&
+            element.Indices.All(CanCompleteNormally);
+    }
+
+    private bool CanCompleteConstruction(IObjectCreationOperation creation)
+    {
+        if (creation.Arguments.Any(argument =>
+                !CanCompleteNormally(argument.Value)) ||
+            creation.Constructor is not { } constructor ||
+            constructor.DeclaringSyntaxReferences.Length != 0 &&
+            !_completionFacts.MethodCanCompleteNormally(constructor))
+        {
+            return false;
+        }
+
+        return creation.Initializer == null ||
+            CanCompleteNormally(creation.Initializer);
+    }
+
+    private bool CanCompleteArrayCreation(IArrayCreationOperation array)
+    {
+        if (array.DimensionSizes.Any(size =>
+                !CanCompleteNormally(size) ||
+                size.ConstantValue is { HasValue: true, Value: int length } &&
+                length < 0))
+        {
+            return false;
+        }
+
+        return array.Initializer == null ||
+            CanCompleteNormally(array.Initializer);
+    }
+
+    private bool CanCompleteConditionalAccess(
+        IConditionalAccessOperation conditional)
+    {
+        if (!CanCompleteNormally(conditional.Operation))
+        {
+            return false;
+        }
+
+        if (IsProvenNull(conditional.Operation, conditional))
+        {
+            return true;
+        }
+
+        return !IsProvenNonNull(conditional.Operation, conditional) ||
+            CanCompleteNormally(conditional.WhenNotNull);
+    }
+
+    private bool CanCompleteLock(ILockOperation @lock)
+    {
+        return CanCompleteNormally(@lock.LockedValue) &&
+            !IsProvenNull(@lock.LockedValue, @lock) &&
+            CanCompleteNormally(@lock.Body);
+    }
+
+    private bool CanCompleteConversion(IConversionOperation conversion)
+    {
+        if (!CanCompleteNormally(conversion.Operand))
+        {
+            return false;
+        }
+
+        return !(conversion.Type?.IsValueType == true &&
+                 conversion.Operand.ConstantValue is
+                 { HasValue: true, Value: null });
+    }
+
+    private bool CanCompleteBinary(IBinaryOperation binary)
+    {
+        if (!ChildrenCanComplete(binary))
+        {
+            return false;
+        }
+
+        return binary.OperatorKind is not (
+            BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) ||
+            binary.RightOperand.ConstantValue is not { HasValue: true, Value: 0 };
+    }
+
+    private bool CanCompleteConditional(IConditionalOperation conditional)
+    {
+        if (!CanCompleteNormally(conditional.Condition))
+        {
+            return false;
+        }
+
+        return CanCompleteNormally(conditional.WhenTrue) ||
+            CanCompleteNormally(conditional.WhenFalse);
+    }
+
+    private bool ChildrenCanComplete(IOperation operation)
+    {
+        return operation.ChildOperations.All(CanCompleteNormally);
+    }
+
+    private bool IsProvenNull(IOperation? value, IOperation origin)
+    {
+        return value != null &&
+            (value.ConstantValue is { HasValue: true, Value: null } ||
+             _abstractFlow?.ProvesNull(origin, value) == true);
     }
 
     private EffectSummary PotentialNullReceiver(IOperation? instance, IOperation access)

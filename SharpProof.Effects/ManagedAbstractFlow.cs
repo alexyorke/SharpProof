@@ -1861,6 +1861,39 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
     }
 
+    /// <summary>
+    /// Returns whether a source method has a reachable normal exit.  This is
+    /// intentionally a control-flow fact rather than a may-throw fact: a
+    /// method with both a throwing and a returning branch can still permit the
+    /// caller's next source-order step.
+    /// </summary>
+    internal bool MethodCanCompleteNormally(IMethodSymbol method)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        cancellationToken.ThrowIfCancellationRequested();
+        if (method.DeclaringSyntaxReferences.Length != 1)
+        {
+            return true;
+        }
+
+        var declaration = method.DeclaringSyntaxReferences[0]
+            .GetSyntax(cancellationToken);
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, declaration.SyntaxTree);
+        var operation = model.GetOperation(declaration, cancellationToken) ??
+            (GetBody(declaration) is { } methodBody
+                ? model.GetOperation(methodBody, cancellationToken)
+                : null);
+        try
+        {
+            return operation == null || CompletesNormally(operation);
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+    }
+
     private bool ChildrenCompleteNormally(IOperation operation)
     {
         return operation.ChildOperations.All(CompletesNormally);
