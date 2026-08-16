@@ -303,7 +303,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'effect-fresh-array-content-provenance'
-        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        File = 'SharpProof.Effects\ConversionOwnershipClassifier.cs'
         Original = "            IFieldReferenceOperation or IArrayElementReferenceOperation =>`n                EffectRegionSet.Unknown,"
         Mutated = "            IFieldReferenceOperation => EffectRegionSet.Unknown,`n            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),"
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
@@ -492,6 +492,14 @@ $mutations = @(
         Mutated = '            (_, true) => EffectEvaluationReason.ResourceLimit,'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~IncompleteReasonCoversEveryDefinedFlagCombination'
+    },
+    [pscustomobject]@{
+        Name = 'effect-resource-limit-tuple-removal'
+        File = 'SharpProof.Worker.Protocol\ProtocolModel.generated.cs'
+        Original = '            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)'
+        Mutated = ''
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ResourceLimitIncompleteEffectTupleIsAProtocolState'
     },
     [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
@@ -1276,6 +1284,14 @@ $mutations = @(
         Mutated = '          DependsOnTargets=""'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication'
+    },
+    [pscustomobject]@{
+        Name = 'invocation-cleanup-not-success-only'
+        File = 'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
+        Original = '    <CallTarget Targets="_SharpProofCleanupInvocation" />'
+        Mutated = '    <CallTarget Targets="_SharpProofCleanupInvocation" Condition="''$(_SharpProofVerifierExitCode)'' == ''0''" />'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerManifestPropertiesAreVisibleBeforeEditorConfigGeneration'
     },
     [pscustomobject]@{
         Name = 'requires-skips-compiler-elided-invocations'

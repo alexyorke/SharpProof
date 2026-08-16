@@ -230,8 +230,11 @@ internal static class EffectContractDiagnostics
 
             var established = valid && complete && isEstablished;
             var violation = valid && !established ? candidateViolation : null;
-            var (outcome, reason, certainty) = EffectEvaluationProjections.Classify(
+            var projected = EffectEvaluationProjections.Classify(
                 established, violation != null, valid, complete, trusted, incompleteReason);
+            var (outcome, reason, certainty) =
+                EffectEvaluationProducerTupleCatalog.Require(
+                    projected.Outcome, projected.Reason, projected.Certainty);
             var claimDiagnostic =
                 summary is
                 { AnalysisIncompleteReason: not EffectAnalysisIncompleteReason.None } &&

@@ -759,9 +759,26 @@ internal static class WorkerProtocolMetadata
             or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry)
             or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract, WorkerEffectEvidenceCertainty.Unavailable)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable, WorkerEffectEvidenceCertainty.Unavailable)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Unknown, _, WorkerEffectEvidenceCertainty.Unavailable);
+    internal static bool MatchesEffectEvidenceTuple(WorkerClaimOutcome outcome, WorkerClaimReason reason, WorkerEffectEvidenceCertainty certainty, WorkerVacuityKind vacuity, bool hasProofCore, bool hasTrustedProvenance, bool trustedProvenanceUsed) =>
+        (outcome, reason, certainty, vacuity, hasProofCore, hasTrustedProvenance, trustedProvenanceUsed) is
+            (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerVacuityKind.None, _, _, _)
+            or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, _, true, true)
+            or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry, WorkerVacuityKind.ContradictoryPreconditions, true, _, _)
+            or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, _, WorkerEffectEvidenceCertainty.Unavailable, WorkerVacuityKind.None, false, _, _);
     internal static bool MatchesVacuity(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerVacuityKind vacuity) =>
         (kind, outcome, vacuity) is
             (_, _, WorkerVacuityKind.None)
@@ -786,6 +803,9 @@ internal static class WorkerProtocolMetadata
     internal static bool MatchesClaimPayload(WorkerClaimOutcome outcome, bool hasProofCore, bool hasModel) =>
         (outcome, hasProofCore, hasModel) is
             (WorkerClaimOutcome.Proven, _, false) or (WorkerClaimOutcome.Refuted, false, _) or (WorkerClaimOutcome.Unknown, false, false);
+    internal static bool MatchesAssumptionKind(WorkerAssumptionKind kind) =>
+        (kind) is
+            (WorkerAssumptionKind.Precondition) or (WorkerAssumptionKind.UserAssume) or (WorkerAssumptionKind.TrustedBoundary);
 
     internal static readonly WorkerProtocolRule<WorkerVerifyRequest>[] RequestRules = [
         new("protocol.unsupported", static value => value.ProtocolVersion == WorkerProtocolVersions.Current),
@@ -833,11 +853,12 @@ internal static class WorkerProtocolMetadata
     ];
     internal static bool IsAssumptionValid(WorkerAssumptionEvidence value) =>
         (!string.IsNullOrWhiteSpace(value.Id)
-        && WorkerProtocolJson.IsDefined(value.Kind, WorkerAssumptionKind.Unspecified));
+        && WorkerProtocolMetadata.MatchesAssumptionKind(value.Kind));
     internal static readonly WorkerProtocolRule<WorkerCallableResult>[] CallableResultRules = [
         new("response.callable_coverage", static value => WorkerProtocolJson.IsDefined(value.Coverage, WorkerCallableCoverage.Unspecified)),
         new("response.callable_reason", static value => WorkerProtocolMetadata.MatchesCallableCoverage(value.Coverage, value.Reason)),
         new("response.callable_assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
+        new("response.callable_assumption_usage", static value => (value.Assumptions ?? []).All(static item => item != null && !item.Used)),
     ];
     internal static readonly WorkerProtocolRule<WorkerClaimResult>[] ClaimResultRules = [
         new("response.claim_outcome", static value => WorkerProtocolJson.IsDefined(value.Outcome, WorkerClaimOutcome.Unspecified)),

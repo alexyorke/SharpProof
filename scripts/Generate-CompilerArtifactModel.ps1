@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter()][string]$SchemaPath,
+    [Parameter()][string]$ProtocolSchemaPath,
     [Parameter()][Alias('OutputPath')][string]$ModelOutputPath,
     [Parameter()][string]$PortableOutputPath,
     [Parameter()][string]$CompilationOutputPath,
@@ -17,6 +18,10 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($SchemaPath)) {
     $SchemaPath = Join-Path $repositoryRoot `
         'SharpProof.CompilerArtifact\CompilerArtifactModel.schema.json'
+}
+if ([string]::IsNullOrWhiteSpace($ProtocolSchemaPath)) {
+    $ProtocolSchemaPath = Join-Path $repositoryRoot `
+        'SharpProof.Worker.Protocol\ProtocolModel.schema.json'
 }
 if ([string]::IsNullOrWhiteSpace($ModelOutputPath)) {
     $ModelOutputPath = Join-Path $repositoryRoot `
@@ -35,12 +40,16 @@ if ([string]::IsNullOrWhiteSpace($CollectorOutputPath)) {
         'SharpProof.CompilerCollector\CompilerArtifact\CompilerWireMappings.generated.cs'
 }
 $SchemaPath = [IO.Path]::GetFullPath($SchemaPath)
+$ProtocolSchemaPath = [IO.Path]::GetFullPath($ProtocolSchemaPath)
 $ModelOutputPath = [IO.Path]::GetFullPath($ModelOutputPath)
 $PortableOutputPath = [IO.Path]::GetFullPath($PortableOutputPath)
 $CompilationOutputPath = [IO.Path]::GetFullPath($CompilationOutputPath)
 $CollectorOutputPath = [IO.Path]::GetFullPath($CollectorOutputPath)
 if (-not [IO.File]::Exists($SchemaPath)) {
     throw "Compiler-artifact schema not found: $SchemaPath"
+}
+if (-not [IO.File]::Exists($ProtocolSchemaPath)) {
+    throw "Protocol schema not found: $ProtocolSchemaPath"
 }
 
 function Get-RequiredMember {
@@ -1380,13 +1389,58 @@ if ($domain -ne 'SharpProof.CompilerEffectClaimEvidence' -or
     $evidenceVersion -ne 8) {
     throw 'Compiler effect evidence must preserve domain version 8.'
 }
-$unknownReasons = @(Get-RequiredMember `
-    $evidence 'unknownReasons' 'effect evidence')
-if ($unknownReasons.Count -eq 0) {
-    throw 'Compiler effect evidence must define typed unknown reasons.'
+$protocolSchema = Get-Content -LiteralPath $ProtocolSchemaPath -Raw |
+    ConvertFrom-Json -Depth 100
+$effectCertaintyTables = @(
+    (Get-MemberArray $protocolSchema 'validationTables') |
+        Where-Object { [string]$_.name -ceq 'EffectCertainty' })
+if ($effectCertaintyTables.Count -ne 1) {
+    throw 'Protocol schema must define exactly one EffectCertainty table.'
 }
-foreach ($reason in $unknownReasons) {
-    Assert-Identifier ([string]$reason) 'Effect evidence unknown reason'
+$effectCertaintyTable = $effectCertaintyTables[0]
+$effectCertaintyParameters = @(
+    Get-RequiredMember $effectCertaintyTable 'parameters' 'EffectCertainty table')
+if (($effectCertaintyParameters | ForEach-Object { [string]$_.name }) -join ',' -cne
+        'outcome,reason,certainty') {
+    throw 'Protocol EffectCertainty table must use outcome, reason, certainty order.'
+}
+$effectTupleRows = [Collections.Generic.List[object]]::new()
+$unknownReasons = [Collections.Generic.List[string]]::new()
+$unknownReasonSet = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($row in @(Get-RequiredMember $effectCertaintyTable 'rows' 'EffectCertainty table')) {
+    $values = @($row)
+    if ($values.Count -ne 3) {
+        throw 'Protocol EffectCertainty table contains a row with the wrong width.'
+    }
+    $outcome = [string]$values[0]
+    $reason = [string]$values[1]
+    $certainty = [string]$values[2]
+    if ([string]::IsNullOrWhiteSpace($outcome) -or
+        [string]::IsNullOrWhiteSpace($reason) -or
+        [string]::IsNullOrWhiteSpace($certainty)) {
+        throw 'Protocol EffectCertainty table contains a blank tuple member.'
+    }
+    if ($outcome -eq '*' -or $certainty -eq '*') {
+        throw 'Protocol EffectCertainty table may wildcard only its reason member.'
+    }
+    Assert-Identifier $outcome 'Effect evidence tuple outcome'
+    Assert-Identifier $certainty 'Effect evidence tuple certainty'
+    if ($reason -eq '*') {
+        continue
+    }
+    Assert-Identifier $reason 'Effect evidence tuple reason'
+    $effectTupleRows.Add([PSCustomObject]@{
+        Outcome = $outcome
+        Reason = $reason
+        Certainty = $certainty
+    })
+    if ($outcome -eq 'Unknown' -and $unknownReasonSet.Add($reason)) {
+        $unknownReasons.Add($reason)
+    }
+}
+if ($effectTupleRows.Count -eq 0 -or $unknownReasons.Count -eq 0) {
+    throw 'Protocol EffectCertainty table must define explicit compiler effect tuples.'
 }
 $constraintKinds = Get-RequiredMember `
     $evidence 'constraintKinds' 'effect evidence'
@@ -1459,6 +1513,31 @@ foreach ($reason in $unknownReasons) {
     $modelLines.Add("        WorkerClaimReason.$reason,")
 }
 $modelLines.Add('    ];')
+$modelLines.Add('    internal static readonly (WorkerClaimOutcome Outcome, WorkerClaimReason Reason,')
+$modelLines.Add('        WorkerEffectEvidenceCertainty Certainty)[] SupportedEffectTuples = [')
+foreach ($row in $effectTupleRows) {
+    $modelLines.Add(
+        "        (WorkerClaimOutcome.$($row.Outcome), " +
+        "WorkerClaimReason.$($row.Reason), " +
+        "WorkerEffectEvidenceCertainty.$($row.Certainty)),")
+}
+$modelLines.Add('    ];')
+$modelLines.Add('    internal static bool HasValidEffectTuple(')
+$modelLines.Add('        WorkerClaimOutcome outcome, WorkerClaimReason reason,')
+$modelLines.Add('        WorkerEffectEvidenceCertainty certainty)')
+$modelLines.Add('    {')
+$modelLines.Add('        foreach (var tuple in SupportedEffectTuples)')
+$modelLines.Add('        {')
+$modelLines.Add('            if (tuple.Outcome == outcome && tuple.Reason == reason &&')
+$modelLines.Add('                tuple.Certainty == certainty)')
+$modelLines.Add('            {')
+$modelLines.Add('                return true;')
+$modelLines.Add('            }')
+$modelLines.Add('        }')
+$modelLines.Add('        return outcome == WorkerClaimOutcome.Unknown &&')
+$modelLines.Add('            certainty == WorkerEffectEvidenceCertainty.Unavailable &&')
+$modelLines.Add('            UnknownReasons.Contains(reason);')
+$modelLines.Add('    }')
 $modelLines.Add('    internal static readonly CompilerEffectConstraintRule[] ConstraintRules = [')
 foreach ($kind in $constraintRuleKinds) {
     $effectsEmpty = if ($kind -eq $combinedKind) { 'false' } else { 'true' }

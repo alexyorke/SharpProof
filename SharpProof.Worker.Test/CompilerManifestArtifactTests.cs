@@ -1229,6 +1229,71 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void ResourceLimitedEffectEvidenceHydratesAsTypedUnknown()
+    {
+        var artifact = CreateEffectArtifact();
+        var evidence = artifact.Callables.Single().EffectClaims.Single();
+        evidence.Outcome = WorkerClaimOutcome.Unknown;
+        evidence.Reason = WorkerClaimReason.ResourceLimit;
+        evidence.Certainty =
+            WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary;
+        evidence.Witness = null;
+        evidence.Replay = null;
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+
+        var target = CompilerManifestArtifactJson.DecodeCallables(artifact)
+            .Single();
+        var hydrated = target.EffectClaims.Single();
+        var result = EffectClaimResultAssembler.Assemble(target, hydrated);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(hydrated.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(hydrated.Reason,
+                Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(hydrated.Certainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.Reason,
+                Is.EqualTo(WorkerClaimReason.ResourceLimit));
+            Assert.That(result.EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary));
+        }
+    }
+
+    [Test]
+    public void EffectEvidenceRejectsInvalidReasonCertaintyCrossProducts()
+    {
+        var invalidTuples = new[]
+        {
+            (WorkerClaimReason.ResourceLimit,
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
+            (WorkerClaimReason.ResourceLimit,
+                WorkerEffectEvidenceCertainty.DefiniteViolation),
+            (WorkerClaimReason.UnsupportedBody,
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
+        };
+
+        foreach (var (reason, certainty) in invalidTuples)
+        {
+            var artifact = CreateEffectArtifact();
+            var evidence = artifact.Callables.Single().EffectClaims.Single();
+            evidence.Outcome = WorkerClaimOutcome.Unknown;
+            evidence.Reason = reason;
+            evidence.Certainty = certainty;
+            evidence.Witness = null;
+            evidence.Replay = null;
+            CompilerEffectClaimArtifactCodec.Seal(evidence);
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(artifact)),
+                $"{reason}/{certainty} must remain invalid.");
+        }
+    }
+
+    [Test]
     public void UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay()
     {
         var artifact = CreateContractArtifact(

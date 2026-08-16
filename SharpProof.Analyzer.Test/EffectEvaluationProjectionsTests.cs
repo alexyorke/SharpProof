@@ -23,14 +23,20 @@ public sealed class EffectEvaluationProjectionsTests
                 complete,
                 trusted);
 
+            var actual = EffectEvaluationProjections.Classify(
+                established,
+                violated,
+                valid,
+                complete,
+                trusted,
+                EffectEvaluationReason.ResourceLimit);
             Assert.That(
-                EffectEvaluationProjections.Classify(
-                    established,
-                    violated,
-                    valid,
-                    complete,
-                    trusted,
-                    EffectEvaluationReason.ResourceLimit),
+                EffectEvaluationProducerTupleCatalog.IsDefined(
+                    actual.Outcome, actual.Reason, actual.Certainty),
+                Is.True,
+                $"Boolean combination {bits} emitted an unsupported producer tuple.");
+            Assert.That(
+                actual,
                 Is.EqualTo(expected),
                 $"Boolean combination {bits} changed classification precedence.");
         }

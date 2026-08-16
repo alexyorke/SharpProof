@@ -168,6 +168,39 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void AssumptionIdentityIncludesCallableScopeAndUsesGeneratedGrammar()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [SharpProofTrusted("reviewed boundary")]
+                [DoesNotThrow]
+                public static long First(long value) => value;
+
+                [SharpProofTrusted("reviewed boundary")]
+                [DoesNotThrow]
+                public static long Second(long value) => value;
+            }
+            """));
+
+        var assumptions = result.Manifest.Callables
+            .SelectMany(static callable => callable.Assumptions)
+            .Where(static assumption =>
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+            .ToArray();
+
+        Assert.That(assumptions, Has.Length.EqualTo(2));
+        Assert.That(
+            assumptions.Select(static assumption => assumption.Id),
+            Is.All.Matches("^spa1:[0-9a-f]{64}$"));
+        Assert.That(
+            assumptions.Select(static assumption => assumption.Id).Distinct().ToArray(),
+            Has.Length.EqualTo(2));
+    }
+
+    [Test]
     public void PredicateChangeChangesOnlyThatClaimIdentity()
     {
         var first = Build(("Subject.cs", TwoClaims("==", ">=")));

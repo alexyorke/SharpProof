@@ -246,8 +246,16 @@ The exact typed outcome and effect-certainty authority follows.
 | `Proven` | `None` | `TrustedCompleteBoundary` |
 | `Proven` | `None` | `VacuousEntry` |
 | `Refuted` | `None` | `DefiniteViolation` |
+| `Unknown` | `UnsupportedContract` | `Unavailable` |
+| `Unknown` | `CounterexampleNotReplayable` | `Unavailable` |
 | `Unknown` | `EffectSummaryIncomplete` | `IncompleteMayEffectSummary` |
+| `Unknown` | `EffectSummaryIncomplete` | `TrustedCompleteBoundary` |
 | `Unknown` | `EffectContractNotEstablished` | `CompleteMayEffectSummary` |
+| `Unknown` | `EffectContractNotEstablished` | `TrustedCompleteBoundary` |
+| `Unknown` | `ResourceLimit` | `IncompleteMayEffectSummary` |
+| `Unknown` | `ResourceLimit` | `TrustedCompleteBoundary` |
+| `Unknown` | `UnsupportedBody` | `IncompleteMayEffectSummary` |
+| `Unknown` | `UnsupportedBody` | `TrustedCompleteBoundary` |
 | `Unknown` | `*` | `Unavailable` |
 <!-- END SHARPPROOF TYPED EFFECT RESULTS -->
 
