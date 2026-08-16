@@ -49,7 +49,7 @@ internal static class CompilerSpecificationPackAuthorityValidation
 
         var separator = identity.LastIndexOf('@');
         return separator > 0 && selectedPackIds.Contains(
-            identity[..separator],
+            identity.Substring(0, separator),
             StringComparer.Ordinal);
     }
 
