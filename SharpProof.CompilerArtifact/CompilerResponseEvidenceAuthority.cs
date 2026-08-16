@@ -706,9 +706,13 @@ internal sealed class CompilerResponseEvidenceAuthority :
         var variables = target.Variables.ToDictionary(
             static variable => variable.ModelLabel,
             StringComparer.Ordinal);
-        var required = target.Variables.Where(static variable =>
-                variable.Role is CompilerVariableRole.Receiver or
-                    CompilerVariableRole.Parameter)
+        var required = target.Variables.Where(variable =>
+                variable.Role is (CompilerVariableRole.Receiver or
+                    CompilerVariableRole.Parameter) &&
+                (target.Factory.GetVariableInfo(variable.Variable).Type ==
+                    target.Factory.BooleanType ||
+                 target.Factory.GetVariableInfo(variable.Variable).Type ==
+                    target.Factory.IntegerType))
             .ToArray();
         var result = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var row in rows)
