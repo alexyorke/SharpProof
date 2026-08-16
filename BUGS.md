@@ -2184,7 +2184,7 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   receive local ownership, and boxing receives a fresh region. The focused
   conversion matrix and the complete Effects suite pass.
 
-### SP-AUDIT-088 - Compiler effect and callable reason mapping is incomplete (P1)
+### SP-AUDIT-088 - Compiler effect and callable reason mapping is incomplete (fixed)
 
 - [x] Compiler capture can emit an unknown effect claim with reason
   `ResourceLimit` and certainty `IncompleteMayEffectSummary`, but the compiler
