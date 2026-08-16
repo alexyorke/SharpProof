@@ -24,7 +24,6 @@ internal static class CompilerSpecificationPackCatalogVersions
     internal const int Current = 1;
     internal const string Sha256 = "14d0e3b98982e7f19d90a90624caf95fa444f6131e7543518b3bfd7ff9198c22";
     internal const string PackIds = "dotnet.scalar";
-    internal const string PackIdentities = "dotnet.scalar@1";
 }
 
 internal static class CompilerSpecificationPackVersions
@@ -154,7 +153,6 @@ internal sealed record CompilerPreparedSpecCall(
 
 internal sealed record CompilerPreparedSummaryEvidence(
     CompilerSummaryOrigin Origin,
-    string CallIdentity,
     string EvidenceSha256,
     string EvidenceIdentity
 );
@@ -333,25 +331,8 @@ internal sealed class CompilerSpecCallArtifact
 internal sealed class CompilerSummaryEvidenceArtifact
 {
     public CompilerSummaryOrigin Origin { get; set; }
-    public string CallIdentity { get; set; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
     public string EvidenceIdentity { get; set; } = string.Empty;
-}
-
-internal sealed class CompilerSummaryEvidenceSnapshot
-{
-    public CompilerSummaryOrigin Origin { get; set; }
-    public string CallIdentity { get; set; } = string.Empty;
-    public string EvidenceSha256 { get; set; } = string.Empty;
-    public string EvidenceIdentity { get; set; } = string.Empty;
-    public string SourcePath { get; set; } = string.Empty;
-    public string SourceTreeSha256 { get; set; } = string.Empty;
-    public int SourceStart { get; set; } = -1;
-    public int SourceLength { get; set; } = -1;
-    public string OwningModuleName { get; set; } = string.Empty;
-    public string OwningModuleMvid { get; set; } = string.Empty;
-    public string OwningModuleSha256 { get; set; } = string.Empty;
-    public int MethodMetadataToken { get; set; } = -1;
 }
 
 internal sealed class CompilerSummaryCallArtifact
