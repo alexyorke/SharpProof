@@ -1898,9 +1898,12 @@ The active backlog contains 24 root-cause rows. Stable IDs are not renumbered; m
 
 Release blockers: false proofs, missing verifier obligations, destructive supported behavior, verifier bypasses, or release authority accepting invalid candidate bytes.
 
-### SP-AUDIT-040 - Compiler variable semantics are not bound to symbol and type identity (P0)
+### SP-AUDIT-040 - Compiler variable semantics are not bound to symbol and type identity (fixed)
 
-- [ ] `CompilerLoweredArtifact.DecodeBody` checks that every program-parameter
+- [x] Fixed by the cumulative schema-13 authority ending at `b536de9ff`.
+  `CompilerLoweredArtifact` now binds source ordinal, source type/name,
+  pre-state source, and scalar domain to the canonical compiler inventory.
+- `CompilerLoweredArtifact.DecodeBody` previously checked that every program-parameter
   binding targets a distinct canonical parameter with the same IR type, but it
   does not bind that target to the source parameter's compiler ordinal.
   `ValidateVariables` similarly permits two same-typed `PreState` rows to swap
@@ -1929,6 +1932,10 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   rather than silently defaulting the field.
 - Consolidated cases: SP-AUDIT-099.
 - Unified closure: Persist authoritative parameter ordinal, source type, pre-state source, and scalar domain; independently derive and validate their exact relationship.
+- Same-type swaps, pre-state substitutions, scalar-domain changes, canonical
+  hydration, and generated-model controls passed in the cumulative Worker
+  authority matrix; full Worker passed 548/548 and Git-backed Architecture
+  passed 440/440 before the protocol-authority merge.
 
 ### SP-AUDIT-050 - Coverage and TCB universes are self-defined (P0)
 
@@ -1982,9 +1989,12 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
 - Consolidated cases: SP-AUDIT-239.
 - Unified closure: Authenticate every source, IL, specification, and transitive summary dependency at hydration and project the materially used closure into proof evidence.
 
-### SP-AUDIT-080 - Compiler feature labels do not bind discovered proof scope (P0)
+### SP-AUDIT-080 - Compiler feature labels do not bind discovered proof scope (fixed)
 
-- [ ] The compiler artifact records a global `WorkerFeatureSet`, but envelope
+- [x] Fixed by the cumulative schema-13 authority ending at `b536de9ff`.
+  The compiler now seals a canonical feature-scope fingerprint and validates
+  profile, selections, reasons, claims, clauses, and effect evidence against it.
+- The compiler artifact previously recorded a global `WorkerFeatureSet`, but envelope
   validation checks only that the enum value is defined. It never proves that
   the callable selections, claim kinds, clauses, effect evidence, and lowered
   bodies are the complete output of discovery for that declared feature set.
@@ -2004,10 +2014,16 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   claims, duplicate selections, generated companions, serialization/cache
   round trips, and real strict-worker controls plus a trusted mutation that
   removes scope parity.
+- Effects/contracts/all parity, omission/extra/duplicate controls, cache and
+  serialization round trips, and generated-model verification passed in the
+  cumulative authority suite.
 
-### SP-AUDIT-173 - Call instantiation is not bound to parameter order and free-variable roles (P0)
+### SP-AUDIT-173 - Call instantiation is not bound to parameter order and free-variable roles (fixed)
 
-- [ ] The compiler instantiates a relational summary from the original receiver
+- [x] Fixed by the cumulative compiler-schema-13/relational-schema-2 authority
+  ending at `b536de9ff`. Hydration authenticates receiver, Roslyn-ordinal
+  arguments, result, existential roles, relation bytes, and generic binding.
+- The compiler previously instantiated a relational summary from the original receiver
   and ordered arguments, but hydration authenticates only identity, types,
   freshness, and relation shape.
 - Soundness impact: swapping two same-typed Boolean argument term indices while
@@ -2019,10 +2035,16 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   and binding-removal mutation controls.
 - Consolidated cases: SP-AUDIT-100, SP-AUDIT-208.
 - Unified closure: Order actuals by Roslyn parameter ordinal and authenticate receiver, ordered arguments, result, existential roles, and relation during hydration.
+- Permutation, duplicate, receiver, result/existential, generic, stale-schema,
+  and exact-valid controls passed; the cumulative Worker suite passed 548/548.
 
-### SP-AUDIT-243 - Compiler effect verdicts are only self-sealed (P0)
+### SP-AUDIT-243 - Compiler effect verdicts are only self-sealed (fixed)
 
-- [ ] Compiler effect evidence hashes its mutable outcome, reason, certainty,
+- [x] Fixed by the cumulative schema-13 effect authority ending at `b536de9ff`.
+  The collector emits an independent typed authority for outcome, reason,
+  certainty, constraint, witness, replay, source, and tree origin; hydration
+  requires exact evidence/authority parity before accepting the claim.
+- Compiler effect evidence previously hashed its mutable outcome, reason, certainty,
   constraint, witness, and replay fields, but worker hydration never compares
   those fields with an independently derived compiler result. Hydration checks
   only the locally valid digest plus the manifest claim ID and contract kind.
@@ -2038,6 +2060,10 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   authority. Add honest `Refuted -> Proven` and `Unknown -> Proven` transitions,
   constraint changes, same-kind evidence swaps, valid unchanged evidence,
   worker/launcher result classification, and authority-check-removal controls.
+- Refuted/unknown transitions, constraint and same-kind swaps, unchanged
+  evidence, malformed authority, and typed ResourceLimit parity controls pass.
+  The post-merge Architecture run passed 435/440; its five failures were solely
+  the known copied-workspace fixtures that require a `.git` directory.
 
 ## P1 active bugs
 
