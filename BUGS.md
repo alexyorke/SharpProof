@@ -2069,7 +2069,7 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
 
 Material supported-surface defects: incorrect verdicts or diagnostics, missing required qualification, or workflows that produce the wrong result.
 
-### SP-AUDIT-004 - Release qualification matrix is incomplete (P1)
+### SP-AUDIT-004 - Release qualification matrix is incomplete (fixed)
 
 - [x] The tag-only `release-qualification` job in
   `.github/workflows/package-consumers.yml` runs acceptance, mutation,
@@ -2158,7 +2158,7 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 - Consolidated cases: SP-AUDIT-064, SP-AUDIT-068, SP-AUDIT-127.
 - Unified closure: After all generators, reconcile every logical target/companion once in every non-off profile, independent of filename, partial ownership, and generator order.
 
-### SP-AUDIT-086 - Unboxed struct copies retain boxed-argument ownership (P1)
+### SP-AUDIT-086 - Unboxed struct copies retain boxed-argument ownership (fixed)
 
 - [x] Region classification strips every built-in conversion without
   distinguishing representation-preserving reference conversions from
@@ -2307,7 +2307,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Consolidated cases: SP-AUDIT-217.
 - Unified closure: Share one artifact-aware mapping from proof-core labels to exact manifest assumptions, Used flags, and summary counts in producer and validator.
 
-### SP-AUDIT-048 - Invocation lifecycle leaks temporary runtime state (P2)
+### SP-AUDIT-048 - Invocation lifecycle leaks temporary runtime state (fixed)
 
 - [x] Every build allocates a GUID-scoped
   `obj/.../SharpProof/runs/<invocation>` directory for its compiler manifest.
@@ -2384,7 +2384,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Consolidated cases: SP-AUDIT-195.
 - Unified closure: Seal sorted selected pack IDs and exact catalog/version digest even when unused, with one identity predicate from catalog load through hydration.
 
-### SP-AUDIT-122 - Clean cannot recover publication-set metadata (P2)
+### SP-AUDIT-122 - Clean cannot recover publication-set metadata (fixed)
 
 - [x] Publication-set markers persist beside every member, but the verifier
   registers no Clean hook or `FileWrites` entries for them. The failure message
@@ -2407,7 +2407,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   unrelated neighbors, and rejects partial ownership. Direct Host/BuildTask,
   mutation, and TCB controls pass; a packaged consumer fixture was unavailable.
 
-### SP-AUDIT-129 - Publication plans omit immutable artifact identities (P2)
+### SP-AUDIT-129 - Publication plans omit immutable artifact identities (fixed)
 
 - [x] Plan-only publication validates package hashes transiently, then emits
   only package IDs, versions, paths, and filenames. It records no package hash
@@ -2456,7 +2456,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 - Consolidated cases: SP-AUDIT-179, SP-AUDIT-220, SP-AUDIT-236.
 - Unified closure: Bind every location to a physical tree and line-map identity; validate checked spans, sealed source length, and recomputed one-based mapped coordinates together.
 
-### SP-AUDIT-140 - Relational-summary work lacks an end-to-end resource budget (P2)
+### SP-AUDIT-140 - Relational-summary work lacks an end-to-end resource budget (fixed)
 
 - [x] The summary builder charges fixed CFG actions but traverses, substitutes,
   rebuilds, merges, and composes arbitrarily wide term DAGs without charging
@@ -2476,7 +2476,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   composition; exact boundary, broad unique-leaf, shared-node, and mutation
   controls pass with the full Summaries, Analyzer, Worker, and Architecture suites.
 
-### SP-AUDIT-152 - Effect certainty and provenance tuples are not jointly validated (P2)
+### SP-AUDIT-152 - Effect certainty and provenance tuples are not jointly validated (fixed)
 
 - [x] Response validation independently accepts `EffectCertainty=VacuousEntry`
   and `Vacuity=None`; it never enforces the producer invariant that vacuous
@@ -2495,7 +2495,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   assumptions; producer assembly uses the same closed tuple and the full Worker
   suite passes.
 
-### SP-AUDIT-155 - Semantic identities and assumption kinds lack a closed producer authority (P2)
+### SP-AUDIT-155 - Semantic identities and assumption kinds lack a closed producer authority (fixed)
 
 - [x] Manifest validation enforces assumption identity/kind only per callable,
   while response summarization groups globally and rejects one ID carrying two
@@ -2515,7 +2515,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   and claim-owned proof/trusted evidence exclusively determines `Used` flags.
   Summary reconstruction and generated-identity regressions pass.
 
-### SP-AUDIT-165 - Z3 query ownership and accounting are incomplete (P2)
+### SP-AUDIT-165 - Z3 query ownership and accounting are incomplete (fixed)
 
 - [x] SMT encoding creates many temporary `MkInt`, comparison, Boolean,
   conditional, and division wrapper objects without disposing them. The encoder
