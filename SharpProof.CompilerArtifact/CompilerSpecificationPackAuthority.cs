@@ -34,25 +34,6 @@ internal static class CompilerSpecificationPackAuthorityValidation
                 artifact.Compilation);
     }
 
-    internal static bool IsValidPackIdentity(
-        string? identity,
-        string[]? selectedPackIds)
-    {
-        if (identity is not { Length: > 0 and <= 128 } ||
-            selectedPackIds == null ||
-            !CompilerSpecificationPackCatalogVersions.PackIdentities
-                .Split([';'], StringSplitOptions.RemoveEmptyEntries)
-                .Contains(identity, StringComparer.Ordinal))
-        {
-            return false;
-        }
-
-        var separator = identity.LastIndexOf('@');
-        return separator > 0 && selectedPackIds.Contains(
-            identity[..separator],
-            StringComparer.Ordinal);
-    }
-
     private static bool Matches(
         string[]? outerPackIds,
         int outerCatalogVersion,

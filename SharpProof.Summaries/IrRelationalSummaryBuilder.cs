@@ -481,7 +481,6 @@ public static class IrRelationalSummaryBuilder
         {
             var key = ((int)provenance.Origin).ToString(
                     System.Globalization.CultureInfo.InvariantCulture) +
-                provenance.EvidenceCallIdentity + "|" +
                 provenance.EvidenceIdentity + "|" +
                 provenance.EvidenceSha256;
             _dependencyProvenance[key] = provenance;

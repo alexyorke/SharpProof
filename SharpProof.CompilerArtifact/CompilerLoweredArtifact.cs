@@ -170,7 +170,6 @@ internal static class CompilerLoweredArtifact
                     static evidence => new CompilerSummaryEvidenceArtifact
                     {
                         Origin = evidence.Origin,
-                        CallIdentity = evidence.CallIdentity,
                         EvidenceSha256 = evidence.EvidenceSha256,
                         EvidenceIdentity = evidence.EvidenceIdentity
                     })],
@@ -704,7 +703,6 @@ internal static class CompilerLoweredArtifact
                 summary.Identity != identity ||
                 !ValidSummaryEvidence(
                     summary.Origin,
-                    summary.Identity,
                     summary.EvidenceSha256,
                     summary.EvidenceIdentity,
                     compilation) ||
@@ -774,7 +772,6 @@ internal static class CompilerLoweredArtifact
                 [.. summary.DependencyEvidence.Select(static evidence =>
                     new CompilerPreparedSummaryEvidence(
                         evidence.Origin,
-                        evidence.CallIdentity,
                         evidence.EvidenceSha256,
                         evidence.EvidenceIdentity))])
             {
@@ -1018,8 +1015,7 @@ internal static class CompilerLoweredArtifact
 
     private static bool ValidSummaryEvidenceIdentity(
         CompilerSummaryOrigin origin,
-        string? identity,
-        CompilerCompilationSnapshot compilation)
+        string? identity)
     {
         if (identity == null)
         {
@@ -1031,106 +1027,27 @@ internal static class CompilerLoweredArtifact
             return identity.Length == 0;
         }
 
-        return CompilerSpecificationPackAuthorityValidation.IsValidPackIdentity(
-            identity,
-            compilation.SpecificationPackIds);
-    }
-
-    private static bool ValidSummaryCallIdentity(string? identity)
-    {
-        return identity is { Length: > 0 and <= 512 } &&
-            identity.All(static character => !char.IsControl(character));
+        return identity.Length is > 0 and <= 128 &&
+            identity.Contains('@') &&
+            identity.All(static character =>
+                character is >= 'a' and <= 'z' or
+                >= '0' and <= '9' or '.' or '-' or '@');
     }
 
     private static bool ValidSummaryEvidence(
         CompilerSummaryOrigin origin,
-        string? callIdentity,
         string? sha256,
         string? identity,
         CompilerCompilationSnapshot compilation)
     {
-        if (Enum.IsDefined(typeof(CompilerSummaryOrigin), origin) &&
+        return Enum.IsDefined(typeof(CompilerSummaryOrigin), origin) &&
             WorkerProtocolJson.IsSha256(sha256) &&
-            ValidSummaryCallIdentity(callIdentity) &&
-            ValidSummaryEvidenceIdentity(origin, identity, compilation))
-        {
-            var rows = compilation.SummaryEvidence ?? [];
-            var matches = rows.Where(row => row != null &&
-                    row.Origin == origin &&
-                    row.CallIdentity == callIdentity &&
-                    row.EvidenceSha256 == sha256 &&
-                    row.EvidenceIdentity == identity)
-                .ToArray();
-            return matches.Length == 1 &&
-                ValidSummaryEvidenceAuthority(matches[0], compilation);
-        }
-
-        return false;
-    }
-
-    private static bool ValidSummaryEvidenceAuthority(
-        CompilerSummaryEvidenceSnapshot row,
-        CompilerCompilationSnapshot compilation)
-    {
-        if (!WorkerProtocolJson.IsSha256(row.EvidenceSha256) ||
-            !ValidSummaryCallIdentity(row.CallIdentity))
-        {
-            return false;
-        }
-
-        switch (row.Origin)
-        {
-            case CompilerSummaryOrigin.Source:
-                return row.EvidenceIdentity.Length == 0 &&
-                    row.SourceTreeSha256.Length == 64 &&
-                    WorkerProtocolJson.IsSha256(row.SourceTreeSha256) &&
-                    row.SourceStart >= 0 &&
-                    row.SourceLength > 0 &&
-                    row.OwningModuleName.Length == 0 &&
-                    row.OwningModuleMvid.Length == 0 &&
-                    row.OwningModuleSha256.Length == 0 &&
-                    row.MethodMetadataToken == -1 &&
-                    (compilation.SyntaxTrees ?? []).Count(tree =>
-                        tree != null &&
-                        tree.Path == row.SourcePath &&
-                        tree.Sha256 == row.SourceTreeSha256 &&
-                        row.SourceStart <= tree.TextLength - row.SourceLength) == 1;
-
-            case CompilerSummaryOrigin.ImplementationIl:
-                return row.EvidenceIdentity.Length == 0 &&
-                    row.SourcePath.Length == 0 &&
-                    row.SourceTreeSha256.Length == 0 &&
-                    row.SourceStart == -1 &&
-                    row.SourceLength == -1 &&
-                    row.OwningModuleName.Length > 0 &&
-                    Guid.TryParse(row.OwningModuleMvid, out _) &&
-                    row.OwningModuleSha256 == row.EvidenceSha256 &&
-                    row.MethodMetadataToken > 0 &&
-                    (compilation.References ?? []).SelectMany(
+            ValidSummaryEvidenceIdentity(origin, identity) &&
+            (origin != CompilerSummaryOrigin.ImplementationIl ||
+                (compilation.References ?? []).SelectMany(
                         static reference => reference?.Modules ?? [])
-                    .Count(module => module != null &&
-                        module.Name == row.OwningModuleName &&
-                        module.Mvid == row.OwningModuleMvid &&
-                        module.Sha256 == row.OwningModuleSha256) == 1;
-
-            case CompilerSummaryOrigin.SpecificationPack:
-                return row.SourcePath.Length == 0 &&
-                    row.SourceTreeSha256.Length == 0 &&
-                    row.SourceStart == -1 &&
-                    row.SourceLength == -1 &&
-                    row.OwningModuleName.Length == 0 &&
-                    row.OwningModuleMvid.Length == 0 &&
-                    row.OwningModuleSha256.Length == 0 &&
-                    row.MethodMetadataToken == -1 &&
-                    row.EvidenceSha256 == compilation.SpecificationPackCatalogSha256 &&
-                    ValidSummaryEvidenceIdentity(
-                        row.Origin,
-                        row.EvidenceIdentity,
-                        compilation);
-
-            default:
-                return false;
-        }
+                    .Any(module => module != null &&
+                        module.Sha256 == sha256));
     }
 
     private static bool ValidDependencyEvidence(
@@ -1148,7 +1065,6 @@ internal static class CompilerLoweredArtifact
             if (item == null ||
                 !ValidSummaryEvidence(
                     item.Origin,
-                    item.CallIdentity,
                     item.EvidenceSha256,
                     item.EvidenceIdentity,
                     compilation))
@@ -1158,7 +1074,6 @@ internal static class CompilerLoweredArtifact
 
             var key = ((int)item.Origin).ToString(
                     CultureInfo.InvariantCulture) + "|" +
-                item.CallIdentity + "|" +
                 item.EvidenceIdentity + "|" + item.EvidenceSha256;
             if (previous != null &&
                 StringComparer.Ordinal.Compare(previous, key) >= 0)

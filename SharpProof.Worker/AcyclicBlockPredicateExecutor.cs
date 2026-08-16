@@ -480,7 +480,6 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 prepared.Origin,
                 prepared.EvidenceSha256,
                 prepared.EvidenceIdentity,
-                prepared.DependencyEvidence,
                 guard,
                 relation));
             return new SpecApplication(

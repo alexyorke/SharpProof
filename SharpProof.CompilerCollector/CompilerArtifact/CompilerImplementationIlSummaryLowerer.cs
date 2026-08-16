@@ -187,8 +187,7 @@ internal static class CompilerImplementationIlSummaryLowerer
                 result,
                 new IrSummaryProvenance(
                     IrSummaryOrigin.ImplementationIl,
-                    evidenceSha256,
-                    evidenceCallIdentity: method.GetDocumentationCommentId() ?? string.Empty));
+                    evidenceSha256));
             var mapper = new RoslynOperationLowerer(
                 factory,
                 isKnownPure);

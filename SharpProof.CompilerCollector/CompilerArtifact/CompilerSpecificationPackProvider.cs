@@ -198,8 +198,7 @@ internal sealed class CompilerSpecificationPackProvider
             new IrSummaryProvenance(
                 IrSummaryOrigin.SpecificationPack,
                 definition.EvidenceSha256,
-                definition.EvidenceIdentity,
-                method.GetDocumentationCommentId() ?? string.Empty));
+                definition.EvidenceIdentity));
         var environment = parameters.ToImmutableDictionary(
             static parameter => parameter,
             parameter => (IrTerm)_factory.Variable(parameter));

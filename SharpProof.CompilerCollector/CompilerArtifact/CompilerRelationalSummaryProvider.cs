@@ -4,18 +4,6 @@ using System.Text;
 // Relational summary inference runs only in the build-time compiler collector.
 namespace SharpProof.CompilerArtifact;
 
-internal sealed record CompilerSummaryEvidenceAuthority(
-    CompilerSummaryOrigin Origin,
-    string CallIdentity,
-    string EvidenceSha256,
-    string EvidenceIdentity,
-    string SourcePath,
-    string SourceTreeSha256,
-    int SourceStart,
-    int SourceLength,
-    string OwningModuleName,
-    int MethodMetadataToken);
-
 internal sealed class CompilerRelationalSummaryProvider
 {
     private readonly CSharpCompilation _compilation;
@@ -23,8 +11,6 @@ internal sealed class CompilerRelationalSummaryProvider
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly CompilerSpecificationPackProvider _specificationPacks;
     private readonly Dictionary<IMethodSymbol, IrRelationalSummary> _summaries =
-        new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<IMethodSymbol, CompilerSummaryEvidenceAuthority> _authorities =
         new(SymbolEqualityComparer.Default);
     private readonly HashSet<IMethodSymbol> _failed =
         new(SymbolEqualityComparer.Default);
@@ -36,13 +22,6 @@ internal sealed class CompilerRelationalSummaryProvider
         get;
         private set;
     }
-
-    internal ImmutableArray<CompilerSummaryEvidenceAuthority> SummaryEvidenceAuthorities =>
-        [.. _authorities.Values
-            .OrderBy(static authority => (int)authority.Origin)
-            .ThenBy(static authority => authority.CallIdentity, StringComparer.Ordinal)
-            .ThenBy(static authority => authority.EvidenceIdentity, StringComparer.Ordinal)
-            .ThenBy(static authority => authority.EvidenceSha256, StringComparer.Ordinal)];
 
     internal CompilerRelationalSummaryProvider(
         CSharpCompilation compilation,
@@ -130,19 +109,7 @@ internal sealed class CompilerRelationalSummaryProvider
                 return false;
             }
 
-            var authority = CreateAuthority(
-                method,
-                summary!,
-                cancellationToken);
-            if (authority == null)
-            {
-                _failed.Add(method);
-                summary = null;
-                return false;
-            }
-
             _summaries.Add(method, summary!);
-            _authorities.Add(method, authority);
             return true;
         }
         finally
@@ -269,8 +236,7 @@ internal sealed class CompilerRelationalSummaryProvider
             result,
             new IrSummaryProvenance(
                 IrSummaryOrigin.Source,
-                EvidenceSha256(declaration, cancellationToken),
-                evidenceCallIdentity: method.GetDocumentationCommentId() ?? string.Empty));
+                EvidenceSha256(declaration, cancellationToken)));
         var built = IrRelationalSummaryBuilder.Build(
             selected.Lowering.Program,
             signature,
@@ -322,77 +288,5 @@ internal sealed class CompilerRelationalSummaryProvider
         var bytes = hash.ComputeHash(Encoding.UTF8.GetBytes(text));
         return string.Concat(bytes.Select(static value =>
             value.ToString("x2", CultureInfo.InvariantCulture)));
-    }
-
-    private static CompilerSummaryEvidenceAuthority? CreateAuthority(
-        IMethodSymbol method,
-        IrRelationalSummary summary,
-        CancellationToken cancellationToken)
-    {
-        var provenance = summary.Signature.Provenance;
-        var callIdentity = provenance.EvidenceCallIdentity;
-        if (string.IsNullOrEmpty(callIdentity) ||
-            !string.Equals(
-                callIdentity,
-                method.GetDocumentationCommentId() ?? string.Empty,
-                StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        if (provenance.Origin == IrSummaryOrigin.Source)
-        {
-            if (method.DeclaringSyntaxReferences.Length != 1 ||
-                method.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken)
-                    is not BaseMethodDeclarationSyntax declaration)
-            {
-                return null;
-            }
-
-            var sourceText = declaration.SyntaxTree.GetText(cancellationToken);
-            return new CompilerSummaryEvidenceAuthority(
-                CompilerSummaryOrigin.Source,
-                callIdentity,
-                provenance.EvidenceSha256,
-                provenance.EvidenceIdentity,
-                declaration.SyntaxTree.FilePath ?? string.Empty,
-                CompilerCompilationCapture.ComputeTextSha256(sourceText),
-                declaration.FullSpan.Start,
-                declaration.FullSpan.Length,
-                string.Empty,
-                -1);
-        }
-
-        if (provenance.Origin == IrSummaryOrigin.ImplementationIl)
-        {
-            var moduleName = method.ContainingModule?.Name;
-            return string.IsNullOrEmpty(moduleName)
-                ? null
-                : new CompilerSummaryEvidenceAuthority(
-                    CompilerSummaryOrigin.ImplementationIl,
-                    callIdentity,
-                    provenance.EvidenceSha256,
-                    provenance.EvidenceIdentity,
-                    string.Empty,
-                    string.Empty,
-                    -1,
-                    -1,
-                    moduleName,
-                    method.MetadataToken);
-        }
-
-        return provenance.Origin == IrSummaryOrigin.SpecificationPack
-            ? new CompilerSummaryEvidenceAuthority(
-                CompilerSummaryOrigin.SpecificationPack,
-                callIdentity,
-                provenance.EvidenceSha256,
-                provenance.EvidenceIdentity,
-                string.Empty,
-                string.Empty,
-                -1,
-                -1,
-                string.Empty,
-                -1)
-            : null;
     }
 }

@@ -40,7 +40,7 @@ internal static class CompilerManifestArtifactProducer
                         snapshot);
                     return claim.Authority;
                 })]
-                })];
+            })];
         }
         else
         {
@@ -62,9 +62,6 @@ internal static class CompilerManifestArtifactProducer
                 })];
                 return artifact;
             })];
-            snapshot.SummaryEvidence = BuildSummaryEvidence(
-                snapshot,
-                lowerer.SummaryEvidenceAuthorities);
         }
         var artifact = new CompilerManifestArtifact
         {
@@ -87,91 +84,6 @@ internal static class CompilerManifestArtifactProducer
         CompilerManifestArtifactJson.Validate(artifact);
         return artifact;
     }
-
-    private static CompilerSummaryEvidenceSnapshot[] BuildSummaryEvidence(
-        CompilerCompilationSnapshot snapshot,
-        ImmutableArray<CompilerSummaryEvidenceAuthority> authorities)
-    {
-        return [.. authorities.Select(authority =>
-        {
-            var row = new CompilerSummaryEvidenceSnapshot
-            {
-                Origin = authority.Origin,
-                CallIdentity = authority.CallIdentity,
-                EvidenceSha256 = authority.EvidenceSha256,
-                EvidenceIdentity = authority.EvidenceIdentity,
-                SourcePath = authority.SourcePath,
-                SourceTreeSha256 = authority.SourceTreeSha256,
-                SourceStart = authority.SourceStart,
-                SourceLength = authority.SourceLength,
-                OwningModuleName = authority.OwningModuleName,
-                MethodMetadataToken = authority.MethodMetadataToken
-            };
-
-            if (authority.Origin == CompilerSummaryOrigin.Source)
-            {
-                if (!snapshot.SyntaxTrees.Any(tree =>
-                        tree.Path == authority.SourcePath &&
-                        tree.Sha256 == authority.SourceTreeSha256 &&
-                        authority.SourceStart >= 0 &&
-                        authority.SourceLength > 0 &&
-                        authority.SourceStart <= tree.TextLength - authority.SourceLength))
-                {
-                    throw new InvalidOperationException(
-                        "A source summary authority is not bound to the captured source tree.");
-                }
-            }
-            else if (authority.Origin == CompilerSummaryOrigin.ImplementationIl)
-            {
-                var module = snapshot.References
-                    .SelectMany(static reference => reference.Modules)
-                    .Where(module =>
-                        module.Name == authority.OwningModuleName &&
-                        module.Sha256 == authority.EvidenceSha256)
-                    .ToArray();
-                if (module.Length != 1)
-                {
-                    throw new InvalidOperationException(
-                        "An IL summary authority is not bound to one captured module.");
-                }
-
-                row.OwningModuleMvid = module[0].Mvid;
-                row.OwningModuleSha256 = module[0].Sha256;
-            }
-            else if (authority.Origin == CompilerSummaryOrigin.SpecificationPack)
-            {
-                if (authority.EvidenceSha256 != snapshot.SpecificationPackCatalogSha256 ||
-                    !IsSelectedPackIdentity(
-                        authority.EvidenceIdentity,
-                        snapshot.SpecificationPackIds))
-                {
-                    throw new InvalidOperationException(
-                        "A specification-pack summary authority is not bound to the selected catalog.");
-                }
-            }
-
-            return row;
-        })];
-    }
-
-    private static bool IsSelectedPackIdentity(
-        string identity,
-        IEnumerable<string> selectedPackIds)
-    {
-        if (identity.Length == 0 ||
-            !CompilerSpecificationPackCatalogVersions.PackIdentities
-                .Split(';', StringSplitOptions.RemoveEmptyEntries)
-                .Contains(identity, StringComparer.Ordinal))
-        {
-            return false;
-        }
-
-        var separator = identity.LastIndexOf('@');
-        return separator > 0 && selectedPackIds.Contains(
-            identity[..separator],
-            StringComparer.Ordinal);
-    }
-
     private static CompilerDiagnosticArtifact CreateDiagnostic(Diagnostic diagnostic)
     {
         var source = diagnostic.Location.IsInSource;
