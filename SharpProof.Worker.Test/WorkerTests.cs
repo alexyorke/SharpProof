@@ -6283,6 +6283,213 @@ public sealed class WorkerTests
         }
     }
 
+    [Test]
+    public async Task ArtifactAuthorityRejectsFabricatedProofCoreAndUsedFlag()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Assume(value >= 0);
+                    Contract.Assume(value <= 10);
+                    Contract.Ensures(Contract.Result<long>() >= 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CapturingBackend(BackendCheckResult.Unsatisfiable([0])));
+
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(response, response.InputHash,
+                response.Manifest, authority).IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+
+        var result = response.ClaimResults.Single();
+        var originalCore = [.. result.ProofCore];
+        result.ProofCore = ["fabricated:999"];
+        var fabricated = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            fabricated.Errors.Select(static error => error.Code),
+            Does.Contain("response.proof_core_authority"));
+
+        result.ProofCore = originalCore;
+        var usedAssumption = result.Assumptions.Single(
+            static assumption => assumption.Kind == WorkerAssumptionKind.UserAssume);
+        usedAssumption.Used = !usedAssumption.Used;
+        var forgedUsage = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forgedUsage.Errors.Select(static error => error.Code),
+            Does.Contain("response.assumption_usage_authority"));
+    }
+
+    [TestCase("variable")]
+    [TestCase("kind")]
+    [TestCase("value")]
+    public async Task ArtifactAuthorityBindsRefutedModelRows(string mutation)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) {
+                    Contract.Ensures(Contract.Result<int>() > 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(response, response.InputHash,
+                response.Manifest, authority).IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+
+        var row = response.ClaimResults.Single().Model.Single();
+        switch (mutation)
+        {
+            case "variable":
+                row.Variable = "parameter:999";
+                break;
+            case "kind":
+                row.Kind = nameof(IrValueKind.Boolean);
+                row.Value = "false";
+                break;
+            default:
+                row.Value = "01";
+                break;
+        }
+
+        var forged = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forged.Errors.Select(static error => error.Code),
+            Does.Contain("response.model_authority"));
+    }
+
+    [TestCase("kind")]
+    [TestCase("capability")]
+    [TestCase("throw-hierarchy")]
+    public async Task ArtifactAuthorityBindsRefutedEffectWitness(string mutation)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ZeroAllocations]
+                public static object Allocate() => new object();
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
+
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(response, response.InputHash,
+                response.Manifest, authority).IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+
+        var witness = response.ClaimResults.Single().EffectWitness!;
+        switch (mutation)
+        {
+            case "kind":
+                witness.Kind = "managed-array-allocation";
+                break;
+            case "capability":
+                witness.Capabilities = WorkerEffectCapabilitySet.Reflection;
+                break;
+            default:
+                witness.ExactExceptionTypeHierarchy = ["System.Exception"];
+                witness.Effects |= WorkerEffectSet.Throws;
+                break;
+        }
+
+        var forged = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forged.Errors.Select(static error => error.Code),
+            Does.Contain("response.effect_witness_authority"));
+    }
+
+    [Test]
+    public async Task ArtifactAuthorityBindsVacuityAndEntryCore()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Impossible() {
+                    Contract.Requires(false);
+                    Contract.Ensures(Contract.Result<int>() > 0);
+                    return 0;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
+
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(response, response.InputHash,
+                response.Manifest, authority).IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+
+        var result = response.ClaimResults.Single();
+        result.Vacuity = WorkerVacuityKind.None;
+        var forgedVacuity = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forgedVacuity.Errors.Select(static error => error.Code),
+            Does.Contain("response.vacuity_authority"));
+
+        result.Vacuity = WorkerVacuityKind.ContradictoryPreconditions;
+        result.ProofCore = ["assume:0"];
+        var forgedCore = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forgedCore.Errors.Select(static error => error.Code),
+            Does.Contain("response.proof_core_authority"));
+    }
+
+    private static CompilerResponseEvidenceAuthority CreateResponseAuthority(
+        WorkerVerifyRequest request)
+    {
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            File.ReadAllText(request.CompilerManifest.Path));
+        return new CompilerResponseEvidenceAuthority(
+            CompilerManifestArtifactJson.DecodeCallables(artifact));
+    }
+
+    private static string FormatValidationErrors(
+        WorkerVerifyResponse response,
+        CompilerResponseEvidenceAuthority authority)
+    {
+        return string.Join(
+            Environment.NewLine,
+            WorkerProtocolJson.Validate(
+                response,
+                response.InputHash,
+                response.Manifest,
+                authority).Errors.Select(static error => error.Code));
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
