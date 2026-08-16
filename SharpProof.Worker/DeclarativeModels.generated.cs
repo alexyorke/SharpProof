@@ -84,6 +84,7 @@ internal readonly partial record struct GuardedBodySummaryAssumption(
     CompilerSummaryOrigin Origin,
     string EvidenceSha256,
     string EvidenceIdentity,
+    ImmutableArray<CompilerPreparedSummaryEvidence> DependencyEvidence,
     IrTerm Guard,
     IrTerm Predicate
 );

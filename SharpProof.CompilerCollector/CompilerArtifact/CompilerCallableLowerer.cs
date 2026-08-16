@@ -12,6 +12,9 @@ internal sealed class CompilerCallableLowerer
     internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention =>
         _summaries.LastImplementationIlAbstention;
 
+    internal ImmutableArray<CompilerSummaryEvidenceAuthority> SummaryEvidenceAuthorities =>
+        _summaries.SummaryEvidenceAuthorities;
+
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
         IrFactory factory,
@@ -315,6 +318,14 @@ internal sealed class CompilerCallableLowerer
             return false;
         }
 
+        if (!string.Equals(
+                summary.Signature.Provenance.EvidenceCallIdentity,
+                callIdentity,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         IrSummaryInstantiation instantiated;
         try
         {
@@ -341,6 +352,7 @@ internal sealed class CompilerCallableLowerer
             [.. summary.DependencyProvenance.Select(static provenance =>
                 new CompilerPreparedSummaryEvidence(
                     ToCompilerOrigin(provenance.Origin),
+                    provenance.EvidenceCallIdentity,
                     provenance.EvidenceSha256,
                     provenance.EvidenceIdentity))]);
         return true;
