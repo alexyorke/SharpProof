@@ -239,11 +239,13 @@ public sealed class WorkerProgramTests
             {
                 ProjectDirectory = directory,
                 AssemblyName = "Subject",
-                AssemblyIdentity = "Subject, Version=1.0.0.0",
+                AssemblyIdentity =
+                    "Subject, Version=1.0.0.0, Culture=neutral, " +
+                    "PublicKeyToken=null",
                 TargetFramework = "net9.0",
-                CompilerVersion = "SharpProof.Test",
+                CompilerVersion = "1.0.0.0",
                 CompilerMvid = Guid.NewGuid().ToString("D"),
-                CSharpCompilerVersion = "SharpProof.Test",
+                CSharpCompilerVersion = "1.0.0.0",
                 CSharpCompilerMvid = Guid.NewGuid().ToString("D"),
                 Options = new CompilerCompilationOptionsSnapshot
                 {

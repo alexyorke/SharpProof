@@ -38,12 +38,13 @@ internal static class CompilationFingerprint
         return value != null &&
         IsCanonicalPath(value.ProjectDirectory) &&
         HasText(value.AssemblyName) &&
-        HasText(value.AssemblyIdentity) &&
+        IsCanonicalAssemblyIdentity(value.AssemblyIdentity, out var identityName) &&
+        string.Equals(value.AssemblyName, identityName, StringComparison.Ordinal) &&
         HasText(value.TargetFramework) &&
-        HasText(value.CompilerVersion) &&
-        Guid.TryParseExact(value.CompilerMvid, "D", out _) &&
-        HasText(value.CSharpCompilerVersion) &&
-        Guid.TryParseExact(value.CSharpCompilerMvid, "D", out _) &&
+        IsCanonicalVersion(value.CompilerVersion) &&
+        IsCanonicalMvid(value.CompilerMvid) &&
+        IsCanonicalVersion(value.CSharpCompilerVersion) &&
+        IsCanonicalMvid(value.CSharpCompilerMvid) &&
         CompilerSpecificationPackAuthorityValidation.IsValid(
             value.SpecificationPackIds,
             value.SpecificationPackCatalogVersion,
@@ -116,7 +117,7 @@ internal static class CompilationFingerprint
         value.Path != null &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
         value.TextLength >= 0 &&
-        HasText(value.LanguageVersion) &&
+        IsCanonicalLanguageVersion(value.LanguageVersion) &&
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
         value.Kind is "Regular" or "Script" &&
         All(value.PreprocessorSymbols, HasText) &&
@@ -141,7 +142,9 @@ internal static class CompilationFingerprint
         value.Kind is "Assembly" or "Module" &&
         All(value.Aliases, HasText) &&
         IsOrdered(value.Aliases, unique: false) &&
-        HasText(value.Identity) &&
+        (value.Kind == "Assembly"
+            ? IsCanonicalAssemblyIdentity(value.Identity, out _)
+            : HasText(value.Identity)) &&
         value.Modules is { Length: > 0 } &&
         (value.Kind == "Assembly" || value.Modules.Length == 1 &&
             string.Equals(value.Identity, value.Modules[0].Name,
@@ -165,7 +168,7 @@ internal static class CompilationFingerprint
     {
         return value != null &&
             HasText(value.Name) &&
-            Guid.TryParseExact(value.Mvid, "D", out _) &&
+            IsCanonicalMvid(value.Mvid) &&
             IsCanonicalPath(value.Path) &&
             WorkerProtocolJson.IsSha256(value.Sha256) &&
             value.SizeBytes is > 0 and
@@ -243,6 +246,84 @@ internal static class CompilationFingerprint
     private static bool HasText(string value)
     {
         return !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static bool IsCanonicalVersion(string value)
+    {
+        return Version.TryParse(value, out var parsed) &&
+            string.Equals(
+                parsed.ToString(),
+                value,
+                StringComparison.Ordinal);
+    }
+
+    private static bool IsCanonicalLanguageVersion(string value)
+    {
+        return value is
+            "Default" or
+            "CSharp1" or
+            "CSharp2" or
+            "CSharp3" or
+            "CSharp4" or
+            "CSharp5" or
+            "CSharp6" or
+            "CSharp7" or
+            "CSharp7_1" or
+            "CSharp7_2" or
+            "CSharp7_3" or
+            "CSharp8" or
+            "CSharp9" or
+            "CSharp10" or
+            "CSharp11" or
+            "CSharp12" or
+            "CSharp13" or
+            "CSharp14" or
+            "LatestMajor" or
+            "Preview" or
+            "Latest";
+    }
+
+    private static bool IsCanonicalMvid(string value)
+    {
+        return Guid.TryParseExact(value, "D", out var parsed) &&
+            parsed != Guid.Empty &&
+            string.Equals(
+                parsed.ToString("D"),
+                value,
+                StringComparison.Ordinal);
+    }
+
+    private static bool IsCanonicalAssemblyIdentity(
+        string value,
+        out string identityName)
+    {
+        identityName = string.Empty;
+        if (!HasText(value))
+        {
+            return false;
+        }
+
+        try
+        {
+            var parsed = new System.Reflection.AssemblyName(value);
+            if (parsed.FullName is not { } fullName ||
+                !string.Equals(fullName, value, StringComparison.Ordinal) ||
+                parsed.Name is not { Length: > 0 } name ||
+                parsed.Version == null ||
+                value.IndexOf(", Culture=", StringComparison.Ordinal) < 0 ||
+                value.IndexOf(", PublicKeyToken=", StringComparison.Ordinal) < 0)
+            {
+                return false;
+            }
+
+            identityName = name;
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or FileLoadException)
+        {
+            return false;
+        }
     }
 }
 

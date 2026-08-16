@@ -172,6 +172,177 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void Sp034MalformedCaptureEvidenceIsRejected()
+    {
+        Action<CompilerCompilationSnapshot>[] corruptions =
+        [
+            snapshot => snapshot.CompilerVersion = "not-a-version",
+            snapshot => snapshot.CompilerMvid =
+                snapshot.CompilerMvid.ToUpperInvariant(),
+            snapshot => snapshot.SyntaxTrees[0].LanguageVersion =
+                "not-a-csharp-language-version",
+            snapshot => snapshot.AssemblyIdentity = "not-an-assembly-identity",
+            snapshot => snapshot.References[0].Identity =
+                "not-an-assembly-identity",
+            snapshot => snapshot.AssemblyName = "DifferentAssembly"
+        ];
+
+        foreach (var corrupt in corruptions)
+        {
+            var artifact = CreateArtifact();
+            corrupt(artifact.Compilation);
+            artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+                artifact.Compilation, []);
+
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Deserialize(
+                    JsonSerializer.Serialize(
+                        artifact,
+                        WorkerProtocolJson.Options) + "\n")));
+        }
+    }
+
+    [Test]
+    public void Sp034VersionsRequireExactSystemVersionRoundTrips()
+    {
+        foreach (var version in new[]
+                 { "1.2", "1.2.3", "1.2.3.4" })
+        {
+            var artifact = CreateArtifact();
+            artifact.Compilation.CompilerVersion = version;
+            artifact.Compilation.CSharpCompilerVersion = version;
+            artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+                artifact.Compilation, []);
+
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.Deserialize(
+                    CompilerManifestArtifactJson.Serialize(artifact))));
+        }
+
+        foreach (var version in new[]
+                 { "not-a-version", "01.2.3.4", "1.2.3.4.5", "1.2.3.4 " })
+        {
+            AssertMalformedCapture(snapshot =>
+            {
+                snapshot.CompilerVersion = version;
+                snapshot.CSharpCompilerVersion = version;
+            });
+        }
+    }
+
+    [Test]
+    public void Sp034MvidsRequireLowercaseNonNilDFormat()
+    {
+        const string valid = "01234567-89ab-cdef-0123-456789abcdef";
+        var validArtifact = CreateArtifact();
+        validArtifact.Compilation.CompilerMvid = valid;
+        validArtifact.Compilation.CSharpCompilerMvid = valid;
+        foreach (var module in validArtifact.Compilation.References.SelectMany(
+                     static reference => reference.Modules))
+        {
+            module.Mvid = valid;
+        }
+        validArtifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            validArtifact.Compilation, []);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(validArtifact))));
+
+        var invalid = new[]
+        {
+            valid.ToUpperInvariant(),
+            "01234567-89Ab-cdef-0123-456789abcdef",
+            "{" + valid + "}",
+            "0123456789abcdef0123456789abcdef",
+            Guid.Empty.ToString("D")
+        };
+        foreach (var value in invalid)
+        {
+            AssertMalformedCapture(snapshot => snapshot.CompilerMvid = value);
+            AssertMalformedCapture(snapshot =>
+                snapshot.CSharpCompilerMvid = value);
+            AssertMalformedCapture(snapshot =>
+                snapshot.References[0].Modules[0].Mvid = value);
+        }
+    }
+
+    [Test]
+    public void Sp034LanguageVersionsAreTheCaptureEnumSpellings()
+    {
+        var valid = new[]
+        {
+            "Default", "CSharp1", "CSharp2", "CSharp3", "CSharp4",
+            "CSharp5", "CSharp6", "CSharp7", "CSharp7_1", "CSharp7_2",
+            "CSharp7_3", "CSharp8", "CSharp9", "CSharp10", "CSharp11",
+            "CSharp12", "CSharp13", "CSharp14", "LatestMajor", "Preview",
+            "Latest"
+        };
+        foreach (var languageVersion in valid)
+        {
+            var artifact = CreateArtifact();
+            artifact.Compilation.SyntaxTrees[0].LanguageVersion = languageVersion;
+            artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+                artifact.Compilation, []);
+
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.Deserialize(
+                    CompilerManifestArtifactJson.Serialize(artifact))),
+                languageVersion);
+        }
+
+        foreach (var languageVersion in new[]
+                 { "not-a-csharp-language-version", "CSharp7.1", "CSharp15", "" })
+        {
+            AssertMalformedCapture(snapshot =>
+                snapshot.SyntaxTrees[0].LanguageVersion = languageVersion);
+        }
+    }
+
+    [Test]
+    public void Sp034AssemblyIdentitiesRoundTripAndBindTheAssemblyName()
+    {
+        var valid = CreateArtifact();
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(valid))));
+
+        var identity = valid.Compilation.AssemblyIdentity;
+        foreach (var malformed in new[]
+                 {
+                     "not-an-assembly-identity",
+                     identity.ToUpperInvariant(),
+                     identity.Replace(
+                         "Version=", "version=", StringComparison.Ordinal),
+                     identity + ", " + new string('x', 1024)
+                 })
+        {
+            AssertMalformedCapture(snapshot => snapshot.AssemblyIdentity = malformed);
+            AssertMalformedCapture(snapshot =>
+                snapshot.References[0].Identity = malformed);
+        }
+
+        AssertMalformedCapture(snapshot => snapshot.AssemblyName = "Different");
+
+        var moduleIdentity = CreateArtifact();
+        var module = moduleIdentity.Compilation.References[0].Modules[0];
+        moduleIdentity.Compilation.References[0].Kind = "Module";
+        moduleIdentity.Compilation.References[0].Identity = module.Name;
+        moduleIdentity.Compilation.References[0].Modules = [module];
+        moduleIdentity.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            moduleIdentity.Compilation, []);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(moduleIdentity))));
+
+        AssertMalformedCapture(snapshot =>
+        {
+            snapshot.References[0].Kind = "Module";
+            snapshot.References[0].Identity = "different-module-name";
+            snapshot.References[0].Modules = [snapshot.References[0].Modules[0]];
+        });
+    }
+
+    [Test]
     public void CompilerCallableFailuresUseOnlyProducerReasons()
     {
         var allowed = new HashSet<WorkerClaimReason>
@@ -2300,6 +2471,22 @@ public sealed class CompilerManifestArtifactTests
         Assert.Throws<JsonException>(
             (Action)(() =>
                 CompilerManifestArtifactJson.Deserialize(json)));
+    }
+
+    private static void AssertMalformedCapture(
+        Action<CompilerCompilationSnapshot> corrupt)
+    {
+        var artifact = CreateArtifact();
+        corrupt(artifact.Compilation);
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, []);
+        var json = JsonSerializer.Serialize(
+                artifact,
+                WorkerProtocolJson.Options) +
+            "\n";
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(json)));
     }
 
     private static CSharpCompilation CreateCompilation(
