@@ -2690,6 +2690,269 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task Sp058SummaryProvenanceTamperMatrixFailsClosedAndProjectsClosure()
+    {
+        static CompilerSummaryCallArtifact OnlySummary(
+            CompilerManifestArtifact artifact)
+        {
+            var summaries = artifact.Callables
+                .SelectMany(static callable => callable.Body?.SummaryCalls ?? [])
+                .ToArray();
+            Assert.That(summaries, Has.Length.EqualTo(1));
+            return summaries[0];
+        }
+
+        static void AssertHydrationRejects(
+            CompilerManifestArtifact artifact,
+            Action<CompilerSummaryCallArtifact> tamper,
+            string label)
+        {
+            tamper(OnlySummary(artifact));
+            Assert.That(
+                (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
+                    artifact)),
+                Throws.TypeOf<InvalidDataException>(),
+                label);
+        }
+
+        static void AssertProven(
+            WorkerVerifyResponse response,
+            string evidencePrefix,
+            bool requiresDependencyClosure)
+        {
+            Assert.That(response.Errors, Is.Empty);
+            var result = response.ClaimResults.Single();
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+                Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+                Assert.That(
+                    result.ProofCore.Any(item => item.StartsWith(
+                        evidencePrefix,
+                        StringComparison.Ordinal)),
+                    Is.True);
+                if (requiresDependencyClosure)
+                {
+                    Assert.That(
+                        result.ProofCore.Any(item => item.Contains(
+                            ":deps=",
+                            StringComparison.Ordinal) && item.Contains(
+                            ";il-summary:",
+                            StringComparison.Ordinal)),
+                        Is.True);
+                }
+            }
+        }
+
+        using var packProject = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Maximum(int left, int right) {
+                    Contract.Ensures(
+                        Contract.Result<int>() ==
+                        (left >= right ? left : right));
+                    return Math.Max(left, right);
+                }
+            }
+            """);
+        packProject.UseNetCoreReferencePack();
+        var packRequest = packProject.CreateRequest(
+            cacheEnabled: false,
+            specificationPacks: ["dotnet.scalar"]);
+        var packJson = await File.ReadAllTextAsync(
+            packRequest.CompilerManifest.Path);
+        CompilerManifestArtifact ReadPack()
+        {
+            return CompilerManifestArtifactJson.Deserialize(packJson);
+        }
+
+        var validPack = ReadPack();
+        var packSummary = OnlySummary(validPack);
+        Assert.That(
+            packSummary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.SpecificationPack));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(validPack)));
+        AssertHydrationRejects(
+            ReadPack(),
+            static summary => summary.EvidenceSha256 = new string('b', 64),
+            "SP058 wrong specification-pack digest");
+        AssertHydrationRejects(
+            ReadPack(),
+            static summary => summary.EvidenceIdentity = "dotnet.scalar@999",
+            "SP058 wrong specification-pack identity");
+
+        using var sourceProject = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static bool Local(bool value) => value;
+
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return Local(value);
+                }
+            }
+            """);
+        var sourceRequest = sourceProject.CreateRequest(cacheEnabled: false);
+        var sourceJson = await File.ReadAllTextAsync(
+            sourceRequest.CompilerManifest.Path);
+        CompilerManifestArtifact ReadSource()
+        {
+            return CompilerManifestArtifactJson.Deserialize(sourceJson);
+        }
+
+        var validSource = ReadSource();
+        var sourceSummary = OnlySummary(validSource);
+        Assert.That(
+            sourceSummary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.Source));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(validSource)));
+        AssertHydrationRejects(
+            ReadSource(),
+            static summary => summary.EvidenceSha256 = new string('c', 64),
+            "SP058 wrong source body digest");
+        AssertHydrationRejects(
+            ReadSource(),
+            static summary => summary.Identity =
+                "M:Subject.NotTheCallee(System.Boolean)",
+            "SP058 wrong source callee identity");
+
+        using var ilProject = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return ExternalUsed.Read(value);
+                }
+            }
+            """);
+        ilProject.AddImplementationReference(
+            """
+            public static class ExternalUsed {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        ilProject.AddImplementationReference(
+            """
+            public static class ExternalUnused {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        var ilRequest = ilProject.CreateRequest(cacheEnabled: false);
+        var ilJson = await File.ReadAllTextAsync(
+            ilRequest.CompilerManifest.Path);
+        CompilerManifestArtifact ReadIl()
+        {
+            return CompilerManifestArtifactJson.Deserialize(ilJson);
+        }
+
+        var validIl = ReadIl();
+        var ilSummary = OnlySummary(validIl);
+        Assert.That(
+            ilSummary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.ImplementationIl));
+        var ilAuthority = validIl.Compilation.SummaryEvidence.Single(row =>
+            row.Origin == CompilerSummaryOrigin.ImplementationIl &&
+            row.CallIdentity == ilSummary.Identity);
+        var unusedModule = validIl.Compilation.References
+            .SelectMany(static reference => reference.Modules)
+            .Single(module =>
+                module.Path.Contains(
+                    "implementation-",
+                    StringComparison.OrdinalIgnoreCase) &&
+                module.Sha256 != ilAuthority.OwningModuleSha256);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(validIl)));
+        AssertHydrationRejects(
+            ReadIl(),
+            summary => summary.EvidenceSha256 = unusedModule.Sha256,
+            "SP058 unused-reference module substitution");
+
+        using var transitiveProject = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static bool Local(bool value) => Inner(value);
+
+                private static bool Inner(bool value) =>
+                    ExternalTransitive.Read(value);
+
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return Local(value);
+                }
+            }
+            """);
+        transitiveProject.AddImplementationReference(
+            """
+            public static class ExternalTransitive {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        var transitiveRequest = transitiveProject.CreateRequest(
+            cacheEnabled: false);
+        var transitiveJson = await File.ReadAllTextAsync(
+            transitiveRequest.CompilerManifest.Path);
+        CompilerManifestArtifact ReadTransitive()
+        {
+            return CompilerManifestArtifactJson.Deserialize(transitiveJson);
+        }
+
+        var validTransitive = ReadTransitive();
+        var transitiveSummary = OnlySummary(validTransitive);
+        Assert.That(
+            transitiveSummary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.Source));
+        var transitiveIlDependency = transitiveSummary.DependencyEvidence
+            .Single(item => item.Origin == CompilerSummaryOrigin.ImplementationIl);
+        Assert.That(transitiveIlDependency.CallIdentity, Is.Not.Empty);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(validTransitive)));
+        AssertHydrationRejects(
+            ReadTransitive(),
+            static summary => summary.DependencyEvidence
+                .Single(item => item.Origin == CompilerSummaryOrigin.ImplementationIl)
+                .EvidenceSha256 = new string('d', 64),
+            "SP058 transitive dependency digest");
+        AssertHydrationRejects(
+            ReadTransitive(),
+            static summary => summary.DependencyEvidence
+                .Single(item => item.Origin == CompilerSummaryOrigin.ImplementationIl)
+                .CallIdentity = "M:ExternalTransitive.NotTheCallee(System.Boolean)",
+            "SP058 transitive dependency identity");
+
+        using var sourceWorker = SharpProofWorker.Create(sourceRequest.Budgets);
+        AssertProven(
+            await sourceWorker.VerifyAsync(sourceRequest),
+            "source-summary:",
+            requiresDependencyClosure: false);
+        using var packWorker = SharpProofWorker.Create(packRequest.Budgets);
+        AssertProven(
+            await packWorker.VerifyAsync(packRequest),
+            "spec-pack:dotnet.scalar@1:",
+            requiresDependencyClosure: false);
+        using var ilWorker = SharpProofWorker.Create(ilRequest.Budgets);
+        AssertProven(
+            await ilWorker.VerifyAsync(ilRequest),
+            "il-summary:",
+            requiresDependencyClosure: false);
+        using var transitiveWorker = SharpProofWorker.Create(
+            transitiveRequest.Budgets);
+        AssertProven(
+            await transitiveWorker.VerifyAsync(transitiveRequest),
+            "source-summary:",
+            requiresDependencyClosure: true);
+    }
+
+    [Test]
     public async Task ImplementationIlBranchesAndInt32WrappingRemainExact()
     {
         using var project = TestProject.Create(
