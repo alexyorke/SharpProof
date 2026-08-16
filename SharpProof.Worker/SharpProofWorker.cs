@@ -145,6 +145,7 @@ public sealed class SharpProofWorker : IDisposable
             }
             projectBoundary.Token.ThrowIfCancellationRequested();
             var manifest = snapshot.CompilerManifest.Manifest;
+            var responseAuthority = new CompilerResponseEvidenceAuthority(targets);
             WorkerVerifyResponse Assemble(WorkerRunStatus status, WorkerRunFailureReason reason,
                 IEnumerable<WorkerCallableResult> callables, IEnumerable<WorkerClaimResult> claims,
                 WorkerCacheStatus resultCacheStatus, IEnumerable<WorkerProtocolError>? errors = null)
@@ -187,8 +188,20 @@ public sealed class SharpProofWorker : IDisposable
                 projectBoundary.Token.ThrowIfCancellationRequested();
                 if (cached != null)
                 {
-                    return Assemble(WorkerRunStatus.Complete, WorkerRunFailureReason.None,
-                        cached.CallableResults, cached.ClaimResults, WorkerCacheStatus.Hit);
+                    var cachedResponse = Assemble(
+                        WorkerRunStatus.Complete,
+                        WorkerRunFailureReason.None,
+                        cached.CallableResults,
+                        cached.ClaimResults,
+                        WorkerCacheStatus.Hit);
+                    if (WorkerProtocolJson.Validate(
+                            cachedResponse,
+                            snapshot.InputHash,
+                            manifest,
+                            responseAuthority).IsValid)
+                    {
+                        return cachedResponse;
+                    }
                 }
             }
             if (!TryCreateLanes(request.Budgets, targets.Length, out solverLanes, out var backendError))
@@ -294,7 +307,11 @@ public sealed class SharpProofWorker : IDisposable
             projectBoundary.Token.ThrowIfCancellationRequested();
             var run = WorkerResultAssembler.Classify(callableResults, claimResults);
             var response = Assemble(run.Status, run.Failure, callableResults, claimResults, cacheStatus);
-            var responseValidation = WorkerProtocolJson.Validate(response, snapshot.InputHash, manifest);
+            var responseValidation = WorkerProtocolJson.Validate(
+                response,
+                snapshot.InputHash,
+                manifest,
+                responseAuthority);
             if (!responseValidation.IsValid)
             {
                 var malformed = targets.Select(target => Unknown(target, WorkerClaimReason.InfrastructureFailure,

@@ -43,6 +43,7 @@ internal static class Program
         byte[] artifactBytes;
         string expectedInputHash;
         WorkerVersionSummary expectedVersions;
+        CompilerResponseEvidenceAuthority responseAuthority;
         WorkerRuntimeClosureSnapshot? runtimeSnapshot = null;
         try
         {
@@ -57,6 +58,8 @@ internal static class Program
                 artifactBytes,
                 runtimeSnapshot);
             expectedVersions = ComputeExpectedVersions(runtimeSnapshot);
+            responseAuthority = new CompilerResponseEvidenceAuthority(
+                CompilerManifestArtifactJson.DecodeCallables(artifact));
             var validation = WorkerProtocolJson.Validate(request);
             if (!validation.IsValid)
             {
@@ -135,7 +138,8 @@ internal static class Program
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
             artifact.Manifest, expectedVersions,
             out var validResponse, out var validatedResponse,
-            arguments.TerminationGraceMilliseconds);
+            arguments.TerminationGraceMilliseconds,
+            responseAuthority);
         if (!validResponse)
         {
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
@@ -145,14 +149,15 @@ internal static class Program
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
                 artifact.Manifest, expectedVersions,
                 out validResponse, out validatedResponse,
-                arguments.TerminationGraceMilliseconds);
+                arguments.TerminationGraceMilliseconds,
+                responseAuthority);
         }
         if (validResponse)
         {
             try
             {
                 PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash,
-                    expectedVersions, validatedResponse!);
+                    expectedVersions, validatedResponse!, responseAuthority);
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
@@ -331,7 +336,8 @@ internal static class Program
         string? expectedInputHash, WorkerClaimManifest? expectedManifest,
         WorkerVersionSummary? expectedVersions,
         out bool validResponse, out WorkerVerifyResponse? validatedResponse,
-        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
+        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds,
+        IWorkerResponseEvidenceAuthority? responseAuthority = null)
     {
         validResponse = false;
         validatedResponse = null;
@@ -349,14 +355,30 @@ internal static class Program
                 "SharpProof worker result is unavailable or malformed.");
             return 3;
         }
-        var validation = expectedManifest == null || expectedInputHash == null
-            ? WorkerProtocolJson.Validate(response)
-            : WorkerProtocolJson.ValidateForRequest(
+        WorkerProtocolValidationResult validation;
+        if (expectedManifest == null || expectedInputHash == null)
+        {
+            validation = WorkerProtocolJson.Validate(response);
+        }
+        else if (responseAuthority is { } authority)
+        {
+            validation = WorkerProtocolJson.ValidateForRequest(
+                response, WorkerProtocolJson.ComputeRequestHash(request),
+                expectedInputHash, expectedManifest, request,
+                expectedVersions ?? throw new InvalidOperationException(
+                    "Expected runtime provenance is unavailable."),
+                authority,
+                terminationGraceMilliseconds);
+        }
+        else
+        {
+            validation = WorkerProtocolJson.ValidateForRequest(
                 response, WorkerProtocolJson.ComputeRequestHash(request),
                 expectedInputHash, expectedManifest, request,
                 expectedVersions ?? throw new InvalidOperationException(
                     "Expected runtime provenance is unavailable."),
                 terminationGraceMilliseconds);
+        }
         if (!validation.IsValid)
         {
             WriteErrors(validation.Errors, "SharpProof ");
@@ -460,7 +482,8 @@ internal static class Program
         LauncherArguments arguments, WorkerVerifyRequest request,
         CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
         WorkerVersionSummary expectedVersions,
-        WorkerVerifyResponse response)
+        WorkerVerifyResponse response,
+        IWorkerResponseEvidenceAuthority responseAuthority)
     {
         if (arguments.PublishRequestPath == null)
         {
@@ -483,6 +506,7 @@ internal static class Program
                 response, response.RequestHash, expectedInputHash,
                 artifact.Manifest, request,
                 expectedVersions,
+                responseAuthority,
                 arguments.TerminationGraceMilliseconds).IsValid)
         {
             throw new IOException("The worker response binding is invalid.");

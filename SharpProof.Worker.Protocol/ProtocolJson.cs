@@ -117,6 +117,19 @@ public static partial class WorkerProtocolJson
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
         return ValidateResponse(response, expectedInputHash, expectedManifest, null, null, null);
     }
+
+    internal static WorkerProtocolValidationResult Validate(
+        WorkerVerifyResponse? response, string expectedInputHash,
+        WorkerClaimManifest? expectedManifest,
+        IWorkerResponseEvidenceAuthority evidenceAuthority)
+    {
+        RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
+        _ = evidenceAuthority ??
+            throw new ArgumentNullException(nameof(evidenceAuthority));
+        return ValidateResponse(
+            response, expectedInputHash, expectedManifest, null, null, null,
+            evidenceAuthority: evidenceAuthority);
+    }
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
@@ -147,6 +160,44 @@ public static partial class WorkerProtocolJson
         return ValidateResponse(response, expectedInputHash, expectedManifest,
             expectedRequestHash, expectedRequest, expectedVersions,
             maximumElapsedMilliseconds);
+    }
+
+    internal static WorkerProtocolValidationResult ValidateForRequest(
+        WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
+        WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
+        WorkerVersionSummary expectedVersions,
+        IWorkerResponseEvidenceAuthority evidenceAuthority,
+        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
+    {
+        RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
+        RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
+        _ = expectedManifest ??
+            throw new ArgumentNullException(nameof(expectedManifest));
+        _ = expectedRequest ??
+            throw new ArgumentNullException(nameof(expectedRequest));
+        _ = expectedVersions ??
+            throw new ArgumentNullException(nameof(expectedVersions));
+        _ = evidenceAuthority ??
+            throw new ArgumentNullException(nameof(evidenceAuthority));
+        if (!Validate(expectedRequest).IsValid ||
+            ComputeRequestHash(expectedRequest) != expectedRequestHash)
+        {
+            throw new ArgumentException(
+                "Expected request authority is invalid or does not match its hash.",
+                nameof(expectedRequest));
+        }
+        if (!WorkerProtocolMetadata.IsVersionsValid(expectedVersions))
+        {
+            throw new ArgumentException(
+                "Expected runtime provenance is invalid.",
+                nameof(expectedVersions));
+        }
+        var maximumElapsedMilliseconds = WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+            expectedRequest, terminationGraceMilliseconds);
+        return ValidateResponse(
+            response, expectedInputHash, expectedManifest,
+            expectedRequestHash, expectedRequest, expectedVersions,
+            maximumElapsedMilliseconds, evidenceAuthority);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -202,7 +253,8 @@ public static partial class WorkerProtocolJson
         WorkerVerifyResponse? response, string? expectedInputHash, WorkerClaimManifest? expectedManifest,
         string? expectedRequestHash, WorkerVerifyRequest? expectedRequest,
         WorkerVersionSummary? expectedVersions,
-        long? maximumElapsedMilliseconds = null)
+        long? maximumElapsedMilliseconds = null,
+        IWorkerResponseEvidenceAuthority? evidenceAuthority = null)
     {
         var errors = new Validator();
         if (response == null)
@@ -262,6 +314,26 @@ public static partial class WorkerProtocolJson
                 JsonSerializer.Serialize(response.Summary.Budgets, s_options) ==
                 JsonSerializer.Serialize(expectedRequest.Budgets, s_options), "response.budgets_mismatch");
             ValidateCacheForRequest(response, expectedRequest, errors);
+        }
+
+        if (evidenceAuthority != null)
+        {
+            try
+            {
+                foreach (var code in evidenceAuthority.Validate(response)
+                             .Where(static code => !string.IsNullOrWhiteSpace(code))
+                             .Distinct(s_ordinal))
+                {
+                    errors.Add(code);
+                }
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException or InvalidDataException or
+                InvalidOperationException or KeyNotFoundException or
+                NullReferenceException)
+            {
+                errors.Add("response.evidence_authority");
+            }
         }
 
         return errors.Result;
