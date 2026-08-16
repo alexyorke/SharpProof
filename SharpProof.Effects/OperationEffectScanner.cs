@@ -20,6 +20,7 @@ internal sealed class OperationEffectScanner
     private readonly ConversionOwnershipClassifier _conversionOwnership;
     private readonly IMethodSymbol _method;
     private readonly INamedTypeSymbol? _monitorType;
+    private readonly IOperation _root;
     private readonly EffectAnalysisSession _session;
     private readonly bool _useAbstractReachability;
     private IOperation? _directOperation;
@@ -39,6 +40,7 @@ internal sealed class OperationEffectScanner
     {
         _session = session;
         _method = method;
+        _root = ArgumentNullGuard.NotNull(root, nameof(root));
         _abstractFlow = abstractFlow;
         _callResolver =
             new EffectCallSiteResolver(
@@ -912,10 +914,12 @@ internal sealed class OperationEffectScanner
         return operation switch
         {
             IThrowOperation => false,
-            IInvocationOperation invocation => CanCompleteInvocation(
-                invocation.TargetMethod,
-                invocation.Instance,
-                invocation),
+            IInvocationOperation invocation =>
+                !IsImplicitLockEnterWithNullValue(invocation) &&
+                CanCompleteInvocation(
+                    invocation.TargetMethod,
+                    invocation.Instance,
+                    invocation),
             IPropertyReferenceOperation property =>
                 CanCompleteProperty(property),
             IFieldReferenceOperation field =>
@@ -1104,7 +1108,81 @@ internal sealed class OperationEffectScanner
     {
         return value != null &&
             (value.ConstantValue is { HasValue: true, Value: null } ||
-             _abstractFlow?.ProvesNull(origin, value) == true);
+             _abstractFlow?.ProvesNull(origin, value) == true ||
+             IsSourceDefinitelyNull(value, origin));
+    }
+
+    private bool IsImplicitLockEnterWithNullValue(IInvocationOperation invocation)
+    {
+        return invocation.IsImplicit &&
+            _monitorType != null &&
+            SymbolEqualityComparer.Default.Equals(
+                invocation.TargetMethod.ContainingType.OriginalDefinition,
+                _monitorType.OriginalDefinition) &&
+            invocation.TargetMethod.Name == "Enter" &&
+            invocation.Arguments.Length != 0 &&
+            IsProvenNull(invocation.Arguments[0].Value, invocation);
+    }
+
+    private bool IsSourceDefinitelyNull(IOperation value, IOperation origin)
+    {
+        if (value is not ILocalReferenceOperation local ||
+            local.Local.DeclaringSyntaxReferences.Length != 1)
+        {
+            return false;
+        }
+
+        var declaration = local.Local.DeclaringSyntaxReferences[0]
+            .GetSyntax();
+        if (declaration.SyntaxTree != origin.Syntax.SyntaxTree ||
+            declaration.SpanStart >= origin.Syntax.SpanStart)
+        {
+            return false;
+        }
+
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_session.Compilation, declaration.SyntaxTree);
+        var declarationOperation = model.GetOperation(declaration);
+        var initializer = declarationOperation?.DescendantsAndSelf()
+            .OfType<IVariableDeclaratorOperation>()
+            .FirstOrDefault(declarator =>
+                SymbolEqualityComparer.Default.Equals(
+                    declarator.Symbol, local.Local))?.Initializer?.Value;
+        if (initializer?.ConstantValue is not { HasValue: true, Value: null })
+        {
+            return false;
+        }
+
+        if (origin is ILockOperation)
+        {
+            return true;
+        }
+
+        foreach (var operation in _root.DescendantsAndSelf()
+                     .Where(candidate =>
+                         candidate.Syntax.SyntaxTree == origin.Syntax.SyntaxTree &&
+                         candidate.Syntax.SpanStart >= declaration.Span.End &&
+                         candidate.Syntax.SpanStart < origin.Syntax.SpanStart))
+        {
+            if (operation is IAssignmentOperation assignment &&
+                assignment.Target is ILocalReferenceOperation target &&
+                SymbolEqualityComparer.Default.Equals(target.Local, local.Local))
+            {
+                return false;
+            }
+
+            if (operation is IArgumentOperation
+                {
+                    Parameter.RefKind: not RefKind.None
+                } argument &&
+                argument.Value is ILocalReferenceOperation argumentValue &&
+                SymbolEqualityComparer.Default.Equals(argumentValue.Local, local.Local))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private EffectSummary PotentialNullReceiver(IOperation? instance, IOperation access)

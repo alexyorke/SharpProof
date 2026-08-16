@@ -6066,7 +6066,7 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
-    public void TemporaryEffectStepBaselineProbe()
+    public void EffectsAfterDefiniteNoncompletionAreSuppressed()
     {
         var compilation = EffectTestHost.CreateCompilation(
             """

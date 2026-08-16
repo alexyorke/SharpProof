@@ -265,15 +265,16 @@ internal sealed class EffectMethodNodeBuilder
         var summary = EffectSummary.Empty;
         foreach (var block in graph.Blocks.Where(static block => block.IsReachable))
         {
-            summary = EffectSummaryOperations.JoinFrom(
-                summary,
-                block.Operations.Where(scanner.IsReachable).Select(scanner.Scan));
-            if (block.BranchValue != null && scanner.IsReachable(block.BranchValue))
+            var step = scanner.ScanSequence(
+                block.Operations.Where(scanner.IsReachable));
+            if (step.CompletesNormally &&
+                block.BranchValue != null &&
+                scanner.IsReachable(block.BranchValue))
             {
-                summary = EffectSummaryOperations.Join(
-                    summary,
-                    scanner.Scan(block.BranchValue));
+                step = step.Then(scanner.ScanSequence([block.BranchValue]));
             }
+
+            summary = EffectSummaryOperations.Join(summary, step.Summary);
         }
 
         return ManagedAbstractFlow.IsAcyclic(graph)
