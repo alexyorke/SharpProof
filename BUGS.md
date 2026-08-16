@@ -2214,9 +2214,14 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 - Consolidated cases: SP-AUDIT-151.
 - Unified closure: Generate one producer/codec/hydrator/callable mapping for every supported compiler/effect Unknown reason and certainty tuple.
 
-### SP-AUDIT-200 - Effect replay is not bound to full tree identity (P1)
+### SP-AUDIT-200 - Effect replay is not bound to full tree identity (fixed)
 
-- [ ] Compiler effect replay binds events only to syntax-tree ordinal, text hash,
+- [x] Fixed by `5df376e60` on the canonical snapshot foundation
+  `33bd36adc`. Every replay event now carries a generated
+  `SyntaxTreeSnapshotSha256` over the complete canonical tree snapshot, and
+  collector, codec, manifest, effect authority, and worker replay independently
+  require exact equality.
+- Compiler effect replay previously bound events only to syntax-tree ordinal, text hash,
   and span, although compilation snapshots also bind path and parse settings.
 - Certifier impact: an event can be resealed against a byte-identical tree with
   different preprocessor symbols or generated/path identity, including a tree
@@ -2225,6 +2230,8 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   selected syntax-tree snapshot. Add identical-text/different-path, symbols,
   language/features, generated identity, ordinary exact, and binding-removal
   controls.
+- The replay codec and counterexample matrix passed 27/27, including path,
+  symbols/options, generated identity, digest tampering, and exact controls.
 
 ## P2 active bugs
 
