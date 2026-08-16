@@ -82,6 +82,12 @@
           "name": "PackIds",
           "type": "string",
           "value": "dotnet.scalar"
+        },
+        {
+          "accessibility": "internal",
+          "name": "PackIdentities",
+          "type": "string",
+          "value": "dotnet.scalar@1"
         }
       ]
     },
@@ -409,6 +415,10 @@
         {
           "name": "Origin",
           "type": "CompilerSummaryOrigin"
+        },
+        {
+          "name": "CallIdentity",
+          "type": "string"
         },
         {
           "name": "EvidenceSha256",
@@ -2379,6 +2389,16 @@
           }
         },
         {
+          "name": "CallIdentity",
+          "jsonName": "callIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
           "name": "EvidenceSha256",
           "jsonName": "evidenceSha256",
           "type": "string",
@@ -2396,6 +2416,135 @@
           "set": "set",
           "default": {
             "kind": "stringEmpty"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "class",
+      "name": "CompilerSummaryEvidenceSnapshot",
+      "properties": [
+        {
+          "name": "Origin",
+          "jsonName": "origin",
+          "type": "CompilerSummaryOrigin",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "CallIdentity",
+          "jsonName": "callIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "EvidenceSha256",
+          "jsonName": "evidenceSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "EvidenceIdentity",
+          "jsonName": "evidenceIdentity",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "SourcePath",
+          "jsonName": "sourcePath",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "SourceTreeSha256",
+          "jsonName": "sourceTreeSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "SourceStart",
+          "jsonName": "sourceStart",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "SourceLength",
+          "jsonName": "sourceLength",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
+          }
+        },
+        {
+          "name": "OwningModuleName",
+          "jsonName": "owningModuleName",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "OwningModuleMvid",
+          "jsonName": "owningModuleMvid",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "OwningModuleSha256",
+          "jsonName": "owningModuleSha256",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
+          "name": "MethodMetadataToken",
+          "jsonName": "methodMetadataToken",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "literal",
+            "value": "-1"
           }
         }
       ]
@@ -2659,6 +2808,16 @@
           "name": "AdditionalFiles",
           "jsonName": "additionalFiles",
           "type": "CompilerAdditionalFileSnapshot[]",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "SummaryEvidence",
+          "jsonName": "summaryEvidence",
+          "type": "CompilerSummaryEvidenceSnapshot[]",
           "accessibility": "public",
           "set": "set",
           "default": {
