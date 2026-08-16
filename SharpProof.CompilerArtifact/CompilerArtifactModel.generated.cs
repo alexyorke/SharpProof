@@ -153,7 +153,6 @@ internal sealed record CompilerPreparedSpecCall(
 
 internal sealed record CompilerPreparedSummaryEvidence(
     CompilerSummaryOrigin Origin,
-    string CallIdentity,
     string EvidenceSha256,
     string EvidenceIdentity
 );
@@ -331,20 +330,8 @@ internal sealed class CompilerSpecCallArtifact
 internal sealed class CompilerSummaryEvidenceArtifact
 {
     public CompilerSummaryOrigin Origin { get; set; }
-    public string CallIdentity { get; set; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
     public string EvidenceIdentity { get; set; } = string.Empty;
-}
-
-internal sealed class CompilerSummaryEvidenceSnapshot
-{
-    public CompilerSummaryOrigin Origin { get; set; }
-    public string CallIdentity { get; set; } = string.Empty;
-    public string EvidenceSha256 { get; set; } = string.Empty;
-    public string EvidenceIdentity { get; set; } = string.Empty;
-    public string OwningModuleName { get; set; } = string.Empty;
-    public string OwningModuleMvid { get; set; } = string.Empty;
-    public string OwningModuleSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerSummaryCallArtifact

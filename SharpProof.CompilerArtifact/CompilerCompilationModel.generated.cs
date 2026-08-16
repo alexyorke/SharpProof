@@ -32,7 +32,6 @@ internal sealed class CompilerCompilationSnapshot
     public CompilerSyntaxTreeSnapshot[] SyntaxTrees { get; set; } = [];
     public CompilerReferenceSnapshot[] References { get; set; } = [];
     public CompilerAdditionalFileSnapshot[] AdditionalFiles { get; set; } = [];
-    public CompilerSummaryEvidenceSnapshot[] SummaryEvidence { get; set; } = [];
 }
 
 internal enum CompilerReportDiagnostic

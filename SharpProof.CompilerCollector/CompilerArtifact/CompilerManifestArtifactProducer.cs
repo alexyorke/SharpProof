@@ -62,9 +62,6 @@ internal static class CompilerManifestArtifactProducer
                 })];
                 return artifact;
             })];
-            snapshot.SummaryEvidence = BuildSummaryEvidence(
-                snapshot,
-                lowerer.SummaryEvidenceAuthorities);
         }
         var artifact = new CompilerManifestArtifact
         {
@@ -87,62 +84,6 @@ internal static class CompilerManifestArtifactProducer
         CompilerManifestArtifactJson.Validate(artifact);
         return artifact;
     }
-
-    private static CompilerSummaryEvidenceSnapshot[] BuildSummaryEvidence(
-        CompilerCompilationSnapshot snapshot,
-        ImmutableArray<CompilerSummaryEvidenceAuthority> authorities)
-    {
-        var modules = snapshot.References
-            .SelectMany(static reference => reference.Modules)
-            .ToArray();
-        return [.. authorities
-            .Select(authority => {
-                if (authority.Origin != CompilerSummaryOrigin.ImplementationIl)
-                {
-                    if (authority.OwningModuleName.Length != 0)
-                    {
-                        throw new InvalidDataException(
-                            "A non-IL summary has an owning module.");
-                    }
-
-                    return new CompilerSummaryEvidenceSnapshot
-                    {
-                        Origin = authority.Origin,
-                        CallIdentity = authority.CallIdentity,
-                        EvidenceSha256 = authority.EvidenceSha256,
-                        EvidenceIdentity = authority.EvidenceIdentity
-                    };
-                }
-
-                var module = modules.SingleOrDefault(candidate =>
-                    candidate.Name == authority.OwningModuleName &&
-                    candidate.Sha256 == authority.EvidenceSha256);
-                if (module == null)
-                {
-                    throw new InvalidDataException(
-                        "An IL summary has no matching owning module evidence.");
-                }
-
-                return new CompilerSummaryEvidenceSnapshot
-                {
-                    Origin = authority.Origin,
-                    CallIdentity = authority.CallIdentity,
-                    EvidenceSha256 = authority.EvidenceSha256,
-                    EvidenceIdentity = authority.EvidenceIdentity,
-                    OwningModuleName = module.Name,
-                    OwningModuleMvid = module.Mvid,
-                    OwningModuleSha256 = module.Sha256
-                };
-            })
-            .OrderBy(static value => (int)value.Origin)
-            .ThenBy(static value => value.CallIdentity, StringComparer.Ordinal)
-            .ThenBy(static value => value.EvidenceIdentity, StringComparer.Ordinal)
-            .ThenBy(static value => value.EvidenceSha256, StringComparer.Ordinal)
-            .ThenBy(static value => value.OwningModuleName, StringComparer.Ordinal)
-            .ThenBy(static value => value.OwningModuleMvid, StringComparer.Ordinal)
-            .ThenBy(static value => value.OwningModuleSha256, StringComparer.Ordinal)];
-    }
-
     private static CompilerDiagnosticArtifact CreateDiagnostic(Diagnostic diagnostic)
     {
         var source = diagnostic.Location.IsInSource;
