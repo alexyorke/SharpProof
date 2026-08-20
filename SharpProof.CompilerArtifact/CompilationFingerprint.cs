@@ -240,7 +240,7 @@ internal static class CompilationFingerprint
     private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
     {
         return value != null &&
-        IsCanonicalPath(value.Path) &&
+        IsLexicallyCanonicalTreePath(value.Path) &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
         value.TextLength >= 0 &&
         (value.TextLength != 0 ||
@@ -334,6 +334,19 @@ internal static class CompilationFingerprint
         {
             return false;
         }
+    }
+
+    private static bool IsLexicallyCanonicalTreePath(string path)
+    {
+        if (path == null)
+        {
+            return false;
+        }
+
+        var segments = path.Replace('\\', '/').Split('/');
+        return segments.All(static segment => segment is not "." and not "..") &&
+            !path.EndsWith("/", StringComparison.Ordinal) &&
+            !path.EndsWith("\\", StringComparison.Ordinal);
     }
 
     private static string NormalizePath(string path)
