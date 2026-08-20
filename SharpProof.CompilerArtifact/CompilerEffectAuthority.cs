@@ -45,6 +45,7 @@ internal static class CompilerEffectAuthority
         var treePath = string.IsNullOrWhiteSpace(authority.SourceTreePath)
             ? authority.Source.Path
             : authority.SourceTreePath;
+        treePath = CompilerCaptureAuthority.NormalizePath(treePath);
         var ordinal = Array.FindIndex(
             compilation.SyntaxTrees,
             tree => tree != null &&
