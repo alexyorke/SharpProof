@@ -130,6 +130,31 @@ public sealed class GeneratedContractForAnalyzerTests
     }
 
     [Test]
+    public async Task PeerGeneratorOrderDoesNotChangeFinalReconciliation()
+    {
+        const string malformed = """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts
+            {
+            }
+            """;
+        var forward = await AnalyzeGeneratedInOrderAsync(malformed, reverse: false);
+        var reverse = await AnalyzeGeneratedInOrderAsync(malformed, reverse: true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                forward.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SPCF0004"]));
+            Assert.That(
+                reverse.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SPCF0004"]));
+        }
+    }
+
+    [Test]
     public async Task GeneratedAndHandwrittenCompanionsReportTheGeneratedOverlap()
     {
         const string handwritten = """
@@ -361,6 +386,39 @@ public sealed class GeneratedContractForAnalyzerTests
             mode: null,
             profile: profile,
             features: features);
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeGeneratedInOrderAsync(
+        string generatedSource,
+        bool reverse)
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            Target,
+            Enumerable.Range(1, 8)
+                .Select(static index => $"SPCF{index:D4}")
+                .ToArray());
+        ISourceGenerator companion = new GeneratedCompanionSourceGenerator(
+            generatedSource,
+            "PeerContracts.cs").AsSourceGenerator();
+        ISourceGenerator decoy = new GeneratedCompanionSourceGenerator(
+            "namespace Peer { internal sealed class Marker { } }",
+            "PeerMarker.cs").AsSourceGenerator();
+        var generators = reverse
+            ? new[] { decoy, companion }
+            : new[] { companion, decoy };
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators,
+            parseOptions: (CSharpParseOptions)compilation.SyntaxTrees[0].Options);
+        driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var output,
+            out var generatorDiagnostics);
+        Assert.That(generatorDiagnostics, Is.Empty);
+        return await AnalyzerTestHost.AnalyzeAsync(
+            (CSharpCompilation)output,
+            mode: null,
+            profile: "advisory",
+            features: "contracts");
     }
 
     private const string RejectedContractForSource = """
