@@ -148,7 +148,6 @@ public sealed class ReleasePublicationScriptTests
             AssertPlan(
                 absentPlan.RootElement,
                 expectedRepositoryCommit,
-                remoteState: "Absent",
                 mainState: "FixtureAbsent",
                 mainAction: "Push",
                 symbolsState: "FixtureAbsent",
@@ -783,7 +782,6 @@ public sealed class ReleasePublicationScriptTests
     private static void AssertPlan(
         JsonElement root,
         string expectedRepositoryCommit,
-        string remoteState,
         string mainState,
         string mainAction,
         string symbolsState,
@@ -808,7 +806,7 @@ public sealed class ReleasePublicationScriptTests
         Assert.That(
             packages.Select(package =>
                 package.GetProperty("remoteState").GetString()),
-            Is.All.EqualTo(remoteState));
+            Is.All.Null);
         Assert.That(
             packages.Select(package =>
                 package.GetProperty("mainState").GetString()),
