@@ -791,7 +791,7 @@ public sealed class ReleasePublicationScriptTests
     {
         Assert.That(
             root.GetProperty("schemaVersion").GetInt32(),
-            Is.EqualTo(1));
+            Is.EqualTo(2));
         Assert.That(
             root.GetProperty("planOnly").GetBoolean(),
             Is.True);
