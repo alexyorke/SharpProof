@@ -243,7 +243,7 @@ ghost specification evidence.
 ## Closed compiler artifact and remaining limits
 
 During container verification, the production analyzer captures compiler
-artifact schema version 13 from the post-generator compilation. The artifact
+artifact schema version 14 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;

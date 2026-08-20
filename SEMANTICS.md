@@ -376,7 +376,7 @@ its outcome is not combined with the containing callable. Unavailable captured
 facts remain unknown. An expression-tree lambda is quoted code and is not
 treated as an executing call site.
 
-The packaged verifier consumes compiler artifact schema version 13 produced
+The packaged verifier consumes compiler artifact schema version 14 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical

@@ -524,7 +524,7 @@ unsupported opcodes, recursive dependencies, and exhausted budgets abstain as
 typed `Unknown`; they are never treated as implementation proof authority.
 Every composed call seals its origin, evidence digest, optional pack identity,
 and complete transitive dependency-evidence closure into compiler artifact
-schema 13. Relational-summary schema version 2 and specification-pack schema
+schema 14. Relational-summary schema version 2 and specification-pack schema
 version 1 govern those evidence records.
 
 Specification packs are off by default. The preview ships one data-driven
@@ -720,7 +720,7 @@ host shadowing and arbitrary relative overrides are rejected before any push.
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 13 from the
+The build-only collector now emits compiler artifact schema version 14 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,
