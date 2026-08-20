@@ -10,6 +10,8 @@
                       Value="$(SharpProofSourceCommit)" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\scripts\SharpProof.SymbolPackageValidator.cs"
+             Link="Release\SharpProof.SymbolPackageValidator.cs" />
     <PackageReference Include="System.Collections.Immutable" />
     <Reference Include="Microsoft.CodeAnalysis"
                HintPath="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll"
