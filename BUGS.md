@@ -2256,9 +2256,15 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 
 Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 
-### SP-AUDIT-034 - Compilation snapshots are not exact canonical capture images (P2)
+### SP-AUDIT-034 - Compilation snapshots are not exact canonical capture images (fixed)
 
-- [ ] `CompilationFingerprint.ValidSnapshot` accepts compiler version and
+- [x] Fixed by the canonical identity foundation `33bd36adc`, residual-state
+  hardening `f7703dd27` and `2723c1c5d`, and the shared schema-14 capture
+  authority `3c6d70a3a`. Producer and validator now share exact version, MVID,
+  assembly identity, language, path, reference-role/property, recursive-alias,
+  additional-file, and empty-tree derivations. The expanded SP034 matrix passed
+  8/8 and the post-merge Worker suite passed 573/573.
+  `CompilationFingerprint.ValidSnapshot` previously accepted compiler version and
   assembly-identity fields with only `HasText`; `ValidReference` does the same
   for reference identity; and the snapshot/module validators accept MVIDs with
   only `Guid.TryParseExact(value, "D")`. The collector instead emits
