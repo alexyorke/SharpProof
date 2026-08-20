@@ -1893,6 +1893,8 @@ public sealed class RequiresAndControlTests
 
             [ContractFor(typeof(Subject))]
             public static class SubjectContracts {
+                private static bool UnsupportedAndThrowing() => true;
+
                 public static int Identity(int value) {
                     Contract.Ensures(
                         Contract.Result<int>() == value);
