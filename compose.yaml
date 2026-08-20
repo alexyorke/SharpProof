@@ -8,6 +8,9 @@ x-sharpproof-common: &sharpproof-common
       USER_UID: ${SHARPPROOF_USER_UID:-1000}
       USER_GID: ${SHARPPROOF_USER_GID:-1000}
   platform: linux/amd64
+  # Task containers start as root only long enough for the entrypoint to
+  # normalize bind-mount ownership, then immediately exec as sharpproof.
+  user: "0:0"
   init: true
   network_mode: bridge
   environment:

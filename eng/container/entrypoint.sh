@@ -142,6 +142,10 @@ case "${command_name}" in
     ln -s "${repo_root}/artifacts" "${task_root}/artifacts"
     if [[ "${source_has_git}" = "true" ]] &&
       [[ -d "${task_root}/.git" ]]; then
+      # The disposable clone uses a symlink so evidence lands in the host
+      # artifact mount. A trailing-slash ignore rule matches directories but
+      # not this symlink, so exclude the exact task-local link explicitly.
+      printf '/artifacts\n' >> "${task_root}/.git/info/exclude"
       git config --global --add safe.directory "${task_root}"
     fi
     export SHARPPROOF_REPO_ROOT="${task_root}"
