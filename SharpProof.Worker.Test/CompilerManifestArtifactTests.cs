@@ -890,7 +890,7 @@ public sealed class CompilerManifestArtifactTests
     public void SerializationEnforcesWorkerInputByteLimit()
     {
         var artifact = CreateArtifact();
-        artifact.Compilation.AssemblyName = "x";
+        artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation,
             artifact.CompilerDiagnostics);
@@ -899,7 +899,7 @@ public sealed class CompilerManifestArtifactTests
             Encoding.UTF8.GetByteCount(initial);
         Assert.That(padding, Is.GreaterThan(0));
 
-        artifact.Compilation.AssemblyName += new string('x', padding);
+        artifact.CompilerDiagnostics[0].Message += new string('x', padding);
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation,
             artifact.CompilerDiagnostics);
@@ -908,7 +908,7 @@ public sealed class CompilerManifestArtifactTests
             Encoding.UTF8.GetByteCount(exact),
             Is.EqualTo(CompilerManifestArtifactFile.MaximumBytes));
 
-        artifact.Compilation.AssemblyName += "x";
+        artifact.CompilerDiagnostics[0].Message += "x";
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation,
             artifact.CompilerDiagnostics);
