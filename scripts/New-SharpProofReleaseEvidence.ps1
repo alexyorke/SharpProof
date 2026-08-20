@@ -362,7 +362,7 @@ function Test-ThirdPartyComponentVersions {
                 AssetsPath = 'SharpProof.Worker\obj\project.assets.json'
             },
             @{
-                EntryPrefix = 'runtimes/linux-x64/native/'
+                EntryPrefix = 'tools/native/linux-x64/'
                 AssetsPath = 'SharpProof.Worker\obj\project.assets.json'
             }
         )

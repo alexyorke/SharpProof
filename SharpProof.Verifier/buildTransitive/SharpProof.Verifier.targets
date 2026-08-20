@@ -31,7 +31,7 @@
   </PropertyGroup>
 
   <Target Name="_SharpProofValidateRuntimeClosure"
-          DependsOnTargets="_SharpProofInitializeVerify">
+          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
     <Error Condition="'$(_SharpProofToolsDirectory)' != '$(_SharpProofPackageToolsDirectory)' OR '$(_SharpProofWorkerPath)' != '$(_SharpProofPackageWorkerPath)' OR '$(_SharpProofLauncherPath)' != '$(_SharpProofPackageLauncherPath)' OR '$(_SharpProofWorkerProtocolPath)' != '$(_SharpProofPackageWorkerProtocolPath)' OR '$(_SharpProofBuildTasksPath)' != '$(_SharpProofPackageBuildTasksPath)'"
            Text="SharpProof verifier runtime paths must resolve to the exact package-owned runtime closure." />
     <Error Condition="!Exists('$(_SharpProofPackageNativeZ3Path)')"
@@ -39,6 +39,7 @@
   </Target>
 
   <Target Name="_SharpProofInitializeVerify"
+          DependsOnTargets="_SharpProofValidateRuntimeClosure"
           BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile">
     <PropertyGroup>
       <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofVerifyDirectory>
@@ -107,7 +108,7 @@
   </Target>
 
   <Target Name="_SharpProofVerifyCore"
-          DependsOnTargets="_SharpProofValidateRuntimeClosure;ResolveReferences">
+          DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
            Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
     <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"

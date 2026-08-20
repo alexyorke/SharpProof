@@ -497,29 +497,40 @@ public sealed class LauncherArgumentTests
     [Platform("Linux")]
     public void DisabledCachePathDoesNotParticipateInIoTopology()
     {
-        var requestPath = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "disabled-cache-request.json");
-        string[] arguments = [
-            "verify",
-            "--worker", "worker.dll",
-            "--request", requestPath,
-            "--result", Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "disabled-cache-result.json"),
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--cache-enabled", "false",
-            "--cache-directory", requestPath,
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
-        Assert.That(
-            LauncherArguments.TryParse(arguments, out var parsed),
-            Is.True);
+        var outputRoot = Directory.CreateTempSubdirectory(
+            "sharpproof-disabled-cache-");
+        try
+        {
+            var requestPath = Path.Combine(
+                outputRoot.FullName,
+                "disabled-cache-request.json");
+            string[] arguments = [
+                "verify",
+                "--worker", "worker.dll",
+                "--request", requestPath,
+                "--result", Path.Combine(
+                    outputRoot.FullName,
+                    "disabled-cache-result.json"),
+                "--compiler-manifest", Path.Combine(
+                    outputRoot.FullName,
+                    "missing-compiler-manifest.json"),
+                "--cache-enabled", "false",
+                "--cache-directory", requestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ];
+            Assert.That(
+                LauncherArguments.TryParse(arguments, out var parsed),
+                Is.True);
 
-        Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
-            Throws.TypeOf<FileNotFoundException>());
+            Assert.That(
+                (Action)(() => parsed.CreateRequest(out _, out _)),
+                Throws.TypeOf<FileNotFoundException>());
+        }
+        finally
+        {
+            outputRoot.Delete(recursive: true);
+        }
     }
 
     [TestCase(false)]
@@ -1478,6 +1489,7 @@ public sealed class LauncherArgumentTests
     {
         var manifest = CreateSarifManifest();
         manifest.Callables = [manifest.Callables[0]];
+        manifest.Claims = [manifest.Claims[0]];
         manifest.Callables[0].Assumptions = [];
         var claim = manifest.Claims.Single();
         WorkerProtocolJson.SealManifest(manifest);

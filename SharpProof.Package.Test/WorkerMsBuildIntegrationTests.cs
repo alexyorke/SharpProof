@@ -1361,7 +1361,7 @@ public sealed class WorkerMsBuildIntegrationTests
         RequireContainerWorker();
         using var project = ConsumerProject.CreateConfigured(
             IdentitySource,
-            ("TargetFrameworks", "netstandard2.0"));
+            ("TargetFramework", "netstandard2.0"));
         var publication = Directory.CreateDirectory(
             Path.Combine(project.Root, "publication"));
         var request = Path.Combine(publication.FullName, "request.json");
@@ -1761,7 +1761,7 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
             Assert.That(response.Summary.Versions.WorkerVersion,
-                Is.EqualTo("launcher"));
+                Is.EqualTo(FileVersionInfo.GetVersionInfo(worker).ProductVersion));
             Assert.That(response.ClaimResults,
                 Has.All.Property(nameof(WorkerClaimResult.Reason))
                     .EqualTo(WorkerClaimReason.ProjectTimeout));
@@ -2210,6 +2210,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 isolatedLauncherDirectory,
                 "isolated-launcher.dll")),
             ("_SharpProofWorkerProtocolPath", protocolPath),
+            ("_SharpProofPackageWorkerProtocolPath", protocolPath),
             ("SharpProofVerifyRequestFile", isolatedRequestPath),
             ("SharpProofCompilerManifestFile", isolatedManifestPath),
             ("SharpProofVerifyResultFile", protocolPath));
@@ -2966,7 +2967,7 @@ public sealed class WorkerMsBuildIntegrationTests
             },
             Errors = [
                 new WorkerProtocolError {
-                    Code = "infrastructure.test",
+                    Code = "worker.infrastructure",
                     Message = "Deliberate failure."
                 }
             ]
@@ -3004,7 +3005,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 Assert.That(validatedResponse, Is.Not.Null);
                 Assert.That(
                     error.ToString(),
-                    Does.Contain("infrastructure.test"));
+                    Does.Contain("worker.infrastructure"));
                 Assert.That(
                     error.ToString(),
                     Does.Contain("worker run Failed"));
