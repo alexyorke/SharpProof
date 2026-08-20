@@ -6299,6 +6299,14 @@ public sealed class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
+        var snapshot = await WorkerInputSnapshot.LoadAsync(
+            request,
+            WorkerCacheIdentity.Current,
+            CancellationToken.None);
+        var assumptionId = snapshot.CompilerManifest.Callables.Single()
+            .Clauses.First(static clause =>
+                clause.Kind == CompilerContractKind.Assume)
+            .AssumptionId;
         using var worker = new SharpProofWorker(
             new CapturingBackend(BackendCheckResult.Unsatisfiable([0])));
 
@@ -6311,7 +6319,7 @@ public sealed class WorkerTests
             FormatValidationErrors(response, authority));
 
         var result = response.ClaimResults.Single();
-        var originalCore = [.. result.ProofCore];
+        var originalCore = result.ProofCore.ToArray();
         result.ProofCore = ["fabricated:999"];
         var fabricated = WorkerProtocolJson.Validate(
             response, response.InputHash, response.Manifest, authority);
@@ -6321,7 +6329,8 @@ public sealed class WorkerTests
 
         result.ProofCore = originalCore;
         var usedAssumption = result.Assumptions.Single(
-            static assumption => assumption.Kind == WorkerAssumptionKind.UserAssume);
+            assumption => assumption.Kind == WorkerAssumptionKind.UserAssume &&
+                assumption.Id == assumptionId);
         usedAssumption.Used = !usedAssumption.Used;
         var forgedUsage = WorkerProtocolJson.Validate(
             response, response.InputHash, response.Manifest, authority);
