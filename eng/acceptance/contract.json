@@ -209,7 +209,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "2be77921987f96a04406eb057f3cb29928a2feb1e01c2c4eac89714f6fba8b17",
+    "inventorySha256": "00ecf28e0533e0a5c666c84a20942d868e44da5174ed5ed91618cb3d51dfb467",
     "components": [
       {
         "name": "discovery",
@@ -641,8 +641,7 @@
           ".github/workflows/package-consumers.yml",
           "eng/release/environment-contract.json",
           "scripts/Test-SharpProofReleaseConfiguration.ps1",
-          "scripts/Test-SharpProofReleaseConfigurationFixtures.ps1",
-          "SharpProof.ArchitectureTest/ReleaseConfigurationScriptTests.cs"
+          "scripts/Test-SharpProofReleaseConfigurationFixtures.ps1"
         ]
       },
       {
