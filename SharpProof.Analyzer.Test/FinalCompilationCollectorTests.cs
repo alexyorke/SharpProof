@@ -170,10 +170,10 @@ public sealed class FinalCompilationCollectorTests
         var diagnostics = await AnalyzeCollectorAsync(
             compilation,
             Options(path));
+        Assert.That(diagnostics, Is.Empty);
         var artifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(path));
 
-        Assert.That(diagnostics, Is.Empty);
         Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
         Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
         Assert.That(artifact.Callables, Has.Length.EqualTo(1));
@@ -210,12 +210,12 @@ public sealed class FinalCompilationCollectorTests
         var diagnostics = await AnalyzeCollectorAsync(
             compilation.AddSyntaxTrees(generated),
             Options(path));
+        Assert.That(diagnostics, Is.Empty);
         var artifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(path));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diagnostics, Is.Empty);
             Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
             Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(artifact.Callables, Has.Length.EqualTo(1));

@@ -33,6 +33,15 @@ internal static class CompilerEffectAuthority
         authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
 
+        if (CompilerSourceLocationAuthority.IsNone(authority.Source))
+        {
+            authority.SourceTreeOrdinal = -1;
+            authority.SourceTreePath = string.Empty;
+            authority.SourceTreeSha256 = string.Empty;
+            authority.SourceLineMapSha256 = string.Empty;
+            return;
+        }
+
         var treePath = string.IsNullOrWhiteSpace(authority.SourceTreePath)
             ? authority.Source.Path
             : authority.SourceTreePath;
@@ -91,7 +100,11 @@ internal static class CompilerEffectAuthority
             if (authority.SourceTreeOrdinal < 0 ||
                 authority.SourceTreeOrdinal >= compilation.SyntaxTrees.Length)
             {
-                return false;
+                return CompilerSourceLocationAuthority.IsNone(authority.Source) &&
+                    authority.SourceTreeOrdinal == -1 &&
+                    authority.SourceTreePath.Length == 0 &&
+                    authority.SourceTreeSha256.Length == 0 &&
+                    authority.SourceLineMapSha256.Length == 0;
             }
 
             var tree = compilation.SyntaxTrees[authority.SourceTreeOrdinal];
