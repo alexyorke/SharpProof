@@ -6,6 +6,8 @@ internal static class CompilationFingerprint
 {
     private const string RuntimeContractEvaluationSymbol =
         "SHARPPROOF_CONTRACTS";
+    private const string EmptyUtf8Sha256 =
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
     private const string SyntaxTreeSnapshotDomain =
         "SharpProof.CompilerSyntaxTreeSnapshot";
@@ -238,9 +240,14 @@ internal static class CompilationFingerprint
     private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
     {
         return value != null &&
-        value.Path != null &&
+        IsCanonicalPath(value.Path) &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
         value.TextLength >= 0 &&
+        (value.TextLength != 0 ||
+            value.Sha256 == EmptyUtf8Sha256 &&
+            value.EffectivePreprocessorSymbols.SequenceEqual(
+                value.PreprocessorSymbols.Distinct(StringComparer.Ordinal),
+                StringComparer.Ordinal)) &&
         IsCanonicalLanguageVersion(value.LanguageVersion) &&
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
         value.Kind is "Regular" or "Script" &&
@@ -270,7 +277,8 @@ internal static class CompilationFingerprint
             ? IsCanonicalAssemblyIdentity(value.Identity, out _)
             : HasText(value.Identity)) &&
         value.Modules is { Length: > 0 } &&
-        (value.Kind == "Assembly" || value.Modules.Length == 1 &&
+        (value.Kind == "Assembly" || !value.EmbedInteropTypes &&
+            value.Aliases.Length == 0 && value.Modules.Length == 1 &&
             string.Equals(value.Identity, value.Modules[0].Name,
                 StringComparison.Ordinal)) &&
         All(value.Modules, ValidReferenceModule) &&

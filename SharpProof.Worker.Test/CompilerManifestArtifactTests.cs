@@ -343,6 +343,67 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void Sp034ReferenceRolesRejectModuleOnlyProperties()
+    {
+        Action<CompilerReferenceSnapshot>[] corruptions =
+        [
+            reference =>
+            {
+                reference.Kind = "Module";
+                reference.Identity = reference.Modules[0].Name;
+                reference.EmbedInteropTypes = true;
+            },
+            reference =>
+            {
+                reference.Kind = "Module";
+                reference.Identity = reference.Modules[0].Name;
+                reference.Aliases = ["module-alias"];
+            }
+        ];
+
+        foreach (var corrupt in corruptions)
+        {
+            var artifact = CreateArtifact();
+            corrupt(artifact.Compilation.References[0]);
+            artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+                artifact.Compilation, []);
+
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Deserialize(
+                    CompilerManifestArtifactJson.Serialize(artifact))));
+        }
+    }
+
+    [Test]
+    public void Sp034SyntaxTreePathsMustBeCaptureCanonical()
+    {
+        var artifact = CreateArtifact();
+        artifact.Compilation.SyntaxTrees[0].Path += "/.";
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, []);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))));
+    }
+
+    [Test]
+    public void Sp034EmptySyntaxTreesRetainDerivedCaptureValues()
+    {
+        var artifact = CreateArtifact(source: string.Empty);
+        var tree = artifact.Compilation.SyntaxTrees[0];
+        tree.TextLength = 0;
+        tree.Sha256 = new string('a', 64);
+        tree.EffectivePreprocessorSymbols = ["fabricated"];
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation, []);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))));
+    }
+
+    [Test]
     public void CompilerCallableFailuresUseOnlyProducerReasons()
     {
         var allowed = new HashSet<WorkerClaimReason>
