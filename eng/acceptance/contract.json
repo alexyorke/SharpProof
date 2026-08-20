@@ -57,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 233,
-    "expectedCatalogSha256": "30a01276d921ef72977e3fa98f309a8c76da179bed671530f0748897629434e2"
+    "expectedCatalogCount": 234,
+    "expectedCatalogSha256": "2ac49b987643d7659f0a697f650dc8947279dc19d394bda6f9380d869e524ea4"
   },
   "worker": {
     "protocolVersion": 11,
@@ -209,7 +209,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "08335cb2ce0d312c6c4a2b63d45291b345e983c0e9799086804d801e2ed3d2fd",
+    "inventorySha256": "80ea28a7332a933e58bd8fe0ebda401ca5b2dcfdef7bc9f7f2fb043a371be1e6",
     "components": [
       {
         "name": "discovery",
@@ -572,7 +572,8 @@
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs",
           "SharpProof.CompilerCollector/CompilerArtifact/CompilerOptionWireMappings.cs",
           "SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs",
-          "SharpProof.CompilerArtifact/CompilationFingerprint.cs"
+          "SharpProof.CompilerArtifact/CompilationFingerprint.cs",
+          "SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs"
         ]
       },
       {

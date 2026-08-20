@@ -2056,6 +2056,14 @@ $mutations = @(
         Mutated = '# Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-source-location-exact-mapped-geometry'
+        File = 'SharpProof.CompilerArtifact\CompilerSourceLocationAuthority.cs'
+        Original = '            location.Line == mappedLine + 1L &&'
+        Mutated = '            location.Line > 0 &&'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerSourceLocationAuthorityTests'
     }
 )
 
