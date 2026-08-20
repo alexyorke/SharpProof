@@ -191,7 +191,7 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 13 currently admits one
+  For an effect candidate, compiler artifact schema 14 currently admits one
   unconditional definite managed object/array allocation event. The worker
   recomputes its constraint and operation identities, checks its source-tree
   identity/span and sealed witness, and independently derives `Allocates`.

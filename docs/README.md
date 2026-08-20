@@ -113,7 +113,7 @@ the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During container verification, the production analyzer emits a deterministic
-schema-13 compiler artifact from the final post-generator Roslyn
+schema-14 compiler artifact from the final post-generator Roslyn
 `Compilation`. It contains the selected-claim manifest and portable lowered
 whole-body CFG/IR for supported selected callables, plus bounded relational
 source/implementation-IL/audited-pack calls, bound contract/spec

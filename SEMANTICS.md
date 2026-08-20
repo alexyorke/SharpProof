@@ -60,7 +60,7 @@ manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
 summary establishes its contract. The compiler can record a structured
 `DefiniteViolation` candidate for a simple unconditional direct operation.
-Compiler artifact schema 13 carries an independently replayable event only for
+Compiler artifact schema 14 carries an independently replayable event only for
 a definite managed object or array allocation whose operands are already
 known to complete and whose allocation is not static-initialization-sensitive.
 The worker derives `Allocates` from that event rather than trusting the
@@ -209,7 +209,7 @@ identity-mismatched pack never contributes a fact.
 
 Every summary call seals its origin, SHA-256 evidence, pack identity when
 applicable, and the canonical transitive provenance of every composed
-dependency. Compiler artifact schema 13, relational-summary schema version 2,
+dependency. Compiler artifact schema 14, relational-summary schema version 2,
 and specification-pack schema version 1 validate that closure before backend
 creation.
 Unsupported or incomplete calls remain `Unknown`; neither a convenient method

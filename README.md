@@ -145,7 +145,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-13 compiler
+default). The effective selection is sealed into the schema-14 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -425,7 +425,7 @@ Each manifest claim receives:
 
 Effect claims use canonical compiler-produced evidence. They are `Proven` only
 when a complete effect summary establishes the selected contract. Compiler
-artifact schema 13 retains schema 10's independently replayable,
+artifact schema 14 retains schema 10's independently replayable,
 unconditional direct event for a definite managed object or array allocation.
 The worker validates the event's order, source-tree hash and span, semantic
 identity, selected constraint, and compiler witness, then derives the
