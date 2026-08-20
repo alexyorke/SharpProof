@@ -1937,9 +1937,15 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
   authority matrix; full Worker passed 548/548 and Git-backed Architecture
   passed 440/440 before the protocol-authority merge.
 
-### SP-AUDIT-050 - Coverage and TCB universes are self-defined (P0)
+### SP-AUDIT-050 - Coverage and TCB universes are self-defined (fixed)
 
-- [ ] `Test-SharpProofCoverage.ps1` builds each project's coverable-line
+- [x] Fixed by `cd5bb3290`, `df0ef63b3`, `2c125cf65`, and
+  `a39f7882b`. `Get-SharpProofProductionInventory.ps1` now derives the exact
+  evaluated production project/source/parse-option/generated-output and PDB
+  sequence-point universe; coverage, complexity, generated exclusions, TCB,
+  release, and acceptance consumers share it. The authority itself is TCB
+  owned, and disposable exact-git/path/generated fixtures pass 29/29.
+  `Test-SharpProofCoverage.ps1` previously built each project's coverable-line
   denominator exclusively from sequence points present in caller-supplied
   Cobertura files. It requires at least one path per configured project, but
   never proves report assembly identity, expected source-file membership, or
