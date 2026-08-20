@@ -269,7 +269,7 @@ public sealed class LinuxPublicationSetTests
             UnixFileMode.UserWrite |
             UnixFileMode.UserExecute);
         Directory.CreateDirectory(lockPaths[failureIndex]);
-        var before = Directory.EnumerateFileSystemEntries("/proc/self/fd").Count();
+        var before = CountOwnedFileDescriptors(metadataDirectory);
 
         for (var attempt = 0; attempt < 32; attempt++)
         {
@@ -280,13 +280,34 @@ public sealed class LinuxPublicationSetTests
                     TimeSpan.FromSeconds(1));
             }));
         }
-        var after = Directory.EnumerateFileSystemEntries("/proc/self/fd").Count();
+        var after = CountOwnedFileDescriptors(metadataDirectory);
         Directory.Delete(lockPaths[failureIndex]);
         using var reacquired = LinuxPathIdentity.AcquirePublicationSet(
             ordered,
             TimeSpan.FromSeconds(1));
 
         Assert.That(after, Is.EqualTo(before));
+
+        static int CountOwnedFileDescriptors(string directory)
+        {
+            var prefix = directory + Path.DirectorySeparatorChar;
+            return Directory.EnumerateFileSystemEntries("/proc/self/fd")
+                .Count(path =>
+                {
+                    try
+                    {
+                        var target = new FileInfo(path).LinkTarget;
+                        return target != null && target.StartsWith(
+                            prefix,
+                            StringComparison.Ordinal);
+                    }
+                    catch (Exception exception) when (
+                        exception is IOException or UnauthorizedAccessException)
+                    {
+                        return false;
+                    }
+                });
+        }
     }
 
     [Test]

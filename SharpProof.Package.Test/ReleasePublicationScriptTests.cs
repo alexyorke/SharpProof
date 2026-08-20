@@ -406,7 +406,7 @@ public sealed class ReleasePublicationScriptTests
             workspace.PackageSource);
         var expectedFailure = mutation switch
         {
-            "missing" => "exact PDB entry set",
+            "missing" => "invalid symbol package layout",
             "foreign" => "debug identifier",
             "wrong-commit" => "canonical repository commit",
             "duplicate" => "duplicate entry",

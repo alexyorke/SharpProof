@@ -910,9 +910,19 @@ $artifacts.Add([pscustomobject][ordered]@{
     sha256 = $sbomHash.Hash.ToLowerInvariant()
 })
 
+$artifactsByName = [Collections.Generic.Dictionary[string, object]]::new(
+    [StringComparer]::Ordinal)
+foreach ($artifact in $artifacts) {
+    if (-not $artifactsByName.TryAdd(
+            [string]$artifact.fileName,
+            $artifact)) {
+        throw "Release artifacts contain duplicate file name '$($artifact.fileName)'."
+    }
+}
+$artifactNames = [string[]]@($artifactsByName.Keys)
+[Array]::Sort($artifactNames, [StringComparer]::Ordinal)
 $orderedArtifacts = @(
-    $artifacts |
-        Sort-Object fileName
+    $artifactNames | ForEach-Object { $artifactsByName[$_] }
 )
 $manifest = [pscustomobject][ordered]@{
     schemaVersion = 2

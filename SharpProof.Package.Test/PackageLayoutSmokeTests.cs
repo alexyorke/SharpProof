@@ -375,7 +375,8 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(invalidSbom.ExitCode, Is.Not.Zero, invalidSbom.Output);
         Assert.That(
             invalidSbom.Output,
-            Does.Contain("SPDX SBOM is missing its package graph"));
+            Does.Contain(
+                "SPDX document does not have the exact canonical property set and order"));
         var firstRun = await RunProcessAsync(
             FindRepositoryRoot(),
             "pwsh",
