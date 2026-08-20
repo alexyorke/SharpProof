@@ -1121,7 +1121,7 @@ public sealed class LauncherArgumentTests
     public void BoundResultValidationRejectsMismatches(
         string mismatch, string expectedError)
     {
-        var request = new WorkerVerifyRequest();
+        var request = CreateValidRequest();
         var manifest = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(manifest);
         const string inputHash =
@@ -1199,6 +1199,11 @@ public sealed class LauncherArgumentTests
     {
         var request = new WorkerVerifyRequest
         {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler.manifest.json",
+                Sha256 = new('c', 64)
+            },
             VerifyPolicy = WorkerVerifyPolicy.RequireProven,
             AssumptionPolicy = WorkerAssumptionPolicy.Error
         };
@@ -1215,8 +1220,13 @@ public sealed class LauncherArgumentTests
                 new WorkerCallableResult {
                     CallableId = "C.M",
                     Coverage = WorkerCallableCoverage.Incomplete,
-                    Reason = WorkerCallableCoverageReason.UnsupportedCallable,
-                    Assumptions = [usedAssumption]
+                    Reason = WorkerCallableCoverageReason.SemanticUnknown,
+                    Assumptions = [
+                        new WorkerAssumptionEvidence {
+                            Id = "assumption-1",
+                            Kind = WorkerAssumptionKind.UserAssume
+                        }
+                    ]
                 },
                 new WorkerCallableResult {
                     CallableId = "C.Unsupported",
@@ -1230,21 +1240,31 @@ public sealed class LauncherArgumentTests
                     Outcome = WorkerClaimOutcome.Unknown,
                     Reason = WorkerClaimReason.UnsupportedExpression,
                     Assumptions = [usedAssumption]
+                },
+                new WorkerClaimResult {
+                    ClaimId = "claim-2",
+                    Outcome = WorkerClaimOutcome.Unknown,
+                    Reason = WorkerClaimReason.UnsupportedCallable,
+                    EffectCertainty = WorkerEffectEvidenceCertainty.Unavailable
                 }
             ],
             Summary = new WorkerVerificationSummary
             {
                 CallableCount = 2,
-                ClaimCount = 1,
+                ClaimCount = 2,
                 OutcomeCounts = [
                     new WorkerClaimOutcomeCount {
                         Outcome = WorkerClaimOutcome.Unknown,
-                        Count = 1
+                        Count = 2
                     }
                 ],
                 ReasonCounts = [
                     new WorkerClaimReasonCount {
                         Reason = WorkerClaimReason.UnsupportedExpression,
+                        Count = 1
+                    },
+                    new WorkerClaimReasonCount {
+                        Reason = WorkerClaimReason.UnsupportedCallable,
                         Count = 1
                     }
                 ],
@@ -1311,6 +1331,18 @@ public sealed class LauncherArgumentTests
                 File.Delete(path);
             }
         }
+    }
+
+    private static WorkerVerifyRequest CreateValidRequest()
+    {
+        return new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler.manifest.json",
+                Sha256 = new('c', 64)
+            }
+        };
     }
 
     [Test]
@@ -1792,7 +1824,8 @@ public sealed class LauncherArgumentTests
                     SelectionReasons = [
                         WorkerSelectionReason.ExplicitAnnotation
                     ],
-                    Location = location
+                    Location = location,
+                    ClaimIds = ["claim-2"]
                 }
             ],
             Claims = [
@@ -1801,6 +1834,14 @@ public sealed class LauncherArgumentTests
                     CallableId = "C.M",
                     Kind = WorkerClaimKind.Postcondition,
                     Evidence = WorkerClaimEvidence.DirectClause,
+                    Location = location
+                },
+                new WorkerClaimManifestEntry {
+                    ClaimId = "claim-2",
+                    CallableId = "C.Unsupported",
+                    Kind = WorkerClaimKind.Effect,
+                    Evidence = WorkerClaimEvidence.Attribute,
+                    EffectContractKind = WorkerEffectContractKind.EnforcePure,
                     Location = location
                 }
             ]

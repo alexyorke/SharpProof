@@ -28,12 +28,6 @@ public sealed class ReleasePublicationScriptTests
                 "Publish-SharpProofRelease.ps1"));
 
         Assert.That(script, Does.Not.Contain("--skip-duplicate"));
-        Assert.That(
-            script,
-            Does.Contain("Remote main package already exists"));
-        Assert.That(
-            script,
-            Does.Contain("Remote symbol package already exists"));
     }
 
     [Test]

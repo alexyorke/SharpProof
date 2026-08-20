@@ -567,7 +567,7 @@ trap {
         [IO.Directory]::Exists($resolvedOutput)) {
         [IO.Directory]::Delete($resolvedOutput, $true)
     }
-    throw
+    throw $PSItem
 }
 
 $packageFiles = @(

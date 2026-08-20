@@ -892,6 +892,25 @@ internal sealed partial class LauncherArguments
         {
             LinuxPathIdentity.RequireLocalPath(publicationPath);
         }
+        var runtimeDirectories = runtimeRoots
+            .Concat(LauncherArguments.LauncherRuntimePaths)
+            .Select(static path => Path.GetDirectoryName(
+                LinuxPathIdentity.Canonicalize(path))!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        string?[] writableCandidates = [
+            cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
+            ..publicationPaths
+        ];
+        var writablePaths = writableCandidates
+            .OfType<string>()
+            .Select(LinuxPathIdentity.Canonicalize);
+        if (writablePaths.Any(path => runtimeDirectories.Any(directory =>
+                LinuxPathIdentity.IsSameOrDescendant(path, directory))))
+        {
+            throw new ArgumentException(
+                "SharpProof writable paths must be outside the worker runtime directory.");
+        }
         string?[] candidates = [..runtimeRoots,
             ..LauncherArguments.LauncherRuntimePaths,
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,

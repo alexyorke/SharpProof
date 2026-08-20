@@ -107,7 +107,7 @@
   </Target>
 
   <Target Name="_SharpProofVerifyCore"
-          DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences">
+          DependsOnTargets="_SharpProofValidateRuntimeClosure;ResolveReferences">
     <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
            Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
     <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
