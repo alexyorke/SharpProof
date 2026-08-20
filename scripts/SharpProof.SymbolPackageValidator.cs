@@ -24,7 +24,8 @@ internal static class SharpProofSymbolPackageValidator
         ArgumentException.ThrowIfNullOrWhiteSpace(packageId);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageVersion);
         if (repositoryCommit.Length != 40 ||
-            repositoryCommit.Any(static value => !Uri.IsHexDigit(value)))
+            repositoryCommit.Any(static value =>
+                !Uri.IsHexDigit(value) || value is >= 'A' and <= 'F'))
         {
             throw new InvalidDataException(
                 "The expected repository commit is not a 40-character hash.");
@@ -84,7 +85,7 @@ internal static class SharpProofSymbolPackageValidator
 
         var expectedSourceUrl =
             "https://raw.githubusercontent.com/alexyorke/SharpProof/" +
-            repositoryCommit.ToLowerInvariant() + "/*";
+            repositoryCommit + "/*";
         for (var index = 0; index < assemblies.Length; index++)
         {
             var pdb = symbols.GetEntry(expectedPdbNames[index]) ??
@@ -239,7 +240,10 @@ internal static class SharpProofSymbolPackageValidator
         DebugDirectoryEntry codeViewEntry,
         string expectedSourceUrl)
     {
-        var pdbId = reader.DebugMetadataHeader.Id;
+        var debugMetadataHeader = reader.DebugMetadataHeader ??
+            throw new InvalidDataException(
+                $"Portable PDB '{pdbEntry.FullName}' has no debug metadata header.");
+        var pdbId = debugMetadataHeader.Id;
         var expectedId = new byte[20];
         codeView.Guid.ToByteArray().CopyTo(expectedId, 0);
         BitConverter.GetBytes(codeViewEntry.Stamp).CopyTo(expectedId, 16);
