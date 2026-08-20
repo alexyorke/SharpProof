@@ -448,6 +448,7 @@ internal sealed class CompilerDiagnosticArtifact
 {
     public string Code { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
+    public bool IsSource { get; set; }
     public WorkerSourceLocation Location { get; set; } = new();
     public int SourceTreeOrdinal { get; set; } = -1;
     public string SourceTreePath { get; set; } = string.Empty;

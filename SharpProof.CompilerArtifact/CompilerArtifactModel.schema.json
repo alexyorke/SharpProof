@@ -3610,6 +3610,16 @@
           }
         },
         {
+          "name": "IsSource",
+          "jsonName": "isSource",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
           "name": "Location",
           "jsonName": "location",
           "type": "WorkerSourceLocation",

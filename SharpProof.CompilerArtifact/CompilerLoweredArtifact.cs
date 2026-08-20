@@ -456,7 +456,7 @@ internal static class CompilerLoweredArtifact
         {
             var evidence = artifact.EffectClaims[index];
             var authority = artifact.EffectAuthorities[index];
-            CompilerEffectClaimArtifactCodec.Validate(evidence);
+            CompilerEffectClaimArtifactCodec.Validate(evidence, compilation);
             if (evidence.ClaimId != expected[index].ClaimId || evidence.ContractKind != expected[index].EffectContractKind)
             {
                 throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");

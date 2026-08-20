@@ -661,6 +661,7 @@ public sealed class CompilerManifestArtifactTests
         var valid = CreateArtifact();
         valid.CompilerDiagnostics = [Diagnostic(
             "valid", length: 0, line: 1, column: 1)];
+        BindDiagnostics(valid);
         valid.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             valid.Compilation, valid.CompilerDiagnostics);
         Assert.DoesNotThrow((Action)(() =>
@@ -732,6 +733,7 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [Diagnostic(
             "invalid code", length: 1, line: 1, column: 1)];
+        BindDiagnostics(artifact);
         artifact.CompilerDiagnostics[0].Code = code;
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation, artifact.CompilerDiagnostics);
@@ -746,6 +748,7 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [Diagnostic(
             "invalid code", length: 1, line: 1, column: 1)];
+        BindDiagnostics(artifact);
         artifact.CompilerDiagnostics[0].Code = "compiler.CS" + (char)1;
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation, artifact.CompilerDiagnostics);
@@ -763,6 +766,7 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [Diagnostic(
             "canonical code", length: 1, line: 1, column: 1)];
+        BindDiagnostics(artifact);
         artifact.CompilerDiagnostics[0].Code = code;
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation, artifact.CompilerDiagnostics);
@@ -857,6 +861,7 @@ public sealed class CompilerManifestArtifactTests
         };
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [.. diagnostics.Reverse()];
+        BindDiagnostics(artifact);
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation, artifact.CompilerDiagnostics);
         var reversedHash = artifact.CompilationSha256;
@@ -878,10 +883,10 @@ public sealed class CompilerManifestArtifactTests
                 Is.EqualTo(new[]
                 {
                     (1, "a", 1, 1),
-                    (1, "a", 1, 2),
-                    (1, "a", 2, 1),
                     (1, "b", 1, 1),
-                    (2, "a", 1, 1)
+                    (2, "a", 1, 1),
+                    (1, "a", 1, 2),
+                    (1, "a", 2, 1)
                 }));
         }
     }
@@ -952,6 +957,7 @@ public sealed class CompilerManifestArtifactTests
     {
         var artifact = CreateArtifact();
         artifact.CompilerDiagnostics = [Diagnostic("x", 1, 1, 1)];
+        BindDiagnostics(artifact);
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation,
             artifact.CompilerDiagnostics);
@@ -1763,6 +1769,54 @@ public sealed class CompilerManifestArtifactTests
         }
     }
 
+    [TestCase("line")]
+    [TestCase("tree")]
+    [TestCase("line-map")]
+    public void AllocationReplayRejectsCoordinatedResealedMappedGeometry(
+        string mutation)
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [ZeroAllocations]
+                internal static object Allocate() =>
+                    new object();
+            }
+            """);
+        var callable = artifact.Callables.Single();
+        var evidence = callable.EffectClaims.Single();
+        var authority = callable.EffectAuthorities.Single();
+        var @event = evidence.Replay!.Events.Single();
+        var authorityEvent = authority.Replay!.Events.Single();
+
+        switch (mutation)
+        {
+            case "line":
+                @event.Location.Line++;
+                authorityEvent.Location.Line++;
+                evidence.Witness!.Location.Line++;
+                break;
+            case "tree":
+                @event.SourceTreeOrdinal++;
+                authorityEvent.SourceTreeOrdinal++;
+                break;
+            case "line-map":
+                @event.SourceLineMapSha256 = new string('0', 64);
+                authorityEvent.SourceLineMapSha256 = new string('0', 64);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation));
+        }
+
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
     [Test]
     public void UnmodeledExceptionConstructorCannotFabricateAReplayWitness()
     {
@@ -2295,7 +2349,7 @@ public sealed class CompilerManifestArtifactTests
 
     private static CompilerManifestArtifact CreateArtifact(
         CSharpParseOptions? parse = null,
-        string source = "internal sealed class Subject {}\n",
+        string source = "internal sealed class Subject {}\n// line two\n// line three\n",
         ImmutableArray<string> specificationPacks = default)
     {
         var compilation = CreateCompilation(
@@ -2514,6 +2568,7 @@ public sealed class CompilerManifestArtifactTests
         {
             Code = "compiler.TEST",
             Message = message,
+            IsSource = true,
             Location = new WorkerSourceLocation
             {
                 Path = "same.cs",
@@ -2523,6 +2578,28 @@ public sealed class CompilerManifestArtifactTests
                 Column = column
             }
         };
+    }
+
+    private static void BindDiagnostics(CompilerManifestArtifact artifact)
+    {
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        foreach (var diagnostic in artifact.CompilerDiagnostics)
+        {
+            var mappedLine = diagnostic.Location.Line - 1;
+            var mappedColumn = diagnostic.Location.Column - 1;
+            var entry = tree.LineMap.LastOrDefault(item =>
+                item.MappedLine == mappedLine &&
+                item.MappedColumn <= mappedColumn &&
+                mappedColumn - item.MappedColumn <= item.SourceLength);
+            Assert.That(entry, Is.Not.Null);
+            diagnostic.Location.Path = entry!.MappedPath;
+            diagnostic.Location.Start = entry.SourceStart +
+                mappedColumn - entry.MappedColumn;
+            diagnostic.SourceTreeOrdinal = 0;
+            diagnostic.SourceTreePath = tree.Path;
+            diagnostic.SourceTreeSha256 = tree.Sha256;
+            diagnostic.SourceLineMapSha256 = tree.LineMapSha256;
+        }
     }
 
     private static void AssertMalformedAdditionalFiles(

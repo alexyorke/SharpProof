@@ -177,9 +177,90 @@ public sealed class CompilerSourceLocationAuthorityTests
         }
     }
 
+    [Test]
+    public void GenuineNonSourceCompilerDiagnosticUsesExplicitSentinelClassification()
+    {
+        var artifact = CreateNonSourceDiagnosticArtifact();
+        var diagnostic = artifact.CompilerDiagnostics.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostic.IsSource, Is.False);
+            Assert.That(
+                CompilerSourceLocationAuthority.IsNone(diagnostic.Location),
+                Is.True);
+            Assert.That(
+                CompilerManifestArtifactJson.Deserialize(
+                    CompilerManifestArtifactJson.Serialize(artifact))
+                    .CompilerDiagnostics.Single().IsSource,
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void SourceCompilerDiagnosticRejectsOmittedBindingAndSentinelConversion()
+    {
+        var omittedBinding = CreateArtifact(
+            "internal static class Subject { static int M() { return ; } }\n");
+        var omitted = omittedBinding.CompilerDiagnostics.Single();
+        omitted.SourceTreeOrdinal = -1;
+        omitted.SourceTreePath = string.Empty;
+        omitted.SourceTreeSha256 = string.Empty;
+        omitted.SourceLineMapSha256 = string.Empty;
+        omittedBinding.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            omittedBinding.Compilation,
+            omittedBinding.CompilerDiagnostics);
+
+        var sourceToSentinel = CreateArtifact(
+            "internal static class Subject { static int M() { return ; } }\n");
+        var converted = sourceToSentinel.CompilerDiagnostics.Single();
+        converted.Location = new WorkerSourceLocation();
+        sourceToSentinel.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            sourceToSentinel.Compilation,
+            sourceToSentinel.CompilerDiagnostics);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(omittedBinding)));
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(sourceToSentinel)));
+        }
+    }
+
+    [Test]
+    public void DiagnosticClassificationIsRequiredOnTheWire()
+    {
+        var json = CompilerManifestArtifactJson.Serialize(
+            CreateNonSourceDiagnosticArtifact());
+        var omitted = json.Replace(
+            "\"isSource\":false,",
+            string.Empty,
+            StringComparison.Ordinal);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(omitted)));
+    }
+
     private static CompilerManifestArtifact CreateArtifact(string source)
     {
         var compilation = CreateCompilation(source, includeContractReference: false);
+        return CompilerManifestArtifactProducer.Create(
+            compilation,
+            TestContext.CurrentContext.WorkDirectory,
+            "net8.0",
+            WorkerFeatureSet.All,
+            new ClaimManifestBuilder(compilation).Build(),
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
+    }
+
+    private static CompilerManifestArtifact CreateNonSourceDiagnosticArtifact()
+    {
+        var compilation = CreateCompilation(
+            "internal sealed class Subject {}\n",
+            includeContractReference: false).WithOptions(
+                new CSharpCompilationOptions(OutputKind.ConsoleApplication));
         return CompilerManifestArtifactProducer.Create(
             compilation,
             TestContext.CurrentContext.WorkDirectory,

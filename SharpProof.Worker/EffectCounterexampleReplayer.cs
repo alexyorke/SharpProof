@@ -10,7 +10,7 @@ internal static class EffectCounterexampleReplayer
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(evidence);
         cancellationToken.ThrowIfCancellationRequested();
-        CompilerEffectClaimArtifactCodec.Validate(evidence);
+        CompilerEffectClaimArtifactCodec.Validate(evidence, target.Compilation);
 
         var replay = evidence.Replay ??
             throw Malformed("A refuted effect claim has no replay artifact.");

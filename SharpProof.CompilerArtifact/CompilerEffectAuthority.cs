@@ -66,7 +66,7 @@ internal static class CompilerEffectAuthority
                 return false;
             }
 
-            if (!HasValidAuthorityPayload(authority) ||
+            if (!HasValidAuthorityPayload(authority, compilation) ||
                 authority.Source == null ||
                 authority.Constraint == null ||
                 authority.SourceTreePath == null ||
@@ -109,13 +109,14 @@ internal static class CompilerEffectAuthority
     }
 
     private static bool HasValidAuthorityPayload(
-        CompilerEffectAuthorityArtifact authority)
+        CompilerEffectAuthorityArtifact authority,
+        CompilerCompilationSnapshot compilation)
     {
         try
         {
             var evidence = ToEvidence(authority);
             CompilerEffectClaimArtifactCodec.Seal(evidence);
-            CompilerEffectClaimArtifactCodec.Validate(evidence);
+            CompilerEffectClaimArtifactCodec.Validate(evidence, compilation);
             return true;
         }
         catch (Exception exception) when (

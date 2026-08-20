@@ -341,6 +341,7 @@ internal static class CompilerManifestArtifactJson
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
         RequireSpecificationPackAuthorityProperties(json);
+        RequireDiagnosticClassificationProperties(json);
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, WorkerProtocolJson.Options) ??
@@ -602,6 +603,24 @@ internal static class CompilerManifestArtifactJson
         RequireProperty(compilation, "specificationPackCatalogSha256");
     }
 
+    private static void RequireDiagnosticClassificationProperties(string json)
+    {
+        using var document = JsonDocument.Parse(
+            json,
+            new JsonDocumentOptions { MaxDepth = WorkerProtocolJson.MaximumJsonDepth });
+        var root = document.RootElement;
+        if (!root.TryGetProperty("compilerDiagnostics", out var diagnostics) ||
+            diagnostics.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var diagnostic in diagnostics.EnumerateArray())
+        {
+            RequireProperty(diagnostic, "isSource");
+        }
+    }
+
     private static JsonElement RequireProperty(JsonElement element, string name)
     {
         if (element.ValueKind != JsonValueKind.Object ||
@@ -645,21 +664,16 @@ internal static class CompilerManifestArtifactJson
 
         if (CompilerSourceLocationAuthority.IsNone(location))
         {
-            return value.SourceTreeOrdinal == -1 &&
+            return !value.IsSource &&
+                value.SourceTreeOrdinal == -1 &&
                 value.SourceTreePath.Length == 0 &&
                 value.SourceTreeSha256.Length == 0 &&
                 value.SourceLineMapSha256.Length == 0;
         }
 
-        // Keep existing in-memory protocol-shape fixtures usable.  All
-        // diagnostics emitted by the compiler collector carry this binding;
-        // when a binding is present it is complete and independently checked.
-        if (value.SourceTreeOrdinal == -1 &&
-            value.SourceTreePath.Length == 0 &&
-            value.SourceTreeSha256.Length == 0 &&
-            value.SourceLineMapSha256.Length == 0)
+        if (!value.IsSource)
         {
-            return true;
+            return false;
         }
 
         return CompilerSourceLocationAuthority.IsBound(
@@ -782,30 +796,39 @@ internal static class CompilerManifestArtifactJson
             return false;
         }
 
-        foreach (var effectEvent in callables
+        foreach (var effectClaim in callables
                      .OfType<CompilerCallableArtifact>()
                      .SelectMany(static callable => callable.EffectClaims ?? [])
-                     .OfType<CompilerEffectClaimArtifact>()
-                     .SelectMany(static claim => claim.Replay?.Events ?? []))
+                     .OfType<CompilerEffectClaimArtifact>())
         {
-            if (effectEvent == null ||
-                effectEvent.SyntaxTreeOrdinal < 0 ||
-                effectEvent.SyntaxTreeOrdinal >= compilation.SyntaxTrees.Length)
+            if (!CompilerEffectClaimArtifactCodec.HasValidReplayGeometry(
+                    effectClaim,
+                    compilation))
             {
                 return false;
             }
 
-            var tree = compilation.SyntaxTrees[effectEvent.SyntaxTreeOrdinal];
-            if (tree == null ||
-                effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
-                effectEvent.SyntaxTreeSnapshotSha256 !=
-                    CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
-                effectEvent.SyntaxStart < 0 ||
-                effectEvent.SyntaxLength <= 0 ||
-                effectEvent.SyntaxStart > tree.TextLength ||
-                effectEvent.SyntaxLength > tree.TextLength - effectEvent.SyntaxStart)
+            foreach (var effectEvent in effectClaim.Replay?.Events ?? [])
             {
-                return false;
+                if (effectEvent == null ||
+                    effectEvent.SyntaxTreeOrdinal < 0 ||
+                    effectEvent.SyntaxTreeOrdinal >= compilation.SyntaxTrees.Length)
+                {
+                    return false;
+                }
+
+                var tree = compilation.SyntaxTrees[effectEvent.SyntaxTreeOrdinal];
+                if (tree == null ||
+                    effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
+                    effectEvent.SyntaxTreeSnapshotSha256 !=
+                        CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
+                    effectEvent.SyntaxStart < 0 ||
+                    effectEvent.SyntaxLength <= 0 ||
+                    effectEvent.SyntaxStart > tree.TextLength ||
+                    effectEvent.SyntaxLength > tree.TextLength - effectEvent.SyntaxStart)
+                {
+                    return false;
+                }
             }
         }
 

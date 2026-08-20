@@ -223,6 +223,7 @@ internal static class CompilerManifestArtifactProducer
         {
             Code = "compiler." + diagnostic.Id,
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
+            IsSource = source,
             Location = location
         };
         if (!source)
