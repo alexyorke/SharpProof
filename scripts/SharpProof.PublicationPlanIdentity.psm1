@@ -67,7 +67,7 @@ function Test-SharpProofPublicationPlanIdentity {
         }
     }
     $expectedChecksumBytes = [Text.StringBuilder]::new()
-    foreach ($artifact in @($artifacts[0..5]) + @($artifacts[7])) {
+    foreach ($artifact in $manifestArtifacts) {
         [void]$expectedChecksumBytes.Append(
             ([string]$artifact.sha256) + '  ' +
             ([string]$artifact.fileName) + "`n")

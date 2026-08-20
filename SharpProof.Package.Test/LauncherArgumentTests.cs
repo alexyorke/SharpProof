@@ -131,7 +131,7 @@ public sealed class LauncherArgumentTests
 
         using var process = LinuxWorkerProcess.Start(
             "/bin/sh",
-            ["-c", "exit 0"],
+            ["-c", "read -r _"],
             TestContext.CurrentContext.WorkDirectory);
         Assert.That(
             (Action)(() => process.WaitForExit(
@@ -143,6 +143,12 @@ public sealed class LauncherArgumentTests
                 TimeSpan.FromMilliseconds(2),
                 TimeSpan.FromMilliseconds(1))),
             Throws.TypeOf<ArgumentOutOfRangeException>());
+        var initialCompletion = process.WaitForExit(
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1));
+        Assert.That(
+            initialCompletion.Kind,
+            Is.EqualTo(LinuxWorkerCompletionKind.Exited));
         var completion = process.WaitForExit(
             TimeSpan.FromMilliseconds(1),
             TimeSpan.FromMilliseconds(1));
