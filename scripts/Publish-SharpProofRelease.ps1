@@ -74,8 +74,6 @@ function Get-RequiredProperty {
 
 function Get-RepositoryHead {
     $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-    $releaseVersion = Get-SharpProofReleaseVersion `
-        -RepositoryRoot $repositoryRoot
     if ($null -eq (Get-Command git -ErrorAction SilentlyContinue)) {
         throw 'Git is required to verify the release checkout commit.'
     }
@@ -253,6 +251,8 @@ function Get-ValidatedRelease {
     )
 
     $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $releaseVersion = Get-SharpProofReleaseVersion `
+        -RepositoryRoot $repositoryRoot
 
     $manifestPath = Join-Path $Directory 'SharpProof.release.json'
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
