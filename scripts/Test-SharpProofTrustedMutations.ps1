@@ -862,14 +862,6 @@ $mutations = @(
         Filter = 'FullyQualifiedName~NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath'
     },
     [pscustomobject]@{
-        Name = 'worker-test-z3-required-bootstrap'
-        File = 'SharpProof.Worker.Test\ContainerNativeLibrarySetup.cs'
-        Original = '            typeof(Microsoft.Z3.Context).Assembly);'
-        Mutated = '            typeof(ContainerNativeLibrarySetup).Assembly);'
-        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
-        Filter = 'FullyQualifiedName~InjectedBuiltInBackendStillChargesTheMethodRlimit'
-    },
-    [pscustomobject]@{
         Name = 'release-tag-exact-ref-authority'
         File = 'scripts\Invoke-SharpProofReleaseContainer.ps1'
         Original = '        if ($ref -cne $expectedRef) {'

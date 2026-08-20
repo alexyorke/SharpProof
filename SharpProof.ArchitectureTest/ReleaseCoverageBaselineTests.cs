@@ -584,6 +584,47 @@ public sealed class ReleaseCoverageBaselineTests
                     "scripts",
                     "Get-SharpProofTcbPaths.ps1"),
                 overwrite: true);
+            File.Copy(
+                Path.Combine(
+                    root,
+                    "scripts",
+                    "Get-SharpProofProductionInventory.ps1"),
+                Path.Combine(
+                    repository,
+                    "scripts",
+                    "Get-SharpProofProductionInventory.ps1"),
+                overwrite: true);
+
+            var projectDirectory = Path.Combine(repository, "Fixture");
+            Directory.CreateDirectory(projectDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(projectDirectory, "Fixture.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <SharpProofProductionProject>true</SharpProofProductionProject>
+                  </PropertyGroup>
+                </Project>
+                """);
+            await File.WriteAllTextAsync(
+                Path.Combine(projectDirectory, "Source.cs"),
+                "internal static class Source { internal static int Value => 1; }\n");
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "SharpProof.sln"),
+                "Microsoft Visual Studio Solution File, Format Version 12.00\n" +
+                "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Fixture\", \"Fixture/Fixture.csproj\", \"{11111111-1111-1111-1111-111111111111}\"\n" +
+                "EndProject\nGlobal\nEndGlobal\n");
+            var generatedDirectory = Path.Combine(repository, "eng", "generated");
+            Directory.CreateDirectory(generatedDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(generatedDirectory, "approved-outputs.v1.json"),
+                "{\"schemaVersion\":1,\"outputs\":[]}\n");
+            var coverageDirectory = Path.Combine(repository, "eng", "coverage");
+            Directory.CreateDirectory(coverageDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(coverageDirectory, "SharpProof.Gates.runsettings"),
+                "<RunSettings />\n");
 
             var acceptancePath = Path.Combine(
                 repository,
