@@ -2307,7 +2307,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 
 ### SP-AUDIT-041 - Proof evidence and used assumptions are not jointly bound (P2)
 
-- [ ] Protocol validation checks proof cores, counterexample models, effect
+- [x] Protocol validation checks proof cores, counterexample models, effect
   witnesses, and assumption-use flags only for local shape or self-consistency.
   It never ties proof labels or model variables to the compiler artifact, never
   requires an effect witness to violate the sealed claim's specific contract
@@ -2338,6 +2338,12 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutations restoring each shape-only path.
 - Consolidated cases: SP-AUDIT-217.
 - Unified closure: Share one artifact-aware mapping from proof-core labels to exact manifest assumptions, Used flags, and summary counts in producer and validator.
+- Resolution: compiler-artifact-aware response validation now authenticates
+  proof labels, replay-model variables, exact effect witnesses, vacuity, and
+  assumption-use flags against the sealed claim authority. Failed compiler
+  targets and summary dependency labels use the producer's exact canonical
+  forms. The adversarial authority matrix passes 8/8 and the full Worker suite
+  passes 581/581.
 
 ### SP-AUDIT-048 - Invocation lifecycle leaks temporary runtime state (fixed)
 
