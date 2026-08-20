@@ -1871,27 +1871,155 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
-        if (method.DeclaringSyntaxReferences.Length != 1)
+        var normalized = method.OriginalDefinition;
+        if (normalized.DeclaringSyntaxReferences.Length != 1 ||
+            !_activeMethods.Add(normalized))
         {
             return true;
         }
 
-        var declaration = method.DeclaringSyntaxReferences[0]
-            .GetSyntax(cancellationToken);
-        var model = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(compilation, declaration.SyntaxTree);
-        var operation = model.GetOperation(declaration, cancellationToken) ??
-            (GetBody(declaration) is { } methodBody
-                ? model.GetOperation(methodBody, cancellationToken)
-                : null);
         try
         {
-            return operation == null || CompletesNormally(operation);
+            var declaration = normalized.DeclaringSyntaxReferences[0]
+                .GetSyntax(cancellationToken);
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, declaration.SyntaxTree);
+            var operation = model.GetOperation(declaration, cancellationToken) ??
+                (GetBody(declaration) is { } methodBody
+                    ? model.GetOperation(methodBody, cancellationToken)
+                    : null);
+            return operation == null || MayCompleteNormally(operation);
         }
         catch (ArgumentException)
         {
             return true;
         }
+        finally
+        {
+            _activeMethods.Remove(normalized);
+        }
+    }
+
+    /// <summary>
+    /// Computes a deliberately permissive normal-completion fact.  This is
+    /// used only to suppress effects after a call that is proven never to
+    /// return, so uncertainty must retain the later effects.  In particular,
+    /// ordinary assignments, writes, external calls, and unsupported shapes
+    /// are all treated as potentially completing.
+    /// </summary>
+    private bool MayCompleteNormally(IOperation? operation)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return operation switch
+        {
+            null => true,
+            IThrowOperation => false,
+            IReturnOperation returnOperation =>
+                ChildrenMayCompleteNormally(returnOperation),
+            IMethodBodyOperation body =>
+                SequenceMayCompleteNormally(body.ChildOperations),
+            IConstructorBodyOperation body =>
+                SequenceMayCompleteNormally(body.ChildOperations),
+            IBlockOperation block =>
+                SequenceMayCompleteNormally(block.ChildOperations),
+            IConditionalOperation conditional =>
+                MayCompleteNormally(conditional.Condition) &&
+                (MayCompleteNormally(conditional.WhenTrue) ||
+                 MayCompleteNormally(conditional.WhenFalse)),
+            IConditionalAccessOperation conditionalAccess =>
+                MayCompleteNormally(conditionalAccess.Operation) &&
+                (MayCompleteNormally(conditionalAccess.WhenNotNull) ||
+                 !DefiniteOperationFacts.IsDefinitelyNonNull(
+                     conditionalAccess.Operation)),
+            IInvocationOperation invocation =>
+                InvocationMayCompleteNormally(invocation),
+            IObjectCreationOperation creation =>
+                CreationMayCompleteNormally(creation),
+            IArrayCreationOperation array =>
+                ChildrenMayCompleteNormally(array),
+            ILockOperation @lock =>
+                MayCompleteNormally(@lock.LockedValue) &&
+                MayCompleteNormally(@lock.Body),
+            IBinaryOperation binary =>
+                ChildrenMayCompleteNormally(binary) &&
+                !IsDefinitelyZeroDivision(binary),
+            IUnaryOperation or IConversionOperation or
+                IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
+                ISimpleAssignmentOperation or IArrayElementReferenceOperation or
+                IFieldReferenceOperation or IPropertyReferenceOperation or
+                IFlowCaptureOperation or IParenthesizedOperation or
+                IArgumentOperation =>
+                ChildrenMayCompleteNormally(operation),
+            IObjectOrCollectionInitializerOperation initializer =>
+                SequenceMayCompleteNormally(initializer.ChildOperations),
+            IExpressionStatementOperation or
+                IVariableDeclarationGroupOperation or
+                IVariableDeclarationOperation or
+                IVariableDeclaratorOperation or
+                IVariableInitializerOperation =>
+                ChildrenMayCompleteNormally(operation),
+            ITryOperation or ILoopOperation or ISwitchOperation or
+                ISwitchExpressionOperation => true,
+            _ => true
+        };
+    }
+
+    private bool InvocationMayCompleteNormally(IInvocationOperation invocation)
+    {
+        if (!MayCompleteNormally(invocation.Instance) ||
+            invocation.Arguments.Any(argument =>
+                !MayCompleteNormally(argument.Value)))
+        {
+            return false;
+        }
+
+        var target = invocation.TargetMethod.OriginalDefinition;
+        return target.DeclaringSyntaxReferences.Length == 0 ||
+            MethodCanCompleteNormally(target);
+    }
+
+    private bool CreationMayCompleteNormally(IObjectCreationOperation creation)
+    {
+        if (creation.Arguments.Any(argument =>
+                !MayCompleteNormally(argument.Value)))
+        {
+            return false;
+        }
+
+        if (creation.Constructor is { } constructor &&
+            constructor.DeclaringSyntaxReferences.Length != 0 &&
+            !MethodCanCompleteNormally(constructor))
+        {
+            return false;
+        }
+
+        return creation.Initializer == null ||
+            MayCompleteNormally(creation.Initializer);
+    }
+
+    private bool SequenceMayCompleteNormally(IEnumerable<IOperation> operations)
+    {
+        foreach (var operation in operations)
+        {
+            if (!MayCompleteNormally(operation))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool ChildrenMayCompleteNormally(IOperation operation)
+    {
+        return operation.ChildOperations.All(MayCompleteNormally);
+    }
+
+    private static bool IsDefinitelyZeroDivision(IBinaryOperation binary)
+    {
+        return binary.OperatorKind is BinaryOperatorKind.Divide or
+            BinaryOperatorKind.Remainder &&
+            binary.RightOperand.ConstantValue is { HasValue: true, Value: 0 };
     }
 
     private bool ChildrenCompleteNormally(IOperation operation)
