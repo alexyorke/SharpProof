@@ -142,6 +142,7 @@
       "scripts/GeneratedFileHelpers.ps1",
       "scripts/Get-SharpProofDevCheckPlan.ps1",
       "scripts/Get-SharpProofPilotPackageAuthority.ps1",
+      "scripts/Get-SharpProofProductionInventory.ps1",
       "scripts/Get-SharpProofReleaseAuthorityClosure.ps1",
       "scripts/Get-SharpProofReleaseVersion.ps1",
       "scripts/Get-SharpProofTcbPaths.ps1",
@@ -208,7 +209,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "933da96183dbf56b563d9c05f0ba5579386047fcc2b848a5078e7e6466b2d880",
+    "inventorySha256": "08335cb2ce0d312c6c4a2b63d45291b345e983c0e9799086804d801e2ed3d2fd",
     "components": [
       {
         "name": "discovery",
@@ -548,6 +549,7 @@
         "SharpProof.Frontend/OperationSubsetClassifier.cs",
         "SharpProof.Worker.Launcher/Program.cs",
         "SharpProof.Worker/CallableVerificationPolicy.cs",
+        "scripts/Get-SharpProofProductionInventory.ps1",
         "scripts/Get-SharpProofTcbPaths.ps1",
         "scripts/Get-SharpProofReleaseDigests.ps1",
         "scripts/Test-SharpProofCoverage.ps1",
