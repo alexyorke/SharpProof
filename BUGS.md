@@ -2100,9 +2100,13 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   and package-consumer evidence. Local stale, wrong-OS, and package-mismatch
   controls plus workflow/receipt removal mutation coverage pass.
 
-### SP-AUDIT-024 - Normal-completion sequencing is modeled inconsistently (P1)
+### SP-AUDIT-024 - Normal-completion sequencing is modeled inconsistently (fixed)
 
-- [ ] `OperationEffectScanner.ScanCall` joins the resolved callee summary even
+- [x] Fixed by the source-ordered EffectStep series `d8a3fab58`,
+  `6fe83f107`, and `8302583f1`. Internal effect transfer now carries normal
+  completion through receiver, arguments, callee, constructor/initializer,
+  lock, and body sequencing while retaining the public summary shape.
+- `OperationEffectScanner.ScanCall` previously joined the resolved callee summary even
   when managed flow proves that an instance receiver is null. Runtime argument
   evaluation is followed by `NullReferenceException`; the target method never
   begins executing. More generally, call children are joined without
@@ -2139,6 +2143,8 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   receivers, conditional access, reduced extensions, and a mutation probe.
 - Consolidated cases: SP-AUDIT-030.
 - Unified closure: Model source-order normal completion once; join later receiver, argument, conditional-access, lock, constructor, and initializer effects only when prior evaluation may complete.
+- Null receiver, throwing-first-argument, and null-lock regressions passed 3/3;
+  the complete Effects suite passed 179/179 after the uncertainty repair.
 
 ### SP-AUDIT-056 - Final ContractFor reconciliation is provenance-incomplete (P1)
 
