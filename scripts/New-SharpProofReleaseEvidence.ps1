@@ -15,6 +15,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$resolvedOutput = $null
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
@@ -562,7 +563,8 @@ $resolvedOutput = Join-Path ([IO.Path]::GetDirectoryName($finalOutput)) (
     [Guid]::NewGuid().ToString('N') + '.staging')
 [IO.Directory]::CreateDirectory($resolvedOutput) | Out-Null
 trap {
-    if ([IO.Directory]::Exists($resolvedOutput)) {
+    if (-not [string]::IsNullOrWhiteSpace($resolvedOutput) -and
+        [IO.Directory]::Exists($resolvedOutput)) {
         [IO.Directory]::Delete($resolvedOutput, $true)
     }
     throw

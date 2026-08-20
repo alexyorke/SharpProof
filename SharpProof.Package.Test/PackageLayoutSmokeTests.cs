@@ -932,7 +932,7 @@ public sealed class PackageLayoutSmokeTests
                 manifest.RootElement
                     .GetProperty("schemaVersion")
                     .GetInt32(),
-                Is.EqualTo(13));
+                Is.EqualTo(14));
             var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()
