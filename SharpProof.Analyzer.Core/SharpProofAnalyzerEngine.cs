@@ -85,6 +85,15 @@ internal sealed partial class SharpProofAnalyzerEngine
             return;
         }
 
+        // ContractFor validation is a final-compilation reconciliation. The
+        // analyzer is the sole owner so every source tree, including output
+        // added by peer generators, is observed exactly once. This is
+        // intentionally independent of feature selection and advisory
+        // activation: every non-off profile must reject malformed companions
+        // rather than silently treating them as absent.
+        context.RegisterCompilationEndAction(
+            ValidateContractForCompanions);
+
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(
                 context.Compilation,
@@ -102,11 +111,6 @@ internal sealed partial class SharpProofAnalyzerEngine
             context.Compilation,
             configuration,
             context.CancellationToken);
-        if (configuration.ContractsEnabled)
-        {
-            context.RegisterCompilationEndAction(
-                ValidateGeneratedContractForCompanions);
-        }
         if (activation.RequiresSymbolAnalysis)
         {
             context.RegisterSyntaxNodeAction(
@@ -180,15 +184,12 @@ internal sealed partial class SharpProofAnalyzerEngine
         }
     }
 
-    private static void ValidateGeneratedContractForCompanions(
+    private static void ValidateContractForCompanions(
         CompilationAnalysisContext context)
     {
         var candidates = ContractForValidationEngine.FindCandidates(
             context.Compilation,
-            tree => AnalyzerGeneratedCodePolicy.IsGenerated(
-                tree,
-                context.Compilation,
-                context.CancellationToken),
+            static _ => true,
             context.CancellationToken);
         foreach (var diagnostic in ContractForValidationEngine.Validate(
                      context.Compilation,

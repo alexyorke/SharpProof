@@ -348,7 +348,12 @@ internal static class ContractForSymbolMatcher
         CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
         ParameterRefCustomModifiersMatch(left, right) &&
         ExplicitDefaultValuesMatch(left, right) &&
-        TypesMatch(left.Type, right.Type, left.ContainingSymbol, right.ContainingSymbol);
+        TypesMatch(
+            left.Type,
+            right.Type,
+            left.ContainingSymbol,
+            right.ContainingSymbol,
+            normalizeMappedTypeParameters: true);
     }
 
     private static bool ExplicitDefaultValuesMatch(

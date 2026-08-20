@@ -606,6 +606,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~MarkerMentionsDoNotSuppressHandwrittenCallSites'
     },
     [pscustomobject]@{
+        Name = 'contract-for-final-tree-reconciliation'
+        File = 'SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs'
+        Original = '            static _ => true,'
+        Mutated = '            tree => AnalyzerGeneratedCodePolicy.IsGenerated(tree, context.Compilation, context.CancellationToken),'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~MalformedPeerCompanionWithOrdinaryHintIsReconciled'
+    },
+    [pscustomobject]@{
         Name = 'trusted-boundary-nonblank-reason'
         File = 'SharpProof.Effects\TrustedBoundaryPolicy.cs'
         Original = '!string.IsNullOrWhiteSpace(reason));'

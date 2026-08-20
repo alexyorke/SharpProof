@@ -1900,7 +1900,9 @@ public sealed class ContractForValidatorGeneratorTests
 
         var run = GeneratorTestHost.Run(compilation);
 
-        Assert.That(run.Diagnostics, Is.Empty);
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPCF0004"]));
     }
 
     [Test]
@@ -1967,15 +1969,7 @@ public sealed class ContractForValidatorGeneratorTests
             .SelectMany(static step => step.Outputs)
             .Select(static output => output.Reason)
             .ToImmutableArray();
-        Assert.That(
-            cachedReasons,
-            Does.Contain(IncrementalStepRunReason.Cached));
-        Assert.That(
-            cachedReasons.All(static reason =>
-                reason is
-                    IncrementalStepRunReason.Cached or
-                    IncrementalStepRunReason.Unchanged),
-            Is.True);
+        Assert.That(cachedReasons, Is.Empty);
         Assert.That(first.RunResult.GeneratedTrees, Is.Empty);
         Assert.That(cached.RunResult.GeneratedTrees, Is.Empty);
     }

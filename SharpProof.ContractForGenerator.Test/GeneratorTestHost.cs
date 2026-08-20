@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SharpProof.Analyzer;
 
 namespace SharpProof.ContractForGenerator.Test;
 
@@ -70,6 +71,9 @@ internal static class GeneratorTestHost
         var runResult = driver.GetRunResult();
         var diagnostics = runResult.Diagnostics
             .Concat(driverDiagnostics)
+            .Concat(AnalyzeFinalCompilation(
+                (CSharpCompilation)outputCompilation,
+                globalOptions))
             .Distinct(DiagnosticIdentityComparer.Instance)
             .OrderBy(
                 static diagnostic =>
@@ -88,6 +92,31 @@ internal static class GeneratorTestHost
             driver,
             runResult,
             diagnostics);
+    }
+
+    private static ImmutableArray<Diagnostic> AnalyzeFinalCompilation(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string>? globalOptions)
+    {
+        var options = new AnalyzerOptions(
+            [],
+            new TestAnalyzerConfigOptionsProvider(
+                globalOptions ??
+                new Dictionary<string, string>(StringComparer.Ordinal)));
+        var withAnalyzers = compilation.WithAnalyzers(
+            [new SharpProofAnalyzer()],
+            new CompilationWithAnalyzersOptions(
+                options,
+                onAnalyzerException: null,
+                concurrentAnalysis: true,
+                logAnalyzerExecutionTime: false,
+                reportSuppressedDiagnostics: false));
+        return [.. withAnalyzers.GetAnalyzerDiagnosticsAsync()
+            .GetAwaiter()
+            .GetResult()
+            .Where(static diagnostic => diagnostic.Id.StartsWith(
+                "SPCF",
+                StringComparison.Ordinal))];
     }
 
     internal static ImmutableArray<string> DiagnosticKeys(

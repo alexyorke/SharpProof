@@ -76,10 +76,10 @@ public sealed class GeneratedContractForAnalyzerTests
 
     [TestCase("advisory", "contracts", true)]
     [TestCase("advisory", "all", true)]
-    [TestCase("advisory", "effects", false)]
+    [TestCase("advisory", "effects", true)]
     [TestCase("strict", "contracts", true)]
     [TestCase("strict", "all", true)]
-    [TestCase("strict", "effects", false)]
+    [TestCase("strict", "effects", true)]
     [TestCase("off", "contracts", false)]
     [TestCase("off", "all", false)]
     [TestCase("off", "effects", false)]
@@ -108,6 +108,25 @@ public sealed class GeneratedContractForAnalyzerTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SPCF0001"]));
+    }
+
+    [Test]
+    public async Task MalformedPeerCompanionWithOrdinaryHintIsReconciled()
+    {
+        var diagnostics = await AnalyzeGeneratedAsync(
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts
+            {
+            }
+            """,
+            hintName: "PeerContracts.cs");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPCF0004"]));
     }
 
     [Test]
@@ -141,10 +160,11 @@ public sealed class GeneratedContractForAnalyzerTests
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0002"]));
+            Is.EqualTo(["SPCF0002", "SPCF0002"]));
         Assert.That(
-            diagnostics[0].Location.SourceTree?.FilePath,
-            Does.EndWith("GeneratedContracts.g.cs"));
+            diagnostics.Select(static diagnostic =>
+                Path.GetFileName(diagnostic.Location.SourceTree?.FilePath)),
+            Is.EqualTo(["GeneratedContracts.g.cs", "input.cs"]));
     }
 
     [Test]
