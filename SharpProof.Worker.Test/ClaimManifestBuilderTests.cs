@@ -1623,13 +1623,17 @@ public sealed class ClaimManifestBuilderTests
                     new DerivedBox();
             }
             """;
-        var discovery = Build(("Allocations.cs", source));
+        var compilation = GetCompilation(("Allocations.cs", source));
+        var discovery = new ClaimManifestBuilder(compilation).Build();
         var evidence = discovery.Targets.Values.ToDictionary(
             static target => target.Method.Name,
             static target => target.EffectClaims.Single().Evidence,
             StringComparer.Ordinal);
         var treeSha256 = WorkerProtocolJson.ComputeSha256(
             Encoding.UTF8.GetBytes(source));
+        var capturedTree = CompilerCompilationCapture.CaptureTree(
+            compilation.SyntaxTrees[0],
+            CancellationToken.None);
 
         AssertAllocation(
             evidence["ObjectAllocation"],
@@ -1728,6 +1732,21 @@ public sealed class ClaimManifestBuilderTests
                 Assert.That(
                     @event?.SyntaxTreeSha256,
                     Is.EqualTo(treeSha256));
+                Assert.That(
+                    @event?.SyntaxTreeLineMapSha256,
+                    Is.EqualTo(capturedTree.LineMapSha256));
+                Assert.That(
+                    @event?.SourceTreeOrdinal,
+                    Is.Zero);
+                Assert.That(
+                    @event?.SourceTreePath,
+                    Is.EqualTo(capturedTree.Path));
+                Assert.That(
+                    @event?.SourceTreeSha256,
+                    Is.EqualTo(capturedTree.Sha256));
+                Assert.That(
+                    @event?.SourceLineMapSha256,
+                    Is.EqualTo(capturedTree.LineMapSha256));
                 Assert.That(@event?.SyntaxStart, Is.EqualTo(start));
                 Assert.That(
                     @event?.SyntaxLength,

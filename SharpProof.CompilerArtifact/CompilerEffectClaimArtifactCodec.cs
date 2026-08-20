@@ -96,6 +96,11 @@ internal static class CompilerEffectClaimArtifactCodec
             value.SyntaxTreeOrdinal < 0 ||
             !WorkerProtocolJson.IsSha256(value.SyntaxTreeSha256) ||
             !WorkerProtocolJson.IsSha256(value.SyntaxTreeSnapshotSha256) ||
+            !WorkerProtocolJson.IsSha256(value.SyntaxTreeLineMapSha256) ||
+            value.SourceTreeOrdinal < 0 ||
+            string.IsNullOrWhiteSpace(value.SourceTreePath) ||
+            !WorkerProtocolJson.IsSha256(value.SourceTreeSha256) ||
+            !WorkerProtocolJson.IsSha256(value.SourceLineMapSha256) ||
             value.SyntaxStart < 0 || value.SyntaxLength <= 0 ||
             value.SyntaxStart > int.MaxValue - value.SyntaxLength ||
             value.OperationIdentitySha256 != ComputeReplayOperationSha256(value) ||
@@ -212,7 +217,8 @@ internal static class CompilerEffectClaimArtifactCodec
         }
 
         hash.Add(value.Kind, value.SyntaxTreeOrdinal, value.SyntaxTreeSha256,
-            value.SyntaxTreeSnapshotSha256, value.SyntaxStart, value.SyntaxLength);
+            value.SyntaxTreeSnapshotSha256, value.SyntaxTreeLineMapSha256,
+            value.SyntaxStart, value.SyntaxLength);
         if (includeOperationIdentity)
         {
             hash.Add(value.OperationIdentitySha256);
@@ -221,6 +227,8 @@ internal static class CompilerEffectClaimArtifactCodec
         hash.Add(value.MemberIdentity, value.MemberDocumentationId,
             value.TypeIdentity, value.TypeDocumentationId,
             value.SpecWitnessIdentifier);
+        hash.Add(value.SourceTreeOrdinal, value.SourceTreePath,
+            value.SourceTreeSha256, value.SourceLineMapSha256);
         var operands = value.ScalarOperands ?? [];
         hash.Add(operands.Length);
         foreach (var operand in operands)

@@ -458,8 +458,28 @@ public sealed class EffectCounterexampleReplayTests
         {
             Path = "Subject.cs",
             Sha256 = TreeSha256,
-            TextLength = 100
+            TextLength = 100,
+            LineMap = [
+                new CompilerSourceLineMapEntry
+                {
+                    SourceStart = 0,
+                    SourceLength = 0,
+                    MappedPath = "MappedSubject.cs",
+                    MappedLine = 0,
+                    MappedColumn = 0
+                },
+                new CompilerSourceLineMapEntry
+                {
+                    SourceStart = 10,
+                    SourceLength = 12,
+                    MappedPath = "MappedSubject.cs",
+                    MappedLine = 6,
+                    MappedColumn = 4
+                }
+            ]
         };
+        snapshot.LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(
+            snapshot.LineMap);
         var effectEvent = new CompilerEffectReplayEventArtifact
         {
             Ordinal = 0,
@@ -469,6 +489,7 @@ public sealed class EffectCounterexampleReplayTests
             SyntaxTreeSnapshotSha256 =
                 CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(
                     snapshot),
+            SyntaxTreeLineMapSha256 = snapshot.LineMapSha256,
             SyntaxStart = location.Start,
             SyntaxLength = location.Length,
             MemberIdentity = isObject
@@ -485,7 +506,11 @@ public sealed class EffectCounterexampleReplayTests
                 : "T:System.Object[]",
             ScalarOperands = [],
             ExactExceptionTypeHierarchy = [],
-            Location = location
+            Location = location,
+            SourceTreeOrdinal = 0,
+            SourceTreePath = snapshot.Path,
+            SourceTreeSha256 = snapshot.Sha256,
+            SourceLineMapSha256 = snapshot.LineMapSha256
         };
         var detail = isObject
             ? effectEvent.MemberDocumentationId!

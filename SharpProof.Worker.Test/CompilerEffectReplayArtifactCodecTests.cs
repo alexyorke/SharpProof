@@ -52,6 +52,7 @@ public sealed class CompilerEffectReplayArtifactCodecTests
             value => value.SyntaxTreeOrdinal++,
             value => value.SyntaxTreeSha256 = new string('b', 64),
             value => value.SyntaxTreeSnapshotSha256 = new string('b', 64),
+            value => value.SyntaxTreeLineMapSha256 = new string('b', 64),
             value => value.SyntaxStart++,
             value => value.SyntaxLength++,
             value => value.MemberIdentity += "-changed",
@@ -61,6 +62,10 @@ public sealed class CompilerEffectReplayArtifactCodecTests
             value => value.SpecWitnessIdentifier = "spec",
             value => value.ScalarOperands = [1],
             value => value.ExactExceptionTypeHierarchy = ["exception"],
+            value => value.SourceTreeOrdinal++,
+            value => value.SourceTreePath += ":changed",
+            value => value.SourceTreeSha256 = new string('b', 64),
+            value => value.SourceLineMapSha256 = new string('b', 64),
             value => value.Location.Path = "Mapped.cs",
             value => value.Location.Start++,
             value => value.Location.Length++,
@@ -217,13 +222,18 @@ public sealed class CompilerEffectReplayArtifactCodecTests
             SyntaxTreeOrdinal = 0,
             SyntaxTreeSha256 = new string('a', 64),
             SyntaxTreeSnapshotSha256 = new string('c', 64),
+            SyntaxTreeLineMapSha256 = new string('d', 64),
             SyntaxStart = 10,
             SyntaxLength = 12,
             MemberIdentity = "assembly::M:System.Object.#ctor",
             MemberDocumentationId = "M:System.Object.#ctor",
             TypeIdentity = "assembly::T:System.Object",
             TypeDocumentationId = "T:System.Object",
-            Location = Location()
+            Location = Location(),
+            SourceTreeOrdinal = 0,
+            SourceTreePath = "Subject.cs",
+            SourceTreeSha256 = new string('a', 64),
+            SourceLineMapSha256 = new string('d', 64)
         };
     }
 

@@ -66,10 +66,16 @@ internal static class CompilerEffectReplayLowerer
         if (!TryResolveSource(
                 compilation,
                 witness.Origin,
+                location,
                 cancellationToken,
                 out var treeOrdinal,
                 out var treeSha256,
-                out var treeSnapshotSha256))
+                out var treeSnapshotSha256,
+                out var treeLineMapSha256,
+                out var sourceTreeOrdinal,
+                out var sourceTreePath,
+                out var sourceTreeSha256,
+                out var sourceLineMapSha256))
         {
             return false;
         }
@@ -145,6 +151,7 @@ internal static class CompilerEffectReplayLowerer
             SyntaxTreeOrdinal = treeOrdinal,
             SyntaxTreeSha256 = treeSha256,
             SyntaxTreeSnapshotSha256 = treeSnapshotSha256,
+            SyntaxTreeLineMapSha256 = treeLineMapSha256,
             SyntaxStart = syntax.SpanStart,
             SyntaxLength = syntax.Span.Length,
             MemberIdentity = memberIdentity,
@@ -154,7 +161,11 @@ internal static class CompilerEffectReplayLowerer
             SpecWitnessIdentifier = null,
             ScalarOperands = [],
             ExactExceptionTypeHierarchy = [],
-            Location = location
+            Location = location,
+            SourceTreeOrdinal = sourceTreeOrdinal,
+            SourceTreePath = sourceTreePath,
+            SourceTreeSha256 = sourceTreeSha256,
+            SourceLineMapSha256 = sourceLineMapSha256
         };
         return true;
     }
@@ -179,10 +190,16 @@ internal static class CompilerEffectReplayLowerer
     private static bool TryResolveSource(
         CSharpCompilation compilation,
         IOperation operation,
+        WorkerSourceLocation location,
         CancellationToken cancellationToken,
         out int treeOrdinal,
         out string treeSha256,
-        out string treeSnapshotSha256)
+        out string treeSnapshotSha256,
+        out string treeLineMapSha256,
+        out int sourceTreeOrdinal,
+        out string sourceTreePath,
+        out string sourceTreeSha256,
+        out string sourceLineMapSha256)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var trees = compilation.SyntaxTrees;
@@ -191,6 +208,11 @@ internal static class CompilerEffectReplayLowerer
         {
             treeSha256 = string.Empty;
             treeSnapshotSha256 = string.Empty;
+            treeLineMapSha256 = string.Empty;
+            sourceTreeOrdinal = -1;
+            sourceTreePath = string.Empty;
+            sourceTreeSha256 = string.Empty;
+            sourceLineMapSha256 = string.Empty;
             return false;
         }
 
@@ -201,16 +223,54 @@ internal static class CompilerEffectReplayLowerer
         {
             treeSha256 = string.Empty;
             treeSnapshotSha256 = string.Empty;
+            treeLineMapSha256 = string.Empty;
+            sourceTreeOrdinal = -1;
+            sourceTreePath = string.Empty;
+            sourceTreeSha256 = string.Empty;
+            sourceLineMapSha256 = string.Empty;
             return false;
         }
 
-        treeSha256 =
-            CompilerCompilationCapture.ComputeTextSha256(text);
+        var syntaxTree = CompilerCompilationCapture.CaptureTree(
+            tree,
+            cancellationToken);
+        treeSha256 = syntaxTree.Sha256;
+        treeLineMapSha256 = syntaxTree.LineMapSha256;
         treeSnapshotSha256 = CompilationFingerprint
-            .ComputeSyntaxTreeSnapshotSha256(
-                CompilerCompilationCapture.CaptureTree(
-                    tree,
-                    cancellationToken));
-        return true;
+            .ComputeSyntaxTreeSnapshotSha256(syntaxTree);
+
+        sourceTreeOrdinal = -1;
+        sourceTreePath = string.Empty;
+        sourceTreeSha256 = string.Empty;
+        sourceLineMapSha256 = string.Empty;
+        for (var index = 0; index < trees.Length; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var candidate = CompilerCompilationCapture.CaptureTree(
+                trees[index],
+                cancellationToken);
+            if (!CompilerSourceLocationAuthority.HasValidLocationGeometry(
+                    location,
+                    candidate))
+            {
+                continue;
+            }
+
+            if (sourceTreeOrdinal >= 0)
+            {
+                sourceTreeOrdinal = -1;
+                sourceTreePath = string.Empty;
+                sourceTreeSha256 = string.Empty;
+                sourceLineMapSha256 = string.Empty;
+                return false;
+            }
+
+            sourceTreeOrdinal = index;
+            sourceTreePath = candidate.Path;
+            sourceTreeSha256 = candidate.Sha256;
+            sourceLineMapSha256 = candidate.LineMapSha256;
+        }
+
+        return sourceTreeOrdinal >= 0;
     }
 }

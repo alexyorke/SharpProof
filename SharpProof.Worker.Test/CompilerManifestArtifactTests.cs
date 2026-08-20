@@ -1176,6 +1176,8 @@ public sealed class CompilerManifestArtifactTests
                         SyntaxTreeSha256 = value.SyntaxTreeSha256,
                         SyntaxTreeSnapshotSha256 =
                             value.SyntaxTreeSnapshotSha256,
+                        SyntaxTreeLineMapSha256 =
+                            value.SyntaxTreeLineMapSha256,
                         SyntaxStart = value.SyntaxStart,
                         SyntaxLength = value.SyntaxLength,
                         OperationIdentitySha256 = value.OperationIdentitySha256,
@@ -1187,6 +1189,10 @@ public sealed class CompilerManifestArtifactTests
                         ScalarOperands = [.. value.ScalarOperands],
                         ExactExceptionTypeHierarchy =
                             [.. value.ExactExceptionTypeHierarchy],
+                        SourceTreeOrdinal = value.SourceTreeOrdinal,
+                        SourceTreePath = value.SourceTreePath,
+                        SourceTreeSha256 = value.SourceTreeSha256,
+                        SourceLineMapSha256 = value.SourceLineMapSha256,
                         Location = new WorkerSourceLocation
                         {
                             Path = value.Location.Path,
