@@ -2483,7 +2483,7 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 
 ### SP-AUDIT-132 - Source locations lack one source-bound canonical geometry (P2)
 
-- [ ] The compiler-artifact producer stores Roslyn's zero-based mapped line and
+- [x] The compiler-artifact producer stores Roslyn's zero-based mapped line and
   column directly, while all other `WorkerSourceLocation` producers and the
   protocol contract require positive, one-based coordinates. Artifact validation
   contains a weaker diagnostic-only exception that admits zero.
@@ -2506,6 +2506,12 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   extent, and authenticated line map.
 - Consolidated cases: SP-AUDIT-179, SP-AUDIT-220, SP-AUDIT-236.
 - Unified closure: Bind every location to a physical tree and line-map identity; validate checked spans, sealed source length, and recomputed one-based mapped coordinates together.
+- Resolution: compiler-artifact schema 14 binds source diagnostics, callable and
+  claim locations, and effect replay events to canonical captured tree paths,
+  text hashes, checked spans, and authenticated line maps. Hydration recomputes
+  exact one-based mapped geometry, distinguishes genuine non-source sentinels,
+  and rejects omitted, substituted, or coordinately resealed bindings. Primary
+  constructor paths are normalized through the same capture authority.
 
 ### SP-AUDIT-140 - Relational-summary work lacks an end-to-end resource budget (fixed)
 
