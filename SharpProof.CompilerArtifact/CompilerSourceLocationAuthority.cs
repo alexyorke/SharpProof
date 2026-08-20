@@ -163,6 +163,20 @@ internal static class CompilerSourceLocationAuthority
                 "A compiler source-location authority is incomplete.");
         }
 
+        if (IsNone(location))
+        {
+            return new CompilerLocationAuthorityArtifact
+            {
+                OwnerKind = ownerKind,
+                OwnerId = ownerId,
+                Location = CopyLocation(location),
+                SourceTreeOrdinal = -1,
+                SourceTreePath = string.Empty,
+                SourceTreeSha256 = string.Empty,
+                SourceLineMapSha256 = string.Empty
+            };
+        }
+
         var ordinal = FindUniqueTree(location, compilation);
         if (ordinal < 0)
         {

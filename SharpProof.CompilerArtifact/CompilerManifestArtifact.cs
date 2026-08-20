@@ -728,7 +728,8 @@ internal static class CompilerManifestArtifactJson
                     authority.SourceTreePath,
                     authority.SourceTreeSha256,
                     authority.SourceLineMapSha256,
-                    compilation))
+                    compilation,
+                    allowNone: true))
             {
                 return false;
             }

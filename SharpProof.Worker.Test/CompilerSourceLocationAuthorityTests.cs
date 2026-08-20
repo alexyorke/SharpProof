@@ -147,6 +147,36 @@ public sealed class CompilerSourceLocationAuthorityTests
             Is.False);
     }
 
+    [Test]
+    public void GenuineNonSourceOwnerUsesCanonicalSentinelAuthority()
+    {
+        var artifact = CreateArtifact(
+            "internal sealed class Subject {}\n");
+        var authority = CompilerSourceLocationAuthority.CreateAuthority(
+            CompilerSourceLocationOwnerKind.Callable,
+            "compiler-synthesized",
+            new WorkerSourceLocation(),
+            artifact.Compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(authority.SourceTreeOrdinal, Is.EqualTo(-1));
+            Assert.That(authority.SourceTreePath, Is.Empty);
+            Assert.That(authority.SourceTreeSha256, Is.Empty);
+            Assert.That(authority.SourceLineMapSha256, Is.Empty);
+            Assert.That(
+                CompilerSourceLocationAuthority.IsBound(
+                    authority.Location,
+                    authority.SourceTreeOrdinal,
+                    authority.SourceTreePath,
+                    authority.SourceTreeSha256,
+                    authority.SourceLineMapSha256,
+                    artifact.Compilation,
+                    allowNone: true),
+                Is.True);
+        }
+    }
+
     private static CompilerManifestArtifact CreateArtifact(string source)
     {
         var compilation = CreateCompilation(source, includeContractReference: false);
