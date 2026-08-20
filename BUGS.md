@@ -2154,7 +2154,7 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 
 ### SP-AUDIT-056 - Final ContractFor reconciliation is provenance-incomplete (P1)
 
-- [ ] Final-compilation ContractFor validation filters syntax trees through
+- [x] Final-compilation ContractFor validation filters syntax trees through
   `AnalyzerGeneratedCodePolicy`, which recognizes provider classification,
   conventional generated suffixes, or an auto-generated header. A peer source
   generator is permitted to add an ordinary `.cs` hint without that header;
@@ -2176,6 +2176,14 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
   heuristic-only filter.
 - Consolidated cases: SP-AUDIT-064, SP-AUDIT-068, SP-AUDIT-127.
 - Unified closure: After all generators, reconcile every logical target/companion once in every non-off profile, independent of filename, partial ownership, and generator order.
+- Resolution: ContractFor ownership now transfers entirely to the final
+  analyzer in every non-off profile. The incremental generator remains
+  loadable but emits no reconciliation diagnostics, while the final analyzer
+  examines every final-compilation tree without generated-code heuristics.
+- Evidence: ordinary no-header, suffix/header/provider-classified, profile-off,
+  overlap/malformed, handwritten, partial-companion, and reversed peer-generator
+  ordering controls pass; Analyzer passed 349/349, ContractFor generator passed
+  117/117, and the exact heuristic-restoration mutation was killed.
 
 ### SP-AUDIT-086 - Unboxed struct copies retain boxed-argument ownership (fixed)
 
