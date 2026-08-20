@@ -478,26 +478,6 @@ public sealed class PackageLayoutSmokeTests
                 "  " +
                 artifact.GetProperty("fileName").GetString())));
 
-        foreach (var packagePath in Directory.EnumerateFiles(
-            feed.Source,
-            "*.nupkg"))
-        {
-            File.Copy(
-                packagePath,
-                Path.Combine(
-                    workspace.OutputDirectory,
-                    Path.GetFileName(packagePath)));
-        }
-        foreach (var symbolsPath in Directory.EnumerateFiles(
-            feed.Source,
-            "*.snupkg"))
-        {
-            File.Copy(
-                symbolsPath,
-                Path.Combine(
-                    workspace.OutputDirectory,
-                    Path.GetFileName(symbolsPath)));
-        }
         var validationScript = Path.Combine(
             FindRepositoryRoot(),
             "scripts",

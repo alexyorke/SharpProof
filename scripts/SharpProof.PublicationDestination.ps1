@@ -38,7 +38,9 @@ function Get-SharpProofPublicationFixtureAuthority {
     $entries = @($InputSnapshot.entries | Where-Object {
         ([string]$_.path).StartsWith($prefix, [StringComparison]::Ordinal)
     } | Sort-Object path)
-    $json = $entries | ConvertTo-Json -Compress
+    $json = ConvertTo-Json `
+        -InputObject ([object[]]$entries) `
+        -Compress
     $digest = [Convert]::ToHexString(
         [Security.Cryptography.SHA256]::HashData(
             [Text.Encoding]::UTF8.GetBytes($json))).ToLowerInvariant()
