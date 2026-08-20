@@ -411,7 +411,8 @@ foreach ($declaration in $declarations) {
             'CompilerReferenceLimits',
             'CompilerReferenceModuleSnapshot',
             'CompilerAdditionalFileSnapshot',
-            'CompilerFeatureSnapshot')) {
+            'CompilerFeatureSnapshot',
+            'CompilerSourceLineMapEntry')) {
         ,$compilationLines
     }
     else {

@@ -122,13 +122,29 @@ internal static class CompilerCompilationCapture
         cancellationToken.ThrowIfCancellationRequested();
         var parse = (CSharpParseOptions)tree.Options;
         var text = tree.GetText(cancellationToken);
+        CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select(line =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var mapped = tree.GetMappedLineSpan(
+                new TextSpan(line.Start, 0));
+            return new CompilerSourceLineMapEntry
+            {
+                SourceStart = line.Start,
+                SourceLength = line.Span.Length,
+                MappedPath = MappedPath(tree, mapped),
+                MappedLine = mapped.StartLinePosition.Line,
+                MappedColumn = mapped.StartLinePosition.Character
+            };
+        })];
         return new CompilerSyntaxTreeSnapshot
         {
             Path = CompilerCaptureAuthority.NormalizePath(tree.FilePath ??
                 throw new InvalidOperationException(
                     "A compiler syntax tree has no path.")),
             Sha256 = ComputeTextSha256(text),
+            LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
+            LineMap = lineMap,
             LanguageVersion = parse.LanguageVersion.ToString(),
             DocumentationMode = parse.DocumentationMode.ToString(),
             Kind = parse.Kind.ToString(),
@@ -140,6 +156,20 @@ internal static class CompilerCompilationCapture
             Features = [.. parse.Features.OrderBy(static value => value.Key, StringComparer.Ordinal)
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
         };
+    }
+
+    private static string MappedPath(
+        SyntaxTree tree,
+        FileLinePositionSpan mapped)
+    {
+        var path = mapped.Path;
+        if (!string.IsNullOrEmpty(path))
+        {
+            return path;
+        }
+
+        path = tree.FilePath;
+        return string.IsNullOrEmpty(path) ? "<compiler-generated>" : path;
     }
     internal static CompilerReferenceSnapshot[] CaptureReferences(
         IEnumerable<MetadataReference> references,

@@ -70,11 +70,22 @@ internal sealed class CompilerDiagnosticOptionSnapshot
     public CompilerReportDiagnostic ReportDiagnostic { get; set; }
 }
 
+internal sealed class CompilerSourceLineMapEntry
+{
+    public int SourceStart { get; set; }
+    public int SourceLength { get; set; }
+    public string MappedPath { get; set; } = string.Empty;
+    public int MappedLine { get; set; }
+    public int MappedColumn { get; set; }
+}
+
 internal sealed class CompilerSyntaxTreeSnapshot
 {
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
+    public string LineMapSha256 { get; set; } = string.Empty;
     public int TextLength { get; set; }
+    public CompilerSourceLineMapEntry[] LineMap { get; set; } = [];
     public string LanguageVersion { get; set; } = string.Empty;
     public string DocumentationMode { get; set; } = string.Empty;
     public string Kind { get; set; } = string.Empty;

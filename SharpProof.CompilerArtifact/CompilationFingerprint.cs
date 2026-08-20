@@ -9,6 +9,24 @@ internal static class CompilationFingerprint
     private const string SyntaxTreeSnapshotDomain =
         "SharpProof.CompilerSyntaxTreeSnapshot";
     private const int SyntaxTreeSnapshotVersion = 1;
+    private const string SourceLineMapDomain =
+        "SharpProof.CompilerSourceLineMap";
+    private const int SourceLineMapVersion = 1;
+
+    internal static string ComputeLineMapSha256(
+        CompilerSourceLineMapEntry[] entries)
+    {
+        entries = ArgumentNullGuard.NotNull(entries, nameof(entries));
+
+        using var hash = new CanonicalHashWriter();
+        hash.Add(
+            SourceLineMapDomain,
+            SourceLineMapVersion,
+            JsonSerializer.SerializeToUtf8Bytes(
+                entries,
+                WorkerProtocolJson.Options));
+        return hash.Finish();
+    }
 
     internal static string ComputeSyntaxTreeSnapshotSha256(
         CompilerSyntaxTreeSnapshot snapshot)
@@ -34,7 +52,7 @@ internal static class CompilationFingerprint
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            8,
+            9,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
             JsonSerializer.Serialize(
                 CompilerDiagnosticArtifactOrdering.Canonicalize(
@@ -250,7 +268,9 @@ internal static class CompilationFingerprint
         return value != null &&
         CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
+        WorkerProtocolJson.IsSha256(value.LineMapSha256) &&
         value.TextLength >= 0 &&
+        ValidLineMap(value) &&
         CompilerCaptureAuthority.IsCanonicalLanguageVersion(
             value.LanguageVersion) &&
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
@@ -264,7 +284,38 @@ internal static class CompilationFingerprint
             StringComparer.Ordinal) &&
         CompilerCaptureAuthority.IsCanonicalEmptyTree(value) &&
         All(value.Features, ValidFeature) &&
-        IsOrdered(value.Features, static feature => feature.Key, unique: true);
+            IsOrdered(value.Features, static feature => feature.Key, unique: true);
+    }
+
+    private static bool ValidLineMap(CompilerSyntaxTreeSnapshot value)
+    {
+        var entries = value.LineMap;
+        if (entries is not { Length: > 0 } ||
+            value.LineMapSha256 != ComputeLineMapSha256(entries))
+        {
+            return false;
+        }
+
+        var previousStart = -1;
+        foreach (var entry in entries)
+        {
+            if (entry == null ||
+                entry.SourceStart < 0 ||
+                entry.SourceLength < 0 ||
+                entry.SourceStart <= previousStart ||
+                entry.SourceStart > value.TextLength ||
+                entry.SourceLength > value.TextLength - entry.SourceStart ||
+                entry.MappedLine < 0 ||
+                entry.MappedColumn < 0 ||
+                entry.MappedPath == null)
+            {
+                return false;
+            }
+
+            previousStart = entry.SourceStart;
+        }
+
+        return entries[0].SourceStart == 0;
     }
 
     private static bool ValidFeature(CompilerFeatureSnapshot? value)
