@@ -9,7 +9,7 @@ internal sealed class OperationEffectScanner
     private readonly EffectCallSiteResolver _callResolver;
     private readonly ConversionEffectClassifier _conversionEffects;
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
-    private readonly DefiniteOperationFacts _completionFacts;
+    private readonly OperationCompletionEvaluator _completionEvaluator;
     private readonly CreationFlowCaptures _creationCaptures = new();
     private readonly SyntaxNode? _directSyntax;
     private readonly ImmutableArray<EffectDirectWitness>.Builder _directWitnesses =
@@ -22,6 +22,7 @@ internal sealed class OperationEffectScanner
     private readonly INamedTypeSymbol? _monitorType;
     private readonly IOperation _root;
     private readonly EffectAnalysisSession _session;
+    private readonly OperationNullnessEvaluator _nullnessEvaluator;
     private readonly bool _useAbstractReachability;
     private IOperation? _directOperation;
     private int _scanDepth;
@@ -49,9 +50,6 @@ internal sealed class OperationEffectScanner
                 calls,
                 abstractFlow);
         _conversionEffects = new ConversionEffectClassifier(session, abstractFlow);
-        _completionFacts = new DefiniteOperationFacts(
-            session.Compilation,
-            CancellationToken.None);
         _conversionOwnership = new ConversionOwnershipClassifier(
             _method,
             _coalesceCaptures,
@@ -63,6 +61,16 @@ internal sealed class OperationEffectScanner
             session.Compilation,
             abstractFlow);
         _monitorType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Monitor);
+        _nullnessEvaluator = new OperationNullnessEvaluator(
+            session,
+            _root,
+            abstractFlow,
+            _monitorType);
+        _completionEvaluator = new OperationCompletionEvaluator(
+            session,
+            _nullnessEvaluator.IsProvenNull,
+            _nullnessEvaluator.IsProvenNonNull,
+            _nullnessEvaluator.IsImplicitLockEnterWithNullValue);
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
         // remain useful in a try body, but absence of a fact cannot prove an
         // operation unreachable after a normally completing handler. The
@@ -264,7 +272,7 @@ internal sealed class OperationEffectScanner
             ? EffectStep.Empty
             : new EffectStep(
                 PotentialNullReceiver(field.Instance, field),
-                !IsProvenNull(field.Instance, field));
+                !_nullnessEvaluator.IsProvenNull(field.Instance, field));
         var evaluation = instance.Then(receiverCheck);
         if (!evaluation.CompletesNormally)
         {
@@ -377,14 +385,14 @@ internal sealed class OperationEffectScanner
         var accessSummary = access == EffectAccess.Write
             ? EffectSummaryOperations.Write(region) : EffectSummaryOperations.Read(region);
         var exceptions = EffectSummary.Empty;
-        if (IsProvenNull(element.ArrayReference, element))
+        if (_nullnessEvaluator.IsProvenNull(element.ArrayReference, element))
         {
             return EffectSummaryDomain.Instance.Join(
                 evaluation.Summary,
                 Throw(FrameworkTypeMetadataNames.NullReferenceException));
         }
 
-        if (!IsProvenNonNull(element.ArrayReference, element))
+        if (!_nullnessEvaluator.IsProvenNonNull(element.ArrayReference, element))
         {
             exceptions = EffectSummaryOperations.Join(
                 exceptions,
@@ -614,7 +622,7 @@ internal sealed class OperationEffectScanner
         {
             var receiverCheck = new EffectStep(
                 PotentialNullReceiver(instance, origin),
-                !IsProvenNull(instance, origin));
+                !_nullnessEvaluator.IsProvenNull(instance, origin));
             result = result.Then(receiverCheck);
             if (!result.CompletesNormally)
             {
@@ -642,7 +650,7 @@ internal sealed class OperationEffectScanner
             arguments);
         return result.Then(new EffectStep(
             call,
-            CanCompleteInvocation(method, instance, origin)));
+            _completionEvaluator.CanCompleteInvocation(method, instance, origin)));
     }
 
     private EffectSummary ScanInstance(IOperation? instance)
@@ -680,7 +688,7 @@ internal sealed class OperationEffectScanner
                 creation.Constructor?.Parameters.Length ?? 0));
         var constructor = new EffectStep(
             EffectSummaryDomain.Instance.Join(allocation, construction),
-            CanCompleteConstruction(creation));
+            _completionEvaluator.CanCompleteConstruction(creation));
         var result = arguments.Then(constructor);
         if (creation.Initializer != null && result.CompletesNormally)
         {
@@ -718,7 +726,7 @@ internal sealed class OperationEffectScanner
             return receiver.Summary;
         }
 
-        if (IsProvenNull(conditional.Operation, conditional))
+        if (_nullnessEvaluator.IsProvenNull(conditional.Operation, conditional))
         {
             return receiver.Summary;
         }
@@ -729,7 +737,7 @@ internal sealed class OperationEffectScanner
         }
 
         var whenNotNullStep = ScanStep(whenNotNull);
-        if (IsProvenNonNull(conditional.Operation, conditional))
+        if (_nullnessEvaluator.IsProvenNonNull(conditional.Operation, conditional))
         {
             return receiver.Then(whenNotNullStep).Summary;
         }
@@ -754,7 +762,7 @@ internal sealed class OperationEffectScanner
                 PotentialNullLock(@lock.LockedValue, @lock),
                 EffectSummaryOperations.Capability(
                     EffectCapabilityKind.Synchronization)),
-            !IsProvenNull(@lock.LockedValue, @lock));
+            !_nullnessEvaluator.IsProvenNull(@lock.LockedValue, @lock));
         var result = receiver.Then(entry);
         if (@lock.Body != null && result.CompletesNormally)
         {
@@ -901,293 +909,12 @@ internal sealed class OperationEffectScanner
 
     private EffectStep ScanStep(IOperation operation)
     {
-        return new(Scan(operation), CanCompleteNormally(operation));
-    }
-
-    private bool CanCompleteNormally(IOperation? operation)
-    {
-        if (operation == null)
-        {
-            return true;
-        }
-
-        return operation switch
-        {
-            IThrowOperation => false,
-            IInvocationOperation invocation =>
-                !IsImplicitLockEnterWithNullValue(invocation) &&
-                CanCompleteInvocation(
-                    invocation.TargetMethod,
-                    invocation.Instance,
-                    invocation),
-            IPropertyReferenceOperation property =>
-                CanCompleteProperty(property),
-            IFieldReferenceOperation field =>
-                CanCompleteField(field),
-            IArrayElementReferenceOperation element =>
-                CanCompleteArrayElement(element),
-            IObjectCreationOperation creation =>
-                CanCompleteConstruction(creation),
-            IArrayCreationOperation array =>
-                CanCompleteArrayCreation(array),
-            IConditionalAccessOperation conditional =>
-                CanCompleteConditionalAccess(conditional),
-            ILockOperation @lock => CanCompleteLock(@lock),
-            IFlowCaptureOperation capture =>
-                CanCompleteNormally(capture.Value),
-            IArgumentOperation argument =>
-                CanCompleteNormally(argument.Value),
-            IParenthesizedOperation parenthesized =>
-                CanCompleteNormally(parenthesized.Operand),
-            IConversionOperation conversion =>
-                CanCompleteConversion(conversion),
-            IBinaryOperation binary => CanCompleteBinary(binary),
-            IUnaryOperation unary =>
-                ChildrenCanComplete(unary),
-            IIncrementOrDecrementOperation increment =>
-                CanCompleteNormally(increment.Target),
-            IConditionalOperation conditional =>
-                CanCompleteConditional(conditional),
-            IBlockOperation or IExpressionStatementOperation or
-                IReturnOperation or IVariableDeclarationGroupOperation or
-                IVariableDeclarationOperation or IVariableDeclaratorOperation or
-                IVariableInitializerOperation or IObjectOrCollectionInitializerOperation =>
-                ChildrenCanComplete(operation),
-            _ => true
-        };
-    }
-
-    private bool CanCompleteInvocation(
-        IMethodSymbol method,
-        IOperation? instance,
-        IOperation origin,
-        IEnumerable<IArgumentOperation>? arguments = null)
-    {
-        if (instance != null &&
-            (!CanCompleteNormally(instance) ||
-             method.ReducedFrom == null && IsProvenNull(instance, origin)))
-        {
-            return false;
-        }
-
-        if (arguments != null &&
-            arguments.Any(argument => !CanCompleteNormally(argument.Value)))
-        {
-            return false;
-        }
-
-        return method.DeclaringSyntaxReferences.Length == 0 ||
-            _completionFacts.MethodCanCompleteNormally(method);
-    }
-
-    private bool CanCompleteProperty(IPropertyReferenceOperation property)
-    {
-        var accessor = property.Property.GetMethod;
-        if (accessor == null ||
-            property.Instance != null &&
-            (!CanCompleteNormally(property.Instance) ||
-             IsProvenNull(property.Instance, property)))
-        {
-            return false;
-        }
-
-        return property.Arguments.All(argument =>
-                   CanCompleteNormally(argument.Value)) &&
-               (accessor.DeclaringSyntaxReferences.Length == 0 ||
-                _completionFacts.MethodCanCompleteNormally(accessor));
-    }
-
-    private bool CanCompleteField(IFieldReferenceOperation field)
-    {
-        return (field.Instance == null ||
-                CanCompleteNormally(field.Instance) &&
-                !IsProvenNull(field.Instance, field));
-    }
-
-    private bool CanCompleteArrayElement(IArrayElementReferenceOperation element)
-    {
-        return CanCompleteNormally(element.ArrayReference) &&
-            !IsProvenNull(element.ArrayReference, element) &&
-            element.Indices.All(CanCompleteNormally);
-    }
-
-    private bool CanCompleteConstruction(IObjectCreationOperation creation)
-    {
-        if (creation.Arguments.Any(argument =>
-                !CanCompleteNormally(argument.Value)) ||
-            creation.Constructor is not { } constructor ||
-            constructor.DeclaringSyntaxReferences.Length != 0 &&
-            !_completionFacts.MethodCanCompleteNormally(constructor))
-        {
-            return false;
-        }
-
-        return creation.Initializer == null ||
-            CanCompleteNormally(creation.Initializer);
-    }
-
-    private bool CanCompleteArrayCreation(IArrayCreationOperation array)
-    {
-        if (array.DimensionSizes.Any(size =>
-                !CanCompleteNormally(size) ||
-                size.ConstantValue is { HasValue: true, Value: int length } &&
-                length < 0))
-        {
-            return false;
-        }
-
-        return array.Initializer == null ||
-            CanCompleteNormally(array.Initializer);
-    }
-
-    private bool CanCompleteConditionalAccess(
-        IConditionalAccessOperation conditional)
-    {
-        if (!CanCompleteNormally(conditional.Operation))
-        {
-            return false;
-        }
-
-        if (IsProvenNull(conditional.Operation, conditional))
-        {
-            return true;
-        }
-
-        return !IsProvenNonNull(conditional.Operation, conditional) ||
-            CanCompleteNormally(conditional.WhenNotNull);
-    }
-
-    private bool CanCompleteLock(ILockOperation @lock)
-    {
-        return CanCompleteNormally(@lock.LockedValue) &&
-            !IsProvenNull(@lock.LockedValue, @lock) &&
-            CanCompleteNormally(@lock.Body);
-    }
-
-    private bool CanCompleteConversion(IConversionOperation conversion)
-    {
-        if (!CanCompleteNormally(conversion.Operand))
-        {
-            return false;
-        }
-
-        return !(conversion.Type?.IsValueType == true &&
-                 conversion.Operand.ConstantValue is
-                 { HasValue: true, Value: null });
-    }
-
-    private bool CanCompleteBinary(IBinaryOperation binary)
-    {
-        if (!ChildrenCanComplete(binary))
-        {
-            return false;
-        }
-
-        return binary.OperatorKind is not (
-            BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) ||
-            binary.RightOperand.ConstantValue is not { HasValue: true, Value: 0 };
-    }
-
-    private bool CanCompleteConditional(IConditionalOperation conditional)
-    {
-        if (!CanCompleteNormally(conditional.Condition))
-        {
-            return false;
-        }
-
-        return CanCompleteNormally(conditional.WhenTrue) ||
-            CanCompleteNormally(conditional.WhenFalse);
-    }
-
-    private bool ChildrenCanComplete(IOperation operation)
-    {
-        return operation.ChildOperations.All(CanCompleteNormally);
-    }
-
-    private bool IsProvenNull(IOperation? value, IOperation origin)
-    {
-        return value != null &&
-            (value.ConstantValue is { HasValue: true, Value: null } ||
-             _abstractFlow?.ProvesNull(origin, value) == true ||
-             IsSourceDefinitelyNull(value, origin));
-    }
-
-    private bool IsImplicitLockEnterWithNullValue(IInvocationOperation invocation)
-    {
-        return invocation.IsImplicit &&
-            _monitorType != null &&
-            SymbolEqualityComparer.Default.Equals(
-                invocation.TargetMethod.ContainingType.OriginalDefinition,
-                _monitorType.OriginalDefinition) &&
-            invocation.TargetMethod.Name == "Enter" &&
-            invocation.Arguments.Length != 0 &&
-            IsProvenNull(invocation.Arguments[0].Value, invocation);
-    }
-
-    private bool IsSourceDefinitelyNull(IOperation value, IOperation origin)
-    {
-        if (value is not ILocalReferenceOperation local ||
-            local.Local.DeclaringSyntaxReferences.Length != 1)
-        {
-            return false;
-        }
-
-        var declaration = local.Local.DeclaringSyntaxReferences[0]
-            .GetSyntax();
-        if (declaration.SyntaxTree != origin.Syntax.SyntaxTree ||
-            declaration.SpanStart >= origin.Syntax.SpanStart)
-        {
-            return false;
-        }
-
-        var model = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(_session.Compilation, declaration.SyntaxTree);
-        var declarationOperation = model.GetOperation(declaration);
-        var initializer = declarationOperation?.DescendantsAndSelf()
-            .OfType<IVariableDeclaratorOperation>()
-            .FirstOrDefault(declarator =>
-                SymbolEqualityComparer.Default.Equals(
-                    declarator.Symbol, local.Local))?.Initializer?.Value;
-        if (initializer?.ConstantValue is not { HasValue: true, Value: null })
-        {
-            return false;
-        }
-
-        if (origin is ILockOperation)
-        {
-            return true;
-        }
-
-        foreach (var operation in _root.DescendantsAndSelf()
-                     .Where(candidate =>
-                         candidate.Syntax.SyntaxTree == origin.Syntax.SyntaxTree &&
-                         candidate.Syntax.SpanStart >= declaration.Span.End &&
-                         candidate.Syntax.SpanStart < origin.Syntax.SpanStart))
-        {
-            if (operation is IAssignmentOperation assignment &&
-                assignment.Target is ILocalReferenceOperation target &&
-                SymbolEqualityComparer.Default.Equals(target.Local, local.Local))
-            {
-                return false;
-            }
-
-            if (operation is IArgumentOperation
-                {
-                    Parameter.RefKind: not RefKind.None
-                } argument &&
-                argument.Value is ILocalReferenceOperation argumentValue &&
-                SymbolEqualityComparer.Default.Equals(argumentValue.Local, local.Local))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return new(Scan(operation), _completionEvaluator.CanCompleteNormally(operation));
     }
 
     private EffectSummary PotentialNullReceiver(IOperation? instance, IOperation access)
     {
-        if (IsProvenNonNull(instance, access))
+        if (_nullnessEvaluator.IsProvenNonNull(instance, access))
         {
             return EffectSummary.Empty;
         }
@@ -1197,18 +924,9 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary PotentialNullLock(IOperation value, IOperation origin)
     {
-        return IsProvenNonNull(value, origin)
+        return _nullnessEvaluator.IsProvenNonNull(value, origin)
             ? EffectSummary.Empty
             : Throw(FrameworkTypeMetadataNames.ArgumentNullException);
-    }
-
-    private bool IsProvenNonNull(IOperation? value, IOperation access)
-    {
-        return value == null ||
-            value is IInstanceReferenceOperation ||
-            value.Type is { IsValueType: true } ||
-            DefiniteOperationFacts.IsDefinitelyNonNull(value) ||
-            _abstractFlow?.ProvesNonNull(access, value) == true;
     }
 
     private EffectSummary ArrayCreationExceptions(
