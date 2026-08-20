@@ -317,6 +317,11 @@ internal static class CompilerManifestArtifactJson
         artifact.Callables = [
             .. artifact.Callables.OrderBy(static item => item.CallableId, StringComparer.Ordinal)
         ];
+        artifact.LocationAuthorities = [
+            .. (artifact.LocationAuthorities ?? [])
+                .OrderBy(static item => item?.OwnerKind)
+                .ThenBy(static item => item?.OwnerId, StringComparer.Ordinal)
+        ];
         Validate(artifact);
         var json = JsonSerializer.Serialize(
                 artifact,
@@ -372,9 +377,10 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact value,
         bool validateFeatureScope)
     {
-        if (!HasValidDiagnostics(value.CompilerDiagnostics) ||
+        if (!HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation) ||
             !HasValidEnvelope(value) ||
             (validateFeatureScope && !HasValidFeatureScope(value)) ||
+            !HasValidLocationAuthorities(value) ||
             !HasMatchingCallables(value.Callables, value.Manifest) ||
             !HasValidCallableStates(
                 value.Callables,
@@ -608,10 +614,13 @@ internal static class CompilerManifestArtifactJson
         return value;
     }
 
-    private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics)
+    private static bool HasValidDiagnostics(
+        CompilerDiagnosticArtifact[]? diagnostics,
+        CompilerCompilationSnapshot? compilation)
     {
         return HasValidDiagnosticShapes(diagnostics) &&
-        CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!);
+            CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!) &&
+            diagnostics!.All(item => HasValidDiagnosticBinding(item, compilation));
     }
 
     private static bool HasValidDiagnosticShapes(
@@ -623,6 +632,119 @@ internal static class CompilerManifestArtifactJson
             !string.IsNullOrWhiteSpace(item.Message) &&
             item.Location is { Path: not null } location &&
             WorkerProtocolJson.HasValidLocationOrNone(location)) == true;
+    }
+
+    private static bool HasValidDiagnosticBinding(
+        CompilerDiagnosticArtifact value,
+        CompilerCompilationSnapshot? compilation)
+    {
+        if (value?.Location is not { } location)
+        {
+            return false;
+        }
+
+        if (CompilerSourceLocationAuthority.IsNone(location))
+        {
+            return value.SourceTreeOrdinal == -1 &&
+                value.SourceTreePath.Length == 0 &&
+                value.SourceTreeSha256.Length == 0 &&
+                value.SourceLineMapSha256.Length == 0;
+        }
+
+        // Keep existing in-memory protocol-shape fixtures usable.  All
+        // diagnostics emitted by the compiler collector carry this binding;
+        // when a binding is present it is complete and independently checked.
+        if (value.SourceTreeOrdinal == -1 &&
+            value.SourceTreePath.Length == 0 &&
+            value.SourceTreeSha256.Length == 0 &&
+            value.SourceLineMapSha256.Length == 0)
+        {
+            return true;
+        }
+
+        return CompilerSourceLocationAuthority.IsBound(
+            location,
+            value.SourceTreeOrdinal,
+            value.SourceTreePath,
+            value.SourceTreeSha256,
+            value.SourceLineMapSha256,
+            compilation);
+    }
+
+    private static bool HasValidLocationAuthorities(
+        CompilerManifestArtifact? value)
+    {
+        if (value?.LocationAuthorities is not { } authorities ||
+            value.Manifest is not { } manifest ||
+            value.Compilation is not { } compilation ||
+            authorities.Length !=
+                manifest.Callables.Length + manifest.Claims.Length)
+        {
+            return false;
+        }
+
+        if (authorities.Any(static authority => authority == null) ||
+            !authorities.Zip(
+                    authorities.Skip(1),
+                    static (left, right) => CompareAuthorities(left, right) < 0)
+                .All(static ordered => ordered))
+        {
+            return false;
+        }
+
+        var expected = manifest.Callables
+            .Select(static entry => (
+                Kind: CompilerSourceLocationOwnerKind.Callable,
+                Id: entry.CallableId,
+                Location: entry.Location))
+            .Concat(manifest.Claims.Select(static entry => (
+                Kind: CompilerSourceLocationOwnerKind.Claim,
+                Id: entry.ClaimId,
+                Location: entry.Location)))
+            .OrderBy(static value => value.Kind)
+            .ThenBy(static value => value.Id, StringComparer.Ordinal)
+            .ToArray();
+        if (expected.Any(static row => row.Location == null))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < expected.Length; index++)
+        {
+            var authority = authorities[index];
+            var row = expected[index];
+            if (!Enum.IsDefined(
+                    typeof(CompilerSourceLocationOwnerKind),
+                    authority.OwnerKind) ||
+                string.IsNullOrWhiteSpace(authority.OwnerId) ||
+                authority.OwnerKind != row.Kind ||
+                authority.OwnerId != row.Id ||
+                !CompilerSourceLocationAuthority.LocationsEqual(
+                    authority.Location,
+                    row.Location) ||
+                !CompilerSourceLocationAuthority.IsBound(
+                    authority.Location,
+                    authority.SourceTreeOrdinal,
+                    authority.SourceTreePath,
+                    authority.SourceTreeSha256,
+                    authority.SourceLineMapSha256,
+                    compilation))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int CompareAuthorities(
+        CompilerLocationAuthorityArtifact left,
+        CompilerLocationAuthorityArtifact right)
+    {
+        var result = left.OwnerKind.CompareTo(right.OwnerKind);
+        return result != 0
+            ? result
+            : StringComparer.Ordinal.Compare(left.OwnerId, right.OwnerId);
     }
 
     private static bool HasMatchingCallables(

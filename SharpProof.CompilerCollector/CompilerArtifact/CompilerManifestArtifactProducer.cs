@@ -23,7 +23,7 @@ internal static class CompilerManifestArtifactProducer
             specificationPackAuthority.SpecificationPackCatalogSha256;
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item.Severity == DiagnosticSeverity.Error)
-            .Select(CreateDiagnostic);
+            .Select(item => CreateDiagnostic(item, snapshot));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
         var targets = discovery.Targets.Values.OrderBy(static item => item.Entry.CallableId, StringComparer.Ordinal);
@@ -81,6 +81,9 @@ internal static class CompilerManifestArtifactProducer
             Compilation = snapshot,
             Manifest = discovery.Manifest,
             MaximumExpressionDepth = maximumExpressionDepth,
+            LocationAuthorities = CreateLocationAuthorities(
+                discovery.Manifest,
+                snapshot),
             CompilerDiagnostics = diagnosticArtifacts,
             Callables = callables
         };
@@ -174,22 +177,70 @@ internal static class CompilerManifestArtifactProducer
             StringComparer.Ordinal);
     }
 
-    private static CompilerDiagnosticArtifact CreateDiagnostic(Diagnostic diagnostic)
+    private static CompilerLocationAuthorityArtifact[] CreateLocationAuthorities(
+        WorkerClaimManifest manifest,
+        CompilerCompilationSnapshot compilation)
+    {
+        return [
+            .. manifest.Callables
+                .Select(entry => CompilerSourceLocationAuthority.CreateAuthority(
+                    CompilerSourceLocationOwnerKind.Callable,
+                    entry.CallableId,
+                    entry.Location,
+                    compilation))
+                .Concat(manifest.Claims.Select(entry =>
+                    CompilerSourceLocationAuthority.CreateAuthority(
+                        CompilerSourceLocationOwnerKind.Claim,
+                        entry.ClaimId,
+                        entry.Location,
+                        compilation)))
+                .OrderBy(static value => value.OwnerKind)
+                .ThenBy(static value => value.OwnerId, StringComparer.Ordinal)
+        ];
+    }
+
+    private static CompilerDiagnosticArtifact CreateDiagnostic(
+        Diagnostic diagnostic,
+        CompilerCompilationSnapshot compilation)
     {
         var source = diagnostic.Location.IsInSource;
         var span = source ? diagnostic.Location.GetMappedLineSpan() : default;
-        return new CompilerDiagnosticArtifact
+        var location = new WorkerSourceLocation
+        {
+            Path = source
+                ? string.IsNullOrEmpty(span.Path)
+                    ? diagnostic.Location.SourceTree?.FilePath ??
+                        throw new InvalidDataException(
+                            "A compiler diagnostic has no source tree path.")
+                    : span.Path
+                : string.Empty,
+            Start = source ? diagnostic.Location.SourceSpan.Start : 0,
+            Length = source ? diagnostic.Location.SourceSpan.Length : 0,
+            Line = source ? span.StartLinePosition.Line + 1 : 0,
+            Column = source ? span.StartLinePosition.Character + 1 : 0
+        };
+        var result = new CompilerDiagnosticArtifact
         {
             Code = "compiler." + diagnostic.Id,
             Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
-            Location = new WorkerSourceLocation
-            {
-                Path = span.Path ?? string.Empty,
-                Start = source ? diagnostic.Location.SourceSpan.Start : 0,
-                Length = source ? diagnostic.Location.SourceSpan.Length : 0,
-                Line = source ? span.StartLinePosition.Line + 1 : 0,
-                Column = source ? span.StartLinePosition.Character + 1 : 0
-            }
+            Location = location
         };
+        if (!source)
+        {
+            return result;
+        }
+
+        CompilerSourceLocationAuthority.Bind(
+            location,
+            compilation,
+            out var sourceTreeOrdinal,
+            out var sourceTreePath,
+            out var sourceTreeSha256,
+            out var sourceLineMapSha256);
+        result.SourceTreeOrdinal = sourceTreeOrdinal;
+        result.SourceTreePath = sourceTreePath;
+        result.SourceTreeSha256 = sourceTreeSha256;
+        result.SourceLineMapSha256 = sourceLineMapSha256;
+        return result;
     }
 }

@@ -98,6 +98,8 @@ internal static class CompilationFingerprint
                 value.SpecificationPackCatalogSha256) &&
             ValidOptions(value.Options) &&
             All(value.SyntaxTrees, ValidTree) &&
+            value.SyntaxTrees.Select(static tree => tree.Path)
+                .Distinct(StringComparer.Ordinal).Count() == value.SyntaxTrees.Length &&
             ValidReferences(value.References) &&
             ValidAdditionalFiles(value.AdditionalFiles) &&
             ValidSummaryEvidence(value.SummaryEvidence, value);
@@ -270,7 +272,7 @@ internal static class CompilationFingerprint
         WorkerProtocolJson.IsSha256(value.Sha256) &&
         WorkerProtocolJson.IsSha256(value.LineMapSha256) &&
         value.TextLength >= 0 &&
-        ValidLineMap(value) &&
+        CompilerSourceLocationAuthority.HasValidLineMap(value) &&
         CompilerCaptureAuthority.IsCanonicalLanguageVersion(
             value.LanguageVersion) &&
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
@@ -285,37 +287,6 @@ internal static class CompilationFingerprint
         CompilerCaptureAuthority.IsCanonicalEmptyTree(value) &&
         All(value.Features, ValidFeature) &&
             IsOrdered(value.Features, static feature => feature.Key, unique: true);
-    }
-
-    private static bool ValidLineMap(CompilerSyntaxTreeSnapshot value)
-    {
-        var entries = value.LineMap;
-        if (entries is not { Length: > 0 } ||
-            value.LineMapSha256 != ComputeLineMapSha256(entries))
-        {
-            return false;
-        }
-
-        var previousStart = -1;
-        foreach (var entry in entries)
-        {
-            if (entry == null ||
-                entry.SourceStart < 0 ||
-                entry.SourceLength < 0 ||
-                entry.SourceStart <= previousStart ||
-                entry.SourceStart > value.TextLength ||
-                entry.SourceLength > value.TextLength - entry.SourceStart ||
-                entry.MappedLine < 0 ||
-                entry.MappedColumn < 0 ||
-                entry.MappedPath == null)
-            {
-                return false;
-            }
-
-            previousStart = entry.SourceStart;
-        }
-
-        return entries[0].SourceStart == 0;
     }
 
     private static bool ValidFeature(CompilerFeatureSnapshot? value)
