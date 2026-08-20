@@ -76,6 +76,12 @@ internal sealed class CompilerResponseEvidenceAuthority :
         WorkerClaimResult result,
         HashSet<string> errors)
     {
+        if (!target.IsSuccess)
+        {
+            ValidateFailedTargetClaim(target, result, errors);
+            return;
+        }
+
         var effect = target.EffectClaims.FirstOrDefault(
             evidence => evidence.ClaimId == result.ClaimId);
         var postcondition = target.Clauses.FirstOrDefault(
@@ -131,6 +137,35 @@ internal sealed class CompilerResponseEvidenceAuthority :
         {
             ValidatePostconditionClaim(target, result, errors);
         }
+    }
+
+    private static void ValidateFailedTargetClaim(
+        CompilerCallablePreparation target,
+        WorkerClaimResult result,
+        HashSet<string> errors)
+    {
+        var isEffect = target.EffectClaims.Any(
+            evidence => evidence.ClaimId == result.ClaimId);
+        var expectedCertainty = isEffect
+            ? WorkerEffectEvidenceCertainty.Unavailable
+            : WorkerEffectEvidenceCertainty.Unspecified;
+
+        if (result.Outcome != WorkerClaimOutcome.Unknown ||
+            result.Reason != target.FailureReason ||
+            result.EffectCertainty != expectedCertainty ||
+            result.Vacuity != WorkerVacuityKind.None ||
+            result.ProofCore is not { Length: 0 } ||
+            result.Model is not { Length: 0 } ||
+            result.EffectWitness != null)
+        {
+            errors.Add("response.evidence_authority");
+        }
+
+        ValidateAssumptionShape(
+            result.Assumptions,
+            target.Entry.Assumptions,
+            [],
+            errors);
     }
 
     private static void ValidateAssumptionShape(
@@ -330,11 +365,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
                     continue;
                 }
 
-                var label = summary.Origin == CompilerSummaryOrigin.SpecificationPack
-                    ? prefix + ":" + summary.EvidenceIdentity + ":" +
-                        summary.CallIdentity
-                    : prefix + ":" + summary.CallIdentity;
-                labels.Add(label);
+                labels.Add(SummaryLabel(summary));
             }
 
             labels.Add("body:normal-completion");
@@ -437,6 +468,48 @@ internal sealed class CompilerResponseEvidenceAuthority :
             CompilerSummaryOrigin.SpecificationPack => "spec-pack",
             _ => null
         };
+    }
+
+    private static string SummaryLabel(CompilerPreparedSummaryCall summary)
+    {
+        var prefix = SummaryPrefix(summary.Origin);
+        if (prefix == null)
+        {
+            return string.Empty;
+        }
+
+        var summaryEvidence = summary.Origin ==
+                CompilerSummaryOrigin.SpecificationPack
+            ? prefix + ":" + summary.EvidenceIdentity
+            : prefix;
+        return summaryEvidence + ":" + summary.CallIdentity +
+            DependencyEvidenceLabel(summary.DependencyEvidence);
+    }
+
+    private static string DependencyEvidenceLabel(
+        ImmutableArray<CompilerPreparedSummaryEvidence> evidence)
+    {
+        if (evidence.IsDefaultOrEmpty)
+        {
+            return string.Empty;
+        }
+
+        var values = evidence.Select(item =>
+        {
+            var prefix = SummaryPrefix(item.Origin);
+            if (prefix == null)
+            {
+                return string.Empty;
+            }
+
+            var evidencePrefix = item.Origin ==
+                    CompilerSummaryOrigin.SpecificationPack
+                ? prefix + ":" + item.EvidenceIdentity
+                : prefix;
+            return evidencePrefix + ":" + item.CallIdentity + ":" +
+                item.EvidenceSha256;
+        });
+        return ":deps=" + string.Join(";", values);
     }
 
     private static bool HasLiteralFalsePrecondition(
