@@ -48,7 +48,8 @@ internal static class CompilerCompilationCapture
             "The project directory and target framework are required.");
         }
 
-        var normalizedProject = NormalizePath(projectDirectory);
+        var normalizedProject = CompilerCaptureAuthority.NormalizePath(
+            projectDirectory);
         var options = compilation.Options;
         if (additionalFiles.IsDefault)
         {
@@ -71,10 +72,14 @@ internal static class CompilerCompilationCapture
             AssemblyName = compilation.AssemblyName ?? throw new InvalidOperationException("The assembly name is unavailable."),
             AssemblyIdentity = compilation.Assembly.Identity.ToString(),
             TargetFramework = targetFramework,
-            CompilerVersion = Version(typeof(Compilation)),
-            CompilerMvid = Mvid(typeof(Compilation)),
-            CSharpCompilerVersion = Version(typeof(CSharpCompilation)),
-            CSharpCompilerMvid = Mvid(typeof(CSharpCompilation)),
+            CompilerVersion = CompilerCaptureAuthority.CaptureVersion(
+                typeof(Compilation)),
+            CompilerMvid = CompilerCaptureAuthority.CaptureMvid(
+                typeof(Compilation)),
+            CSharpCompilerVersion = CompilerCaptureAuthority.CaptureVersion(
+                typeof(CSharpCompilation)),
+            CSharpCompilerMvid = CompilerCaptureAuthority.CaptureMvid(
+                typeof(CSharpCompilation)),
             Options = new CompilerCompilationOptionsSnapshot
             {
                 OutputKind = CompilerOptionWireMappings.Map(options.OutputKind),
@@ -119,7 +124,9 @@ internal static class CompilerCompilationCapture
         var text = tree.GetText(cancellationToken);
         return new CompilerSyntaxTreeSnapshot
         {
-            Path = tree.FilePath ?? string.Empty,
+            Path = CompilerCaptureAuthority.NormalizePath(tree.FilePath ??
+                throw new InvalidOperationException(
+                    "A compiler syntax tree has no path.")),
             Sha256 = ComputeTextSha256(text),
             TextLength = text.Length,
             LanguageVersion = parse.LanguageVersion.ToString(),
@@ -233,7 +240,7 @@ internal static class CompilerCompilationCapture
             {
                 Name = fileName,
                 Mvid = fileMvid.ToString("D"),
-                Path = NormalizePath(modulePath),
+                Path = CompilerCaptureAuthority.NormalizePath(modulePath),
                 Sha256 = Hash(stream, cancellationToken),
                 SizeBytes = sizeBytes
             });
@@ -286,7 +293,7 @@ internal static class CompilerCompilationCapture
             throw new InvalidOperationException("An additional file has no compiler text.");
         return new CompilerAdditionalFileSnapshot
         {
-            Path = NormalizePath(path),
+            Path = CompilerCaptureAuthority.NormalizePath(path),
             Sha256 = ComputeTextSha256(text)
         };
     }
@@ -371,22 +378,6 @@ internal static class CompilerCompilationCapture
     {
         return tree.GetRoot(cancellationToken).DescendantTrivia(descendIntoTrivia: true)
                 .Any(static trivia => trivia.IsKind(SyntaxKind.LoadDirectiveTrivia) || trivia.IsKind(SyntaxKind.ReferenceDirectiveTrivia));
-    }
-
-    private static string Version(Type type)
-    {
-        return type.Assembly.GetName().Version?.ToString() ??
-            throw new InvalidOperationException("The compiler version is unavailable.");
-    }
-
-    private static string Mvid(Type type)
-    {
-        return type.Module.ModuleVersionId.ToString("D");
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return Path.GetFullPath(path);
     }
 
     internal static string Hash(Stream stream, CancellationToken cancellationToken)

@@ -87,6 +87,7 @@ internal sealed class CompilerReferenceSnapshot
 {
     public string Kind { get; set; } = string.Empty;
     public bool EmbedInteropTypes { get; set; }
+    public bool HasRecursiveAliases { get; set; }
     public string[] Aliases { get; set; } = [];
     public string Identity { get; set; } = string.Empty;
     public CompilerReferenceModuleSnapshot[] Modules { get; set; } = [];

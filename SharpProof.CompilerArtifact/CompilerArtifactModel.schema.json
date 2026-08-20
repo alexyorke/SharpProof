@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 13
+    "version": 14
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 13
+          "value": 14
         }
       ]
     },
@@ -3200,6 +3200,16 @@
         {
           "name": "EmbedInteropTypes",
           "jsonName": "embedInteropTypes",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
+          "name": "HasRecursiveAliases",
+          "jsonName": "hasRecursiveAliases",
           "type": "bool",
           "accessibility": "public",
           "set": "set",

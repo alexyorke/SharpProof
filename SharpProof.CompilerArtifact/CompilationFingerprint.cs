@@ -6,9 +6,6 @@ internal static class CompilationFingerprint
 {
     private const string RuntimeContractEvaluationSymbol =
         "SHARPPROOF_CONTRACTS";
-    private const string EmptyUtf8Sha256 =
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-
     private const string SyntaxTreeSnapshotDomain =
         "SharpProof.CompilerSyntaxTreeSnapshot";
     private const int SyntaxTreeSnapshotVersion = 1;
@@ -56,25 +53,36 @@ internal static class CompilationFingerprint
 
     private static bool ValidSnapshot(CompilerCompilationSnapshot? value)
     {
-        return value != null &&
-        IsCanonicalPath(value.ProjectDirectory) &&
-        HasText(value.AssemblyName) &&
-        IsCanonicalAssemblyIdentity(value.AssemblyIdentity, out var identityName) &&
-        string.Equals(value.AssemblyName, identityName, StringComparison.Ordinal) &&
-        HasText(value.TargetFramework) &&
-        IsCanonicalVersion(value.CompilerVersion) &&
-        IsCanonicalMvid(value.CompilerMvid) &&
-        IsCanonicalVersion(value.CSharpCompilerVersion) &&
-        IsCanonicalMvid(value.CSharpCompilerMvid) &&
-        CompilerSpecificationPackAuthorityValidation.IsValid(
-            value.SpecificationPackIds,
-            value.SpecificationPackCatalogVersion,
-            value.SpecificationPackCatalogSha256) &&
-        ValidOptions(value.Options) &&
-        All(value.SyntaxTrees, ValidTree) &&
-        ValidReferences(value.References) &&
-        ValidAdditionalFiles(value.AdditionalFiles) &&
-        ValidSummaryEvidence(value.SummaryEvidence, value);
+        if (value is null)
+        {
+            return false;
+        }
+
+        return CompilerCaptureAuthority.IsCanonicalPath(value.ProjectDirectory) &&
+            HasText(value.AssemblyName) &&
+            CompilerCaptureAuthority.IsCanonicalAssemblyIdentity(
+                value.AssemblyIdentity,
+                out var identityName) &&
+            string.Equals(
+                value.AssemblyName,
+                identityName,
+                StringComparison.Ordinal) &&
+            HasText(value.TargetFramework) &&
+            CompilerCaptureAuthority.IsCanonicalVersion(value.CompilerVersion) &&
+            CompilerCaptureAuthority.IsCanonicalMvid(value.CompilerMvid) &&
+            CompilerCaptureAuthority.IsCanonicalVersion(
+                value.CSharpCompilerVersion) &&
+            CompilerCaptureAuthority.IsCanonicalMvid(
+                value.CSharpCompilerMvid) &&
+            CompilerSpecificationPackAuthorityValidation.IsValid(
+                value.SpecificationPackIds,
+                value.SpecificationPackCatalogVersion,
+                value.SpecificationPackCatalogSha256) &&
+            ValidOptions(value.Options) &&
+            All(value.SyntaxTrees, ValidTree) &&
+            ValidReferences(value.References) &&
+            ValidAdditionalFiles(value.AdditionalFiles) &&
+            ValidSummaryEvidence(value.SummaryEvidence, value);
     }
 
     private static bool ValidSummaryEvidence(
@@ -240,15 +248,11 @@ internal static class CompilationFingerprint
     private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
     {
         return value != null &&
-        IsLexicallyCanonicalTreePath(value.Path) &&
+        CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
         value.TextLength >= 0 &&
-        (value.TextLength != 0 ||
-            value.Sha256 == EmptyUtf8Sha256 &&
-            value.EffectivePreprocessorSymbols.SequenceEqual(
-                value.PreprocessorSymbols.Distinct(StringComparer.Ordinal),
-                StringComparer.Ordinal)) &&
-        IsCanonicalLanguageVersion(value.LanguageVersion) &&
+        CompilerCaptureAuthority.IsCanonicalLanguageVersion(
+            value.LanguageVersion) &&
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
         value.Kind is "Regular" or "Script" &&
         All(value.PreprocessorSymbols, HasText) &&
@@ -258,6 +262,7 @@ internal static class CompilationFingerprint
         !value.EffectivePreprocessorSymbols.Contains(
             RuntimeContractEvaluationSymbol,
             StringComparer.Ordinal) &&
+        CompilerCaptureAuthority.IsCanonicalEmptyTree(value) &&
         All(value.Features, ValidFeature) &&
         IsOrdered(value.Features, static feature => feature.Key, unique: true);
     }
@@ -272,9 +277,13 @@ internal static class CompilationFingerprint
         return value != null &&
         value.Kind is "Assembly" or "Module" &&
         All(value.Aliases, HasText) &&
+        (value.Kind == "Assembly" ||
+            !value.EmbedInteropTypes && value.Aliases.Length == 0) &&
         IsOrdered(value.Aliases, unique: false) &&
         (value.Kind == "Assembly"
-            ? IsCanonicalAssemblyIdentity(value.Identity, out _)
+            ? CompilerCaptureAuthority.IsCanonicalAssemblyIdentity(
+                value.Identity,
+                out _)
             : HasText(value.Identity)) &&
         value.Modules is { Length: > 0 } &&
         (value.Kind == "Assembly" || !value.EmbedInteropTypes &&
@@ -300,8 +309,8 @@ internal static class CompilationFingerprint
     {
         return value != null &&
             HasText(value.Name) &&
-            IsCanonicalMvid(value.Mvid) &&
-            IsCanonicalPath(value.Path) &&
+            CompilerCaptureAuthority.IsCanonicalMvid(value.Mvid) &&
+            CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
             WorkerProtocolJson.IsSha256(value.Sha256) &&
             value.SizeBytes is > 0 and
                 <= CompilerReferenceLimits.MaximumModuleBytes;
@@ -318,40 +327,8 @@ internal static class CompilationFingerprint
     private static bool ValidAdditionalFile(CompilerAdditionalFileSnapshot? value)
     {
         return value != null &&
-            IsCanonicalPath(value.Path) &&
+            CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
             WorkerProtocolJson.IsSha256(value.Sha256);
-    }
-
-    private static bool IsCanonicalPath(string path)
-    {
-        try
-        {
-            return Path.IsPathRooted(path) &&
-                NormalizePath(Path.GetFullPath(path)) == path;
-        }
-        catch (Exception exception) when (
-            exception is ArgumentException or IOException or NotSupportedException)
-        {
-            return false;
-        }
-    }
-
-    private static bool IsLexicallyCanonicalTreePath(string path)
-    {
-        if (path == null)
-        {
-            return false;
-        }
-
-        var segments = path.Replace('\\', '/').Split('/');
-        return segments.All(static segment => segment is not "." and not "..") &&
-            !path.EndsWith("/", StringComparison.Ordinal) &&
-            !path.EndsWith("\\", StringComparison.Ordinal);
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return path;
     }
 
     private static bool IsOrdered(string[]? values, bool unique)
@@ -393,83 +370,6 @@ internal static class CompilationFingerprint
         return !string.IsNullOrWhiteSpace(value);
     }
 
-    private static bool IsCanonicalVersion(string value)
-    {
-        return Version.TryParse(value, out var parsed) &&
-            string.Equals(
-                parsed.ToString(),
-                value,
-                StringComparison.Ordinal);
-    }
-
-    private static bool IsCanonicalLanguageVersion(string value)
-    {
-        return value is
-            "Default" or
-            "CSharp1" or
-            "CSharp2" or
-            "CSharp3" or
-            "CSharp4" or
-            "CSharp5" or
-            "CSharp6" or
-            "CSharp7" or
-            "CSharp7_1" or
-            "CSharp7_2" or
-            "CSharp7_3" or
-            "CSharp8" or
-            "CSharp9" or
-            "CSharp10" or
-            "CSharp11" or
-            "CSharp12" or
-            "CSharp13" or
-            "CSharp14" or
-            "LatestMajor" or
-            "Preview" or
-            "Latest";
-    }
-
-    private static bool IsCanonicalMvid(string value)
-    {
-        return Guid.TryParseExact(value, "D", out var parsed) &&
-            parsed != Guid.Empty &&
-            string.Equals(
-                parsed.ToString("D"),
-                value,
-                StringComparison.Ordinal);
-    }
-
-    private static bool IsCanonicalAssemblyIdentity(
-        string value,
-        out string identityName)
-    {
-        identityName = string.Empty;
-        if (!HasText(value))
-        {
-            return false;
-        }
-
-        try
-        {
-            var parsed = new System.Reflection.AssemblyName(value);
-            if (parsed.FullName is not { } fullName ||
-                !string.Equals(fullName, value, StringComparison.Ordinal) ||
-                parsed.Name is not { Length: > 0 } name ||
-                parsed.Version == null ||
-                value.IndexOf(", Culture=", StringComparison.Ordinal) < 0 ||
-                value.IndexOf(", PublicKeyToken=", StringComparison.Ordinal) < 0)
-            {
-                return false;
-            }
-
-            identityName = name;
-            return true;
-        }
-        catch (Exception exception) when (
-            exception is ArgumentException or FileLoadException)
-        {
-            return false;
-        }
-    }
 }
 
 internal static class CompilerDiagnosticArtifactOrdering
