@@ -101,7 +101,7 @@ public sealed class ReleasePublicationScriptTests
     }
 
     [Test]
-    public async Task OfflinePlanIsOrderedAndRejectsEveryExistingArtifact()
+    public async Task OfflinePlanIsOrderedAndProjectsEveryExistingArtifactCollision()
     {
         var repositoryRoot = FindRepositoryRoot();
         var repositoryHead = await RunProcessAsync(
@@ -166,30 +166,50 @@ public sealed class ReleasePublicationScriptTests
             File.Copy(fixture.Package.Path, remotePath);
             try
             {
+                var planPath = Path.Combine(
+                    workspace.Root,
+                    "existing-" + fixture.Kind + "-" +
+                    fixture.Package.Id + "-plan.json");
                 var existing = await RunPublicationScriptAsync(
                     workspace,
-                    Path.Combine(
-                        workspace.Root,
-                        "existing-" + fixture.Kind + "-" +
-                        fixture.Package.Id + "-plan.json"));
+                    planPath);
+                using var existingPlan = JsonDocument.Parse(
+                    await File.ReadAllBytesAsync(planPath));
+                var package = existingPlan.RootElement
+                    .GetProperty("packages")
+                    .EnumerateArray()
+                    .Single(candidate =>
+                        candidate.GetProperty("packageId").GetString() ==
+                        fixture.Package.Id);
                 using (Assert.EnterMultipleScope())
                 {
                     Assert.That(
                         existing.ExitCode,
-                        Is.Not.Zero,
+                        Is.Zero,
                         existing.Output);
                     Assert.That(
-                        existing.Output,
-                        Does.Contain(
-                            fixture.Kind == "main"
-                                ? "Remote main package already exists"
-                                : "Remote symbol package already exists"));
+                        package.GetProperty("remoteState").ValueKind,
+                        Is.EqualTo(JsonValueKind.Null));
                     Assert.That(
-                        existing.Output,
-                        Does.Contain(fixture.Package.Id));
+                        package.GetProperty("mainState").GetString(),
+                        Is.EqualTo(fixture.Kind == "main"
+                            ? "FixturePresent"
+                            : "FixtureAbsent"));
                     Assert.That(
-                        existing.Output,
-                        Does.Contain(fixture.Package.Version));
+                        package.GetProperty("mainAction").GetString(),
+                        Is.EqualTo(fixture.Kind == "main"
+                            ? "Collision"
+                            : "Push"));
+                    Assert.That(
+                        package.GetProperty("symbolsState").GetString(),
+                        Is.EqualTo(fixture.Kind == "symbol"
+                            ? "FixturePresent"
+                            : "FixtureAbsent"));
+                    Assert.That(
+                        package.GetProperty("symbolsAction").GetString(),
+                        Is.EqualTo(fixture.Kind == "symbol"
+                            ? "Collision"
+                            : "Push"));
                 }
             }
             finally
