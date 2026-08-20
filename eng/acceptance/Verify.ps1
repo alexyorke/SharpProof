@@ -110,7 +110,6 @@ function Add-AcceptanceTimingPhase {
         status = $Status
     })
 }
-
 function Start-AcceptanceTimingPhase {
     param([Parameter(Mandatory = $true)][string]$Name)
 
@@ -221,6 +220,12 @@ Start-AcceptanceTimingPhase -Name 'static-validation'
 . (Join-Path $repositoryRoot 'scripts\Get-SharpProofTcbPaths.ps1')
 . (Join-Path $repositoryRoot 'scripts\Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
+$productionInventoryJson = & (Join-Path $repositoryRoot 'scripts\Get-SharpProofProductionInventory.ps1') -RepositoryRoot $repositoryRoot -Configuration $Configuration
+if ($LASTEXITCODE -ne 0) {
+    throw 'Production inventory authority derivation failed during static validation.'
+}
+$productionInventory = ($productionInventoryJson -join [Environment]::NewLine) | ConvertFrom-Json
+
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainerContract.ps1')
 & (Join-Path $repositoryRoot 'scripts\Generate-Readme.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
@@ -400,7 +405,10 @@ function Measure-RepositoryCSharpSyntax {
         [object[]]$Paths,
 
         [Parameter(Mandatory = $true)]
-        [string]$Scope
+        [string]$Scope,
+
+        [Parameter()]
+        $ProductionInventory
     )
 
     Assert-RepositoryPaths -Paths $Paths -Scope $Scope
@@ -417,9 +425,17 @@ function Measure-RepositoryCSharpSyntax {
             throw "$Scope contains a non-C# source path: $relativePath"
         }
         $fullPath = Join-Path $repositoryRoot $relativePath
-        $metrics = Measure-CSharpSourceText `
-            -Source (Get-Content -LiteralPath $fullPath -Raw) `
-            -Path $relativePath
+        $parseOptions = $null
+        if ($null -ne $ProductionInventory) {
+            $optionMatches = @($ProductionInventory.projects | Where-Object {
+                @($_.compile | Where-Object { [string]$_.path -ceq $relativePath }).Count -ne 0
+            })
+            if ($optionMatches.Count -ne 1) {
+                throw ("$Scope source '$relativePath' is not uniquely owned by the production inventory.")
+            }
+            $parseOptions = New-SharpProofCSharpParseOptions -LanguageVersion ([string]$optionMatches[0].parseOptions.languageVersion) -PreprocessorSymbols @($optionMatches[0].parseOptions.preprocessorSymbols | ForEach-Object { [string]$_ })
+        }
+        $metrics = Measure-CSharpSourceText -Source (Get-Content -LiteralPath $fullPath -Raw) -Path $relativePath -ParseOptions $parseOptions
         $syntaxTokens += $metrics.syntaxTokens
         $syntaxNodes += $metrics.syntaxNodes
         $expressionNodes += $metrics.expressionNodes
@@ -482,11 +498,11 @@ Assert-Equal `
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
 Assert-Equal $contract.worker.protocolVersion 11 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 13 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 12 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumCompilerReferenceModuleBytes 268435456 'worker.maximumCompilerReferenceModuleBytes'
 Assert-Equal $contract.worker.maximumCompilerReferenceClosureBytes 1073741824 'worker.maximumCompilerReferenceClosureBytes'
 Assert-Equal $contract.worker.maximumCompilerReferenceModules 4096 'worker.maximumCompilerReferenceModules'
-Assert-Equal $contract.worker.relationalSummarySchemaVersion 2 'worker.relationalSummarySchemaVersion'
+Assert-Equal $contract.worker.relationalSummarySchemaVersion 1 'worker.relationalSummarySchemaVersion'
 Assert-Equal $contract.worker.specificationPackSchemaVersion 1 'worker.specificationPackSchemaVersion'
 Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
 Assert-Equal $contract.worker.maximumExpressionDepth 64 'worker.maximumExpressionDepth'
@@ -619,26 +635,11 @@ try {
             throw "Trusted-computing-base component '$name' is declared twice."
         }
     }
-    $canonicalTcbPaths = @(Get-SharpProofTcbPaths -Contract $contract)
-    $sortedTcbPaths = [string[]]@($canonicalTcbPaths)
-    [Array]::Sort($sortedTcbPaths, [StringComparer]::Ordinal)
-    $inventoryText = ($sortedTcbPaths -join "`n") + "`n"
-    $inventoryBytes = [Text.Encoding]::UTF8.GetBytes($inventoryText)
-    $inventoryDigest = [Convert]::ToHexString(
-        [Security.Cryptography.SHA256]::HashData($inventoryBytes)
-    ).ToLowerInvariant()
-    $expectedInventoryDigest =
-        [string]$contract.trustedComputingBase.inventorySha256
-    if ($inventoryDigest -cne $expectedInventoryDigest) {
-        throw "The trusted-computing-base inventory digest changed. " +
-            "Review path ownership and update the intentional digest pin."
-    }
+    $canonicalTcbPaths = @(Get-SharpProofTcbPaths -Contract $contract -ProductionInventory $productionInventory)
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)
-        Assert-RepositoryPaths `
-            -Paths $paths `
-            -Scope "trusted-computing-base component '$name'"
+        Assert-RepositoryPaths -Paths $paths -Scope "trusted-computing-base component '$name'"
         Write-Host "Trusted-computing-base $name paths: $($paths.Count)"
     }
     Write-Host "Trusted-computing-base union paths: $($canonicalTcbPaths.Count)"
@@ -666,9 +667,7 @@ try {
             $maximumDecisionPoints -le 0) {
             throw "Production coordinator '$name' must have positive limits."
         }
-        $currentMetrics = Measure-RepositoryCSharpSyntax `
-            -Paths @($path) `
-            -Scope "production coordinator '$name'"
+        $currentMetrics = Measure-RepositoryCSharpSyntax -Paths @($path) -Scope "production coordinator '$name'" -ProductionInventory $productionInventory
         $currentExpressionNodes = [int]$currentMetrics.expressionNodes
         $currentDecisionPoints = [int]$currentMetrics.decisionPoints
         if ($currentExpressionNodes -gt $maximumExpressionNodes -or

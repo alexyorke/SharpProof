@@ -6,6 +6,10 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseAuthorityClosure.ps1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
+$inventoryJson = & (Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1') `
+    -RepositoryRoot $repositoryRoot `
+    -Configuration Release
+$productionInventory = $inventoryJson -join [Environment]::NewLine | ConvertFrom-Json
 $contract = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
@@ -19,7 +23,7 @@ if ($declared.Count -ne @($declared | Select-Object -Unique).Count -or
     @($derived | Where-Object { $declared -cnotcontains $_ }).Count -ne 0) {
     throw 'The declared release-authority closure does not equal the independently derived closure.'
 }
-$tcb = @(Get-SharpProofTcbPaths -Contract $contract)
+$tcb = @(Get-SharpProofTcbPaths -Contract $contract -ProductionInventory $productionInventory)
 foreach ($path in $derived) {
     if (@($tcb | Where-Object { $_ -ceq $path }).Count -ne 1) {
         throw "Release-authority path must occur exactly once in the TCB: '$path'."

@@ -42,7 +42,6 @@ function ConvertTo-OrdinalSortedArray {
     $items.Sort([StringComparer]::Ordinal)
     return $items.ToArray()
 }
-
 function Test-ClearlyNonSemanticSourceLine {
     param(
         [Parameter(Mandatory = $true)]
@@ -240,26 +239,37 @@ if (-not (Test-Path -LiteralPath $coverageAuthorityPath -PathType Leaf)) {
 $recordedAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json
-$authorityScript = Join-Path `
-    $PSScriptRoot `
-    'Get-SharpProofCoverageAuthority.ps1'
-$recomputedAuthorityJson = & $authorityScript `
-    -RepositoryRoot $repositoryRoot `
-    -BaselinePath $resolvedBaselinePath `
-    -Configuration Release
+$authorityScript = Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1'
+$recomputedAuthorityJson = & $authorityScript -RepositoryRoot $repositoryRoot -Configuration Release -RequirePdb
 if ($LASTEXITCODE -ne 0) {
-    throw 'Coverage authority could not be recomputed from current PDBs.'
+    throw 'Production inventory authority could not be recomputed from current MSBuild/PDB inputs.'
 }
-$recomputedAuthority = ($recomputedAuthorityJson -join "`n") |
+$recomputedAuthority = ($recomputedAuthorityJson -join [Environment]::NewLine) |
     ConvertFrom-Json
 if ($recordedAuthority.schemaVersion -ne 1 -or
     $recordedAuthority.commit -cne $recomputedAuthority.commit -or
     $recordedAuthority.commit -cne (& git -C $repositoryRoot rev-parse HEAD).Trim() -or
     $recordedAuthority.configuration -cne 'Release' -or
-    $recordedAuthority.universeSha256 -cne $recomputedAuthority.universeSha256) {
+    $recordedAuthority.sourceUniverseSha256 -cne $recomputedAuthority.sourceUniverseSha256 -or
+    $recordedAuthority.pdbUniverseSha256 -cne $recomputedAuthority.pdbUniverseSha256 -or
+    $recordedAuthority.generatedManifestSha256 -cne $recomputedAuthority.generatedManifestSha256) {
     throw (
         'Coverage authority evidence does not match the exact current ' +
-        'commit, binaries, and portable-PDB source universe.')
+        'commit, evaluated MSBuild inventory, binaries, and portable-PDB universe.')
+}
+$authorityProjectNames = @(
+    $recomputedAuthority.projects |
+        ForEach-Object { [string]$_.name } |
+        Sort-Object)
+$baselineProjectNames = @(
+    $baseline.projects.PSObject.Properties |
+        ForEach-Object { [string]$_.Name } |
+        Sort-Object)
+if (($authorityProjectNames -join [Environment]::NewLine) -cne
+    ($baselineProjectNames -join [Environment]::NewLine)) {
+    throw (
+        'Coverage baseline project floors do not match the independently ' +
+        'evaluated production inventory.')
 }
 $expectedAuthorityModules = @($recomputedAuthority.modules | Sort-Object project)
 $expectedModuleHashes = @(
@@ -374,8 +384,12 @@ foreach ($report in $reports) {
     $authorityNode = $authorityNodes[0]
     if ([string]$authorityNode.schemaVersion -cne '1' -or
         [string]$authorityNode.commit -cne [string]$recomputedAuthority.commit -or
+        [string]$authorityNode.sourceUniverseSha256 -cne
+            [string]$recomputedAuthority.sourceUniverseSha256 -or
         [string]$authorityNode.universeSha256 -cne
-            [string]$recomputedAuthority.universeSha256) {
+            [string]$recomputedAuthority.pdbUniverseSha256 -or
+        [string]$authorityNode.generatedManifestSha256 -cne
+            [string]$recomputedAuthority.generatedManifestSha256) {
         throw (
             "Coverage report authority does not match current commit/universe: " +
             $report.FullName)
@@ -568,9 +582,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $contractPath = Join-Path $repositoryRoot 'eng\acceptance\contract.json'
     $contract = Get-Content -LiteralPath $contractPath -Raw |
         ConvertFrom-Json
-    $canonicalTcbPaths = @(Get-SharpProofTcbPaths `
-        -Contract $contract `
-        -IncludeAcceptanceContract)
+    $canonicalTcbPaths = @(Get-SharpProofTcbPaths -Contract $contract -IncludeAcceptanceContract -ProductionInventory $recomputedAuthority)
     $coverageTcbPaths = @(
         $canonicalTcbPaths |
             Where-Object {
@@ -776,7 +788,9 @@ $summary = [pscustomobject][ordered]@{
     authority = [pscustomobject][ordered]@{
         schemaVersion = 1
         commit = [string]$recomputedAuthority.commit
-        universeSha256 = [string]$recomputedAuthority.universeSha256
+        sourceUniverseSha256 = [string]$recomputedAuthority.sourceUniverseSha256
+        pdbUniverseSha256 = [string]$recomputedAuthority.pdbUniverseSha256
+        generatedManifestSha256 = [string]$recomputedAuthority.generatedManifestSha256
         moduleCount = $expectedAuthorityModules.Count
         sequencePointCount = $expectedSequencePointCount
     }

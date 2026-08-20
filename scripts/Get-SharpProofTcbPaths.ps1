@@ -5,7 +5,10 @@ function Get-SharpProofTcbPaths {
         $Contract,
 
         [Parameter()]
-        [switch]$IncludeAcceptanceContract
+        [switch]$IncludeAcceptanceContract,
+
+        [Parameter()]
+        $ProductionInventory
     )
 
     if ($null -eq $Contract.trustedKernel -or
@@ -56,6 +59,27 @@ function Get-SharpProofTcbPaths {
             $Contract.trustedComputingBase.components)) {
         foreach ($path in @($component.paths)) {
             & $addPath $path
+        }
+    }
+
+    if ($null -ne $ProductionInventory) {
+        if ($null -eq $ProductionInventory.projects) {
+            throw 'The production inventory authority has no projects.'
+        }
+        $compilePaths = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($project in @($ProductionInventory.projects)) {
+            foreach ($file in @($project.compile)) {
+                [void]$compilePaths.Add([string]$file.path)
+            }
+        }
+        foreach ($path in $paths) {
+            if ($path.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase) -and
+                -not $compilePaths.Contains($path)) {
+                throw (
+                    "Trusted-computing-base source is not an evaluated " +
+                    "production Compile item: '$path'.")
+            }
         }
     }
 

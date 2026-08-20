@@ -40,7 +40,6 @@ if (Test-Path -LiteralPath $resolvedResultsDirectory -PathType Container) {
             $existingReport.FullName)
     }
 }
-
 New-Item `
     -ItemType Directory `
     -Force `
@@ -53,10 +52,10 @@ New-Item `
 $coverageAuthorityPath = Join-Path `
     $resolvedResultsDirectory `
     'coverage-authority.json'
-& (Join-Path $PSScriptRoot 'Get-SharpProofCoverageAuthority.ps1') `
+& (Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1') `
     -RepositoryRoot $repositoryRoot `
-    -BaselinePath (Join-Path $repositoryRoot 'eng/coverage/baseline.json') `
     -Configuration Release `
+    -RequirePdb `
     -OutputPath $coverageAuthorityPath
 if ($LASTEXITCODE -ne 0) {
     throw 'Coverage authority derivation failed before collection.'
@@ -222,10 +221,12 @@ foreach ($coverageReport in $coverageReports) {
     }
     $authorityNode = $coverageDocument.CreateElement('sharpProofAuthority')
     $authorityNode.SetAttribute('schemaVersion', '1')
+    $authorityNode.SetAttribute('sourceUniverseSha256', [string]$coverageAuthority.sourceUniverseSha256)
+    $authorityNode.SetAttribute('generatedManifestSha256', [string]$coverageAuthority.generatedManifestSha256)
     $authorityNode.SetAttribute('commit', [string]$coverageAuthority.commit)
     $authorityNode.SetAttribute(
         'universeSha256',
-        [string]$coverageAuthority.universeSha256)
+        [string]$coverageAuthority.pdbUniverseSha256)
     $authorityNode.SetAttribute(
         'modules',
         ($coverageModuleHashes -join ','))
