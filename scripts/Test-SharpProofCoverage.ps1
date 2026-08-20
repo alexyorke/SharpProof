@@ -280,6 +280,8 @@ $expectedModuleHashText = $expectedModuleHashes -join ','
 $expectedLineHits = [Collections.Generic.Dictionary[string,
     Collections.Generic.Dictionary[int, int]]]::new(
         [StringComparer]::Ordinal)
+$permittedLineRanges = [Collections.Generic.Dictionary[string,
+    Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
 $expectedSequencePointCount = 0
 foreach ($module in $expectedAuthorityModules) {
     foreach ($document in @($module.documents | Sort-Object path)) {
@@ -290,6 +292,20 @@ foreach ($module in $expectedAuthorityModules) {
         else {
             $fileLines = [Collections.Generic.Dictionary[int, int]]::new()
             $expectedLineHits[$path] = $fileLines
+        }
+        if (-not $permittedLineRanges.ContainsKey($path)) {
+            $permittedLineRanges[$path] = [Collections.Generic.List[object]]::new()
+        }
+        foreach ($range in @($document.sequencePointRanges)) {
+            $startLine = [int]$range.startLine
+            $endLine = [int]$range.endLine
+            if ($startLine -le 0 -or $endLine -lt $startLine) {
+                throw (
+                    "Coverage authority has an invalid sequence-point range " +
+                    "'${path}:$startLine-$endLine'.")
+            }
+            $permittedLineRanges[$path].Add(
+                [pscustomobject]@{ startLine = $startLine; endLine = $endLine })
         }
         foreach ($value in @($document.sequencePoints | Sort-Object)) {
             $number = [int]$value
@@ -454,12 +470,21 @@ foreach ($report in $reports) {
                     "Coverage report contains a malformed sequence point: " +
                     $report.FullName)
             }
-            if (-not $fileHits.ContainsKey($number)) {
+            $isPermittedLine = $false
+            foreach ($range in $permittedLineRanges[$relativePath]) {
+                if ($number -ge $range.startLine -and
+                    $number -le $range.endLine) {
+                    $isPermittedLine = $true
+                    break
+                }
+            }
+            if (-not $isPermittedLine) {
                 throw (
                     "Coverage report sequence point is outside the authenticated " +
                     "PDB universe: '${relativePath}:$number'.")
             }
-            if ($hits -gt $fileHits[$number]) {
+            if ($fileHits.ContainsKey($number) -and
+                $hits -gt $fileHits[$number]) {
                 $fileHits[$number] = $hits
             }
             [void]$observedLineNumbers[$relativePath].Add($number)

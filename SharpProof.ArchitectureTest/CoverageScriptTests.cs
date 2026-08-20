@@ -418,6 +418,69 @@ public sealed class CoverageScriptTests
         }
     }
 
+    [Test]
+    public async Task AuthenticatedCoverageAllowsLinesInsidePdbSequencePointSpans()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "Project", "Trusted.cs"),
+                "public static class Trusted\n" +
+                "{\n" +
+                "    public static int Covered() =>\n" +
+                "        1 +\n" +
+                "        0;\n" +
+                "}\n");
+            await CommitAllAsync(repository, "multiline sequence point");
+            await PrepareCoverageFixtureAsync(repository);
+
+            var coverage = Path.Combine(repository, "coverage");
+            using var authority = JsonDocument.Parse(
+                await File.ReadAllTextAsync(Path.Combine(
+                    coverage,
+                    "coverage-authority.json")));
+            var sourceDocument = authority.RootElement
+                .GetProperty("modules")[0]
+                .GetProperty("documents")[0];
+            var startLines = sourceDocument
+                .GetProperty("sequencePoints")
+                .EnumerateArray()
+                .Select(static value => value.GetInt32())
+                .ToHashSet();
+            var interiorLine = sourceDocument
+                .GetProperty("sequencePointRanges")
+                .EnumerateArray()
+                .SelectMany(static range => Enumerable.Range(
+                    range.GetProperty("startLine").GetInt32(),
+                    range.GetProperty("endLine").GetInt32() -
+                    range.GetProperty("startLine").GetInt32() + 1))
+                .First(line => !startLines.Contains(line));
+
+            var reportPath = Path.Combine(
+                coverage,
+                "fixture.cobertura.xml");
+            var report = XDocument.Load(reportPath);
+            report.Descendants("class").First().Element("lines")!.Add(
+                new XElement(
+                    "line",
+                    new XAttribute("number", interiorLine),
+                    new XAttribute("hits", 1)));
+            report.Save(reportPath, SaveOptions.DisableFormatting);
+
+            var result = await RunCoverageScriptOnlyAsync(
+                repository,
+                comparisonRef: null,
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Zero, result.Error + result.Output);
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
     private static async Task AssertChangedFilesAsync(
         bool featureChangesTcb,
         int expectedChangedFiles)

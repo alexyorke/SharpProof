@@ -153,6 +153,7 @@ function Get-PortablePdbModule {
         $pdbProvider = [System.Reflection.Metadata.MetadataReaderProvider]::FromPortablePdbStream($pdbStream)
         $pdb = $pdbProvider.GetMetadataReader()
         $sourceLines = [Collections.Generic.Dictionary[string, Collections.Generic.HashSet[int]]]::new([StringComparer]::Ordinal)
+        $sourceRanges = [Collections.Generic.Dictionary[string, Collections.Generic.Dictionary[string, object]]]::new([StringComparer]::Ordinal)
         foreach ($debugHandle in $pdb.MethodDebugInformation) {
             $debug = $pdb.GetMethodDebugInformation($debugHandle)
             foreach ($point in $debug.GetSequencePoints()) {
@@ -164,14 +165,24 @@ function Get-PortablePdbModule {
                 if (-not $relativePath.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)) { throw "Production inventory PDB source is not C#: '$relativePath'." }
                 if ($relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) { continue }
                 if (-not $CompilePaths.Contains($relativePath)) { throw "Production inventory PDB source is not an evaluated Compile item: '$relativePath'." }
-                if ($point.StartLine -le 0) { throw "Production inventory PDB has an invalid sequence-point line for '$relativePath'." }
+                if ($point.StartLine -le 0 -or $point.EndLine -lt $point.StartLine) { throw "Production inventory PDB has an invalid sequence-point range for '$relativePath'." }
                 if (-not $sourceLines.ContainsKey($relativePath)) { $sourceLines[$relativePath] = [Collections.Generic.HashSet[int]]::new() }
                 [void]$sourceLines[$relativePath].Add($point.StartLine)
+                if (-not $sourceRanges.ContainsKey($relativePath)) { $sourceRanges[$relativePath] = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal) }
+                $rangeKey = ([string]$point.StartLine) + ':' + ([string]$point.EndLine)
+                if (-not $sourceRanges[$relativePath].ContainsKey($rangeKey)) {
+                    $sourceRanges[$relativePath][$rangeKey] = [pscustomobject][ordered]@{ startLine = $point.StartLine; endLine = $point.EndLine }
+                }
             }
         }
         if ($sourceLines.Count -eq 0) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
         $documents = foreach ($path in @($sourceLines.Keys | Sort-Object)) {
-            [pscustomobject][ordered]@{ path = $path; sourceSha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator))); sequencePoints = @($sourceLines[$path] | Sort-Object) }
+            [pscustomobject][ordered]@{
+                path = $path
+                sourceSha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator)))
+                sequencePoints = @($sourceLines[$path] | Sort-Object)
+                sequencePointRanges = @($sourceRanges[$path].Values | Sort-Object startLine, endLine)
+            }
         }
         return [pscustomobject][ordered]@{
             project = $ProjectName
@@ -318,4 +329,3 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) { Write-Output $json } else {
     [IO.Directory]::CreateDirectory($directory) | Out-Null
     [IO.File]::WriteAllText($fullOutputPath, $json + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
 }
-
