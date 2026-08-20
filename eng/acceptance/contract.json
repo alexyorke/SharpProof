@@ -209,7 +209,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "00ecf28e0533e0a5c666c84a20942d868e44da5174ed5ed91618cb3d51dfb467",
+    "inventorySha256": "6285bf4670402f8922d33f6d42a8a70f11bda0616ce2930e719d7bd7c41ae422",
     "components": [
       {
         "name": "discovery",
@@ -674,7 +674,6 @@
         "paths": [
           ".github/actions/build-tooling/action.yml",
           ".github/workflows/nightly.yml",
-          "SharpProof.ArchitectureTest/StandaloneGateEvidenceTests.cs",
           "SharpProof.Gates/Program.cs",
           "SharpProof.Gates/SharpProof.Gates.csproj",
           "SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1",
@@ -716,15 +715,12 @@
           "scripts/Test-SharpProofSymbolPackages.ps1",
           "scripts/SharpProof.SymbolPackageValidator.cs",
           "scripts/Write-SharpProofQualificationReceipt.ps1",
-          "scripts/package-projects.json",
-          "SharpProof.ArchitectureTest/ReleaseAuthorityClosureTests.cs",
-          "SharpProof.ArchitectureTest/PilotAuthorityTests.cs"
+          "scripts/package-projects.json"
         ]
       },
       {
         "name": "fuzzEvidenceAuthority",
         "paths": [
-          "SharpProof.ArchitectureTest/FuzzRunnerEvidenceTests.cs",
           "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
           "scripts/SharpProof.FuzzEvidenceLifecycle.ps1",
           "scripts/Test-SharpProofFuzzEvidenceLifecycle.ps1",
@@ -746,8 +742,7 @@
           "scripts/Generate-Readme.ps1",
           "scripts/Invoke-SharpProofFuzzCampaign.ps1",
           "scripts/Resolve-SharpProofContainedPath.ps1",
-          "scripts/Test-SharpProofContainedPathFixtures.ps1",
-          "SharpProof.ArchitectureTest/ContainedPathAuthorityTests.cs"
+          "scripts/Test-SharpProofContainedPathFixtures.ps1"
         ]
       }
     ]
