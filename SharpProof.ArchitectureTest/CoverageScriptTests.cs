@@ -523,6 +523,36 @@ public sealed class CoverageScriptTests
         }
     }
 
+    [Test]
+    public async Task AuthenticatedCoverageIgnoresVstestArchiveCopies()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            await PrepareCoverageFixtureAsync(repository);
+            var coverage = Path.Combine(repository, "coverage");
+            var reportPath = Path.Combine(
+                coverage,
+                "fixture.cobertura.xml");
+            var archive = Path.Combine(coverage, "archive", "In", "host");
+            Directory.CreateDirectory(archive);
+            File.Copy(
+                reportPath,
+                Path.Combine(archive, "fixture.cobertura.xml"));
+
+            var result = await RunCoverageScriptOnlyAsync(
+                repository,
+                comparisonRef: null,
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Zero, result.Error + result.Output);
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
     private static async Task AssertChangedFilesAsync(
         bool featureChangesTcb,
         int expectedChangedFiles)

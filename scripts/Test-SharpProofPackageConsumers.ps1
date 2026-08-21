@@ -139,14 +139,14 @@ function Resolve-SharpProofPackageSource {
     foreach ($packageId in $expectedIds) {
         $main = @($identities | Where-Object Id -eq $packageId)[0]
         $symbols = @($symbolIdentities | Where-Object Id -eq $packageId)[0]
-        Test-SharpProofSymbolPackagePair `
+        $null = Test-SharpProofSymbolPackagePair `
             -PackagePath $main.Path `
             -SymbolPackagePath $symbols.Path `
             -PackageId $packageId `
             -PackageVersion $versions[0] `
             -RepositoryCommit $repositoryCommit
     }
-    return $resolved
+    return [string]$resolved
 }
 
 function Get-SharpProofPortablePackageVersion {

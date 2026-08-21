@@ -214,6 +214,11 @@ $reports = @(
         -Recurse `
         -Filter '*.cobertura.xml' `
         -File |
+        Where-Object {
+            [IO.Path]::GetRelativePath(
+                $resolvedCoverageRoot,
+                $_.FullName).Replace('\', '/') -cnotmatch '(^|/)In(/|$)'
+        } |
         Sort-Object FullName
 )
 if ($reports.Count -eq 0) {
