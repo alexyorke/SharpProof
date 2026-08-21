@@ -432,8 +432,13 @@ foreach ($report in $reports) {
         if (-not $class.HasAttribute('filename')) {
             throw "Coverage report class has no source filename: $($report.FullName)"
         }
+        $reportedFileName = ([string]$class.filename).Replace('\', '/')
+        if ($reportedFileName.Contains('/obj/', [StringComparison]::Ordinal) -or
+            $reportedFileName.Contains('/bin/', [StringComparison]::Ordinal)) {
+            continue
+        }
         $relativePath = Resolve-CoverageSourcePath `
-            -FileName ([string]$class.filename) `
+            -FileName $reportedFileName `
             -SourceRoots $sourceRoots
         if (-not $relativePath.EndsWith(
                 '.cs',

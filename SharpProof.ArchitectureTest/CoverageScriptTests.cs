@@ -481,6 +481,48 @@ public sealed class CoverageScriptTests
         }
     }
 
+    [Test]
+    public async Task AuthenticatedCoverageIgnoresGeneratedObjDocuments()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            await PrepareCoverageFixtureAsync(repository);
+            var reportPath = Path.Combine(
+                repository,
+                "coverage",
+                "fixture.cobertura.xml");
+            var report = XDocument.Load(reportPath);
+            report.Descendants("classes").First().Add(
+                new XElement(
+                    "class",
+                    new XAttribute(
+                        "name",
+                        "GeneratedLibraryImports"),
+                    new XAttribute(
+                        "filename",
+                        "Project/obj/Release/net8.0/Generator/LibraryImports.g.cs"),
+                    new XElement(
+                        "lines",
+                        new XElement(
+                            "line",
+                            new XAttribute("number", 1),
+                            new XAttribute("hits", 1)))));
+            report.Save(reportPath, SaveOptions.DisableFormatting);
+
+            var result = await RunCoverageScriptOnlyAsync(
+                repository,
+                comparisonRef: null,
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Zero, result.Error + result.Output);
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
     private static async Task AssertChangedFilesAsync(
         bool featureChangesTcb,
         int expectedChangedFiles)
