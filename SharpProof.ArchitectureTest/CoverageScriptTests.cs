@@ -461,6 +461,10 @@ public sealed class CoverageScriptTests
                 coverage,
                 "fixture.cobertura.xml");
             var report = XDocument.Load(reportPath);
+            foreach (var line in report.Descendants("line"))
+            {
+                line.SetAttributeValue("hits", 0);
+            }
             report.Descendants("class").First().Element("lines")!.Add(
                 new XElement(
                     "line",
@@ -474,6 +478,17 @@ public sealed class CoverageScriptTests
                 reportOnly: true);
 
             Assert.That(result.ExitCode, Is.Zero, result.Error + result.Output);
+            using var summary = JsonDocument.Parse(result.Output);
+            var aggregate = summary.RootElement.GetProperty("aggregate");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    aggregate.GetProperty("coveredLines").GetInt32(),
+                    Is.EqualTo(1));
+                Assert.That(
+                    aggregate.GetProperty("coverableLines").GetInt32(),
+                    Is.GreaterThanOrEqualTo(1));
+            }
         }
         finally
         {

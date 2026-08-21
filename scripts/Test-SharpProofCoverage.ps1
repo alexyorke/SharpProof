@@ -308,6 +308,21 @@ foreach ($module in $expectedAuthorityModules) {
         if (-not $permittedLineRanges.ContainsKey($path)) {
             $permittedLineRanges[$path] = [Collections.Generic.List[object]]::new()
         }
+        $documentSequencePoints =
+            [Collections.Generic.HashSet[int]]::new()
+        foreach ($value in @($document.sequencePoints | Sort-Object)) {
+            $number = [int]$value
+            if ($number -le 0) {
+                throw (
+                    "Coverage authority has an invalid sequence point " +
+                    "'${path}:$number'.")
+            }
+            [void]$documentSequencePoints.Add($number)
+            if (-not $fileLines.ContainsKey($number)) {
+                $fileLines[$number] = 0
+                $expectedSequencePointCount++
+            }
+        }
         foreach ($range in @($document.sequencePointRanges)) {
             $startLine = [int]$range.startLine
             $endLine = [int]$range.endLine
@@ -317,20 +332,16 @@ foreach ($module in $expectedAuthorityModules) {
                     "'${path}:$startLine-$endLine'.")
             }
             $permittedLineRanges[$path].Add(
-                [pscustomobject]@{ startLine = $startLine; endLine = $endLine })
-        }
-        foreach ($value in @($document.sequencePoints | Sort-Object)) {
-            $number = [int]$value
-            if ($number -le 0 -or $fileLines.ContainsKey($number)) {
-                if ($number -le 0) {
-                    throw (
-                        "Coverage authority has an invalid sequence point " +
-                        "'${path}:$number'.")
-                }
-                continue
-            }
-            $fileLines[$number] = 0
-            $expectedSequencePointCount++
+                [pscustomobject]@{
+                    startLine = $startLine
+                    endLine = $endLine
+                    creditLine = if ($documentSequencePoints.Contains($startLine)) {
+                        $startLine
+                    }
+                    else {
+                        0
+                    }
+                })
         }
     }
 }
@@ -496,17 +507,16 @@ foreach ($report in $reports) {
                 if ($number -ge $range.startLine -and
                     $number -le $range.endLine) {
                     $isPermittedLine = $true
-                    break
+                    if ($range.creditLine -gt 0 -and
+                        $hits -gt $fileHits[$range.creditLine]) {
+                        $fileHits[$range.creditLine] = $hits
+                    }
                 }
             }
             if (-not $isPermittedLine) {
                 throw (
                     "Coverage report sequence point is outside the authenticated " +
                     "PDB universe: '${relativePath}:$number'.")
-            }
-            if ($fileHits.ContainsKey($number) -and
-                $hits -gt $fileHits[$number]) {
-                $fileHits[$number] = $hits
             }
             $reportLineCount++
         }
@@ -761,7 +771,26 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                 # trusted execution and need no sequence point.
                 continue
             }
-            if (-not $fileHits.ContainsKey($number)) {
+            $changedLineHits = if ($fileHits.ContainsKey($number)) {
+                $fileHits[$number]
+            }
+            else {
+                $rangeHits = @(
+                    $permittedLineRanges[$changedPath] |
+                        Where-Object {
+                            $_.creditLine -gt 0 -and
+                            $number -ge $_.startLine -and
+                            $number -le $_.endLine
+                        } |
+                        ForEach-Object { $fileHits[$_.creditLine] })
+                if ($rangeHits.Count -gt 0) {
+                    ($rangeHits | Measure-Object -Maximum).Maximum
+                }
+                else {
+                    $null
+                }
+            }
+            if ($null -eq $changedLineHits) {
                 # Declarations and initializers can alter trusted execution
                 # without receiving a Coverlet sequence point. Treat every
                 # unmapped line not proven to be trivia as uncovered.
@@ -772,7 +801,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                 continue
             }
             $changedCoverable++
-            if ($fileHits[$number] -gt 0) {
+            if ($changedLineHits -gt 0) {
                 $changedCovered++
             }
             else {
