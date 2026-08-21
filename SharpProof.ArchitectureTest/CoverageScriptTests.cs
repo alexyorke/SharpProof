@@ -553,6 +553,49 @@ public sealed class CoverageScriptTests
         }
     }
 
+    [Test]
+    public async Task AuthenticatedCoverageIgnoresNonProductionPackages()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            await PrepareCoverageFixtureAsync(repository);
+            var reportPath = Path.Combine(
+                repository,
+                "coverage",
+                "fixture.cobertura.xml");
+            var report = XDocument.Load(reportPath);
+            report.Descendants("packages").First().Add(
+                new XElement(
+                    "package",
+                    new XAttribute("name", "Project.TestSupport"),
+                    new XElement(
+                        "classes",
+                        new XElement(
+                            "class",
+                            new XAttribute("name", "ForeignSupport"),
+                            new XAttribute("filename", "ForeignSupport.cs"),
+                            new XElement(
+                                "lines",
+                                new XElement(
+                                    "line",
+                                    new XAttribute("number", 1),
+                                    new XAttribute("hits", 1)))))));
+            report.Save(reportPath, SaveOptions.DisableFormatting);
+
+            var result = await RunCoverageScriptOnlyAsync(
+                repository,
+                comparisonRef: null,
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Zero, result.Error + result.Output);
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
     private static async Task AssertChangedFilesAsync(
         bool featureChangesTcb,
         int expectedChangedFiles)

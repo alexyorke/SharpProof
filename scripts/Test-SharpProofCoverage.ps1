@@ -282,6 +282,13 @@ $expectedModuleHashes = @(
         ForEach-Object { [string]$_.assemblySha256 } |
         Sort-Object)
 $expectedModuleHashText = $expectedModuleHashes -join ','
+$expectedAssemblyNames = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($module in $expectedAuthorityModules) {
+    if (-not $expectedAssemblyNames.Add([string]$module.assemblyName)) {
+        throw "Coverage authority has a duplicate assembly name '$($module.assemblyName)'."
+    }
+}
 $expectedLineHits = [Collections.Generic.Dictionary[string,
     Collections.Generic.Dictionary[int, int]]]::new(
         [StringComparer]::Ordinal)
@@ -433,7 +440,17 @@ foreach ($report in $reports) {
         throw "Coverage report has no classes: $($report.FullName)"
     }
     $reportLineCount = 0
+    $hasProductionPackage = $false
     foreach ($class in $classes) {
+        $package = $class.ParentNode.ParentNode
+        if ($null -eq $package -or
+            -not $package.HasAttribute('name')) {
+            throw "Coverage report class has no package identity: $($report.FullName)"
+        }
+        if (-not $expectedAssemblyNames.Contains([string]$package.name)) {
+            continue
+        }
+        $hasProductionPackage = $true
         if (-not $class.HasAttribute('filename')) {
             throw "Coverage report class has no source filename: $($report.FullName)"
         }
@@ -501,7 +518,7 @@ foreach ($report in $reports) {
             $reportLineCount++
         }
     }
-    if ($reportLineCount -eq 0) {
+    if ($hasProductionPackage -and $reportLineCount -eq 0) {
         throw "Coverage report has no production sequence points: $($report.FullName)"
     }
 }
