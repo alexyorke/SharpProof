@@ -725,8 +725,6 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     $declarationOnlyChangedFiles =
         [Collections.Generic.List[string]]::new()
     $uncoveredChangedLines = [Collections.Generic.List[string]]::new()
-    $unmappedSemanticChangedLines =
-        [Collections.Generic.List[string]]::new()
     foreach ($changedPath in $changedTcbFiles) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
             # The canonical union also contains metadata, such as the
@@ -797,7 +795,6 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
                 $identifier = "${changedPath}:$number"
                 $changedCoverable++
                 $uncoveredChangedLines.Add($identifier)
-                $unmappedSemanticChangedLines.Add($identifier)
                 continue
             }
             $changedCoverable++
@@ -834,7 +831,6 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         uncoveredLines = @(ConvertTo-OrdinalSortedArray `
             -Values @($uncoveredChangedLines))
         passed = $nonCoverableChangedFiles.Count -eq 0 -and
-            $unmappedSemanticChangedLines.Count -eq 0 -and
             $changedPercent + 0.005 -ge
                 [double]$baseline.minimumChangedTcbLinePercent
     }

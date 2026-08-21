@@ -273,6 +273,34 @@ public sealed class CoverageScriptTests
     }
 
     [Test]
+    public async Task UnmappedSemanticLineParticipatesInConfiguredRatchet()
+    {
+        var result = await RunUnmappedChangedLineFixtureAsync(
+            "    public const int Limit = 128;",
+            "    public const int Limit = 129;",
+            generated: false,
+            targetClosesMethod: false,
+            minimumChangedTcbLinePercent: 0);
+
+        Assert.That(result.Process.ExitCode, Is.Zero, result.Process.Error);
+        using var document = JsonDocument.Parse(result.Process.Output);
+        var changed = document.RootElement.GetProperty("changedTcb");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                changed.GetProperty("uncoveredLines")
+                    .EnumerateArray()
+                    .Select(static value => value.GetString())
+                    .ToArray(),
+                Is.EqualTo(new[]
+                {
+                    "Project/Trusted.cs:" + result.ChangedLine
+                }));
+            Assert.That(changed.GetProperty("passed").GetBoolean(), Is.True);
+        }
+    }
+
+    [Test]
     public async Task UnmappedBraceOnlyChangeRemainsAdmissible()
     {
         var result = await RunUnmappedChangedLineFixtureAsync(
@@ -898,9 +926,10 @@ public sealed class CoverageScriptTests
     private static async Task<ChangedLineResult>
         RunUnmappedChangedLineFixtureAsync(
             string originalLine,
-            string changedLine,
-            bool generated,
-            bool targetClosesMethod)
+        string changedLine,
+        bool generated,
+        bool targetClosesMethod,
+        double minimumChangedTcbLinePercent = 100)
     {
         var root = RepositoryRoot();
         var repository = Path.Combine(
@@ -914,7 +943,11 @@ public sealed class CoverageScriptTests
                 originalLine,
                 generated,
                 targetClosesMethod);
-            await WriteChangedLineFixtureAsync(root, repository, original);
+            await WriteChangedLineFixtureAsync(
+                root,
+                repository,
+                original,
+                minimumChangedTcbLinePercent);
             await CommitAllAsync(repository, "root");
             await AssertSuccessAsync(RunAsync(
                 repository,
@@ -974,7 +1007,8 @@ public sealed class CoverageScriptTests
     private static async Task WriteChangedLineFixtureAsync(
         string root,
         string repository,
-        SourceFixture source)
+        SourceFixture source,
+        double minimumChangedTcbLinePercent)
     {
         var scripts = Path.Combine(repository, "scripts");
         var acceptance = Path.Combine(repository, "eng", "acceptance");
@@ -1014,7 +1048,7 @@ public sealed class CoverageScriptTests
                 },
                 declarationOnlyTcbFiles = Array.Empty<string>(),
                 minimumAggregateLinePercent = 0,
-                minimumChangedTcbLinePercent = 100
+                minimumChangedTcbLinePercent
             }) + "\n");
         await File.WriteAllTextAsync(
             Path.Combine(coverage, "fixture.cobertura.xml"),
