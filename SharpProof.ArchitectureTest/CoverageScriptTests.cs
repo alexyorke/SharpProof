@@ -623,6 +623,46 @@ public sealed class CoverageScriptTests
         }
     }
 
+    [Test]
+    public async Task ProductionInventoryExcludesCompilerGeneratedAccessors()
+    {
+        var repository = await CreateSingleCommitFixtureAsync();
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "Project", "Trusted.cs"),
+                "public static class Trusted\n" +
+                "{\n" +
+                "    public static int Generated\n" +
+                "    {\n" +
+                "        get;\n" +
+                "    } = 1;\n" +
+                "    public static int Covered() => 1;\n" +
+                "}\n");
+            await PrepareCoverageFixtureAsync(repository);
+            using var authority = JsonDocument.Parse(
+                await File.ReadAllTextAsync(
+                    Path.Combine(
+                        repository,
+                        "coverage",
+                        "coverage-authority.json")));
+            var sequencePoints = authority.RootElement
+                .GetProperty("modules")[0]
+                .GetProperty("documents")[0]
+                .GetProperty("sequencePoints")
+                .EnumerateArray()
+                .Select(static value => value.GetInt32())
+                .ToArray();
+
+            Assert.That(sequencePoints, Does.Contain(7));
+            Assert.That(sequencePoints, Does.Not.Contain(5));
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
     private static async Task AssertChangedFilesAsync(
         bool featureChangesTcb,
         int expectedChangedFiles)

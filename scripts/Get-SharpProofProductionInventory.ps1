@@ -129,6 +129,65 @@ function Get-PdbDocumentPath {
     return $name
 }
 
+function Get-MetadataTypeIdentity {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Reflection.Metadata.MetadataReader]$Reader,
+        [Parameter(Mandatory = $true)]
+        [System.Reflection.Metadata.EntityHandle]$Handle
+    )
+
+    if ($Handle.Kind -eq [System.Reflection.Metadata.HandleKind]::TypeDefinition) {
+        $type = $Reader.GetTypeDefinition(
+            [System.Reflection.Metadata.TypeDefinitionHandle]$Handle)
+    }
+    elseif ($Handle.Kind -eq [System.Reflection.Metadata.HandleKind]::TypeReference) {
+        $type = $Reader.GetTypeReference(
+            [System.Reflection.Metadata.TypeReferenceHandle]$Handle)
+    }
+    else {
+        return ''
+    }
+    return $Reader.GetString($type.Namespace) + '.' + $Reader.GetString($type.Name)
+}
+
+function Test-CompilerGeneratedMethod {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Reflection.Metadata.MetadataReader]$Reader,
+        [Parameter(Mandatory = $true)]
+        [System.Reflection.Metadata.MethodDefinitionHandle]$Handle
+    )
+
+    $method = $Reader.GetMethodDefinition($Handle)
+    foreach ($attributeHandle in $method.GetCustomAttributes()) {
+        $attribute = $Reader.GetCustomAttribute($attributeHandle)
+        $constructor = $attribute.Constructor
+        $attributeType = ''
+        if ($constructor.Kind -eq
+            [System.Reflection.Metadata.HandleKind]::MemberReference) {
+            $member = $Reader.GetMemberReference(
+                [System.Reflection.Metadata.MemberReferenceHandle]$constructor)
+            $attributeType = Get-MetadataTypeIdentity `
+                -Reader $Reader `
+                -Handle $member.Parent
+        }
+        elseif ($constructor.Kind -eq
+            [System.Reflection.Metadata.HandleKind]::MethodDefinition) {
+            $attributeMethod = $Reader.GetMethodDefinition(
+                [System.Reflection.Metadata.MethodDefinitionHandle]$constructor)
+            $attributeType = Get-MetadataTypeIdentity `
+                -Reader $Reader `
+                -Handle $attributeMethod.GetDeclaringType()
+        }
+        if ($attributeType -ceq
+            'System.Runtime.CompilerServices.CompilerGeneratedAttribute') {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Get-PortablePdbModule {
     param([Parameter(Mandatory = $true)] [string]$ProjectName, [Parameter(Mandatory = $true)] [string]$AssemblyPath, [Parameter(Mandatory = $true)] [string]$PdbPath, [Parameter(Mandatory = $true)] [System.Collections.Generic.HashSet[string]]$CompilePaths)
     if (-not (Test-Path -LiteralPath $AssemblyPath -PathType Leaf)) { throw "Production inventory assembly is missing: '$AssemblyPath'." }
@@ -155,6 +214,14 @@ function Get-PortablePdbModule {
         $sourceLines = [Collections.Generic.Dictionary[string, Collections.Generic.HashSet[int]]]::new([StringComparer]::Ordinal)
         $sourceRanges = [Collections.Generic.Dictionary[string, Collections.Generic.Dictionary[string, object]]]::new([StringComparer]::Ordinal)
         foreach ($debugHandle in $pdb.MethodDebugInformation) {
+            $methodHandle = [System.Reflection.Metadata.Ecma335.MetadataTokens]::MethodDefinitionHandle(
+                [System.Reflection.Metadata.Ecma335.MetadataTokens]::GetRowNumber(
+                    $debugHandle))
+            if (Test-CompilerGeneratedMethod `
+                    -Reader $metadata `
+                    -Handle $methodHandle) {
+                continue
+            }
             $debug = $pdb.GetMethodDebugInformation($debugHandle)
             foreach ($point in $debug.GetSequencePoints()) {
                 if ($point.IsHidden) { continue }
