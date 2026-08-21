@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.FlowAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Ir;
 using SharpProof.Specs;
 
@@ -88,16 +90,248 @@ public sealed class EffectAnalysisTests
         Assert.That(interpolated.Projection.IsComplete, Is.False);
         Assert.That(
             interpolatedString.Summary.Allocation,
-            Is.EqualTo(EffectAllocationKind.Unknown));
+            Is.EqualTo(EffectAllocationKind.Managed));
         Assert.That(
-            interpolatedString.Summary.Throws.IncludesUnknown,
+            interpolatedString.Summary.Throws.IsEmpty,
             Is.True);
         Assert.That(
             interpolatedString.Projection.IsComplete,
-            Is.False);
+            Is.True);
         Assert.That(
             interpolatedConstant.Summary.Allocation,
             Is.EqualTo(EffectAllocationKind.None));
+    }
+
+    [Test]
+    public void OrdinaryInterpolationPreservesFormattingAndEvaluationEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class ThrowingValue {
+                private static int s_state;
+                public override string ToString() {
+                    s_state++;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                private static int s_state;
+                private static string Next() { s_state++; return "next"; }
+                public static string StringValue(string value) => $"{{{value}}}";
+                public static string Scalar(int value) => $"value={value}";
+                public static string Ordered(string value) => $"{Next()}{value}";
+                public static string Throwing(ThrowingValue value) => $"{value}";
+                public static string Aligned(string value) => $"{value,4}";
+                public static string Formatted(int value) => $"{value:X}";
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var stringValue = session.Analyze(Method(compilation, "StringValue"));
+        Assert.That(stringValue.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(stringValue.Summary.Completeness,
+            Is.EqualTo(EffectCompleteness.Complete));
+
+        var scalar = session.Analyze(Method(compilation, "Scalar"));
+        Assert.That(scalar.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Unknown));
+        Assert.That(scalar.Summary.Completeness,
+            Is.EqualTo(EffectCompleteness.Incomplete));
+
+        var ordered = session.Analyze(Method(compilation, "Ordered"));
+        Assert.That(ordered.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+
+        var throwing = session.Analyze(Method(compilation, "Throwing"));
+        Assert.That(throwing.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+        AssertContainsThrows(
+            throwing.Summary,
+            "System.InvalidOperationException");
+
+        foreach (var unsupported in new[] { "Aligned", "Formatted" })
+        {
+            Assert.That(
+                session.Analyze(Method(compilation, unsupported))
+                    .Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete),
+                unsupported);
+        }
+    }
+
+    [Test]
+    public void StringConcatenationIncludesExactSourceToStringEffects()
+    {
+        var result = Analyze(
+            """
+            using System;
+
+            public sealed class FormattedValue {
+                private static volatile int s_state;
+
+                public override string ToString() {
+                    s_state = 1;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                public static string Format(FormattedValue value) =>
+                    "value=" + value;
+            }
+            """,
+            "Sample",
+            "Format");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Capabilities.Contains(
+                    EffectCapabilityKind.Synchronization),
+                Is.True);
+            AssertContainsThrows(
+                result.Summary,
+                "System.InvalidOperationException");
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(result.Projection.IsComplete, Is.True);
+        }
+    }
+
+    [Test]
+    public void StringConcatenationKeepsExactNoFormattingControls()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class NoOpValue {
+                public override string ToString() => "";
+            }
+
+            public readonly struct NoOpStruct {
+                public override string ToString() => "";
+            }
+
+            public static class Sample {
+                public static string StringOperand(string value) =>
+                    "value=" + value;
+                public static string NullOperand() =>
+                    "value=" + (object?)null;
+                public static string ReferenceNoOp(NoOpValue value) =>
+                    "value=" + value;
+                public static string ValueNoOp(NoOpStruct value) =>
+                    "value=" + value;
+                public static string Constant() => "value=" + "known";
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "StringOperand",
+                     "NullOperand",
+                     "ReferenceNoOp",
+                     "ValueNoOp"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Summary.Writes.IsEmpty, Is.True, methodName);
+                Assert.That(result.Summary.Capabilities.IsEmpty, Is.True, methodName);
+                Assert.That(result.Summary.Throws.IsEmpty, Is.True, methodName);
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+                Assert.That(result.Projection.IsComplete, Is.True, methodName);
+            }
+        }
+
+        Assert.That(
+            session.Analyze(Method(compilation, "ReferenceNoOp"))
+                .Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(
+            session.Analyze(Method(compilation, "ReferenceNoOp"))
+                .Summary.Uncertainty & EffectUncertainty.DirectCall,
+            Is.EqualTo(EffectUncertainty.DirectCall));
+        Assert.That(
+            session.Analyze(Method(compilation, "ValueNoOp"))
+                .Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(
+            session.Analyze(Method(compilation, "ValueNoOp"))
+                .Summary.Uncertainty & EffectUncertainty.DirectCall,
+            Is.EqualTo(EffectUncertainty.DirectCall));
+        Assert.That(
+            session.Analyze(Method(compilation, "Constant"))
+                .Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.None));
+    }
+
+    [Test]
+    public void StringConcatenationFailsClosedForUnresolvedFormatting()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public class OpenValue {
+                public override string ToString() => "";
+            }
+
+            public static class Sample {
+                public static string Open(OpenValue value) =>
+                    "value=" + value;
+                public static string Primitive(int value) =>
+                    "value=" + value;
+                public static string Nullable(int? value) =>
+                    "value=" + value;
+                public static string Interpolated(OpenValue value) =>
+                    $"{value}";
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var open = session.Analyze(Method(compilation, "Open"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(open.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                open.Summary.Uncertainty & EffectUncertainty.Dispatch,
+                Is.EqualTo(EffectUncertainty.Dispatch));
+            Assert.That(open.Projection.IsComplete, Is.False);
+
+            foreach (var methodName in new[] { "Primitive", "Nullable" })
+            {
+                var result = session.Analyze(Method(compilation, methodName));
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Incomplete),
+                    methodName);
+                Assert.That(
+                    result.Summary.Uncertainty &
+                        EffectUncertainty.UnmodeledCall,
+                    Is.EqualTo(EffectUncertainty.UnmodeledCall),
+                    methodName);
+                Assert.That(result.Projection.IsComplete, Is.False, methodName);
+            }
+
+            var interpolated = session.Analyze(
+                Method(compilation, "Interpolated"));
+            Assert.That(interpolated.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(interpolated.Projection.IsComplete, Is.False);
+        }
     }
 
     [Test]
@@ -151,6 +385,314 @@ public sealed class EffectAnalysisTests
             Is.EqualTo(EffectAllocationKind.Unknown));
         Assert.That(dynamic.Summary.Throws.IncludesUnknown, Is.True);
         Assert.That(dynamic.Projection.IsComplete, Is.False);
+    }
+
+    [Test]
+    public void ConversionEffectsUseProvenNullnessAndNullablePresence()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static int? NullToNullableValue() =>
+                    (int?)(object?)null;
+                public static string? NullToReference() =>
+                    (string?)(object?)null;
+
+                public static int PresentNullableUnwrap() {
+                    int? value = 1;
+                    return (int)value;
+                }
+
+                public static int? CompatibleNullableUnbox() =>
+                    (int?)(object)1;
+                public static string CompatibleReferenceCast() =>
+                    (string)(object)"text";
+
+                public static int? UnknownNullableUnbox(object? value) =>
+                    (int?)value;
+                public static int? IncompatibleNullableUnbox() =>
+                    (int?)(object)"text";
+                public static string? UnknownReferenceCast(object? value) =>
+                    (string?)value;
+                public static string IncompatibleReferenceCast() =>
+                    (string)(object)new object();
+                public static int NullToNonNullableValue() =>
+                    (int)(object?)null!;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[]
+                 {
+                     "NullToNullableValue",
+                     "NullToReference",
+                     "PresentNullableUnwrap",
+                     "CompatibleNullableUnbox",
+                     "CompatibleReferenceCast"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Throws.IsEmpty,
+                Is.True,
+                methodName);
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        foreach (var methodName in new[]
+                 {
+                     "UnknownNullableUnbox",
+                     "IncompatibleNullableUnbox",
+                     "UnknownReferenceCast",
+                     "IncompatibleReferenceCast"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            AssertThrows(result.Summary, "System.InvalidCastException");
+            AssertDoesNotThrow(
+                result.Summary,
+                "System.NullReferenceException");
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        var nonNullable = session.Analyze(
+            Method(compilation, "NullToNonNullableValue"));
+        AssertThrows(nonNullable.Summary, "System.NullReferenceException");
+        AssertDoesNotThrow(
+            nonNullable.Summary,
+            "System.InvalidCastException");
+        Assert.That(nonNullable.Projection.IsComplete, Is.True);
+    }
+
+    [Test]
+    public void NullableBoxingUsesProvenPresenceWithoutDefiniteUnknownWitness()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static object? Empty() => (int?)null;
+
+                public static object? Present() {
+                    int? value = 1;
+                    return value;
+                }
+
+                public static object? Unknown(int? value) => value;
+
+                public static object? LiftedEmpty() {
+                    int? source = null;
+                    long? value = source;
+                    return value;
+                }
+
+                public static object? LiftedPresent() {
+                    int? source = 1;
+                    long? value = source;
+                    return value;
+                }
+
+                public static object OrdinaryValue(int value) => value;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] { "Empty", "LiftedEmpty" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.None),
+                methodName);
+            Assert.That(
+                result.Projection.Effects & SharpProofEffect.Allocates,
+                Is.EqualTo(SharpProofEffect.None),
+                methodName);
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        foreach (var methodName in new[]
+                 {
+                     "Present",
+                     "LiftedPresent",
+                     "OrdinaryValue"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed),
+                methodName);
+            Assert.That(
+                result.Projection.Effects & SharpProofEffect.Allocates,
+                Is.EqualTo(SharpProofEffect.Allocates),
+                methodName);
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        var unknown = session.Analyze(Method(compilation, "Unknown"));
+        Assert.That(
+            unknown.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Unknown));
+        Assert.That(
+            unknown.Projection.Effects & SharpProofEffect.Allocates,
+            Is.EqualTo(SharpProofEffect.None));
+        Assert.That(unknown.Projection.IsComplete, Is.False);
+        Assert.That(unknown.DirectWitnesses, Is.Empty);
+    }
+
+    [Test]
+    public void LiftedArithmeticSkipsHazardsWhenAnyOperandIsAbsent()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static int? DivideNullLeft() {
+                    int? left = null;
+                    int? right = 0;
+                    return left / right;
+                }
+
+                public static int? DivideNullRight() {
+                    int? left = int.MinValue;
+                    int? right = null;
+                    return left / right;
+                }
+
+                public static int? DivideBothNull() {
+                    int? left = null;
+                    int? right = null;
+                    return left / right;
+                }
+
+                public static int? RemainderNullRight() {
+                    int? left = int.MinValue;
+                    int? right = null;
+                    return left % right;
+                }
+
+                public static uint? UnsignedDivideNullLeft() {
+                    uint? left = null;
+                    uint? right = 0;
+                    return left / right;
+                }
+
+                public static int? CheckedAddNullLeft() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    return checked(left + right);
+                }
+
+                public static int? CheckedNegateNull() {
+                    int? value = null;
+                    return checked(-value);
+                }
+
+                public static int? CheckedIncrementNull() {
+                    int? value = null;
+                    checked { value++; }
+                    return value;
+                }
+
+                public static int? DivideAssignNullRight() {
+                    int? left = 1;
+                    int? right = null;
+                    left /= right;
+                    return left;
+                }
+
+                public static int? DivideAssignNullLeft() {
+                    int? left = null;
+                    int? right = 0;
+                    left /= right;
+                    return left;
+                }
+
+                public static int? CheckedAddAssignNull() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    checked { left += right; }
+                    return left;
+                }
+
+                public static int? UncheckedAddNull() {
+                    int? left = null;
+                    int? right = int.MaxValue;
+                    return unchecked(left + right);
+                }
+
+                public static long? CheckedConversionNull() {
+                    int? value = null;
+                    return checked((long?)value);
+                }
+
+                public static int? PresentDivideZero() {
+                    int? left = 1;
+                    int? right = 0;
+                    return left / right;
+                }
+
+                public static int? PresentCheckedAdd() {
+                    int? left = int.MaxValue;
+                    int? right = 1;
+                    return checked(left + right);
+                }
+
+                public static int? PresentCheckedIncrement() {
+                    int? value = int.MaxValue;
+                    checked { value++; }
+                    return value;
+                }
+
+                public static int? UnknownDivide(int? left, int? right) =>
+                    left / right;
+
+                public static int? UnknownCheckedAdd(int? left, int? right) =>
+                    checked(left + right);
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[]
+                 {
+                     "DivideNullLeft",
+                     "DivideNullRight",
+                     "DivideBothNull",
+                     "RemainderNullRight",
+                     "UnsignedDivideNullLeft",
+                     "CheckedAddNullLeft",
+                     "CheckedNegateNull",
+                     "CheckedIncrementNull",
+                     "DivideAssignNullRight",
+                     "DivideAssignNullLeft",
+                     "CheckedAddAssignNull",
+                     "UncheckedAddNull",
+                     "CheckedConversionNull"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Throws.IsEmpty,
+                Is.True,
+                methodName);
+            Assert.That(result.Projection.IsComplete, Is.True, methodName);
+        }
+
+        AssertThrows(
+            session.Analyze(Method(compilation, "PresentDivideZero")).Summary,
+            "System.DivideByZeroException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "PresentCheckedAdd")).Summary,
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "PresentCheckedIncrement")).Summary,
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "UnknownDivide")).Summary,
+            "System.DivideByZeroException",
+            "System.OverflowException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "UnknownCheckedAdd")).Summary,
+            "System.OverflowException");
     }
 
     [Test]
@@ -330,6 +872,157 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void CapturedPrimaryConstructorParametersReadReceiverState()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class ClassSample(int seed) {
+                private static int Pass(int value) => value;
+
+                public int Read() => seed;
+                public int Forward() => Pass(seed);
+                public int Value => seed;
+            }
+
+            public record class RecordSample(int seed) {
+                public int Read() => seed;
+                public int Value => seed;
+            }
+
+            public struct StructSample(int seed) {
+                public int Read() => seed;
+                public int Value => seed;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var methods = new[] {
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ClassSample",
+                "Read"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ClassSample",
+                "Forward"),
+            RequireGetter(compilation, "ClassSample", "Value"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "RecordSample",
+                "Read"),
+            RequireGetter(compilation, "RecordSample", "Value"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "StructSample",
+                "Read"),
+            RequireGetter(compilation, "StructSample", "Value")
+        };
+
+        foreach (var method in methods)
+        {
+            var result = session.Analyze(method);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Reads.Regions,
+                    Is.EqualTo(new[] { EffectRegionId.Receiver }),
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Summary.Writes.IsEmpty,
+                    Is.True,
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Projection.Effects,
+                    Is.EqualTo(SharpProofEffect.ReadsReceiverState),
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Projection.IsComplete,
+                    Is.True,
+                    method.ToDisplayString());
+            }
+        }
+    }
+
+    [Test]
+    public void PrimaryConstructorAndOrdinaryParameterReadsStayLocal()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public class BaseSample {
+                protected BaseSample(int value) {
+                }
+            }
+
+            public sealed class ForwardOnly(int seed) : BaseSample(seed) {
+                public int Constant() => 1;
+                public int Ordinary(int value) => value;
+            }
+
+            public sealed class ConstructorOnly(int seed) {
+                private readonly int _copy = seed;
+
+                public int Constant() => 1;
+                public static int Ordinary(int value) => value;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var exactControls = new[] {
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ForwardOnly",
+                "Constant"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ForwardOnly",
+                "Ordinary"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ConstructorOnly",
+                "Constant"),
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ConstructorOnly",
+                "Ordinary")
+        };
+
+        foreach (var method in exactControls)
+        {
+            var result = session.Analyze(method);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Reads.IsEmpty,
+                    Is.True,
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    method.ToDisplayString());
+                Assert.That(
+                    result.Projection.Effects,
+                    Is.EqualTo(SharpProofEffect.None),
+                    method.ToDisplayString());
+            }
+        }
+
+        foreach (var typeName in new[] { "ForwardOnly", "ConstructorOnly" })
+        {
+            var constructor = EffectTestHost.RequireType(
+                    compilation,
+                    typeName)
+                .InstanceConstructors
+                .Single(static method => method.Parameters.Length == 1);
+            Assert.That(
+                session.Analyze(constructor).Summary.Reads.IsEmpty,
+                Is.True,
+                typeName);
+        }
+    }
+
+    [Test]
     public void ValueTypeConstructionDoesNotReportManagedAllocation()
     {
         var result = Analyze(
@@ -350,6 +1043,100 @@ public sealed class EffectAnalysisTests
             result.Projection.Effects & SharpProofEffect.Allocates,
             Is.EqualTo(SharpProofEffect.None));
         Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+    }
+
+    [Test]
+    public void ProvablyEmptyImplicitConstructorsAreModeledExactly()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+                public static int Touch() => ++State;
+            }
+
+            public sealed class ImplicitClass { }
+
+            public sealed class ExplicitClass {
+                public ExplicitClass() { }
+            }
+
+            public class ExplicitEmptyBase {
+                protected ExplicitEmptyBase() { }
+            }
+
+            public sealed class ImplicitEmptyDerived : ExplicitEmptyBase { }
+
+            public struct ImplicitStruct { }
+
+            public sealed record ImplicitRecord;
+
+            public class EffectfulBase {
+                protected EffectfulBase() {
+                    Global.Touch();
+                }
+            }
+
+            public sealed class ImplicitDerived : EffectfulBase { }
+
+            public sealed class MemberInitializer {
+                private readonly int _value = Global.Touch();
+            }
+
+            public sealed class StaticInitializer {
+                private static readonly int Value = Global.Touch();
+            }
+
+            public static class Sample {
+                public static ImplicitClass Class() => new();
+                public static ExplicitClass Explicit() => new();
+                public static ImplicitEmptyDerived EmptyDerived() => new();
+                public static ImplicitStruct Struct() => new();
+                public static ImplicitRecord Record() => new();
+                public static ImplicitDerived Derived() => new();
+                public static MemberInitializer Member() => new();
+                public static StaticInitializer Static() => new();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "Class", "Explicit", "EmptyDerived", "Struct", "Record"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+                Assert.That(
+                    result.Summary.Uncertainty & EffectUncertainty.UnmodeledCall,
+                    Is.EqualTo(EffectUncertainty.None),
+                    methodName);
+            }
+        }
+
+        foreach (var methodName in new[] { "Member", "Static" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete),
+                methodName);
+        }
+
+        var derived = session.Analyze(Method(compilation, "Derived"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                derived.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(
+                derived.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+        }
     }
 
     [Test]
@@ -408,6 +1195,10 @@ public sealed class EffectAnalysisTests
         {
             Assert.That(
                 objectInitializer.Summary.Writes.IsUnknown,
+                Is.False);
+            Assert.That(
+                objectInitializer.Summary.Writes.Contains(
+                    EffectRegionId.Static()),
                 Is.True);
             Assert.That(
                 collectionInitializer.Summary.Writes.Contains(
@@ -415,7 +1206,7 @@ public sealed class EffectAnalysisTests
                 Is.True);
             Assert.That(
                 objectInitializer.Projection.IsComplete,
-                Is.False);
+                Is.True);
             Assert.That(
                 collectionInitializer.Projection.Effects &
                 SharpProofEffect.WritesStaticState,
@@ -425,6 +1216,179 @@ public sealed class EffectAnalysisTests
                 SharpProofEffect.WritesStaticState,
                 Is.EqualTo(SharpProofEffect.WritesStaticState));
         }
+    }
+
+    [Test]
+    public void FreshObjectInitializerOwnershipMatrixIsExact()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Collections;
+
+            public sealed class Value {
+                public int Field;
+                private int _property;
+                public int Property {
+                    get => _property;
+                    set => _property = value;
+                }
+                public int this[int index] { get => 0; set { } }
+            }
+
+            public struct StructValue {
+                public int Field;
+                private int _property;
+                public int Property {
+                    readonly get => _property;
+                    set => _property = value;
+                }
+            }
+
+            public sealed class Nested {
+                public Value Child;
+            }
+
+            public sealed class Values : IEnumerable {
+                public void Add(int value) { }
+                public IEnumerator GetEnumerator() =>
+                    throw new NotSupportedException();
+            }
+
+            public sealed class ThrowingValue {
+                public int Property {
+                    set => throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                private static int SideEffect() {
+                    s_state++;
+                    return 1;
+                }
+
+                public static Value Field() => new() { Field = 1 };
+                public static Value Property() => new() { Property = 1 };
+                public static Value Indexer() => new() { [0] = 1 };
+                public static Nested NestedFresh() =>
+                    new() { Child = new() { Field = 1 } };
+                public static Values Collection() => new() { 1 };
+                public static StructValue StructField() => new() { Field = 1 };
+                public static StructValue StructProperty() => new() { Property = 1 };
+                public static Value StaticEffect() => new() { Field = SideEffect() };
+                public static ThrowingValue ThrowingSetter() => new() { Property = 1 };
+                public static int[] FreshArray() => new[] { 1 };
+                public static Nested ExternalAlias(Value value) {
+                    var result = new Nested { Child = value };
+                    result.Child.Field = 1;
+                    return result;
+                }
+                public static Nested MemberDerived() =>
+                    new() { Child = { Field = 1 } };
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var name in new[] {
+                         "Field", "Property", "Indexer", "NestedFresh",
+                         "Collection", "StructField", "StructProperty", "FreshArray"
+                     })
+            {
+                var result = session.Analyze(Method(compilation, name));
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    name);
+                Assert.That(
+                    EffectContractMappings.IsObservablePure(result.Summary),
+                    Is.True,
+                    name);
+                Assert.That(
+                    result.Summary.Writes.IsUnknown,
+                    Is.False,
+                    name);
+            }
+
+            var staticEffect = session.Analyze(Method(compilation, "StaticEffect"));
+            Assert.That(
+                staticEffect.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                "StaticEffect");
+            Assert.That(
+                staticEffect.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                "StaticEffect");
+
+            var throwing = session.Analyze(Method(compilation, "ThrowingSetter"));
+            Assert.That(
+                throwing.Summary.Throws.Types.Select(static type => type.Name),
+                Does.Contain("InvalidOperationException"),
+                "ThrowingSetter");
+            Assert.That(
+                throwing.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                "ThrowingSetter");
+
+            foreach (var name in new[] { "ExternalAlias", "MemberDerived" })
+            {
+                var result = session.Analyze(Method(compilation, name));
+                Assert.That(
+                    EffectContractMappings.IsObservablePure(result.Summary),
+                    Is.False,
+                    name);
+                Assert.That(
+                    result.Summary.Writes.IsUnknown,
+                    Is.True,
+                    name);
+            }
+        }
+    }
+
+    [Test]
+    public void FreshInitializerCaptureSourcesAreCompilerOwnedCreations()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Value { public int Field; }
+            public struct StructValue {
+                public int Field;
+                public int Property { get; set; }
+            }
+            public static class Sample {
+                public static Value Field() => new() { Field = 1 };
+                public static StructValue StructField() => new() { Field = 1 };
+                public static StructValue StructProperty() => new() { Property = 1 };
+            }
+            """);
+        var shapes = new List<string>();
+        foreach (var name in new[] { "Field", "StructField", "StructProperty" })
+        {
+            var method = Method(compilation, name);
+            var declaration = method.DeclaringSyntaxReferences.Single().GetSyntax();
+            var model = compilation.GetSemanticModel(declaration.SyntaxTree);
+            var body = model.GetOperation(declaration) as IMethodBodyOperation;
+            Assert.That(body, Is.Not.Null, name);
+            var graph = ControlFlowGraph.Create(body!);
+            shapes.AddRange(graph.Blocks
+                .SelectMany(static block => block.Operations)
+                .SelectMany(static operation => operation.DescendantsAndSelf())
+                .OfType<IFlowCaptureOperation>()
+                .Select(capture =>
+                    name + ":" + capture.Value.Kind + ":" +
+                    capture.Value.Syntax.Kind() + ":" +
+                    capture.Value.Type?.ToDisplayString()));
+        }
+
+        Assert.That(
+            string.Join("\n", shapes),
+            Is.EqualTo(
+                "Field:ObjectCreation:ImplicitObjectCreationExpression:Value\n" +
+                "StructField:ObjectCreation:ImplicitObjectCreationExpression:StructValue\n" +
+                "StructProperty:ObjectCreation:ImplicitObjectCreationExpression:StructValue"));
     }
 
     [Test]
@@ -515,6 +1479,133 @@ public sealed class EffectAnalysisTests
                 result.Projection.IsComplete,
                 Is.False,
                 method.MetadataName);
+        }
+    }
+
+    [Test]
+    public void ValueTypeInstanceCallsAccountForExplicitTypeInitialization()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global {
+                public static object? State;
+            }
+
+            public struct InitializedValue {
+                static InitializedValue() {
+                    Global.State = new object();
+                    throw new InvalidOperationException();
+                }
+
+                public readonly void Touch() { }
+                public readonly int Number => 0;
+            }
+
+            public readonly struct PlainValue {
+                public void Touch() { }
+                public int Number => 0;
+            }
+
+            public sealed class InitializedReference {
+                static InitializedReference() {
+                    Global.State = new object();
+                }
+
+                public void Touch() { }
+            }
+
+            public static class InitializedStatic {
+                static InitializedStatic() {
+                    Global.State = new object();
+                }
+
+                public static void Touch() { }
+            }
+
+            public static class Sample {
+                public static void CallInitializedMethod() =>
+                    default(InitializedValue).Touch();
+
+                public static int ReadInitializedProperty() =>
+                    default(InitializedValue).Number;
+
+                public static void CallPlainMethod() =>
+                    default(PlainValue).Touch();
+
+                public static int ReadPlainProperty() =>
+                    default(PlainValue).Number;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var affected = new[]
+        {
+            session.Analyze(Method(compilation, "CallInitializedMethod")),
+            session.Analyze(Method(compilation, "ReadInitializedProperty")),
+            session.Analyze(EffectTestHost.RequireMethod(
+                compilation,
+                "InitializedStatic",
+                "Touch"))
+        };
+        var exact = new[]
+        {
+            session.Analyze(Method(compilation, "CallPlainMethod")),
+            session.Analyze(Method(compilation, "ReadPlainProperty")),
+            session.Analyze(EffectTestHost.RequireMethod(
+                compilation,
+                "InitializedReference",
+                "Touch"))
+        };
+
+        foreach (var result in affected)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Incomplete),
+                    ResultKey(result));
+                Assert.That(
+                    result.Summary.Uncertainty & EffectUncertainty.UnmodeledCall,
+                    Is.EqualTo(EffectUncertainty.UnmodeledCall),
+                    ResultKey(result));
+                Assert.That(
+                    result.Summary.Writes.IsUnknown,
+                    Is.True,
+                    ResultKey(result));
+                Assert.That(
+                    result.Summary.Allocation,
+                    Is.EqualTo(EffectAllocationKind.Unknown),
+                    ResultKey(result));
+                Assert.That(
+                    result.Summary.Throws.IncludesUnknown,
+                    Is.True,
+                    ResultKey(result));
+                Assert.That(
+                    result.Projection.IsComplete,
+                    Is.False,
+                    ResultKey(result));
+            }
+        }
+
+        foreach (var result in exact)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    ResultKey(result));
+                Assert.That(result.Summary.Reads.IsEmpty, Is.True, ResultKey(result));
+                Assert.That(result.Summary.Writes.IsEmpty, Is.True, ResultKey(result));
+                Assert.That(
+                    result.Summary.Allocation,
+                    Is.EqualTo(EffectAllocationKind.None),
+                    ResultKey(result));
+                Assert.That(result.Summary.Throws.IsEmpty, Is.True, ResultKey(result));
+                Assert.That(result.Projection.IsComplete, Is.True, ResultKey(result));
+            }
         }
     }
 
@@ -623,6 +1714,239 @@ public sealed class EffectAnalysisTests
         Assert.That(
             @static.Projection.Effects,
             Is.EqualTo(SharpProofEffect.WritesStaticState));
+    }
+
+    [Test]
+    public void CoalesceAssignmentRetainsObservableTargetWrites()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Box {
+                public object? Value;
+            }
+
+            public sealed class Sample {
+                private object? _field;
+                private static object? s_field;
+                private object? _propertyValue;
+                private object? _indexerValue;
+
+                private object? Property {
+                    get => _propertyValue;
+                    set => _propertyValue = value;
+                }
+
+                private object? this[int index] {
+                    get => _indexerValue;
+                    set => _indexerValue = value;
+                }
+
+                public void ReceiverField(object value) =>
+                    _field ??= value;
+                public static void StaticField(object value) =>
+                    s_field ??= value;
+                public static void ParameterField(Box box, object value) =>
+                    box.Value ??= value;
+                public void PropertySetter(object value) =>
+                    Property ??= value;
+                public void IndexerSetter(object value) =>
+                    this[0] ??= value;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var cases = new[] {
+            (Method: "ReceiverField", Region: EffectRegionId.Receiver),
+            (Method: "StaticField", Region: EffectRegionId.Static()),
+            (Method: "ParameterField", Region: EffectRegionId.Parameter(0)),
+            (Method: "PropertySetter", Region: EffectRegionId.Receiver),
+            (Method: "IndexerSetter", Region: EffectRegionId.Receiver)
+        };
+
+        foreach (var (methodName, region) in cases)
+        {
+            var method = EffectTestHost.RequireMethod(
+                compilation,
+                "Sample",
+                methodName);
+            var result = session.Analyze(method);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Writes.Regions,
+                    Is.EqualTo(new[] { region }),
+                    methodName);
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+                Assert.That(result.Projection.IsComplete, Is.True, methodName);
+            }
+        }
+    }
+
+    [Test]
+    public void CoalesceAssignmentLocalTargetsRemainConservativeAndUnobservable()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void DefinitelyNull() {
+                    object? value = null;
+                    value ??= new object();
+                }
+
+                public static void DefinitelyNonNull() {
+                    object? value = typeof(object);
+                    value ??= new object();
+                }
+
+                public static void MaybeNull(object? value) {
+                    value ??= new object();
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var definitelyNull = session.Analyze(
+            Method(compilation, "DefinitelyNull"));
+        var definitelyNonNull = session.Analyze(
+            Method(compilation, "DefinitelyNonNull"));
+        var maybeNull = session.Analyze(
+            Method(compilation, "MaybeNull"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                definitelyNull.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                definitelyNonNull.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                maybeNull.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                new[] {
+                    definitelyNull.Summary,
+                    definitelyNonNull.Summary,
+                    maybeNull.Summary
+                },
+                Has.All.Property(nameof(EffectSummary.Writes))
+                    .EqualTo(EffectRegionSet.Empty));
+            Assert.That(
+                new[] {
+                    definitelyNull.Summary,
+                    definitelyNonNull.Summary,
+                    maybeNull.Summary
+                },
+                Has.All.Property(nameof(EffectSummary.Completeness))
+                    .EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
+    public void UsingFormsIncludeImplicitDisposeEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class Resource : IDisposable {
+                private static volatile int s_state;
+
+                public void Dispose() {
+                    s_state = 1;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                public static void Statement(Resource resource) {
+                    using (resource) { }
+                }
+
+                public static void Declaration(Resource resource) {
+                    using var alias = resource;
+                }
+
+                public static void Explicit(Resource resource) =>
+                    resource.Dispose();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] { "Statement", "Declaration", "Explicit" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    result.Summary.Writes.Contains(EffectRegionId.Static()),
+                    Is.True,
+                    methodName);
+                Assert.That(
+                    result.Summary.Capabilities.Contains(
+                        EffectCapabilityKind.Synchronization),
+                    Is.True,
+                    methodName);
+                AssertContainsThrows(
+                    result.Summary,
+                    "System.InvalidOperationException");
+                Assert.That(result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete), methodName);
+            }
+        }
+    }
+
+    [Test]
+    public void UsingNullNoOpAndInterfaceControlsStaySound()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class NoOp : IDisposable {
+                public void Dispose() { }
+            }
+
+            public sealed class NullSensitive : IDisposable {
+                private static int s_state;
+                public void Dispose() => s_state = 1;
+            }
+
+            public static class Sample {
+                public static void NoOpResource(NoOp resource) {
+                    using (resource) { }
+                }
+
+                public static void NullResource() {
+                    NullSensitive? resource = null;
+                    using (resource) { }
+                }
+
+                public static void InterfaceResource(IDisposable resource) {
+                    using (resource) { }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var noOp = session.Analyze(Method(compilation, "NoOpResource"));
+        var @null = session.Analyze(Method(compilation, "NullResource"));
+        var @interface = session.Analyze(Method(compilation, "InterfaceResource"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(noOp.Summary.Writes.IsEmpty, Is.True);
+            Assert.That(noOp.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(@null.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+            Assert.That(@null.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(@interface.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(@interface.Summary.Uncertainty & EffectUncertainty.Dispatch,
+                Is.EqualTo(EffectUncertainty.Dispatch));
+        }
     }
 
     [Test]
@@ -1452,6 +2776,100 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void PropertyDispatchUsesTheOperationReceiver()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public class Base {
+                private int _value;
+                public virtual int Value {
+                    get { return _value; }
+                    set { _value = value; }
+                }
+                public virtual int this[int index] {
+                    get { return _value; }
+                    set { _value = value; }
+                }
+                public virtual int GetValue() => _value;
+            }
+
+            public class Derived : Base {
+                public int BaseGet() => base.Value;
+                public void BaseSet(int value) => base.Value = value;
+                public int BaseIndexerGet() => base[0];
+                public void BaseIndexerSet(int value) => base[0] = value;
+                public int BaseMethod() => base.GetValue();
+                public int ThisVirtual() => this.Value;
+            }
+
+            public sealed class SealedDerived : Base {
+                public override int Value {
+                    get { return base.Value; }
+                    set { base.Value = value; }
+                }
+                public int Read() => Value;
+            }
+
+            public sealed class SealedInherited : Base {
+                public int Read() => Value;
+            }
+
+            public sealed class NonVirtual {
+                private int _value;
+                public int Value {
+                    get { return _value; }
+                    set { _value = value; }
+                }
+                public int Read() => Value;
+            }
+
+            public interface IValue {
+                int Value { get; }
+            }
+
+            public static class Sample {
+                public static int Interface(IValue value) => value.Value;
+                public static int Conditional(Derived? value) => value?.Value ?? 0;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        foreach (var (type, method) in new[] {
+                     ("Derived", "BaseGet"),
+                     ("Derived", "BaseSet"),
+                     ("Derived", "BaseIndexerGet"),
+                     ("Derived", "BaseIndexerSet"),
+                     ("Derived", "BaseMethod"),
+                     ("SealedDerived", "Read"),
+                     ("SealedInherited", "Read"),
+                     ("NonVirtual", "Read")
+                 })
+        {
+            var result = session.Analyze(
+                EffectTestHost.RequireMethod(compilation, type, method));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                type + "." + method);
+            Assert.That(result.Projection.IsComplete, Is.True, type + "." + method);
+        }
+
+        foreach (var (type, method) in new[] {
+                     ("Derived", "ThisVirtual"),
+                     ("Sample", "Interface"),
+                     ("Sample", "Conditional")
+                 })
+        {
+            var result = session.Analyze(
+                EffectTestHost.RequireMethod(compilation, type, method));
+            Assert.That(
+                result.Summary.Uncertainty & EffectUncertainty.Dispatch,
+                Is.EqualTo(EffectUncertainty.Dispatch),
+                type + "." + method);
+            Assert.That(result.Projection.IsComplete, Is.False, type + "." + method);
+        }
+    }
+
+    [Test]
     public void ExplicitAndImplicitExceptionsRemainResolved()
     {
         var compilation = EffectTestHost.CreateCompilation(
@@ -1631,6 +3049,113 @@ public sealed class EffectAnalysisTests
         AssertDoesNotThrow(
             requiredNonNull,
             "System.NullReferenceException");
+    }
+
+    [Test]
+    public void DefinitelyNullThrownExpressionsReplaceTheirDeclaredExceptionType()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using System;
+
+            public static class Sample {
+                private static int s_state;
+                private static InvalidOperationException? s_exception;
+
+                public static void NullLiteral() => throw null!;
+
+                public static void NullLocal() {
+                    InvalidOperationException? exception = null;
+                    throw exception!;
+                }
+
+                public static void NullBranch(bool condition) {
+                    InvalidOperationException? exception;
+                    if (condition) {
+                        exception = null;
+                    }
+                    else {
+                        exception = null;
+                    }
+                    throw exception;
+                }
+
+                public static void NonNullLocal() {
+                    InvalidOperationException? exception =
+                        new InvalidOperationException();
+                    throw exception;
+                }
+
+                public static void NullConditional(bool condition) {
+                    InvalidOperationException? left = null;
+                    InvalidOperationException? right = null;
+                    throw (condition ? left : right);
+                }
+
+                public static void NullConversion() {
+                    Exception? exception = null;
+                    throw (InvalidOperationException?)exception;
+                }
+
+                public static void MaybeNull(
+                    InvalidOperationException? exception) =>
+                    throw exception;
+
+                public static void Field() => throw s_exception;
+
+                public static void Coalesced(
+                    InvalidOperationException? exception) =>
+                    throw (exception ?? new InvalidOperationException());
+
+                public static void NullCatchReachability() {
+                    try {
+                        InvalidOperationException? exception = null;
+                        throw exception;
+                    }
+                    catch (InvalidOperationException) {
+                        s_state++;
+                    }
+                    catch (NullReferenceException) {
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[]
+                 {
+                     "NullLiteral",
+                     "NullLocal",
+                     "NullBranch",
+                     "NullConditional",
+                     "NullConversion"
+                 })
+        {
+            var summary = session.Analyze(Method(compilation, methodName)).Summary;
+            AssertThrows(summary, "System.NullReferenceException");
+            AssertDoesNotThrow(summary, "System.InvalidOperationException");
+        }
+
+        var nonNull = session.Analyze(Method(compilation, "NonNullLocal")).Summary;
+        AssertThrows(nonNull, "System.InvalidOperationException");
+        AssertDoesNotThrow(nonNull, "System.NullReferenceException");
+
+        AssertThrows(
+            session.Analyze(Method(compilation, "MaybeNull")).Summary,
+            "System.InvalidOperationException",
+            "System.NullReferenceException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "Field")).Summary,
+            "System.InvalidOperationException",
+            "System.NullReferenceException");
+        AssertThrows(
+            session.Analyze(Method(compilation, "Coalesced")).Summary,
+            "System.InvalidOperationException");
+        Assert.That(
+            session.Analyze(Method(compilation, "NullCatchReachability"))
+                .Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.False);
     }
 
     [Test]
@@ -1881,6 +3406,116 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void UnboxingCreatesAValueOwnedCopyWithoutDroppingReferenceAliases()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public struct Counter {
+                public int Number;
+            }
+
+            public sealed class Box {
+                public int Number;
+            }
+
+            public sealed class Holder {
+                public object Value = null!;
+            }
+
+            public interface IBox {
+                int Number { get; set; }
+            }
+
+            public struct InterfaceCounter : IBox {
+                public int Number { get; set; }
+            }
+
+            public sealed class BoxWithInterface : IBox {
+                public int Number { get; set; }
+            }
+
+            public static class Sample {
+                public static void BoxedArgument(object value) {
+                    var copy = (Counter)value;
+                    copy.Number = 1;
+                }
+
+                public static void BoxedField(Holder value) {
+                    var copy = (Counter)value.Value;
+                    copy.Number = 1;
+                }
+
+                public static void NullableUnbox(Counter? value) {
+                    var copy = (Counter)value;
+                    copy.Number = 1;
+                }
+
+                public static void RefUnbox(ref object value) {
+                    var copy = (Counter)value;
+                    copy.Number = 1;
+                }
+
+                public static void ReferenceCast(Box value) {
+                    var alias = (Box)(object)value;
+                    alias.Number = 1;
+                }
+
+                public static void InterfaceReferenceCast(BoxWithInterface value) {
+                    var alias = (BoxWithInterface)(IBox)value;
+                    alias.Number = 1;
+                }
+
+                public static object InterfaceBoxing(InterfaceCounter value) => (IBox)value;
+
+                public static void ByValue(Counter value) => value.Number = 1;
+                public static void ByRef(ref Counter value) => value.Number = 1;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var valueOwned = new[]
+        {
+            "BoxedArgument",
+            "BoxedField",
+            "NullableUnbox",
+            "RefUnbox",
+            "ByValue"
+        };
+        foreach (var methodName in valueOwned)
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Writes.IsEmpty,
+                Is.True,
+                methodName);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.True,
+                methodName);
+        }
+
+        foreach (var methodName in new[] { "ReferenceCast", "InterfaceReferenceCast" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True,
+                methodName);
+        }
+
+        var byReference = session.Analyze(Method(compilation, "ByRef"));
+        Assert.That(
+            byReference.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+            Is.True);
+
+        var interfaceBoxing = session.Analyze(
+            Method(compilation, "InterfaceBoxing"));
+        Assert.That(interfaceBoxing.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(interfaceBoxing.Summary.Writes.IsEmpty, Is.True);
+    }
+
+    [Test]
     public void RecursiveSccStartsConservative()
     {
         var result = Analyze(
@@ -1924,6 +3559,104 @@ public sealed class EffectAnalysisTests
             result.Summary.AnalysisIncompleteReason,
             Is.EqualTo(EffectAnalysisIncompleteReason.None));
         Assert.That(result.Projection.IsComplete, Is.True);
+    }
+
+    [Test]
+    public void CompileTimeLoopConditionsControlReachabilityAndTermination()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static object? Stored;
+
+                public static void WhileFalse() {
+                    while (false) {
+                        Stored = new object();
+                        throw new System.Exception();
+                    }
+                }
+
+                public static void ForFalse() {
+                    for (; false;) {
+                        Stored = new object();
+                    }
+                }
+
+                public static void WhileTrue() {
+                    while (true) {
+                    }
+                }
+
+                public static void WhileUnknown(bool condition) {
+                    while (condition) {
+                    }
+                }
+
+                public static void DoFalse() {
+                    do {
+                        Stored = new object();
+                    } while (false);
+                }
+
+                public static void DoTrue() {
+                    do {
+                    } while (true);
+                }
+
+                public static void FalseInsideUnknown(bool condition) {
+                    while (condition) {
+                        while (false) {
+                            Stored = new object();
+                            throw new System.Exception();
+                        }
+                    }
+                }
+
+                public static void UnknownInsideFalse(bool condition) {
+                    while (false) {
+                        while (condition) {
+                            Stored = new object();
+                        }
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var whileFalse = session.Analyze(Method(compilation, "WhileFalse")).Summary;
+        var forFalse = session.Analyze(Method(compilation, "ForFalse")).Summary;
+        var whileTrue = session.Analyze(Method(compilation, "WhileTrue")).Summary;
+        var whileUnknown = session.Analyze(Method(compilation, "WhileUnknown")).Summary;
+        var doFalse = session.Analyze(Method(compilation, "DoFalse")).Summary;
+        var doTrue = session.Analyze(Method(compilation, "DoTrue")).Summary;
+        var falseInsideUnknown = session.Analyze(
+            Method(compilation, "FalseInsideUnknown")).Summary;
+        var unknownInsideFalse = session.Analyze(
+            Method(compilation, "UnknownInsideFalse")).Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            AssertNoEffectsAndTerminates(whileFalse);
+            AssertNoEffectsAndTerminates(forFalse);
+            AssertNoEffectsAndTerminates(unknownInsideFalse);
+            Assert.That(whileTrue.Termination, Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(whileUnknown.Termination, Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(doTrue.Termination, Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(doFalse.Termination, Is.EqualTo(EffectTermination.Terminates));
+            Assert.That(doFalse.Writes.IsEmpty, Is.False);
+            Assert.That(doFalse.Allocation, Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(falseInsideUnknown.Termination, Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(falseInsideUnknown.Writes.IsEmpty, Is.True);
+            Assert.That(falseInsideUnknown.Allocation, Is.EqualTo(EffectAllocationKind.None));
+            Assert.That(falseInsideUnknown.Throws.IsEmpty, Is.True);
+        }
+    }
+
+    private static void AssertNoEffectsAndTerminates(EffectSummary summary)
+    {
+        Assert.That(summary.Termination, Is.EqualTo(EffectTermination.Terminates));
+        Assert.That(summary.Writes.IsEmpty, Is.True);
+        Assert.That(summary.Allocation, Is.EqualTo(EffectAllocationKind.None));
+        Assert.That(summary.Throws.IsEmpty, Is.True);
     }
 
     [Test]
@@ -2025,6 +3758,60 @@ public sealed class EffectAnalysisTests
         AssertDoesNotThrow(
             result.Summary,
             "System.ArrayTypeMismatchException");
+    }
+
+    [Test]
+    public void ArrayStoreCompatibilityUsesExactFreshRuntimeElementType()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public interface IValue { }
+            public sealed class Value : IValue { }
+            public class Base { }
+            public sealed class Derived : Base { }
+            public static class Sample {
+                private static object[] s_field = new object[1];
+                public static void FreshObject() { object[] values = new object[1]; values[0] = "value"; }
+                public static void LocalAlias() { object[] values = new object[1]; object[] alias = values; alias[0] = "value"; }
+                public static void FreshBase() { Base[] values = new Base[1]; values[0] = new Derived(); }
+                public static void FreshInterface() { IValue[] values = new IValue[1]; values[0] = new Value(); }
+                public static void FreshBoxing() { object[] values = new object[1]; values[0] = 1; }
+                public static void Covariant() { object[] values = new string[1]; values[0] = new object(); }
+                public static void UnknownParameter(object[] values, string value) { values[0] = value; }
+                public static void FieldAlias(string value) { s_field[0] = value; }
+                public static void CovariantNull() { object[] values = new string[1]; values[0] = null; }
+                public static void ValueArray() { int[] values = new int[1]; values[0] = 1; }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            AssertCompatible("FreshObject");
+            AssertCompatible("LocalAlias");
+            AssertCompatible("FreshBase");
+            AssertCompatible("FreshInterface");
+            AssertCompatible("FreshBoxing");
+            AssertIncompatible("Covariant");
+            AssertIncompatible("UnknownParameter");
+            AssertIncompatible("FieldAlias");
+            AssertCompatible("CovariantNull");
+            AssertCompatible("ValueArray");
+        }
+
+        void AssertCompatible(string methodName)
+        {
+            AssertDoesNotThrow(
+                session.Analyze(Method(compilation, methodName)).Summary,
+                "System.ArrayTypeMismatchException");
+        }
+
+        void AssertIncompatible(string methodName)
+        {
+            AssertContainsThrows(
+                session.Analyze(Method(compilation, methodName)).Summary,
+                "System.ArrayTypeMismatchException");
+        }
     }
 
     [Test]
@@ -2318,6 +4105,106 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void NormallyCompletingCatchFlowsIntoPostTryEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                private static int s_state;
+
+                public static int HandledThrow() {
+                    var divisor = 1;
+                    try {
+                        throw new InvalidOperationException();
+                    }
+                    catch (InvalidOperationException) {
+                        divisor = 0;
+                    }
+
+                    s_state++;
+                    return 1 / divisor;
+                }
+
+                public static int NoThrowControl() {
+                    var divisor = 1;
+                    try {
+                        divisor = 1;
+                    }
+                    catch (InvalidOperationException) {
+                        divisor = 0;
+                    }
+
+                    return 1 / divisor;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var handled = session.Analyze(Method(compilation, "HandledThrow"));
+        var control = session.Analyze(Method(compilation, "NoThrowControl"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                handled.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            AssertContainsThrows(
+                handled.Summary,
+                "System.DivideByZeroException");
+            Assert.That(
+                EffectContractMappings.IsObservablePure(handled.Summary),
+                Is.False);
+            Assert.That(
+                handled.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(control.Summary.Throws.IsEmpty, Is.True);
+        }
+    }
+
+    [Test]
+    public void ExceptionHandlersContributeEffectsOnlyWhenReachable()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            public interface IExternal { void Run(); }
+            public static class Sample {
+                private static int s_state;
+                public static void EmptyTry() { try { } catch { s_state++; } }
+                public static void NoThrowTry() { try { var value = 1; value++; } catch { s_state++; } }
+                public static void KnownThrow() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { s_state++; } }
+                public static void UnknownThrow(IExternal external) { try { external.Run(); } catch (Exception) { s_state++; } }
+                public static void FalseFilter() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) when (false) { s_state++; } }
+                public static void TrueFilter() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) when (true) { s_state++; } }
+                public static void OrderedHierarchy() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { } catch (Exception) { s_state++; } }
+                public static void Rethrow() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { throw; } } catch (Exception) { s_state++; } }
+                public static void FinallyRuns() { try { } finally { s_state++; } }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(HasStaticWrite("EmptyTry"), Is.False);
+            Assert.That(HasStaticWrite("NoThrowTry"), Is.False);
+            Assert.That(HasStaticWrite("KnownThrow"), Is.True);
+            Assert.That(HasStaticWrite("UnknownThrow"), Is.True);
+            Assert.That(HasStaticWrite("FalseFilter"), Is.False);
+            Assert.That(HasStaticWrite("TrueFilter"), Is.True);
+            Assert.That(HasStaticWrite("OrderedHierarchy"), Is.False);
+            Assert.That(HasStaticWrite("Rethrow"), Is.True);
+            Assert.That(HasStaticWrite("FinallyRuns"), Is.True);
+        }
+
+        bool HasStaticWrite(string methodName)
+        {
+            return session.Analyze(Method(compilation, methodName))
+                .Summary.Writes.Contains(EffectRegionId.Static());
+        }
+    }
+
+    [Test]
     public void ExceptionFlowReportsOnlyExceptionsThatEscape()
     {
         var compilation = EffectTestHost.CreateCompilation(
@@ -2542,6 +4429,138 @@ public sealed class EffectAnalysisTests
                 session.Analyze(Method(compilation, "NonReturningFinally"))
                     .Summary.Throws.IsEmpty,
                 Is.True);
+        }
+    }
+
+    [Test]
+    public void BareRethrowBelongsOnlyToItsNearestCatch()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                private static void ThrowInvalid(InvalidOperationException value) {
+                    Contract.Requires(value != null);
+                    throw value;
+                }
+                private static void ThrowApplication(ApplicationException value) {
+                    Contract.Requires(value != null);
+                    throw value;
+                }
+                private static void ThrowArgument(ArgumentException value) {
+                    Contract.Requires(value != null);
+                    throw value;
+                }
+
+                public static void NestedCatch(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException inner) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(inner); }
+                        catch (ApplicationException) { throw; }
+                    }
+                }
+
+                public static void DirectOuterRethrow(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException inner) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(inner); }
+                        catch (ApplicationException) { }
+                        throw;
+                    }
+                }
+
+                public static void MultipleNestedCatch(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException middle,
+                    [NotNull] ArgumentException inner) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(middle); }
+                        catch (ApplicationException) {
+                            try { ThrowArgument(inner); }
+                            catch (ArgumentException) { throw; }
+                        }
+                    }
+                }
+
+                public static void NestedFilteredCatch(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException inner,
+                    bool selected) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(inner); }
+                        catch (ApplicationException) when (selected) { throw; }
+                        catch (ApplicationException) { }
+                    }
+                }
+
+                public static void NestedFinally(
+                    [NotNull] InvalidOperationException outer,
+                    [NotNull] ApplicationException inner) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        try { ThrowApplication(inner); }
+                        catch (ApplicationException) { throw; }
+                        finally { _ = 1; }
+                    }
+                }
+
+                public static void NestedCallableDeclarations(
+                    [NotNull] InvalidOperationException outer) {
+                    try { ThrowInvalid(outer); }
+                    catch (InvalidOperationException) {
+                        Action lambda = () => {
+                            try { throw new ApplicationException(); }
+                            catch (ApplicationException) { throw; }
+                        };
+                        static void Local() {
+                            try { throw new ArgumentException(); }
+                            catch (ArgumentException) { throw; }
+                        }
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                ExceptionNames(session, compilation, "NestedCatch"),
+                Is.EqualTo(["System.ApplicationException"]));
+            AssertThrows(
+                session.Analyze(Method(compilation, "DirectOuterRethrow")).Summary,
+                "System.InvalidOperationException");
+            Assert.That(
+                ExceptionNames(session, compilation, "MultipleNestedCatch"),
+                Is.EqualTo(["System.ArgumentException"]));
+            Assert.That(
+                ExceptionNames(session, compilation, "NestedFilteredCatch"),
+                Is.EqualTo(["System.ApplicationException"]));
+            Assert.That(
+                ExceptionNames(session, compilation, "NestedFinally"),
+                Is.EqualTo(["System.ApplicationException"]));
+            Assert.That(
+                session.Analyze(Method(compilation, "NestedCallableDeclarations"))
+                    .Summary.Throws.Types.IsEmpty,
+                Is.True);
+        }
+
+        static string[] ExceptionNames(
+            EffectAnalysisSession session,
+            CSharpCompilation compilation,
+            string method)
+        {
+            return [.. session.Analyze(Method(compilation, method)).Summary.Throws.Types
+                .Select(static type =>
+                    type.ContainingNamespace.MetadataName + "." + type.MetadataName)];
         }
     }
 
@@ -2806,6 +4825,133 @@ public sealed class EffectAnalysisTests
                 EffectTypeFacts.IsDerivedFrom(
                     derivedException,
                     integerException),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void MutationBearingExpressionsKeepRuntimeReachableEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int s_state;
+
+                public static void DirectFalseEdge() {
+                    var value = 1;
+                    if (value + (value = 2) == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void DirectTrueEdge() {
+                    var value = 1;
+                    if (value + (value = 2) == 3) {
+                        s_state++;
+                    }
+                }
+
+                public static void InitializerFalseEdge() {
+                    var value = 1;
+                    var predicate = value + (value = 2) == 4;
+                    if (predicate) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void AssignmentFalseEdge() {
+                    var value = 1;
+                    var predicate = false;
+                    predicate = value + (value = 2) == 4;
+                    if (predicate) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void IncrementFalseEdge() {
+                    var value = 1;
+                    if (value++ + value == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                private static int Replace(ref int value) {
+                    value = 2;
+                    return value;
+                }
+
+                public static void RefCallFalseEdge() {
+                    var value = 1;
+                    if (value + Replace(ref value) == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void NestedTrueEdge() {
+                    var value = 1;
+                    if ((value + (value = 2) == 3) && true) {
+                        s_state++;
+                    }
+                }
+
+                public static void StableImpossibleEdge() {
+                    var value = 2;
+                    if (value + value == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+
+                public static void StableReachableEdge() {
+                    var value = 1;
+                    if (value + value == 4) {
+                    }
+                    else {
+                        s_state++;
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var methodName in new[] {
+                         "DirectFalseEdge",
+                         "DirectTrueEdge",
+                     "InitializerFalseEdge",
+                     "AssignmentFalseEdge",
+                     "IncrementFalseEdge",
+                     "RefCallFalseEdge",
+                     "NestedTrueEdge",
+                         "StableReachableEdge"
+                     })
+            {
+                var result = session.Analyze(Method(compilation, methodName));
+                Assert.That(
+                    result.Summary.Writes.Contains(EffectRegionId.Static()),
+                    Is.True,
+                    methodName);
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+            }
+
+            Assert.That(
+                session.Analyze(Method(compilation, "StableImpossibleEdge"))
+                    .Summary.Writes.Contains(EffectRegionId.Static()),
                 Is.False);
         }
     }
@@ -3859,6 +6005,19 @@ public sealed class EffectAnalysisTests
         return EffectTestHost.RequireMethod(compilation, "Sample", methodName);
     }
 
+    private static IMethodSymbol RequireGetter(
+        Compilation compilation,
+        string typeMetadataName,
+        string propertyName)
+    {
+        return EffectTestHost.RequireType(compilation, typeMetadataName)
+            .GetMembers(propertyName)
+            .OfType<IPropertySymbol>()
+            .Single()
+            .GetMethod ?? throw new InvalidOperationException(
+                $"Property '{typeMetadataName}.{propertyName}' has no getter.");
+    }
+
     private static void AssertThrows(
         EffectSummary summary,
         params string[] metadataNames)
@@ -3904,6 +6063,64 @@ public sealed class EffectAnalysisTests
         return result.Method.ContainingType.MetadataName + "." +
         result.Method.MetadataName + "/" +
         result.Method.Parameters.Length;
+    }
+
+    [Test]
+    public void EffectsAfterDefiniteNoncompletionAreSuppressed()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global {
+                public static int State;
+
+                public static int Fail() =>
+                    throw new InvalidOperationException();
+
+                public static int Mutate() {
+                    State++;
+                    return 1;
+                }
+            }
+
+            public sealed class Target {
+                public void Touch() => Global.State++;
+
+                public void Pair(int first, int second) => Global.State++;
+            }
+
+            public static class Sample {
+                public static void NullReceiver() {
+                    Target? target = null;
+                    target.Touch();
+                }
+
+                public static void FirstArgumentThrows() {
+                    var target = new Target();
+                    target.Pair(Global.Fail(), Global.Mutate());
+                }
+
+                public static void NullLock() {
+                    object? gate = null;
+                    lock (gate) {
+                        Global.State++;
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "NullReceiver", "FirstArgumentThrows", "NullLock"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False,
+                methodName);
+        }
     }
 
     [Test]

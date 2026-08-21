@@ -24,6 +24,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 
 function Get-PackageIdentity {
     param(
@@ -128,7 +129,24 @@ function Resolve-SharpProofPackageSource {
     if ($versions.Count -ne 1) {
         throw "SharpProof package and symbol package versions must match; found '$($versions -join ', ')'."
     }
-    return $resolved
+
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $repositoryCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or
+        $repositoryCommit -notmatch '^[0-9a-f]{40}$') {
+        throw 'Could not resolve the package-source checkout commit.'
+    }
+    foreach ($packageId in $expectedIds) {
+        $main = @($identities | Where-Object Id -eq $packageId)[0]
+        $symbols = @($symbolIdentities | Where-Object Id -eq $packageId)[0]
+        $null = Test-SharpProofSymbolPackagePair `
+            -PackagePath $main.Path `
+            -SymbolPackagePath $symbols.Path `
+            -PackageId $packageId `
+            -PackageVersion $versions[0] `
+            -RepositoryCommit $repositoryCommit
+    }
+    return [string]$resolved
 }
 
 function Get-SharpProofPortablePackageVersion {
@@ -517,12 +535,6 @@ $isSupportedWorkerHost = $IsLinux -and
         [System.Runtime.InteropServices.Architecture]::X64 -and
     [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq
         [System.Runtime.InteropServices.Architecture]::X64
-if (-not $isSupportedWorkerHost) {
-    throw (
-        'SharpProof package consumers must run in the canonical Linux ' +
-        'amd64 container.')
-}
-
 if ([string]::IsNullOrWhiteSpace($PackageSource)) {
     $PackageSource = [Environment]::GetEnvironmentVariable(
         'SHARPPROOF_PACKAGE_SOURCE',
@@ -558,6 +570,11 @@ if ($FrameworkConsumersOnly) {
         "SharpProof package-backed framework consumers passed with actual " +
         "SDK '$ConsumerSdkVersion'.")
     return
+}
+if (-not $isSupportedWorkerHost) {
+    throw (
+        'SharpProof package consumers must run in the canonical Linux ' +
+        'amd64 container.')
 }
 $previousPackageSource = [Environment]::GetEnvironmentVariable(
     'SHARPPROOF_PACKAGE_SOURCE',

@@ -54,23 +54,33 @@ sp acceptance -Configuration Release
 ```
 
 Use `sp test-changed` during an edit loop. It derives the affected test-project
-closure from Git and project references. Use `sp check` for the coherent Debug
-gate: one incremental build, duration-aware semantic and Worker shards,
-duration-aware package shards, and a short performance smoke. The exact
-release performance protocol remains part of `sp acceptance`; trusted
-mutations remain a separate exact-commit gate.
+closure from Git and project references.
+The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
+The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
+Both run
+duration-aware semantic, Worker, and package shards plus a short performance
+smoke. The exact release performance protocol remains part of `sp acceptance`;
+trusted mutations remain a separate exact-commit gate.
 
 The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
 Roslyn's compiler server. A no-change rebuild is therefore incremental.
-Finite `docker compose run --rm tooling ...` commands deliberately clone into
-a clean temporary workspace and pay a cold build; use them for qualification,
-not for every edit.
+Finite `docker compose run --rm tooling ...` commands materialize the current
+source snapshot in a private temporary workspace and pay a cold build; use them
+for qualification, not for every edit. `contract`, `build`, and ordinary test
+commands work when the source directory came from an archive without `.git`.
+Commands that compare revisions or certify exact-commit evidence (`test-changed`,
+acceptance, mutation, packaging, pilots, fuzz, coverage, and release commands)
+require a Git-backed source workspace. Start the persistent Dev Container to
+obtain that workspace using container Git; Git remains unnecessary on the host.
 
 `portable-tests`, broad coverage, and acceptance run independent test projects
-through MSBuild's project scheduler. The default 16-CPU container uses eight
-project lanes. Worker fixtures and package integration methods run in isolated
-duration-weighted processes. Trusted mutations use eight deterministic
-weighted lanes. Override the
+through MSBuild's project scheduler.
+
+The default container budget is 16 CPUs and 40960 MiB.
+Test-project concurrency uses 8 lanes (one lane per 2 CPUs).
+Trusted mutations use 4 deterministic weighted lanes. Worker fixtures and
+package integration methods run in isolated duration-weighted processes.
+Override the
 Docker budget with
 `SHARPPROOF_CONTAINER_CPU_LIMIT` and `SHARPPROOF_CONTAINER_MEMORY_LIMIT`; the
 lane count follows the CPUs visible to .NET. Use
@@ -85,9 +95,14 @@ MSBuild, filesystem, or child-process hangs that solver limits cannot observe.
 ## Multiple independent workspaces
 
 Each source directory or remote ref must use a different Compose project name.
-This gives it a private persistent source volume, cache volumes, and output
-tree. Put the project name and ref in each checkout's untracked `.env` file,
-then use the same commands on every operating system:
+This gives it a private tooling image tag, persistent source volume, cache
+volumes, and output tree. By default the tooling image is
+`<compose-project-name>-tooling:local`; build and run therefore resolve the
+same checkout-owned tag. Put the project name and ref in each checkout's
+untracked `.env` file, especially when two checkout paths have the same base
+directory name, then use the same commands on every operating system. A
+reviewed immutable image can instead be selected explicitly with
+`SHARPPROOF_TOOLING_IMAGE`.
 
 ```text
 docker compose up -d dev

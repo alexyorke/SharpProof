@@ -493,6 +493,11 @@ internal static partial class SemanticClaimIdentity
         writer.Add(value.GetType().FullName ?? value.GetType().Name);
         switch (value)
         {
+            case string text:
+                writer.Add(Utf16WellFormedness.IsWellFormed(text)
+                    ? text
+                    : "ill-formed-utf16");
+                break;
             case ITypeSymbol type:
                 WriteType(writer, type, context);
                 break;

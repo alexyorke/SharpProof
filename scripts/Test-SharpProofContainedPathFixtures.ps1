@@ -1,0 +1,60 @@
+[CmdletBinding()]
+param()
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+$fixture = Join-Path ([IO.Path]::GetTempPath()) (
+    'SharpProof-contained-path-' + [Guid]::NewGuid().ToString('N'))
+$root = Join-Path $fixture 'Repo'
+[IO.Directory]::CreateDirectory((Join-Path $root 'artifacts')) | Out-Null
+
+function Require-Rejection([string]$Path, [string]$Name) {
+    try {
+        Resolve-SharpProofContainedPath -Root $root -Path $Path -ParameterName $Name | Out-Null
+        throw "Contained-path fixture '$Name' was accepted."
+    }
+    catch {
+        if ($_.Exception.Message -eq "Contained-path fixture '$Name' was accepted.") { throw }
+    }
+}
+
+try {
+    $exact = Resolve-SharpProofContainedPath -Root $root `
+        -Path 'artifacts/report.json' -ParameterName exact
+    if ($exact -cne (Join-Path $root 'artifacts/report.json')) {
+        throw 'Exact contained child did not retain canonical identity.'
+    }
+    $canonical = Resolve-SharpProofContainedPath -Root $root `
+        -Path 'artifacts/../artifacts/report.json' -ParameterName canonical
+    if ($canonical -cne $exact) { throw 'Contained traversal did not canonicalize.' }
+    $absolute = Resolve-SharpProofContainedPath -Root $root `
+        -Path $exact -ParameterName absolute
+    if ($absolute -cne $exact) { throw 'Absolute contained child was rejected.' }
+    Require-Rejection $root root-equality
+    Require-Rejection (Join-Path $fixture 'repo/out.json') case-distinct-sibling
+    Require-Rejection (Join-Path $fixture 'RepoSibling/out.json') prefix-sibling
+    Require-Rejection '../outside.json' traversal-escape
+
+    $consumers = @(
+        'eng/acceptance/Verify.ps1',
+        'scripts/Generate-DiagnosticDescriptors.ps1',
+        'scripts/Generate-ProjectionCatalog.ps1',
+        'scripts/Generate-Readme.ps1',
+        'scripts/Invoke-SharpProofCoverage.ps1',
+        'scripts/Invoke-SharpProofGateEvidence.ps1',
+        'scripts/Invoke-SharpProofFuzzCampaign.ps1',
+        'scripts/Test-CompilerArtifactModelGenerator.ps1',
+        'scripts/Test-SharpProofPilots.ps1',
+        'scripts/Test-SharpProofReleaseConfiguration.ps1',
+        'scripts/Test-SharpProofSamples.ps1',
+        'scripts/Test-SharpProofTrustedMutations.ps1')
+    foreach ($consumer in $consumers) {
+        $text = [IO.File]::ReadAllText((Join-Path $repositoryRoot $consumer))
+        if (-not $text.Contains('Resolve-SharpProofContainedPath', [StringComparison]::Ordinal)) {
+            throw "Containment consumer does not use shared authority: '$consumer'."
+        }
+    }
+    Write-Host 'Repository-contained path fixtures passed.'
+}
+finally { if (Test-Path $fixture) { Remove-Item $fixture -Recurse -Force } }

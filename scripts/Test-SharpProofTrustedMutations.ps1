@@ -30,24 +30,19 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationScheduling.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$output = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputPath))
-if (-not $output.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw "OutputPath must be inside the repository: $output"
-}
+$output = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 $baselineFile = if ([string]::IsNullOrWhiteSpace($BaselineEvidencePath)) {
     $null
 }
 else {
-    [IO.Path]::GetFullPath((Join-Path $repositoryRoot $BaselineEvidencePath))
-}
-if ($null -ne $baselineFile -and -not $baselineFile.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw "BaselineEvidencePath must be inside the repository: $baselineFile"
+    Resolve-SharpProofContainedPath `
+        -Root $repositoryRoot -Path $BaselineEvidencePath `
+        -ParameterName 'BaselineEvidencePath'
 }
 if ($BaselineOnly -and $null -eq $baselineFile) {
     throw 'BaselineOnly requires BaselineEvidencePath.'
@@ -275,8 +270,40 @@ $mutations = @(
         Filter = 'FullyQualifiedName~CatchVariableFlowUsesTheEffectDiscoveryCatalog'
     },
     [pscustomobject]@{
-        Name = 'effect-fresh-array-content-provenance'
+        Name = 'effect-exception-handler-reachability'
         File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = "            return _handlerReachability.IsReachable(`n                @catch,`n                @catch.Filter?.Span.Contains(operation.Syntax.Span) == true);"
+        Mutated = '            return true;'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ExceptionHandlersContributeEffectsOnlyWhenReachable'
+    },
+    [pscustomobject]@{
+        Name = 'effect-fresh-initializer-creation-capture-ownership'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = '        _creationCaptures.Record(capture);'
+        Mutated = '        _ = _creationCaptures;'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~FreshObjectInitializerOwnershipMatrixIsExact'
+    },
+    [pscustomobject]@{
+        Name = 'effect-definitely-null-throw-projection'
+        File = 'SharpProof.Effects\EffectExceptionFlow.cs'
+        Original = '        if (abstractFlow?.ProvesNull(thrown, thrown.Exception) == true)'
+        Mutated = '        if (abstractFlow?.ProvesNull(thrown, thrown.Exception) == false)'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~DefinitelyNullThrownExpressionsReplaceTheirDeclaredExceptionType'
+    },
+    [pscustomobject]@{
+        Name = 'effect-exact-array-store-compatibility'
+        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        Original = "        return _session.Compilation.ClassifyCommonConversion(`n            assignedValue.Type,`n            runtimeType.ElementType).IsImplicit;"
+        Mutated = '        return false;'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ArrayStoreCompatibilityUsesExactFreshRuntimeElementType'
+    },
+    [pscustomobject]@{
+        Name = 'effect-fresh-array-content-provenance'
+        File = 'SharpProof.Effects\ConversionOwnershipClassifier.cs'
         Original = "            IFieldReferenceOperation or IArrayElementReferenceOperation =>`n                EffectRegionSet.Unknown,"
         Mutated = "            IFieldReferenceOperation => EffectRegionSet.Unknown,`n            IArrayElementReferenceOperation element => ClassifyRegion(element.ArrayReference, aliasSource),"
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
@@ -451,12 +478,12 @@ $mutations = @(
         Filter = 'FullyQualifiedName~UnsupportedEffectCallableShapesCannotCarryReplayEvidence'
     },
     [pscustomobject]@{
-        Name = 'runtime-interpolation-fails-closed'
+        Name = 'ordinary-interpolation-catalog-parent'
         File = 'SharpProof.Frontend\OperationSupportCatalog.generated.cs'
-        Original = "        OperationKind.ConditionalAccessInstance,`n        OperationKind.ObjectOrCollectionInitializer,"
-        Mutated = "        OperationKind.ConditionalAccessInstance,`n        OperationKind.InterpolatedString,`n        OperationKind.ObjectOrCollectionInitializer,"
-        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
-        Filter = 'FullyQualifiedName~StringConstructionDistinguishesKnownAndUnknownAllocation'
+        Original = "        OperationKind.InterpolatedString,`n        OperationKind.InterpolatedStringText,"
+        Mutated = '        OperationKind.InterpolatedStringText,'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~StageSpecificOperationClassifiersMatchTheClosedCatalog'
     },
     [pscustomobject]@{
         Name = 'effect-incomplete-reason-projection'
@@ -465,6 +492,14 @@ $mutations = @(
         Mutated = '            (_, true) => EffectEvaluationReason.ResourceLimit,'
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~IncompleteReasonCoversEveryDefinedFlagCombination'
+    },
+    [pscustomobject]@{
+        Name = 'effect-resource-limit-tuple-removal'
+        File = 'SharpProof.Worker.Protocol\ProtocolModel.generated.cs'
+        Original = '            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)'
+        Mutated = ''
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ResourceLimitIncompleteEffectTupleIsAProtocolState'
     },
     [pscustomobject]@{
         Name = 'advisory-contract-candidate-detection'
@@ -505,6 +540,14 @@ $mutations = @(
         Mutated = "return new(`n                        RequiresSymbolAnalysis: false,`n                        RequiresOperationAnalysis: true,`n                        RequiresFullOperationAnalysis: false);"
         Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
         Filter = 'FullyQualifiedName~SelectedGeneratedMethodIsAnalyzedAndReported'
+    },
+    [pscustomobject]@{
+        Name = 'rejected-control-declaration-scope'
+        File = 'SharpProof.Analyzer.Core\SharpProofControlAttributePolicy.cs'
+        Original = '            if (!session.Attributes.IsRejectedControlAttribute(attribute) ||'
+        Mutated = '            if (true ||'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~SourceShadowedControlAttributesReportOnEveryDeclaredScope'
     },
     [pscustomobject]@{
         Name = 'advisory-lazy-state-creation'
@@ -555,6 +598,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SelectedGeneratedMethodIsAnalyzedAndReported'
     },
     [pscustomobject]@{
+        Name = 'generated-header-exact-token'
+        File = 'SharpProof.Analyzer.Core\AnalyzerGeneratedCodePolicy.cs'
+        Original = "        return GeneratedHeaderTokens.Any(token => string.Equals(`n            body,`n            token,`n            StringComparison.OrdinalIgnoreCase));"
+        Mutated = '        return body.IndexOf("<auto-generated", StringComparison.OrdinalIgnoreCase) >= 0 || body.IndexOf("<autogenerated", StringComparison.OrdinalIgnoreCase) >= 0;'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~MarkerMentionsDoNotSuppressHandwrittenCallSites'
+    },
+    [pscustomobject]@{
+        Name = 'contract-for-final-tree-reconciliation'
+        File = 'SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs'
+        Original = '            static _ => true,'
+        Mutated = '            tree => AnalyzerGeneratedCodePolicy.IsGenerated(tree, context.Compilation, context.CancellationToken),'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~MalformedPeerCompanionWithOrdinaryHintIsReconciled'
+    },
+    [pscustomobject]@{
         Name = 'trusted-boundary-nonblank-reason'
         File = 'SharpProof.Effects\TrustedBoundaryPolicy.cs'
         Original = '!string.IsNullOrWhiteSpace(reason));'
@@ -601,6 +660,22 @@ $mutations = @(
         Mutated = '        evidence.Outcome = WorkerClaimOutcome.Refuted;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~UnsupportedDefiniteEffectViolationFailsClosedWithoutReplay'
+    },
+    [pscustomobject]@{
+        Name = 'effect-authority-verdict-binding'
+        File = 'SharpProof.CompilerArtifact\CompilerLoweredArtifact.cs'
+        Original = '            if (!authorityMatches)'
+        Mutated = '            if (false)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~EffectEvidenceMustMatchIndependentCompilerAuthority'
+    },
+    [pscustomobject]@{
+        Name = 'effect-authority-source-tree-binding'
+        File = 'SharpProof.CompilerArtifact\CompilerEffectAuthority.cs'
+        Original = '                authority.SourceTreeSha256 == tree.Sha256;'
+        Mutated = '                true;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~EffectAuthorityBindsConstraintsEvidenceAndSourceTreeOrigin'
     },
     [pscustomobject]@{
         Name = 'effect-replay-object-event-kind'
@@ -755,6 +830,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~LinuxWorkerReceivesTheExactStartupRelease'
     },
     [pscustomobject]@{
+        Name = 'launcher-single-termination-grace-deadline'
+        File = 'SharpProof.Host\LinuxWorkerProcess.cs'
+        Original = '                Terminate(process, stopwatch, finalLimit);'
+        Mutated = '                Terminate(process, Stopwatch.StartNew(), finalLimit);'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~LinuxWorkerTimeoutTerminatesTheDirectChild'
+    },
+    [pscustomobject]@{
         Name = 'worker-parent-death-boundary'
         File = 'SharpProof.Host\LinuxWorkerProcess.cs'
         Original = '    private const int ParentDeathSignal = 1;'
@@ -779,6 +862,30 @@ $mutations = @(
         Filter = 'FullyQualifiedName~NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath'
     },
     [pscustomobject]@{
+        Name = 'release-tag-exact-ref-authority'
+        File = 'scripts\Invoke-SharpProofReleaseContainer.ps1'
+        Original = '        if ($ref -cne $expectedRef) {'
+        Mutated = '        if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseTagAuthorityRejectsEveryNonExactIdentity'
+    },
+    [pscustomobject]@{
+        Name = 'release-configuration-empty-expected-set'
+        File = 'scripts\Test-SharpProofReleaseConfiguration.ps1'
+        Original = '[Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Expected,'
+        Mutated = '[Parameter(Mandatory = $true)][object[]]$Expected,'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~EffectiveReleaseRefSetsMustEqualTheContract'
+    },
+    [pscustomobject]@{
+        Name = 'release-qualification-matrix-receipt-projection'
+        File = 'scripts\Invoke-SharpProofReleaseContainer.ps1'
+        Original = '        $requiredGates = @($matrix.releaseQualificationMatrix |'
+        Mutated = '        $requiredGates = @() # mutation removes qualification rows'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~WorkflowExecutesTheExactCatalogOwnedQualificationMatrix'
+    },
+    [pscustomobject]@{
         Name = 'launcher-timeout-owns-result'
         File = 'SharpProof.Worker.Launcher\Program.cs'
         Original = '        if (exitCode == 124)'
@@ -801,6 +908,14 @@ $mutations = @(
         Mutated = 'MaximumJsonDepth = 64;'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DeserializationRejectsDocumentsBeyondTheDeclaredDepth'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-json-nested-shape-authority'
+        File = 'SharpProof.Worker.Protocol\ProtocolJsonSupport.cs'
+        Original = '        EnsureObjectShape(document.RootElement, shape);'
+        Mutated = '        _ = shape;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~OmittedNestedManifestSchemaVersionIsRejectedDuringDeserialization'
     },
     [pscustomobject]@{
         Name = 'contract-api-consumer-requires-identity'
@@ -1059,6 +1174,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~GeneratedCompanionIsValidatedFromFinalCompilation'
     },
     [pscustomobject]@{
+        Name = 'configuration-authoritative-alias-order'
+        File = 'SharpProof.Analyzer.Core\Configuration\AnalyzerConfiguration.cs'
+        Original = '        foreach (var key in keys)'
+        Mutated = '        foreach (var key in keys.Reverse())'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~GeneratorUsesTheAuthoritativeConfigurationAliasOrder'
+    },
+    [pscustomobject]@{
+        Name = 'requires-accessor-call-site-discovery'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
+        Original = "            IPropertyReferenceOperation property =>`n                GetPropertyCalls(property),`n            IEventReferenceOperation eventReference =>`n                GetEventCalls(eventReference),"
+        Mutated = "            IPropertyReferenceOperation property => [],`n            IEventReferenceOperation eventReference => [],"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~PropertyAndEventAccessorsCheckRequiresExactlyOnce'
+    },
+    [pscustomobject]@{
         Name = 'package-contract-for-generator-entrypoint'
         File = 'SharpProof.Package\SharpProof.nuspec'
         Original = '    <file src="..\SharpProof.ContractForGenerator\bin\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.dll" target="tools\analyzers\dotnet\cs" />'
@@ -1075,12 +1206,236 @@ $mutations = @(
         Filter = 'FullyQualifiedName~TrustedComputingBaseRejectsNoncanonicalPaths'
     },
     [pscustomobject]@{
+        Name = 'release-authority-contained-path-case-sensitivity'
+        File = 'scripts\Resolve-SharpProofContainedPath.ps1'
+        Original = "    if (-not `$canonicalPath.StartsWith(`n            `$prefix,`n            [StringComparison]::Ordinal)) {"
+        Mutated = "    if (-not `$canonicalPath.StartsWith(`n            `$prefix,`n            [StringComparison]::OrdinalIgnoreCase)) {"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~LinuxEvidencePathsUseOrdinalCanonicalContainment'
+    },
+    [pscustomobject]@{
         Name = 'publication-locks-every-member'
         File = 'SharpProof.Host\LinuxPathIdentity.cs'
-        Original = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Select(static path => new PublicationLock(path))"
-        Mutated = "        var locks = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Take(1)`n            .Select(static path => new PublicationLock(path))"
+        Original = "        var lockPaths = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .ToArray();"
+        Mutated = "        var lockPaths = canonicalPaths`n            .Select(PublicationLockNameForCanonicalPath)`n            .OrderBy(static path => path, StringComparer.Ordinal)`n            .Take(1)`n            .ToArray();"
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~OverlapOnAnyPublicationMemberBlocks'
+    },
+    [pscustomobject]@{
+        Name = 'publication-lock-construction-cleanup-ownership'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '                locks.Add(publicationLock);'
+        Mutated = '                _ = publicationLock;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ConstructorFailureDisposesEveryEarlierLock'
+    },
+    [pscustomobject]@{
+        Name = 'publication-set-identity-injective-framing'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '            AppendPublicationSetFrame(hash, bytes.Length);'
+        Mutated = '            hash.AppendData(Encoding.UTF8.GetBytes("\n"));'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~PublicationSetIdentityUsesCanonicalInjectiveUtf8Framing'
+    },
+    [pscustomobject]@{
+        Name = 'publication-reset-removes-owned-markers'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '            File.Delete(markerPath);'
+        Mutated = '            _ = markerPath;'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~PublicationResetRemovesOnlyCompleteOwnedSet'
+    },
+    [pscustomobject]@{
+        Name = 'publication-metadata-fixed-size-hash-name'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = "            PublicationMetadataDirectory,`n            identity + extension);"
+        Mutated = "            PublicationMetadataDirectory,`n            Path.GetFileName(canonicalPath) + extension);"
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~PublicationMetadataSupportsNameMaxBoundaryForEveryMember'
+    },
+    [pscustomobject]@{
+        Name = 'contractfor-location-active-compilation'
+        File = 'SharpProof.Analyzer.Core\ContractForValidation\ContractForCompanionValidator.cs'
+        Original = "                location.SourceTree is { } tree &&`n                compilation.ContainsSyntaxTree(tree))"
+        Mutated = "                location.SourceTree is { } tree &&`n                !compilation.ContainsSyntaxTree(tree))"
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilationReferenceTargetDiagnosticUsesCurrentCompanionLocation'
+    },
+    [pscustomobject]@{
+        Name = 'multitarget-sarif-framework-scope'
+        File = 'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
+        Original = "      <_SharpProofEffectiveSarifFile Condition=`"'`$(SharpProofVerifySarifFile)' != '' AND '`$(TargetFrameworks)' != ''`">"
+        Mutated = "      <_SharpProofEffectiveSarifFile Condition=`"'`$(SharpProofVerifySarifFile)' != '' AND '`$(TargetFrameworks)' == ''`">"
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~MultiTargetConfiguredSarifIsFrameworkScoped'
+    },
+    [pscustomobject]@{
+        Name = 'packaged-paths-normalize-after-project-body'
+        File = 'SharpProof.Package\buildTransitive\SharpProof.targets'
+        Original = "    <_SharpProofAnalyzerDirectory>`$([System.IO.Path]::GetFullPath('`$(SharpProofAnalyzerDirectory)'))</_SharpProofAnalyzerDirectory>"
+        Mutated = "    <_SharpProofAnalyzerDirectory>`$([System.IO.Path]::GetFullPath('`$(MSBuildThisFileDirectory)../tools/analyzers/dotnet/cs'))</_SharpProofAnalyzerDirectory>"
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ProjectBodyAnalyzerAndCollectorOverridesNormalizeLate'
+    },
+    [pscustomobject]@{
+        Name = 'runtime-closure-validates-before-invalidation'
+        File = 'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
+        Original = '          DependsOnTargets="_SharpProofValidateRuntimeClosure"'
+        Mutated = '          DependsOnTargets=""'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication'
+    },
+    [pscustomobject]@{
+        Name = 'invocation-cleanup-not-success-only'
+        File = 'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
+        Original = '    <CallTarget Targets="_SharpProofCleanupInvocation" />'
+        Mutated = '    <CallTarget Targets="_SharpProofCleanupInvocation" Condition="''$(_SharpProofVerifierExitCode)'' == ''0''" />'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerManifestPropertiesAreVisibleBeforeEditorConfigGeneration'
+    },
+    [pscustomobject]@{
+        Name = 'requires-skips-compiler-elided-invocations'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
+        Original = "        if (operation is IInvocationOperation invocation &&`n            _invocationEmission.IsElided(invocation))"
+        Mutated = "        if (operation is IInvocationOperation invocation &&`n            !_invocationEmission.IsElided(invocation))"
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~SourceConditionalInvocationAndArgumentsFollowEmission'
+    },
+    [pscustomobject]@{
+        Name = 'requires-parenthesized-call-ownership'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
+        Original = '            expression = parenthesized.Expression;'
+        Mutated = '            expression = null;'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ParenthesizedDirectCallsReplayPreconditionsInEveryOwnedShape'
+    },
+    [pscustomobject]@{
+        Name = 'nightly-fuzz-command-connected'
+        File = '.github\workflows\nightly.yml'
+        Original = '          docker compose run --rm tooling fuzz-nightly'
+        Mutated = '          docker compose run --rm tooling acceptance'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~NightlyFuzzCampaignIsContainerConnectedAndEvidenceBound'
+    },
+    [pscustomobject]@{
+        Name = 'fuzz-result-requires-exact-property-count'
+        File = 'scripts\Assert-SharpProofFuzzRunnerResult.ps1'
+        Original = '$actual.Count -ne $Expected.Count -or'
+        Mutated = '$false -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FuzzRunnerEvidenceUsesStrictSchemaFourDecoder'
+    },
+    [pscustomobject]@{
+        Name = 'fuzz-result-requires-number-tokens'
+        File = 'scripts\Assert-SharpProofFuzzRunnerResult.ps1'
+        Original = '$property.ValueKind -ne [Text.Json.JsonValueKind]::Number -or'
+        Mutated = '$property.ValueKind -eq [Text.Json.JsonValueKind]::Number -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FuzzRunnerEvidenceUsesStrictSchemaFourDecoder'
+    },
+    [pscustomobject]@{
+        Name = 'fuzz-result-requires-positive-coverage'
+        File = 'scripts\Assert-SharpProofFuzzRunnerResult.ps1'
+        Original = '(Get-ExactJsonInt32 $coverage $name) -le 0'
+        Mutated = '(Get-ExactJsonInt32 $coverage $name) -lt 0'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FuzzRunnerEvidenceUsesStrictSchemaFourDecoder'
+    },
+    [pscustomobject]@{
+        Name = 'contract-generic-owners-ignore-nongeneric-wrappers'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = ': GetGenericTypeLayers(containingType);'
+        Mutated = ': GetTypeLayers(containingType);'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~GenericOwnersAlignIndependentlyOfNonGenericWrappers'
+    },
+    [pscustomobject]@{
+        Name = 'corpus-snapshot-loader-requires-schema-header'
+        File = 'SharpProof.Gates\Corpus\CorpusSnapshotFormat.cs'
+        Original = '        return data;'
+        Mutated = '        return lines;'
+        Project = 'SharpProof.Gates.Test\SharpProof.Gates.Test.csproj'
+        Filter = 'FullyQualifiedName~CorpusSnapshotFormatRequiresExactSchemaThreeBytes'
+    },
+    [pscustomobject]@{
+        Name = 'pilot-source-report-remains-unreviewed'
+        File = 'scripts\Test-SharpProofPilots.ps1'
+        Original = '        falsePositiveReports = $null'
+        Mutated = '        falsePositiveReports = 0'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PilotAuthorityTests'
+    },
+    [pscustomobject]@{
+        Name = 'contract-ref-readonly-normalizes-compiler-in-modifier'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = 'return refKind is RefKind.In or RefKind.RefReadOnlyParameter;'
+        Mutated = 'return refKind is RefKind.In;'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~RefReadonlyParameterMatchesExactStaticCompanion'
+    },
+    [pscustomobject]@{
+        Name = 'contract-ref-expression-uses-declaration-operation-root'
+        File = 'SharpProof.Contracts\ContractClauseInventoryBuilder.cs'
+        Original = 'return expression is RefExpressionSyntax ? declaration : expression;'
+        Mutated = 'return expression;'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~RefReturningExpressionBodiedCompanionHasAnOperationBody'
+    },
+    [pscustomobject]@{
+        Name = 'contract-function-pointer-conventions-are-unordered'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = '                    match = index;'
+        Mutated = '                    match = left.IndexOf(leftType);'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~UnmanagedFunctionPointerConventionOrderIsInterchangeable'
+    },
+    [pscustomobject]@{
+        Name = 'contract-constructed-function-pointer-preserves-ref-modifiers'
+        File = 'SharpProof.Contracts\ContractCanonicalization.cs'
+        Original = '            if (signatureTypes.TryGetValue(type, out var signatureType))'
+        Mutated = '            if (false && signatureTypes.TryGetValue(type, out var signatureType))'
+        Project = 'SharpProof.Contracts.Test\SharpProof.Contracts.Test.csproj'
+        Filter = 'FullyQualifiedName~FunctionPointerRefReadonlyModifiersSurviveConstruction'
+    },
+    [pscustomobject]@{
+        Name = 'contract-float-default-bits-are-exact'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = '                SingleBits(leftValue) == SingleBits(rightValue),'
+        Mutated = '                SingleBits(leftValue) == SingleBits(rightValue) || leftValue.Equals(rightValue),'
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~FloatingDefaultBitsMustMatchExactly'
+    },
+    [pscustomobject]@{
+        Name = 'contract-double-default-bits-are-exact'
+        File = 'SharpProof.Contracts\ContractForSymbolMatcher.cs'
+        Original = "                BitConverter.DoubleToInt64Bits(leftValue) ==`n                BitConverter.DoubleToInt64Bits(rightValue),"
+        Mutated = "                BitConverter.DoubleToInt64Bits(leftValue) ==`n                BitConverter.DoubleToInt64Bits(rightValue) || leftValue.Equals(rightValue),"
+        Project = 'SharpProof.ContractForGenerator.Test\SharpProof.ContractForGenerator.Test.csproj'
+        Filter = 'FullyQualifiedName~FloatingDefaultBitsMustMatchExactly'
+    },
+    [pscustomobject]@{
+        Name = 'requires-discovers-implicit-base-constructor'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs'
+        Original = '            caller.ContainingType.TypeKind != TypeKind.Class ||'
+        Mutated = '            caller.ContainingType.TypeKind == TypeKind.Class ||'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ImplicitBaseInitializerReplaysParameterlessPrecondition'
+    },
+    [pscustomobject]@{
+        Name = 'verifier-native-payload-is-build-tool-only'
+        File = 'SharpProof.Verifier\SharpProof.Verifier.nuspec'
+        Original = 'target="tools/native/linux-x64"'
+        Mutated = 'target="runtimes/linux-x64/native"'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~VerifierNativeToolDoesNotBecomeApplicationRuntimeAsset'
+    },
+    [pscustomobject]@{
+        Name = 'standalone-gate-requires-passing-result'
+        File = 'scripts\Assert-SharpProofStandaloneGateResult.ps1'
+        Original = '$document.Result.Passed -isnot [bool] -or'
+        Mutated = '$document.Result.Passed -is [bool] -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~StandaloneGateDecoderRejectsUnauthenticatedEvidence'
     },
     [pscustomobject]@{
         Name = 'publication-rejects-symbolic-links'
@@ -1133,10 +1488,18 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'relational-spec-pack-explicit-opt-in'
         File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerSpecificationPackProvider.cs'
-        Original = '        var selected = (enabledPacks ?? [])'
-        Mutated = '        var selected = (enabledPacks ?? []).Concat(catalog.Packs.Keys)'
+        Original = '        var selected = CanonicalizeSelection(enabledPacks, catalog);'
+        Mutated = '        var selected = catalog.Packs.Keys.OrderBy(static value => value, StringComparer.Ordinal).ToArray();'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~AuditedSpecificationPackRequiresExplicitOptIn'
+    },
+    [pscustomobject]@{
+        Name = 'relational-spec-pack-authority-validation'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '        CompilerSpecificationPackAuthorityValidation.Matches(value) &&'
+        Mutated = '        true &&'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SpecificationPackAuthorityIsSealedWhenUnusedAndFingerprintBound'
     },
     [pscustomobject]@{
         Name = 'relational-transitive-provenance'
@@ -1199,6 +1562,508 @@ $mutations = @(
         Mutated = '                            false)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~ExecutedRelationalSummaryCallIsNotAReplayableCounterexample'
+    },
+    [pscustomobject]@{
+        Name = 'relational-roslyn-parameter-ordinal-binding'
+        File = 'SharpProof.Frontend\RoslynProgramLowerer.cs'
+        Original = '                .OrderBy(static argument => argument.Ordinal)'
+        Mutated = '                .OrderBy(static _ => 0)'
+        Project = 'SharpProof.Frontend.Test\SharpProof.Frontend.Test.csproj'
+        Filter = 'FullyQualifiedName~InvocationLoweringOrdersArgumentsByRoslynParameterOrdinal'
+    },
+    [pscustomobject]@{
+        Name = 'relational-summary-instantiation-binding'
+        File = 'SharpProof.CompilerArtifact\CompilerLoweredArtifact.cs'
+        Original = (@'
+                summary.InstantiationSha256 != SummaryInstantiationSha256(
+                    graph.Factory,
+                    call,
+                    result,
+                    existentials,
+                    relation))
+'@).Trim()
+        Mutated = '                false'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SummaryCallBindsSameTypedArgumentPermutationAndDuplicate'
+    },
+    [pscustomobject]@{
+        Name = 'relational-summary-instantiation-digest-required'
+        File = 'SharpProof.CompilerArtifact\CompilerLoweredArtifact.cs'
+        Original = '                !WorkerProtocolJson.IsSha256(summary.InstantiationSha256) ||'
+        Mutated = '                false ||'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~SummaryCallBindsExistentialRolesAndRequiresDigest'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-partial-executable-owner'
+        File = 'SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs'
+        Original = (@'
+        if (method.PartialImplementationPart != null)
+        {
+            return;
+        }
+        if (method.PartialDefinitionPart != null &&
+'@).TrimEnd()
+        Mutated = (@'
+        if (false)
+        {
+            return;
+        }
+        if (method.PartialDefinitionPart != null &&
+'@).TrimEnd()
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~PartialMethodHasOneExecutableEffectOwner'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-exact-run-state-projection'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = (@'
+                response.RunStatus == expectedStatus &&
+                response.FailureReason == expectedFailure,
+'@).TrimEnd()
+        Mutated = (@'
+                WorkerProtocolMetadata.MatchesRunFailure(
+                    response.RunStatus, response.FailureReason),
+'@).TrimEnd()
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~AllProvenEvidenceRejectsFabricated'
+    },
+    [pscustomobject]@{
+        Name = 'effects-rethrow-nearest-catch-owner'
+        File = 'SharpProof.Effects\EffectExceptionFlow.cs'
+        Original = (@'
+            node.Ancestors()
+                .TakeWhile(static ancestor =>
+                    ancestor is not AnonymousFunctionExpressionSyntax and
+                    not LocalFunctionStatementSyntax)
+                .OfType<CatchClauseSyntax>()
+                .FirstOrDefault()?.Block == block);
+'@).TrimEnd()
+        Mutated = (@'
+            !node.Ancestors()
+                .TakeWhile(ancestor => !ReferenceEquals(ancestor, block))
+                .Any(ancestor => ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax));
+'@).TrimEnd()
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~BareRethrowBelongsOnlyToItsNearestCatch'
+    },
+    [pscustomobject]@{
+        Name = 'release-sbom-exact-license-authority'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = '            [string]$matches[0].licenseDeclared -cne'
+        Mutated = '            $false -and [string]$matches[0].licenseDeclared -cne'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SbomLicensesMatchTheExactPackageAuthority'
+    },
+    [pscustomobject]@{
+        Name = 'release-sbom-exact-release-identity'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = '        [string]$Sbom.name -cne [string]$expected.Name -or'
+        Mutated = '        [string]$Sbom.name -ceq [string]$expected.Name -and'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SbomReleaseIdentityIsExact'
+    },
+    [pscustomobject]@{
+        Name = 'release-third-party-component-projection'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = (@'
+    if ($actual.Count -ne $expected.Count -or
+        ($actual | ConvertTo-Json -Depth 4 -Compress) -cne
+            ($expected | ConvertTo-Json -Depth 4 -Compress)) {
+'@).TrimEnd()
+        Mutated = '    if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ThirdPartyInventoryMatchesCatalogPayloadAndSbomOwnership'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-request-bound-cache-state'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = '        var inactive = !request.Cache.Enabled ||'
+        Mutated = '        var inactive = request.Cache.Enabled ||'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestBoundValidationRequiresProducerCompatibleCacheStates'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-exact-runtime-provenance'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = "                response.Summary?.Versions != null &&`n                VersionsEqual(response.Summary.Versions, expectedVersions),"
+        Mutated = '                response.Summary?.Versions != null,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~RequestBoundValidationAuthenticatesRuntimeProvenance'
+    },
+    [pscustomobject]@{
+        Name = 'protocol-response-elapsed-envelope'
+        File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
+        Original = '                    WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds,'
+        Mutated = '                    long.MaxValue,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~ResponseElapsedTimeUsesTheProducerRepresentableEnvelope'
+    },
+    [pscustomobject]@{
+        Name = 'summary-unique-term-budget'
+        File = 'SharpProof.Summaries\IrRelationalSummaryBuilder.cs'
+        Original = '            if (!Charge(term))'
+        Mutated = '            if (false)'
+        Project = 'SharpProof.Summaries.Test\SharpProof.Summaries.Test.csproj'
+        Filter = 'FullyQualifiedName~SymbolicBudgetRejectsBroadUniqueTermDag'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-package-role-filenames'
+        File = 'scripts\SharpProof.SymbolPackageValidator.cs'
+        Original = (@'
+        if (!string.Equals(
+                Path.GetFileName(path),
+                expectedName,
+                StringComparison.Ordinal))
+'@).TrimEnd()
+        Mutated = '        if (false)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ReleasePackageRolesAuthenticateNamesArchivesAndNuspecs'
+    },
+    [pscustomobject]@{
+        Name = 'portable-ir-exact-encoder-image'
+        File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
+        Original = '            actual.SequenceEqual(expected),'
+        Mutated = '            true,'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~DecoderRejectsMetadataOutsideTheCanonicalEncoderImage'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-spdx-topology'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = (@'
+    if ($actualRelationships.Count -ne $expectedRelationships.Count -or
+        ($actualRelationships | ConvertTo-Json -Compress) -cne
+            ($expectedRelationships | ConvertTo-Json -Compress)) {
+'@).TrimEnd()
+        Mutated = '    if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SbomTopologyIsTheExactAuthenticatedProjection'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-nuget-purl-authority'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = (@'
+            [string]$row.referenceLocator -cne
+                (Get-SharpProofNuGetPurl `
+'@).TrimEnd()
+        Mutated = (@'
+            $false -and [string]$row.referenceLocator -cne
+                (Get-SharpProofNuGetPurl `
+'@).TrimEnd()
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SymbolPackagesAreProvenanceArtifactsButNotSbomSubjects'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-spdx-checksum-row'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = '    if ($rows.Count -ne 1 -or $null -eq $rows[0]) {'
+        Mutated = '    if ($null -eq $rows[0]) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SpdxChecksumRowsAreExact'
+    },
+    [pscustomobject]@{
+        Name = 'worker-cache-post-publish-rollback'
+        File = 'SharpProof.Worker\VerificationCache.cs'
+        Original = '                if (published && path != null)'
+        Mutated = '                if (false && published && path != null)'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CacheWriteRollsBackPublicationWhenPostValidationIsCanceled'
+    },
+    [pscustomobject]@{
+        Name = 'release-sbom-symbol-checksum-substitution'
+        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
+        Original = '            -ExpectedSha256 ([string]$main[0].sha256) `'
+        Mutated = '            -ExpectedSha256 ([string]$symbol[0].sha256) `'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~SbomSymbolArtifactScopeTests'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-diagnostic-one-based-location'
+        File = 'SharpProof.CompilerCollector\CompilerArtifact\CompilerManifestArtifactProducer.cs'
+        Original = '                Line = source ? span.StartLinePosition.Line + 1 : 0,'
+        Mutated = '                Line = source ? span.StartLinePosition.Line : 0,'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerDiagnosticLocationsUseOneBasedMappedCoordinates'
+    },
+    [pscustomobject]@{
+        Name = 'release-version-authority-ordinal-comparison'
+        File = 'scripts\Get-SharpProofReleaseVersion.ps1'
+        Original = '    if (-not $ActualVersion.Equals('
+        Mutated = '    if ($false -and -not $ActualVersion.Equals('
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseVersionAuthorityTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-publication-plan-topology-alias-guard'
+        File = 'scripts\SharpProof.PublicationPlanTopology.ps1'
+        Original = (@'
+        if ([string]$entry.path -ceq $OutputPath -or
+            ($null -ne $outputIdentity -and
+             [string]$entry.fileIdentity -ceq
+                [string]$outputIdentity.fileIdentity)) {
+'@).TrimEnd()
+        Mutated = '        if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationPlanTopologyTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-publication-plan-identity-replay'
+        File = 'scripts\Publish-SharpProofRelease.ps1'
+        Original = '    Test-SharpProofPublicationPlanIdentity -Plan $plan'
+        Mutated = '    # Test-SharpProofPublicationPlanIdentity -Plan $plan'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublisherValidatesCurrentIdentitiesBeforeAndAfterWritingPlan'
+    },
+    [pscustomobject]@{
+        Name = 'release-publication-destination-mode-exclusivity'
+        File = 'scripts\SharpProof.PublicationDestination.ps1'
+        Original = '    if ($hasFixture -and ($hasMain -or $hasSymbols)) {'
+        Mutated = '    if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationDestinationAuthorityTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-fixture-package-identity-case-normalization'
+        File = 'scripts\SharpProof.PublicationDestination.ps1'
+        Original = (@'
+        [string]::Equals(
+            [string]$_.packageId, $PackageId,
+            [StringComparison]::OrdinalIgnoreCase) -and
+'@).TrimEnd()
+        Mutated = (@'
+        [string]::Equals(
+            [string]$_.packageId, $PackageId,
+            [StringComparison]::Ordinal) -and
+'@).TrimEnd()
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationDestinationModesAreExactAndAuthenticated'
+    },
+    [pscustomobject]@{
+        Name = 'release-symbol-publication-action-authority'
+        File = 'scripts\SharpProof.PublicationDestination.ps1'
+        Original = "                symbolsAction = 'CollisionOnPush'"
+        Mutated = "                symbolsAction = 'PreflightThenPush'"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationDestinationModesAreExactAndAuthenticated'
+    },
+    [pscustomobject]@{
+        Name = 'release-checksum-byte-comparison'
+        File = 'scripts\SharpProof.ReleaseChecksums.ps1'
+        Original = '    if ($actual.Length -ne $expected.Length -or'
+        Mutated = '    if ($false -or'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseChecksumAuthorityTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-strict-json-canonical-byte-comparison'
+        File = 'scripts\SharpProof.ReleaseJson.ps1'
+        Original = '    if ($text -cne $canonical) {'
+        Mutated = '    if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseJsonAuthorityTests'
+    },
+    [pscustomobject]@{
+        Name = 'release-exact-bundle-topology-consumer'
+        File = 'scripts\Publish-SharpProofRelease.ps1'
+        Original = (@'
+    Test-SharpProofReleaseBundleTopology `
+        -Directory $Directory `
+        -Artifacts $artifacts `
+        -Owner 'Publication release bundle'
+'@).TrimEnd()
+        Mutated = '    # release bundle topology validation removed'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~ReleaseBundleAuthorityGuardsEveryReleaseConsumerAndUpload'
+    },
+    [pscustomobject]@{
+        Name = 'acceptance-restore-timeline-owner'
+        File = 'eng\acceptance\Verify.ps1'
+        Original = "Start-AcceptanceTimingPhase -Name 'restore'"
+        Mutated = "Start-AcceptanceTimingPhase -Name 'static-validation'"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~AcceptanceScriptOwnsRestoreInsideOuterTimeline'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-diagnostic-reserved-namespace'
+        File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
+        Original = '            WorkerProtocolJson.IsCompilerDiagnosticCode(item.Code) &&'
+        Mutated = '            true &&'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerDiagnosticCodesRequireTheExactReservedNamespace'
+    },
+    [pscustomobject]@{
+        Name = 'publication-plan-strict-sbom-semantics'
+        File = 'scripts\Publish-SharpProofRelease.ps1'
+        Original = '    Test-SharpProofSbomTopology `'
+        Mutated = '    # strict SBOM topology validation removed'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~PublicationPlanConsumesStrictReleaseSemanticsBeforeActions'
+    },
+    [pscustomobject]@{
+        Name = 'documentation-support-contract-disconnected'
+        File = 'eng\acceptance\Verify.ps1'
+        Original = "& (Join-Path `$repositoryRoot 'scripts\Generate-Readme.ps1') -Verify"
+        Mutated = '# documentation support-contract validation removed'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~DocumentationGatePrecedesPackagingAndReleaseEvidence'
+    },
+    [pscustomobject]@{
+        Name = 'documentation-contract-api-silence-guard'
+        File = 'scripts\Generate-Readme.ps1'
+        Original = "    'disable contract analysis without a diagnostic',"
+        Mutated = "    'unrelated stale claim',"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
+    },
+    [pscustomobject]@{
+        Name = 'documentation-resource-concurrency-claim-count'
+        File = 'scripts\Generate-Readme.ps1'
+        Original = '        if ($claimCount -cne 1) {'
+        Mutated = '        if ($false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
+    },
+    [pscustomobject]@{
+        Name = 'dev-check-command-plan-package-build'
+        File = 'scripts\Get-SharpProofDevCheckPlan.ps1'
+        Original = "    Add-Command 'package-test-build' 'package-tests' `$Configuration `$false"
+        Mutated = '    # package-test build removed from command plan'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~CommandPlanOwnsConfigurationSpecificBuildGraph'
+    },
+    [pscustomobject]@{
+        Name = 'documentation-typed-effect-result-block'
+        File = 'scripts\Generate-Readme.ps1'
+        Original = '    $typedBlocks[0].Value -cne $expectedTypedResultBlock) {'
+        Mutated = '    $false) {'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~DocumentationSupportContractRejectsDrift'
+    },
+    [pscustomobject]@{
+        Name = 'api-spec-exact-null-substitution-type'
+        File = 'SharpProof.Specs\ApiSpecInstantiation.cs'
+        Original = '                ? new(factory.Null(peer.Term.Type), null)'
+        Mutated = '                ? new(factory.Null(factory.ObjectType), null)'
+        Project = 'SharpProof.Specs.Test\SharpProof.Specs.Test.csproj'
+        Filter = 'FullyQualifiedName~ReferenceNullUsesTheExactSubstitutedOperandType'
+    },
+    [pscustomobject]@{
+        Name = 'managed-flow-raw-syntactic-cycle'
+        File = 'SharpProof.Effects\ManagedAbstractFlow.cs'
+        Original = '        return !expected.HasValue ||'
+        Mutated = '        return expected.HasValue ||'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~CompileTimeLoopConditionsControlReachabilityAndTermination'
+    },
+    [pscustomobject]@{
+        Name = 'property-symbol-only-dispatch'
+        File = 'SharpProof.Effects\PropertyDispatchFacts.cs'
+        Original = "        return !IsStaticallyBound(property) &&`n               IsSymbolDispatchUncertain(accessor);"
+        Mutated = '        return IsSymbolDispatchUncertain(accessor);'
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~PropertyDispatchUsesTheOperationReceiver'
+    },
+    [pscustomobject]@{
+        Name = 'implicit-empty-constructor-modeling'
+        File = 'SharpProof.Effects\EffectCallSiteResolver.cs'
+        Original = '        while (EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer('
+        Mutated = '        while (false && EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer('
+        Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
+        Filter = 'FullyQualifiedName~ProvablyEmptyImplicitConstructorsAreModeledExactly'
+    },
+    [pscustomobject]@{
+        Name = 'container-archive-source-materialization'
+        File = 'eng\container\entrypoint.sh'
+        Original = '    if [[ "${source_has_git}" = "true" ]]; then'
+        Mutated = '    if [[ "true" = "true" ]]; then'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FiniteCommandsRunFromAnArchiveWithoutGit'
+    },
+    [pscustomobject]@{
+        Name = 'publication-complete-topology-preflight'
+        File = 'SharpProof.Host\LinuxPathIdentity.cs'
+        Original = '        ValidatePublicationTopology(canonicalPaths);'
+        Mutated = '        _ = canonicalPaths;'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~NestedPublicationSetsFailBeforeAnyFilesystemMutation'
+    },
+    [pscustomobject]@{
+        Name = 'build-task-active-symmetric-topology'
+        File = 'SharpProof.BuildTasks\InvalidatePublishedResult.cs'
+        Original = (@'
+                 .Any(path => LinuxPathIdentity.PathsConflict(
+                     path,
+                     resolvedCachePath)) ||
+'@).TrimEnd()
+        Mutated = (@'
+                 .Any(path => LinuxPathIdentity.IsSameOrDescendant(
+                     path,
+                     resolvedCachePath)) ||
+'@).TrimEnd()
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~InvalidationRejectsSymmetricIoTopologyBeforeMutation'
+    },
+    [pscustomobject]@{
+        Name = 'standalone-build-stage-nonroot-contract'
+        File = 'eng\container\Dockerfile'
+        Original = "COPY --chown=sharpproof:sharpproof . .`nUSER sharpproof"
+        Mutated = "COPY --chown=sharpproof:sharpproof . .`nUSER root"
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~NamedStagesHaveStandaloneNonRootExecutionContracts'
+    },
+    [pscustomobject]@{
+        Name = 'analyzer-selected-semicolon-accessor-operation-owner'
+        File = 'SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs'
+        Original = (@'
+        if (IsConcreteSemicolonAccessor(method, context.CancellationToken))
+        {
+            return;
+        }
+'@).TrimEnd()
+        Mutated = '        if (false) { return; }'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ConcreteSelectedAutoAccessorsAbstainExactlyOnce'
+    },
+    [pscustomobject]@{
+        Name = 'rejected-metadata-precondition-accountability'
+        File = 'SharpProof.Analyzer.Core\RequiresCallSiteAnalyzer.cs'
+        Original = '            if (session.HasRejectedMetadataPrecondition(contractTarget))'
+        Mutated = '            if (false && session.HasRejectedMetadataPrecondition(contractTarget))'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~ReadableRejectedMetadataPreconditionsAreReportedAtEveryCallSite'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-callable-runtime-reason-acceptance'
+        File = 'SharpProof.CompilerArtifact\CompilerLoweredArtifact.cs'
+        Original = '            !CompilerCallableArtifactReasonCatalog.IsFailureReason('
+        Mutated = '            !Enum.IsDefined(typeof(WorkerClaimReason),'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerCallableFailuresUseOnlyProducerReasons'
+    },
+    [pscustomobject]@{
+        Name = 'generated-rejected-contractfor-candidate-discovery'
+        File = 'SharpProof.Contracts\ContractSelectionInventory.cs'
+        Original = '        return Is(attribute, ContractFor) ||'
+        Mutated = '        return Is(attribute, ContractFor) &&'
+        Project = 'SharpProof.Analyzer.Test\SharpProof.Analyzer.Test.csproj'
+        Filter = 'FullyQualifiedName~PeerGeneratedRejectedContractForIsReported'
+    },
+    [pscustomobject]@{
+        Name = 'fuzz-campaign-stale-evidence-invalidation'
+        File = 'scripts\Invoke-SharpProofFuzzCampaign.ps1'
+        Original = 'Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput'
+        Mutated = '# Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput'
+        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
+        Filter = 'FullyQualifiedName~FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic'
+    },
+    [pscustomobject]@{
+        Name = 'compiler-source-location-exact-mapped-geometry'
+        File = 'SharpProof.CompilerArtifact\CompilerSourceLocationAuthority.cs'
+        Original = '            location.Line == mappedLine + 1L &&'
+        Mutated = '            location.Line > 0 &&'
+        Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
+        Filter = 'FullyQualifiedName~CompilerSourceLocationAuthorityTests'
     }
 )
 
@@ -1343,7 +2208,16 @@ if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
             [string]$result.mutated -ne [string]$registered.Mutated -or
             -not [bool]$result.killed -or
             [int]$result.exitCode -eq 0 -or
-            [int]$result.assertionFailureCount -lt 1) {
+            [int]$result.assertionFailureCount -lt 1 -or
+            [string]$result.assertionProvenanceSha256 -notmatch
+                '^[0-9a-f]{64}$' -or
+            [string]$result.baselineInvocationSha256 -ne
+                (Get-SharpProofMutationBaselineInvocation `
+                    -Project ([string]$registered.Project) `
+                    -Filter ([string]$registered.Filter) `
+                    -Configuration $Configuration).Sha256 -or
+            @($result.baselineSelectedTests).Count -eq 0 -or
+            [string]$result.baselineTrxSha256 -notmatch '^[0-9a-f]{64}$') {
             throw 'Mutation checkpoint result does not match its catalog entry.'
         }
     }
@@ -1352,6 +2226,9 @@ if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
         if ($completedResults.Count -ne $catalogCount) {
             throw 'Completed mutation evidence does not cover the full catalog.'
         }
+        & (Join-Path $PSScriptRoot 'Test-SharpProofMutationCatalog.ps1') `
+            -EvidencePath $output `
+            -ExpectedCommit $sourceCommit
         Write-Host "Mutation evidence is already complete: $output"
         return
     }
@@ -1508,7 +2385,7 @@ try {
         $savedBaseline = Get-Content -LiteralPath $baselineFile -Raw |
             ConvertFrom-Json
         $savedTests = @($savedBaseline.tests)
-        if ([int]$savedBaseline.schemaVersion -ne 1 -or
+        if ([int]$savedBaseline.schemaVersion -ne 2 -or
             [string]$savedBaseline.commit -ne $sourceCommit -or
             [string]$savedBaseline.configuration -ne $Configuration -or
             [string]$savedBaseline.selection -notin @('full', 'selected') -or
@@ -1521,30 +2398,66 @@ try {
             string, object]]::new([StringComparer]::Ordinal)
         foreach ($test in $savedTests) {
             $project = [string]$test.project
-            $method = [string]$test.method
+            $filter = [string]$test.filter
             $ledger = @($test.ledger)
             if ([string]::IsNullOrWhiteSpace($project) -or
-                [string]::IsNullOrWhiteSpace($method) -or
+                [string]::IsNullOrWhiteSpace($filter) -or
+                [string]$test.configuration -ne $Configuration -or
                 $ledger.Count -eq 0) {
                 throw 'Mutation baseline evidence contains an invalid test row.'
             }
-            $key = $project + "`n" + $method
-            if (-not $baselineMap.TryAdd($key, [object]$ledger)) {
-                throw "Mutation baseline evidence duplicates '$project::$method'."
+            $invocation = Get-SharpProofMutationBaselineInvocation `
+                -Project $project -Filter $filter -Configuration $Configuration
+            if ([string]$test.invocationSha256 -ne $invocation.Sha256) {
+                throw 'Mutation baseline evidence has a mismatched invocation identity.'
+            }
+            $baselineRoot = Split-Path -Parent $baselineFile
+            $baselineTrxPath = [IO.Path]::GetFullPath((Join-Path `
+                    $baselineRoot ([string]$test.trx)))
+            if (-not $baselineTrxPath.StartsWith(
+                    $baselineRoot + [IO.Path]::DirectorySeparatorChar,
+                    [StringComparison]::Ordinal) -or
+                -not [IO.File]::Exists($baselineTrxPath) -or
+                [string]$test.trxSha256 -notmatch '^[0-9a-f]{64}$' -or
+                (Get-FileHash -LiteralPath $baselineTrxPath -Algorithm SHA256).
+                    Hash.ToLowerInvariant() -ne [string]$test.trxSha256) {
+                throw 'Mutation baseline evidence has an invalid TRX receipt.'
+            }
+            $method = $filter.Substring('FullyQualifiedName~'.Length)
+            [void](Read-SharpProofMutationTestEvidence `
+                    -TrxPath $baselineTrxPath `
+                    -EvidenceName ($project + ' saved baseline') `
+                    -Mode Baseline `
+                    -ProcessExitCode 0 `
+                    -ExpectedMethodName $method `
+                    -ExpectedLedger $ledger)
+            $key = $invocation.Sha256
+            if (-not $baselineMap.TryAdd($key, [object]$test)) {
+                throw "Mutation baseline evidence duplicates '$project::$filter'."
             }
         }
         foreach ($mutation in $pendingMutations) {
-            $method = $mutation.Filter.Substring(
-                'FullyQualifiedName~'.Length)
-            $key = [string]$mutation.Project + "`n" + $method
+            $invocation = Get-SharpProofMutationBaselineInvocation `
+                -Project ([string]$mutation.Project) `
+                -Filter ([string]$mutation.Filter) `
+                -Configuration $Configuration
+            $key = $invocation.Sha256
             if (-not $baselineMap.ContainsKey($key)) {
                 throw (
                     "Mutation baseline evidence does not cover " +
-                    "'$($mutation.Project)::$method'.")
+                    "'$($mutation.Project)::$($mutation.Filter)'.")
             }
+            $saved = $baselineMap[$key]
             $mutation | Add-Member `
                 -NotePropertyName BaselineLedger `
-                -NotePropertyValue @($baselineMap[$key])
+                -NotePropertyValue @($saved.ledger)
+            $mutation | Add-Member `
+                -NotePropertyName BaselineInvocationSha256 `
+                -NotePropertyValue $key
+            $mutation | Add-Member -NotePropertyName BaselineTrx `
+                -NotePropertyValue ([string]$saved.trx)
+            $mutation | Add-Member -NotePropertyName BaselineTrxSha256 `
+                -NotePropertyValue ([string]$saved.trxSha256)
         }
     }
     else {
@@ -1552,19 +2465,15 @@ try {
         $baselineKeys = [Collections.Generic.HashSet[string]]::new(
             [StringComparer]::Ordinal)
         $baselineGroupIndex = 0
-        foreach ($projectGroup in @($pendingMutations | Group-Object Project)) {
+        $baselinePlan = @(Get-SharpProofMutationBaselinePlan `
+                -Mutations $pendingMutations `
+                -Configuration $Configuration)
+        foreach ($baselineGroup in $baselinePlan) {
             $baselineGroupIndex++
-            $projectMutations = @($projectGroup.Group)
-            $filters = @($projectMutations.Filter | Sort-Object -Unique)
-            $expectedMethodNames = @($filters | ForEach-Object {
-                    $_.Substring('FullyQualifiedName~'.Length)
-                })
-            if (@($expectedMethodNames | Sort-Object -Unique).Count -ne
-                $expectedMethodNames.Count) {
-                throw (
-                    "Mutation baseline project '$($projectGroup.Name)' has " +
-                    'duplicate method identities.')
-            }
+            $projectMutations = @($baselineGroup.Mutations)
+            $invocation = $baselineGroup.Invocation
+            $expectedMethodName = $invocation.Filter.Substring(
+                'FullyQualifiedName~'.Length)
             $baselineTrxName = 'project-' +
                 $baselineGroupIndex.ToString(
                     'D2', [Globalization.CultureInfo]::InvariantCulture) +
@@ -1575,12 +2484,12 @@ try {
             $baselineExit = Invoke-IsolatedDotnet `
                 -Arguments @(
                     'test',
-                    [string]$projectGroup.Name,
+                    $invocation.Project,
                     '-c',
                     $Configuration,
                     '--no-restore',
                     '--filter',
-                    ($filters -join '|'),
+                    $invocation.Filter,
                     '--logger',
                     'console;verbosity=minimal',
                     '--logger',
@@ -1592,33 +2501,49 @@ try {
                     '-baseline.log')
             $baselineElapsedMilliseconds += $lastInvocationElapsedMilliseconds
             $baselineInvocationCount++
-            if ($baselineExit -ne 0) {
-                throw (
-                    "Baseline for mutation project '$($projectGroup.Name)' " +
-                    "failed; see $logs\project-" +
-                    $baselineGroupIndex.ToString(
-                        'D2', [Globalization.CultureInfo]::InvariantCulture) +
-                    '-baseline.log.')
-            }
+            Assert-SharpProofMutationBaselineResult `
+                -ExitCode $baselineExit `
+                -TrxPath $baselineTrx `
+                -EvidenceName ($invocation.Project + '::' + $invocation.Filter)
             $baselineTestEvidence = Read-SharpProofMutationTestEvidence `
                 -TrxPath $baselineTrx `
-                -EvidenceName ($projectGroup.Name + ' baseline') `
+                -EvidenceName ($invocation.Project + ' baseline') `
                 -Mode Baseline `
                 -ProcessExitCode $baselineExit `
-                -ExpectedMethodName $expectedMethodNames
+                -ExpectedMethodName $expectedMethodName
+            $ledger = @($baselineTestEvidence.testLedgers[$expectedMethodName])
+            $baselineEvidenceRoot = if ($null -ne $baselineFile) {
+                Split-Path -Parent $baselineFile
+            }
+            else {
+                Split-Path -Parent $output
+            }
+            $baselineTrxRelative = [IO.Path]::GetRelativePath(
+                $baselineEvidenceRoot,
+                $baselineTrx).Replace('\', '/')
+            $baselineTrxSha256 = (Get-FileHash -LiteralPath $baselineTrx `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
             foreach ($mutation in $projectMutations) {
-                $method = $mutation.Filter.Substring(
-                    'FullyQualifiedName~'.Length)
-                $ledger = @($baselineTestEvidence.testLedgers[$method])
                 $mutation | Add-Member `
                     -NotePropertyName BaselineLedger `
                     -NotePropertyValue $ledger
-                $key = [string]$mutation.Project + "`n" + $method
+                $mutation | Add-Member `
+                    -NotePropertyName BaselineInvocationSha256 `
+                    -NotePropertyValue $invocation.Sha256
+                $mutation | Add-Member -NotePropertyName BaselineTrx `
+                    -NotePropertyValue $baselineTrxRelative
+                $mutation | Add-Member -NotePropertyName BaselineTrxSha256 `
+                    -NotePropertyValue $baselineTrxSha256
+                $key = $invocation.Sha256
                 if ($baselineKeys.Add($key)) {
                     $baselineRows.Add([pscustomobject]@{
                         project = [string]$mutation.Project
-                        method = $method
+                        filter = [string]$mutation.Filter
+                        configuration = $Configuration
+                        invocationSha256 = $invocation.Sha256
                         ledger = $ledger
+                        trx = $baselineTrxRelative
+                        trxSha256 = $baselineTrxSha256
                     })
                 }
             }
@@ -1629,14 +2554,14 @@ try {
             $temporaryBaseline = $baselineFile + '.' +
                 [Guid]::NewGuid().ToString('N') + '.tmp'
             [pscustomobject]@{
-                schemaVersion = 1
+                schemaVersion = 2
                 commit = $sourceCommit
                 configuration = $Configuration
                 selection = $selection
                 catalogCount = $catalogCount
                 catalogSha256 = $catalogSha256
                 testCount = $baselineRows.Count
-                tests = @($baselineRows | Sort-Object project, method)
+                tests = @($baselineRows | Sort-Object project, filter)
                 timing = [ordered]@{
                     restoreElapsedMilliseconds = $restoreElapsedMilliseconds
                     baselineElapsedMilliseconds = $baselineElapsedMilliseconds
@@ -1648,7 +2573,7 @@ try {
                 -Destination $baselineFile -Force
             Write-Host (
                 "Recorded $($baselineRows.Count) exact mutation baselines " +
-                "from $baselineInvocationCount test projects.")
+                "from $baselineInvocationCount focused invocations.")
             Write-Host "Baseline evidence: $baselineFile"
             return
         }
@@ -1732,9 +2657,22 @@ try {
                 executedCount = $testEvidence.executedCount
                 failedCount = $testEvidence.failedCount
                 assertionFailureCount = $testEvidence.assertionFailureCount
+                assertionProvenanceSha256 =
+                    $testEvidence.assertionProvenanceSha256
                 selectedTests = $testEvidence.testLedger
+                baselineInvocationSha256 =
+                    $mutation.BaselineInvocationSha256
+                baselineSelectedTests = @($mutation.BaselineLedger)
+                baselineTrx = $mutation.BaselineTrx
+                baselineTrxSha256 = $mutation.BaselineTrxSha256
                 log = "mutation-logs/$runId/$($mutation.Name)-test.log"
                 trx = "mutation-logs/$runId/$testTrxName"
+                logSha256 = (Get-FileHash `
+                    -LiteralPath $testLog `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
+                trxSha256 = (Get-FileHash `
+                    -LiteralPath $testTrx `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
             }
             if ($MutationShardCount -gt 1) {
                 $result | Add-Member -NotePropertyName catalogOrdinal `
@@ -1771,12 +2709,9 @@ finally {
         (Test-Path -LiteralPath $workspace)) {
         $resolvedWorkspace = [IO.Path]::GetFullPath($workspace)
         $resolvedMutationRoot = [IO.Path]::GetFullPath($mutationRoot)
-        if (-not $resolvedWorkspace.StartsWith(
-                $resolvedMutationRoot +
-                [IO.Path]::DirectorySeparatorChar,
-                [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Refusing to remove mutation workspace: $resolvedWorkspace"
-        }
+        [void](Resolve-SharpProofContainedPath `
+            -Root $resolvedMutationRoot -Path $resolvedWorkspace `
+            -ParameterName 'Mutation workspace')
         Remove-Item -LiteralPath $resolvedWorkspace -Recurse -Force
     }
 }

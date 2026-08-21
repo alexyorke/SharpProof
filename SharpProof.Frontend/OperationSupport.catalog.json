@@ -67,6 +67,7 @@
     "CatchClause",
     "SwitchCase",
     "CaseClause",
+    "InterpolatedString",
     "InterpolatedStringText",
     "Interpolation",
     "MethodBodyOperation",

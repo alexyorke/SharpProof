@@ -13,6 +13,8 @@ internal sealed class ContractCanonicalization(
     {
         var substitutions = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(
             SymbolEqualityComparer.Default);
+        var signatureTypes = new Dictionary<ITypeSymbol, ITypeSymbol>(
+            SymbolEqualityComparer.IncludeNullability);
         AddParameters(
             source.OriginalDefinition.TypeParameters,
             source.TypeArguments);
@@ -24,6 +26,15 @@ internal sealed class ContractCanonicalization(
                 type.OriginalDefinition.TypeParameters,
                 type.TypeArguments);
         }
+        AddSignatureType(
+            source.OriginalDefinition.ReturnType,
+            source.ReturnType);
+        for (var index = 0; index < source.Parameters.Length; index++)
+        {
+            AddSignatureType(
+                source.OriginalDefinition.Parameters[index].Type,
+                source.Parameters[index].Type);
+        }
 
         return Specialize;
 
@@ -32,6 +43,11 @@ internal sealed class ContractCanonicalization(
             if (type == null)
             {
                 return null;
+            }
+
+            if (signatureTypes.TryGetValue(type, out var signatureType))
+            {
+                return signatureType;
             }
 
             if (type is ITypeParameterSymbol parameter &&
@@ -162,6 +178,65 @@ internal sealed class ContractCanonicalization(
             for (var index = 0; index < parameters.Length; index++)
             {
                 substitutions[parameters[index]] = arguments[index];
+            }
+        }
+
+        void AddSignatureType(
+            ITypeSymbol original,
+            ITypeSymbol constructed)
+        {
+            if (signatureTypes.ContainsKey(original))
+            {
+                return;
+            }
+            signatureTypes.Add(original, constructed);
+
+            switch (original, constructed)
+            {
+                case (IArrayTypeSymbol originalArray,
+                      IArrayTypeSymbol constructedArray):
+                    AddSignatureType(
+                        originalArray.ElementType,
+                        constructedArray.ElementType);
+                    break;
+                case (IPointerTypeSymbol originalPointer,
+                      IPointerTypeSymbol constructedPointer):
+                    AddSignatureType(
+                        originalPointer.PointedAtType,
+                        constructedPointer.PointedAtType);
+                    break;
+                case (IFunctionPointerTypeSymbol originalFunction,
+                      IFunctionPointerTypeSymbol constructedFunction):
+                    AddSignatureType(
+                        originalFunction.Signature.ReturnType,
+                        constructedFunction.Signature.ReturnType);
+                    for (var index = 0;
+                         index < originalFunction.Signature.Parameters.Length;
+                         index++)
+                    {
+                        AddSignatureType(
+                            originalFunction.Signature.Parameters[index].Type,
+                            constructedFunction.Signature.Parameters[index].Type);
+                    }
+                    break;
+                case (INamedTypeSymbol originalNamed,
+                      INamedTypeSymbol constructedNamed):
+                    if (originalNamed.ContainingType != null &&
+                        constructedNamed.ContainingType != null)
+                    {
+                        AddSignatureType(
+                            originalNamed.ContainingType,
+                            constructedNamed.ContainingType);
+                    }
+                    for (var index = 0;
+                         index < originalNamed.TypeArguments.Length;
+                         index++)
+                    {
+                        AddSignatureType(
+                            originalNamed.TypeArguments[index],
+                            constructedNamed.TypeArguments[index]);
+                    }
+                    break;
             }
         }
     }

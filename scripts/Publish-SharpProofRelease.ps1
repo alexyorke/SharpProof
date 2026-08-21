@@ -37,6 +37,15 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanIdentity.psm1') -Force
+. (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
 $packageOrder = @(
     'SharpProof.Attributes',
@@ -125,7 +134,7 @@ function Resolve-ReleaseDotNet {
     }
     if ($path.StartsWith(
             $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-            [StringComparison]::OrdinalIgnoreCase)) {
+            [StringComparison]::Ordinal)) {
         throw "DotNetPath cannot use a project-local host: '$path'."
     }
     $actualVersion = (& $path --version 2>&1).Trim()
@@ -226,7 +235,7 @@ function Get-ArtifactPath {
     if (-not [string]::Equals(
             $parent,
             $Directory,
-            [StringComparison]::OrdinalIgnoreCase)) {
+            [StringComparison]::Ordinal)) {
         throw "Release artifact escapes PackageSource: '$FileName'."
     }
     return $path
@@ -241,12 +250,17 @@ function Get-ValidatedRelease {
         [string]$RepositoryCommit
     )
 
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $releaseVersion = Get-SharpProofReleaseVersion `
+        -RepositoryRoot $repositoryRoot
+
     $manifestPath = Join-Path $Directory 'SharpProof.release.json'
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
         throw "Release manifest is missing: $manifestPath"
     }
-    $manifest = Get-Content -LiteralPath $manifestPath -Raw |
-        ConvertFrom-Json
+    $manifest = Read-SharpProofCanonicalReleaseJson `
+        -Path $manifestPath `
+        -DocumentType ReleaseManifest
     if ((Get-RequiredProperty $manifest 'schemaVersion' 'Release manifest') -ne
             2 -or
         [string](Get-RequiredProperty `
@@ -263,6 +277,14 @@ function Get-ValidatedRelease {
         '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
         throw "Release manifest package version is invalid: '$version'."
     }
+    Test-SharpProofReleaseVersion `
+        -ExpectedVersion $releaseVersion `
+        -ActualVersion $version `
+        -Owner 'Release manifest'
+    Test-SharpProofReleaseVersionAuthority `
+        -RepositoryRoot $repositoryRoot `
+        -Authority (Get-RequiredProperty `
+            $manifest 'versionAuthority' 'Release manifest')
 
     $repository = Get-RequiredProperty `
         $manifest `
@@ -296,6 +318,10 @@ function Get-ValidatedRelease {
     if ($artifacts.Count -ne 7) {
         throw 'Release manifest must contain exactly seven artifacts.'
     }
+    Test-SharpProofReleaseBundleTopology `
+        -Directory $Directory `
+        -Artifacts $artifacts `
+        -Owner 'Publication release bundle'
     $seenFileNames = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::OrdinalIgnoreCase)
     foreach ($artifact in $artifacts) {
@@ -336,6 +362,10 @@ function Get-ValidatedRelease {
             throw "Release artifact does not match its manifest: '$fileName'."
         }
     }
+    Test-SharpProofReleaseChecksumFile `
+        -Path (Join-Path $Directory 'SHA256SUMS') `
+        -Artifacts $artifacts `
+        -Owner 'Publication SHA256SUMS'
 
     $packageArtifacts = @(
         $artifacts |
@@ -354,6 +384,18 @@ function Get-ValidatedRelease {
     }
 
     $packages = [Collections.Generic.List[object]]::new()
+    $payloadSets = @(
+        Get-RequiredProperty $manifest 'packagePayloads' 'Release manifest'
+    )
+    if ($payloadSets.Count -ne $packageOrder.Count -or
+        ((@($payloadSets.packageId | Sort-Object) -join '|') -ne
+            (@($packageOrder | Sort-Object) -join '|'))) {
+        throw 'Release manifest has an invalid package payload graph.'
+    }
+    $catalogComponents = @(Get-SharpProofThirdPartyComponentGraph)
+    Test-SharpProofThirdPartyComponentProjection `
+        -ActualComponents @($manifest.thirdPartyComponents) `
+        -ExpectedComponents $catalogComponents
     foreach ($packageId in $packageOrder) {
         $main = @(
             $packageArtifacts |
@@ -405,7 +447,27 @@ function Get-ValidatedRelease {
                 "Release package repository commit does not match checkout " +
                 "'$RepositoryCommit' for '$packageId'.")
         }
-        $packages.Add([pscustomobject][ordered]@{
+        $components = @(
+            $catalogComponents |
+                Where-Object { [string]$_.packageId -eq $packageId }
+        )
+        $null = Test-SharpProofPackagePayload `
+            -PackagePath $mainPath `
+            -PackageId $packageId `
+            -RepositoryRoot $repositoryRoot `
+            -Components $components `
+            -ExpectedPayloads @(
+                $payloadSets |
+                    Where-Object { [string]$_.packageId -eq $packageId } |
+                    ForEach-Object { @($_.entries) }
+            )
+        $null = Test-SharpProofSymbolPackagePair `
+            -PackagePath $mainPath `
+            -SymbolPackagePath $symbolsPath `
+            -PackageId $packageId `
+            -PackageVersion $version `
+            -RepositoryCommit $RepositoryCommit
+        $null = $packages.Add([pscustomobject][ordered]@{
             packageId = $packageId
             version = $version
             mainFileName = [string]$main[0].fileName
@@ -424,8 +486,84 @@ function Get-ValidatedRelease {
         throw 'Release manifest contains an unexpected package ID.'
     }
 
+    $dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
+        -PackagePaths @($packages | ForEach-Object {
+            $_.mainPath
+            $_.symbolsPath
+        }))
+    $licenseGraph = @(Get-SharpProofPackageLicenseGraph `
+        -PackagePaths @($packages | ForEach-Object {
+            $_.mainPath
+            $_.symbolsPath
+        }))
+    $sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
+        -PackageLicenseGraph $licenseGraph `
+        -PackageVersion $version `
+        -ThirdPartyComponents $catalogComponents)
+    $sbomPath = Get-ArtifactPath `
+        -Directory $Directory `
+        -FileName ([string]$sbomArtifacts[0].fileName)
+    $sbom = Read-SharpProofCanonicalReleaseJson `
+        -Path $sbomPath `
+        -DocumentType Spdx
+    if ($null -eq $sbom.PSObject.Properties['relationships'] -or
+        $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
+        $null -eq $sbom.PSObject.Properties['packages']) {
+        throw 'Release SBOM has no complete package topology.'
+    }
+    Test-SharpProofSbomReleaseIdentity `
+        -Sbom $sbom `
+        -RepositoryRoot $repositoryRoot `
+        -Version $version `
+        -RepositoryCommit $RepositoryCommit
+    foreach ($packageId in $packageOrder) {
+        $sbomPackages = @($sbom.packages | Where-Object {
+            [string]$_.name -ceq $packageId -and
+            [string]$_.versionInfo -ceq $version
+        })
+        $manifestPackages = @($packageArtifacts | Where-Object {
+            [string]$_.kind -ceq 'package' -and
+            [string]$_.packageId -ceq $packageId
+        })
+        if ($sbomPackages.Count -ne 1 -or $manifestPackages.Count -ne 1) {
+            throw "Release SBOM package checksum identity is invalid: $packageId"
+        }
+        Test-SharpProofSpdxPackageChecksum `
+            -Package $sbomPackages[0] `
+            -ExpectedSha256 ([string]$manifestPackages[0].sha256) `
+            -Identity $packageId
+    }
+    Test-SharpProofSbomTopology `
+        -SbomPackages @($sbom.packages) `
+        -DocumentDescribes @($sbom.documentDescribes) `
+        -Relationships @($sbom.relationships) `
+        -FirstPartyPackageIds $packageOrder `
+        -PackageVersion $version `
+        -Components $catalogComponents `
+        -DependencyGraph $dependencyGraph
+    Test-SharpProofSbomArtifactScope `
+        -Artifacts $packageArtifacts `
+        -SbomPackages @($sbom.packages) `
+        -DocumentDescribes @($sbom.documentDescribes) `
+        -FirstPartyPackageIds $packageOrder `
+        -PackageVersion $version
+    Test-SharpProofSbomAttestationWorkflow -Workflow (
+        Get-Content -LiteralPath (Join-Path `
+            $repositoryRoot '.github/workflows/package-consumers.yml') -Raw)
+    Test-SharpProofSbomDependencyGraph `
+        -Relationships @($sbom.relationships) `
+        -DependencyGraph $dependencyGraph
+    Test-SharpProofSbomComponentGraph `
+        -SbomPackages @($sbom.packages) `
+        -Relationships @($sbom.relationships) `
+        -Components $catalogComponents
+    Test-SharpProofSbomLicenseGraph `
+        -SbomPackages @($sbom.packages) `
+        -LicenseGraph $sbomLicenseGraph
+
     return [pscustomobject][ordered]@{
         version = $version
+        versionAuthority = $manifest.versionAuthority
         packages = @($packages)
     }
 }
@@ -515,28 +653,6 @@ function Get-V3PackageBaseAddress {
     return $baseUri.AbsoluteUri.TrimEnd('/')
 }
 
-function Get-RemotePackageUrl {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$BaseAddress,
-
-        [Parameter(Mandatory = $true)]
-        [string]$PackageId,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Version
-    )
-
-    $normalizedId = $PackageId.ToLowerInvariant()
-    $normalizedVersion = $Version.ToLowerInvariant()
-    return (
-        $BaseAddress + '/' +
-        [Uri]::EscapeDataString($normalizedId) + '/' +
-        [Uri]::EscapeDataString($normalizedVersion) + '/' +
-        [Uri]::EscapeDataString(
-            "$normalizedId.$normalizedVersion.nupkg"))
-}
-
 function Get-RemotePackageState {
     param(
         [Parameter(Mandatory = $true)]
@@ -546,65 +662,26 @@ function Get-RemotePackageState {
         [string]$BaseAddress,
 
         [Parameter()]
-        [string]$FixtureDirectory
+        [string]$FixtureDirectory,
+
+        [AllowNull()][AllowEmptyCollection()]
+        [object[]]$FixtureCatalog
     )
 
     if (-not [string]::IsNullOrWhiteSpace($FixtureDirectory)) {
-        $remoteMainPath = Join-Path `
-            $FixtureDirectory `
-            $Package.mainFileName
-        if (Test-Path -LiteralPath $remoteMainPath -PathType Leaf) {
-            throw (
-                "Remote main package already exists; publication is " +
-                "non-overwriting: $($Package.packageId) " +
-                "$($Package.version).")
-        }
-        $remoteSymbolsPath = Join-Path `
-            $FixtureDirectory `
-            $Package.symbolsFileName
-        if (Test-Path -LiteralPath $remoteSymbolsPath -PathType Leaf) {
-            throw (
-                "Remote symbol package already exists; publication is " +
-                "non-overwriting: $($Package.packageId) " +
-                "$($Package.version).")
-        }
-        return [pscustomobject][ordered]@{
-            state = 'Absent'
-            remoteUrl = $null
-        }
+        return Get-SharpProofPublicationFixturePackageState `
+            -Catalog @($FixtureCatalog) `
+            -PackageId ([string]$Package.packageId) `
+            -Version ([string]$Package.version)
     }
 
-    $remoteUrl = Get-RemotePackageUrl `
+    return Invoke-SharpProofMainPackagePreflight `
+        -Package $Package `
         -BaseAddress $BaseAddress `
-        -PackageId $Package.packageId `
-        -Version $Package.version
-    $temporaryPath = [IO.Path]::GetTempFileName()
-    try {
-        [IO.File]::Delete($temporaryPath)
-        $response = Invoke-V3Get `
-            -Uri $remoteUrl `
-            -OutputPath $temporaryPath
-        $status = [int]$response.StatusCode
-        if ($status -eq 404) {
-            return [pscustomobject][ordered]@{
-                state = 'Absent'
-                remoteUrl = $remoteUrl
-            }
+        -Get {
+            param($uri, $outputPath)
+            Invoke-V3Get -Uri $uri -OutputPath $outputPath
         }
-        if ($status -ne 200) {
-            throw (
-                "NuGet PackageBaseAddress returned HTTP $status for " +
-                "$($Package.packageId) $($Package.version).")
-        }
-        throw (
-            "Remote main package already exists; publication is " +
-            "non-overwriting: $($Package.packageId) $($Package.version).")
-    }
-    finally {
-        if ([IO.File]::Exists($temporaryPath)) {
-            [IO.File]::Delete($temporaryPath)
-        }
-    }
 }
 
 function Invoke-NuGetPush {
@@ -649,28 +726,23 @@ function Invoke-NuGetPush {
 function Write-PublicationPlan {
     param(
         [Parameter(Mandatory = $true)]
-        [object]$Plan
+        [object]$Plan,
+
+        [AllowNull()][string]$OutputPath,
+
+        [AllowNull()][object]$InputSnapshot
     )
 
     $json = ($Plan | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
     $json += "`n"
-    if ([string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+    if ([string]::IsNullOrWhiteSpace($OutputPath)) {
         Write-Output $json.TrimEnd()
         return
     }
-    $fullPath = [IO.Path]::GetFullPath($PlanOutputPath)
-    $directory = [IO.Path]::GetDirectoryName($fullPath)
-    if ([string]::IsNullOrWhiteSpace($directory)) {
-        throw "PlanOutputPath has no parent directory: '$PlanOutputPath'."
-    }
-    if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
-        [IO.Directory]::CreateDirectory($directory) |
-            Out-Null
-    }
-    [IO.File]::WriteAllText(
-        $fullPath,
-        $json,
-        [Text.UTF8Encoding]::new($false))
+    Write-SharpProofPublicationPlanAtomic `
+        -OutputPath $OutputPath `
+        -Json $json `
+        -InputSnapshot $InputSnapshot
 }
 
 $resolvedPackageSource = (Resolve-Path `
@@ -698,6 +770,22 @@ if (-not [string]::IsNullOrWhiteSpace($RemotePackageDirectory)) {
             $resolvedRemoteDirectory)
     }
 }
+$resolvedPlanOutputPath = $null
+$publicationInputSnapshot = New-SharpProofPublicationInputSnapshot `
+    -PackageSource $resolvedPackageSource `
+    -FixtureDirectory $resolvedRemoteDirectory
+if ($PlanOnly -and -not [string]::IsNullOrWhiteSpace($PlanOutputPath)) {
+    $resolvedPlanOutputPath = Resolve-SharpProofPublicationPlanOutput `
+        -Path $PlanOutputPath
+    Assert-SharpProofPublicationPlanTopology `
+        -OutputPath $resolvedPlanOutputPath `
+        -InputSnapshot $publicationInputSnapshot
+}
+$publicationDestination = New-SharpProofPublicationDestinationAuthority `
+    -Source $Source `
+    -SymbolSource $SymbolSource `
+    -FixtureDirectory $resolvedRemoteDirectory `
+    -InputSnapshot $publicationInputSnapshot
 if (-not $PlanOnly -and
     ([string]::IsNullOrWhiteSpace($Source) -or
      [string]::IsNullOrWhiteSpace($ApiKey))) {
@@ -715,14 +803,22 @@ $release = Get-ValidatedRelease `
     -RepositoryCommit $repositoryHead
 $baseAddress = $null
 if (-not $PlanOnly) {
-    $baseAddress = Get-V3PackageBaseAddress -ServiceIndex $Source
+    $baseAddress = Get-V3PackageBaseAddress `
+        -ServiceIndex $publicationDestination.mainDestination
 }
 $entries = [Collections.Generic.List[object]]::new()
+$fixtureCatalog = if ($publicationDestination.mode -ceq 'fixture') {
+    @($publicationDestination.fixture.archives)
+}
+else { @() }
 foreach ($package in $release.packages) {
     $remote = if ($PlanOnly -and
-        [string]::IsNullOrWhiteSpace($resolvedRemoteDirectory)) {
+        $publicationDestination.mode -cne 'fixture') {
         [pscustomobject][ordered]@{
-            state = 'Unchecked'
+            state = if ($publicationDestination.mode -ceq 'registry') {
+                'Unchecked'
+            }
+            else { $null }
             remoteUrl = $null
         }
     }
@@ -730,54 +826,83 @@ foreach ($package in $release.packages) {
         Get-RemotePackageState `
             -Package $package `
             -BaseAddress $baseAddress `
-            -FixtureDirectory $resolvedRemoteDirectory
+            -FixtureDirectory $resolvedRemoteDirectory `
+            -FixtureCatalog $fixtureCatalog
     }
+    $action = New-SharpProofPublicationActionAuthority `
+        -Mode $publicationDestination.mode `
+        -MainState $(if ($publicationDestination.mode -ceq 'registry') {
+            $remote.state
+        }
+        else { $null }) `
+        -FixtureMainState $(if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.mainState
+        } else { $null }) `
+        -FixtureSymbolsState $(if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.symbolsState
+        } else { $null })
+    Test-SharpProofPublicationActionAuthority `
+        -Authority $action `
+        -Mode $publicationDestination.mode `
+        -MainState $(if ($publicationDestination.mode -ceq 'registry') {
+            $remote.state
+        }
+        else { $null }) `
+        -FixtureMainState $(if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.mainState
+        } else { $null }) `
+        -FixtureSymbolsState $(if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.symbolsState
+        } else { $null })
     $entries.Add([pscustomobject][ordered]@{
         packageId = $package.packageId
         version = $package.version
         mainFileName = $package.mainFileName
         symbolsFileName = $package.symbolsFileName
-        remoteState = $remote.state
+        availabilityMode = $publicationDestination.mode
+        remoteState = if ($publicationDestination.mode -ceq 'fixture') {
+            $null
+        }
+        else { $remote.state }
+        fixtureState = if ($publicationDestination.mode -ceq 'fixture') {
+            $remote.mainState
+        }
+        else { $null }
         remoteUrl = $remote.remoteUrl
-        mainAction = if ($remote.state -eq 'Absent') {
-            'Push'
-        }
-        else {
-            'PreflightThenPush'
-        }
-        symbolsAction = if ($remote.state -eq 'Absent') {
-            'Push'
-        }
-        else {
-            'PreflightThenPush'
-        }
+        mainState = $action.mainState
+        mainAction = $action.mainAction
+        symbolsState = $action.symbolsState
+        symbolsAction = $action.symbolsAction
     })
 }
 
 $plan = [pscustomobject][ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     planOnly = [bool]$PlanOnly
     packageVersion = $release.version
+    versionAuthority = $release.versionAuthority
     repositoryCommit = $repositoryHead
-    source = if ([string]::IsNullOrWhiteSpace($Source)) {
-        $null
-    }
-    else {
-        $Source
-    }
+    publicationDestination = $publicationDestination
     packages = @($entries)
+    artifacts = @(New-SharpProofPublicationPlanIdentities `
+        -Packages @($release.packages) `
+        -Directory $resolvedPackageSource `
+        -Version $release.version `
+        -RepositoryCommit $repositoryHead)
 }
 if ($PlanOnly) {
-    Write-PublicationPlan -Plan $plan
+    Test-SharpProofPublicationPlanIdentity -Plan $plan
+    Write-PublicationPlan `
+        -Plan $plan `
+        -OutputPath $resolvedPlanOutputPath `
+        -InputSnapshot $publicationInputSnapshot
+    if (-not [string]::IsNullOrWhiteSpace($resolvedPlanOutputPath)) {
+        & (Join-Path $PSScriptRoot 'Test-SharpProofPublicationPlan.ps1') `
+            -PlanPath $resolvedPlanOutputPath
+    }
     return
 }
 
-$effectiveSymbolSource = if ([string]::IsNullOrWhiteSpace($SymbolSource)) {
-    $Source
-}
-else {
-    $SymbolSource
-}
 $effectiveSymbolApiKey = if (
     [string]::IsNullOrWhiteSpace($SymbolApiKey)) {
     $ApiKey
@@ -792,7 +917,7 @@ for ($index = 0; $index -lt $release.packages.Count; $index++) {
         "main package.")
     Invoke-NuGetPush `
         -Path $package.mainPath `
-        -Destination $Source `
+        -Destination $publicationDestination.mainDestination `
         -Key $ApiKey `
         -NoSymbols $true
     Write-Host (
@@ -800,7 +925,7 @@ for ($index = 0; $index -lt $release.packages.Count; $index++) {
         "symbol package.")
     Invoke-NuGetPush `
         -Path $package.symbolsPath `
-        -Destination $effectiveSymbolSource `
+        -Destination $publicationDestination.symbolDestination `
         -Key $effectiveSymbolApiKey `
         -NoSymbols $false
 }

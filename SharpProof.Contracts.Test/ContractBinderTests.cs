@@ -11,6 +11,95 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
+    [TestCase("-0.0", "0.0", false)]
+    [TestCase("0.0", "-0.0", false)]
+    [TestCase("-0.0", "-0.0", true)]
+    public void DoubleDefaultBitsControlCompanionResolution(
+        string targetDefault,
+        string companionDefault,
+        bool expectedSuccess)
+    {
+        using var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(double value = {{targetDefault}});
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    double value = {{companionDefault}}) {
+                }
+            }
+            """);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.EqualTo(expectedSuccess));
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(expectedSuccess
+                ? ContractBindingFailure.None
+                : ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    [Test]
+    public void FunctionPointerConventionOrderBindsExactCompanion()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public unsafe interface Target {
+                delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int>
+                    Map(delegate* unmanaged[Cdecl, SuppressGCTransition]<int, int> value);
+            }
+            [ContractFor(typeof(Target))]
+            public static unsafe class TargetContracts {
+                public static delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int>
+                    Map(
+                        Target receiver,
+                        delegate* unmanaged[SuppressGCTransition, Cdecl]<int, int> value) {
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source, allowUnsafe: true);
+
+        var result = subject.Bind("Target", "Map");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Is.Empty);
+    }
+
+    [Test]
+    public void RefReadonlyParameterBindsExactCompanionWithoutRefKindCollapse()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(ref readonly int value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    ref readonly int value) {
+                    Contract.Requires(value >= 0);
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+    }
+
     [Test]
     public void DirectCompilerBoundContractWinsAndSymbolIdentityRejectsShadows()
     {
@@ -890,6 +979,46 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void ConstructedNestedGenericTargetIgnoresNonGenericOwnerWrappers()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Outer<TOuter> where TOuter : class {
+                public sealed class Middle {
+                    public interface ITarget<TInner> where TInner : struct {
+                        void Read(TOuter outer, TInner inner);
+                    }
+                }
+            }
+            public static class CompanionOuter<TOuter> where TOuter : class {
+                [ContractFor(typeof(Outer<>.Middle.ITarget<>))]
+                public static class TargetContracts<TInner> where TInner : struct {
+                    public static void Read(
+                        Outer<TOuter>.Middle.ITarget<TInner> receiver,
+                        TOuter outer,
+                        TInner inner) {
+                        Contract.Requires(outer != null);
+                    }
+                }
+            }
+            public static class Caller {
+                public static void Call(
+                    Outer<string>.Middle.ITarget<int> target,
+                    string outer,
+                    int inner) => target.Read(outer, inner);
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindCallRequires("Caller", "Call", "Read");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+    }
+
+    [Test]
     public void NonGenericTargetWrapperDoesNotRequireCompanionWrapper()
     {
         const string source =
@@ -1353,7 +1482,9 @@ public sealed class ContractBinderTests
             get;
         }
 
-        internal static ContractSubject Create(string source)
+        internal static ContractSubject Create(
+            string source,
+            bool allowUnsafe = false)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 source,
@@ -1366,7 +1497,8 @@ public sealed class ContractBinderTests
                 GetReferences(),
                 new CSharpCompilationOptions(
                     OutputKind.DynamicallyLinkedLibrary,
-                    nullableContextOptions: NullableContextOptions.Enable));
+                    nullableContextOptions: NullableContextOptions.Enable,
+                    allowUnsafe: allowUnsafe));
             var errors = compilation.GetDiagnostics()
                 .Where(static diagnostic =>
                     diagnostic.Severity == DiagnosticSeverity.Error)

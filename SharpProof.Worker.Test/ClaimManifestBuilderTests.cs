@@ -168,6 +168,39 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void AssumptionIdentityIncludesCallableScopeAndUsesGeneratedGrammar()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [SharpProofTrusted("reviewed boundary")]
+                [DoesNotThrow]
+                public static long First(long value) => value;
+
+                [SharpProofTrusted("reviewed boundary")]
+                [DoesNotThrow]
+                public static long Second(long value) => value;
+            }
+            """));
+
+        var assumptions = result.Manifest.Callables
+            .SelectMany(static callable => callable.Assumptions)
+            .Where(static assumption =>
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+            .ToArray();
+
+        Assert.That(assumptions, Has.Length.EqualTo(2));
+        Assert.That(
+            assumptions.Select(static assumption => assumption.Id),
+            Is.All.Matches("^spa1:[0-9a-f]{64}$"));
+        Assert.That(
+            assumptions.Select(static assumption => assumption.Id).Distinct().ToArray(),
+            Has.Length.EqualTo(2));
+    }
+
+    [Test]
     public void PredicateChangeChangesOnlyThatClaimIdentity()
     {
         var first = Build(("Subject.cs", TwoClaims("==", ">=")));
@@ -592,6 +625,98 @@ public sealed class ClaimManifestBuilderTests
                 callable.SelectedFeatures.Contains(
                 WorkerSelectedFeature.Effects)).SelectedFeatures,
             Does.Contain(WorkerSelectedFeature.Effects));
+    }
+
+    [Test]
+    public void FieldLikeEventMethodAttributesDiscoverBothAccessorsOnce()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Subject {
+                [method: DoesNotThrow]
+                public event Action? FieldLike, SecondFieldLike;
+
+                public event Action? Custom {
+                    [DoesNotThrow]
+                    add { }
+                    [DoesNotThrow]
+                    remove { }
+                }
+
+                public event Action? Unselected;
+
+                [DoesNotThrow]
+                public int Value => 1;
+
+                [DoesNotThrow]
+                public void Method() { }
+            }
+            """));
+        var targets = result.Targets.Values.ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(targets, Has.Length.EqualTo(8));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "FieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventAdd),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "FieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventRemove),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "SecondFieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventAdd),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "SecondFieldLike" &&
+                    target.Method.MethodKind == MethodKind.EventRemove),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "Custom" &&
+                    target.Method.MethodKind == MethodKind.EventAdd),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "Custom" &&
+                    target.Method.MethodKind == MethodKind.EventRemove),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.AssociatedSymbol?.Name == "Value" &&
+                    target.Method.MethodKind == MethodKind.PropertyGet),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Count(static target =>
+                    target.Method.Name == "Method" &&
+                    target.Method.MethodKind == MethodKind.Ordinary),
+                Is.EqualTo(1));
+            Assert.That(
+                targets.Any(static target =>
+                    target.Method.AssociatedSymbol?.Name == "Unselected"),
+                Is.False);
+            Assert.That(
+                result.Manifest.Callables.Select(static callable =>
+                    callable.CallableId).Distinct(StringComparer.Ordinal).ToArray(),
+                Has.Length.EqualTo(8));
+            Assert.That(
+                result.Manifest.Claims.Select(static claim =>
+                    claim.ClaimId).Distinct(StringComparer.Ordinal).ToArray(),
+                Has.Length.EqualTo(8));
+            Assert.That(
+                targets.SelectMany(static target => target.EffectClaims).ToArray(),
+                Has.Length.EqualTo(8));
+        }
     }
 
     [Test]
@@ -1498,13 +1623,17 @@ public sealed class ClaimManifestBuilderTests
                     new DerivedBox();
             }
             """;
-        var discovery = Build(("Allocations.cs", source));
+        var compilation = GetCompilation(("Allocations.cs", source));
+        var discovery = new ClaimManifestBuilder(compilation).Build();
         var evidence = discovery.Targets.Values.ToDictionary(
             static target => target.Method.Name,
             static target => target.EffectClaims.Single().Evidence,
             StringComparer.Ordinal);
         var treeSha256 = WorkerProtocolJson.ComputeSha256(
             Encoding.UTF8.GetBytes(source));
+        var capturedTree = CompilerCompilationCapture.CaptureTree(
+            compilation.SyntaxTrees[0],
+            CancellationToken.None);
 
         AssertAllocation(
             evidence["ObjectAllocation"],
@@ -1603,6 +1732,21 @@ public sealed class ClaimManifestBuilderTests
                 Assert.That(
                     @event?.SyntaxTreeSha256,
                     Is.EqualTo(treeSha256));
+                Assert.That(
+                    @event?.SyntaxTreeLineMapSha256,
+                    Is.EqualTo(capturedTree.LineMapSha256));
+                Assert.That(
+                    @event?.SourceTreeOrdinal,
+                    Is.Zero);
+                Assert.That(
+                    @event?.SourceTreePath,
+                    Is.EqualTo(capturedTree.Path));
+                Assert.That(
+                    @event?.SourceTreeSha256,
+                    Is.EqualTo(capturedTree.Sha256));
+                Assert.That(
+                    @event?.SourceLineMapSha256,
+                    Is.EqualTo(capturedTree.LineMapSha256));
                 Assert.That(@event?.SyntaxStart, Is.EqualTo(start));
                 Assert.That(
                     @event?.SyntaxLength,

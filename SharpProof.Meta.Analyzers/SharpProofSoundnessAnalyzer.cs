@@ -45,9 +45,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             [KnownType.SyntaxFactory] = Names("ParseStatement", "ParseExpression", "ParseTypeName")
         }.ToImmutableDictionary();
 
-    private static readonly ImmutableHashSet<string> CacheWriteMethods =
-        Names("Add", "AddOrUpdate", "GetOrAdd", "Set", "TryAdd", "TryUpdate", "TryWrite", "TryWriteAsync", "Write", "WriteAsync");
-
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
         [" is null", " is not null", " == ", " != ", " && ", " || ", "=>", "?."];
 
@@ -66,12 +63,22 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             var symbols = new KnownSymbols(startContext.Compilation);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
+            startContext.RegisterOperationAction(CacheSoundnessRules.AnalyzeAssignment, OperationKind.SimpleAssignment);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
+            startContext.RegisterOperationAction(
+                AnalyzeInterpolatedString,
+                OperationKind.InterpolatedString);
             startContext.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
+            startContext.RegisterSymbolAction(AnalyzeProperty, SymbolKind.Property);
+            startContext.RegisterSymbolAction(AnalyzeEvent, SymbolKind.Event);
             startContext.RegisterSyntaxNodeAction(
                 c => CancellationBoundaryAnalyzer.AnalyzeCatchClause(c, symbols),
                 SyntaxKind.CatchClause);
+            startContext.RegisterSyntaxNodeAction(
+                AnalyzeSemanticPatternControlFlow,
+                SyntaxKind.ConstantPattern,
+                SyntaxKind.CaseSwitchLabel);
         });
     }
 
@@ -90,7 +97,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         AnalyzeSemanticEquals(context, invocation, symbols);
-        AnalyzeCacheWrite(context, invocation);
+        CacheSoundnessRules.AnalyzeWrite(context, invocation);
     }
 
     private static bool IsForbidden(
@@ -217,6 +224,35 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    private static void AnalyzeSemanticPatternControlFlow(
+        SyntaxNodeAnalysisContext context)
+    {
+        var expression = context.Node switch
+        {
+            ConstantPatternSyntax pattern => pattern.Expression,
+            CaseSwitchLabelSyntax label => label.Value,
+            _ => null
+        };
+        if (expression == null)
+        {
+            return;
+        }
+
+        var constant = context.SemanticModel.GetConstantValue(
+            expression,
+            context.CancellationToken);
+        var literal = !constant.HasValue
+            ? null
+            : GetSemanticLiteral(constant.Value);
+        if (literal != null)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                MetaDiagnosticDescriptors.SemanticStringControlFlow,
+                expression.GetLocation(),
+                literal));
+        }
+    }
+
     private static void AnalyzeCSharpExpressionText(OperationAnalysisContext context)
     {
         if (context.Operation is not IBinaryOperation { OperatorKind: BinaryOperatorKind.Add } binary ||
@@ -232,6 +268,36 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    private static void AnalyzeInterpolatedString(
+        OperationAnalysisContext context)
+    {
+        var interpolated = (IInterpolatedStringOperation)context.Operation;
+        if (!interpolated.Parts.Any(static part =>
+                part is IInterpolationOperation))
+        {
+            return;
+        }
+
+        foreach (var part in interpolated.Parts)
+        {
+            if (part is not IInterpolatedStringTextOperation text)
+            {
+                continue;
+            }
+
+            var fragment = GetCSharpExpressionFragment(text.Text);
+            if (fragment != null)
+            {
+                Report(
+                    context,
+                    MetaDiagnosticDescriptors.CSharpExpressionText,
+                    interpolated.Syntax.GetLocation(),
+                    fragment);
+                return;
+            }
+        }
+    }
+
     private static string? GetCSharpExpressionFragment(IOperation operation)
     {
         if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value)
@@ -242,53 +308,23 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         return CSharpExpressionFragments.FirstOrDefault(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
     }
 
-    private static void AnalyzeCacheWrite(OperationAnalysisContext context, IInvocationOperation invocation)
-    {
-        if (!CacheWriteMethods.Contains(invocation.TargetMethod.Name) ||
-            !IsCacheType(invocation.Instance?.Type ?? invocation.TargetMethod.ContainingType) ||
-            !invocation.Arguments.Any(static argument => ContainsNonCacheableSemanticAnswer(argument.Value)))
-        {
-            return;
-        }
-
-        Report(context, MetaDiagnosticDescriptors.NonCacheableSemanticAnswer, invocation.Syntax.GetLocation());
-    }
-
-    private static bool IsCacheType(ITypeSymbol? type)
-    {
-        return type?.Name.IndexOf("Cache", StringComparison.Ordinal) >= 0;
-    }
-
-    private static bool ContainsNonCacheableSemanticAnswer(IOperation operation)
-    {
-        return operation.DescendantsAndSelf().Any(static descendant => descendant switch
-        {
-            IFieldReferenceOperation field => IsNonCacheableName(field.Field.Name),
-            IPropertyReferenceOperation property => IsNonCacheableName(property.Property.Name),
-            IInvocationOperation invocation => IsNonCacheableName(invocation.TargetMethod.Name),
-            IObjectCreationOperation creation => IsNonCacheableName(creation.Type?.Name),
-            ILocalReferenceOperation local => IsNonCacheableName(local.Local.Name),
-            _ => false
-        });
-    }
-
-    private static bool IsNonCacheableName(string? name)
-    {
-        return name != null &&
-        (string.Equals(name, "Unknown", StringComparison.Ordinal) ||
-         name.IndexOf("Timeout", StringComparison.Ordinal) >= 0 ||
-         name.IndexOf("Error", StringComparison.Ordinal) >= 0 ||
-         name.IndexOf("Failure", StringComparison.Ordinal) >= 0);
-    }
-
     private static string? GetSemanticLiteral(IOperation operation)
     {
-        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value)
+        if (!operation.ConstantValue.HasValue)
         {
             return null;
         }
 
-        return value.StartsWith("ir.", StringComparison.Ordinal) || value.StartsWith("ir_", StringComparison.Ordinal) ? value : null;
+        return GetSemanticLiteral(operation.ConstantValue.Value);
+    }
+
+    private static string? GetSemanticLiteral(object? value)
+    {
+        return value is string text &&
+            (text.StartsWith("ir.", StringComparison.Ordinal) ||
+             text.StartsWith("ir_", StringComparison.Ordinal))
+                ? text
+                : null;
     }
 
     private static bool IsInsideCondition(SyntaxNode syntax)
@@ -312,7 +348,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (field.IsStatic && !field.IsReadOnly && IsCriticalStateNamespace(field.ContainingNamespace))
+        if (!field.IsReadOnly && IsForbiddenMutableStaticStorage(field))
         {
             Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
         }
@@ -322,6 +358,66 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             Report(context, MetaDiagnosticDescriptors.StringFieldInIr, field.Locations.FirstOrDefault(), field.Name);
         }
+    }
+
+    private static void AnalyzeProperty(SymbolAnalysisContext context)
+    {
+        var property = (IPropertySymbol)context.Symbol;
+        if (property.SetMethod != null &&
+            IsForbiddenMutableStaticStorage(property) &&
+            IsAutoProperty(property, context.CancellationToken))
+        {
+            Report(
+                context,
+                MetaDiagnosticDescriptors.MutableStaticState,
+                property.Locations.FirstOrDefault(),
+                property.Name);
+        }
+    }
+
+    private static void AnalyzeEvent(SymbolAnalysisContext context)
+    {
+        var @event = (IEventSymbol)context.Symbol;
+        if (IsForbiddenMutableStaticStorage(@event) &&
+            IsFieldLikeEvent(@event, context.CancellationToken))
+        {
+            Report(
+                context,
+                MetaDiagnosticDescriptors.MutableStaticState,
+                @event.Locations.FirstOrDefault(),
+                @event.Name);
+        }
+    }
+
+    private static bool IsForbiddenMutableStaticStorage(ISymbol symbol)
+    {
+        return symbol.IsStatic &&
+            IsCriticalStateNamespace(symbol.ContainingNamespace);
+    }
+
+    private static bool IsAutoProperty(
+        IPropertySymbol property,
+        CancellationToken cancellationToken)
+    {
+        return property.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax(cancellationToken) is PropertyDeclarationSyntax
+            {
+                ExpressionBody: null,
+                AccessorList.Accessors: var accessors
+            } &&
+            accessors.All(static accessor =>
+                accessor.Body == null && accessor.ExpressionBody == null));
+    }
+
+    private static bool IsFieldLikeEvent(
+        IEventSymbol @event,
+        CancellationToken cancellationToken)
+    {
+        return @event.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax(cancellationToken) is VariableDeclaratorSyntax
+            {
+                Parent.Parent: EventFieldDeclarationSyntax
+            });
     }
 
     private static bool IsCriticalStateNamespace(INamespaceSymbol? value)

@@ -36,6 +36,7 @@
       '$(MSBuildProjectName)' == 'SharpProof.Dataflow' Or
       '$(MSBuildProjectName)' == 'SharpProof.Effects' Or
       '$(MSBuildProjectName)' == 'SharpProof.Frontend' Or
+      '$(MSBuildProjectName)' == 'SharpProof.Gates' Or
       '$(MSBuildProjectName)' == 'SharpProof.Host' Or
       '$(MSBuildProjectName)' == 'SharpProof.Ir' Or
       '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers' Or

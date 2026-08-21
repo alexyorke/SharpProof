@@ -4,6 +4,34 @@ namespace SharpProof.Effects;
 
 internal static class EffectExceptionFlow
 {
+    internal static EffectThrowSet ResolveThrownException(
+        IThrowOperation thrown,
+        EffectAnalysisSession session,
+        ManagedFlowResult? abstractFlow)
+    {
+        if (thrown.Exception == null)
+        {
+            return ResolveRethrow(thrown);
+        }
+
+        if (abstractFlow?.ProvesNull(thrown, thrown.Exception) == true)
+        {
+            return session.ResolveExceptionSet(
+                FrameworkTypeMetadataNames.NullReferenceException);
+        }
+
+        var exceptions = session.ResolveThrownException(thrown.Exception);
+        if (abstractFlow?.ProvesNonNull(thrown, thrown.Exception) == true ||
+            DefiniteOperationFacts.IsDefinitelyNonNull(thrown.Exception))
+        {
+            return exceptions;
+        }
+
+        return exceptions.Union(
+            session.ResolveExceptionSet(
+                FrameworkTypeMetadataNames.NullReferenceException));
+    }
+
     internal static EffectSummary KeepEscaping(
         EffectSummary summary, IOperation origin, Compilation compilation)
     {
@@ -225,9 +253,12 @@ internal static class EffectExceptionFlow
     {
         return block.DescendantNodes().Any(node =>
             node is ThrowStatementSyntax { Expression: null } &&
-            !node.Ancestors()
-                .TakeWhile(ancestor => !ReferenceEquals(ancestor, block))
-                .Any(ancestor => ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax));
+            node.Ancestors()
+                .TakeWhile(static ancestor =>
+                    ancestor is not AnonymousFunctionExpressionSyntax and
+                    not LocalFunctionStatementSyntax)
+                .OfType<CatchClauseSyntax>()
+                .FirstOrDefault()?.Block == block);
     }
 
     private readonly record struct CatchFlow(

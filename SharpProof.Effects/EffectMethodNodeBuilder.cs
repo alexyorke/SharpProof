@@ -69,6 +69,7 @@ internal sealed class EffectMethodNodeBuilder
             localSummary,
             _session.ResolveEntryPreconditions(method),
             scanner.ScanLexicalControlEffects(root),
+            scanner.ScanUsingDisposalEffects(root),
             ScanConstructorMemberInitializers(method, scanner, cancellationToken),
             CanTriggerOwnTypeInitialization(method) &&
             HasPotentialStaticInitialization(
@@ -180,6 +181,39 @@ internal sealed class EffectMethodNodeBuilder
         return false;
     }
 
+    internal static bool IsProvablyEmptyImplicitConstructorLayer(
+        IMethodSymbol method,
+        ResolvedApiSpecTable apiSpecs)
+    {
+        var type = method.ContainingType;
+        return method.MethodKind == MethodKind.Constructor &&
+        method.IsImplicitlyDeclared &&
+        method.Parameters.IsDefaultOrEmpty &&
+        type.DeclaringSyntaxReferences.Length != 0 &&
+        !HasPotentialStaticInitialization(type, apiSpecs) &&
+        !HasInstanceMemberInitializer(type);
+    }
+
+    internal static IMethodSymbol? GetUniqueParameterlessBaseConstructor(
+        IMethodSymbol constructor)
+    {
+        var candidates = constructor.ContainingType.BaseType?
+            .InstanceConstructors
+            .Where(static candidate => candidate.Parameters.IsDefaultOrEmpty)
+            .ToImmutableArray() ?? [];
+        return candidates.Length == 1 ? candidates[0] : null;
+    }
+
+    private static bool HasInstanceMemberInitializer(INamedTypeSymbol type)
+    {
+        return type.GetMembers().Any(member =>
+            !member.IsImplicitlyDeclared &&
+            IsInitializableMember(member, staticInitializers: false) &&
+            member.DeclaringSyntaxReferences.Any(reference =>
+                EffectProjections.GetInitializerExpression(
+                    reference.GetSyntax()) != null));
+    }
+
     private static bool HasApprovedSystemObjectConstructor(
         INamedTypeSymbol type,
         ResolvedApiSpecTable apiSpecs)
@@ -206,7 +240,8 @@ internal sealed class EffectMethodNodeBuilder
     private static bool CanTriggerOwnTypeInitialization(IMethodSymbol method)
     {
         return method.MethodKind == MethodKind.Constructor ||
-        method.IsStatic && method.MethodKind != MethodKind.StaticConstructor;
+        method.MethodKind != MethodKind.StaticConstructor &&
+        (method.IsStatic || method.ContainingType.IsValueType);
     }
 
     private static bool IsInitializableMember(
@@ -230,15 +265,16 @@ internal sealed class EffectMethodNodeBuilder
         var summary = EffectSummary.Empty;
         foreach (var block in graph.Blocks.Where(static block => block.IsReachable))
         {
-            summary = EffectSummaryOperations.JoinFrom(
-                summary,
-                block.Operations.Where(scanner.IsReachable).Select(scanner.Scan));
-            if (block.BranchValue != null && scanner.IsReachable(block.BranchValue))
+            var step = scanner.ScanSequence(
+                block.Operations.Where(scanner.IsReachable));
+            if (step.CompletesNormally &&
+                block.BranchValue != null &&
+                scanner.IsReachable(block.BranchValue))
             {
-                summary = EffectSummaryOperations.Join(
-                    summary,
-                    scanner.Scan(block.BranchValue));
+                step = step.Then(scanner.ScanSequence([block.BranchValue]));
             }
+
+            summary = EffectSummaryOperations.Join(summary, step.Summary);
         }
 
         return ManagedAbstractFlow.IsAcyclic(graph)

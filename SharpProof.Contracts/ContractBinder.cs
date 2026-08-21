@@ -72,7 +72,12 @@ public sealed class ContractBinder(
         }
 
         if (target.MethodKind is not (
-                MethodKind.Ordinary or MethodKind.Constructor))
+                MethodKind.Ordinary or
+                MethodKind.Constructor or
+                MethodKind.PropertyGet or
+                MethodKind.PropertySet or
+                MethodKind.EventAdd or
+                MethodKind.EventRemove))
         {
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedTarget);
         }
@@ -266,11 +271,16 @@ public sealed class ContractBinder(
     {
         foreach (var attribute in attributes)
         {
+            if (_api!.Selections.IsRejectedClosedContract(attribute))
+            {
+                return ContractBindingFailure.InvalidClosedAttribute;
+            }
+
             var validation = ClosedContractAttributeValidator.Validate(
                 attribute,
                 sourceType,
                 refKind,
-                _api!.Selections);
+                _api.Selections);
             if (!validation.IsRecognized)
             {
                 continue;

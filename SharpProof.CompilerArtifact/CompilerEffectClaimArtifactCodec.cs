@@ -17,6 +17,13 @@ internal static class CompilerEffectClaimArtifactCodec
 
     internal static void Validate(CompilerEffectClaimArtifact value)
     {
+        Validate(value, null);
+    }
+
+    internal static void Validate(
+        CompilerEffectClaimArtifact value,
+        CompilerCompilationSnapshot? compilation)
+    {
         if (value == null || string.IsNullOrWhiteSpace(value.ClaimId) ||
             string.IsNullOrWhiteSpace(value.Evidence) ||
             !WorkerProtocolJson.IsDefined(value.ContractKind, WorkerEffectContractKind.Unspecified) ||
@@ -25,15 +32,75 @@ internal static class CompilerEffectClaimArtifactCodec
             !HasValidConstraint(value.ContractKind, value.Constraint) ||
             !HasValidReplay(value) ||
             !HasValidOutcome(value) ||
-            value.EvidenceSha256 != ComputeSha256(value))
+            value.EvidenceSha256 != ComputeSha256(value) ||
+            (compilation != null && !HasValidReplayGeometry(value, compilation)))
         {
             throw new InvalidDataException("Compiler effect-claim evidence is invalid.");
         }
     }
 
+    internal static bool HasValidReplayGeometry(
+        CompilerEffectClaimArtifact? value,
+        CompilerCompilationSnapshot? compilation)
+    {
+        if (value?.Replay == null)
+        {
+            return true;
+        }
+
+        if (compilation is not { SyntaxTrees: not null })
+        {
+            return false;
+        }
+
+        foreach (var effectEvent in value.Replay.Events ?? [])
+        {
+            if (effectEvent == null ||
+                effectEvent.SyntaxTreeOrdinal < 0 ||
+                effectEvent.SyntaxTreeOrdinal >= compilation.SyntaxTrees.Length)
+            {
+                return false;
+            }
+
+            var syntaxTree = compilation.SyntaxTrees[effectEvent.SyntaxTreeOrdinal];
+            if (syntaxTree == null ||
+                effectEvent.SyntaxTreeSha256 != syntaxTree.Sha256 ||
+                effectEvent.SyntaxTreeSnapshotSha256 !=
+                    CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(syntaxTree) ||
+                effectEvent.SyntaxTreeLineMapSha256 != syntaxTree.LineMapSha256 ||
+                effectEvent.SyntaxStart < 0 ||
+                effectEvent.SyntaxLength <= 0 ||
+                effectEvent.SyntaxStart > syntaxTree.TextLength ||
+                effectEvent.SyntaxLength >
+                    syntaxTree.TextLength - effectEvent.SyntaxStart)
+            {
+                return false;
+            }
+
+            if (CompilerSourceLocationAuthority.FindUniqueTree(
+                    effectEvent.Location,
+                    compilation) != effectEvent.SourceTreeOrdinal ||
+                !CompilerSourceLocationAuthority.IsBound(
+                    effectEvent.Location,
+                    effectEvent.SourceTreeOrdinal,
+                    effectEvent.SourceTreePath,
+                    effectEvent.SourceTreeSha256,
+                    effectEvent.SourceLineMapSha256,
+                    compilation) ||
+                effectEvent.Location.Start != effectEvent.SyntaxStart ||
+                effectEvent.Location.Length != effectEvent.SyntaxLength)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static bool HasValidOutcome(CompilerEffectClaimArtifact value)
     {
-        return WorkerProtocolJson.HasValidEffectCertainty(value.Outcome, value.Reason, value.Certainty) &&
+        return CompilerEffectEvidenceCatalog.HasValidEffectTuple(
+            value.Outcome, value.Reason, value.Certainty) &&
         (value.Outcome, value.Reason, value.Certainty, value.Witness, value.Replay) switch
         {
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null, null) => true,
@@ -94,6 +161,12 @@ internal static class CompilerEffectClaimArtifactCodec
             !CompilerEffectEvidenceCatalog.SupportedReplayEventKinds.Contains(value.Kind) ||
             value.SyntaxTreeOrdinal < 0 ||
             !WorkerProtocolJson.IsSha256(value.SyntaxTreeSha256) ||
+            !WorkerProtocolJson.IsSha256(value.SyntaxTreeSnapshotSha256) ||
+            !WorkerProtocolJson.IsSha256(value.SyntaxTreeLineMapSha256) ||
+            value.SourceTreeOrdinal < 0 ||
+            string.IsNullOrWhiteSpace(value.SourceTreePath) ||
+            !WorkerProtocolJson.IsSha256(value.SourceTreeSha256) ||
+            !WorkerProtocolJson.IsSha256(value.SourceLineMapSha256) ||
             value.SyntaxStart < 0 || value.SyntaxLength <= 0 ||
             value.SyntaxStart > int.MaxValue - value.SyntaxLength ||
             value.OperationIdentitySha256 != ComputeReplayOperationSha256(value) ||
@@ -210,6 +283,7 @@ internal static class CompilerEffectClaimArtifactCodec
         }
 
         hash.Add(value.Kind, value.SyntaxTreeOrdinal, value.SyntaxTreeSha256,
+            value.SyntaxTreeSnapshotSha256, value.SyntaxTreeLineMapSha256,
             value.SyntaxStart, value.SyntaxLength);
         if (includeOperationIdentity)
         {
@@ -219,6 +293,8 @@ internal static class CompilerEffectClaimArtifactCodec
         hash.Add(value.MemberIdentity, value.MemberDocumentationId,
             value.TypeIdentity, value.TypeDocumentationId,
             value.SpecWitnessIdentifier);
+        hash.Add(value.SourceTreeOrdinal, value.SourceTreePath,
+            value.SourceTreeSha256, value.SourceLineMapSha256);
         var operands = value.ScalarOperands ?? [];
         hash.Add(operands.Length);
         foreach (var operand in operands)

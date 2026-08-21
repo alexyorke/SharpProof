@@ -29,7 +29,7 @@ public sealed class LauncherArgumentTests
             TestContext.CurrentContext.WorkDirectory);
         var completion = process.WaitForExit(
             TimeSpan.FromSeconds(5),
-            TimeSpan.FromSeconds(1));
+            TimeSpan.FromSeconds(6));
 
         using (Assert.EnterMultipleScope())
         {
@@ -53,15 +53,150 @@ public sealed class LauncherArgumentTests
             TestContext.CurrentContext.WorkDirectory);
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var completion = process.WaitForExit(
-            TimeSpan.FromMilliseconds(100),
-            TimeSpan.FromMilliseconds(500));
+            TimeSpan.FromMilliseconds(1_000),
+            TimeSpan.FromMilliseconds(1_100));
         stopwatch.Stop();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.TimedOut));
             Assert.That(completion.ExitCode, Is.EqualTo(124));
-            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromMilliseconds(1_350)),
+                "The final deadline must include exactly one termination grace.");
+        }
+    }
+
+    [Test]
+    public void LinuxWorkerCooperatesWithTerminationInsideTheSameDeadline()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "trap 'exit 0' TERM; while :; do sleep 0.05; done"],
+            TestContext.CurrentContext.WorkDirectory);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var completion = process.WaitForExit(
+            TimeSpan.FromMilliseconds(1_000),
+            TimeSpan.FromMilliseconds(1_100));
+        stopwatch.Stop();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.TimedOut));
+            Assert.That(completion.ExitCode, Is.EqualTo(124));
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromMilliseconds(1_300)));
+        }
+    }
+
+    [Test]
+    public void LinuxWorkerCancellationDoesNotWaitForTheDeadline()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "while :; do sleep 1; done"],
+            TestContext.CurrentContext.WorkDirectory);
+        using var cancellation = new CancellationTokenSource(100);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        Assert.That(
+            (Action)(() => process.WaitForExit(
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(6),
+                cancellation.Token)),
+            Throws.TypeOf<OperationCanceledException>());
+        stopwatch.Stop();
+        Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(1)));
+    }
+
+    [Test]
+    public void LinuxWorkerDeadlineBoundariesAreExact()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        using var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "read -r _"],
+            TestContext.CurrentContext.WorkDirectory);
+        Assert.That(
+            (Action)(() => process.WaitForExit(
+                TimeSpan.Zero,
+                TimeSpan.FromMilliseconds(1))),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(
+            (Action)(() => process.WaitForExit(
+                TimeSpan.FromMilliseconds(2),
+                TimeSpan.FromMilliseconds(1))),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+        var initialCompletion = process.WaitForExit(
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1));
+        Assert.That(
+            initialCompletion.Kind,
+            Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+        var completion = process.WaitForExit(
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(1));
+        Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void LinuxWorkerMinimumGraceDoesNotRestartCleanupBudget()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "trap '' TERM; while :; do sleep 1; done"],
+            TestContext.CurrentContext.WorkDirectory);
+        Exception? failure = null;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            try
+            {
+                _ = process.WaitForExit(
+                    TimeSpan.FromMilliseconds(1),
+                    TimeSpan.FromMilliseconds(1));
+            }
+            catch (InvalidOperationException exception)
+            {
+                failure = exception;
+            }
+        }
+        finally
+        {
+            process.Dispose();
+            stopwatch.Stop();
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failure, Is.Null.Or.TypeOf<InvalidOperationException>());
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromMilliseconds(300)),
+                "The minimum grace and disposal must share the original final deadline.");
         }
     }
 
@@ -352,6 +487,81 @@ public sealed class LauncherArgumentTests
                 "result.json"),
             "--compiler-manifest", "missing-compiler-manifest.json",
             "--cache-directory", requestPath,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void DisabledCachePathDoesNotParticipateInIoTopology()
+    {
+        var outputRoot = Directory.CreateTempSubdirectory(
+            "sharpproof-disabled-cache-");
+        try
+        {
+            var requestPath = Path.Combine(
+                outputRoot.FullName,
+                "disabled-cache-request.json");
+            string[] arguments = [
+                "verify",
+                "--worker", "worker.dll",
+                "--request", requestPath,
+                "--result", Path.Combine(
+                    outputRoot.FullName,
+                    "disabled-cache-result.json"),
+                "--compiler-manifest", Path.Combine(
+                    outputRoot.FullName,
+                    "missing-compiler-manifest.json"),
+                "--cache-enabled", "false",
+                "--cache-directory", requestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ];
+            Assert.That(
+                LauncherArguments.TryParse(arguments, out var parsed),
+                Is.True);
+
+            Assert.That(
+                (Action)(() => parsed.CreateRequest(out _, out _)),
+                Throws.TypeOf<FileNotFoundException>());
+        }
+        finally
+        {
+            outputRoot.Delete(recursive: true);
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    [Platform("Linux")]
+    public void RequestProjectionRejectsNestedCachePathsBeforeManifestRead(
+        bool cacheBelowResult)
+    {
+        var root = TestContext.CurrentContext.WorkDirectory;
+        var result = Path.Combine(root, "nested-cache-result.json");
+        var cache = cacheBelowResult
+            ? Path.Combine(result, "cache")
+            : Path.Combine(root, "cache-root");
+        if (!cacheBelowResult)
+        {
+            result = Path.Combine(cache, "result.json");
+        }
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", Path.Combine(root, "nested-cache-request.json"),
+            "--result", result,
+            "--compiler-manifest", "missing-compiler-manifest.json",
+            "--cache-enabled", "true",
+            "--cache-directory", cache,
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
@@ -717,6 +927,11 @@ public sealed class LauncherArgumentTests
             WorkerLauncherDefaults.TerminationGraceMilliseconds);
 
         Assert.That(action, Throws.TypeOf<OverflowException>());
+        Assert.That(
+            (Action)(() => _ = Program.ComputeFinalLimit(
+                int.MaxValue,
+                WorkerLauncherDefaults.TerminationGraceMilliseconds)),
+            Throws.TypeOf<OverflowException>());
     }
 
     [Test]
@@ -765,6 +980,7 @@ public sealed class LauncherArgumentTests
             var exitCode = Program.ValidateAndReport(
                 path,
                 new WorkerVerifyRequest(),
+                null,
                 null,
                 null,
                 out var validResponse,
@@ -829,20 +1045,100 @@ public sealed class LauncherArgumentTests
 
     [TestCase(1_000, 1_000, 1_900)]
     [TestCase(1_000, 100, 1_001)]
+    [TestCase(1_000, 1, 1_001)]
     public void CombinedTimeoutReservesCleanupTime(
         int projectMilliseconds, int graceMilliseconds, int expected)
     {
         Assert.That(
             Program.ComputeHardLimit(projectMilliseconds, graceMilliseconds),
             Is.EqualTo(expected));
+        Assert.That(
+            Program.ComputeFinalLimit(projectMilliseconds, graceMilliseconds),
+            Is.EqualTo(projectMilliseconds + graceMilliseconds));
+    }
+
+    [TestCase(1)]
+    [TestCase(100)]
+    [TestCase(1000)]
+    public void BoundResultUsesTheConfiguredTerminationGrace(
+        int terminationGraceMilliseconds)
+    {
+        var request = new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler.manifest.json",
+                Sha256 = new('c', 64)
+            }
+        };
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        const string inputHash =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var expectedVersions = new WorkerVersionSummary
+        {
+            WorkerVersion = "launcher-test",
+            ApiSpecVersion = "launcher-test"
+        };
+        var response = new WorkerVerifyResponse
+        {
+            RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+            InputHash = inputHash,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
+            {
+                CacheStatus = WorkerCacheStatus.Miss,
+                Versions = expectedVersions,
+                Budgets = request.Budgets,
+                ElapsedMilliseconds =
+                    WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+                        request, terminationGraceMilliseconds)
+            }
+        };
+
+        var direct = WorkerProtocolJson.ValidateForRequest(
+            response, response.RequestHash, inputHash, manifest, request,
+            expectedVersions, terminationGraceMilliseconds);
+        Assert.That(direct.IsValid, Is.True,
+            string.Join(Environment.NewLine,
+                direct.Errors.Select(static error => error.Code)));
+
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, WorkerProtocolJson.SerializeResponse(response));
+            Assert.That(Program.ValidateAndReport(
+                path, request, inputHash, manifest, expectedVersions,
+                out var valid, out _, terminationGraceMilliseconds), Is.Not.EqualTo(3));
+            Assert.That(valid, Is.True);
+
+            response.Summary.ElapsedMilliseconds++;
+            var over = WorkerProtocolJson.ValidateForRequest(
+                response, response.RequestHash, inputHash, manifest, request,
+                expectedVersions, terminationGraceMilliseconds);
+            Assert.That(over.Errors.Select(static error => error.Code),
+                Does.Contain("response.elapsed_request_envelope"));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 
     [TestCase("input", "response.input_mismatch")]
     [TestCase("budgets", "response.budgets_mismatch")]
+    [TestCase("provenance", "response.versions_mismatch")]
     public void BoundResultValidationRejectsMismatches(
         string mismatch, string expectedError)
     {
-        var request = new WorkerVerifyRequest();
+        var request = CreateValidRequest();
         var manifest = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(manifest);
         const string inputHash =
@@ -865,13 +1161,26 @@ public sealed class LauncherArgumentTests
                 Budgets = new WorkerBudgets()
             }
         };
+        var expectedVersions = new WorkerVersionSummary
+        {
+            WorkerVersion = response.Summary.Versions.WorkerVersion,
+            ApiSpecVersion = response.Summary.Versions.ApiSpecVersion,
+            WorkerBinarySha256 =
+                response.Summary.Versions.WorkerBinarySha256,
+            ApiSpecContentSha256 =
+                response.Summary.Versions.ApiSpecContentSha256
+        };
         if (mismatch == "input")
         {
             response.InputHash = new('b', 64);
         }
-        else
+        else if (mismatch == "budgets")
         {
             response.Summary.Budgets.QueryRlimit++;
+        }
+        else
+        {
+            response.Summary.Versions.WorkerVersion = "fabricated";
         }
 
         var path = Path.Combine(
@@ -886,7 +1195,8 @@ public sealed class LauncherArgumentTests
                 path, WorkerProtocolJson.SerializeResponse(response));
             Assert.That(
                 Program.ValidateAndReport(
-                    path, request, inputHash, manifest, out var valid, out _),
+                    path, request, inputHash, manifest,
+                    expectedVersions, out var valid, out _),
                 Is.EqualTo(3));
             Assert.That(valid, Is.False);
             Assert.That(capture.ToString(), Does.Contain(expectedError));
@@ -906,6 +1216,11 @@ public sealed class LauncherArgumentTests
     {
         var request = new WorkerVerifyRequest
         {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler.manifest.json",
+                Sha256 = new('c', 64)
+            },
             VerifyPolicy = WorkerVerifyPolicy.RequireProven,
             AssumptionPolicy = WorkerAssumptionPolicy.Error
         };
@@ -922,8 +1237,13 @@ public sealed class LauncherArgumentTests
                 new WorkerCallableResult {
                     CallableId = "C.M",
                     Coverage = WorkerCallableCoverage.Incomplete,
-                    Reason = WorkerCallableCoverageReason.UnsupportedCallable,
-                    Assumptions = [usedAssumption]
+                    Reason = WorkerCallableCoverageReason.SemanticUnknown,
+                    Assumptions = [
+                        new WorkerAssumptionEvidence {
+                            Id = "assumption-1",
+                            Kind = WorkerAssumptionKind.UserAssume
+                        }
+                    ]
                 },
                 new WorkerCallableResult {
                     CallableId = "C.Unsupported",
@@ -937,21 +1257,31 @@ public sealed class LauncherArgumentTests
                     Outcome = WorkerClaimOutcome.Unknown,
                     Reason = WorkerClaimReason.UnsupportedExpression,
                     Assumptions = [usedAssumption]
+                },
+                new WorkerClaimResult {
+                    ClaimId = "claim-2",
+                    Outcome = WorkerClaimOutcome.Unknown,
+                    Reason = WorkerClaimReason.UnsupportedCallable,
+                    EffectCertainty = WorkerEffectEvidenceCertainty.Unavailable
                 }
             ],
             Summary = new WorkerVerificationSummary
             {
                 CallableCount = 2,
-                ClaimCount = 1,
+                ClaimCount = 2,
                 OutcomeCounts = [
                     new WorkerClaimOutcomeCount {
                         Outcome = WorkerClaimOutcome.Unknown,
-                        Count = 1
+                        Count = 2
                     }
                 ],
                 ReasonCounts = [
                     new WorkerClaimReasonCount {
                         Reason = WorkerClaimReason.UnsupportedExpression,
+                        Count = 1
+                    },
+                    new WorkerClaimReasonCount {
+                        Reason = WorkerClaimReason.UnsupportedCallable,
                         Count = 1
                     }
                 ],
@@ -992,6 +1322,7 @@ public sealed class LauncherArgumentTests
                 request,
                 inputHash,
                 manifest,
+                response.Summary.Versions,
                 out var valid,
                 out _);
 
@@ -1017,6 +1348,18 @@ public sealed class LauncherArgumentTests
                 File.Delete(path);
             }
         }
+    }
+
+    private static WorkerVerifyRequest CreateValidRequest()
+    {
+        return new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler.manifest.json",
+                Sha256 = new('c', 64)
+            }
+        };
     }
 
     [Test]
@@ -1152,6 +1495,7 @@ public sealed class LauncherArgumentTests
     {
         var manifest = CreateSarifManifest();
         manifest.Callables = [manifest.Callables[0]];
+        manifest.Claims = [manifest.Claims[0]];
         manifest.Callables[0].Assumptions = [];
         var claim = manifest.Claims.Single();
         WorkerProtocolJson.SealManifest(manifest);
@@ -1498,7 +1842,8 @@ public sealed class LauncherArgumentTests
                     SelectionReasons = [
                         WorkerSelectionReason.ExplicitAnnotation
                     ],
-                    Location = location
+                    Location = location,
+                    ClaimIds = ["claim-2"]
                 }
             ],
             Claims = [
@@ -1507,6 +1852,14 @@ public sealed class LauncherArgumentTests
                     CallableId = "C.M",
                     Kind = WorkerClaimKind.Postcondition,
                     Evidence = WorkerClaimEvidence.DirectClause,
+                    Location = location
+                },
+                new WorkerClaimManifestEntry {
+                    ClaimId = "claim-2",
+                    CallableId = "C.Unsupported",
+                    Kind = WorkerClaimKind.Effect,
+                    Evidence = WorkerClaimEvidence.Attribute,
+                    EffectContractKind = WorkerEffectContractKind.EnforcePure,
                     Location = location
                 }
             ]

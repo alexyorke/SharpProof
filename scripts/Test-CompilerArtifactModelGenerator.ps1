@@ -5,6 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $schemaPath = Join-Path $repositoryRoot `
     'SharpProof.CompilerArtifact\CompilerArtifactModel.schema.json'
 $generatorPath = Join-Path $PSScriptRoot `
@@ -133,13 +134,10 @@ try {
     Write-Host 'Compiler-artifact metadata-row generator validation passed.'
 }
 finally {
-    $resolvedRoot = [IO.Path]::GetFullPath($temporaryRoot)
     $resolvedBase = [IO.Path]::GetFullPath($temporaryBase)
-    if (-not $resolvedRoot.StartsWith(
-            $resolvedBase + [IO.Path]::DirectorySeparatorChar,
-            [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to remove generator test directory: $resolvedRoot"
-    }
+    $resolvedRoot = Resolve-SharpProofContainedPath `
+        -Root $resolvedBase -Path $temporaryRoot `
+        -ParameterName 'Generator test directory'
     if (Test-Path -LiteralPath $resolvedRoot) {
         Remove-Item -LiteralPath $resolvedRoot -Recurse -Force
     }

@@ -88,7 +88,11 @@ internal static class Program
             return await Respond(WorkerResultAssembler.Create(
                 WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
                 WorkerRunStatus.Canceled, WorkerRunFailureReason.None, [], [],
-                request?.Budgets ?? new WorkerBudgets(), WorkerCacheStatus.Disabled, 0)).ConfigureAwait(false);
+                request?.Budgets ?? new WorkerBudgets(), WorkerCacheStatus.Disabled, 0,
+                [new WorkerProtocolError {
+                    Code = "worker.canceled",
+                    Message = "The worker was canceled before producing manifest-bound evidence."
+                }])).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not
             OutOfMemoryException and not StackOverflowException)

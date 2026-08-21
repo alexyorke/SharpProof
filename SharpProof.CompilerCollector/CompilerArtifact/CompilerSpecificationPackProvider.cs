@@ -20,20 +20,33 @@ internal sealed class CompilerSpecificationPackProvider
     internal CompilerSpecificationPackProvider(
         IrFactory factory,
         IEnumerable<string>? enabledPacks)
+        : this(factory, ResolveAuthority(enabledPacks))
+    {
+    }
+
+    internal CompilerSpecificationPackProvider(
+        IrFactory factory,
+        CompilerSpecificationPackAuthority authority)
     {
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
 
         var catalog = SharedCatalog.Value;
-        var selected = (enabledPacks ?? [])
-            .Select(static value => value?.Trim() ?? string.Empty)
-            .Where(static value => value.Length != 0)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static value => value, StringComparer.Ordinal)
-            .ToArray();
+        authority = ArgumentNullGuard.NotNull(authority, nameof(authority));
+        if (!CompilerSpecificationPackAuthorityValidation.IsValid(
+                authority.SpecificationPackIds,
+                authority.SpecificationPackCatalogVersion,
+                authority.SpecificationPackCatalogSha256) ||
+            authority.SpecificationPackCatalogVersion != catalog.Version ||
+            authority.SpecificationPackCatalogSha256 != catalog.EvidenceSha256)
+        {
+            throw new InvalidOperationException(
+                "The SharpProof specification-pack authority is not current.");
+        }
+
         var methods = ImmutableDictionary.CreateBuilder<
             string,
             MethodDefinition>(StringComparer.Ordinal);
-        foreach (var packId in selected)
+        foreach (var packId in authority.SpecificationPackIds)
         {
             if (!catalog.Packs.TryGetValue(packId, out var pack))
             {
@@ -62,6 +75,49 @@ internal sealed class CompilerSpecificationPackProvider
         }
 
         _methods = methods.ToImmutable();
+    }
+
+    internal static CompilerSpecificationPackAuthority ResolveAuthority(
+        IEnumerable<string>? enabledPacks)
+    {
+        var catalog = SharedCatalog.Value;
+        var selected = CanonicalizeSelection(enabledPacks, catalog);
+        return new CompilerSpecificationPackAuthority
+        {
+            SpecificationPackIds = selected,
+            SpecificationPackCatalogVersion = catalog.Version,
+            SpecificationPackCatalogSha256 = catalog.EvidenceSha256
+        };
+    }
+
+    private static string[] CanonicalizeSelection(
+        IEnumerable<string>? enabledPacks,
+        Catalog catalog)
+    {
+        var values = (enabledPacks ?? [])
+            .Select(static value => value?.Trim() ?? string.Empty)
+            .Where(static value => value.Length != 0)
+            .ToArray();
+        if (values.Distinct(StringComparer.Ordinal).Count() != values.Length)
+        {
+            throw new InvalidOperationException(
+                "SharpProof specification-pack identifiers must be unique.");
+        }
+
+        var selected = values
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray();
+        foreach (var packId in selected)
+        {
+            if (!catalog.Packs.ContainsKey(packId))
+            {
+                throw new InvalidOperationException(
+                    "Unknown SharpProof specification pack '" +
+                    packId + "'.");
+            }
+        }
+
+        return selected;
     }
 
     internal bool CanResolve(IMethodSymbol method)
@@ -142,7 +198,8 @@ internal sealed class CompilerSpecificationPackProvider
             new IrSummaryProvenance(
                 IrSummaryOrigin.SpecificationPack,
                 definition.EvidenceSha256,
-                definition.EvidenceIdentity));
+                definition.EvidenceIdentity,
+                method.GetDocumentationCommentId() ?? string.Empty));
         var environment = parameters.ToImmutableDictionary(
             static parameter => parameter,
             parameter => (IrTerm)_factory.Variable(parameter));
@@ -321,7 +378,8 @@ internal sealed class CompilerSpecificationPackProvider
             "packs");
         if (RequiredString(root, "schema", "catalog") !=
                 "SharpProof.RelationalSpecPackCatalog" ||
-            RequiredInt32(root, "schemaVersion", "catalog") != 1)
+            RequiredInt32(root, "schemaVersion", "catalog") !=
+                CompilerSpecificationPackCatalogVersions.Current)
         {
             throw new InvalidDataException(
                 "The relational specification-pack catalog schema is unsupported.");
@@ -352,7 +410,16 @@ internal sealed class CompilerSpecificationPackProvider
                 "The relational specification-pack catalog is empty.");
         }
 
-        return new Catalog(packs.ToImmutable(), evidenceSha256);
+        if (evidenceSha256 != CompilerSpecificationPackCatalogVersions.Sha256)
+        {
+            throw new InvalidDataException(
+                "The relational specification-pack catalog digest is not authoritative.");
+        }
+
+        return new Catalog(
+            packs.ToImmutable(),
+            CompilerSpecificationPackCatalogVersions.Current,
+            evidenceSha256);
     }
 
     private static PackDefinition ParsePack(JsonElement element)
@@ -753,6 +820,7 @@ internal sealed class CompilerSpecificationPackProvider
 
     private sealed record Catalog(
         ImmutableDictionary<string, PackDefinition> Packs,
+        int Version,
         string EvidenceSha256);
 
     private sealed record PackDefinition(

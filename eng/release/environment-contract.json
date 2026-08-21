@@ -6,11 +6,23 @@
       "refs/tags/v1.0.0*",
       "refs/tags/evidence/v*"
     ],
-    "requiredRules": [
+    "excludes": [],
+    "rules": [
       "deletion",
       "update"
-    ]
+    ],
+    "bypassActors": []
   },
+  "workflowJobs": [
+    {
+      "id": "publish-private-preview",
+      "canonicalSha256": "67bb6e4ae4463730f87f04bb6e92a7dbde2f12a2a068e9309d00f91f164eb4d8"
+    },
+    {
+      "id": "publish",
+      "canonicalSha256": "d7b7fb6e5d73312a751c32fcbd1c8c693fe5c8b4e564ee2497a77ebbb056fce0"
+    }
+  ],
   "environments": [
     {
       "name": "nuget.private-preview",

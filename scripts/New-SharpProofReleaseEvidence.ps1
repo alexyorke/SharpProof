@@ -15,6 +15,13 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$resolvedOutput = $null
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 
 function Get-PackageIdentity {
     param(
@@ -148,24 +155,19 @@ function New-DeterministicPackageSbom {
         [object[]]$ThirdPartyComponents,
 
         [Parameter(Mandatory = $true)]
+        [object[]]$DependencyGraph,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$LicenseGraph,
+
+        [Parameter(Mandatory = $true)]
         [string]$RepositoryRoot
     )
 
-    $commitTimestamp = (
-        & git -C $RepositoryRoot show `
-            -s `
-            --format=%cI `
-            $RepositoryCommit
-    ).Trim()
-    if ($LASTEXITCODE -ne 0 -or
-        [string]::IsNullOrWhiteSpace($commitTimestamp)) {
-        throw "Could not resolve timestamp for commit $RepositoryCommit."
-    }
-    $created = [DateTimeOffset]::Parse(
-        $commitTimestamp,
-        [Globalization.CultureInfo]::InvariantCulture).UtcDateTime.ToString(
-            'yyyy-MM-ddTHH:mm:ssZ',
-            [Globalization.CultureInfo]::InvariantCulture)
+    $releaseIdentity = Get-SharpProofSbomReleaseIdentity `
+        -RepositoryRoot $RepositoryRoot `
+        -Version $Version `
+        -RepositoryCommit $RepositoryCommit
 
     $packages = [Collections.Generic.List[object]]::new()
     $relationships = [Collections.Generic.List[object]]::new()
@@ -178,6 +180,12 @@ function New-DeterministicPackageSbom {
         $hash = (Get-FileHash `
             -LiteralPath $item.File.FullName `
             -Algorithm SHA256).Hash.ToLowerInvariant()
+        $license = @($LicenseGraph | Where-Object {
+            [string]$_.PackageId -eq $id
+        })
+        if ($license.Count -ne 1) {
+            throw "Package license authority is missing '$id'."
+        }
         $packages.Add([pscustomobject][ordered]@{
             name = $id
             SPDXID = $spdxId
@@ -190,18 +198,16 @@ function New-DeterministicPackageSbom {
                     checksumValue = $hash
                 }
             )
-            licenseConcluded = 'MIT'
-            licenseDeclared = 'MIT'
+            licenseConcluded = [string]$license[0].LicenseExpression
+            licenseDeclared = [string]$license[0].LicenseExpression
             copyrightText = 'NOASSERTION'
             externalRefs = @(
                 [pscustomobject][ordered]@{
                     referenceCategory = 'PACKAGE-MANAGER'
                     referenceType = 'purl'
-                    referenceLocator = (
-                        'pkg:nuget/' +
-                        [Uri]::EscapeDataString($id) +
-                        '@' +
-                        [Uri]::EscapeDataString($Version))
+                    referenceLocator = Get-SharpProofNuGetPurl `
+                        -Name $id `
+                        -Version $Version
                 }
             )
         })
@@ -236,11 +242,9 @@ function New-DeterministicPackageSbom {
                     [pscustomobject][ordered]@{
                         referenceCategory = 'PACKAGE-MANAGER'
                         referenceType = 'purl'
-                        referenceLocator = (
-                            'pkg:nuget/' +
-                            [Uri]::EscapeDataString($componentName) +
-                            '@' +
-                            [Uri]::EscapeDataString($componentVersion))
+                        referenceLocator = Get-SharpProofNuGetPurl `
+                            -Name $componentName `
+                            -Version $componentVersion
                     }
                 )
             })
@@ -252,31 +256,24 @@ function New-DeterministicPackageSbom {
             relatedSpdxElement = [string]$componentIds[$key]
         })
     }
-    $relationships.Add([pscustomobject][ordered]@{
-        spdxElementId = Get-SpdxPackageId -Name 'SharpProof'
-        relationshipType = 'DEPENDS_ON'
-        relatedSpdxElement = Get-SpdxPackageId `
-            -Name 'SharpProof.Attributes'
-    })
-    $relationships.Add([pscustomobject][ordered]@{
-        spdxElementId = Get-SpdxPackageId `
-            -Name 'SharpProof.Verifier'
-        relationshipType = 'DEPENDS_ON'
-        relatedSpdxElement = Get-SpdxPackageId -Name 'SharpProof'
-    })
+    foreach ($dependency in $DependencyGraph) {
+        $relationships.Add([pscustomobject][ordered]@{
+            spdxElementId = Get-SpdxPackageId -Name $dependency.FromId
+            relationshipType = 'DEPENDS_ON'
+            relatedSpdxElement = Get-SpdxPackageId -Name $dependency.ToId
+        })
+    }
 
     $document = [pscustomobject][ordered]@{
         spdxVersion = 'SPDX-2.3'
         dataLicense = 'CC0-1.0'
         SPDXID = 'SPDXRef-DOCUMENT'
-        name = "SharpProof-$Version"
-        documentNamespace = (
-            'https://github.com/alexyorke/SharpProof/sbom/' +
-            "$Version/$RepositoryCommit")
+        name = [string]$releaseIdentity.Name
+        documentNamespace = [string]$releaseIdentity.DocumentNamespace
         creationInfo = [pscustomobject][ordered]@{
-            created = $created
-            creators = @('Tool: SharpProof release evidence')
-            comment = 'Timestamp is derived from the source commit for reproducibility.'
+            created = [string]$releaseIdentity.Created
+            creators = @($releaseIdentity.Creators)
+            comment = [string]$releaseIdentity.Comment
         }
         documentDescribes = @($described)
         packages = @($packages |
@@ -284,8 +281,33 @@ function New-DeterministicPackageSbom {
         relationships = @($relationships |
             Sort-Object spdxElementId, relationshipType, relatedSpdxElement)
     }
+    Test-SharpProofSbomReleaseIdentity `
+        -Sbom $document `
+        -RepositoryRoot $RepositoryRoot `
+        -Version $Version `
+        -RepositoryCommit $RepositoryCommit
+    foreach ($item in $PackageItems) {
+        $id = [string]$item.Identity.Id
+        $matches = @($document.packages | Where-Object {
+            [string]$_.name -ceq $id -and
+            [string]$_.versionInfo -ceq $Version
+        })
+        if ($matches.Count -ne 1) {
+            throw "Generated SPDX package identity is invalid: $id"
+        }
+        $expectedHash = (Get-FileHash `
+            -LiteralPath $item.File.FullName `
+            -Algorithm SHA256).Hash.ToLowerInvariant()
+        Test-SharpProofSpdxPackageChecksum `
+            -Package $matches[0] `
+            -ExpectedSha256 $expectedHash `
+            -Identity $id
+    }
     $json = ($document | ConvertTo-Json -Depth 10) -replace "`r`n", "`n"
     Write-AtomicText -Path $Path -Value ($json + "`n")
+    $null = Read-SharpProofCanonicalReleaseJson `
+        -Path $Path `
+        -DocumentType Spdx
 }
 
 function Get-ArchiveText {
@@ -340,7 +362,7 @@ function Test-ThirdPartyComponentVersions {
                 AssetsPath = 'SharpProof.Worker\obj\project.assets.json'
             },
             @{
-                EntryPrefix = 'runtimes/linux-x64/native/'
+                EntryPrefix = 'tools/native/linux-x64/'
                 AssetsPath = 'SharpProof.Worker\obj\project.assets.json'
             }
         )
@@ -496,6 +518,8 @@ if (-not (Test-Path -LiteralPath $resolvedSource -PathType Container)) {
 $repositoryRoot = (Resolve-Path `
     -LiteralPath (Join-Path $PSScriptRoot '..') `
     -ErrorAction Stop).Path
+$releaseVersion = Get-SharpProofReleaseVersion `
+    -RepositoryRoot $repositoryRoot
 if ([string]::IsNullOrWhiteSpace($ThirdPartyManifestPath)) {
     $resolvedThirdPartyManifest = Join-Path `
         $repositoryRoot `
@@ -517,7 +541,7 @@ Test-ThirdPartyComponentVersions `
     -RepositoryRoot $repositoryRoot `
     -Manifest $thirdPartyManifest
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $resolvedOutput = $resolvedSource
+    $finalOutput = $resolvedSource
 }
 else {
     $outputPath = [IO.Path]::GetFullPath($OutputDirectory)
@@ -525,14 +549,25 @@ else {
         New-Item -ItemType Directory -Path $outputPath |
             Out-Null
     }
-    $resolvedOutput = (Resolve-Path `
+    $finalOutput = (Resolve-Path `
         -LiteralPath $outputPath `
         -ErrorAction Stop).Path
     if (-not (Test-Path `
-            -LiteralPath $resolvedOutput `
+            -LiteralPath $finalOutput `
             -PathType Container)) {
-        throw "OutputDirectory is not a directory: $resolvedOutput"
+        throw "OutputDirectory is not a directory: $finalOutput"
     }
+}
+$resolvedOutput = Join-Path ([IO.Path]::GetDirectoryName($finalOutput)) (
+    '.' + [IO.Path]::GetFileName($finalOutput) + '.' +
+    [Guid]::NewGuid().ToString('N') + '.staging')
+[IO.Directory]::CreateDirectory($resolvedOutput) | Out-Null
+trap {
+    if (-not [string]::IsNullOrWhiteSpace($resolvedOutput) -and
+        [IO.Directory]::Exists($resolvedOutput)) {
+        [IO.Directory]::Delete($resolvedOutput, $true)
+    }
+    throw $PSItem
 }
 
 $packageFiles = @(
@@ -545,6 +580,10 @@ $packageFiles = @(
 if ($packageFiles.Count -ne 6) {
     throw "Release evidence requires exactly six NuGet artifacts; found $($packageFiles.Count)."
 }
+Test-SharpProofExactRegularFileSet `
+    -Directory $resolvedSource `
+    -ExpectedFileNames @($packageFiles.Name) `
+    -Owner 'Release package input'
 
 $expectedIds = @(
     'SharpProof',
@@ -580,6 +619,10 @@ $versions = @(
 if ($versions.Count -ne 1) {
     throw "NuGet artifact versions must match; found '$($versions -join ', ')'."
 }
+Test-SharpProofReleaseVersionSet `
+    -ExpectedVersion $releaseVersion `
+    -Versions @($identities | ForEach-Object { $_.Identity.Version }) `
+    -Owner 'NuGet artifacts'
 $commits = @(
     $identities |
         ForEach-Object { $_.Identity.RepositoryCommit } |
@@ -596,6 +639,51 @@ if ($commits[0] -ne $checkoutCommit) {
     throw (
         "NuGet artifact repository commit '$($commits[0])' does not match " +
         "checkout '$checkoutCommit'.")
+}
+$dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
+    -PackagePaths @($identities.File.FullName))
+$licenseGraph = @(Get-SharpProofPackageLicenseGraph `
+    -PackagePaths @($identities.File.FullName))
+
+$packagePayloadEvidence = [Collections.Generic.List[object]]::new()
+foreach ($item in $identities |
+        Where-Object { $_.File.Extension -eq '.nupkg' }) {
+    $packageId = $item.Identity.Id
+    $components = @(
+        $thirdPartyManifest.packages.PSObject.Properties[$packageId].Value
+    )
+    $payloads = @(Test-SharpProofPackagePayload `
+        -PackagePath $item.File.FullName `
+        -PackageId $packageId `
+        -RepositoryRoot $repositoryRoot `
+        -Components $components)
+    $packagePayloadEvidence.Add([pscustomobject][ordered]@{
+        packageId = $packageId
+        entries = $payloads
+    })
+}
+
+foreach ($packageId in $expectedIds) {
+    $main = @(
+        $identities |
+            Where-Object {
+                $_.File.Extension -eq '.nupkg' -and
+                $_.Identity.Id -eq $packageId
+            }
+    )[0]
+    $symbols = @(
+        $identities |
+            Where-Object {
+                $_.File.Extension -eq '.snupkg' -and
+                $_.Identity.Id -eq $packageId
+            }
+    )[0]
+    Test-SharpProofSymbolPackagePair `
+        -PackagePath $main.File.FullName `
+        -SymbolPackagePath $symbols.File.FullName `
+        -PackageId $packageId `
+        -PackageVersion $versions[0] `
+        -RepositoryCommit $checkoutCommit
 }
 
 $thirdPartyPackages = @(
@@ -631,6 +719,15 @@ foreach ($item in $identities |
         })
     }
 }
+$catalogComponents = @(Get-SharpProofThirdPartyComponentGraph `
+    -ContractPath $resolvedThirdPartyManifest)
+Test-SharpProofThirdPartyComponentProjection `
+    -ActualComponents @($thirdPartyComponents) `
+    -ExpectedComponents $catalogComponents
+$sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
+    -PackageLicenseGraph $licenseGraph `
+    -PackageVersion $versions[0] `
+    -ThirdPartyComponents $catalogComponents)
 
 $artifacts = [Collections.Generic.List[object]]::new()
 foreach ($item in $identities) {
@@ -660,24 +757,34 @@ if ([string]::IsNullOrWhiteSpace($SbomPath)) {
         -Version $versions[0] `
         -RepositoryCommit $commits[0] `
         -ThirdPartyComponents @($thirdPartyComponents) `
+        -DependencyGraph $dependencyGraph `
+        -LicenseGraph $licenseGraph `
         -RepositoryRoot $repositoryRoot
 }
 else {
-    $resolvedSbom = (Resolve-Path `
+    $suppliedSbom = (Resolve-Path `
         -LiteralPath $SbomPath `
         -ErrorAction Stop).Path
+    $resolvedSbom = Join-Path $resolvedOutput ([IO.Path]::GetFileName($suppliedSbom))
+    [IO.File]::Copy($suppliedSbom, $resolvedSbom, $false)
 }
 if (-not (Test-Path -LiteralPath $resolvedSbom -PathType Leaf)) {
     throw "SbomPath is not a file: $resolvedSbom"
 }
-$sbom = Get-Content -LiteralPath $resolvedSbom -Raw |
-    ConvertFrom-Json
+$sbom = Read-SharpProofCanonicalReleaseJson `
+    -Path $resolvedSbom `
+    -DocumentType Spdx
 if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
     [string]$sbom.spdxVersion -ne 'SPDX-2.3' -or
     $null -eq $sbom.PSObject.Properties['dataLicense'] -or
     [string]$sbom.dataLicense -ne 'CC0-1.0') {
     throw "SbomPath is not a supported SPDX JSON document: $resolvedSbom"
 }
+Test-SharpProofSbomReleaseIdentity `
+    -Sbom $sbom `
+    -RepositoryRoot $repositoryRoot `
+    -Version $versions[0] `
+    -RepositoryCommit $commits[0]
 if ($null -eq $sbom.PSObject.Properties['packages'] -or
     $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
     $null -eq $sbom.PSObject.Properties['relationships']) {
@@ -686,6 +793,23 @@ if ($null -eq $sbom.PSObject.Properties['packages'] -or
 $sbomPackages = @($sbom.packages)
 $documentDescribes = @($sbom.documentDescribes)
 $relationships = @($sbom.relationships)
+Test-SharpProofSbomTopology `
+    -SbomPackages $sbomPackages `
+    -DocumentDescribes $documentDescribes `
+    -Relationships $relationships `
+    -FirstPartyPackageIds $expectedIds `
+    -PackageVersion $versions[0] `
+    -Components @($thirdPartyComponents) `
+    -DependencyGraph $dependencyGraph
+Test-SharpProofSbomArtifactScope `
+    -Artifacts @($artifacts) `
+    -SbomPackages $sbomPackages `
+    -DocumentDescribes $documentDescribes `
+    -FirstPartyPackageIds $expectedIds `
+    -PackageVersion $versions[0]
+Test-SharpProofSbomAttestationWorkflow -Workflow (
+    Get-Content -LiteralPath (Join-Path `
+        $repositoryRoot '.github/workflows/package-consumers.yml') -Raw)
 $expectedComponentKeys = @(
     $thirdPartyComponents |
         ForEach-Object {
@@ -725,14 +849,10 @@ foreach ($expectedId in $expectedIds) {
     $expectedHash = (Get-FileHash `
         -LiteralPath $packageItem[0].File.FullName `
         -Algorithm SHA256).Hash.ToLowerInvariant()
-    $checksums = @($matchingPackages[0].checksums |
-        Where-Object {
-            [string]$_.algorithm -eq 'SHA256' -and
-            [string]$_.checksumValue -eq $expectedHash
-        })
-    if ($checksums.Count -ne 1) {
-        throw "SPDX SBOM checksum for '$expectedId' is missing or stale."
-    }
+    Test-SharpProofSpdxPackageChecksum `
+        -Package $matchingPackages[0] `
+        -ExpectedSha256 $expectedHash `
+        -Identity $expectedId
 }
 foreach ($key in $expectedComponentKeys) {
     $parts = $key.Split("`0")
@@ -768,36 +888,16 @@ foreach ($component in $thirdPartyComponents) {
             "'$($component.packageId)' and '$($component.id)'.")
     }
 }
-$expectedDependencies = @(
-    [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof'
-        to = Get-SpdxPackageId -Name 'SharpProof.Attributes'
-    },
-    [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof.Verifier'
-        to = Get-SpdxPackageId -Name 'SharpProof'
-    }
-)
-$dependencyRelationships = @(
-    $relationships |
-        Where-Object {
-            [string]$_.relationshipType -eq 'DEPENDS_ON'
-        }
-)
-if ($dependencyRelationships.Count -ne $expectedDependencies.Count) {
-    throw 'SPDX SBOM does not contain the exact package dependency graph.'
-}
-foreach ($dependency in $expectedDependencies) {
-    if (@($dependencyRelationships |
-            Where-Object {
-                [string]$_.spdxElementId -eq $dependency.from -and
-                [string]$_.relatedSpdxElement -eq $dependency.to
-            }).Count -ne 1) {
-        throw (
-            "SPDX SBOM dependency is missing: " +
-            "$($dependency.from) -> $($dependency.to)")
-    }
-}
+Test-SharpProofSbomDependencyGraph `
+    -Relationships $relationships `
+    -DependencyGraph $dependencyGraph
+Test-SharpProofSbomComponentGraph `
+    -SbomPackages $sbomPackages `
+    -Relationships $relationships `
+    -Components @($thirdPartyComponents)
+Test-SharpProofSbomLicenseGraph `
+    -SbomPackages $sbomPackages `
+    -LicenseGraph $sbomLicenseGraph
 $sbomFile = Get-Item -LiteralPath $resolvedSbom
 $sbomHash = Get-FileHash `
     -LiteralPath $resolvedSbom `
@@ -810,13 +910,25 @@ $artifacts.Add([pscustomobject][ordered]@{
     sha256 = $sbomHash.Hash.ToLowerInvariant()
 })
 
+$artifactsByName = [Collections.Generic.Dictionary[string, object]]::new(
+    [StringComparer]::Ordinal)
+foreach ($artifact in $artifacts) {
+    if (-not $artifactsByName.TryAdd(
+            [string]$artifact.fileName,
+            $artifact)) {
+        throw "Release artifacts contain duplicate file name '$($artifact.fileName)'."
+    }
+}
+$artifactNames = [string[]]@($artifactsByName.Keys)
+[Array]::Sort($artifactNames, [StringComparer]::Ordinal)
 $orderedArtifacts = @(
-    $artifacts |
-        Sort-Object fileName
+    $artifactNames | ForEach-Object { $artifactsByName[$_] }
 )
 $manifest = [pscustomobject][ordered]@{
     schemaVersion = 2
-    packageVersion = $versions[0]
+    packageVersion = $releaseVersion
+    versionAuthority = Get-SharpProofReleaseVersionAuthority `
+        -RepositoryRoot $repositoryRoot
     repository = [pscustomobject][ordered]@{
         type = 'git'
         url = 'https://github.com/alexyorke/SharpProof'
@@ -824,6 +936,10 @@ $manifest = [pscustomobject][ordered]@{
     }
     hashAlgorithm = 'SHA256'
     artifacts = $orderedArtifacts
+    packagePayloads = @(
+        $packagePayloadEvidence |
+            Sort-Object packageId
+    )
     thirdPartyComponents = @(
         $thirdPartyComponents |
             Sort-Object packageId, id, version
@@ -831,21 +947,32 @@ $manifest = [pscustomobject][ordered]@{
 }
 $json = ($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n"
 $json += "`n"
-$sums = (
-    $orderedArtifacts |
-        ForEach-Object {
-            if ($_.fileName -match '[\r\n]') {
-                throw 'Artifact file names must not contain newlines.'
-            }
-            $_.sha256 + '  ' + $_.fileName
-        }
-) -join "`n"
-$sums += "`n"
-
 $manifestPath = Join-Path $resolvedOutput 'SharpProof.release.json'
 $sumsPath = Join-Path $resolvedOutput 'SHA256SUMS'
 Write-AtomicText -Path $manifestPath -Value $json
-Write-AtomicText -Path $sumsPath -Value $sums
+$null = Read-SharpProofCanonicalReleaseJson `
+    -Path $manifestPath `
+    -DocumentType ReleaseManifest
+Write-SharpProofReleaseChecksumFile `
+    -Path $sumsPath `
+    -Artifacts $orderedArtifacts
+foreach ($packageFile in $packageFiles) {
+    [IO.File]::Copy(
+        $packageFile.FullName,
+        (Join-Path $resolvedOutput $packageFile.Name),
+        $false)
+}
+Test-SharpProofReleaseBundleTopology `
+    -Directory $resolvedOutput `
+    -Artifacts $orderedArtifacts `
+    -Owner 'Generated release bundle staging'
+Publish-SharpProofReleaseBundleAtomically `
+    -StagingDirectory $resolvedOutput `
+    -DestinationDirectory $finalOutput `
+    -Artifacts $orderedArtifacts `
+    -Owner 'Generated release bundle'
+$manifestPath = Join-Path $finalOutput 'SharpProof.release.json'
+$sumsPath = Join-Path $finalOutput 'SHA256SUMS'
 
 Write-Host "Wrote deterministic SharpProof release evidence for version $($versions[0])."
 [pscustomobject][ordered]@{

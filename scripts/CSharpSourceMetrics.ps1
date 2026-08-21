@@ -114,10 +114,21 @@ function Measure-CSharpSourceText {
         [string]$Source,
 
         [Parameter()]
-        [string]$Path = '<memory>'
+        [string]$Path = '<memory>',
+
+        [Parameter()]
+        $ParseOptions
     )
 
-    $tree = $script:CSharpSyntaxTreeType::ParseText($Source)
+    $tree = if ($null -eq $ParseOptions) {
+        $script:CSharpSyntaxTreeType::ParseText($Source)
+    }
+    else {
+        $script:CSharpSyntaxTreeType::ParseText(
+            $Source,
+            $ParseOptions,
+            $Path)
+    }
     $parseErrors = @($tree.GetDiagnostics() | Where-Object {
         $_.Severity.ToString() -eq 'Error'
     })
@@ -157,4 +168,49 @@ function Measure-CSharpSourceText {
         decisionPoints = $decisionPoints
         members = $members
     }
+}
+
+function New-SharpProofCSharpParseOptions {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LanguageVersion,
+
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [string[]]$PreprocessorSymbols = @()
+    )
+
+    $normalizedLanguageVersion = $LanguageVersion.Trim()
+    if ([string]::IsNullOrWhiteSpace($normalizedLanguageVersion)) {
+        throw 'The evaluated C# language version is blank.'
+    }
+    $enumName = switch ($normalizedLanguageVersion.ToLowerInvariant()) {
+        'latest' { 'Latest'; break }
+        'preview' { 'Preview'; break }
+        'default' { 'Default'; break }
+        default {
+            $digits = $normalizedLanguageVersion.Replace('.', '')
+            if ($digits -notmatch '^\d+$') {
+                throw "Unsupported C# language version '$LanguageVersion'."
+            }
+            'CSharp' + $digits
+        }
+    }
+    try {
+        $version = [Enum]::Parse(
+            [Microsoft.CodeAnalysis.CSharp.LanguageVersion],
+            $enumName,
+            $true)
+    }
+    catch {
+        throw "Unsupported C# language version '$LanguageVersion'."
+    }
+    $symbols = @(
+        $PreprocessorSymbols |
+            ForEach-Object { [string]$_ } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Sort-Object -Unique)
+    return [Microsoft.CodeAnalysis.CSharp.CSharpParseOptions]::Default.
+        WithLanguageVersion($version).
+        WithPreprocessorSymbols($symbols)
 }

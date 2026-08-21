@@ -1,4 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;
 using SharpProof.Gates.Performance;
@@ -46,7 +49,13 @@ internal static class Program
                 var result = await CorpusGate.RunAsync(root)
                     .ConfigureAwait(false);
                 Console.WriteLine(
-                    JsonSerializer.Serialize(result, JsonDefaults.Indented));
+                    JsonSerializer.Serialize(
+                        CreateStandaloneEnvelope(
+                            root,
+                            command,
+                            result.Passed,
+                            result),
+                        JsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
             if (command == "corpus-print")
@@ -68,7 +77,13 @@ internal static class Program
                 var result = await PerformanceGate.RunAsync(root)
                     .ConfigureAwait(false);
                 Console.WriteLine(
-                    JsonSerializer.Serialize(result, JsonDefaults.Indented));
+                    JsonSerializer.Serialize(
+                        CreateStandaloneEnvelope(
+                            root,
+                            command,
+                            result.Passed,
+                            result),
+                        JsonDefaults.Indented));
                 return result.Passed ? 0 : 1;
             }
             if (command == "performance-smoke")
@@ -90,6 +105,71 @@ internal static class Program
             Console.Error.WriteLine(exception);
             return 1;
         }
+    }
+
+    private static object CreateStandaloneEnvelope(
+        string repositoryRoot,
+        string gate,
+        bool passed,
+        object result)
+    {
+        var assembly = typeof(Program).Assembly;
+        var sourceCommit = assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .SingleOrDefault(static attribute =>
+                attribute.Key == "SharpProofSourceCommit")
+            ?.Value;
+        if (sourceCommit is null)
+        {
+            // Interactive corpus/performance commands remain useful without
+            // producing certifiable evidence. The evidence writer always
+            // rebuilds with this metadata and rejects an unwrapped result.
+            return result;
+        }
+        if (sourceCommit.Length != 40 ||
+            sourceCommit.Any(static character =>
+                character is not (>= '0' and <= '9') and
+                    not (>= 'a' and <= 'f')))
+        {
+            throw new InvalidOperationException(
+                "The standalone gate executable is not source-bound.");
+        }
+
+        var executablePath = assembly.Location;
+        var pdbPath = Path.ChangeExtension(executablePath, ".pdb");
+        if (!File.Exists(executablePath) || !File.Exists(pdbPath))
+        {
+            throw new InvalidOperationException(
+                "The standalone gate build identity is incomplete.");
+        }
+
+        var contractPath = Path.Combine(
+            repositoryRoot,
+            "eng",
+            "acceptance",
+            "contract.json");
+        return new
+        {
+            SchemaVersion = 1,
+            Gate = gate,
+            Passed = passed,
+            SourceCommit = sourceCommit,
+            AcceptanceContractSha256 = Sha256(contractPath),
+            Executable = new
+            {
+                Sha256 = Sha256(executablePath),
+                Mvid = assembly.ManifestModule.ModuleVersionId.ToString("D"),
+                PdbSha256 = Sha256(pdbPath)
+            },
+            Result = result
+        };
+    }
+
+    private static string Sha256(string path)
+    {
+        return string.Concat(
+            SHA256.HashData(File.ReadAllBytes(path)).Select(static value =>
+                value.ToString("x2", CultureInfo.InvariantCulture)));
     }
 }
 

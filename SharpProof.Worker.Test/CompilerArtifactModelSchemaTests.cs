@@ -238,6 +238,34 @@ public sealed class CompilerArtifactModelSchemaTests
     }
 
     [Test]
+    public void EffectEvidenceUnknownReasonsAreDerivedFromProtocolTuples()
+    {
+        using var protocol = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "SharpProof.Worker.Protocol",
+            "ProtocolModel.schema.json")));
+        var table = protocol.RootElement.GetProperty("validationTables")
+            .EnumerateArray()
+            .Single(value => value.GetProperty("name").GetString() == "EffectCertainty");
+        var expected = table.GetProperty("rows")
+            .EnumerateArray()
+            .Where(row => row[0].GetString() == "Unknown" && row[1].GetString() != "*")
+            .Select(row => Enum.Parse<WorkerClaimReason>(row[1].GetString()!))
+            .Distinct()
+            .ToArray();
+        var catalogType = s_artifactAssembly.GetType(
+            "SharpProof.CompilerArtifact.CompilerEffectEvidenceCatalog",
+            throwOnError: true)!;
+        var actual = ((Array)catalogType.GetField(
+                "UnknownReasons",
+                BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!)
+            .Cast<WorkerClaimReason>()
+            .ToArray();
+
+        Assert.That(actual, Is.EqualTo(expected));
+    }
+
+    [Test]
     public void CollectorWireCatalogIsUniqueAndSourceComplete()
     {
         using var schema = ReadSchema();

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using SharpProof.Host;
@@ -38,6 +39,12 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
     public string WorkerProtocolPath { get; set; } = string.Empty;
 
     public string? CachePath { get; set; }
+
+    [SuppressMessage(
+        "Performance",
+        "CA1819:Properties should not return arrays",
+        Justification = "MSBuild task item parameters use ITaskItem arrays.")]
+    public ITaskItem[] CompilerOutputPaths { get; set; } = [];
 
     public override bool Execute()
     {
@@ -98,6 +105,12 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
         var publicationMutationPaths = outputPaths
             .Concat(publicationMarkerPaths)
             .ToArray();
+        var compilerOutputPaths = CompilerOutputPaths
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ItemSpec))
+            .Select(static item => item.ItemSpec)
+            .Select(ResolvePath)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
         var aliasesOutput = outputPaths
             .Distinct(StringComparer.Ordinal)
             .Count() != outputPaths.Length ||
@@ -119,15 +132,21 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
             File.Exists(Path.ChangeExtension(
                 resolvedWorkerPath,
                 ".runtimeconfig.json"));
-        var protectedPaths = Present(
+        var inputPaths = Present(
                 RequestPath,
                 ManifestPath,
                 InvocationRequestPath,
                 InvocationResultPath,
-                InvocationManifestPath,
-                WorkerProtocolPath)
+                InvocationManifestPath)
             .Select(ResolvePath)
-            .Concat(toolPaths.Select(ResolvePath))
+            .ToArray();
+        var resolvedToolPaths = toolPaths
+            .Append(WorkerProtocolPath)
+            .Select(ResolvePath)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var protectedPaths = inputPaths
+            .Concat(resolvedToolPaths)
             .ToArray();
         var resolvedCachePath = string.IsNullOrWhiteSpace(CachePath)
             ? null
@@ -139,31 +158,40 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
                     StringComparison.Ordinal) &&
                 LinuxPathIdentity.AreSameExistingFile(output, input)));
         var aliasesInput = aliasesFileIdentity ||
+            Pairs(inputPaths).Any(static pair =>
+                LinuxPathIdentity.PathsConflict(pair[0], pair[1])) ||
             publicationMutationPaths.Any(output => protectedPaths.Any(input =>
-                string.Equals(
-                    output,
-                    input,
-                    StringComparison.Ordinal)));
+                LinuxPathIdentity.PathsConflict(output, input)));
         var aliasesWorkerTree = workerTreeExists &&
             !string.IsNullOrWhiteSpace(workerDirectory) &&
-            publicationMutationPaths.Any(output =>
-                LinuxPathIdentity.IsSameOrDescendant(
-                    output,
+            publicationPaths
+                .Concat(publicationMarkerPaths)
+                .Concat(inputPaths)
+                .Any(path => LinuxPathIdentity.PathsConflict(
+                    path,
                     workerDirectory));
         var aliasesCache = resolvedCachePath != null &&
-            (publicationMutationPaths.Any(output =>
-                 LinuxPathIdentity.IsSameOrDescendant(
-                     output,
-                     resolvedCachePath)) ||
-             protectedPaths.Any(input =>
-                 LinuxPathIdentity.IsSameOrDescendant(
-                     input,
+            (publicationPaths
+                 .Concat(publicationMarkerPaths)
+                 .Concat(inputPaths)
+                 .Any(path => LinuxPathIdentity.PathsConflict(
+                     path,
                      resolvedCachePath)) ||
              workerTreeExists &&
              !string.IsNullOrWhiteSpace(workerDirectory) &&
-             LinuxPathIdentity.IsSameOrDescendant(
+             LinuxPathIdentity.PathsConflict(
                  resolvedCachePath,
                  workerDirectory));
+        var aliasesCompilerOutput = publicationPaths
+            .Concat(publicationMarkerPaths)
+            .Any(publication => compilerOutputPaths.Any(compilerOutput =>
+                string.Equals(
+                    publication,
+                    compilerOutput,
+                    StringComparison.Ordinal) ||
+                LinuxPathIdentity.AreSameExistingFile(
+                    publication,
+                    compilerOutput)));
 
         if (aliasesOutput)
         {
@@ -184,6 +212,11 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
         if (aliasesCache)
         {
             Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");
+        }
+        if (aliasesCompilerOutput)
+        {
+            Log.LogError(
+                "SharpProof publication paths must not alias compiler-owned outputs.");
         }
         if (Log.HasLoggedErrors)
         {

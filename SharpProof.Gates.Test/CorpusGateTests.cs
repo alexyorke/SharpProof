@@ -8,6 +8,38 @@ namespace SharpProof.Gates.Test;
 public sealed class CorpusGateTests
 {
     [Test]
+    public void CorpusSnapshotFormatRequiresExactSchemaThreeBytes()
+    {
+        const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
+        const string data = "case|Proven|Proven|";
+        var canonical = Encoding.UTF8.GetBytes(header + data + "\n");
+        Assert.That(CorpusSnapshotFormat.Parse(canonical), Is.EqualTo(new[] { data }));
+        Assert.That(CorpusSnapshotFormat.Render(new[] { data }), Is.EqualTo(header + data + "\n"));
+        var invalid = new[]
+        {
+            Encoding.UTF8.GetBytes(data + "\n"),
+            Encoding.UTF8.GetBytes(header.Split('\n')[0] + "\n" + data + "\n"),
+            Encoding.UTF8.GetBytes(header + header + data + "\n"),
+            Encoding.UTF8.GetBytes((header + data + "\n").Replace("schema 3", "schema 2", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes((header + data + "\n").Replace("schema 3", "schema 999", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes((header + data + "\n").Replace("SharpProof", "sharpproof", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes((header + data + "\n").Replace("schema 3", "schema  3", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes("# case-id|verdict|semantic-outcome|sorted-diagnostics\n# SharpProof analyzer corpus snapshot schema 3\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n" + data + "\n"),
+            Encoding.UTF8.GetBytes(header + "# extra\n" + data + "\n"),
+            Encoding.UTF8.GetBytes(header + "\n" + data + "\n"),
+            Encoding.UTF8.GetBytes((header + data + "\n").Replace("\n", "\r\n", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes(header + data),
+            Encoding.UTF8.GetBytes(header + data + "\n\n"),
+            new byte[] { 0xEF, 0xBB, 0xBF }.Concat(canonical).ToArray(),
+            canonical[..^1].Concat(new byte[] { 0xFF, (byte)'\n' }).ToArray()
+        };
+        foreach (var bytes in invalid)
+        {
+            Assert.Throws<InvalidDataException>((Action)(() => CorpusSnapshotFormat.Parse(bytes)));
+        }
+    }
+
+    [Test]
     public void GeneratorHasDocumentedMetamorphicCoverage()
     {
         var cases = CorpusCatalog.CreateCases();

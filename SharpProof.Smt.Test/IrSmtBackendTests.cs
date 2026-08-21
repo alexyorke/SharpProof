@@ -1,3 +1,8 @@
+using Z3Ast = Microsoft.Z3.AST;
+using Z3Context = Microsoft.Z3.Context;
+using Z3Expr = Microsoft.Z3.Expr;
+using Z3Status = Microsoft.Z3.Status;
+
 namespace SharpProof.Smt.Test;
 
 [TestFixture]
@@ -467,6 +472,73 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public void QueryExpressionOwnerDisposesPinnedZ3ExpressionsWithoutManagedGc()
+    {
+        Assert.That(
+            typeof(Z3Context).Assembly.GetName().Version,
+            Is.EqualTo(new System.Version(4, 12, 2, 0)));
+
+        using var context = new Z3Context();
+        using var solver = context.MkSolver();
+        using var owner = new Z3ExpressionOwner();
+        var expressions = new List<Z3Expr>();
+        for (var index = 0; index < 64; index++)
+        {
+            var left = owner.Own(context.MkIntConst("owner-left-" + index));
+            var right = owner.Own(context.MkInt(index));
+            var sum = owner.Own(context.MkAdd(
+                (Microsoft.Z3.ArithExpr)left,
+                (Microsoft.Z3.ArithExpr)right));
+            var constraint = owner.Own(
+                context.MkEq(sum, right));
+            expressions.Add(left);
+            expressions.Add(right);
+            expressions.Add(sum);
+            expressions.Add(constraint);
+            solver.Assert((Microsoft.Z3.BoolExpr)constraint);
+        }
+
+        Assert.That(solver.Check(), Is.EqualTo(Z3Status.SATISFIABLE));
+        Assert.That(owner.OwnedCount, Is.EqualTo(expressions.Count));
+        Assert.That(expressions.All(IsLiveNativeObject), Is.True);
+
+        owner.Dispose();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(owner.OwnedCount, Is.Zero);
+            Assert.That(expressions.All(static expression =>
+                NativeObject(expression) == IntPtr.Zero), Is.True);
+            Assert.That(solver.Check(), Is.EqualTo(Z3Status.SATISFIABLE));
+        }));
+    }
+
+    [Test]
+    public void QueryExpressionOwnerDisposesOnExceptionalAndCanceledExit()
+    {
+        using var context = new Z3Context();
+        Z3Expr? exceptional = null;
+        Action exceptionalAction = () => ThrowAfterOwning(
+            context,
+            expression => exceptional = expression);
+        Assert.Throws<InvalidOperationException>(exceptionalAction);
+        Assert.That(NativeObject(exceptional!), Is.EqualTo(IntPtr.Zero));
+
+        using var cancellation = new CancellationTokenSource();
+        Z3Expr? canceled = null;
+        Action canceledAction = () => ThrowAfterOwning(
+            context,
+            expression =>
+            {
+                canceled = expression;
+                cancellation.Cancel();
+                cancellation.Token.ThrowIfCancellationRequested();
+            });
+        Assert.Throws<OperationCanceledException>(canceledAction);
+        Assert.That(NativeObject(canceled!), Is.EqualTo(IntPtr.Zero));
+    }
+
+    [Test]
     public void ActiveCancellationInterruptsTheNativeContext()
     {
         var factory = new IrFactory();
@@ -649,6 +721,32 @@ public sealed class IrSmtBackendTests
 
         Monitor.Exit(gate);
         return false;
+    }
+
+    private static bool IsLiveNativeObject(Z3Expr expression)
+    {
+        return NativeObject(expression) != IntPtr.Zero;
+    }
+
+    private static IntPtr NativeObject(Z3Expr expression)
+    {
+        var property = typeof(Z3Ast).GetProperty(
+            "NativeObject",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic |
+            System.Reflection.BindingFlags.Public);
+        Assert.That(property, Is.Not.Null);
+        return (IntPtr)property!.GetValue(expression)!;
+    }
+
+    private static void ThrowAfterOwning(
+        Z3Context context,
+        Action<Z3Expr> afterOwn)
+    {
+        using var owner = new Z3ExpressionOwner();
+        var expression = owner.Own(context.MkInt(7));
+        afterOwn(expression);
+        throw new InvalidOperationException("pinned query failure");
     }
 
     private sealed class DisposableLabel(string label) : IDisposable

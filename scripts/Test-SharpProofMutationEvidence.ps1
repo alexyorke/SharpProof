@@ -5,6 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
 
 $fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) (
     'SharpProof-mutation-evidence-' + [Guid]::NewGuid().ToString('N'))
@@ -52,21 +53,27 @@ function New-TestParts {
         [string]$Outcome,
         [string]$Message,
         [string]$Method = 'ExpectedTest',
+        [string]$DisplayName,
         [string]$Class = 'SharpProof.Test.EvidenceTests',
         [string]$TestId = 'test-1',
-        [string]$ExecutionId = 'execution-1'
+        [string]$ExecutionId = 'execution-1',
+        [string]$StackTrace = 'at SharpProof.Test.EvidenceTests.ExpectedTest() in /workspace/SharpProof/Test.cs:line 1'
     )
 
+    if ([string]::IsNullOrEmpty($DisplayName)) {
+        $DisplayName = $Method
+    }
     $escaped = [Security.SecurityElement]::Escape($Message)
     $output = if ($Outcome -eq 'Failed') {
-        "<Output><ErrorInfo><Message>$escaped</Message><StackTrace>irrelevant Assert.That(text)</StackTrace></ErrorInfo></Output>"
+        $escapedStack = [Security.SecurityElement]::Escape($StackTrace)
+        "<Output><ErrorInfo><Message>$escaped</Message><StackTrace>$escapedStack</StackTrace></ErrorInfo></Output>"
     }
     else { '' }
     return [pscustomobject]@{
-        Definition = "<UnitTest id='$TestId' name='$Method'><Execution id='$ExecutionId'/><TestMethod className='$Class' name='$Method'/></UnitTest>"
+        Definition = "<UnitTest id='$TestId' name='$DisplayName'><Execution id='$ExecutionId'/><TestMethod className='$Class' name='$Method'/></UnitTest>"
         Entry = "<TestEntry testId='$TestId' executionId='$ExecutionId'/>"
-        Result = "<UnitTestResult testId='$TestId' executionId='$ExecutionId' testName='$Method' outcome='$Outcome'>$output</UnitTestResult>"
-        Identity = "$Class.$Method|$Method"
+        Result = "<UnitTestResult testId='$TestId' executionId='$ExecutionId' testName='$DisplayName' outcome='$Outcome'>$output</UnitTestResult>"
+        Identity = "$Class.$Method|$DisplayName"
     }
 }
 
@@ -92,6 +99,282 @@ function Assert-Throws {
             "Unexpected rejection for '$Because': " +
             $failure.Exception.Message)
     }
+}
+
+function Test-MutationReuseValidation {
+    $repository = Join-Path $fixtureRoot 'reuse-repository'
+    $scripts = Join-Path $repository 'scripts'
+    $contractDirectory = Join-Path $repository 'eng/acceptance'
+    $evidenceDirectory = Join-Path $repository 'artifacts/mutation'
+    $receiptDirectory = Join-Path $evidenceDirectory 'receipts'
+    New-Item -ItemType Directory -Path `
+        $scripts, $contractDirectory, $receiptDirectory, `
+        (Join-Path $repository 'Project') -Force | Out-Null
+    foreach ($name in @(
+            'Invoke-SharpProofTrustedMutationsParallel.ps1',
+            'Test-SharpProofMutationCatalog.ps1',
+            'SharpProof.MutationEvidence.psm1',
+            'SharpProof.MutationBaselines.psm1',
+            'SharpProof.ContainerExecution.psm1')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) `
+            -Destination (Join-Path $scripts $name)
+    }
+    [IO.File]::WriteAllText(
+        (Join-Path $scripts 'Test-SharpProofTrustedMutations.ps1'),
+        "Set-Content -LiteralPath (Join-Path `$PSScriptRoot '../campaign-launched') -Value launched`nthrow 'campaign launched'`n",
+        [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText(
+        (Join-Path $repository '.gitignore'),
+        "/artifacts/`n",
+        [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText(
+        (Join-Path $repository 'Project/Source.cs'),
+        "internal static class Source { }`n",
+        [Text.UTF8Encoding]::new($false))
+
+    $catalog = @(
+        [pscustomobject][ordered]@{
+            Name = 'first-mutation'
+            File = 'Project/Source.cs'
+            Project = 'Project.Test/Project.Test.csproj'
+            Filter = 'FullyQualifiedName~FirstTest'
+            Original = 'before-one'
+            Mutated = 'after-one'
+        },
+        [pscustomobject][ordered]@{
+            Name = 'second-mutation'
+            File = 'Project/Source.cs'
+            Project = 'Project.Test/Project.Test.csproj'
+            Filter = 'FullyQualifiedName~SecondTest'
+            Original = 'before-two'
+            Mutated = 'after-two'
+        })
+    $catalogSha256 = Get-SharpProofMutationCatalogSha256 -Mutations $catalog
+    [pscustomobject]@{
+        mutationEvidence = [ordered]@{
+            expectedCatalogCount = $catalog.Count
+            expectedCatalogSha256 = $catalogSha256
+        }
+        automation = [ordered]@{
+            mutationParallelism = 1
+            mutationShardWallSeconds = 30
+        }
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (
+        Join-Path $contractDirectory 'contract.json') -Encoding utf8NoBOM
+
+    $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
+    $results = @()
+    for ($index = 0; $index -lt $catalog.Count; $index++) {
+        $entry = $catalog[$index]
+        $method = ([string]$entry.Filter).Substring(
+            'FullyQualifiedName~'.Length)
+        $identity = "Fixture.Tests.$method|$method"
+        $parts = New-TestParts `
+            -Outcome Failed `
+            -Message "Assert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2" `
+            -Method $method `
+            -DisplayName $method `
+            -Class 'Fixture.Tests' `
+            -TestId "test-$index" `
+            -ExecutionId "execution-$index"
+        $trx = Join-Path $receiptDirectory ($entry.Name + '.trx')
+        $log = Join-Path $receiptDirectory ($entry.Name + '.log')
+        $xml = @"
+<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <TestDefinitions>$($parts.Definition)</TestDefinitions>
+  <TestEntries>$($parts.Entry)</TestEntries>
+  <Results>$($parts.Result)</Results>
+  <ResultSummary outcome="Failed"><Counters total="1" executed="1" passed="0" failed="1" $zeroInfrastructure /></ResultSummary>
+</TestRun>
+"@
+        [IO.File]::WriteAllText(
+            $trx, $xml, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText(
+            $log, "assertion-backed failure`n", [Text.UTF8Encoding]::new($false))
+        $baselineParts = New-TestParts `
+            -Outcome Passed `
+            -Message '' `
+            -Method $method `
+            -DisplayName $method `
+            -Class 'Fixture.Tests' `
+            -TestId "baseline-test-$index" `
+            -ExecutionId "baseline-execution-$index"
+        $baselineTrx = Join-Path $receiptDirectory (
+            $entry.Name + '-baseline.trx')
+        $baselineXml = @"
+<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <TestDefinitions>$($baselineParts.Definition)</TestDefinitions>
+  <TestEntries>$($baselineParts.Entry)</TestEntries>
+  <Results>$($baselineParts.Result)</Results>
+  <ResultSummary outcome="Completed"><Counters total="1" executed="1" passed="1" failed="0" $zeroInfrastructure /></ResultSummary>
+</TestRun>
+"@
+        [IO.File]::WriteAllText(
+            $baselineTrx,
+            $baselineXml,
+            [Text.UTF8Encoding]::new($false))
+        $invocation = Get-SharpProofMutationBaselineInvocation `
+            -Project $entry.Project `
+            -Filter $entry.Filter `
+            -Configuration Release
+        $results += [pscustomobject][ordered]@{
+            name = $entry.Name
+            file = $entry.File
+            test = $entry.Filter
+            project = $entry.Project
+            original = $entry.Original
+            mutated = $entry.Mutated
+            killed = $true
+            exitCode = 1
+            executedCount = 1
+            failedCount = 1
+            assertionFailureCount = 1
+            assertionProvenanceSha256 = $(
+                (Read-SharpProofMutationTestEvidence `
+                    -TrxPath $trx `
+                    -EvidenceName $entry.Name `
+                    -Mode Mutation `
+                    -ProcessExitCode 1 `
+                    -ExpectedMethodName $method `
+                    -ExpectedLedger @($identity)).assertionProvenanceSha256)
+            selectedTests = @($identity)
+            baselineInvocationSha256 = $invocation.Sha256
+            baselineSelectedTests = @($identity)
+            baselineTrx = "receipts/$($entry.Name)-baseline.trx"
+            baselineTrxSha256 = (Get-FileHash `
+                -LiteralPath $baselineTrx `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
+            log = "receipts/$($entry.Name).log"
+            trx = "receipts/$($entry.Name).trx"
+            logSha256 = (Get-FileHash -LiteralPath $log -Algorithm SHA256).Hash.ToLowerInvariant()
+            trxSha256 = (Get-FileHash -LiteralPath $trx -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    }
+
+    & git -C $repository init --quiet
+    & git -C $repository config user.email fixture@sharpproof.test
+    & git -C $repository config user.name 'SharpProof Fixture'
+    & git -C $repository add -- .
+    & git -C $repository commit --quiet -m fixture
+    $commit = (& git -C $repository rev-parse HEAD).Trim()
+    $evidencePath = Join-Path $evidenceDirectory 'trusted-mutations.json'
+    $campaignSentinel = Join-Path $repository 'campaign-launched'
+
+    function New-CompleteEvidence {
+        return [pscustomobject][ordered]@{
+            schemaVersion = 2
+            commit = $commit
+            configuration = 'Release'
+            selection = 'full'
+            catalogCount = $catalog.Count
+            catalogSha256 = $catalogSha256
+            mutationCount = $catalog.Count
+            killedCount = $catalog.Count
+            mutations = @($results | ForEach-Object {
+                    $_ | ConvertTo-Json -Depth 5 | ConvertFrom-Json
+                })
+        }
+    }
+
+    function Invoke-ReuseCase {
+        param(
+            [Parameter(Mandatory = $true)][string]$Name,
+            [Parameter(Mandatory = $true)][object]$Evidence,
+            [bool]$ExpectSuccess = $false,
+            [bool]$Dirty = $false
+        )
+        $Evidence | ConvertTo-Json -Depth 6 | Set-Content `
+            -LiteralPath $evidencePath -Encoding utf8NoBOM
+        Remove-Item -LiteralPath $campaignSentinel `
+            -Force -ErrorAction SilentlyContinue
+        if ($Dirty) {
+            Add-Content -LiteralPath (Join-Path $repository 'Project/Source.cs') `
+                -Value '// dirty'
+        }
+        try {
+            $caseOutput = & pwsh -NoLogo -NoProfile -File (
+                Join-Path $scripts 'Invoke-SharpProofTrustedMutationsParallel.ps1') `
+                -Configuration Release `
+                -OutputPath 'artifacts/mutation/trusted-mutations.json' `
+                -ExpectedCommit $commit `
+                -Parallelism 1 2>&1
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            if ($Dirty) {
+                & git -C $repository checkout -- Project/Source.cs
+            }
+        }
+        if ($ExpectSuccess) {
+            if ($exitCode -ne 0 -or
+                [string]::Join("`n", @($caseOutput)) -notlike `
+                    '*Mutation evidence is already complete*') {
+                throw "Valid mutation reuse failed for '$Name': $caseOutput"
+            }
+        }
+        elseif ($exitCode -eq 0) {
+            throw "Forged mutation reuse was accepted for '$Name'."
+        }
+        if (Test-Path -LiteralPath $campaignSentinel) {
+            throw "Mutation campaign launched while validating '$Name'."
+        }
+    }
+
+    $empty = New-CompleteEvidence
+    $empty.mutations = @()
+    Invoke-ReuseCase -Name empty-mutations -Evidence $empty
+
+    $duplicate = New-CompleteEvidence
+    $duplicate.mutations[1] = $duplicate.mutations[0]
+    Invoke-ReuseCase -Name duplicate-row -Evidence $duplicate
+
+    $wrongName = New-CompleteEvidence
+    $wrongName.mutations[0].name = 'wrong-name'
+    Invoke-ReuseCase -Name wrong-name -Evidence $wrongName
+
+    $missingName = New-CompleteEvidence
+    $missingName.mutations[0].PSObject.Properties.Remove('name')
+    Invoke-ReuseCase -Name missing-name -Evidence $missingName
+
+    foreach ($missing in @(
+            @{ Name = 'missing-log'; Property = 'log'; Delete = $false },
+            @{ Name = 'missing-trx'; Property = 'trx'; Delete = $false },
+            @{ Name = 'missing-log-digest'; Property = 'logSha256'; Delete = $false },
+            @{ Name = 'missing-trx-digest'; Property = 'trxSha256'; Delete = $false },
+            @{ Name = 'missing-assertion-provenance'; Property = 'assertionProvenanceSha256'; Delete = $false },
+            @{ Name = 'missing-baseline-invocation'; Property = 'baselineInvocationSha256'; Delete = $false },
+            @{ Name = 'missing-baseline-ledger'; Property = 'baselineSelectedTests'; Delete = $false },
+            @{ Name = 'missing-baseline-trx'; Property = 'baselineTrx'; Delete = $false },
+            @{ Name = 'missing-baseline-trx-digest'; Property = 'baselineTrxSha256'; Delete = $false })) {
+        $candidate = New-CompleteEvidence
+        $candidate.mutations[0].PSObject.Properties.Remove($missing.Property)
+        Invoke-ReuseCase -Name $missing.Name -Evidence $candidate
+    }
+
+    $wrongBaselineInvocation = New-CompleteEvidence
+    $wrongBaselineInvocation.mutations[0].baselineInvocationSha256 = '0' * 64
+    Invoke-ReuseCase -Name wrong-baseline-invocation `
+        -Evidence $wrongBaselineInvocation
+    $wrongBaselineLedger = New-CompleteEvidence
+    $wrongBaselineLedger.mutations[0].baselineSelectedTests = @(
+        'Fixture.Tests.Other|Other')
+    Invoke-ReuseCase -Name wrong-baseline-ledger -Evidence $wrongBaselineLedger
+    $wrongBaselineDigest = New-CompleteEvidence
+    $wrongBaselineDigest.mutations[0].baselineTrxSha256 = '0' * 64
+    Invoke-ReuseCase -Name wrong-baseline-digest -Evidence $wrongBaselineDigest
+    $wrongAssertionProvenance = New-CompleteEvidence
+    $wrongAssertionProvenance.mutations[0].assertionProvenanceSha256 = '0' * 64
+    Invoke-ReuseCase -Name wrong-assertion-provenance `
+        -Evidence $wrongAssertionProvenance
+
+    Invoke-ReuseCase `
+        -Name dirty-tree `
+        -Evidence (New-CompleteEvidence) `
+        -Dirty $true
+    Invoke-ReuseCase `
+        -Name valid-complete `
+        -Evidence (New-CompleteEvidence) `
+        -ExpectSuccess $true
 }
 
 $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
@@ -226,6 +509,185 @@ try {
         throw 'Parameterized method evidence was not projected correctly.'
     }
 
+    $caseAssertionMessage =
+        "Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"
+    $caseBaselineParts = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTest `
+        -DisplayName 'ExpectedTest(Case("A"))'
+    $caseBaselinePath = Write-Fixture `
+        -Name case-ledger-baseline `
+        -Summary Completed `
+        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions $caseBaselineParts.Definition `
+        -Entries $caseBaselineParts.Entry `
+        -Results $caseBaselineParts.Result
+    $caseBaseline = Read-SharpProofMutationTestEvidence `
+        -TrxPath $caseBaselinePath `
+        -EvidenceName case-ledger-baseline `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName ExpectedTest
+
+    $exactCaseParts = New-TestParts `
+        -Outcome Failed `
+        -Message $caseAssertionMessage `
+        -Method ExpectedTest `
+        -DisplayName 'ExpectedTest(Case("A"))'
+    $exactCasePath = Write-Fixture `
+        -Name exact-case-ledger `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $exactCaseParts.Definition `
+        -Entries $exactCaseParts.Entry `
+        -Results $exactCaseParts.Result
+    $exactCase = Read-SharpProofMutationTestEvidence `
+        -TrxPath $exactCasePath `
+        -EvidenceName exact-case-ledger `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $caseBaseline.testLedger
+    if ($exactCase.assertionFailureCount -ne 1) {
+        throw 'Exact-case ledger identity did not pass unchanged.'
+    }
+
+    $caseOnlyDrifts = @(
+        [pscustomobject]@{
+            Name = 'parameter-case-ledger'
+            Because = 'case-only parameter identity drift'
+            ExpectedMethod = 'ExpectedTest'
+            Parts = New-TestParts `
+                -Outcome Failed `
+                -Message $caseAssertionMessage `
+                -Method ExpectedTest `
+                -DisplayName 'ExpectedTest(Case("a"))'
+        },
+        [pscustomobject]@{
+            Name = 'display-case-ledger'
+            Because = 'case-only display identity drift'
+            ExpectedMethod = 'ExpectedTest'
+            Parts = New-TestParts `
+                -Outcome Failed `
+                -Message $caseAssertionMessage `
+                -Method ExpectedTest `
+                -DisplayName 'expectedTest(Case("A"))'
+        },
+        [pscustomobject]@{
+            Name = 'class-case-ledger'
+            Because = 'case-only class identity drift'
+            ExpectedMethod = 'ExpectedTest'
+            Parts = New-TestParts `
+                -Outcome Failed `
+                -Message $caseAssertionMessage `
+                -Method ExpectedTest `
+                -DisplayName 'ExpectedTest(Case("A"))' `
+                -Class 'SharpProof.Test.evidenceTests'
+        },
+        [pscustomobject]@{
+            Name = 'method-case-ledger'
+            Because = 'case-only method identity drift'
+            ExpectedMethod = 'expectedTest'
+            Parts = New-TestParts `
+                -Outcome Failed `
+                -Message $caseAssertionMessage `
+                -Method expectedTest `
+                -DisplayName 'ExpectedTest(Case("A"))'
+        })
+    foreach ($drift in $caseOnlyDrifts) {
+        $driftPath = Write-Fixture `
+            -Name $drift.Name `
+            -Summary Failed `
+            -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+                $zeroInfrastructure) `
+            -Definitions $drift.Parts.Definition `
+            -Entries $drift.Parts.Entry `
+            -Results $drift.Parts.Result
+        Assert-Throws `
+            -Because $drift.Because `
+            -ExpectedMessage 'test ledger changed' `
+            -Action {
+            Read-SharpProofMutationTestEvidence `
+                -TrxPath $driftPath `
+                -EvidenceName $drift.Name `
+                -Mode Mutation `
+                -ProcessExitCode 1 `
+                -ExpectedMethodName $drift.ExpectedMethod `
+                -ExpectedLedger $caseBaseline.testLedger
+        }
+    }
+
+    $upperParameter = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTest `
+        -DisplayName 'ExpectedTest(Case("A"))' `
+        -TestId test-case-row-1 `
+        -ExecutionId execution-case-row-1
+    $lowerParameter = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTest `
+        -DisplayName 'ExpectedTest(Case("a"))' `
+        -TestId test-case-row-2 `
+        -ExecutionId execution-case-row-2
+    $caseRowsPath = Write-Fixture `
+        -Name case-distinct-rows `
+        -Summary Completed `
+        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions ($upperParameter.Definition + $lowerParameter.Definition) `
+        -Entries ($upperParameter.Entry + $lowerParameter.Entry) `
+        -Results ($upperParameter.Result + $lowerParameter.Result)
+    $caseRows = Read-SharpProofMutationTestEvidence `
+        -TrxPath $caseRowsPath `
+        -EvidenceName case-distinct-rows `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName ExpectedTest
+    if ($caseRows.testLedger.Count -ne 2 -or
+        -not [StringComparer]::Ordinal.Equals(
+            $caseRows.testLedger[0], $upperParameter.Identity) -or
+        -not [StringComparer]::Ordinal.Equals(
+            $caseRows.testLedger[1], $lowerParameter.Identity)) {
+        throw 'Case-distinct parameter rows were collapsed or misordered.'
+    }
+
+    $upperMethod = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method ExpectedTest `
+        -TestId test-case-method-1 `
+        -ExecutionId execution-case-method-1
+    $lowerMethod = New-TestParts `
+        -Outcome Passed `
+        -Message '' `
+        -Method expectedTest `
+        -TestId test-case-method-2 `
+        -ExecutionId execution-case-method-2
+    $caseMethodsPath = Write-Fixture `
+        -Name case-distinct-methods `
+        -Summary Completed `
+        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
+            $zeroInfrastructure) `
+        -Definitions ($upperMethod.Definition + $lowerMethod.Definition) `
+        -Entries ($upperMethod.Entry + $lowerMethod.Entry) `
+        -Results ($upperMethod.Result + $lowerMethod.Result)
+    $caseMethods = Read-SharpProofMutationTestEvidence `
+        -TrxPath $caseMethodsPath `
+        -EvidenceName case-distinct-methods `
+        -Mode Baseline `
+        -ProcessExitCode 0 `
+        -ExpectedMethodName @('ExpectedTest', 'expectedTest')
+    if ($caseMethods.testLedgers.Count -ne 2 -or
+        @($caseMethods.testLedgers['ExpectedTest']).Count -ne 1 -or
+        @($caseMethods.testLedgers['expectedTest']).Count -ne 1) {
+        throw 'Case-distinct method identities were collapsed.'
+    }
+
     $renamed = New-TestParts `
         -Outcome Passed `
         -Message '' `
@@ -270,6 +732,84 @@ try {
         -ExpectedLedger $baseline.testLedger
     if ($mutation.assertionFailureCount -ne 1) {
         throw 'Assertion kill was not recognized.'
+    }
+    if ([string]$mutation.assertionProvenanceSha256 -notmatch
+        '^[0-9a-f]{64}$') {
+        throw 'Structured assertion provenance was not projected.'
+    }
+
+    foreach ($forgery in @(
+            @{ Name = 'custom-failure'; Message = "ProbeFailure : forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
+            @{ Name = 'qualified-error'; Message = "Vendor.Probe : forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
+            @{ Name = 'error-header'; Message = "Error: forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
+            @{ Name = 'exception-stack'; Message = "Assert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = "ProbeFailure : forged`nat Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1" },
+            @{ Name = 'stack-error'; Message = "Assert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = "Stack trace: forged`nat Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1" })) {
+        $parts = New-TestParts `
+            -Outcome Failed `
+            -Message $forgery.Message `
+            -StackTrace $forgery.Stack
+        $path = Write-Fixture `
+            -Name $forgery.Name `
+            -Summary Failed `
+            -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+                $zeroInfrastructure) `
+            -Definitions $parts.Definition `
+            -Entries $parts.Entry `
+            -Results $parts.Result
+        Assert-Throws `
+            -Because $forgery.Name `
+            -ExpectedMessage 'not killed solely by assertions' `
+            -Action {
+            Read-SharpProofMutationTestEvidence `
+                -TrxPath $path `
+                -EvidenceName $forgery.Name `
+                -Mode Mutation `
+                -ProcessExitCode 1 `
+                -ExpectedMethodName ExpectedTest `
+                -ExpectedLedger $baseline.testLedger
+        }
+    }
+
+    $contextAssertion = New-TestParts `
+        -Outcome Failed `
+        -Message "The scalar-bound mutation changed the result.`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"
+    $contextPath = Write-Fixture `
+        -Name user-context `
+        -Summary Failed `
+        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
+            $zeroInfrastructure) `
+        -Definitions $contextAssertion.Definition `
+        -Entries $contextAssertion.Entry `
+        -Results $contextAssertion.Result
+    $contextEvidence = Read-SharpProofMutationTestEvidence `
+        -TrxPath $contextPath `
+        -EvidenceName user-context `
+        -Mode Mutation `
+        -ProcessExitCode 1 `
+        -ExpectedMethodName ExpectedTest `
+        -ExpectedLedger $baseline.testLedger
+    if ($contextEvidence.assertionFailureCount -ne 1) {
+        throw 'Benign user assertion context was rejected.'
+    }
+
+    $missingStructuredStack = [IO.File]::ReadAllText($assertionPath).Replace(
+        '<StackTrace>at SharpProof.Test.EvidenceTests.ExpectedTest() in /workspace/SharpProof/Test.cs:line 1</StackTrace>',
+        '',
+        [StringComparison]::Ordinal)
+    $missingStructuredStackPath = Write-RawFixture `
+        -Name missing-structured-stack `
+        -Xml $missingStructuredStack
+    Assert-Throws `
+        -Because 'assertion text without structured stack provenance' `
+        -ExpectedMessage 'not killed solely by assertions' `
+        -Action {
+        Read-SharpProofMutationTestEvidence `
+            -TrxPath $missingStructuredStackPath `
+            -EvidenceName missing-structured-stack `
+            -Mode Mutation `
+            -ProcessExitCode 1 `
+            -ExpectedMethodName ExpectedTest `
+            -ExpectedLedger $baseline.testLedger
     }
 
     $multilineAssertion = New-TestParts `
@@ -678,6 +1218,7 @@ try {
             -ExpectedMethodName ExpectedTest
     }
 
+    Test-MutationReuseValidation
     Write-Host 'Mutation evidence behavioral fixtures passed.'
 }
 finally {

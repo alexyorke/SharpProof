@@ -3,6 +3,8 @@ using Microsoft.Build.Utilities;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using System.Security.Cryptography;
+using System.Text.Json;
 using SharpProof.BuildTasks;
 using SharpProof.Host;
 using SharpProof.Worker;
@@ -13,6 +15,64 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
+    [TestCase("missing")]
+    [TestCase("malformed")]
+    [TestCase("stale-request")]
+    [Platform("Linux")]
+    public void PublishedResultValidatorRejectsAbsentOrStaleEvidence(string kind)
+    {
+        var directory = Directory.CreateTempSubdirectory("sharpproof-result-binding-");
+        try
+        {
+            var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
+            var request = Path.Combine(directory.FullName, "request.json");
+            var result = Path.Combine(directory.FullName, "result.json");
+            File.WriteAllText(manifest, "{}");
+            var manifestHash = Convert.ToHexString(
+                SHA256.HashData(File.ReadAllBytes(manifest)));
+            var requestJson = JsonSerializer.Serialize(new
+            {
+                protocolVersion = "11",
+                compilerManifest = new { path = manifest, sha256 = manifestHash },
+                budgets = new { },
+                cache = new { },
+                verifyPolicy = "Advisory",
+                assumptionPolicy = "Allow"
+            });
+            File.WriteAllText(request, requestJson);
+            if (kind == "malformed")
+            {
+                File.WriteAllText(result, "not json");
+            }
+            else if (kind == "stale-request")
+            {
+                File.WriteAllText(result, JsonSerializer.Serialize(new
+                {
+                    protocolVersion = "11",
+                    requestHash = new string('0', 64),
+                    inputHash = new string('1', 64),
+                    runStatus = "Complete"
+                }));
+            }
+
+            var engine = new RecordingBuildEngine();
+            var task = new ValidatePublishedVerificationResult
+            {
+                BuildEngine = engine,
+                RequestPath = request,
+                ResultPath = result,
+                ManifestPath = manifest
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            Assert.That(engine.Errors, Is.Not.Empty);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Test]
     public void CanceledVerifierTaskDoesNotLaunchAProcess()
     {
@@ -52,15 +112,104 @@ public sealed class BuildTaskTests
         {
             Assert.That(
                 engine.Warnings.Select(static warning => warning.Code),
-                Is.EqualTo((string[])["SP0047", "SP0048", "SP0047"]));
+                Is.EqualTo((string[])["SP0047", "SP0048"]));
             Assert.That(engine.Warnings[0].File, Is.EqualTo("source.cs"));
             Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
             Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(3));
-            Assert.That(engine.Warnings[2].LineNumber, Is.Zero);
-            Assert.That(engine.Warnings[2].ColumnNumber, Is.Zero);
+            Assert.That(
+                engine.Messages.Select(static message => message.Message),
+                Does.Contain("source.cs(x,3): warning SP0047: malformed location"));
             Assert.That(
                 engine.Messages.Select(static message => message.Message),
                 Does.Contain("worker stderr"));
+        }));
+    }
+
+    [Test]
+    public void VerifierDiagnosticGrammarPreservesMarkerLikePathsAndSeverity()
+    {
+        var engine = new RecordingBuildEngine();
+        var task = new RunVerifier { BuildEngine = engine };
+
+        task.LogStandardError(
+            "/tmp/source: warning SP0047: detail.cs(4,5): warning SP0048: assumptions" +
+            Environment.NewLine +
+            "punctuation (draft), v2.cs(7,9): error SP0047: incomplete: detail" +
+            Environment.NewLine +
+            "SharpProof: error SP0048: strict assumptions");
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(engine.Warnings, Has.Count.EqualTo(1));
+            Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
+            Assert.That(
+                engine.Warnings[0].File,
+                Is.EqualTo("/tmp/source: warning SP0047: detail.cs"));
+            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(4));
+            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(5));
+            Assert.That(engine.Warnings[0].Message, Is.EqualTo("assumptions"));
+
+            Assert.That(engine.Errors, Has.Count.EqualTo(2));
+            Assert.That(engine.Errors[0].Code, Is.EqualTo("SP0047"));
+            Assert.That(
+                engine.Errors[0].File,
+                Is.EqualTo("punctuation (draft), v2.cs"));
+            Assert.That(engine.Errors[0].LineNumber, Is.EqualTo(7));
+            Assert.That(engine.Errors[0].ColumnNumber, Is.EqualTo(9));
+            Assert.That(engine.Errors[1].Code, Is.EqualTo("SP0048"));
+            Assert.That(engine.Errors[1].File, Is.Empty);
+            Assert.That(task.HasStructuredError, Is.True);
+        }));
+    }
+
+    [Test]
+    public void StructuredVerifierDiagnosticsPreserveArbitraryPathText()
+    {
+        var engine = new RecordingBuildEngine();
+        var task = new RunVerifier { BuildEngine = engine };
+        var path = "/tmp/line\nbreak: warning SP0047: (draft), \u03c0.cs";
+        var warning = VerifierDiagnosticTransport.Serialize(
+            new VerifierDiagnostic(
+                "warning",
+                "SP0048",
+                path,
+                12,
+                14,
+                "assumptions: (user, trusted)"));
+        var error = VerifierDiagnosticTransport.Serialize(
+            new VerifierDiagnostic(
+                "error",
+                "SP0047",
+                string.Empty,
+                0,
+                0,
+                "strict incomplete"));
+        var unknown = warning.Replace(
+            "SP0048",
+            "SP9999",
+            StringComparison.Ordinal);
+
+        task.LogStandardError(
+            warning + Environment.NewLine +
+            error + Environment.NewLine +
+            unknown + Environment.NewLine +
+            VerifierDiagnosticTransport.Prefix + "{malformed");
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(engine.Warnings, Has.Count.EqualTo(1));
+            Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
+            Assert.That(engine.Warnings[0].File, Is.EqualTo(path));
+            Assert.That(engine.Warnings[0].LineNumber, Is.EqualTo(12));
+            Assert.That(engine.Warnings[0].ColumnNumber, Is.EqualTo(14));
+            Assert.That(
+                engine.Warnings[0].Message,
+                Is.EqualTo("assumptions: (user, trusted)"));
+            Assert.That(engine.Errors, Has.Count.EqualTo(1));
+            Assert.That(engine.Errors[0].Code, Is.EqualTo("SP0047"));
+            Assert.That(engine.Errors[0].File, Is.Empty);
+            Assert.That(task.HasStructuredError, Is.True);
+            Assert.That(engine.Messages, Has.Count.EqualTo(2));
         }));
     }
 
@@ -264,6 +413,92 @@ public sealed class BuildTaskTests
         return assemblyPath;
     }
 
+    [Platform("Linux")]
+    [TestCase("cache-below-output")]
+    [TestCase("output-below-cache")]
+    [TestCase("input-below-output")]
+    [TestCase("output-above-runtime")]
+    [TestCase("output-below-runtime")]
+    public void InvalidationRejectsSymmetricIoTopologyBeforeMutation(
+        string collision)
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-topology-");
+        try
+        {
+            var tools = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "tools"));
+            var worker = Path.Combine(tools.FullName, "worker.dll");
+            var launcher = Path.Combine(tools.FullName, "launcher.dll");
+            var protocol = Path.Combine(tools.FullName, "protocol.dll");
+            foreach (var path in new[] { worker, launcher, protocol })
+            {
+                File.WriteAllText(path, "runtime");
+            }
+            var result = Path.Combine(directory.FullName, "result.json");
+            var request = Path.Combine(directory.FullName, "request.json");
+            var manifest = Path.Combine(directory.FullName, "manifest.json");
+            var cache = Path.Combine(directory.FullName, "cache");
+            var invocationRequest = Path.Combine(
+                directory.FullName,
+                "runs",
+                "request.json");
+            switch (collision)
+            {
+                case "cache-below-output":
+                    cache = Path.Combine(result, "cache");
+                    break;
+                case "output-below-cache":
+                    result = Path.Combine(cache, "result.json");
+                    break;
+                case "input-below-output":
+                    invocationRequest = Path.Combine(result, "request.json");
+                    break;
+                case "output-above-runtime":
+                    result = tools.FullName;
+                    break;
+                case "output-below-runtime":
+                    result = Path.Combine(tools.FullName, "result.json");
+                    break;
+                default:
+                    throw new AssertionException("Unknown topology fixture.");
+            }
+            var engine = new RecordingBuildEngine();
+            var task = new InvalidatePublishedResult
+            {
+                BuildEngine = engine,
+                ProjectDirectory = directory.FullName,
+                ResultPath = result,
+                RequestPath = request,
+                ManifestPath = manifest,
+                InvocationRequestPath = invocationRequest,
+                WorkerPath = worker,
+                LauncherPath = launcher,
+                WorkerProtocolPath = protocol,
+                CachePath = cache
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(engine.Errors, Is.Not.Empty);
+                Assert.That(File.Exists(result), Is.False);
+                Assert.That(
+                    new[] { request, manifest, result }
+                        .Select(LinuxPathIdentity.PublicationLockName),
+                    Has.None.Matches<string>(File.Exists));
+                Assert.That(
+                    new[] { request, manifest, result }
+                        .Select(LinuxPathIdentity.PublicationMarkerPath),
+                    Has.None.Matches<string>(File.Exists));
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Test]
     [Platform("Linux")]
     public void InvalidationDeletesOnlyThePublishedOutputs()
@@ -328,6 +563,223 @@ public sealed class BuildTaskTests
                 Assert.That(File.ReadAllText(protocol), Is.EqualTo("protocol.dll"));
                 Assert.That(engine.Errors, Is.Empty);
             }));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void EveryPublicationMemberRejectsEveryCompilerOwnedOutput()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-compiler-output-");
+        try
+        {
+            var tools = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "tools"));
+            var worker = Path.Combine(tools.FullName, "worker.dll");
+            var launcher = Path.Combine(tools.FullName, "launcher.dll");
+            var protocol = Path.Combine(tools.FullName, "protocol.dll");
+            foreach (var path in new[] { worker, launcher, protocol })
+            {
+                File.WriteAllText(path, Path.GetFileName(path));
+            }
+
+            var compilerNames = new[]
+            {
+                "Consumer.dll",
+                "obj/Consumer.dll",
+                "Consumer.xml",
+                "obj/Consumer.pdb",
+                "obj/ref/Consumer.dll",
+                "obj/refint/Consumer.dll",
+                "obj/Consumer.AssemblyInfo.cs",
+                "obj/Consumer.GeneratedMSBuildEditorConfig.editorconfig",
+                "obj/Consumer.deps.json",
+                "obj/Consumer.runtimeconfig.json"
+            };
+            foreach (var compilerName in compilerNames)
+            {
+                foreach (var member in new[]
+                         {
+                             "request", "result", "manifest", "sarif"
+                         })
+                {
+                    var root = Directory.CreateDirectory(Path.Combine(
+                        directory.FullName,
+                        Guid.NewGuid().ToString("N")));
+                    var request = Path.Combine(root.FullName, "request.json");
+                    var result = Path.Combine(root.FullName, "result.json");
+                    var manifest = Path.Combine(root.FullName, "manifest.json");
+                    var sarif = Path.Combine(root.FullName, "result.sarif");
+                    var compilerOutput = Path.Combine(root.FullName, compilerName);
+                    Directory.CreateDirectory(
+                        Path.GetDirectoryName(compilerOutput)!);
+                    switch (member)
+                    {
+                        case "request":
+                            request = compilerOutput;
+                            break;
+                        case "result":
+                            result = compilerOutput;
+                            break;
+                        case "manifest":
+                            manifest = compilerOutput;
+                            break;
+                        case "sarif":
+                            sarif = compilerOutput;
+                            break;
+                    }
+                    var task = new InvalidatePublishedResult
+                    {
+                        BuildEngine = new RecordingBuildEngine(),
+                        ResultPath = result,
+                        RequestPath = request,
+                        ManifestPath = manifest,
+                        SarifPath = sarif,
+                        ProjectDirectory = root.FullName,
+                        WorkerPath = worker,
+                        LauncherPath = launcher,
+                        WorkerProtocolPath = protocol,
+                        CompilerOutputPaths = [new TaskItem(compilerOutput)]
+                    };
+
+                    Assert.That(
+                        task.Execute(),
+                        Is.False,
+                        $"{member} -> {compilerName}");
+                    Assert.That(File.Exists(compilerOutput), Is.False);
+                    foreach (var publication in new[]
+                             {
+                                 request, result, manifest, sarif
+                             })
+                    {
+                        Assert.That(
+                            File.Exists(
+                                LinuxPathIdentity.PublicationMarkerPath(
+                                    publication)),
+                            Is.False,
+                            $"{member} -> {compilerName}");
+                    }
+                }
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public async System.Threading.Tasks.Task PublicationResetRemovesOnlyCompleteOwnedSet()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-");
+        try
+        {
+            var request = Path.Combine(directory.FullName, "request.json");
+            var oldResult = Path.Combine(directory.FullName, "result-a.json");
+            var newResult = Path.Combine(directory.FullName, "result-b.json");
+            var manifest = Path.Combine(directory.FullName, "manifest.json");
+            var unrelated = Path.Combine(directory.FullName, "neighbor.txt");
+            var setA = new[] { request, oldResult, manifest };
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       setA,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in setA.Append(unrelated))
+            {
+                await File.WriteAllTextAsync(path, Path.GetFileName(path));
+            }
+            var setB = new[] { request, newResult, manifest };
+            Assert.That(
+                (Action)(() =>
+                {
+                    using var unexpected =
+                        LinuxPathIdentity.AcquirePublicationSet(
+                            setB,
+                            TimeSpan.FromSeconds(1));
+                }),
+                Throws.TypeOf<IOException>());
+
+            var reset = new ResetPublishedVerification
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                RequestPath = request,
+                ResultPath = oldResult,
+                ManifestPath = manifest
+            };
+            Assert.That(reset.Execute(), Is.True);
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       setB,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(File.Exists(oldResult), Is.False);
+                Assert.That(
+                    File.Exists(LinuxPathIdentity.PublicationMarkerPath(
+                        oldResult)),
+                    Is.False);
+                Assert.That(
+                    setB.All(path => File.Exists(
+                        LinuxPathIdentity.PublicationMarkerPath(path))),
+                    Is.True);
+                Assert.That(File.Exists(unrelated), Is.True);
+            }
+            Assert.That(reset.Execute(), Is.False, "set A is no longer complete");
+
+            LinuxPathIdentity.ResetPublicationSet(
+                setB,
+                TimeSpan.FromSeconds(5));
+            LinuxPathIdentity.ResetPublicationSet(
+                setB,
+                TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void PublicationResetRejectsPartialOwnershipWithoutDeletingMembers()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-partial-");
+        try
+        {
+            var set = new[]
+            {
+                Path.Combine(directory.FullName, "request.json"),
+                Path.Combine(directory.FullName, "result.json"),
+                Path.Combine(directory.FullName, "manifest.json")
+            };
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       set,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in set)
+            {
+                File.WriteAllText(path, Path.GetFileName(path));
+            }
+            File.Delete(LinuxPathIdentity.PublicationMarkerPath(set[1]));
+
+            Assert.That(
+                (Action)(() => LinuxPathIdentity.ResetPublicationSet(
+                    set,
+                    TimeSpan.FromSeconds(5))),
+                Throws.TypeOf<IOException>());
+            Assert.That(set.All(File.Exists), Is.True);
         }
         finally
         {

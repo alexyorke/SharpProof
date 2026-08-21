@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: ["**"]
   workflow_dispatch:
+    inputs:
+      comparison_ref:
+        description: Exact commit or named ref for changed-TCB comparison
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -27,15 +32,26 @@ jobs:
           fetch-depth: 0
 
       - name: Select changed-TCB comparison commit
+        env:
+          SHARPPROOF_REQUESTED_COMPARISON_REF: ${{ inputs.comparison_ref }}
         run: |
           if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
-            comparison='${{ github.event.pull_request.base.sha }}'
+            candidate='${{ github.event.pull_request.base.sha }}'
           elif [[ '${{ github.event.before }}' =~ ^[0-9a-f]{40}$ ]] &&
                [[ '${{ github.event.before }}' != '0000000000000000000000000000000000000000' ]]; then
-            comparison='${{ github.event.before }}'
+            candidate='${{ github.event.before }}'
+          elif [[ '${{ github.event_name }}' == 'workflow_dispatch' ]] &&
+               [[ -n "${SHARPPROOF_REQUESTED_COMPARISON_REF}" ]]; then
+            candidate="${SHARPPROOF_REQUESTED_COMPARISON_REF}"
           else
-            comparison='HEAD^'
+            echo 'No durable coverage comparison authority was supplied.' >&2
+            exit 1
           fi
+          comparison="$(git rev-parse --verify "${candidate}^{commit}")"
+          [[ "${comparison}" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'Coverage comparison did not resolve to one exact commit.' >&2
+            exit 1
+          }
           echo "SHARPPROOF_COVERAGE_COMPARISON_REF=${comparison}" >> "$GITHUB_ENV"
 
       - name: Build the pinned toolchain

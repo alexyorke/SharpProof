@@ -52,7 +52,7 @@
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.IO.Pipelines.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Encodings.Web.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Text.Json.dll" target="tools\net9" />
-    <file src="$nativeroot$/z3/4.12.2/linux-x64/libz3.so" target="runtimes/linux-x64/native" />
+    <file src="$nativeroot$/z3/4.12.2/linux-x64/libz3.so" target="tools/native/linux-x64" />
     <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.dll" target="tools\net9" />
     <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker.Launcher\bin\$configuration$\net9.0\SharpProof.Worker.Launcher.deps.json" target="tools\net9" />

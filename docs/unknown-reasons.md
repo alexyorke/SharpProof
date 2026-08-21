@@ -214,22 +214,55 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `EffectSummaryIncomplete` | The compiler-produced effect summary has an unknown facet or is otherwise incomplete |
 | `EffectContractNotEstablished` | A complete may-effect summary does not establish the selected effect contract and no definite replayable violation witness is available |
 
-Effect claim records have an additional closed certainty field:
+The exact typed outcome and effect-certainty authority follows.
 
-- `CompleteMayEffectSummary` means the relevant may-effect facet was complete;
-- `IncompleteMayEffectSummary` means that facet was incomplete;
-- `TrustedCompleteBoundary` means a complete bodyless contract was accepted as
-  an explicit trusted boundary;
-- `DefiniteViolation` is compiler evidence that a simple unconditional direct
-  effect has a source-located structured witness. The worker independently
-  replays only the admitted managed object/array allocation form; and
-- `Unavailable` means infrastructure or invalid contract evidence prevented a
-  semantic effect result.
+<!-- BEGIN SHARPPROOF TYPED EFFECT RESULTS -->
+### `WorkerClaimOutcome`
+
+| Member | Meaning |
+|---|---|
+| `Unspecified` | Invalid placeholder; rejected for every completed claim result |
+| `Proven` | The selected claim was established from authenticated evidence |
+| `Refuted` | A concrete counterexample or effect witness passed exact replay |
+| `Unknown` | The claim was not proved or refuted and carries one admitted reason |
+
+### `WorkerEffectEvidenceCertainty`
+
+| Member | Meaning |
+|---|---|
+| `Unspecified` | Required for non-effect claims and invalid for effect claims |
+| `IncompleteMayEffectSummary` | The relevant may-effect facet is incomplete |
+| `CompleteMayEffectSummary` | The relevant may-effect facet is complete |
+| `TrustedCompleteBoundary` | A complete bodyless effect contract is an explicit trusted boundary |
+| `DefiniteViolation` | A source-located direct effect has an independently replayable witness |
+| `Unavailable` | An `Unknown` effect claim for any schema-admitted unknown reason when no more specific certainty applies |
+| `VacuousEntry` | Contradictory entry preconditions prove the effect claim vacuously |
+
+### Allowed effect-result tuples
+
+| Outcome | Reason | Certainty |
+|---|---|---|
+| `Proven` | `None` | `CompleteMayEffectSummary` |
+| `Proven` | `None` | `TrustedCompleteBoundary` |
+| `Proven` | `None` | `VacuousEntry` |
+| `Refuted` | `None` | `DefiniteViolation` |
+| `Unknown` | `UnsupportedContract` | `Unavailable` |
+| `Unknown` | `CounterexampleNotReplayable` | `Unavailable` |
+| `Unknown` | `EffectSummaryIncomplete` | `IncompleteMayEffectSummary` |
+| `Unknown` | `EffectSummaryIncomplete` | `TrustedCompleteBoundary` |
+| `Unknown` | `EffectContractNotEstablished` | `CompleteMayEffectSummary` |
+| `Unknown` | `EffectContractNotEstablished` | `TrustedCompleteBoundary` |
+| `Unknown` | `ResourceLimit` | `IncompleteMayEffectSummary` |
+| `Unknown` | `ResourceLimit` | `TrustedCompleteBoundary` |
+| `Unknown` | `UnsupportedBody` | `IncompleteMayEffectSummary` |
+| `Unknown` | `UnsupportedBody` | `TrustedCompleteBoundary` |
+| `Unknown` | `*` | `Unavailable` |
+<!-- END SHARPPROOF TYPED EFFECT RESULTS -->
 
 A may-effect summary is suitable for proving the absence of a disallowed
 effect, but the presence of a may-effect is not itself a concrete trace.
 Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 12 can seal
+`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 14 can seal
 one unconditional definite managed object/array allocation event for
 independent worker replay. The worker validates its order, source-tree
 identity/span, selected-constraint and semantic-operation hashes, and sealed

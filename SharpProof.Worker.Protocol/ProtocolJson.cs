@@ -8,6 +8,7 @@ namespace SharpProof.Worker.Protocol;
 
 public static partial class WorkerProtocolJson
 {
+    internal const string CompilerDiagnosticCodePrefix = "compiler.";
     internal const int MaximumJsonBytes = 16 * 1024 * 1024;
     internal const int MaximumJsonDepth = 32;
     private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
@@ -15,6 +16,21 @@ public static partial class WorkerProtocolJson
     private static readonly JsonSerializerOptions s_options = CreateOptions();
 
     public static JsonSerializerOptions Options => new(s_options);
+
+    internal static bool IsCompilerDiagnosticCode(string? value)
+    {
+        return value != null &&
+            value.StartsWith(
+                CompilerDiagnosticCodePrefix,
+                StringComparison.Ordinal) &&
+            value.Length > CompilerDiagnosticCodePrefix.Length &&
+            value.Skip(CompilerDiagnosticCodePrefix.Length).All(
+                static character =>
+                    (character >= 'A' && character <= 'Z') ||
+                    (character >= 'a' && character <= 'z') ||
+                    (character >= '0' && character <= '9') ||
+                    character == '_');
+    }
 
     internal static string ReadUtf8File(string path)
     {
@@ -92,25 +108,96 @@ public static partial class WorkerProtocolJson
     }
     public static WorkerProtocolValidationResult Validate(WorkerVerifyResponse? response)
     {
-        return ValidateResponse(response, null, null, null, null);
+        return ValidateResponse(response, null, null, null, null, null);
     }
 
     public static WorkerProtocolValidationResult Validate(
         WorkerVerifyResponse? response, string expectedInputHash, WorkerClaimManifest? expectedManifest = null)
     {
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
-        return ValidateResponse(response, expectedInputHash, expectedManifest, null, null);
+        return ValidateResponse(response, expectedInputHash, expectedManifest, null, null, null);
+    }
+
+    internal static WorkerProtocolValidationResult Validate(
+        WorkerVerifyResponse? response, string expectedInputHash,
+        WorkerClaimManifest? expectedManifest,
+        IWorkerResponseEvidenceAuthority evidenceAuthority)
+    {
+        RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
+        _ = evidenceAuthority ??
+            throw new ArgumentNullException(nameof(evidenceAuthority));
+        return ValidateResponse(
+            response, expectedInputHash, expectedManifest, null, null, null,
+            evidenceAuthority: evidenceAuthority);
     }
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
-        WorkerClaimManifest expectedManifest, WorkerBudgets expectedBudgets)
+        WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
+        WorkerVersionSummary expectedVersions,
+        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
         _ = expectedManifest ??
             throw new ArgumentNullException(nameof(expectedManifest));
-        _ = expectedBudgets ?? throw new ArgumentNullException(nameof(expectedBudgets));
-        return ValidateResponse(response, expectedInputHash, expectedManifest, expectedRequestHash, expectedBudgets);
+        _ = expectedRequest ?? throw new ArgumentNullException(nameof(expectedRequest));
+        _ = expectedVersions ?? throw new ArgumentNullException(nameof(expectedVersions));
+        if (!Validate(expectedRequest).IsValid ||
+            ComputeRequestHash(expectedRequest) != expectedRequestHash)
+        {
+            throw new ArgumentException(
+                "Expected request authority is invalid or does not match its hash.",
+                nameof(expectedRequest));
+        }
+        if (!WorkerProtocolMetadata.IsVersionsValid(expectedVersions))
+        {
+            throw new ArgumentException(
+                "Expected runtime provenance is invalid.",
+                nameof(expectedVersions));
+        }
+        var maximumElapsedMilliseconds = WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+            expectedRequest, terminationGraceMilliseconds);
+        return ValidateResponse(response, expectedInputHash, expectedManifest,
+            expectedRequestHash, expectedRequest, expectedVersions,
+            maximumElapsedMilliseconds);
+    }
+
+    internal static WorkerProtocolValidationResult ValidateForRequest(
+        WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
+        WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
+        WorkerVersionSummary expectedVersions,
+        IWorkerResponseEvidenceAuthority evidenceAuthority,
+        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
+    {
+        RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
+        RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
+        _ = expectedManifest ??
+            throw new ArgumentNullException(nameof(expectedManifest));
+        _ = expectedRequest ??
+            throw new ArgumentNullException(nameof(expectedRequest));
+        _ = expectedVersions ??
+            throw new ArgumentNullException(nameof(expectedVersions));
+        _ = evidenceAuthority ??
+            throw new ArgumentNullException(nameof(evidenceAuthority));
+        if (!Validate(expectedRequest).IsValid ||
+            ComputeRequestHash(expectedRequest) != expectedRequestHash)
+        {
+            throw new ArgumentException(
+                "Expected request authority is invalid or does not match its hash.",
+                nameof(expectedRequest));
+        }
+        if (!WorkerProtocolMetadata.IsVersionsValid(expectedVersions))
+        {
+            throw new ArgumentException(
+                "Expected runtime provenance is invalid.",
+                nameof(expectedVersions));
+        }
+        var maximumElapsedMilliseconds = WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+            expectedRequest, terminationGraceMilliseconds);
+        return ValidateResponse(
+            response, expectedInputHash, expectedManifest,
+            expectedRequestHash, expectedRequest, expectedVersions,
+            maximumElapsedMilliseconds, evidenceAuthority);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -164,7 +251,10 @@ public static partial class WorkerProtocolJson
 
     private static WorkerProtocolValidationResult ValidateResponse(
         WorkerVerifyResponse? response, string? expectedInputHash, WorkerClaimManifest? expectedManifest,
-        string? expectedRequestHash, WorkerBudgets? expectedBudgets)
+        string? expectedRequestHash, WorkerVerifyRequest? expectedRequest,
+        WorkerVersionSummary? expectedVersions,
+        long? maximumElapsedMilliseconds = null,
+        IWorkerResponseEvidenceAuthority? evidenceAuthority = null)
     {
         var errors = new Validator();
         if (response == null)
@@ -193,19 +283,123 @@ public static partial class WorkerProtocolJson
             errors.Count == manifestErrorCount,
             errors);
         var protocolErrors = ValidateProtocolErrors(response.Errors, errors);
-        ValidateRun(response, protocolErrors, errors);
         var callables = ValidateCallableResults(response.CallableResults, response.Manifest, errors);
         var claims = ValidateClaimResults(response.ClaimResults, response.Manifest, errors);
+        ValidateRun(response, callables, claims, protocolErrors, errors);
         ValidateUnknownCoverage(callables, claims, response.Manifest, errors);
         ValidateSummary(response.Summary, callables, claims, errors);
-        if (expectedBudgets != null)
+        if (response.Summary != null)
+        {
+            errors.Check(
+                response.Summary.ElapsedMilliseconds <=
+                    WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds,
+                "response.elapsed_unrepresentable");
+            if (maximumElapsedMilliseconds.HasValue)
+            {
+                errors.Check(
+                    response.Summary.ElapsedMilliseconds <= maximumElapsedMilliseconds.Value,
+                    "response.elapsed_request_envelope");
+            }
+        }
+        if (expectedVersions != null)
+        {
+            errors.Check(
+                response.Summary?.Versions != null &&
+                VersionsEqual(response.Summary.Versions, expectedVersions),
+                "response.versions_mismatch");
+        }
+        if (expectedRequest != null)
         {
             errors.Check(response.Summary?.Budgets != null &&
                 JsonSerializer.Serialize(response.Summary.Budgets, s_options) ==
-                JsonSerializer.Serialize(expectedBudgets, s_options), "response.budgets_mismatch");
+                JsonSerializer.Serialize(expectedRequest.Budgets, s_options), "response.budgets_mismatch");
+            ValidateCacheForRequest(response, expectedRequest, errors);
+        }
+
+        if (evidenceAuthority != null)
+        {
+            try
+            {
+                foreach (var code in evidenceAuthority.Validate(response)
+                             .Where(static code => !string.IsNullOrWhiteSpace(code))
+                             .Distinct(s_ordinal))
+                {
+                    errors.Add(code);
+                }
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException or InvalidDataException or
+                InvalidOperationException or KeyNotFoundException or
+                NullReferenceException)
+            {
+                errors.Add("response.evidence_authority");
+            }
         }
 
         return errors.Result;
+    }
+
+    private static void ValidateCacheForRequest(
+        WorkerVerifyResponse response,
+        WorkerVerifyRequest request,
+        Validator errors)
+    {
+        if (response.Summary == null)
+        {
+            return;
+        }
+        var status = response.Summary.CacheStatus;
+        var inactive = !request.Cache.Enabled ||
+            request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
+        if (inactive)
+        {
+            errors.Check(status == WorkerCacheStatus.Disabled,
+                "response.cache_request_mismatch");
+            return;
+        }
+
+        var storableShape = response is
+        {
+            RunStatus: WorkerRunStatus.Complete,
+            FailureReason: WorkerRunFailureReason.None,
+            Errors.Length: 0,
+            CallableResults: { Length: > 0 } callables,
+            ClaimResults: { Length: > 0 } claims,
+            Manifest.Claims: { Length: > 0 } manifestClaims
+        } &&
+            callables.All(static result => result is
+            {
+                Coverage: WorkerCallableCoverage.Complete,
+                Reason: WorkerCallableCoverageReason.None
+            }) &&
+            claims.All(static result => result?.Outcome == WorkerClaimOutcome.Refuted) &&
+            manifestClaims.All(static claim =>
+                claim?.Kind == WorkerClaimKind.Postcondition);
+        var valid = status switch
+        {
+            WorkerCacheStatus.Hit or WorkerCacheStatus.Written => storableShape,
+            WorkerCacheStatus.Rejected =>
+                response.RunStatus == WorkerRunStatus.Failed &&
+                response.FailureReason == WorkerRunFailureReason.MalformedResult,
+            WorkerCacheStatus.Miss => !storableShape,
+            WorkerCacheStatus.Unavailable => true,
+            WorkerCacheStatus.Disabled =>
+                response.RunStatus != WorkerRunStatus.Complete,
+            _ => false
+        };
+        errors.Check(valid, "response.cache_request_mismatch");
+    }
+    private static bool VersionsEqual(
+        WorkerVersionSummary actual,
+        WorkerVersionSummary expected)
+    {
+        return actual.ProtocolVersion == expected.ProtocolVersion &&
+            actual.ManifestSchemaVersion == expected.ManifestSchemaVersion &&
+            actual.CacheSchemaVersion == expected.CacheSchemaVersion &&
+            actual.WorkerVersion == expected.WorkerVersion &&
+            actual.ApiSpecVersion == expected.ApiSpecVersion &&
+            actual.WorkerBinarySha256 == expected.WorkerBinarySha256 &&
+            actual.ApiSpecContentSha256 == expected.ApiSpecContentSha256;
     }
     private static void ValidateExpectedManifest(
         WorkerClaimManifest? actual,
@@ -250,9 +444,12 @@ public static partial class WorkerProtocolJson
         foreach (var callable in callables)
         {
             errors.Check(HasValidLocation(callable.Location), prefix + ".callable_location")
-                .Rules(callable, WorkerProtocolMetadata.ManifestCallableRules, prefix + ".");
+                .Rules(callable, WorkerProtocolMetadata.ManifestCallableRules, prefix + ".")
+                .Check(HasProducerAssumptionKinds(callable.Assumptions),
+                    prefix + ".assumption_kind");
             ValidateClaimMembership(callable, claims, prefix, errors);
         }
+        ValidateManifestAssumptionIdentity(callables, prefix, errors);
         foreach (var claim in claims)
         {
             errors.Check(callableIds.Contains(claim.CallableId), prefix + ".claim_callable")
@@ -315,10 +512,28 @@ public static partial class WorkerProtocolJson
         var claim = manifest?.Claims?.FirstOrDefault(
             item => item != null && item.ClaimId == value.ClaimId);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
+        errors.Check(claim != null &&
+                WorkerProtocolMetadata.MatchesClaimKindOutcome(
+                    claim.Kind, value.Outcome, value.Reason),
+            "response.claim_reason");
         errors.Check(effectClaim
                 ? HasValidEffectCertainty(value.Outcome, value.Reason, value.EffectCertainty)
                 : value.EffectCertainty == WorkerEffectEvidenceCertainty.Unspecified,
             "response.effect_certainty")
+            .Check(!effectClaim || WorkerProtocolMetadata.MatchesEffectEvidenceTuple(
+                value.Outcome,
+                value.Reason,
+                value.EffectCertainty,
+                value.Vacuity,
+                value.ProofCore is { Length: > 0 },
+                (value.Assumptions ?? []).Any(static assumption =>
+                    assumption != null &&
+                    assumption.Kind == WorkerAssumptionKind.TrustedBoundary),
+                (value.Assumptions ?? []).Any(static assumption =>
+                    assumption != null &&
+                    assumption.Kind == WorkerAssumptionKind.TrustedBoundary &&
+                    assumption.Used)),
+                "response.effect_evidence")
             .Check(effectClaim && value.Outcome == WorkerClaimOutcome.Refuted
                 ? HasValidEffectWitness(value.EffectWitness)
                 : value.EffectWitness == null, "response.effect_witness");
@@ -367,22 +582,41 @@ public static partial class WorkerProtocolJson
             owners.TryGetValue(value.ClaimId, out var owner) && !incomplete.Contains(owner)),
             "response.unknown_coverage");
     }
-    private static void ValidateRun(WorkerVerifyResponse response, WorkerProtocolError[] protocolErrors, Validator errors)
+    private static void ValidateRun(
+        WorkerVerifyResponse response,
+        WorkerCallableResult[] callables,
+        WorkerClaimResult[] claims,
+        WorkerProtocolError[] protocolErrors,
+        Validator errors)
     {
-        var failed = response.RunStatus == WorkerRunStatus.Failed;
         errors.Defined(response.RunStatus, WorkerRunStatus.Unspecified, "response.run_status")
             .Check(WorkerProtocolMetadata.MatchesRunFailure(
-                response.RunStatus, response.FailureReason) &&
-                (protocolErrors.Length == 0 || failed), "response.run_failure");
-        var evidence = WorkerResultAssembler.Classify(response.CallableResults, response.ClaimResults);
-        errors.Check(!evidence.FatalClaim || failed, "response.fatal_claim")
-            .Check(!evidence.FatalCallable || failed, "response.fatal_callable")
-            .Check(!evidence.TimedOut ||
-                response.RunStatus is WorkerRunStatus.TimedOut or WorkerRunStatus.Failed,
-                "response.timeout_status")
-            .Check(!evidence.Canceled ||
-                response.RunStatus is WorkerRunStatus.Canceled or WorkerRunStatus.Failed,
-                "response.canceled_status");
+                response.RunStatus, response.FailureReason),
+                "response.run_failure");
+        var projected = WorkerResultAssembler.TryProjectRunState(
+            callables,
+            claims,
+            protocolErrors,
+            out var expectedStatus,
+            out var expectedFailure);
+        errors.Check(projected &&
+                response.RunStatus == expectedStatus &&
+                response.FailureReason == expectedFailure,
+            "response.run_projection");
+        if (response.Manifest != null && projected)
+        {
+            foreach (var callable in callables)
+            {
+                errors.Check(WorkerResultAssembler.MatchesCallableProjection(
+                        callable,
+                        response.Manifest,
+                        claims,
+                        expectedStatus,
+                        expectedFailure,
+                        protocolErrors.Length != 0),
+                    "response.callable_projection");
+            }
+        }
     }
 
     private static void ValidateSummary(WorkerVerificationSummary? summary,
@@ -459,6 +693,17 @@ public static partial class WorkerProtocolJson
         return value != null && WorkerProtocolMetadata.IsSourceLocationValid(value);
     }
 
+    internal static bool HasValidLocationOrNone(WorkerSourceLocation? value)
+    {
+        return value != null &&
+            (WorkerProtocolMetadata.IsSourceLocationValid(value) ||
+             (value.Path.Length == 0 &&
+              value.Start == 0 &&
+              value.Length == 0 &&
+              value.Line == 0 &&
+              value.Column == 0));
+    }
+
     internal static bool HasKnownEffects(WorkerEffectSet effects, WorkerEffectCapabilitySet capabilities)
     {
         return WorkerProtocolMetadata.HasOnlyKnownFlags(effects) &&
@@ -490,6 +735,28 @@ public static partial class WorkerProtocolJson
         return CompleteUnique(values,
                 WorkerProtocolMetadata.IsAssumptionValid,
                 static value => value.Id);
+    }
+
+    private static bool HasProducerAssumptionKinds(WorkerAssumptionEvidence[]? values)
+    {
+        return values != null && values.All(static value =>
+            value != null && WorkerProtocolMetadata.MatchesAssumptionKind(value.Kind));
+    }
+
+    private static void ValidateManifestAssumptionIdentity(
+        WorkerCallableManifestEntry[] callables, string prefix, Validator errors)
+    {
+        var groups = callables
+            .Where(static callable => callable != null)
+            .SelectMany(static callable => (callable.Assumptions ?? [])
+                .Where(static assumption => assumption != null &&
+                    !string.IsNullOrWhiteSpace(assumption.Id))
+                .Select(assumption => (CallableId: callable.CallableId, Assumption: assumption)))
+            .GroupBy(static item => item.Assumption.Id, s_ordinal);
+        errors.Check(groups.All(static group => group
+                .Select(static item => (item.CallableId, item.Assumption.Kind))
+                .Distinct()
+                .Count() == 1), prefix + ".assumption_identity");
     }
 
     private static T[] ValidateResultSet<T>(T[]? values, IEnumerable<string?> expectedIds,
@@ -576,7 +843,8 @@ public static partial class WorkerProtocolJson
 
     private static T? Deserialize<T>(string json, IEnumerable<string> requiredProperties)
     {
-        EnsureRootProperties(json, requiredProperties);
+        _ = requiredProperties;
+        EnsureJsonShape(json, typeof(T).Name);
         return JsonSerializer.Deserialize<T>(json, s_options);
     }
     private static int FindClaimOrdinal(WorkerClaimManifest? manifest, string? id)

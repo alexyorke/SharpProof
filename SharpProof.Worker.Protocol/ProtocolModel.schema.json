@@ -36,6 +36,23 @@
     "WorkerEffectEvidenceCertainty",
     "WorkerAssumptionKind"
   ],
+  "documentation": {
+    "WorkerClaimOutcome": [
+      {"name":"Unspecified","meaning":"Invalid placeholder; rejected for every completed claim result"},
+      {"name":"Proven","meaning":"The selected claim was established from authenticated evidence"},
+      {"name":"Refuted","meaning":"A concrete counterexample or effect witness passed exact replay"},
+      {"name":"Unknown","meaning":"The claim was not proved or refuted and carries one admitted reason"}
+    ],
+    "WorkerEffectEvidenceCertainty": [
+      {"name":"Unspecified","meaning":"Required for non-effect claims and invalid for effect claims"},
+      {"name":"IncompleteMayEffectSummary","meaning":"The relevant may-effect facet is incomplete"},
+      {"name":"CompleteMayEffectSummary","meaning":"The relevant may-effect facet is complete"},
+      {"name":"TrustedCompleteBoundary","meaning":"A complete bodyless effect contract is an explicit trusted boundary"},
+      {"name":"DefiniteViolation","meaning":"A source-located direct effect has an independently replayable witness"},
+      {"name":"Unavailable","meaning":"An `Unknown` effect claim for any schema-admitted unknown reason when no more specific certainty applies"},
+      {"name":"VacuousEntry","meaning":"Contradictory entry preconditions prove the effect claim vacuously"}
+    ]
+  },
   "validationTables": [
     {
       "name": "ClaimShape",
@@ -104,6 +121,36 @@
       ]
     },
     {
+      "name": "ClaimKindOutcome",
+      "parameters": [
+        {"name":"kind","type":"WorkerClaimKind"},
+        {"name":"outcome","type":"WorkerClaimOutcome"},
+        {"name":"reason","type":"WorkerClaimReason"}
+      ],
+      "rows": [
+        ["*","Proven","None"],
+        ["*","Refuted","None"],
+        ["*","Unknown","UnsupportedCallable"],
+        ["*","Unknown","UnsupportedContract"],
+        ["*","Unknown","UnsupportedBody"],
+        ["*","Unknown","UnsupportedExpression"],
+        ["Postcondition","Unknown","DeepPostcondition"],
+        ["Postcondition","Unknown","MissingReturnValue"],
+        ["*","Unknown","ResourceLimit"],
+        ["*","Unknown","MethodTimeout"],
+        ["*","Unknown","ProjectTimeout"],
+        ["*","Unknown","Canceled"],
+        ["*","Unknown","BackendUnavailable"],
+        ["*","Unknown","InfrastructureFailure"],
+        ["*","Unknown","MalformedBackendResult"],
+        ["*","Unknown","CounterexampleReplayFailed"],
+        ["Postcondition","Unknown","PostconditionMayBeUndefined"],
+        ["*","Unknown","CounterexampleNotReplayable"],
+        ["Effect","Unknown","EffectSummaryIncomplete"],
+        ["Effect","Unknown","EffectContractNotEstablished"]
+      ]
+    },
+    {
       "name": "EffectCertainty",
       "parameters": [
         {"name":"outcome","type":"WorkerClaimOutcome"},
@@ -115,9 +162,38 @@
         ["Proven","None","TrustedCompleteBoundary"],
         ["Proven","None","VacuousEntry"],
         ["Refuted","None","DefiniteViolation"],
+        ["Unknown","UnsupportedContract","Unavailable"],
+        ["Unknown","CounterexampleNotReplayable","Unavailable"],
         ["Unknown","EffectSummaryIncomplete","IncompleteMayEffectSummary"],
+        ["Unknown","EffectSummaryIncomplete","TrustedCompleteBoundary"],
         ["Unknown","EffectContractNotEstablished","CompleteMayEffectSummary"],
+        ["Unknown","EffectContractNotEstablished","TrustedCompleteBoundary"],
+        ["Unknown","ResourceLimit","IncompleteMayEffectSummary"],
+        ["Unknown","ResourceLimit","TrustedCompleteBoundary"],
+        ["Unknown","UnsupportedBody","IncompleteMayEffectSummary"],
+        ["Unknown","UnsupportedBody","TrustedCompleteBoundary"],
         ["Unknown","*","Unavailable"]
+      ]
+    },
+    {
+      "name": "EffectEvidenceTuple",
+      "parameters": [
+        {"name":"outcome","type":"WorkerClaimOutcome"},
+        {"name":"reason","type":"WorkerClaimReason"},
+        {"name":"certainty","type":"WorkerEffectEvidenceCertainty"},
+        {"name":"vacuity","type":"WorkerVacuityKind"},
+        {"name":"hasProofCore","type":"bool"},
+        {"name":"hasTrustedProvenance","type":"bool"},
+        {"name":"trustedProvenanceUsed","type":"bool"}
+      ],
+      "rows": [
+        ["Proven","None","CompleteMayEffectSummary","None","*","*","*"],
+        ["Proven","None","TrustedCompleteBoundary","None","*",true,true],
+        ["Proven","None","VacuousEntry","ContradictoryPreconditions",true,"*","*"],
+        ["Refuted","None","DefiniteViolation","None",false,"*","*"],
+        ["Unknown","EffectSummaryIncomplete","IncompleteMayEffectSummary","None",false,"*","*"],
+        ["Unknown","EffectContractNotEstablished","CompleteMayEffectSummary","None",false,"*","*"],
+        ["Unknown","*","Unavailable","None",false,"*","*"]
       ]
     },
     {
@@ -181,6 +257,17 @@
         ["Proven","*",false],
         ["Refuted",false,"*"],
         ["Unknown",false,false]
+      ]
+    },
+    {
+      "name": "AssumptionKind",
+      "parameters": [
+        {"name":"kind","type":"WorkerAssumptionKind"}
+      ],
+      "rows": [
+        ["Precondition"],
+        ["UserAssume"],
+        ["TrustedBoundary"]
       ]
     }
   ],
@@ -263,7 +350,9 @@
       "rules": [
         {"code":"valid","condition":{"op":"all","conditions":[
           {"op":"nonBlank","property":"Id"},
-          {"op":"defined","property":"Kind","unspecified":"WorkerAssumptionKind.Unspecified"}
+          {"op":"stateTable","table":"AssumptionKind","arguments":[
+            {"op":"property","property":"Kind"}
+          ]}
         ]}}
       ]
     },
@@ -276,7 +365,8 @@
           {"op":"property","property":"Coverage"},
           {"op":"property","property":"Reason"}
         ]}},
-        {"code":"response.callable_assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}}
+        {"code":"response.callable_assumptions","condition":{"op":"validAssumptions","property":"Assumptions"}},
+        {"code":"response.callable_assumption_usage","condition":{"op":"assumptionsUnused","property":"Assumptions"}}
       ]
     },
     {

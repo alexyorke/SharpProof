@@ -20,6 +20,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Dataflow",
         "SharpProof.Effects",
         "SharpProof.Frontend",
+        "SharpProof.Gates",
         "SharpProof.Host",
         "SharpProof.Ir",
         "SharpProof.Meta.Analyzers",

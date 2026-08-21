@@ -57,6 +57,7 @@
             {"type": "IMethodSymbol", "name": "TargetMethod"},
             {"type": "IOperation?", "name": "Instance"},
             {"type": "ImmutableArray<IArgumentOperation>", "name": "Arguments"},
+            {"type": "ImmutableDictionary<int, IOperation>", "name": "ExplicitArguments"},
             {"type": "bool", "name": "CanReplay"},
             {"type": "ManagedFlowResult?", "name": "Flow"},
             {"type": "ManagedFlowStatus", "name": "FlowStatus"}
@@ -129,7 +130,9 @@
               "parameters": [
                 {"type": "IMethodSymbol", "name": "TargetMethod"},
                 {"type": "IOperation?", "name": "Instance"},
-                {"type": "ImmutableArray<IArgumentOperation>", "name": "Arguments"}
+                {"type": "ImmutableArray<IArgumentOperation>", "name": "Arguments"},
+                {"type": "ImmutableDictionary<int, IOperation>", "name": "ExplicitArguments"},
+                {"type": "bool", "name": "CanReplay"}
               ]
             }
           ]
@@ -203,7 +206,8 @@
           "name": "ManifestEffectClaim",
           "parameters": [
             {"type": "WorkerClaimManifestEntry", "name": "Entry"},
-            {"type": "CompilerEffectClaimArtifact", "name": "Evidence"}
+            {"type": "CompilerEffectClaimArtifact", "name": "Evidence"},
+            {"type": "CompilerEffectAuthorityArtifact", "name": "Authority"}
           ]
         }
       ],
@@ -474,6 +478,7 @@
             {"type": "CompilerSummaryOrigin", "name": "Origin"},
             {"type": "string", "name": "EvidenceSha256"},
             {"type": "string", "name": "EvidenceIdentity"},
+            {"type": "ImmutableArray<CompilerPreparedSummaryEvidence>", "name": "DependencyEvidence"},
             {"type": "IrTerm", "name": "Guard"},
             {"type": "IrTerm", "name": "Predicate"}
           ]

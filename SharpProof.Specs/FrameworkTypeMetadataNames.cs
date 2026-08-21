@@ -23,6 +23,9 @@ public static class FrameworkTypeMetadataNames
     public const string InvalidCastException = "System.InvalidCastException";
     public const string InvalidOperationException =
         "System.InvalidOperationException";
+    public const string IDisposable = "System.IDisposable";
+    public const string ModuleInitializerAttribute =
+        "System.Runtime.CompilerServices.ModuleInitializerAttribute";
     public static readonly string Monitor = "System.Threading.Monitor";
     public const string NullReferenceException =
         "System.NullReferenceException";

@@ -7,6 +7,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
         maximumBytes, nameof(maximumBytes));
     internal static Action<string, string>? PathValidationOverride;
+    internal static Action? TransactionRollbackOverride;
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
         string inputHash,
@@ -16,10 +17,23 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         CancellationToken cancellationToken)
     {
         var path = GetPath(inputHash);
+        var staged = new List<StagedEntry>();
+        var committed = false;
+        FileStream? cacheLock = null;
         try
         {
-            using var cacheLock = AcquireLock(_directory);
+            cacheLock = AcquireLock(_directory);
             ValidatePath(path);
+            var file = new FileInfo(path);
+            if (file.Length > Math.Min(
+                    _maximumBytes,
+                    WorkerProtocolJson.MaximumJsonBytes))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ValidatePath(path);
+                file.Delete();
+                return null;
+            }
             var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
                 .ConfigureAwait(false);
             var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
@@ -64,8 +78,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            if (!TryStageCapacity(path, staged, cancellationToken))
+            {
+                return null;
+            }
             ValidatePath(path);
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+            committed = true;
+            DiscardStaged(staged);
             return response;
         }
         catch (Exception exception) when (exception is
@@ -74,15 +94,45 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         {
             return null;
         }
+        finally
+        {
+            try
+            {
+                if (!committed && staged.Count > 0)
+                {
+                    try
+                    {
+                        TransactionRollbackOverride?.Invoke();
+                    }
+                    finally
+                    {
+                        RestoreStaged(staged);
+                    }
+                }
+            }
+            finally
+            {
+                if (cacheLock != null)
+                {
+                    await cacheLock.DisposeAsync().ConfigureAwait(false);
+                }
+            }
+        }
     }
 
     internal async Task<bool> TryWriteAsync(WorkerVerifyResponse response, string inputHash,
         WorkerClaimManifest manifest, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(response);
+        var staged = new List<StagedEntry>();
+        string? previousPath = null;
+        string? path = null;
+        var published = false;
+        var committed = false;
+        FileStream? cacheLock = null;
         try
         {
-            using var cacheLock = AcquireLock(_directory);
+            cacheLock = AcquireLock(_directory);
             var payload = JsonSerializer.Serialize(new CachePayload(
                 manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
             var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
@@ -94,11 +144,27 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 return false;
             }
 
-            var path = GetPath(inputHash);
+            path = GetPath(inputHash);
             ValidatePath(path);
+            if (File.Exists(path))
+            {
+                previousPath = path + "." +
+                    Guid.NewGuid().ToString("N") + ".rollback";
+                ValidatePath(previousPath);
+                File.Move(path, previousPath);
+            }
             await AtomicFile.WriteUtf8Async(path, json, cancellationToken).ConfigureAwait(false);
+            published = true;
             ValidatePath(path);
-            return Evict(path, cancellationToken);
+            if (!TryStageCapacity(path, staged, cancellationToken))
+            {
+                return false;
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            committed = true;
+            DiscardStaged(staged);
+            TryDeleteRollbackFile(previousPath);
+            return true;
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException or
@@ -106,6 +172,40 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         {
             // Cache failures never change semantic verifier outcomes.
             return false;
+        }
+        finally
+        {
+            try
+            {
+                if (!committed)
+                {
+                    try
+                    {
+                        if (published ||
+                            previousPath != null ||
+                            staged.Count > 0)
+                        {
+                            TransactionRollbackOverride?.Invoke();
+                        }
+                    }
+                    finally
+                    {
+                        if (published && path != null)
+                        {
+                            TryDeletePublishedFile(path);
+                        }
+                        RestoreStaged(staged);
+                        RestorePrevious(path, previousPath);
+                    }
+                }
+            }
+            finally
+            {
+                if (cacheLock != null)
+                {
+                    await cacheLock.DisposeAsync().ConfigureAwait(false);
+                }
+            }
         }
     }
 
@@ -136,8 +236,9 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
     }
 
-    private bool Evict(
+    private bool TryStageCapacity(
         string protectedPath,
+        List<StagedEntry> staged,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -171,37 +272,97 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 continue;
             }
 
+            ValidatePath(file.FullName);
+            var length = file.Length;
+            var stagedPath = file.FullName + "." +
+                Guid.NewGuid().ToString("N") + ".eviction";
+            ValidatePath(stagedPath);
+            File.Move(file.FullName, stagedPath);
+            staged.Add(new StagedEntry(file.FullName, stagedPath));
+            total -= length;
+        }
+
+        return total <= _maximumBytes;
+    }
+
+    private static void DiscardStaged(List<StagedEntry> staged)
+    {
+        foreach (var entry in staged)
+        {
+            TryDeleteRollbackFile(entry.StagedPath);
+        }
+        staged.Clear();
+    }
+
+    private static void RestoreStaged(List<StagedEntry> staged)
+    {
+        for (var index = staged.Count - 1; index >= 0; index--)
+        {
+            var entry = staged[index];
             try
             {
-                ValidatePath(file.FullName);
-                var length = file.Length;
-                file.Delete();
-                total -= length;
+                if (File.Exists(entry.StagedPath) &&
+                    !File.Exists(entry.OriginalPath))
+                {
+                    File.Move(entry.StagedPath, entry.OriginalPath);
+                }
             }
             catch (Exception exception) when (exception is
                 ArgumentException or IOException or UnauthorizedAccessException)
             {
-                // One unavailable old entry must not prevent eviction of
-                // other cache-owned entries.
             }
         }
+    }
 
-        if (total <= _maximumBytes)
+    private static void RestorePrevious(string? path, string? previousPath)
+    {
+        if (path == null || previousPath == null)
         {
-            return true;
+            return;
         }
-
         try
         {
-            ValidatePath(protectedPath);
-            File.Delete(protectedPath);
+            if (File.Exists(previousPath) && !File.Exists(path))
+            {
+                File.Move(previousPath, path);
+            }
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException)
         {
         }
-        return false;
     }
+
+    private static void TryDeletePublishedFile(string path)
+    {
+        try
+        {
+            SharpProof.Host.LinuxPathIdentity.Canonicalize(path);
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static void TryDeleteRollbackFile(string? path)
+    {
+        if (path == null)
+        {
+            return;
+        }
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private sealed record StagedEntry(string OriginalPath, string StagedPath);
 
     private static bool IsOwnedCacheEntry(string fileName)
     {

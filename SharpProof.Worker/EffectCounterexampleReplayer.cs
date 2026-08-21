@@ -10,7 +10,7 @@ internal static class EffectCounterexampleReplayer
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(evidence);
         cancellationToken.ThrowIfCancellationRequested();
-        CompilerEffectClaimArtifactCodec.Validate(evidence);
+        CompilerEffectClaimArtifactCodec.Validate(evidence, target.Compilation);
 
         var replay = evidence.Replay ??
             throw Malformed("A refuted effect claim has no replay artifact.");
@@ -82,6 +82,9 @@ internal static class EffectCounterexampleReplayer
         var tree = trees[effectEvent.SyntaxTreeOrdinal];
         if (tree == null ||
             effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
+            effectEvent.SyntaxTreeSnapshotSha256 !=
+                CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
+            effectEvent.SyntaxTreeLineMapSha256 != tree.LineMapSha256 ||
             effectEvent.SyntaxStart < 0 ||
             effectEvent.SyntaxLength <= 0 ||
             effectEvent.SyntaxStart > tree.TextLength ||
@@ -93,7 +96,16 @@ internal static class EffectCounterexampleReplayer
         }
 
         var location = effectEvent.Location;
-        if (!WorkerProtocolJson.HasValidLocation(location) ||
+        if (CompilerSourceLocationAuthority.FindUniqueTree(
+                location,
+                target.Compilation) != effectEvent.SourceTreeOrdinal ||
+            !CompilerSourceLocationAuthority.IsBound(
+                location,
+                effectEvent.SourceTreeOrdinal,
+                effectEvent.SourceTreePath,
+                effectEvent.SourceTreeSha256,
+                effectEvent.SourceLineMapSha256,
+                target.Compilation) ||
             location.Start != effectEvent.SyntaxStart ||
             location.Length != effectEvent.SyntaxLength)
         {
@@ -241,6 +253,8 @@ internal static class EffectCounterexampleReplayer
             effectEvent.Kind,
             effectEvent.SyntaxTreeOrdinal,
             effectEvent.SyntaxTreeSha256,
+            effectEvent.SyntaxTreeSnapshotSha256,
+            effectEvent.SyntaxTreeLineMapSha256,
             effectEvent.SyntaxStart,
             effectEvent.SyntaxLength,
             effectEvent.MemberIdentity,
@@ -248,6 +262,11 @@ internal static class EffectCounterexampleReplayer
             effectEvent.TypeIdentity,
             effectEvent.TypeDocumentationId,
             effectEvent.SpecWitnessIdentifier);
+        hash.Add(
+            effectEvent.SourceTreeOrdinal,
+            effectEvent.SourceTreePath,
+            effectEvent.SourceTreeSha256,
+            effectEvent.SourceLineMapSha256);
         hash.Add(effectEvent.ScalarOperands.Length);
         foreach (var operand in effectEvent.ScalarOperands)
         {

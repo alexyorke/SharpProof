@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -251,43 +252,169 @@ public sealed class SharpProofSoundnessAnalyzerTests
         }
         """,
         "SPMETA010")]
-    [TestCase(
-        """
-        namespace SharpProof.Verify;
-        enum Answer { Proven }
-        sealed class AnswerSource {
-            internal Answer Unknown => Answer.Proven;
-        }
-        sealed class ProofCache {
-            internal void Write(Answer answer) { }
-        }
-        sealed class C {
-            void M(ProofCache cache, AnswerSource source) =>
-                cache.Write(source.Unknown);
-        }
-        """,
-        "SPMETA010")]
-    [TestCase(
-        """
-        namespace SharpProof.Verify;
-        enum Answer { Proven }
-        sealed class ProofCache {
-            internal void Write(Answer answer) { }
-        }
-        sealed class C {
-            void M(ProofCache cache) {
-                var TimeoutAnswer = Answer.Proven;
-                cache.Write(TimeoutAnswer);
-            }
-        }
-        """,
-        "SPMETA010")]
     public async Task ReportsSoundnessBoundaryViolation(string source, string expectedId)
     {
         var diagnostics = await Analyze(source);
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain(expectedId));
+    }
+
+    [Test]
+    public async Task SemanticCacheWritesTrackAliasesAndAssignments()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify {
+            using ExternalAnswer = Other.Answer;
+            enum Answer { Unknown, TimedOut, Failed, Proven }
+            sealed class AnswerSource {
+                internal Answer Unknown => Answer.Proven;
+                internal Answer CreateTimeout() => Answer.Proven;
+            }
+            sealed class ProofCache {
+                internal Answer this[string key] { set { } }
+                internal Answer Latest { set { } }
+                internal void Add(string key, Answer answer) { }
+                internal void AddOrUpdate(string key, Answer answer) { }
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                void AliasUnknown(ProofCache cache) {
+                    var answer = Answer.Unknown;
+                    cache.Add("key", answer);
+                }
+                void AliasTimedOut(ProofCache cache) {
+                    var answer = Answer.TimedOut;
+                    cache.Write(answer);
+                }
+                void AliasFailed(ProofCache cache) {
+                    var answer = Answer.Failed;
+                    cache["key"] = answer;
+                }
+                void Branch(ProofCache cache, bool condition) {
+                    var answer = Answer.Proven;
+                    if (condition) answer = Answer.Unknown;
+                    cache.Write(answer);
+                }
+                void DirectIndexer(ProofCache cache) =>
+                    cache["key"] = Answer.Unknown;
+                void Property(ProofCache cache) =>
+                    cache.Latest = Answer.Failed;
+                void Overwrite(ProofCache cache) =>
+                    cache.AddOrUpdate("key", Answer.TimedOut);
+                void Unresolved(ProofCache cache, Answer answer) =>
+                    cache.Write(answer);
+                void Safe(ProofCache cache, AnswerSource source) {
+                    var answer = Answer.Unknown;
+                    answer = Answer.Proven;
+                    cache.Add("key", answer);
+                    cache["key"] = Answer.Proven;
+                    cache.Latest = source.Unknown;
+                    cache.Write(source.CreateTimeout());
+                    var TimeoutAnswer = Answer.Proven;
+                    cache.Write(TimeoutAnswer);
+                    _ = ExternalAnswer.Unknown;
+                }
+            }
+            }
+            namespace Other {
+                enum Answer { Unknown }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(8));
+    }
+
+    [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
+    public async Task ReportsCSharpExpressionTextConstruction(string source)
+    {
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA009"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AllowsOrdinaryInterpolatedFormattingAndValueDecoys()
+    {
+        const string source =
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                private const string Fragment = " is not null";
+                internal static string Ordinary(string name) =>
+                    $"Name: {name}";
+                internal static string Formatted(int value) =>
+                    $"Value: {value:D}";
+                internal static string Aligned(string value) =>
+                    $"Value: {value,10}";
+                internal static string ValueOnly() => $"{Fragment}";
+                internal static string FormatDecoy(int value) =>
+                    $"{value: is not null}";
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA009"));
+    }
+
+    [TestCaseSource(nameof(SemanticPatternControlFlowCases))]
+    public async Task ReportsSemanticPatternControlFlowOnce(string source)
+    {
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA004"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AllowsNonsemanticAndNonconstantPatternControls()
+    {
+        const string source =
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool OrdinaryIs(string reason) =>
+                    reason is "ordinary";
+                internal static bool NullIs(string reason) => reason is null;
+                internal static bool OrdinarySwitch(string reason) {
+                    switch (reason) {
+                        case "ordinary": return true;
+                        default: return false;
+                    }
+                }
+                internal static bool OrdinaryExpression(string reason) =>
+                    reason switch {
+                        "ordinary" => true,
+                        _ => false
+                    };
+                internal static int Relational(int value) => value switch {
+                    > 0 => 1,
+                    _ => 0
+                };
+                internal static string DefaultOnly(string reason) {
+                    switch (reason) {
+                        default: return reason;
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA004"));
     }
 
     [Test]
@@ -314,6 +441,77 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         var diagnostics = await Analyze(source);
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task RejectsMutableStaticPropertyAndEventStorage()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Analyzer;
+            sealed class C {
+                internal static int State { get; set; }
+                internal static event Action? Changed;
+                internal static void Raise() => Changed?.Invoke();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        var mutableState = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SPMETA002")
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(mutableState, Has.Length.EqualTo(2));
+            Assert.That(
+                mutableState.Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contains("State"));
+            Assert.That(
+                mutableState.Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contains("Changed"));
+        }
+    }
+
+    [Test]
+    public async Task AllowsStaticImmutableAndNonStorageMemberForms()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Analyzer {
+                sealed class Critical {
+                    internal static int Immutable { get; } = 1;
+                    internal int InstanceState { get; set; }
+                    internal event Action? InstanceChanged;
+                    internal static int Computed {
+                        get => 1;
+                        set { }
+                    }
+                    internal static event Action? CustomChanged {
+                        add { }
+                        remove { }
+                    }
+                    internal void Raise() => InstanceChanged?.Invoke();
+                }
+            }
+            namespace SharpProof.Effects {
+                sealed class Noncritical {
+                    internal static int State { get; set; }
+                    internal static event Action? Changed;
+                    internal static void Raise() => Changed?.Invoke();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA002"));
     }
 
     [Test]
@@ -666,6 +864,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 enum WorkerClaimReason { Canceled, ProjectTimeout }
                 static class WorkerResultAssembler {
                     internal static WorkerVerifyResponse Create(
+                        string inputHash,
                         WorkerRunStatus runStatus) => new();
                     internal static WorkerVerifyResponse CreateIncomplete(
                         WorkerRunStatus status,
@@ -686,7 +885,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
                         try { throw new OperationCanceledException(); }
                         catch (OperationCanceledException) {
                             return await Respond(WorkerResultAssembler.Create(
-                                WorkerRunStatus.Canceled));
+                                "input", WorkerRunStatus.Canceled))
+                                .ConfigureAwait(false);
                         }
                     }
                 }
@@ -721,6 +921,65 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         var diagnostics = await Analyze(source);
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [TestCase(
+        "true ? await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Failed)) : await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Canceled))")]
+    [TestCase(
+        "await Respond(true ? WorkerResultAssembler.Create(WorkerRunStatus.Failed) : WorkerResultAssembler.Create(WorkerRunStatus.Canceled))")]
+    [TestCase(
+        "await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Canceled == WorkerRunStatus.Canceled ? WorkerRunStatus.Failed : WorkerRunStatus.Failed))")]
+    [TestCase(
+        "await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Failed, WorkerRunStatus.Canceled))")]
+    [TestCase(
+        "await Respond(Pick(WorkerResultAssembler.Create(WorkerRunStatus.Failed), WorkerResultAssembler.Create(WorkerRunStatus.Canceled)))")]
+    public async Task RejectsInexactWorkerCancellationResponseShapes(
+        string returnExpression)
+    {
+        var source =
+            $$"""
+            using System;
+            using System.Threading.Tasks;
+
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyResponse { }
+                enum WorkerRunStatus { Canceled, Failed }
+                static class WorkerResultAssembler {
+                    internal static WorkerVerifyResponse Create(
+                        WorkerRunStatus runStatus) => new();
+                    internal static WorkerVerifyResponse Create(
+                        WorkerRunStatus first,
+                        WorkerRunStatus second) => new();
+                }
+            }
+
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+
+                static class Program {
+                    internal static async Task<int> Main(string[] args) {
+                        async Task<int> Respond(
+                            WorkerVerifyResponse response) {
+                            await Task.Yield();
+                            return 0;
+                        }
+                        WorkerVerifyResponse Pick(
+                            WorkerVerifyResponse selected,
+                            WorkerVerifyResponse decoy) => selected;
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return {{returnExpression}};
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
     }
 
     [TestCase(
@@ -1492,6 +1751,106 @@ public sealed class SharpProofSoundnessAnalyzerTests
         return await compilation
             .WithAnalyzers([new SharpProofSoundnessAnalyzer()])
             .GetAnalyzerDiagnosticsAsync();
+    }
+
+    private static IEnumerable<TestCaseData>
+        CSharpExpressionConstructionCases()
+    {
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) =>
+                    $"({name}) is not null";
+            }
+            """).SetName("InterpolatedExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M() => $"({42}) is not null";
+            }
+            """).SetName("ConstantInterpolationExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(int value) =>
+                    $"({value:D}) is not null";
+            }
+            """).SetName("FormattedInterpolationExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(int value) =>
+                    $"({value,10}) is not null";
+            }
+            """).SetName("AlignedInterpolationExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) =>
+                    $"\"{name}\" is not null";
+            }
+            """).SetName("EscapedInterpolationExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) =>
+                    "(" + name + ") is not null";
+            }
+            """).SetName("ConcatenatedExpressionTextRemainsRejected");
+    }
+
+    private static IEnumerable<TestCaseData> SemanticPatternControlFlowCases()
+    {
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool M(string reason) =>
+                    reason is "ir_condition_both_branches_feasible";
+            }
+            """).SetName("SemanticIsConstantPatternIsRejectedOnce");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool M(string reason) {
+                    switch (reason) {
+                        case "ir_condition_both_branches_feasible":
+                            return true;
+                        default:
+                            return false;
+                    }
+                }
+            }
+            """).SetName("SemanticSwitchStatementCaseIsRejectedOnce");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool M(string reason) => reason switch {
+                    "ir_condition_both_branches_feasible" => true,
+                    _ => false
+                };
+            }
+            """).SetName("SemanticSwitchExpressionArmIsRejectedOnce");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool M(string reason) =>
+                    (reason is ("ir_condition_both_branches_feasible"))
+                        switch {
+                            true => true,
+                            _ => false
+                        };
+            }
+            """).SetName("NestedSemanticPatternIsRejectedOnce");
     }
 
     private static IEnumerable<MetadataReference> PlatformReferences()

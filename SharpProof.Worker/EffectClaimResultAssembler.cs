@@ -31,6 +31,13 @@ internal static class EffectClaimResultAssembler
         CallableEntryFeasibility entryFeasibility,
         CancellationToken cancellationToken)
     {
+        if (!WorkerProtocolJson.HasValidEffectCertainty(
+                evidence.Outcome, evidence.Reason, evidence.Certainty))
+        {
+            throw new InvalidDataException(
+                "Compiler effect-claim evidence has an unsupported result tuple.");
+        }
+
         if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
             evidence.Reason == WorkerClaimReason.UnsupportedContract)
         {
@@ -105,6 +112,16 @@ internal static class EffectClaimResultAssembler
         result.ProofCore = evidence.Outcome == WorkerClaimOutcome.Proven
             ? ["compiler-effect:" + evidence.EvidenceSha256]
             : [];
+        if (evidence.Certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+        {
+            result.Assumptions = CallableClaimResultAssembler.MarkAssumptionsUsed(
+                target,
+                target.Entry.Assumptions
+                    .Where(static assumption =>
+                        assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+                    .Select(static assumption => assumption.Id)
+                    .ToHashSet(StringComparer.Ordinal));
+        }
         return result;
     }
 }

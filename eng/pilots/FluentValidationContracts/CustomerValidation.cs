@@ -19,6 +19,7 @@ public static class CustomerContracts
     public static int PositiveAge(int value)
     {
         Contract.Requires(value >= 0);
+        Contract.Ensures(Contract.Result<int>() >= 0);
         return value;
     }
 

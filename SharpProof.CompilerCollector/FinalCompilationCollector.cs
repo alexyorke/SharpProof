@@ -95,16 +95,20 @@ internal static class FinalCompilationCollector
         var packs = value.Split([';'], StringSplitOptions.RemoveEmptyEntries)
             .Select(static pack => pack.Trim())
             .Where(static pack => pack.Length != 0)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static pack => pack, StringComparer.Ordinal)
-            .ToImmutableArray();
-        if (packs.IsEmpty)
+            .ToArray();
+        if (packs.Length == 0)
         {
             throw new InvalidOperationException(
                 "SharpProofSpecificationPacks must contain a pack identifier.");
         }
 
-        return packs;
+        if (packs.Distinct(StringComparer.Ordinal).Count() != packs.Length)
+        {
+            throw new InvalidOperationException(
+                "SharpProofSpecificationPacks must not contain duplicate identifiers.");
+        }
+
+        return [.. packs.OrderBy(static pack => pack, StringComparer.Ordinal)];
     }
 
     private static string Get(AnalyzerConfigOptions options, string key)

@@ -2,13 +2,36 @@ namespace SharpProof.Analyzer;
 
 internal static partial class AnalyzerFeaturePipeline
 {
+    internal static void ValidateNestedCallableDeclaration(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                context.Node.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        SharpProofControlAttributePolicy.ValidateNestedCallableDeclaration(
+            context.Node,
+            context.SemanticModel,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
+    }
+
     internal static void AnalyzeUnselectedOperationBlock(
         OperationBlockAnalysisContext context,
         AnalyzerSession session)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.OwningSymbol is not IMethodSymbol method ||
-            method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
+            method.DeclaringSyntaxReferences.IsDefaultOrEmpty ||
+            IsNestedCallable(method) ||
+            session.IsContractCompanion(method))
         {
             return;
         }
@@ -56,13 +79,20 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+        if (method.PartialImplementationPart != null)
+        {
+            return;
+        }
 
         EffectContractDiagnostics.ValidateArguments(method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(method, session, context.ReportDiagnostic);
         var rejectedContractApi =
             session.Attributes.GetRejectedSelectionFeatures(method) !=
             ContractSelectionFeatures.None;
-        if (rejectedContractApi &&
+        var rejectedCallableApi =
+            session.Attributes.GetRejectedCallableSelectionFeatures(method) !=
+            ContractSelectionFeatures.None;
+        if (rejectedCallableApi &&
             session.TryMarkRejectedContractApiReported(method))
         {
             ReportRejectedContractApi(
@@ -72,6 +102,28 @@ internal static partial class AnalyzerFeaturePipeline
         }
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
+        if (IsConcreteSemicolonAccessor(method, context.CancellationToken) &&
+            selection.Any)
+        {
+            var declaration = method.DeclaringSyntaxReferences[0]
+                .GetSyntax(context.CancellationToken);
+            if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                    method,
+                    declaration.SyntaxTree,
+                    context.Compilation,
+                    context.CancellationToken))
+            {
+                return;
+            }
+            if (selection.IsSuppressed)
+            {
+                session.RecordSemanticOutcome(
+                    method,
+                    AnalyzerSemanticOutcome.Suppressed);
+                return;
+            }
+            session.RegisterSelectedSemicolonAccessor(method);
+        }
         if ((!method.IsAbstract && !method.IsExtern) || !selection.Any)
         {
             return;
@@ -124,6 +176,31 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+
+        if (IsConcreteSemicolonAccessor(method, context.CancellationToken))
+        {
+            return;
+        }
+
+        if (session.IsContractCompanion(method))
+        {
+            return;
+        }
+        if (InvocationEmissionPolicy.IsUnimplementedPartial(method))
+        {
+            return;
+        }
+
+        if (method.PartialImplementationPart != null)
+        {
+            return;
+        }
+        if (method.PartialDefinitionPart != null &&
+            !session.TryBeginExecutableAnalysis(method))
+        {
+            return;
+        }
+        method = EffectAnalysisSession.NormalizeMethod(method);
 
         if (method.DeclaringSyntaxReferences.IsDefaultOrEmpty)
         {
@@ -218,7 +295,8 @@ internal static partial class AnalyzerFeaturePipeline
                     context.CancellationToken));
         }
 
-        if (session.Configuration.ContractsEnabled)
+        if (session.Configuration.ContractsEnabled &&
+            !IsNestedCallable(method))
         {
             var requiresOutcome =
                 RequiresCallSiteAnalyzer.Analyze(
@@ -247,6 +325,145 @@ internal static partial class AnalyzerFeaturePipeline
         }
 
         session.RecordSemanticOutcome(method, outcome);
+    }
+
+    internal static void ReconcileSelectedSemicolonAccessors(
+        CompilationAnalysisContext context,
+        AnalyzerSession session)
+    {
+        foreach (var method in session.GetUnrecordedSelectedSemicolonAccessors())
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            context.ReportDiagnostic(Diagnostic.Create(
+                GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                    method,
+                    context.CancellationToken),
+                method.Name,
+                LanguageSubsetAbstentionReason.MissingOperationRoot));
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+        }
+    }
+
+    private static bool IsNestedCallable(IMethodSymbol method)
+    {
+        return method.MethodKind is
+            MethodKind.LocalFunction or MethodKind.AnonymousFunction;
+    }
+
+    private static bool IsConcreteSemicolonAccessor(
+        IMethodSymbol method,
+        CancellationToken cancellationToken)
+    {
+        return !method.IsAbstract &&
+            !method.IsExtern &&
+            method.MethodKind is
+                MethodKind.PropertyGet or
+                MethodKind.PropertySet or
+                MethodKind.EventAdd or
+                MethodKind.EventRemove &&
+            method.DeclaringSyntaxReferences.Any(reference =>
+                reference.GetSyntax(cancellationToken) is AccessorDeclarationSyntax
+                {
+                    Body: null,
+                    ExpressionBody: null,
+                    SemicolonToken.RawKind: not 0
+                });
+    }
+
+    internal static void AnalyzePrimaryConstructor(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.Node is not TypeDeclarationSyntax declaration ||
+            !PrimaryConstructorCallableInventory.TryGet(
+                declaration,
+                context.SemanticModel,
+                context.CancellationToken,
+                out var constructor) ||
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                constructor,
+                declaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken) ||
+            !session.TryBeginRequiresCallSiteAnalysis(constructor))
+        {
+            return;
+        }
+
+        var outcome = SharpProofControlAttributePolicy
+            .ValidateAndShouldSuppress(
+                constructor,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken)
+            ? AnalyzerSemanticOutcome.Suppressed
+            : RequiresCallSiteAnalyzer.AnalyzePrimaryConstructorInitializer(
+                constructor,
+                declaration,
+                context.SemanticModel,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken);
+        session.RecordSemanticOutcome(constructor, outcome);
+    }
+
+    internal static void AnalyzeMemberInitializer(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.Node is not EqualsValueClauseSyntax initializer ||
+            initializer.Parent is not VariableDeclaratorSyntax and not PropertyDeclarationSyntax ||
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                initializer.SyntaxTree, context.Compilation, context.CancellationToken))
+        {
+            return;
+        }
+        var symbol = initializer.Parent switch
+        {
+            VariableDeclaratorSyntax variable => context.SemanticModel.GetDeclaredSymbol(
+                variable, context.CancellationToken),
+            PropertyDeclarationSyntax property => context.SemanticModel.GetDeclaredSymbol(
+                property, context.CancellationToken),
+            _ => null
+        };
+        if (symbol is not IFieldSymbol and not IPropertySymbol ||
+            symbol.ContainingType is not { } type)
+        {
+            return;
+        }
+        var isStatic = symbol.IsStatic;
+        var constructor = (isStatic
+                ? type.StaticConstructors
+                : type.InstanceConstructors)
+            .OrderBy(static candidate => candidate.DeclaringSyntaxReferences
+                .FirstOrDefault()?.Span.Start ?? int.MaxValue)
+            .FirstOrDefault();
+        var root = context.SemanticModel.GetOperation(
+            initializer.Value, context.CancellationToken);
+        if (constructor == null || root == null)
+        {
+            return;
+        }
+        var outcome = AnalyzerSemanticOutcome.NotApplicable;
+        foreach (var operation in root.DescendantsAndSelf())
+        {
+            if (operation is not IInvocationOperation and not IObjectCreationOperation)
+            {
+                continue;
+            }
+            outcome = AnalyzerSemanticOutcomes.Combine(
+                outcome,
+                RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
+                    constructor, initializer, operation,
+                    context.SemanticModel, session,
+                    context.ReportDiagnostic, context.CancellationToken));
+        }
+        session.RecordSemanticOutcome(constructor, outcome);
     }
 
     private static bool ValidateContractClauses(
@@ -282,13 +499,12 @@ internal static partial class AnalyzerFeaturePipeline
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        reportDiagnostic(Diagnostic.Create(
-            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+        SharpProofControlAttributePolicy.ReportRejectedContractApi(
+            method.Name,
             AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
                 method,
                 cancellationToken),
-            method.Name,
-            "ContractApiIdentityRejected"));
+            reportDiagnostic);
     }
 
     private static IEnumerable<IMethodSymbol> GetNestedOwners(

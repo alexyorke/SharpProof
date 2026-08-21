@@ -1015,6 +1015,194 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public void CacheWriteRollsBackPublicationWhenPostValidationIsCanceled()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-cancel-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            var inputHash = new string('f', 64);
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+            var cache = new VerificationCache(directory, 1024 * 1024);
+            VerificationCache.PathValidationOverride = (_, path) =>
+            {
+                if (path.EndsWith(
+                        ".sharp-proof-cache.json",
+                        StringComparison.Ordinal) &&
+                    File.Exists(path))
+                {
+                    cancellation.Cancel();
+                    cancellation.Token.ThrowIfCancellationRequested();
+                }
+            };
+
+            Func<Task> write = async () =>
+            {
+                await cache.TryWriteAsync(
+                    new WorkerVerifyResponse(),
+                    inputHash,
+                    manifest,
+                    cancellation.Token);
+            };
+            Assert.ThrowsAsync<OperationCanceledException>(write);
+            Assert.That(
+                Directory.GetFiles(directory, "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
+        finally
+        {
+            VerificationCache.PathValidationOverride = null;
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CacheWriteRollbackRestoresPreExistingExactKeyBytes()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-existing-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var inputHash = new string('9', 64);
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+            var cache = new VerificationCache(directory, 1024 * 1024);
+            Assert.That(
+                await cache.TryWriteAsync(
+                    new WorkerVerifyResponse(),
+                    inputHash,
+                    manifest,
+                    CancellationToken.None),
+                Is.True);
+            var path = Directory.GetFiles(
+                directory,
+                "*.sharp-proof-cache.json").Single();
+            var original = await File.ReadAllBytesAsync(path);
+            VerificationCache.PathValidationOverride = (_, candidate) =>
+            {
+                if (candidate.EndsWith(
+                        ".sharp-proof-cache.json",
+                        StringComparison.Ordinal) &&
+                    File.Exists(candidate))
+                {
+                    throw new ArgumentException("synthetic post-publish failure");
+                }
+            };
+
+            var written = await cache.TryWriteAsync(
+                new WorkerVerifyResponse
+                {
+                    ClaimResults = [new WorkerClaimResult
+                    {
+                        ClaimId = "different"
+                    }]
+                },
+                inputHash,
+                manifest,
+                CancellationToken.None);
+
+            Assert.That(written, Is.False);
+            Assert.That(await File.ReadAllBytesAsync(path), Is.EqualTo(original));
+        }
+        finally
+        {
+            VerificationCache.PathValidationOverride = null;
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CacheRollbackRemainsLockedUntilAttemptOwnedStateIsRemoved()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-locked-rollback-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        using var rollbackEntered = new ManualResetEventSlim();
+        using var allowRollback = new ManualResetEventSlim();
+        try
+        {
+            var firstHash = new string('7', 64);
+            var secondHash = new string('8', 64);
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+            var cache = new VerificationCache(directory, 1024 * 1024);
+            var failValidation = 0;
+            VerificationCache.PathValidationOverride = (_, candidate) =>
+            {
+                if (candidate.EndsWith(
+                        ".sharp-proof-cache.json",
+                        StringComparison.Ordinal) &&
+                    File.Exists(candidate) &&
+                    Interlocked.CompareExchange(
+                        ref failValidation,
+                        1,
+                        0) == 0)
+                {
+                    throw new ArgumentException("synthetic post-publish failure");
+                }
+            };
+            var rollbackCalls = 0;
+            VerificationCache.TransactionRollbackOverride = () =>
+            {
+                if (Interlocked.Increment(ref rollbackCalls) == 1)
+                {
+                    rollbackEntered.Set();
+                    allowRollback.Wait(TimeSpan.FromSeconds(10));
+                }
+            };
+
+            var first = Task.Run(() => cache.TryWriteAsync(
+                new WorkerVerifyResponse(),
+                firstHash,
+                manifest,
+                CancellationToken.None));
+            Assert.That(
+                rollbackEntered.Wait(TimeSpan.FromSeconds(10)),
+                Is.True,
+                "The failed transaction did not reach rollback.");
+            var competing = await cache.TryWriteAsync(
+                new WorkerVerifyResponse(),
+                secondHash,
+                manifest,
+                CancellationToken.None);
+            Assert.That(
+                competing,
+                Is.False,
+                "A second cache transaction observed attempt-owned state.");
+
+            allowRollback.Set();
+            Assert.That(await first, Is.False);
+            Assert.That(
+                await cache.TryWriteAsync(
+                    new WorkerVerifyResponse(),
+                    secondHash,
+                    manifest,
+                    CancellationToken.None),
+                Is.True);
+            Assert.That(
+                Directory.GetFiles(directory, "*.sharp-proof-cache.json")
+                    .Select(Path.GetFileName),
+                Is.EqualTo(new[] {
+                    secondHash + ".sharp-proof-cache.json"
+                }));
+        }
+        finally
+        {
+            allowRollback.Set();
+            VerificationCache.TransactionRollbackOverride = null;
+            VerificationCache.PathValidationOverride = null;
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public void CacheLockDisposesHandleWhenPostOpenValidationFails()
     {
         var directory = Path.Combine(

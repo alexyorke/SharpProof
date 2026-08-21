@@ -110,7 +110,9 @@ public sealed class PortableIrGraphCodecTests
             fixture.Program,
             fixture.Roots,
             [unused]);
-        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
+        var decoded = PortableIrGraphCodec.Decode(
+            encoded.Graph,
+            [encoded.VariableIndices[unused]]);
         var reencoded = PortableIrGraphCodec.Encode(
             decoded.Factory,
             decoded.Program,
@@ -384,6 +386,87 @@ public sealed class PortableIrGraphCodecTests
             (Action)(() => PortableIrGraphCodec.Decode(graph)));
     }
 
+    [TestCase(UnreachableMetadataMutation.Type)]
+    [TestCase(UnreachableMetadataMutation.Identity)]
+    [TestCase(UnreachableMetadataMutation.Variable)]
+    [TestCase(UnreachableMetadataMutation.Member)]
+    [TestCase(UnreachableMetadataMutation.Operation)]
+    [TestCase(UnreachableMetadataMutation.Term)]
+    [TestCase(UnreachableMetadataMutation.ReorderedOperations)]
+    public void DecoderRejectsMetadataOutsideTheCanonicalEncoderImage(
+        UnreachableMetadataMutation mutation)
+    {
+        var fixture = CreateFixture();
+        var graph = PortableIrGraphCodec.Encode(
+            fixture.Program,
+            fixture.Roots).Graph;
+
+        switch (mutation)
+        {
+            case UnreachableMetadataMutation.Type:
+                graph.Types = [.. graph.Types, new PortableIrType(
+                    IrTypeKind.Reference, "Unused", -1)];
+                break;
+            case UnreachableMetadataMutation.Identity:
+                graph.Identities = [.. graph.Identities, graph.Identities.Length];
+                break;
+            case UnreachableMetadataMutation.Variable:
+                graph.Variables = [.. graph.Variables,
+                    new PortableIrVariable("unused", 1)];
+                break;
+            case UnreachableMetadataMutation.Member:
+                graph.Identities = [.. graph.Identities, graph.Identities.Length];
+                graph.Members = [.. graph.Members, new PortableIrMember(
+                    graph.Identities.Length - 1,
+                    3,
+                    "Unused",
+                    1,
+                    true,
+                    [])];
+                break;
+            case UnreachableMetadataMutation.Operation:
+                graph.Operations = [.. graph.Operations,
+                    new PortableIrOperation("unused")];
+                break;
+            case UnreachableMetadataMutation.Term:
+                graph.Terms = [.. graph.Terms, new PortableIrTerm(
+                    IrTermKind.Integer,
+                    1,
+                    number: 42,
+                    items: [])];
+                break;
+            case UnreachableMetadataMutation.ReorderedOperations:
+                (graph.Operations[0], graph.Operations[1]) =
+                    (graph.Operations[1], graph.Operations[0]);
+                foreach (var instruction in graph.Blocks.SelectMany(
+                             static block => block.Instructions))
+                {
+                    instruction.Operation = instruction.Operation switch
+                    {
+                        0 => 1,
+                        1 => 0,
+                        _ => instruction.Operation
+                    };
+                }
+                foreach (var term in graph.Terms.Where(static term =>
+                             term.Kind == IrTermKind.Opaque && term.C != 0))
+                {
+                    term.D = term.D switch
+                    {
+                        0 => 1,
+                        1 => 0,
+                        _ => term.D
+                    };
+                }
+                break;
+            default:
+                throw new AssertionException("Unknown metadata mutation.");
+        }
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+    }
+
     [TestCase(CanonicalSlotMutation.TermUnusedIndex)]
     [TestCase(CanonicalSlotMutation.TermUnusedNumber)]
     [TestCase(CanonicalSlotMutation.TermUnusedText)]
@@ -644,6 +727,13 @@ public sealed class PortableIrGraphCodecTests
                         : index + 1
                 };
             }
+            graph.Variables = [new PortableIrVariable("deep", 4)];
+            graph.Terms = [new PortableIrTerm(
+                IrTermKind.Variable,
+                4,
+                a: 0,
+                items: [])];
+            graph.Roots = [0];
         }
         else
         {
@@ -818,6 +908,17 @@ public sealed class PortableIrGraphCodecTests
         UnaryOperator,
         BinaryOperator,
         HavocKind
+    }
+
+    public enum UnreachableMetadataMutation
+    {
+        Type,
+        Identity,
+        Variable,
+        Member,
+        Operation,
+        Term,
+        ReorderedOperations
     }
 
     private sealed record CodecFixture(

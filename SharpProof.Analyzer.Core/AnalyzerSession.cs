@@ -44,8 +44,19 @@ internal sealed class AnalyzerSession
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _reportedRejectedContractApis =
             new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
+        _reportedRejectedControlAttributes = new();
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _requiresCallSiteAnalyses =
+            new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+        _executableAnalyses =
+            new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, byte>
+        _selectedSemicolonAccessors =
+            new(SymbolEqualityComparer.Default);
+    private readonly ConcurrentDictionary<IMethodSymbol, AnalyzerSemanticOutcome>
+        _semanticOutcomes =
             new(SymbolEqualityComparer.Default);
 
     internal AnalyzerSession(
@@ -123,6 +134,14 @@ internal sealed class AnalyzerSession
         return _contractSources.Value.Resolve(method);
     }
 
+    internal bool IsContractCompanion(IMethodSymbol method)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        return ContractForSymbolMatcher.IsCompanionType(
+            _contractSources.Value.Companions,
+            method.ContainingType);
+    }
+
     internal ContractBindingResult BindRequires(IMethodSymbol method)
     {
         return _contractBinder.Value.BindRequires(method);
@@ -153,12 +172,28 @@ internal sealed class AnalyzerSession
                 clause.Kind == BoundContractKind.Requires);
     }
 
+    internal bool HasRejectedMetadataPrecondition(IMethodSymbol method)
+    {
+        method = EffectAnalysisSession.NormalizeMethod(method);
+        return method.DeclaringSyntaxReferences.IsEmpty &&
+            method.Parameters.Any(parameter =>
+                parameter.GetAttributes().Any(attribute =>
+                    Attributes.IsRejectedClosedContract(attribute)));
+    }
+
     internal bool TryBeginRequiresCallSiteAnalysis(
         IMethodSymbol method)
     {
         return _requiresCallSiteAnalyses.TryAdd(
             ContractClauseInventoryBuilder.NormalizeCallable(
                 method),
+            0);
+    }
+
+    internal bool TryBeginExecutableAnalysis(IMethodSymbol method)
+    {
+        return _executableAnalyses.TryAdd(
+            EffectAnalysisSession.NormalizeMethod(method),
             0);
     }
 
@@ -204,15 +239,45 @@ internal sealed class AnalyzerSession
         IMethodSymbol method,
         AnalyzerSemanticOutcome outcome)
     {
+        method = EffectAnalysisSession.NormalizeMethod(method);
+        _semanticOutcomes.AddOrUpdate(
+            method,
+            outcome,
+            (_, current) => AnalyzerSemanticOutcomes.Combine(current, outcome));
         _outcomeObserver?.Invoke(method, outcome);
+    }
+
+    internal void RegisterSelectedSemicolonAccessor(IMethodSymbol method)
+    {
+        _selectedSemicolonAccessors.TryAdd(
+            EffectAnalysisSession.NormalizeMethod(method),
+            0);
+    }
+
+    internal ImmutableArray<IMethodSymbol> GetUnrecordedSelectedSemicolonAccessors()
+    {
+        return [.. _selectedSemicolonAccessors.Keys
+            .Where(method => !_semanticOutcomes.ContainsKey(method))
+            .OrderBy(static method => method.DeclaringSyntaxReferences
+                .FirstOrDefault()?.SyntaxTree.FilePath, StringComparer.Ordinal)
+            .ThenBy(static method => method.DeclaringSyntaxReferences
+                .FirstOrDefault()?.Span.Start ?? int.MaxValue)];
     }
 
     internal bool TryMarkAttributeValidated(AttributeData attribute)
     {
         var reference = attribute.ApplicationSyntaxReference;
         return reference == null ||
-               _validatedAttributes.TryAdd(
-                   (reference.SyntaxTree, reference.Span), 0);
+               TryMarkAttributeValidated(
+                   reference.SyntaxTree,
+                   reference.Span);
+    }
+
+    internal bool TryMarkAttributeValidated(
+        SyntaxTree tree,
+        TextSpan span)
+    {
+        return _validatedAttributes.TryAdd((tree, span), 0);
     }
 
     internal bool TryMarkContractIntrinsicValidated(
@@ -230,5 +295,15 @@ internal sealed class AnalyzerSession
         return _reportedRejectedContractApis.TryAdd(
             ContractClauseInventoryBuilder.NormalizeCallable(method),
             0);
+    }
+
+    internal bool TryMarkRejectedControlAttributeReported(
+        AttributeData attribute)
+    {
+        var reference = attribute.ApplicationSyntaxReference;
+        return reference == null ||
+            _reportedRejectedControlAttributes.TryAdd(
+                (reference.SyntaxTree, reference.Span),
+                0);
     }
 }

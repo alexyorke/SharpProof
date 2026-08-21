@@ -7,6 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $repositoryDefaultBranch = 'master'
 $currentMaintainedDocuments = @(
     'README.md',
@@ -137,12 +138,16 @@ function Assert-RepositoryDocumentLink {
         throw "Repository documentation link has no file path in ${SourceRelativePath}: $Target"
     }
 
-    $targetPath = Get-RepositoryPath (
-        [Uri]::UnescapeDataString($parts[0]))
-    if (-not $targetPath.StartsWith(
-            $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-            [StringComparison]::OrdinalIgnoreCase) -or
-        -not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+    try {
+        $targetPath = Resolve-SharpProofContainedPath `
+            -Root $repositoryRoot `
+            -Path ([Uri]::UnescapeDataString($parts[0])) `
+            -ParameterName 'Repository documentation link'
+    }
+    catch {
+        throw "Broken repository documentation link in ${SourceRelativePath}: $Target"
+    }
+    if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
         throw "Broken repository documentation link in ${SourceRelativePath}: $Target"
     }
 
@@ -499,6 +504,54 @@ foreach ($launcherDiagnostic in @('SP0047', 'SP0048')) {
     }
 }
 
+$contractApiDescriptors = @(
+    $analyzerDescriptorOutput[0].diagnostics |
+        Where-Object { $_.id -in @('SP0047', 'SP0050') }
+)
+if ($contractApiDescriptors.Count -ne 2 -or
+    @($contractApiDescriptors | ForEach-Object { [string]$_.id } |
+        Sort-Object) -join ',' -cne 'SP0047,SP0050') {
+    throw 'Diagnostic authority must contain exactly SP0047 and SP0050.'
+}
+$rejectedIdentitySource = Get-RequiredText (
+    'SharpProof.Analyzer.Core\SharpProofControlAttributePolicy.cs')
+if ([regex]::Matches(
+        $rejectedIdentitySource,
+        '"ContractApiIdentityRejected"').Count -ne 1) {
+    throw (
+        'Rejected contract API behavior must have one canonical ' +
+        'ContractApiIdentityRejected reason.')
+}
+$requiredContractApiDocumentation = @(
+    'SP0047 also reports `ContractApiIdentityRejected`',
+    'A readable payload whose hash does not match the pin is rejected and every',
+    'attempted use reports SP0047 `ContractApiIdentityRejected`',
+    'SP0050 is reserved for a payload that cannot be read.'
+)
+foreach ($required in $requiredContractApiDocumentation) {
+    if (-not $diagnosticReference.Contains(
+            $required,
+            [StringComparison]::Ordinal)) {
+        throw (
+            'Diagnostic documentation does not match rejected contract API ' +
+            "behavior: missing '$required'.")
+    }
+}
+$forbiddenContractApiSilenceClaims = @(
+    'disable contract analysis without a diagnostic',
+    'disables contract analysis without a diagnostic',
+    'continues to disable contract analysis without a diagnostic'
+)
+foreach ($forbidden in $forbiddenContractApiSilenceClaims) {
+    if ($diagnosticReference.Contains(
+            $forbidden,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw (
+            'Diagnostic documentation contains the stale readable-payload ' +
+            "silence claim: '$forbidden'.")
+    }
+}
+
 $architecture = Get-RequiredText 'docs\architecture.md'
 $architectureAnchors = Get-MarkdownAnchors $architecture
 if (-not $architectureAnchors.Contains('mechanized-boundaries')) {
@@ -671,6 +724,211 @@ $derivedVersions = [ordered]@{
 }
 $acceptanceContract = Get-RequiredText 'eng\acceptance\contract.json' |
     ConvertFrom-Json
+$protocolSchema = Get-RequiredText (
+    'SharpProof.Worker.Protocol\ProtocolModel.schema.json') |
+    ConvertFrom-Json
+$typedResultDocumentation = $protocolSchema.documentation
+if ($null -eq $typedResultDocumentation) {
+    throw 'Protocol schema is missing typed-result documentation authority.'
+}
+$typedResultEnums = @(
+    'WorkerClaimOutcome',
+    'WorkerEffectEvidenceCertainty'
+)
+$typedResultRows = [ordered]@{}
+foreach ($enumName in $typedResultEnums) {
+    $declarations = @($protocolSchema.declarations | Where-Object {
+            [string]$_.kind -ceq 'enum' -and
+            [string]$_.name -ceq $enumName
+        })
+    $documentationProperty =
+        $typedResultDocumentation.PSObject.Properties[$enumName]
+    if ($declarations.Count -ne 1 -or $null -eq $documentationProperty) {
+        throw "Protocol schema is missing $enumName documentation authority."
+    }
+    $members = @($declarations[0].members | ForEach-Object {
+            [string]$_.name
+        })
+    $documented = @($documentationProperty.Value)
+    $documentedNames = @($documented | ForEach-Object {
+            [string]$_.name
+        })
+    if (($members -join "`n") -cne ($documentedNames -join "`n") -or
+        @($documented | Where-Object {
+                [string]::IsNullOrWhiteSpace([string]$_.meaning) -or
+                ([string]$_.meaning).Contains('|', [StringComparison]::Ordinal) -or
+                ([string]$_.meaning).Contains("`n", [StringComparison]::Ordinal)
+            }).Count -ne 0) {
+        throw (
+            "$enumName documentation must exactly follow schema member " +
+            'order with one safe nonblank meaning per member.')
+    }
+    $typedResultRows[$enumName] = $documented
+}
+$effectCertaintyTables = @($protocolSchema.validationTables | Where-Object {
+        [string]$_.name -ceq 'EffectCertainty'
+    })
+if ($effectCertaintyTables.Count -ne 1) {
+    throw 'Protocol schema must own exactly one EffectCertainty tuple table.'
+}
+$effectCertaintyTable = $effectCertaintyTables[0]
+$effectParameterNames = @($effectCertaintyTable.parameters | ForEach-Object {
+        [string]$_.name
+    })
+if (($effectParameterNames -join ',') -cne 'outcome,reason,certainty' -or
+    @($effectCertaintyTable.rows).Count -eq 0 -or
+    @($effectCertaintyTable.rows | Where-Object {
+            @($_).Count -ne 3 -or
+            @($_ | Where-Object { [string]::IsNullOrWhiteSpace([string]$_) }).Count -ne 0
+        }).Count -ne 0) {
+    throw 'Protocol EffectCertainty tuple authority is malformed.'
+}
+$typedResultLines = [Collections.Generic.List[string]]::new()
+$typedResultLines.Add('<!-- BEGIN SHARPPROOF TYPED EFFECT RESULTS -->')
+foreach ($enumName in $typedResultEnums) {
+    $typedResultLines.Add("### ``$enumName``")
+    $typedResultLines.Add('')
+    $typedResultLines.Add('| Member | Meaning |')
+    $typedResultLines.Add('|---|---|')
+    foreach ($row in @($typedResultRows[$enumName])) {
+        $typedResultLines.Add(
+            "| ``$([string]$row.name)`` | $([string]$row.meaning) |")
+    }
+    $typedResultLines.Add('')
+}
+$typedResultLines.Add('### Allowed effect-result tuples')
+$typedResultLines.Add('')
+$typedResultLines.Add('| Outcome | Reason | Certainty |')
+$typedResultLines.Add('|---|---|---|')
+foreach ($row in @($effectCertaintyTable.rows)) {
+    $typedResultLines.Add(
+        "| ``$([string]$row[0])`` | ``$([string]$row[1])`` | ``$([string]$row[2])`` |")
+}
+$typedResultLines.Add('<!-- END SHARPPROOF TYPED EFFECT RESULTS -->')
+$expectedTypedResultBlock = $typedResultLines -join "`n"
+$unknownReasons = Get-RequiredText 'docs\unknown-reasons.md'
+$typedBlockPattern =
+    [regex]::Escape('<!-- BEGIN SHARPPROOF TYPED EFFECT RESULTS -->') +
+    '[\s\S]*?' +
+    [regex]::Escape('<!-- END SHARPPROOF TYPED EFFECT RESULTS -->')
+$typedBlocks = [regex]::Matches($unknownReasons, $typedBlockPattern)
+if ($typedBlocks.Count -ne 1 -or
+    $typedBlocks[0].Value -cne $expectedTypedResultBlock) {
+    throw (
+        'docs/unknown-reasons.md typed result block must exactly match the ' +
+        'protocol schema member and tuple authority.')
+}
+$typedResultReadmeClaim =
+    'The schema-owned typed result table includes `VacuousEntry` and the full' +
+    "`n" +
+    '`Unavailable` domain; see [unknown reasons]' +
+    '(docs/unknown-reasons.md#worker-verification-records).'
+if ([regex]::Matches(
+        $readme,
+        [regex]::Escape($typedResultReadmeClaim)).Count -ne 1) {
+    throw 'README.md must contain the exact typed-result documentation claim.'
+}
+$containerCpuCount = [int]$acceptanceContract.container.defaultCpuCount
+$containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
+$testProjectCpuDivisor =
+    [int]$acceptanceContract.automation.testProjectCpuDivisor
+$mutationParallelism =
+    [int]$acceptanceContract.automation.mutationParallelism
+if ($containerCpuCount -le 0 -or
+    $containerMemoryMiB -le 0 -or
+    $testProjectCpuDivisor -le 0 -or
+    $containerCpuCount % $testProjectCpuDivisor -ne 0 -or
+    $mutationParallelism -le 0) {
+    throw 'Acceptance resource and concurrency authority is invalid.'
+}
+$testProjectLanes = $containerCpuCount / $testProjectCpuDivisor
+$resourceClaims = @(
+    ("The default container budget is $containerCpuCount CPUs and " +
+        "$containerMemoryMiB MiB.")
+    ("Test-project concurrency uses $testProjectLanes lanes " +
+        "(one lane per $testProjectCpuDivisor CPUs).")
+    ("Trusted mutations use $mutationParallelism deterministic weighted lanes.")
+)
+foreach ($resourceDocument in @(
+        'README.md',
+        'docs\container-development.md')) {
+    $resourceText = Get-RequiredText $resourceDocument
+    foreach ($claim in $resourceClaims) {
+        $claimCount = [regex]::Matches(
+            $resourceText,
+            [regex]::Escape($claim)).Count
+        if ($claimCount -cne 1) {
+            throw (
+                "$resourceDocument must contain exactly one catalog-derived " +
+                "resource claim '$claim'; found $claimCount.")
+        }
+    }
+}
+$devCheckPlanScript = Get-RepositoryPath (
+    'scripts\Get-SharpProofDevCheckPlan.ps1')
+$debugCheckPlan = & $devCheckPlanScript -Configuration Debug |
+    ConvertFrom-Json
+$releaseCheckPlan = & $devCheckPlanScript -Configuration Release |
+    ConvertFrom-Json
+foreach ($plan in @($debugCheckPlan, $releaseCheckPlan)) {
+    if ([int]$plan.schemaVersion -ne 1 -or
+        [string]$plan.command -cne 'check') {
+        throw 'Developer-check command plan authority is invalid.'
+    }
+}
+$debugCommands = @($debugCheckPlan.commands)
+$releaseCommands = @($releaseCheckPlan.commands)
+$debugPacks = @($debugCommands | Where-Object {
+        [string]$_.id -clike 'package-pack:*'
+    })
+$releasePacks = @($releaseCommands | Where-Object {
+        [string]$_.id -clike 'package-pack:*'
+    })
+if (@($debugCommands | Where-Object {
+            [string]$_.id -ceq 'solution-build' -and
+            [string]$_.configuration -ceq 'Debug'
+        }).Count -ne 1 -or
+    @($debugCommands | Where-Object {
+            [string]$_.id -ceq 'package-test-build' -and
+            [string]$_.configuration -ceq 'Debug'
+        }).Count -ne 1 -or
+    @($debugPacks | Where-Object {
+            [string]$_.configuration -cne 'Release' -or [bool]$_.noBuild
+        }).Count -ne 0 -or
+    @($releaseCommands | Where-Object {
+            [string]$_.id -ceq 'solution-build' -and
+            [string]$_.configuration -ceq 'Release'
+        }).Count -ne 1 -or
+    @($releaseCommands | Where-Object {
+            [string]$_.id -ceq 'package-test-build'
+        }).Count -ne 0 -or
+    @($releasePacks | Where-Object {
+            [string]$_.configuration -cne 'Release' -or -not [bool]$_.noBuild
+        }).Count -ne 0) {
+    throw 'Developer-check command plan has an unsupported build topology.'
+}
+$checkPlanClaims = @(
+    ("The default Debug check performs one Debug solution build, one " +
+        "additional Debug package-test build, and $($debugPacks.Count) " +
+        "build-capable Release pack commands.")
+    ("The Release check performs one Release solution build and " +
+        "$($releasePacks.Count) Release pack commands with ``--no-build``.")
+)
+foreach ($checkPlanDocument in @(
+        'README.md',
+        'docs\container-development.md')) {
+    $checkPlanText = Get-RequiredText $checkPlanDocument
+    foreach ($claim in $checkPlanClaims) {
+        $claimCount = [regex]::Matches(
+            $checkPlanText,
+            [regex]::Escape($claim)).Count
+        if ($claimCount -cne 1) {
+            throw (
+                "$checkPlanDocument must contain exactly one command-plan " +
+                "claim '$claim'; found $claimCount.")
+        }
+    }
+}
 $contractVersions = [ordered]@{
     Protocol = $acceptanceContract.worker.protocolVersion
     Cache = $acceptanceContract.cache.schemaVersion

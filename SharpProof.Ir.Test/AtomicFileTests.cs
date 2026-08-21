@@ -74,6 +74,28 @@ public sealed class AtomicFileTests
         Assert.That(TemporaryFiles(path), Is.Empty);
     }
 
+    [Test]
+    public void PublicationStagingUsesAStableShortTemporaryName()
+    {
+        var path = Path.Combine(
+            _root,
+            new string('s', 220) + ".sarif");
+        var temporary = AtomicFile.PrepareStaged(path);
+        try
+        {
+            Assert.That(Path.GetFileName(temporary).Length, Is.LessThan(255));
+            AtomicFile.WriteStagedBytes(
+                temporary,
+                Encoding.UTF8.GetBytes("content"));
+            AtomicFile.PublishStaged(temporary, path);
+            Assert.That(File.ReadAllText(path), Is.EqualTo("content"));
+        }
+        finally
+        {
+            AtomicFile.TryDeleteStaged(temporary);
+        }
+    }
+
     private static string[] TemporaryFiles(string path)
     {
         return Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*.tmp");

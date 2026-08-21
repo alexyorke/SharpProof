@@ -96,6 +96,11 @@ public sealed class ContainerContractTests
                 File.Exists(ContainerContract.ResolveZ3LibraryRequired()),
                 Is.True);
 
+            Environment.SetEnvironmentVariable("SHARPPROOF_NATIVE_ROOT", root);
+            Assert.Throws<InvalidDataException>(
+                (Action)(() =>
+                    ContainerContract.ResolveZ3LibraryRequired()));
+
             var contract = ContainerContract.ValidateRequired();
             var library = Path.Combine(
                 root,
@@ -105,8 +110,6 @@ public sealed class ContainerContractTests
                 "libz3.so");
             Directory.CreateDirectory(Path.GetDirectoryName(library)!);
             File.WriteAllText(library, string.Empty);
-            Environment.SetEnvironmentVariable("SHARPPROOF_NATIVE_ROOT", root);
-
             Assert.Throws<InvalidDataException>(
                 (Action)(() =>
                     ContainerContract.ResolveZ3LibraryRequired()));

@@ -11,12 +11,20 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 12;
+    internal const int Current = 14;
 }
 
 internal static class CompilerRelationalSummaryVersions
 {
+    internal const int Current = 2;
+}
+
+internal static class CompilerSpecificationPackCatalogVersions
+{
     internal const int Current = 1;
+    internal const string Sha256 = "14d0e3b98982e7f19d90a90624caf95fa444f6131e7543518b3bfd7ff9198c22";
+    internal const string PackIds = "dotnet.scalar";
+    internal const string PackIdentities = "dotnet.scalar@1";
 }
 
 internal static class CompilerSpecificationPackVersions
@@ -46,6 +54,17 @@ internal enum CompilerVariableRole
     PreState = 3
 }
 
+internal enum CompilerScalarDomain
+{
+    None = 0,
+    SByte = 1,
+    Byte = 2,
+    Short = 3,
+    UShort = 4,
+    Int = 5,
+    UInt = 6
+}
+
 internal enum CompilerPreparedBodyKind
 {
     Trivial = 0,
@@ -57,6 +76,12 @@ internal enum CompilerSummaryOrigin
     Source = 0,
     ImplementationIl = 1,
     SpecificationPack = 2
+}
+
+internal enum CompilerSourceLocationOwnerKind
+{
+    Callable = 0,
+    Claim = 1
 }
 
 internal sealed record CompilerCallablePreparation(
@@ -135,6 +160,7 @@ internal sealed record CompilerPreparedSpecCall(
 
 internal sealed record CompilerPreparedSummaryEvidence(
     CompilerSummaryOrigin Origin,
+    string CallIdentity,
     string EvidenceSha256,
     string EvidenceIdentity
 );
@@ -149,7 +175,28 @@ internal sealed record CompilerPreparedSummaryCall(
     string EvidenceSha256,
     string EvidenceIdentity,
     ImmutableArray<CompilerPreparedSummaryEvidence> DependencyEvidence
-);
+)
+{
+    internal string InstantiationSha256 { get; init; } = string.Empty;
+}
+
+internal sealed class CompilerSpecificationPackAuthority
+{
+    public string[] SpecificationPackIds { get; set; } = [];
+    public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
+    public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
+}
+
+internal sealed class CompilerLocationAuthorityArtifact
+{
+    public CompilerSourceLocationOwnerKind OwnerKind { get; set; }
+    public string OwnerId { get; set; } = string.Empty;
+    public WorkerSourceLocation Location { get; set; } = new();
+    public int SourceTreeOrdinal { get; set; } = -1;
+    public string SourceTreePath { get; set; } = string.Empty;
+    public string SourceTreeSha256 { get; set; } = string.Empty;
+    public string SourceLineMapSha256 { get; set; } = string.Empty;
+}
 
 internal sealed class CompilerCallableArtifact
 {
@@ -160,6 +207,7 @@ internal sealed class CompilerCallableArtifact
     public CompilerVariableArtifact[] Variables { get; set; } = [];
     public CompilerBodyArtifact? Body { get; set; }
     public CompilerEffectClaimArtifact[] EffectClaims { get; set; } = [];
+    public CompilerEffectAuthorityArtifact[] EffectAuthorities { get; set; } = [];
 }
 
 internal sealed class CompilerEffectClaimArtifact
@@ -174,6 +222,24 @@ internal sealed class CompilerEffectClaimArtifact
     public CompilerEffectReplayArtifact? Replay { get; set; }
     public string Evidence { get; set; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
+}
+
+internal sealed class CompilerEffectAuthorityArtifact
+{
+    public string ClaimId { get; set; } = string.Empty;
+    public WorkerEffectContractKind ContractKind { get; set; }
+    public WorkerClaimOutcome Outcome { get; set; }
+    public WorkerClaimReason Reason { get; set; }
+    public WorkerEffectEvidenceCertainty Certainty { get; set; }
+    public CompilerEffectConstraintArtifact Constraint { get; set; } = new();
+    public WorkerEffectViolationWitness? Witness { get; set; }
+    public CompilerEffectReplayArtifact? Replay { get; set; }
+    public string Evidence { get; set; } = string.Empty;
+    public WorkerSourceLocation Source { get; set; } = new();
+    public int SourceTreeOrdinal { get; set; } = -1;
+    public string SourceTreePath { get; set; } = string.Empty;
+    public string SourceTreeSha256 { get; set; } = string.Empty;
+    public string SourceLineMapSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerEffectConstraintArtifact
@@ -214,6 +280,8 @@ internal sealed class CompilerEffectReplayEventArtifact
     public CompilerEffectReplayEventKind Kind { get; set; }
     public int SyntaxTreeOrdinal { get; set; } = -1;
     public string SyntaxTreeSha256 { get; set; } = string.Empty;
+    public string SyntaxTreeSnapshotSha256 { get; set; } = string.Empty;
+    public string SyntaxTreeLineMapSha256 { get; set; } = string.Empty;
     public int SyntaxStart { get; set; } = -1;
     public int SyntaxLength { get; set; } = -1;
     public string OperationIdentitySha256 { get; set; } = string.Empty;
@@ -225,6 +293,10 @@ internal sealed class CompilerEffectReplayEventArtifact
     public long[] ScalarOperands { get; set; } = [];
     public string[] ExactExceptionTypeHierarchy { get; set; } = [];
     public WorkerSourceLocation Location { get; set; } = new();
+    public int SourceTreeOrdinal { get; set; } = -1;
+    public string SourceTreePath { get; set; } = string.Empty;
+    public string SourceTreeSha256 { get; set; } = string.Empty;
+    public string SourceLineMapSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerClauseArtifact
@@ -243,8 +315,10 @@ internal sealed class CompilerVariableArtifact
     public int Ordinal { get; set; }
     public int Variable { get; set; } = -1;
     public int CurrentStateVariable { get; set; } = -1;
+    public int SourceOrdinal { get; set; } = -1;
     public long? Minimum { get; set; }
     public long? Maximum { get; set; }
+    public CompilerScalarDomain ScalarDomain { get; set; }
     public string ModelLabel { get; set; } = string.Empty;
 }
 
@@ -260,6 +334,9 @@ internal sealed class CompilerBodyArtifact
 internal sealed class CompilerVariableMappingArtifact
 {
     public int Source { get; set; } = -1;
+    public int SourceOrdinal { get; set; } = -1;
+    public int SourceType { get; set; } = -1;
+    public string SourceName { get; set; } = string.Empty;
     public int Target { get; set; } = -1;
 }
 
@@ -279,8 +356,25 @@ internal sealed class CompilerSpecCallArtifact
 internal sealed class CompilerSummaryEvidenceArtifact
 {
     public CompilerSummaryOrigin Origin { get; set; }
+    public string CallIdentity { get; set; } = string.Empty;
     public string EvidenceSha256 { get; set; } = string.Empty;
     public string EvidenceIdentity { get; set; } = string.Empty;
+}
+
+internal sealed class CompilerSummaryEvidenceSnapshot
+{
+    public CompilerSummaryOrigin Origin { get; set; }
+    public string CallIdentity { get; set; } = string.Empty;
+    public string EvidenceSha256 { get; set; } = string.Empty;
+    public string EvidenceIdentity { get; set; } = string.Empty;
+    public string SourcePath { get; set; } = string.Empty;
+    public string SourceTreeSha256 { get; set; } = string.Empty;
+    public int SourceStart { get; set; } = -1;
+    public int SourceLength { get; set; } = -1;
+    public string OwningModuleName { get; set; } = string.Empty;
+    public string OwningModuleMvid { get; set; } = string.Empty;
+    public string OwningModuleSha256 { get; set; } = string.Empty;
+    public int MethodMetadataToken { get; set; } = -1;
 }
 
 internal sealed class CompilerSummaryCallArtifact
@@ -294,6 +388,7 @@ internal sealed class CompilerSummaryCallArtifact
     public string EvidenceSha256 { get; set; } = string.Empty;
     public string EvidenceIdentity { get; set; } = string.Empty;
     public CompilerSummaryEvidenceArtifact[] DependencyEvidence { get; set; } = [];
+    public string InstantiationSha256 { get; set; } = string.Empty;
 }
 
 internal enum CompilerOutputKind
@@ -353,7 +448,12 @@ internal sealed class CompilerDiagnosticArtifact
 {
     public string Code { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
+    public bool IsSource { get; set; }
     public WorkerSourceLocation Location { get; set; } = new();
+    public int SourceTreeOrdinal { get; set; } = -1;
+    public string SourceTreePath { get; set; } = string.Empty;
+    public string SourceTreeSha256 { get; set; } = string.Empty;
+    public string SourceLineMapSha256 { get; set; } = string.Empty;
 }
 
 internal sealed class CompilerManifestArtifact
@@ -363,11 +463,16 @@ internal sealed class CompilerManifestArtifact
     public string ProtocolVersion { get; set; } = WorkerProtocolVersions.Current;
     public int RelationalSummarySchemaVersion { get; set; } = CompilerRelationalSummaryVersions.Current;
     public int SpecificationPackSchemaVersion { get; set; } = CompilerSpecificationPackVersions.Current;
+    public string[] SpecificationPackIds { get; set; } = [];
+    public int SpecificationPackCatalogVersion { get; set; } = CompilerSpecificationPackCatalogVersions.Current;
+    public string SpecificationPackCatalogSha256 { get; set; } = CompilerSpecificationPackCatalogVersions.Sha256;
     public WorkerFeatureSet Features { get; set; }
+    public string FeatureScopeSha256 { get; set; } = string.Empty;
     public string CompilationSha256 { get; set; } = string.Empty;
     public CompilerCompilationSnapshot Compilation { get; set; } = new();
     public WorkerClaimManifest Manifest { get; set; } = new();
     public int MaximumExpressionDepth { get; set; } = WorkerBudgets.DefaultMaximumExpressionDepth;
+    public CompilerLocationAuthorityArtifact[] LocationAuthorities { get; set; } = [];
     public CompilerDiagnosticArtifact[] CompilerDiagnostics { get; set; } = [];
     public CompilerCallableArtifact[] Callables { get; set; } = [];
 }
@@ -400,7 +505,42 @@ internal static class CompilerEffectEvidenceCatalog
         WorkerClaimReason.CounterexampleNotReplayable,
         WorkerClaimReason.EffectSummaryIncomplete,
         WorkerClaimReason.EffectContractNotEstablished,
+        WorkerClaimReason.ResourceLimit,
+        WorkerClaimReason.UnsupportedBody,
     ];
+    internal static readonly (WorkerClaimOutcome Outcome, WorkerClaimReason Reason,
+        WorkerEffectEvidenceCertainty Certainty)[] SupportedEffectTuples = [
+        (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
+        (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+        (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry),
+        (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract, WorkerEffectEvidenceCertainty.Unavailable),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable, WorkerEffectEvidenceCertainty.Unavailable),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary),
+        (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary),
+    ];
+    internal static bool HasValidEffectTuple(
+        WorkerClaimOutcome outcome, WorkerClaimReason reason,
+        WorkerEffectEvidenceCertainty certainty)
+    {
+        foreach (var tuple in SupportedEffectTuples)
+        {
+            if (tuple.Outcome == outcome && tuple.Reason == reason &&
+                tuple.Certainty == certainty)
+            {
+                return true;
+            }
+        }
+        return outcome == WorkerClaimOutcome.Unknown &&
+            certainty == WorkerEffectEvidenceCertainty.Unavailable &&
+            UnknownReasons.Contains(reason);
+    }
     internal static readonly CompilerEffectConstraintRule[] ConstraintRules = [
         new(WorkerEffectContractKind.EnforcePure, true, true, true),
         new(WorkerEffectContractKind.ZeroAllocations, true, true, true),
@@ -413,4 +553,18 @@ internal static class CompilerEffectEvidenceCatalog
         CompilerEffectReplayEventKind.ManagedObjectAllocation,
         CompilerEffectReplayEventKind.ManagedArrayAllocation,
     ];
+}
+
+internal static class CompilerCallableArtifactReasonCatalog
+{
+    internal const WorkerClaimReason SuccessReason = WorkerClaimReason.None;
+    internal const WorkerClaimReason DiagnosticFailureReason = WorkerClaimReason.UnsupportedCallable;
+    internal static readonly WorkerClaimReason[] FailureReasons = [
+        WorkerClaimReason.UnsupportedCallable,
+        WorkerClaimReason.UnsupportedContract,
+        WorkerClaimReason.UnsupportedBody,
+        WorkerClaimReason.UnsupportedExpression,
+    ];
+    internal static bool IsFailureReason(WorkerClaimReason reason) =>
+        Array.IndexOf(FailureReasons, reason) >= 0;
 }

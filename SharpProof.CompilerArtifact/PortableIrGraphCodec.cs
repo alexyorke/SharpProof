@@ -2,6 +2,7 @@ namespace SharpProof.CompilerArtifact;
 
 internal static partial class PortableIrGraphCodec
 {
+    internal const int MaximumGraphDepth = 256;
     private static readonly IrOpaquePurity[] OpaquePurities =
         PortableIrWireCatalog.OpaquePurities;
     private static readonly IrUnaryOperator[] UnaryOperators =
@@ -61,13 +62,20 @@ internal static partial class PortableIrGraphCodec
         return new Encoder(factory, program, roots, variables ?? []).Encode();
     }
 
-    internal static DecodedPortableIrGraph Decode(PortableIrGraph graph)
+    internal static DecodedPortableIrGraph Decode(
+        PortableIrGraph graph,
+        IReadOnlyList<int>? externalVariableIndices = null)
     {
         graph = ArgumentNullGuard.NotNull(graph, nameof(graph));
 
         try
         {
-            return new Decoder(graph).Decode();
+            var decoded = new Decoder(graph).Decode();
+            RequireCanonicalEncoderImage(
+                graph,
+                decoded,
+                externalVariableIndices ?? []);
+            return decoded;
         }
         catch (InvalidDataException)
         {
@@ -78,6 +86,46 @@ internal static partial class PortableIrGraphCodec
         {
             throw Bad("The portable IR graph is malformed.", exception);
         }
+    }
+
+    private static void RequireCanonicalEncoderImage(
+        PortableIrGraph graph,
+        DecodedPortableIrGraph decoded,
+        IReadOnlyList<int> externalVariableIndices)
+    {
+        var previous = -1;
+        var externalVariables = new List<IrVarId>(externalVariableIndices.Count);
+        foreach (var index in externalVariableIndices)
+        {
+            Require(
+                index >= 0 && index < decoded.Variables.Count && index > previous,
+                "Portable IR external variable metadata is not canonical.");
+            previous = index;
+            externalVariables.Add(decoded.Variables[index]);
+        }
+
+        var canonical = Encode(
+            decoded.Factory,
+            decoded.Program,
+            decoded.Roots,
+            externalVariables).Graph;
+        if (canonical.Members.Length == graph.Members.Length)
+        {
+            for (var index = 0; index < canonical.Members.Length; index++)
+            {
+                canonical.Members[index].DocumentationCommentId =
+                    graph.Members[index].DocumentationCommentId;
+            }
+        }
+        var actual = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            graph,
+            WorkerProtocolJson.Options);
+        var expected = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            canonical,
+            WorkerProtocolJson.Options);
+        Require(
+            actual.SequenceEqual(expected),
+            "Portable IR metadata is not the canonical encoder image.");
     }
 
     private static InvalidDataException Bad(string message, Exception? inner = null)
@@ -359,7 +407,6 @@ internal static partial class PortableIrGraphCodec
 
     private sealed class Decoder(PortableIrGraph _graph)
     {
-        private const int MaximumDecodeDepth = 256;
         private readonly IrFactory _factory = new();
         private readonly HashSet<IrMemberId> _distinctMembers = [];
         private readonly HashSet<IrId> _distinctTerms = [];
@@ -444,7 +491,7 @@ internal static partial class PortableIrGraphCodec
             }
 
             Require(_typeState[index] != 1, "Portable IR type metadata contains a cycle.");
-            Require(depth < MaximumDecodeDepth, "Portable IR type depth exceeds the supported limit.");
+            Require(depth < MaximumGraphDepth, "Portable IR type depth exceeds the supported limit.");
             _typeState[index] = 1;
             var row = Required(_graph.Types[index], "type row");
             Require(!string.IsNullOrWhiteSpace(row.Name), "Portable IR type metadata is invalid.");
@@ -497,7 +544,7 @@ internal static partial class PortableIrGraphCodec
             }
 
             Require(_termState[index] != 1, "Portable IR terms contain a cycle.");
-            Require(depth < MaximumDecodeDepth, "Portable IR term depth exceeds the supported limit.");
+            Require(depth < MaximumGraphDepth, "Portable IR term depth exceeds the supported limit.");
             _termState[index] = 1;
             var row = Required(_graph.Terms[index], "term row");
             Require(row.Items != null, "Portable IR term metadata is invalid.");

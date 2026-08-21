@@ -347,15 +347,48 @@ internal static class ContractForSymbolMatcher
                    right.IsOptional, right.HasExplicitDefaultValue) &&
         CustomModifiersMatch(left.CustomModifiers, right.CustomModifiers) &&
         ParameterRefCustomModifiersMatch(left, right) &&
-        (!left.HasExplicitDefaultValue || Equals(left.ExplicitDefaultValue, right.ExplicitDefaultValue)) &&
-        TypesMatch(left.Type, right.Type, left.ContainingSymbol, right.ContainingSymbol);
+        ExplicitDefaultValuesMatch(left, right) &&
+        TypesMatch(
+            left.Type,
+            right.Type,
+            left.ContainingSymbol,
+            right.ContainingSymbol,
+            normalizeMappedTypeParameters: true);
+    }
+
+    private static bool ExplicitDefaultValuesMatch(
+        IParameterSymbol left,
+        IParameterSymbol right)
+    {
+        if (!left.HasExplicitDefaultValue)
+        {
+            return true;
+        }
+
+        return (left.ExplicitDefaultValue, right.ExplicitDefaultValue) switch
+        {
+            (float leftValue, float rightValue) =>
+                SingleBits(leftValue) == SingleBits(rightValue),
+            (double leftValue, double rightValue) =>
+                BitConverter.DoubleToInt64Bits(leftValue) ==
+                BitConverter.DoubleToInt64Bits(rightValue),
+            _ => Equals(
+                left.ExplicitDefaultValue,
+                right.ExplicitDefaultValue)
+        };
+    }
+
+    private static int SingleBits(float value)
+    {
+        return BitConverter.ToInt32(BitConverter.GetBytes(value), 0);
     }
 
     private static bool ParameterRefCustomModifiersMatch(
         IParameterSymbol left,
         IParameterSymbol right)
     {
-        if (left.RefKind != RefKind.In || right.RefKind != RefKind.In)
+        if (!IsCompilerReadOnlyInput(left.RefKind) ||
+            !IsCompilerReadOnlyInput(right.RefKind))
         {
             return CustomModifiersMatch(
                 left.RefCustomModifiers,
@@ -369,6 +402,11 @@ internal static class ContractForSymbolMatcher
         return CustomModifiersMatch(
             RemoveCompilerInAttribute(left.RefCustomModifiers),
             RemoveCompilerInAttribute(right.RefCustomModifiers));
+    }
+
+    private static bool IsCompilerReadOnlyInput(RefKind refKind)
+    {
+        return refKind is RefKind.In or RefKind.RefReadOnlyParameter;
     }
 
     private static ImmutableArray<CustomModifier> RemoveCompilerInAttribute(
@@ -530,19 +568,17 @@ internal static class ContractForSymbolMatcher
                    right.ReturnsByRefReadonly, right.Parameters.Length) &&
                TypesMatch(left.ReturnType, right.ReturnType,
                    leftScope, rightScope, normalizeMappedTypeParameters) &&
-               CustomModifiersMatch(
+               FunctionPointerReturnCustomModifiersMatch(
                    left.ReturnTypeCustomModifiers,
-                   right.ReturnTypeCustomModifiers) &&
+                   right.ReturnTypeCustomModifiers,
+                   left.UnmanagedCallingConventionTypes,
+                   right.UnmanagedCallingConventionTypes) &&
                CustomModifiersMatch(
                    left.RefCustomModifiers,
                    right.RefCustomModifiers) &&
-               left.UnmanagedCallingConventionTypes.Length ==
-                   right.UnmanagedCallingConventionTypes.Length &&
-               left.UnmanagedCallingConventionTypes.Select((type, index) =>
-                       SymbolEqualityComparer.Default.Equals(
-                           type,
-                           right.UnmanagedCallingConventionTypes[index]))
-                   .All(static matches => matches) &&
+               UnmanagedCallingConventionTypesMatch(
+                   left.UnmanagedCallingConventionTypes,
+                   right.UnmanagedCallingConventionTypes) &&
                left.Parameters.Select((parameter, index) =>
                        FunctionPointerParametersMatch(
                            parameter,
@@ -551,6 +587,69 @@ internal static class ContractForSymbolMatcher
                            rightScope,
                            normalizeMappedTypeParameters))
                    .All(static matches => matches);
+    }
+
+    private static bool UnmanagedCallingConventionTypesMatch(
+        ImmutableArray<INamedTypeSymbol> left,
+        ImmutableArray<INamedTypeSymbol> right)
+    {
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+
+        var matched = new bool[right.Length];
+        foreach (var leftType in left)
+        {
+            var match = -1;
+            for (var index = 0; index < right.Length; index++)
+            {
+                if (!matched[index] &&
+                    SymbolEqualityComparer.Default.Equals(
+                        leftType,
+                        right[index]))
+                {
+                    match = index;
+                    break;
+                }
+            }
+
+            if (match < 0)
+            {
+                return false;
+            }
+
+            matched[match] = true;
+        }
+
+        return true;
+    }
+
+    private static bool FunctionPointerReturnCustomModifiersMatch(
+        ImmutableArray<CustomModifier> left,
+        ImmutableArray<CustomModifier> right,
+        ImmutableArray<INamedTypeSymbol> leftCallingConventions,
+        ImmutableArray<INamedTypeSymbol> rightCallingConventions)
+    {
+        return CustomModifiersMatch(
+            [.. left.Where(modifier =>
+                !IsCallingConventionModifier(
+                    modifier,
+                    leftCallingConventions))],
+            [.. right.Where(modifier =>
+                !IsCallingConventionModifier(
+                    modifier,
+                    rightCallingConventions))]);
+    }
+
+    private static bool IsCallingConventionModifier(
+        CustomModifier modifier,
+        ImmutableArray<INamedTypeSymbol> callingConventions)
+    {
+        return callingConventions.Any(type =>
+            SymbolEqualityComparer.Default.Equals(
+                modifier.Modifier,
+                type));
     }
 
     private static bool FunctionPointerParametersMatch(
@@ -586,12 +685,45 @@ internal static class ContractForSymbolMatcher
         ISymbol? leftScope,
         ISymbol? rightScope)
     {
+        if (left is INamedTypeSymbol leftType &&
+            right is INamedTypeSymbol rightType)
+        {
+            var leftOwners = GetGenericOwnerLayers(leftScope);
+            var rightOwners = GetGenericOwnerLayers(rightScope);
+            var leftIndex = GetGenericOwnerIndex(leftOwners, leftType);
+            var rightIndex = GetGenericOwnerIndex(rightOwners, rightType);
+            return leftIndex >= 0 && leftIndex == rightIndex;
+        }
+
         return leftScope != null &&
         rightScope != null &&
         (SymbolEqualityComparer.Default.Equals(left, leftScope)
             ? SymbolEqualityComparer.Default.Equals(right, rightScope)
             : !SymbolEqualityComparer.Default.Equals(right, rightScope) &&
               OwnersMatch(left, right, leftScope.ContainingSymbol, rightScope.ContainingSymbol));
+    }
+
+    private static ImmutableArray<INamedTypeSymbol> GetGenericOwnerLayers(
+        ISymbol? scope)
+    {
+        var containingType = scope as INamedTypeSymbol ?? scope?.ContainingType;
+        return containingType == null
+            ? []
+            : GetGenericTypeLayers(containingType);
+    }
+
+    private static int GetGenericOwnerIndex(
+        ImmutableArray<INamedTypeSymbol> owners,
+        INamedTypeSymbol owner)
+    {
+        for (var index = 0; index < owners.Length; index++)
+        {
+            if (SymbolEqualityComparer.Default.Equals(owners[index], owner))
+            {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private static NullableAnnotation GetAnnotation(

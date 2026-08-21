@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
     $CatalogPath = Join-Path $repositoryRoot 'SharpProof.Projection.catalog.json'
 }
@@ -65,15 +66,9 @@ foreach ($output in @(Required $catalog 'outputs' 'Projection catalog')) {
     if ($relativePath -notmatch '^[^:]+\.generated\.cs$') {
         throw "Projection output path is not a generated C# file: '$relativePath'."
     }
-    $path = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $relativePath))
-    $repositoryPrefix = $repositoryRoot.TrimEnd(
-        [IO.Path]::DirectorySeparatorChar,
-        [IO.Path]::AltDirectorySeparatorChar) +
-        [IO.Path]::DirectorySeparatorChar
-    if (-not $path.StartsWith($repositoryPrefix,
-            [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Projection output path escapes the repository: '$relativePath'."
-    }
+    $path = Resolve-SharpProofContainedPath `
+        -Root $repositoryRoot -Path $relativePath `
+        -ParameterName 'Projection output path'
     $namespace = NamespaceName ([string](Required $output 'namespace' "output '$relativePath'") ) "output '$relativePath' namespace"
     $accessibility = Identifier ([string](Required $output 'accessibility' "output '$relativePath'") ) "output '$relativePath' accessibility"
     $modifiers = @(

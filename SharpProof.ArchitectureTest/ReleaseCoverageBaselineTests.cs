@@ -34,7 +34,7 @@ public sealed class ReleaseCoverageBaselineTests
             {
                 Assert.That(workflow, Does.Contain(job), job);
             }
-            Assert.That(workflow, Does.Not.Contain("portable-consumer"));
+            Assert.That(workflow, Does.Contain("portable-consumers"));
             Assert.That(workflow, Does.Not.Contain("minimum-sdk-consumer"));
         }
     }
@@ -98,6 +98,223 @@ public sealed class ReleaseCoverageBaselineTests
             Assert.That(
                 qualification,
                 Does.Contain("tooling release-qualification"));
+        }
+    }
+
+    [Test]
+    public void QualificationWriterRevalidatesArtifactsAndGateReceipts()
+    {
+        var root = RepositoryRoot();
+        var writer = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofReleaseContainer.ps1"));
+        var receiptWriter = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Write-SharpProofQualificationReceipt.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(
+            root,
+            ".github",
+            "workflows",
+            "package-consumers.yml"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                writer,
+                Does.Contain("Test-SharpProofReleaseArtifacts.ps1"));
+            Assert.That(writer, Does.Contain("packages.Count -ne 6"));
+            Assert.That(writer, Does.Contain("does not match checkout HEAD"));
+            Assert.That(writer, Does.Contain("requires a clean checkout"));
+            Assert.That(writer, Does.Contain("annotated tag at checkout HEAD"));
+            foreach (var gate in new[]
+                     {
+                         "coverage",
+                         "mutation",
+                         "package-consumers",
+                         "pilots"
+                     })
+            {
+                Assert.That(
+                    workflow,
+                    Does.Contain("tooling " + gate),
+                    gate);
+            }
+            Assert.That(
+                writer,
+                Does.Contain("releaseQualificationMatrix")
+                    .And.Contain("requiredGates"));
+            Assert.That(writer, Does.Contain("status -cne 'passed'"));
+            Assert.That(writer, Does.Contain("evidence.sha256"));
+            Assert.That(
+                writer,
+                Does.Contain("targets different packages"));
+            Assert.That(receiptWriter, Does.Contain("status -ceq 'passed'"));
+            Assert.That(receiptWriter, Does.Contain("mutationCount"));
+            Assert.That(
+                receiptWriter,
+                Does.Contain("Test-SharpProofPilotReport")
+                    .And.Contain("pilotEvidence"));
+            Assert.That(receiptWriter, Does.Contain("packageArtifacts"));
+        }
+    }
+
+    [Test]
+    public async Task QualificationReceiptRejectsMalformedPackageIdentityEvidence()
+    {
+        var root = RepositoryRoot();
+        var parent = Path.Combine(root, "artifacts", "qualification-fixtures");
+        var workspace = Path.Combine(parent, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workspace);
+        try
+        {
+            var head = (await RunAsync(root, "git", "rev-parse", "HEAD"))
+                .Output.Trim();
+            var evidencePath = Path.Combine(workspace, "package-consumers.json");
+            var receiptDirectory = Path.Combine(workspace, "receipts");
+            var packages = Enumerable.Range(0, 6)
+                .Select(index => new
+                {
+                    fileName = $"package-{index}.nupkg",
+                    bytes = 1,
+                    sha256 = new string((char)('a' + index), 64)
+                })
+                .ToArray();
+            var fixtures = new[]
+            {
+                (Packages: packages, Valid: true),
+                (Packages: packages.Take(5).ToArray(), Valid: false),
+                (Packages: packages.Select((item, index) => index == 5
+                    ? new
+                    {
+                        fileName = packages[0].fileName,
+                        item.bytes,
+                        item.sha256
+                    }
+                    : item).ToArray(), Valid: false),
+                (Packages: packages.Select((item, index) => index == 5
+                    ? new
+                    {
+                        item.fileName,
+                        item.bytes,
+                        sha256 = "not-a-digest"
+                    }
+                    : item).ToArray(), Valid: false)
+            };
+            foreach (var fixture in fixtures)
+            {
+                await File.WriteAllTextAsync(
+                    evidencePath,
+                    JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        status = "passed",
+                        commit = head,
+                        packageArtifacts = fixture.Packages
+                    }));
+                var result = await RunAsync(
+                    root,
+                    "pwsh",
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-File",
+                    Path.Combine(
+                        root,
+                        "scripts",
+                        "Write-SharpProofQualificationReceipt.ps1"),
+                    "-Gate",
+                    "package-consumers",
+                    "-EvidencePath",
+                    evidencePath,
+                    "-ReceiptDirectory",
+                    receiptDirectory);
+                Assert.That(
+                    result.ExitCode == 0,
+                    Is.EqualTo(fixture.Valid),
+                    result.Output + result.Error);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(workspace))
+            {
+                Directory.Delete(workspace, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public async Task QualificationReceiptRejectsMalformedFailedAndStaleEvidence()
+    {
+        var root = RepositoryRoot();
+        var parent = Path.Combine(root, "artifacts", "qualification-fixtures");
+        var workspace = Path.Combine(parent, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workspace);
+        try
+        {
+            var head = (await RunAsync(root, "git", "rev-parse", "HEAD"))
+                .Output.Trim();
+            var evidencePath = Path.Combine(workspace, "acceptance.json");
+            var receiptDirectory = Path.Combine(workspace, "receipts");
+            var fixtures = new[]
+            {
+                (Value: "not-json", Valid: false),
+                (Value: JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    status = "failed",
+                    commit = head
+                }), Valid: false),
+                (Value: JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    status = "passed",
+                    commit = new string('0', 40)
+                }), Valid: false),
+                (Value: JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    status = "passed",
+                    commit = head
+                }), Valid: true)
+            };
+            foreach (var fixture in fixtures)
+            {
+                await File.WriteAllTextAsync(evidencePath, fixture.Value);
+                var result = await RunAsync(
+                    root,
+                    "pwsh",
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-File",
+                    Path.Combine(
+                        root,
+                        "scripts",
+                        "Write-SharpProofQualificationReceipt.ps1"),
+                    "-Gate",
+                    "acceptance-release",
+                    "-EvidencePath",
+                    evidencePath,
+                    "-ReceiptDirectory",
+                    receiptDirectory);
+                Assert.That(
+                    result.ExitCode == 0,
+                    Is.EqualTo(fixture.Valid),
+                    result.Output + result.Error);
+            }
+            Assert.That(
+                File.Exists(Path.Combine(
+                    receiptDirectory,
+                    "acceptance-release.json")),
+                Is.True);
+        }
+        finally
+        {
+            if (Directory.Exists(workspace))
+            {
+                Directory.Delete(workspace, recursive: true);
+            }
         }
     }
 
@@ -367,6 +584,47 @@ public sealed class ReleaseCoverageBaselineTests
                     "scripts",
                     "Get-SharpProofTcbPaths.ps1"),
                 overwrite: true);
+            File.Copy(
+                Path.Combine(
+                    root,
+                    "scripts",
+                    "Get-SharpProofProductionInventory.ps1"),
+                Path.Combine(
+                    repository,
+                    "scripts",
+                    "Get-SharpProofProductionInventory.ps1"),
+                overwrite: true);
+
+            var projectDirectory = Path.Combine(repository, "Fixture");
+            Directory.CreateDirectory(projectDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(projectDirectory, "Fixture.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <SharpProofProductionProject>true</SharpProofProductionProject>
+                  </PropertyGroup>
+                </Project>
+                """);
+            await File.WriteAllTextAsync(
+                Path.Combine(projectDirectory, "Source.cs"),
+                "internal static class Source { internal static int Value => 1; }\n");
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "SharpProof.sln"),
+                "Microsoft Visual Studio Solution File, Format Version 12.00\n" +
+                "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Fixture\", \"Fixture/Fixture.csproj\", \"{11111111-1111-1111-1111-111111111111}\"\n" +
+                "EndProject\nGlobal\nEndGlobal\n");
+            var generatedDirectory = Path.Combine(repository, "eng", "generated");
+            Directory.CreateDirectory(generatedDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(generatedDirectory, "approved-outputs.v1.json"),
+                "{\"schemaVersion\":1,\"outputs\":[]}\n");
+            var coverageDirectory = Path.Combine(repository, "eng", "coverage");
+            Directory.CreateDirectory(coverageDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(coverageDirectory, "SharpProof.Gates.runsettings"),
+                "<RunSettings />\n");
 
             var acceptancePath = Path.Combine(
                 repository,

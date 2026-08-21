@@ -44,6 +44,7 @@ public sealed class NestedRequiresCallSiteTests
         var diagnostics = await Analyze(
             """
             using System;
+            using System.Linq.Expressions;
             using SharpProof.Attributes;
 
             public static class Fixture {
@@ -289,6 +290,65 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task LambdaBodiesRequireInvocationOrConservativeEscape()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static void Consume(Func<int> callback) { }
+
+                public static Func<int> Escaped() =>
+                    () => Positive(-4);
+
+                public static int Outer(bool condition) {
+                    Func<int> dead = () => Positive(-1);
+                    Func<int> invoked = () => Positive(-2);
+                    Func<int> conditional = () => Positive(-3);
+                    Func<int> copied = invoked;
+                    Consume(() => Positive(-5));
+
+                    Func<int> deadOuter = () => {
+                        Func<int> nested = () => Positive(-6);
+                        return nested();
+                    };
+                    Func<int> liveOuter = () => {
+                        Func<int> nested = () => Positive(-7);
+                        return nested();
+                    };
+
+                    var result = copied() + liveOuter();
+                    return condition
+                        ? result + conditional()
+                        : result;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 5);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EqualTo(new[]
+            {
+                source.IndexOf("Positive(-4)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-3)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-5)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-7)", StringComparison.Ordinal)
+            }.OrderBy(static position => position)));
+    }
+
+    [Test]
     public async Task UnreferencedLocalFunctionsAreNotAnalyzed()
     {
         const string source =
@@ -438,6 +498,113 @@ public sealed class NestedRequiresCallSiteTests
                 factory.GetOutcomes(MethodKind.AnonymousFunction),
                 Does.Contain(AnalyzerSemanticOutcome.Refuted));
         }
+    }
+
+    [Test]
+    public async Task NestedCallableControlReasonsAreValidatedRegardlessOfReachability()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public static int Outer() {
+                    [SharpProofSuppress("")]
+                    int UnusedLocal() => 0;
+
+                    [SharpProofTrusted(" ")]
+                    int UsedLocal() => 1;
+
+                    [SharpProofTrusted("")]
+                    int EscapedLocal() => 2;
+                    Func<int> escaped = EscapedLocal;
+
+                    Func<int> unusedExpression =
+                        [SharpProofSuppress("")]
+                        () => 3;
+                    Func<int> usedBlock =
+                        [SharpProofTrusted(" ")]
+                        () => { return 4; };
+                    Func<int> unusedAnonymous =
+                        delegate { return 5; };
+                    Expression<Func<int>> quoted =
+                        [SharpProofSuppress(" ")]
+                        () => 6;
+
+                    [SharpProofSuppress("reviewed outer")]
+                    int ValidNested() {
+                        Func<int> nested =
+                            [SharpProofTrusted("reviewed nested")]
+                            () => 5;
+                        return nested();
+                    }
+
+                    return UsedLocal() + escaped() + usedBlock() +
+                        ValidNested();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(
+            source,
+            enabledIds: ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0024", 6)));
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EqualTo(new[]
+            {
+                source.IndexOf("SharpProofSuppress(\"\")", StringComparison.Ordinal),
+                source.IndexOf("SharpProofTrusted(\" \")", StringComparison.Ordinal),
+                source.IndexOf("SharpProofTrusted(\"\")", StringComparison.Ordinal),
+                source.IndexOf(
+                    "SharpProofSuppress(\"\")",
+                    source.IndexOf("unusedExpression", StringComparison.Ordinal),
+                    StringComparison.Ordinal),
+                source.IndexOf(
+                    "SharpProofTrusted(\" \")",
+                    source.IndexOf("usedBlock", StringComparison.Ordinal),
+                    StringComparison.Ordinal),
+                source.IndexOf(
+                    "SharpProofSuppress(\" \")",
+                    source.IndexOf("quoted", StringComparison.Ordinal),
+                    StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
+    public async Task GeneratedNestedCallableControlReasonsRemainExcluded()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static void Outer() {
+                    [SharpProofSuppress("")]
+                    void Local() { }
+                    Func<int> lambda =
+                        [SharpProofTrusted(" ")]
+                        () => Positive(-1);
+                    _ = lambda();
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024", "SP0027"],
+            filePath: "Fixture.g.cs");
+
+        Assert.That(diagnostics, Is.Empty);
     }
 
     private static Task<ImmutableArray<Diagnostic>> Analyze(

@@ -15,26 +15,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repositoryPrefix = $repositoryRoot.TrimEnd(
+    [IO.Path]::DirectorySeparatorChar,
+    [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $testProjectParallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
-$resolvedResultsDirectory = [IO.Path]::GetFullPath(
-    $(if ([IO.Path]::IsPathRooted($ResultsDirectory)) {
-        $ResultsDirectory
-    }
-    else {
-        Join-Path $repositoryRoot $ResultsDirectory
-    }))
-$repositoryPrefix =
-    $repositoryRoot + [IO.Path]::DirectorySeparatorChar
-if (-not $resolvedResultsDirectory.StartsWith(
-        $repositoryPrefix,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw (
-        'ResultsDirectory must be inside the repository: ' +
-        $resolvedResultsDirectory)
-}
+$resolvedResultsDirectory = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $ResultsDirectory `
+    -ParameterName 'ResultsDirectory'
 if (Test-Path -LiteralPath $resolvedResultsDirectory -PathType Container) {
     $existingReport = Get-ChildItem `
         -LiteralPath $resolvedResultsDirectory `
@@ -49,12 +40,26 @@ if (Test-Path -LiteralPath $resolvedResultsDirectory -PathType Container) {
             $existingReport.FullName)
     }
 }
-
 New-Item `
     -ItemType Directory `
     -Force `
     -Path $resolvedResultsDirectory |
     Out-Null
+
+# Establish the denominator and module/source authority before any collector
+# can instrument or merge binaries. The validator independently recomputes the
+# same portable-PDB universe; this file is evidence, not the source of truth.
+$coverageAuthorityPath = Join-Path `
+    $resolvedResultsDirectory `
+    'coverage-authority.json'
+& (Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1') `
+    -RepositoryRoot $repositoryRoot `
+    -Configuration Release `
+    -RequirePdb `
+    -OutputPath $coverageAuthorityPath
+if ($LASTEXITCODE -ne 0) {
+    throw 'Coverage authority derivation failed before collection.'
+}
 
 $dotnetWrapper = Join-Path `
     $repositoryRoot `
@@ -179,6 +184,13 @@ $coverageReports = @(
         -Filter '*.cobertura.xml' `
         -File `
         -ErrorAction Stop)
+$coverageAuthority = Get-Content `
+    -LiteralPath $coverageAuthorityPath `
+    -Raw | ConvertFrom-Json
+$coverageModuleHashes = @(
+    $coverageAuthority.modules |
+        ForEach-Object { [string]$_.assemblySha256 } |
+        Sort-Object)
 foreach ($coverageReport in $coverageReports) {
     [xml]$coverageDocument = Get-Content `
         -LiteralPath $coverageReport.FullName `
@@ -200,6 +212,26 @@ foreach ($coverageReport in $coverageReports) {
             $fullPath.Substring($repositoryPrefix.Length).Replace('\', '/'))
         $changed = $true
     }
+    $authorityNodes = @(
+        $coverageDocument.SelectNodes('/coverage/sharpProofAuthority'))
+    if ($authorityNodes.Count -ne 0) {
+        throw (
+            "Coverage report already contains authority metadata: " +
+            $coverageReport.FullName)
+    }
+    $authorityNode = $coverageDocument.CreateElement('sharpProofAuthority')
+    $authorityNode.SetAttribute('schemaVersion', '1')
+    $authorityNode.SetAttribute('sourceUniverseSha256', [string]$coverageAuthority.sourceUniverseSha256)
+    $authorityNode.SetAttribute('generatedManifestSha256', [string]$coverageAuthority.generatedManifestSha256)
+    $authorityNode.SetAttribute('commit', [string]$coverageAuthority.commit)
+    $authorityNode.SetAttribute(
+        'universeSha256',
+        [string]$coverageAuthority.pdbUniverseSha256)
+    $authorityNode.SetAttribute(
+        'modules',
+        ($coverageModuleHashes -join ','))
+    [void]$coverageDocument.DocumentElement.AppendChild($authorityNode)
+    $changed = $true
     if ($changed) {
         $writerSettings = [Xml.XmlWriterSettings]::new()
         $writerSettings.Encoding = [Text.UTF8Encoding]::new($false)

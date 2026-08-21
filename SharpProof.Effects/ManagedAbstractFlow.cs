@@ -168,7 +168,8 @@ internal sealed class ManagedAbstractFlow
             {
                 var condition = block.BranchValue;
                 var edgeBlock = blocks.Count;
-                blocks.Add(new(edgeBlock, state => expected.HasValue && condition != null
+                blocks.Add(new(edgeBlock, state => expected.HasValue && condition != null &&
+                    !ManagedMutationFacts.HasMutation(condition)
                     ? Assume(state, condition, expected.Value) : state));
                 edges.Add(new(block.Ordinal, edgeBlock));
                 edges.Add(new(edgeBlock, branch.Destination!.Ordinal));
@@ -228,17 +229,36 @@ internal sealed class ManagedAbstractFlow
                 }
                 else
                 {
+                    var hasMutation = ManagedMutationFacts.HasMutation(
+                        declarator.Initializer.Value);
                     state = Transfer(state, declarator.Initializer.Value, result, cancellationToken);
-                    state = state.Set(declarator.Symbol, EvaluateCore(declarator.Initializer.Value, state));
+                    state = state.Set(
+                        declarator.Symbol,
+                        hasMutation
+                            ? TopForType(declarator.Symbol.Type)
+                            : EvaluateCore(declarator.Initializer.Value, state));
                 }
                 break;
             case IFlowCaptureOperation capture:
+                var captureHasMutation = ManagedMutationFacts.HasMutation(
+                    capture.Value);
                 state = Transfer(state, capture.Value, result, cancellationToken);
-                state = state.Set(capture.Id, EvaluateCore(capture.Value, state));
+                state = state.Set(
+                    capture.Id,
+                    captureHasMutation
+                        ? TopForType(capture.Value.Type)
+                        : EvaluateCore(capture.Value, state));
                 break;
             case ISimpleAssignmentOperation assignment:
+                var valueHasMutation = ManagedMutationFacts.HasMutation(
+                    assignment.Value);
                 state = TransferMany(state, assignment.ChildOperations, result, cancellationToken);
-                state = SetStorage(state, assignment.Target, EvaluateCore(assignment.Value, state));
+                state = SetStorage(
+                    state,
+                    assignment.Target,
+                    valueHasMutation
+                        ? TopForType(assignment.Type)
+                        : EvaluateCore(assignment.Value, state));
                 break;
             case ICompoundAssignmentOperation compound:
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
@@ -632,6 +652,33 @@ internal sealed class ManagedAbstractFlow
             return operand;
         }
 
+        if (string.Equals(
+                conversion.Syntax.Language,
+                LanguageNames.CSharp,
+                StringComparison.Ordinal) &&
+            Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+                .GetConversion(conversion).IsBoxing)
+        {
+            return IsNullableType(conversion.Operand.Type) &&
+                   operand.TryGetNullness(out var boxedNullness)
+                ? Reference(boxedNullness, operand.Cardinality)
+                : NonNull;
+        }
+
+        if (IsNullableType(conversion.Type) &&
+            conversion.OperatorMethod == null &&
+            !conversion.Conversion.IsUserDefined)
+        {
+            if (operand.TryGetNullness(out var nullableNullness))
+            {
+                return Reference(nullableNullness, operand.Cardinality);
+            }
+
+            return IsNullableType(conversion.Operand.Type)
+                ? Reference(NullnessValue.MaybeNull)
+                : NonNull;
+        }
+
         return !conversion.IsTryCast && conversion.OperatorMethod == null && conversion.Conversion.IsReference &&
                operand.TryGetNullness(out var nullness)
             ? Reference(nullness, operand.Cardinality)
@@ -894,17 +941,64 @@ internal sealed class ManagedAbstractFlow
             ControlFlowConditionKind.WhenFalse => false,
             _ => null
         };
+        var constant = block.BranchValue?.ConstantValue is { HasValue: true, Value: bool value }
+            ? value
+            : (bool?)null;
         if (block.FallThroughSuccessor is
-            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null })
+            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null } &&
+            IsFeasible(!expected, constant))
         {
             yield return (block.FallThroughSuccessor!, !expected);
         }
 
         if (block.ConditionalSuccessor is
-            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null })
+            { Semantics: ControlFlowBranchSemantics.Regular, Destination: not null } &&
+            IsFeasible(expected, constant))
         {
             yield return (block.ConditionalSuccessor!, expected);
         }
+    }
+
+    private static bool IsFeasible(bool? expected, bool? constant)
+    {
+        return !expected.HasValue ||
+               !constant.HasValue ||
+               expected.Value == constant.Value;
+    }
+
+    internal static bool IsCompileTimeUnreachable(
+        Compilation compilation,
+        IOperation operation)
+    {
+        foreach (var syntax in operation.Syntax.Ancestors())
+        {
+            SyntaxNode? condition = syntax switch
+            {
+                WhileStatementSyntax @while
+                    when @while.Statement.Span.Contains(operation.Syntax.Span) =>
+                    @while.Condition,
+                ForStatementSyntax @for
+                    when @for.Condition != null &&
+                         (@for.Statement.Span.Contains(operation.Syntax.Span) ||
+                          @for.Incrementors.Any(incrementor =>
+                              incrementor.Span.Contains(operation.Syntax.Span))) =>
+                    @for.Condition,
+                _ => null
+            };
+            if (condition == null)
+            {
+                continue;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, condition.SyntaxTree);
+            if (model.GetConstantValue(condition) is { HasValue: true, Value: false })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static EffectAnalysisIncompleteReason CheckBudget(
@@ -1100,7 +1194,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool TryEvaluate(IOperation origin, IOperation value, out ManagedAbstractValue result)
     {
-        if (!HasMutation(value) &&
+        if (!ManagedMutationFacts.HasMutation(value) &&
             (TryGetState(value, out var state) ||
              TryGetState(origin, out state)))
         {
@@ -1111,7 +1205,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         var unwrapped =
             DefiniteOperationFacts.UnwrapHarmlessValue(value);
         if (unwrapped is ISimpleAssignmentOperation assignment &&
-            !HasMutation(assignment.Value) &&
+            !ManagedMutationFacts.HasMutation(assignment.Value) &&
             TryGetState(assignment.Value, out var valueState))
         {
             result = flow.Evaluate(
@@ -1129,7 +1223,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
         IOperation value,
         out ManagedAbstractValue result)
     {
-        if (!HasMutation(value) &&
+        if (!ManagedMutationFacts.HasMutation(value) &&
             TryGetState(origin, out var state))
         {
             result = flow.Evaluate(value, state);
@@ -1142,6 +1236,11 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     internal bool ProvesNonNull(IOperation origin, IOperation value)
     {
         return TryEvaluate(origin, value, out var result) && result.IsDefinitelyNonNull;
+    }
+
+    internal bool ProvesNull(IOperation origin, IOperation value)
+    {
+        return TryEvaluate(origin, value, out var result) && result.IsDefinitelyNull;
     }
 
     internal bool ProvesNonZero(IOperation origin, IOperation value)
@@ -1158,7 +1257,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     internal bool ProvesNoSignedDivisionOverflow(
         IOperation origin, IOperation left, IOperation right, long minimum)
     {
-        return !HasMutation(right) &&
+        return !ManagedMutationFacts.HasMutation(right) &&
         TryEvaluate(origin, left, out var leftValue) &&
         TryEvaluate(origin, right, out var rightValue) &&
         leftValue.TryGetInteger(out var leftInterval) &&
@@ -1169,7 +1268,7 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     internal bool ProvesArrayAccess(IArrayElementReferenceOperation element)
     {
         return element.Indices.Length == 1 &&
-        !HasMutation(element.Indices[0]) &&
+        !ManagedMutationFacts.HasMutation(element.Indices[0]) &&
         TryEvaluate(element, element.ArrayReference, out var array) &&
         TryEvaluate(element, element.Indices[0], out var index) &&
         array.IsDefinitelyNonNull &&
@@ -1180,19 +1279,9 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool ProvesNoOverflow(IOperation operation)
     {
-        return operation is not IBinaryOperation binary || !HasMutation(binary.RightOperand)
+        return !ManagedMutationFacts.HasMutation(operation)
             ? TryGetState(operation, out var state) && flow.ProvesNoOverflow(operation, state)
             : false;
-    }
-
-    private static bool HasMutation(IOperation operation)
-    {
-        return operation.DescendantsAndSelf().Any(static candidate =>
-            candidate is IAssignmentOperation or IIncrementOrDecrementOperation or IDynamicInvocationOperation ||
-            candidate is IArgumentOperation { Parameter.RefKind: not RefKind.None } ||
-            candidate is IInvocationOperation invocation &&
-            (invocation.TargetMethod.MethodKind == MethodKind.LocalFunction ||
-             invocation.TargetMethod.ContainingType.TypeKind == TypeKind.Delegate));
     }
 
     private static bool IsControlFlow(IOperation operation)
@@ -1370,7 +1459,9 @@ internal readonly record struct ManagedAbstractValue(
             return Integer(IntervalValue.Range(integer.Minimum, integer.Maximum));
         }
 
-        return type?.IsReferenceType is true ? Reference(NullnessValue.MaybeNull) : Unknown;
+        return type?.IsReferenceType is true || IsNullableType(type)
+            ? Reference(NullnessValue.MaybeNull)
+            : Unknown;
     }
 
     internal static ManagedAbstractValue DefaultForType(ITypeSymbol? type)
@@ -1385,7 +1476,9 @@ internal readonly record struct ManagedAbstractValue(
             return Integer(IntervalValue.Constant(0));
         }
 
-        return type?.IsReferenceType is true ? Null : Unknown;
+        return type?.IsReferenceType is true || IsNullableType(type)
+            ? Null
+            : Unknown;
     }
 
     internal static ManagedAbstractValue FromConstant(object? value, ITypeSymbol? type)
@@ -1674,6 +1767,14 @@ internal readonly record struct ManagedAbstractValue(
     {
         return CSharpScalarSemantics.TryGetInteger(type?.SpecialType ?? SpecialType.None, out semantics);
     }
+
+    internal static bool IsNullableType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol
+        {
+            OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+        };
+    }
 }
 
 /// <summary>Fail-closed execution facts shared by analyzer and effect witnesses.</summary>
@@ -1758,6 +1859,167 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             _activeMethods.Remove(normalized);
         }
+    }
+
+    /// <summary>
+    /// Returns whether a source method has a reachable normal exit.  This is
+    /// intentionally a control-flow fact rather than a may-throw fact: a
+    /// method with both a throwing and a returning branch can still permit the
+    /// caller's next source-order step.
+    /// </summary>
+    internal bool MethodCanCompleteNormally(IMethodSymbol method)
+    {
+        method = ArgumentNullGuard.NotNull(method, nameof(method));
+        cancellationToken.ThrowIfCancellationRequested();
+        var normalized = method.OriginalDefinition;
+        if (normalized.DeclaringSyntaxReferences.Length != 1 ||
+            !_activeMethods.Add(normalized))
+        {
+            return true;
+        }
+
+        try
+        {
+            var declaration = normalized.DeclaringSyntaxReferences[0]
+                .GetSyntax(cancellationToken);
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, declaration.SyntaxTree);
+            var operation = model.GetOperation(declaration, cancellationToken) ??
+                (GetBody(declaration) is { } methodBody
+                    ? model.GetOperation(methodBody, cancellationToken)
+                    : null);
+            return operation == null || MayCompleteNormally(operation);
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+        finally
+        {
+            _activeMethods.Remove(normalized);
+        }
+    }
+
+    /// <summary>
+    /// Computes a deliberately permissive normal-completion fact.  This is
+    /// used only to suppress effects after a call that is proven never to
+    /// return, so uncertainty must retain the later effects.  In particular,
+    /// ordinary assignments, writes, external calls, and unsupported shapes
+    /// are all treated as potentially completing.
+    /// </summary>
+    private bool MayCompleteNormally(IOperation? operation)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return operation switch
+        {
+            null => true,
+            IThrowOperation => false,
+            IReturnOperation returnOperation =>
+                ChildrenMayCompleteNormally(returnOperation),
+            IMethodBodyOperation body =>
+                SequenceMayCompleteNormally(body.ChildOperations),
+            IConstructorBodyOperation body =>
+                SequenceMayCompleteNormally(body.ChildOperations),
+            IBlockOperation block =>
+                SequenceMayCompleteNormally(block.ChildOperations),
+            IConditionalOperation conditional =>
+                MayCompleteNormally(conditional.Condition) &&
+                (MayCompleteNormally(conditional.WhenTrue) ||
+                 MayCompleteNormally(conditional.WhenFalse)),
+            IConditionalAccessOperation conditionalAccess =>
+                MayCompleteNormally(conditionalAccess.Operation) &&
+                (MayCompleteNormally(conditionalAccess.WhenNotNull) ||
+                 !DefiniteOperationFacts.IsDefinitelyNonNull(
+                     conditionalAccess.Operation)),
+            IInvocationOperation invocation =>
+                InvocationMayCompleteNormally(invocation),
+            IObjectCreationOperation creation =>
+                CreationMayCompleteNormally(creation),
+            IArrayCreationOperation array =>
+                ChildrenMayCompleteNormally(array),
+            ILockOperation @lock =>
+                MayCompleteNormally(@lock.LockedValue) &&
+                MayCompleteNormally(@lock.Body),
+            IBinaryOperation binary =>
+                ChildrenMayCompleteNormally(binary) &&
+                !IsDefinitelyZeroDivision(binary),
+            IUnaryOperation or IConversionOperation or
+                IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
+                ISimpleAssignmentOperation or IArrayElementReferenceOperation or
+                IFieldReferenceOperation or IPropertyReferenceOperation or
+                IFlowCaptureOperation or IParenthesizedOperation or
+                IArgumentOperation =>
+                ChildrenMayCompleteNormally(operation),
+            IObjectOrCollectionInitializerOperation initializer =>
+                SequenceMayCompleteNormally(initializer.ChildOperations),
+            IExpressionStatementOperation or
+                IVariableDeclarationGroupOperation or
+                IVariableDeclarationOperation or
+                IVariableDeclaratorOperation or
+                IVariableInitializerOperation =>
+                ChildrenMayCompleteNormally(operation),
+            ITryOperation or ILoopOperation or ISwitchOperation or
+                ISwitchExpressionOperation => true,
+            _ => true
+        };
+    }
+
+    private bool InvocationMayCompleteNormally(IInvocationOperation invocation)
+    {
+        if (!MayCompleteNormally(invocation.Instance) ||
+            invocation.Arguments.Any(argument =>
+                !MayCompleteNormally(argument.Value)))
+        {
+            return false;
+        }
+
+        var target = invocation.TargetMethod.OriginalDefinition;
+        return target.DeclaringSyntaxReferences.Length == 0 ||
+            MethodCanCompleteNormally(target);
+    }
+
+    private bool CreationMayCompleteNormally(IObjectCreationOperation creation)
+    {
+        if (creation.Arguments.Any(argument =>
+                !MayCompleteNormally(argument.Value)))
+        {
+            return false;
+        }
+
+        if (creation.Constructor is { } constructor &&
+            constructor.DeclaringSyntaxReferences.Length != 0 &&
+            !MethodCanCompleteNormally(constructor))
+        {
+            return false;
+        }
+
+        return creation.Initializer == null ||
+            MayCompleteNormally(creation.Initializer);
+    }
+
+    private bool SequenceMayCompleteNormally(IEnumerable<IOperation> operations)
+    {
+        foreach (var operation in operations)
+        {
+            if (!MayCompleteNormally(operation))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool ChildrenMayCompleteNormally(IOperation operation)
+    {
+        return operation.ChildOperations.All(MayCompleteNormally);
+    }
+
+    private static bool IsDefinitelyZeroDivision(IBinaryOperation binary)
+    {
+        return binary.OperatorKind is BinaryOperatorKind.Divide or
+            BinaryOperatorKind.Remainder &&
+            binary.RightOperand.ConstantValue is { HasValue: true, Value: 0 };
     }
 
     private bool ChildrenCompleteNormally(IOperation operation)

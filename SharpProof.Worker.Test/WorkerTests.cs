@@ -852,6 +852,9 @@ public sealed class WorkerTests
                     WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
             Assert.That(result.Assumptions.Select(static item => item.Kind),
                 Does.Contain(WorkerAssumptionKind.TrustedBoundary));
+            Assert.That(result.Assumptions.Single(static item =>
+                    item.Kind == WorkerAssumptionKind.TrustedBoundary).Used,
+                Is.True);
             Assert.That(response.CallableResults.Single().Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(backend.CallCount, Is.Zero);
@@ -1203,8 +1206,13 @@ public sealed class WorkerTests
                 request.CompilerManifest.Path));
         var evidence = artifact.Callables.Single()
             .EffectClaims.Single();
+        var authority = artifact.Callables.Single()
+            .EffectAuthorities.Single();
         evidence.Witness!.Effects = WorkerEffectSet.Throws;
+        authority.Witness!.Effects = WorkerEffectSet.Throws;
         CompilerEffectClaimArtifactCodec.Seal(evidence);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
         var bytes = System.Text.Encoding.UTF8.GetBytes(
             CompilerManifestArtifactJson.Serialize(artifact));
         await File.WriteAllBytesAsync(
@@ -2679,6 +2687,269 @@ public sealed class WorkerTests
             (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
                 artifact)),
             Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
+    public async Task Sp058SummaryProvenanceTamperMatrixFailsClosedAndProjectsClosure()
+    {
+        static CompilerSummaryCallArtifact OnlySummary(
+            CompilerManifestArtifact artifact)
+        {
+            var summaries = artifact.Callables
+                .SelectMany(static callable => callable.Body?.SummaryCalls ?? [])
+                .ToArray();
+            Assert.That(summaries, Has.Length.EqualTo(1));
+            return summaries[0];
+        }
+
+        static void AssertHydrationRejects(
+            CompilerManifestArtifact artifact,
+            Action<CompilerSummaryCallArtifact> tamper,
+            string label)
+        {
+            tamper(OnlySummary(artifact));
+            Assert.That(
+                (Action)(() => CompilerManifestArtifactJson.DecodeCallables(
+                    artifact)),
+                Throws.TypeOf<InvalidDataException>(),
+                label);
+        }
+
+        static void AssertProven(
+            WorkerVerifyResponse response,
+            string evidencePrefix,
+            bool requiresDependencyClosure)
+        {
+            Assert.That(response.Errors, Is.Empty);
+            var result = response.ClaimResults.Single();
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+                Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+                Assert.That(
+                    result.ProofCore.Any(item => item.StartsWith(
+                        evidencePrefix,
+                        StringComparison.Ordinal)),
+                    Is.True);
+                if (requiresDependencyClosure)
+                {
+                    Assert.That(
+                        result.ProofCore.Any(item => item.Contains(
+                            ":deps=",
+                            StringComparison.Ordinal) && item.Contains(
+                            ";il-summary:",
+                            StringComparison.Ordinal)),
+                        Is.True);
+                }
+            }
+        }
+
+        using var packProject = TestProject.Create(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Maximum(int left, int right) {
+                    Contract.Ensures(
+                        Contract.Result<int>() ==
+                        (left >= right ? left : right));
+                    return Math.Max(left, right);
+                }
+            }
+            """);
+        packProject.UseNetCoreReferencePack();
+        var packRequest = packProject.CreateRequest(
+            cacheEnabled: false,
+            specificationPacks: ["dotnet.scalar"]);
+        var packJson = await File.ReadAllTextAsync(
+            packRequest.CompilerManifest.Path);
+        CompilerManifestArtifact ReadPack()
+        {
+            return CompilerManifestArtifactJson.Deserialize(packJson);
+        }
+
+        var validPack = ReadPack();
+        var packSummary = OnlySummary(validPack);
+        Assert.That(
+            packSummary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.SpecificationPack));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(validPack)));
+        AssertHydrationRejects(
+            ReadPack(),
+            static summary => summary.EvidenceSha256 = new string('b', 64),
+            "SP058 wrong specification-pack digest");
+        AssertHydrationRejects(
+            ReadPack(),
+            static summary => summary.EvidenceIdentity = "dotnet.scalar@999",
+            "SP058 wrong specification-pack identity");
+
+        using var sourceProject = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static bool Local(bool value) => value;
+
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return Local(value);
+                }
+            }
+            """);
+        var sourceRequest = sourceProject.CreateRequest(cacheEnabled: false);
+        var sourceJson = await File.ReadAllTextAsync(
+            sourceRequest.CompilerManifest.Path);
+        CompilerManifestArtifact ReadSource()
+        {
+            return CompilerManifestArtifactJson.Deserialize(sourceJson);
+        }
+
+        var validSource = ReadSource();
+        var sourceSummary = OnlySummary(validSource);
+        Assert.That(
+            sourceSummary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.Source));
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(validSource)));
+        AssertHydrationRejects(
+            ReadSource(),
+            static summary => summary.EvidenceSha256 = new string('c', 64),
+            "SP058 wrong source body digest");
+        AssertHydrationRejects(
+            ReadSource(),
+            static summary => summary.Identity =
+                "M:Subject.NotTheCallee(System.Boolean)",
+            "SP058 wrong source callee identity");
+
+        using var ilProject = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return ExternalUsed.Read(value);
+                }
+            }
+            """);
+        ilProject.AddImplementationReference(
+            """
+            public static class ExternalUsed {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        ilProject.AddImplementationReference(
+            """
+            public static class ExternalUnused {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        var ilRequest = ilProject.CreateRequest(cacheEnabled: false);
+        var ilJson = await File.ReadAllTextAsync(
+            ilRequest.CompilerManifest.Path);
+        CompilerManifestArtifact ReadIl()
+        {
+            return CompilerManifestArtifactJson.Deserialize(ilJson);
+        }
+
+        var validIl = ReadIl();
+        var ilSummary = OnlySummary(validIl);
+        Assert.That(
+            ilSummary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.ImplementationIl));
+        var ilAuthority = validIl.Compilation.SummaryEvidence.Single(row =>
+            row.Origin == CompilerSummaryOrigin.ImplementationIl &&
+            row.CallIdentity == ilSummary.Identity);
+        var unusedModule = validIl.Compilation.References
+            .SelectMany(static reference => reference.Modules)
+            .Single(module =>
+                module.Path.Contains(
+                    "implementation-",
+                    StringComparison.OrdinalIgnoreCase) &&
+                module.Sha256 != ilAuthority.OwningModuleSha256);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(validIl)));
+        AssertHydrationRejects(
+            ReadIl(),
+            summary => summary.EvidenceSha256 = unusedModule.Sha256,
+            "SP058 unused-reference module substitution");
+
+        using var transitiveProject = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                private static bool Local(bool value) => Inner(value);
+
+                private static bool Inner(bool value) =>
+                    ExternalTransitive.Read(value);
+
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return Local(value);
+                }
+            }
+            """);
+        transitiveProject.AddImplementationReference(
+            """
+            public static class ExternalTransitive {
+                public static bool Read(bool value) => value;
+            }
+            """);
+        var transitiveRequest = transitiveProject.CreateRequest(
+            cacheEnabled: false);
+        var transitiveJson = await File.ReadAllTextAsync(
+            transitiveRequest.CompilerManifest.Path);
+        CompilerManifestArtifact ReadTransitive()
+        {
+            return CompilerManifestArtifactJson.Deserialize(transitiveJson);
+        }
+
+        var validTransitive = ReadTransitive();
+        var transitiveSummary = OnlySummary(validTransitive);
+        Assert.That(
+            transitiveSummary.Origin,
+            Is.EqualTo(CompilerSummaryOrigin.Source));
+        var transitiveIlDependency = transitiveSummary.DependencyEvidence
+            .Single(item => item.Origin == CompilerSummaryOrigin.ImplementationIl);
+        Assert.That(transitiveIlDependency.CallIdentity, Is.Not.Empty);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(validTransitive)));
+        AssertHydrationRejects(
+            ReadTransitive(),
+            static summary => summary.DependencyEvidence
+                .Single(item => item.Origin == CompilerSummaryOrigin.ImplementationIl)
+                .EvidenceSha256 = new string('d', 64),
+            "SP058 transitive dependency digest");
+        AssertHydrationRejects(
+            ReadTransitive(),
+            static summary => summary.DependencyEvidence
+                .Single(item => item.Origin == CompilerSummaryOrigin.ImplementationIl)
+                .CallIdentity = "M:ExternalTransitive.NotTheCallee(System.Boolean)",
+            "SP058 transitive dependency identity");
+
+        using var sourceWorker = SharpProofWorker.Create(sourceRequest.Budgets);
+        AssertProven(
+            await sourceWorker.VerifyAsync(sourceRequest),
+            "source-summary:",
+            requiresDependencyClosure: false);
+        using var packWorker = SharpProofWorker.Create(packRequest.Budgets);
+        AssertProven(
+            await packWorker.VerifyAsync(packRequest),
+            "spec-pack:dotnet.scalar@1:",
+            requiresDependencyClosure: false);
+        using var ilWorker = SharpProofWorker.Create(ilRequest.Budgets);
+        AssertProven(
+            await ilWorker.VerifyAsync(ilRequest),
+            "il-summary:",
+            requiresDependencyClosure: false);
+        using var transitiveWorker = SharpProofWorker.Create(
+            transitiveRequest.Budgets);
+        AssertProven(
+            await transitiveWorker.VerifyAsync(transitiveRequest),
+            "source-summary:",
+            requiresDependencyClosure: true);
     }
 
     [Test]
@@ -4274,6 +4545,115 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task CacheHitEnforcesALoweredByteBound()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        var cacheFile = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        request.Cache.MaximumBytes = new FileInfo(cacheFile).Length - 1;
+
+        var second = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task CacheHitEvictsOlderEntriesUnderTheActiveByteBound()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var firstRequest = project.CreateRequest(
+            cacheEnabled: true,
+            targetFramework: "net8.0-linux");
+        var secondRequest = project.CreateRequest(
+            cacheEnabled: true,
+            targetFramework: "net9.0-linux");
+        await worker.VerifyAsync(firstRequest);
+        var oldest = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        await worker.VerifyAsync(secondRequest);
+        var files = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json");
+        Assert.That(files, Has.Length.EqualTo(2));
+        var newest = files.Single(path => !string.Equals(
+            path,
+            oldest,
+            StringComparison.Ordinal));
+        File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
+        File.SetLastWriteTimeUtc(newest, DateTime.UtcNow);
+        secondRequest.Cache.MaximumBytes = new FileInfo(newest).Length;
+
+        var hit = await worker.VerifyAsync(secondRequest);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(hit.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                Is.EqualTo(new[] { newest }));
+        }
+    }
+
+    [Test]
+    public async Task CanceledCachePublicationCannotBecomeALaterHit()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            VerificationCache.PathValidationOverride = (_, path) =>
+            {
+                if (path.EndsWith(
+                        ".sharp-proof-cache.json",
+                        StringComparison.Ordinal) &&
+                    File.Exists(path))
+                {
+                    cancellation.Cancel();
+                    cancellation.Token.ThrowIfCancellationRequested();
+                }
+            };
+            var canceled = await worker.VerifyAsync(request, cancellation.Token);
+            Assert.That(canceled.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
+            Assert.That(
+                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                Is.Empty);
+        }
+        finally
+        {
+            VerificationCache.PathValidationOverride = null;
+        }
+
+        var recomputed = await worker.VerifyAsync(request);
+        var cached = await worker.VerifyAsync(request);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(recomputed.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(cached.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
     public async Task CacheEvictionPreservesUnrelatedJsonFiles()
     {
         using var project = TestProject.Create(RefutationSource);
@@ -4450,6 +4830,11 @@ public sealed class WorkerTests
             Assert.That(response.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(File.Exists(cacheFile), Is.True);
             Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
+            Assert.That(
+                Directory.GetFiles(
+                    project.CacheDirectory,
+                    "*.sharp-proof-cache.json"),
+                Is.EqualTo(new[] { cacheFile }));
         }
     }
 
@@ -4794,6 +5179,155 @@ public sealed class WorkerTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task RenewalFailurePreservesTimeoutAndClassifiesUnclaimedWork(
+        bool backendUnavailable)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 1;
+        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.ProjectWallTimeMilliseconds = 1_000;
+        var factoryCalls = 0;
+        using var worker = new SharpProofWorker(() =>
+        {
+            if (Interlocked.Increment(ref factoryCalls) == 1)
+            {
+                return new DelayingBackend();
+            }
+
+            throw backendUnavailable
+                ? new DllNotFoundException("replacement z3 missing")
+                : new InvalidOperationException("replacement creation failed");
+        });
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factoryCalls, Is.EqualTo(2));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(backendUnavailable
+                    ? WorkerRunFailureReason.BackendUnavailable
+                    : WorkerRunFailureReason.InfrastructureFailure));
+            Assert.That(
+                response.CallableResults.Select(static result => result.Reason),
+                Is.EqualTo((WorkerCallableCoverageReason[])[
+                    WorkerCallableCoverageReason.MethodTimeout,
+                    WorkerCallableCoverageReason.InfrastructureFailure
+                ]));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.EqualTo((WorkerClaimReason[])[
+                    WorkerClaimReason.MethodTimeout,
+                    backendUnavailable
+                        ? WorkerClaimReason.BackendUnavailable
+                        : WorkerClaimReason.InfrastructureFailure
+                ]));
+            Assert.That(
+                WorkerProtocolJson.ValidateForRequest(
+                    response,
+                    WorkerProtocolJson.ComputeRequestHash(request),
+                    response.InputHash,
+                    response.Manifest,
+                    request,
+                    new WorkerVersionSummary
+                    {
+                        WorkerVersion = WorkerCacheIdentity.Current.ToolVersion,
+                        ApiSpecVersion = WorkerCacheIdentity.Current.ApiSpecVersion,
+                        WorkerBinarySha256 =
+                            WorkerCacheIdentity.Current.WorkerBinarySha256,
+                        ApiSpecContentSha256 =
+                            WorkerCacheIdentity.Current.ApiSpecContentSha256
+                    }).IsValid,
+                Is.True);
+        }
+    }
+
+    [TestCase("null", WorkerRunFailureReason.InfrastructureFailure,
+        WorkerClaimReason.InfrastructureFailure, 2)]
+    [TestCase("reuse", WorkerRunFailureReason.BackendUnavailable,
+        WorkerClaimReason.BackendUnavailable, 2)]
+    [TestCase("dispose", WorkerRunFailureReason.InfrastructureFailure,
+        WorkerClaimReason.InfrastructureFailure, 1)]
+    public async Task InvalidRenewalStateFailsClosedWithTypedEvidence(
+        string scenario,
+        WorkerRunFailureReason expectedFailure,
+        WorkerClaimReason expectedClaimReason,
+        int expectedFactoryCalls)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 1;
+        request.Budgets.MethodWallTimeMilliseconds = 30;
+        request.Budgets.ProjectWallTimeMilliseconds = 1_000;
+        var factoryCalls = 0;
+        ISmtBackend? original = null;
+        using var worker = new SharpProofWorker(() =>
+        {
+            factoryCalls++;
+            if (factoryCalls == 1)
+            {
+                original = scenario == "dispose"
+                    ? new ThrowingDisposeDelayingBackend()
+                    : new DelayingBackend();
+                return original;
+            }
+
+            return scenario switch
+            {
+                "null" => null!,
+                "reuse" => original!,
+                _ => new CountingBackend(
+                    BackendCheckResult.Unsatisfiable([]))
+            };
+        });
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factoryCalls, Is.EqualTo(expectedFactoryCalls));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(response.FailureReason, Is.EqualTo(expectedFailure));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.EqualTo((WorkerClaimReason[])[
+                    WorkerClaimReason.MethodTimeout,
+                    expectedClaimReason
+                ]));
+        }
+    }
+
     [Test]
     public async Task FactorylessTimeoutClassifiesEveryUnclaimedTargetAsTimedOut()
     {
@@ -4917,9 +5451,8 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(() =>
             Interlocked.Increment(ref factoryCalls) <= 2
                 ? new DelayingBackend()
-                : new SharpProof.Smt.IrSmtBackend(
-                    new SharpProof.Smt.IrSmtBackendOptions(
-                        request.Budgets.QueryRlimit)));
+                : new CountingBackend(
+                    BackendCheckResult.Unsatisfiable([])));
 
         var response = await worker.VerifyAsync(request);
 
@@ -4932,7 +5465,7 @@ public sealed class WorkerTests
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimOutcome.Proven,
-                    WorkerClaimOutcome.Refuted
+                    WorkerClaimOutcome.Proven
                 ]));
             Assert.That(
                 response.ClaimResults.Take(2)
@@ -5552,6 +6085,25 @@ public sealed class WorkerTests
         }
     }
 
+    private sealed class ThrowingDisposeDelayingBackend :
+        ISmtBackend,
+        IDisposable
+    {
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return BackendCheckResult.Unknown(
+                BackendFailureReason.InfrastructureFailure);
+        }
+
+        public void Dispose()
+        {
+            throw new InvalidOperationException("backend disposal failed");
+        }
+    }
+
     private sealed class ProofThenCounterexampleBackend : ISmtBackend
     {
         private int _calls;
@@ -5729,6 +6281,222 @@ public sealed class WorkerTests
             Interlocked.Add(ref _consumedResourceCount, _resourceCost);
             return Task.FromResult(_result);
         }
+    }
+
+    [Test]
+    public async Task ArtifactAuthorityRejectsFabricatedProofCoreAndUsedFlag()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Assume(value >= 0);
+                    Contract.Assume(value <= 10);
+                    Contract.Ensures(Contract.Result<long>() >= 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var snapshot = await WorkerInputSnapshot.LoadAsync(
+            request,
+            WorkerCacheIdentity.Current,
+            CancellationToken.None);
+        var assumptionId = snapshot.CompilerManifest.Callables.Single()
+            .Clauses.First(static clause =>
+                clause.Kind == CompilerContractKind.Assume)
+            .AssumptionId;
+        using var worker = new SharpProofWorker(
+            new CapturingBackend(BackendCheckResult.Unsatisfiable([0])));
+
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(response, response.InputHash,
+                response.Manifest, authority).IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+
+        var result = response.ClaimResults.Single();
+        var originalCore = result.ProofCore.ToArray();
+        result.ProofCore = ["fabricated:999"];
+        var fabricated = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            fabricated.Errors.Select(static error => error.Code),
+            Does.Contain("response.proof_core_authority"));
+
+        result.ProofCore = originalCore;
+        var usedAssumption = result.Assumptions.Single(
+            assumption => assumption.Kind == WorkerAssumptionKind.UserAssume &&
+                assumption.Id == assumptionId);
+        usedAssumption.Used = !usedAssumption.Used;
+        var forgedUsage = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forgedUsage.Errors.Select(static error => error.Code),
+            Does.Contain("response.assumption_usage_authority"));
+    }
+
+    [TestCase("variable")]
+    [TestCase("kind")]
+    [TestCase("value")]
+    public async Task ArtifactAuthorityBindsRefutedModelRows(string mutation)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Positive(int value) {
+                    Contract.Ensures(Contract.Result<int>() > 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(new SpuriousModelBackend());
+
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(response, response.InputHash,
+                response.Manifest, authority).IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+
+        var row = response.ClaimResults.Single().Model.Single();
+        switch (mutation)
+        {
+            case "variable":
+                row.Variable = "parameter:999";
+                break;
+            case "kind":
+                row.Kind = nameof(IrValueKind.Boolean);
+                row.Value = "false";
+                break;
+            default:
+                row.Value = "01";
+                break;
+        }
+
+        var forged = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forged.Errors.Select(static error => error.Code),
+            Does.Contain("response.model_authority"));
+    }
+
+    [TestCase("kind")]
+    [TestCase("capability")]
+    [TestCase("throw-hierarchy")]
+    public async Task ArtifactAuthorityBindsRefutedEffectWitness(string mutation)
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                [ZeroAllocations]
+                public static object Allocate() => new object();
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
+
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(response, response.InputHash,
+                response.Manifest, authority).IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+
+        var witness = response.ClaimResults.Single().EffectWitness!;
+        switch (mutation)
+        {
+            case "kind":
+                witness.Kind = "managed-array-allocation";
+                break;
+            case "capability":
+                witness.Capabilities = WorkerEffectCapabilitySet.Reflection;
+                break;
+            default:
+                witness.ExactExceptionTypeHierarchy = ["System.Exception"];
+                witness.Effects |= WorkerEffectSet.Throws;
+                break;
+        }
+
+        var forged = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forged.Errors.Select(static error => error.Code),
+            Does.Contain("response.effect_witness_authority"));
+    }
+
+    [Test]
+    public async Task ArtifactAuthorityBindsVacuityAndEntryCore()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static int Impossible() {
+                    Contract.Requires(false);
+                    Contract.Ensures(Contract.Result<int>() > 0);
+                    return 0;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
+
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(response, response.InputHash,
+                response.Manifest, authority).IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+
+        var result = response.ClaimResults.Single();
+        result.Vacuity = WorkerVacuityKind.None;
+        var forgedVacuity = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forgedVacuity.Errors.Select(static error => error.Code),
+            Does.Contain("response.vacuity_authority"));
+
+        result.Vacuity = WorkerVacuityKind.ContradictoryPreconditions;
+        result.ProofCore = ["assume:0"];
+        var forgedCore = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            forgedCore.Errors.Select(static error => error.Code),
+            Does.Contain("response.proof_core_authority"));
+    }
+
+    private static CompilerResponseEvidenceAuthority CreateResponseAuthority(
+        WorkerVerifyRequest request)
+    {
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            File.ReadAllText(request.CompilerManifest.Path));
+        return new CompilerResponseEvidenceAuthority(
+            CompilerManifestArtifactJson.DecodeCallables(artifact));
+    }
+
+    private static string FormatValidationErrors(
+        WorkerVerifyResponse response,
+        CompilerResponseEvidenceAuthority authority)
+    {
+        return string.Join(
+            Environment.NewLine,
+            WorkerProtocolJson.Validate(
+                response,
+                response.InputHash,
+                response.Manifest,
+                authority).Errors.Select(static error => error.Code));
     }
 
     private static string FindRepositoryRoot()

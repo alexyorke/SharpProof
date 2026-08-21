@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "assemblyNames": [
+    "SharpProof.Analyzer",
+    "SharpProof.Analyzer.Core",
+    "SharpProof.Attributes",
+    "SharpProof.BuildTasks",
+    "SharpProof.CompilerArtifact",
+    "SharpProof.CompilerCollector",
+    "SharpProof.ContractForGenerator",
+    "SharpProof.Contracts",
+    "SharpProof.Dataflow",
+    "SharpProof.Effects",
+    "SharpProof.Frontend",
+    "SharpProof.Host",
+    "SharpProof.Ir",
+    "SharpProof.Smt",
+    "SharpProof.Specs",
+    "SharpProof.Summaries",
+    "SharpProof.Verify",
+    "SharpProof.Worker",
+    "SharpProof.Worker.Launcher",
+    "SharpProof.Worker.Protocol"
+  ]
+}

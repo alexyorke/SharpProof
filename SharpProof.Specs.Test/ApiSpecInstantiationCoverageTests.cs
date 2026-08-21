@@ -264,6 +264,180 @@ public sealed class ApiSpecInstantiationCoverageTests
             SpecInstantiationFailureKind.UnsupportedValueType);
     }
 
+    [TestCase(SpecVariableRole.Receiver, IrBinaryOperator.Equal, false)]
+    [TestCase(SpecVariableRole.Parameter, IrBinaryOperator.NotEqual, false)]
+    [TestCase(SpecVariableRole.Result, IrBinaryOperator.Equal, true)]
+    [TestCase(SpecVariableRole.Result, IrBinaryOperator.NotEqual, false)]
+    public void ReferenceNullUsesTheExactSubstitutedOperandType(
+        SpecVariableRole role,
+        IrBinaryOperator @operator,
+        bool nullOnLeft)
+    {
+        var variable = Variable(role, role == SpecVariableRole.Parameter ? 0 : -1,
+            IrTypeKind.Reference);
+        var nullValue = new SpecNullDeclaration(IrTypeKind.Reference);
+        var comparison = Binary(
+            @operator,
+            nullOnLeft ? nullValue : variable,
+            nullOnLeft ? variable : nullValue,
+            IrTypeKind.Boolean);
+        var template = CreateTemplate(
+            isStatic: role != SpecVariableRole.Receiver,
+            receiverType: role == SpecVariableRole.Receiver ? IrTypeKind.Reference : null,
+            parameterTypes: role == SpecVariableRole.Parameter
+                ? [IrTypeKind.Reference]
+                : [],
+            resultType: role == SpecVariableRole.Result ? IrTypeKind.Reference : null,
+            [comparison]);
+        var factory = new IrFactory();
+        var widgetType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Widget<string>");
+        var replacement = factory.Variable(factory.CreateVariable("value", widgetType));
+        var id = role switch
+        {
+            SpecVariableRole.Receiver => template.Receiver!.Value,
+            SpecVariableRole.Parameter => template.Parameters.Single(),
+            _ => template.Result!.Value
+        };
+
+        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm> { [id] = replacement });
+
+        Assert.That(instantiated.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
+        var binary = instantiated.Postconditions.Single() as IrBinaryTerm;
+        Assert.That(binary, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(binary!.Left.Type, Is.EqualTo(widgetType));
+            Assert.That(binary.Right.Type, Is.EqualTo(widgetType));
+        }
+    }
+
+    [Test]
+    public void ExactReferenceAndSequenceTypesMustAgreeBeforeIrConstruction()
+    {
+        var left = Variable(SpecVariableRole.Parameter, 0, IrTypeKind.Reference);
+        var right = Variable(SpecVariableRole.Parameter, 1, IrTypeKind.Reference);
+        var template = CreateTemplate(
+            isStatic: true,
+            receiverType: null,
+            parameterTypes: [IrTypeKind.Reference, IrTypeKind.Reference],
+            resultType: null,
+            [Equal(left, right)]);
+        var factory = new IrFactory();
+        var widgetType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Widget");
+        var otherType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Other");
+        var compatible = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters[0]] = factory.Variable(
+                    factory.CreateVariable("left", widgetType)),
+                [template.Parameters[1]] = factory.Variable(
+                    factory.CreateVariable("right", widgetType))
+            });
+        var incompatible = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters[0]] = factory.Variable(
+                    factory.CreateVariable("leftOther", widgetType)),
+                [template.Parameters[1]] = factory.Variable(
+                    factory.CreateVariable("rightOther", otherType))
+            });
+
+        Assert.That(compatible.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
+        AssertFailure(incompatible, SpecInstantiationFailureKind.TypeMismatch);
+    }
+
+    [TestCase(IrTypeKind.String)]
+    [TestCase(IrTypeKind.Reference)]
+    public void BuiltInNullableTypesRetainTheirExactType(
+        IrTypeKind declaredType)
+    {
+        var variable = Variable(
+            SpecVariableRole.Parameter,
+            0,
+            declaredType);
+        var template = CreateTemplate(
+            isStatic: true,
+            receiverType: null,
+            parameterTypes: [declaredType],
+            resultType: null,
+            [Binary(
+                IrBinaryOperator.NotEqual,
+                new SpecNullDeclaration(declaredType),
+                variable,
+                IrTypeKind.Boolean)]);
+        var factory = new IrFactory();
+        var exactType = declaredType == IrTypeKind.String
+            ? factory.StringType
+            : factory.ObjectType;
+
+        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters.Single()] = factory.Variable(
+                    factory.CreateVariable("value", exactType))
+            });
+
+        Assert.That(instantiated.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
+        var binary = instantiated.Postconditions.Single() as IrBinaryTerm;
+        Assert.That(binary, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(binary!.Left.Type, Is.EqualTo(exactType));
+            Assert.That(binary.Right.Type, Is.EqualTo(exactType));
+        }
+    }
+
+    [Test]
+    public void ExactSequenceTypesMustAgreeBeforeIrConstruction()
+    {
+        var left = Variable(SpecVariableRole.Parameter, 0, IrTypeKind.Sequence);
+        var right = Variable(SpecVariableRole.Parameter, 1, IrTypeKind.Sequence);
+        var template = CreateTemplate(
+            isStatic: true,
+            receiverType: null,
+            parameterTypes: [IrTypeKind.Sequence, IrTypeKind.Sequence],
+            resultType: null,
+            [Equal(left, right)]);
+        var factory = new IrFactory();
+        var integers = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var strings = factory.GetOrCreateSequenceType(factory.StringType);
+        var compatible = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters[0]] = factory.Variable(
+                    factory.CreateVariable("integersLeft", integers)),
+                [template.Parameters[1]] = factory.Variable(
+                    factory.CreateVariable("integersRight", integers))
+            });
+        var incompatible = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters[0]] = factory.Variable(
+                    factory.CreateVariable("integers", integers)),
+                [template.Parameters[1]] = factory.Variable(
+                    factory.CreateVariable("strings", strings))
+            });
+
+        Assert.That(compatible.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
+        AssertFailure(incompatible, SpecInstantiationFailureKind.TypeMismatch);
+    }
+
     private static void AssertFailure(
         SpecInstantiationResult result,
         SpecInstantiationFailureKind kind)

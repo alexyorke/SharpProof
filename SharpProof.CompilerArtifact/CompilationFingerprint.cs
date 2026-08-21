@@ -6,6 +6,42 @@ internal static class CompilationFingerprint
 {
     private const string RuntimeContractEvaluationSymbol =
         "SHARPPROOF_CONTRACTS";
+    private const string SyntaxTreeSnapshotDomain =
+        "SharpProof.CompilerSyntaxTreeSnapshot";
+    private const int SyntaxTreeSnapshotVersion = 1;
+    private const string SourceLineMapDomain =
+        "SharpProof.CompilerSourceLineMap";
+    private const int SourceLineMapVersion = 1;
+
+    internal static string ComputeLineMapSha256(
+        CompilerSourceLineMapEntry[] entries)
+    {
+        entries = ArgumentNullGuard.NotNull(entries, nameof(entries));
+
+        using var hash = new CanonicalHashWriter();
+        hash.Add(
+            SourceLineMapDomain,
+            SourceLineMapVersion,
+            JsonSerializer.SerializeToUtf8Bytes(
+                entries,
+                WorkerProtocolJson.Options));
+        return hash.Finish();
+    }
+
+    internal static string ComputeSyntaxTreeSnapshotSha256(
+        CompilerSyntaxTreeSnapshot snapshot)
+    {
+        snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
+
+        using var hash = new CanonicalHashWriter();
+        hash.Add(
+            SyntaxTreeSnapshotDomain,
+            SyntaxTreeSnapshotVersion,
+            JsonSerializer.SerializeToUtf8Bytes(
+                snapshot,
+                WorkerProtocolJson.Options));
+        return hash.Finish();
+    }
 
     internal static string ComputeSha256(
         CompilerCompilationSnapshot snapshot,
@@ -16,7 +52,7 @@ internal static class CompilationFingerprint
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            8,
+            9,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
             JsonSerializer.Serialize(
                 CompilerDiagnosticArtifactOrdering.Canonicalize(
@@ -35,19 +71,142 @@ internal static class CompilationFingerprint
 
     private static bool ValidSnapshot(CompilerCompilationSnapshot? value)
     {
-        return value != null &&
-        IsCanonicalPath(value.ProjectDirectory) &&
-        HasText(value.AssemblyName) &&
-        HasText(value.AssemblyIdentity) &&
-        HasText(value.TargetFramework) &&
-        HasText(value.CompilerVersion) &&
-        Guid.TryParseExact(value.CompilerMvid, "D", out _) &&
-        HasText(value.CSharpCompilerVersion) &&
-        Guid.TryParseExact(value.CSharpCompilerMvid, "D", out _) &&
-        ValidOptions(value.Options) &&
-        All(value.SyntaxTrees, ValidTree) &&
-        ValidReferences(value.References) &&
-        ValidAdditionalFiles(value.AdditionalFiles);
+        if (value is null)
+        {
+            return false;
+        }
+
+        return CompilerCaptureAuthority.IsCanonicalPath(value.ProjectDirectory) &&
+            HasText(value.AssemblyName) &&
+            CompilerCaptureAuthority.IsCanonicalAssemblyIdentity(
+                value.AssemblyIdentity,
+                out var identityName) &&
+            string.Equals(
+                value.AssemblyName,
+                identityName,
+                StringComparison.Ordinal) &&
+            HasText(value.TargetFramework) &&
+            CompilerCaptureAuthority.IsCanonicalVersion(value.CompilerVersion) &&
+            CompilerCaptureAuthority.IsCanonicalMvid(value.CompilerMvid) &&
+            CompilerCaptureAuthority.IsCanonicalVersion(
+                value.CSharpCompilerVersion) &&
+            CompilerCaptureAuthority.IsCanonicalMvid(
+                value.CSharpCompilerMvid) &&
+            CompilerSpecificationPackAuthorityValidation.IsValid(
+                value.SpecificationPackIds,
+                value.SpecificationPackCatalogVersion,
+                value.SpecificationPackCatalogSha256) &&
+            ValidOptions(value.Options) &&
+            All(value.SyntaxTrees, ValidTree) &&
+            value.SyntaxTrees.Select(static tree => tree.Path)
+                .Distinct(StringComparer.Ordinal).Count() == value.SyntaxTrees.Length &&
+            ValidReferences(value.References) &&
+            ValidAdditionalFiles(value.AdditionalFiles) &&
+            ValidSummaryEvidence(value.SummaryEvidence, value);
+    }
+
+    private static bool ValidSummaryEvidence(
+        CompilerSummaryEvidenceSnapshot[]? values,
+        CompilerCompilationSnapshot snapshot)
+    {
+        if (values == null)
+        {
+            return false;
+        }
+
+        string? previous = null;
+        foreach (var row in values)
+        {
+            if (row == null ||
+                !Enum.IsDefined(typeof(CompilerSummaryOrigin), row.Origin) ||
+                !ValidIdentity(row.CallIdentity) ||
+                !WorkerProtocolJson.IsSha256(row.EvidenceSha256) ||
+                !CompilerSpecificationPackAuthorityValidation.IsValidPackIdentity(
+                    row.Origin == CompilerSummaryOrigin.SpecificationPack
+                        ? row.EvidenceIdentity
+                        : null,
+                    snapshot.SpecificationPackIds) &&
+                row.Origin == CompilerSummaryOrigin.SpecificationPack ||
+                row.Origin != CompilerSummaryOrigin.SpecificationPack &&
+                row.EvidenceIdentity.Length != 0)
+            {
+                return false;
+            }
+
+            var key = ((int)row.Origin).ToString(CultureInfo.InvariantCulture) + "|" +
+                row.CallIdentity + "|" + row.EvidenceIdentity + "|" + row.EvidenceSha256;
+            if (previous != null &&
+                StringComparer.Ordinal.Compare(previous, key) >= 0 ||
+                !ValidSummaryEvidenceRow(row, snapshot))
+            {
+                return false;
+            }
+
+            previous = key;
+        }
+
+        return true;
+    }
+
+    private static bool ValidSummaryEvidenceRow(
+        CompilerSummaryEvidenceSnapshot row,
+        CompilerCompilationSnapshot snapshot)
+    {
+        switch (row.Origin)
+        {
+            case CompilerSummaryOrigin.Source:
+                return row.EvidenceIdentity.Length == 0 &&
+                    row.SourcePath != null &&
+                    WorkerProtocolJson.IsSha256(row.SourceTreeSha256) &&
+                    row.SourceStart >= 0 &&
+                    row.SourceLength > 0 &&
+                    row.OwningModuleName.Length == 0 &&
+                    row.OwningModuleMvid.Length == 0 &&
+                    row.OwningModuleSha256.Length == 0 &&
+                    row.MethodMetadataToken == -1 &&
+                    (snapshot.SyntaxTrees ?? []).Count(tree =>
+                        tree != null &&
+                        tree.Path == row.SourcePath &&
+                        tree.Sha256 == row.SourceTreeSha256 &&
+                        row.SourceStart <= tree.TextLength - row.SourceLength) == 1;
+
+            case CompilerSummaryOrigin.ImplementationIl:
+                return row.EvidenceIdentity.Length == 0 &&
+                    row.SourcePath.Length == 0 &&
+                    row.SourceTreeSha256.Length == 0 &&
+                    row.SourceStart == -1 &&
+                    row.SourceLength == -1 &&
+                    row.OwningModuleName.Length > 0 &&
+                    Guid.TryParseExact(row.OwningModuleMvid, "D", out _) &&
+                    row.OwningModuleSha256 == row.EvidenceSha256 &&
+                    row.MethodMetadataToken > 0 &&
+                    (snapshot.References ?? []).SelectMany(
+                        static reference => reference?.Modules ?? [])
+                    .Count(module => module != null &&
+                        module.Name == row.OwningModuleName &&
+                        module.Mvid == row.OwningModuleMvid &&
+                        module.Sha256 == row.OwningModuleSha256) == 1;
+
+            case CompilerSummaryOrigin.SpecificationPack:
+                return row.SourcePath.Length == 0 &&
+                    row.SourceTreeSha256.Length == 0 &&
+                    row.SourceStart == -1 &&
+                    row.SourceLength == -1 &&
+                    row.OwningModuleName.Length == 0 &&
+                    row.OwningModuleMvid.Length == 0 &&
+                    row.OwningModuleSha256.Length == 0 &&
+                    row.MethodMetadataToken == -1 &&
+                    row.EvidenceSha256 == snapshot.SpecificationPackCatalogSha256;
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool ValidIdentity(string? value)
+    {
+        return value is { Length: > 0 and <= 512 } &&
+            value.All(static character => !char.IsControl(character));
     }
 
     private static bool ValidReferences(
@@ -109,10 +268,13 @@ internal static class CompilationFingerprint
     private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
     {
         return value != null &&
-        value.Path != null &&
+        CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
+        WorkerProtocolJson.IsSha256(value.LineMapSha256) &&
         value.TextLength >= 0 &&
-        HasText(value.LanguageVersion) &&
+        CompilerSourceLocationAuthority.HasValidLineMap(value) &&
+        CompilerCaptureAuthority.IsCanonicalLanguageVersion(
+            value.LanguageVersion) &&
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&
         value.Kind is "Regular" or "Script" &&
         All(value.PreprocessorSymbols, HasText) &&
@@ -122,8 +284,9 @@ internal static class CompilationFingerprint
         !value.EffectivePreprocessorSymbols.Contains(
             RuntimeContractEvaluationSymbol,
             StringComparer.Ordinal) &&
+        CompilerCaptureAuthority.IsCanonicalEmptyTree(value) &&
         All(value.Features, ValidFeature) &&
-        IsOrdered(value.Features, static feature => feature.Key, unique: true);
+            IsOrdered(value.Features, static feature => feature.Key, unique: true);
     }
 
     private static bool ValidFeature(CompilerFeatureSnapshot? value)
@@ -136,10 +299,17 @@ internal static class CompilationFingerprint
         return value != null &&
         value.Kind is "Assembly" or "Module" &&
         All(value.Aliases, HasText) &&
+        (value.Kind == "Assembly" ||
+            !value.EmbedInteropTypes && value.Aliases.Length == 0) &&
         IsOrdered(value.Aliases, unique: false) &&
-        HasText(value.Identity) &&
+        (value.Kind == "Assembly"
+            ? CompilerCaptureAuthority.IsCanonicalAssemblyIdentity(
+                value.Identity,
+                out _)
+            : HasText(value.Identity)) &&
         value.Modules is { Length: > 0 } &&
-        (value.Kind == "Assembly" || value.Modules.Length == 1 &&
+        (value.Kind == "Assembly" || !value.EmbedInteropTypes &&
+            value.Aliases.Length == 0 && value.Modules.Length == 1 &&
             string.Equals(value.Identity, value.Modules[0].Name,
                 StringComparison.Ordinal)) &&
         All(value.Modules, ValidReferenceModule) &&
@@ -161,8 +331,8 @@ internal static class CompilationFingerprint
     {
         return value != null &&
             HasText(value.Name) &&
-            Guid.TryParseExact(value.Mvid, "D", out _) &&
-            IsCanonicalPath(value.Path) &&
+            CompilerCaptureAuthority.IsCanonicalMvid(value.Mvid) &&
+            CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
             WorkerProtocolJson.IsSha256(value.Sha256) &&
             value.SizeBytes is > 0 and
                 <= CompilerReferenceLimits.MaximumModuleBytes;
@@ -179,27 +349,8 @@ internal static class CompilationFingerprint
     private static bool ValidAdditionalFile(CompilerAdditionalFileSnapshot? value)
     {
         return value != null &&
-            IsCanonicalPath(value.Path) &&
+            CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
             WorkerProtocolJson.IsSha256(value.Sha256);
-    }
-
-    private static bool IsCanonicalPath(string path)
-    {
-        try
-        {
-            return Path.IsPathRooted(path) &&
-                NormalizePath(Path.GetFullPath(path)) == path;
-        }
-        catch (Exception exception) when (
-            exception is ArgumentException or IOException or NotSupportedException)
-        {
-            return false;
-        }
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return path;
     }
 
     private static bool IsOrdered(string[]? values, bool unique)
@@ -240,6 +391,7 @@ internal static class CompilationFingerprint
     {
         return !string.IsNullOrWhiteSpace(value);
     }
+
 }
 
 internal static class CompilerDiagnosticArtifactOrdering

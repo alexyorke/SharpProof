@@ -272,6 +272,31 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void InvocationLoweringOrdersArgumentsByRoslynParameterOrdinal()
+    {
+        var lowered = Lower(
+            """
+            private static T Select<T>(T first, T second) => first;
+            public static long Target(long first, long second) =>
+                Select(second: second, first: first);
+            """);
+        var call = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrCallInstruction>()
+            .Single();
+
+        Assert.That(lowered.Result.IsExact, Is.True);
+        Assert.That(call.Arguments, Has.Length.EqualTo(2));
+        var first = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "first" }).Variable;
+        var second = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "second" }).Variable;
+        Assert.That(
+            call.Arguments.Select(static term => ((IrVariableTerm)term).Variable),
+            Is.EqualTo(new[] { first, second }));
+    }
+
+    [Test]
     public void ProgramLoweringOrderAndIdentifiersAreDeterministic()
     {
         const string source =

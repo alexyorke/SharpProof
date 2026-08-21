@@ -150,3 +150,33 @@ internal static class EffectSummaryOperations
             throws, termination, completeness, uncertainty);
     }
 }
+
+/// <summary>
+/// The effects observed while evaluating one source-order step.
+/// </summary>
+/// <remarks>
+/// A may-effect summary alone cannot say whether a following expression can
+/// execute.  Keeping normal completion beside the summary lets callers retain
+/// effects from a definitely throwing step while suppressing effects that are
+/// only reachable after it.
+/// </remarks>
+internal readonly record struct EffectStep(
+    EffectSummary Summary,
+    bool CompletesNormally)
+{
+    internal static EffectStep Empty => new(EffectSummary.Empty, true);
+
+    internal EffectStep Then(EffectStep next)
+    {
+        return new(
+            CompletesNormally
+                ? EffectSummaryDomain.Instance.Join(Summary, next.Summary)
+                : Summary,
+            CompletesNormally && next.CompletesNormally);
+    }
+
+    internal EffectStep WithSummary(EffectSummary summary)
+    {
+        return new(summary, CompletesNormally);
+    }
+}

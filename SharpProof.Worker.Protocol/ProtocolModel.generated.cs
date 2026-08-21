@@ -467,6 +467,156 @@ internal static class WorkerProtocolMetadata
         "summary", "errors",
     ];
 
+    internal static readonly IReadOnlyDictionary<string, WorkerProtocolJsonObjectShape> JsonObjectShapes =
+        new Dictionary<string, WorkerProtocolJsonObjectShape>(StringComparer.Ordinal)
+        {
+            ["WorkerVerifyRequest"] = new([
+                new("protocolVersion", "string"),
+                new("compilerManifest", "WorkerFileReference"),
+                new("budgets", "WorkerBudgets"),
+                new("cache", "WorkerCacheOptions"),
+                new("verifyPolicy", "WorkerVerifyPolicy"),
+                new("assumptionPolicy", "WorkerAssumptionPolicy"),
+            ]),
+            ["WorkerFileReference"] = new([
+                new("path", "string"),
+                new("sha256", "string"),
+            ]),
+            ["WorkerBudgets"] = new([
+                new("queryRlimit", "uint"),
+                new("methodRlimit", "uint"),
+                new("methodWallTimeMilliseconds", "int"),
+                new("projectWallTimeMilliseconds", "int"),
+                new("maxParallelism", "int"),
+                new("maximumExpressionDepth", "int"),
+            ]),
+            ["WorkerCacheOptions"] = new([
+                new("enabled", "bool"),
+                new("directory", "string?"),
+                new("maximumBytes", "long"),
+            ]),
+            ["WorkerSourceLocation"] = new([
+                new("path", "string"),
+                new("start", "int"),
+                new("length", "int"),
+                new("line", "int"),
+                new("column", "int"),
+            ]),
+            ["WorkerCallableManifestEntry"] = new([
+                new("callableId", "string"),
+                new("selectedFeatures", "WorkerSelectedFeature[]"),
+                new("selectionReasons", "WorkerSelectionReason[]"),
+                new("location", "WorkerSourceLocation"),
+                new("claimIds", "string[]"),
+                new("assumptions", "WorkerAssumptionEvidence[]"),
+            ]),
+            ["WorkerClaimManifestEntry"] = new([
+                new("claimId", "string"),
+                new("callableId", "string"),
+                new("ordinal", "int"),
+                new("kind", "WorkerClaimKind"),
+                new("evidence", "WorkerClaimEvidence"),
+                new("effectContractKind", "WorkerEffectContractKind"),
+                new("location", "WorkerSourceLocation"),
+            ]),
+            ["WorkerClaimManifest"] = new([
+                new("schemaVersion", "int"),
+                new("hash", "string"),
+                new("callables", "WorkerCallableManifestEntry[]"),
+                new("claims", "WorkerClaimManifestEntry[]"),
+            ]),
+            ["WorkerAssumptionEvidence"] = new([
+                new("id", "string"),
+                new("kind", "WorkerAssumptionKind"),
+                new("used", "bool"),
+            ]),
+            ["WorkerCallableResult"] = new([
+                new("callableId", "string"),
+                new("coverage", "WorkerCallableCoverage"),
+                new("reason", "WorkerCallableCoverageReason"),
+                new("assumptions", "WorkerAssumptionEvidence[]"),
+            ]),
+            ["WorkerClaimResult"] = new([
+                new("claimId", "string"),
+                new("outcome", "WorkerClaimOutcome"),
+                new("reason", "WorkerClaimReason"),
+                new("effectCertainty", "WorkerEffectEvidenceCertainty"),
+                new("effectWitness", "WorkerEffectViolationWitness?"),
+                new("vacuity", "WorkerVacuityKind"),
+                new("proofCore", "string[]"),
+                new("model", "WorkerModelValue[]"),
+                new("assumptions", "WorkerAssumptionEvidence[]"),
+            ]),
+            ["WorkerEffectViolationWitness"] = new([
+                new("kind", "string"),
+                new("detail", "string"),
+                new("effects", "WorkerEffectSet"),
+                new("capabilities", "WorkerEffectCapabilitySet"),
+                new("exactExceptionTypeHierarchy", "string[]"),
+                new("location", "WorkerSourceLocation"),
+            ]),
+            ["WorkerModelValue"] = new([
+                new("variable", "string"),
+                new("kind", "string"),
+                new("value", "string"),
+            ]),
+            ["WorkerClaimOutcomeCount"] = new([
+                new("outcome", "WorkerClaimOutcome"),
+                new("count", "int"),
+            ]),
+            ["WorkerClaimReasonCount"] = new([
+                new("reason", "WorkerClaimReason"),
+                new("count", "int"),
+            ]),
+            ["WorkerAssumptionSummary"] = new([
+                new("total", "int"),
+                new("used", "int"),
+                new("user", "int"),
+                new("trusted", "int"),
+            ]),
+            ["WorkerVersionSummary"] = new([
+                new("protocolVersion", "string"),
+                new("manifestSchemaVersion", "int"),
+                new("cacheSchemaVersion", "int"),
+                new("workerVersion", "string"),
+                new("apiSpecVersion", "string"),
+                new("workerBinarySha256", "string"),
+                new("apiSpecContentSha256", "string"),
+            ]),
+            ["WorkerVerificationSummary"] = new([
+                new("callableCount", "int"),
+                new("claimCount", "int"),
+                new("outcomeCounts", "WorkerClaimOutcomeCount[]"),
+                new("reasonCounts", "WorkerClaimReasonCount[]"),
+                new("assumptions", "WorkerAssumptionSummary"),
+                new("cacheHit", "bool"),
+                new("cacheStatus", "WorkerCacheStatus"),
+                new("versions", "WorkerVersionSummary"),
+                new("budgets", "WorkerBudgets"),
+                new("elapsedMilliseconds", "long"),
+            ]),
+            ["WorkerProtocolError"] = new([
+                new("code", "string"),
+                new("message", "string"),
+            ]),
+            ["WorkerVerifyResponse"] = new([
+                new("protocolVersion", "string"),
+                new("requestHash", "string"),
+                new("inputHash", "string"),
+                new("manifest", "WorkerClaimManifest"),
+                new("runStatus", "WorkerRunStatus"),
+                new("failureReason", "WorkerRunFailureReason"),
+                new("callableResults", "WorkerCallableResult[]"),
+                new("claimResults", "WorkerClaimResult[]"),
+                new("summary", "WorkerVerificationSummary"),
+                new("errors", "WorkerProtocolError[]"),
+            ]),
+            ["WorkerProtocolValidationResult"] = new([
+                new("errors", "ImmutableArray<WorkerProtocolError>"),
+                new("isValid", "bool"),
+            ]),
+        };
+
     private static readonly HashSet<Enum> s_knownValues = [
         WorkerFeatureSet.Unspecified, WorkerFeatureSet.Effects, WorkerFeatureSet.Contracts, WorkerFeatureSet.All,
         WorkerVerifyPolicy.Unspecified, WorkerVerifyPolicy.Advisory, WorkerVerifyPolicy.WarnOnUnknown, WorkerVerifyPolicy.RequireProven,
@@ -582,15 +732,53 @@ internal static class WorkerProtocolMetadata
                 or WorkerClaimReason.EffectContractNotEstablished,
             _ => false
         };
+    internal static bool MatchesClaimKindOutcome(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerClaimReason reason) =>
+        (kind, outcome, reason) is
+            (_, WorkerClaimOutcome.Proven, WorkerClaimReason.None) or (_, WorkerClaimOutcome.Refuted, WorkerClaimReason.None)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedCallable)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedExpression)
+            or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.DeepPostcondition)
+            or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.MissingReturnValue)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.MethodTimeout)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.ProjectTimeout)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.Canceled)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.BackendUnavailable)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.InfrastructureFailure)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.MalformedBackendResult)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleReplayFailed)
+            or (WorkerClaimKind.Postcondition, WorkerClaimOutcome.Unknown, WorkerClaimReason.PostconditionMayBeUndefined)
+            or (_, WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable)
+            or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete)
+            or (WorkerClaimKind.Effect, WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished);
     internal static bool MatchesEffectCertainty(WorkerClaimOutcome outcome, WorkerClaimReason reason, WorkerEffectEvidenceCertainty certainty) =>
         (outcome, reason, certainty) is
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
             or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry)
             or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedContract, WorkerEffectEvidenceCertainty.Unavailable)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.CounterexampleNotReplayable, WorkerEffectEvidenceCertainty.Unavailable)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
             or (WorkerClaimOutcome.Unknown, _, WorkerEffectEvidenceCertainty.Unavailable);
+    internal static bool MatchesEffectEvidenceTuple(WorkerClaimOutcome outcome, WorkerClaimReason reason, WorkerEffectEvidenceCertainty certainty, WorkerVacuityKind vacuity, bool hasProofCore, bool hasTrustedProvenance, bool trustedProvenanceUsed) =>
+        (outcome, reason, certainty, vacuity, hasProofCore, hasTrustedProvenance, trustedProvenanceUsed) is
+            (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerVacuityKind.None, _, _, _)
+            or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, _, true, true)
+            or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry, WorkerVacuityKind.ContradictoryPreconditions, true, _, _)
+            or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, _, WorkerEffectEvidenceCertainty.Unavailable, WorkerVacuityKind.None, false, _, _);
     internal static bool MatchesVacuity(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerVacuityKind vacuity) =>
         (kind, outcome, vacuity) is
             (_, _, WorkerVacuityKind.None)
@@ -615,6 +803,9 @@ internal static class WorkerProtocolMetadata
     internal static bool MatchesClaimPayload(WorkerClaimOutcome outcome, bool hasProofCore, bool hasModel) =>
         (outcome, hasProofCore, hasModel) is
             (WorkerClaimOutcome.Proven, _, false) or (WorkerClaimOutcome.Refuted, false, _) or (WorkerClaimOutcome.Unknown, false, false);
+    internal static bool MatchesAssumptionKind(WorkerAssumptionKind kind) =>
+        (kind) is
+            (WorkerAssumptionKind.Precondition) or (WorkerAssumptionKind.UserAssume) or (WorkerAssumptionKind.TrustedBoundary);
 
     internal static readonly WorkerProtocolRule<WorkerVerifyRequest>[] RequestRules = [
         new("protocol.unsupported", static value => value.ProtocolVersion == WorkerProtocolVersions.Current),
@@ -662,11 +853,12 @@ internal static class WorkerProtocolMetadata
     ];
     internal static bool IsAssumptionValid(WorkerAssumptionEvidence value) =>
         (!string.IsNullOrWhiteSpace(value.Id)
-        && WorkerProtocolJson.IsDefined(value.Kind, WorkerAssumptionKind.Unspecified));
+        && WorkerProtocolMetadata.MatchesAssumptionKind(value.Kind));
     internal static readonly WorkerProtocolRule<WorkerCallableResult>[] CallableResultRules = [
         new("response.callable_coverage", static value => WorkerProtocolJson.IsDefined(value.Coverage, WorkerCallableCoverage.Unspecified)),
         new("response.callable_reason", static value => WorkerProtocolMetadata.MatchesCallableCoverage(value.Coverage, value.Reason)),
         new("response.callable_assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
+        new("response.callable_assumption_usage", static value => (value.Assumptions ?? []).All(static item => item != null && !item.Used)),
     ];
     internal static readonly WorkerProtocolRule<WorkerClaimResult>[] ClaimResultRules = [
         new("response.claim_outcome", static value => WorkerProtocolJson.IsDefined(value.Outcome, WorkerClaimOutcome.Unspecified)),

@@ -85,6 +85,15 @@ internal sealed partial class SharpProofAnalyzerEngine
             return;
         }
 
+        // ContractFor validation is a final-compilation reconciliation. The
+        // analyzer is the sole owner so every source tree, including output
+        // added by peer generators, is observed exactly once. This is
+        // intentionally independent of feature selection and advisory
+        // activation: every non-off profile must reject malformed companions
+        // rather than silently treating them as absent.
+        context.RegisterCompilationEndAction(
+            ValidateContractForCompanions);
+
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(
                 context.Compilation,
@@ -102,13 +111,16 @@ internal sealed partial class SharpProofAnalyzerEngine
             context.Compilation,
             configuration,
             context.CancellationToken);
-        if (configuration.ContractsEnabled)
-        {
-            context.RegisterCompilationEndAction(
-                ValidateGeneratedContractForCompanions);
-        }
         if (activation.RequiresSymbolAnalysis)
         {
+            context.RegisterSyntaxNodeAction(
+                syntaxContext =>
+                    AnalyzerFeaturePipeline.ValidateNestedCallableDeclaration(
+                        syntaxContext,
+                        session),
+                SyntaxKind.LocalFunctionStatement,
+                SyntaxKind.SimpleLambdaExpression,
+                SyntaxKind.ParenthesizedLambdaExpression);
             context.RegisterSymbolAction(
                 symbolContext => AnalyzerFeaturePipeline.ValidateMethodAttributes(
                     symbolContext,
@@ -129,9 +141,32 @@ internal sealed partial class SharpProofAnalyzerEngine
                         session,
                         compilationContext.ReportDiagnostic,
                         compilationContext.CancellationToken));
+            context.RegisterCompilationEndAction(
+                compilationContext =>
+                    AnalyzerFeaturePipeline.ReconcileSelectedSemicolonAccessors(
+                        compilationContext,
+                        session));
         }
         if (activation.RequiresOperationAnalysis)
         {
+            if (configuration.ContractsEnabled)
+            {
+                context.RegisterSyntaxNodeAction(
+                    syntaxContext =>
+                        AnalyzerFeaturePipeline.AnalyzePrimaryConstructor(
+                            syntaxContext,
+                            session),
+                    SyntaxKind.ClassDeclaration,
+                    SyntaxKind.StructDeclaration,
+                    SyntaxKind.RecordDeclaration,
+                    SyntaxKind.RecordStructDeclaration);
+                context.RegisterSyntaxNodeAction(
+                    syntaxContext =>
+                        AnalyzerFeaturePipeline.AnalyzeMemberInitializer(
+                            syntaxContext,
+                            session),
+                    SyntaxKind.EqualsValueClause);
+            }
             if (activation.RequiresFullOperationAnalysis)
             {
                 context.RegisterOperationBlockAction(operationContext =>
@@ -149,15 +184,12 @@ internal sealed partial class SharpProofAnalyzerEngine
         }
     }
 
-    private static void ValidateGeneratedContractForCompanions(
+    private static void ValidateContractForCompanions(
         CompilationAnalysisContext context)
     {
         var candidates = ContractForValidationEngine.FindCandidates(
             context.Compilation,
-            tree => AnalyzerGeneratedCodePolicy.IsGenerated(
-                tree,
-                context.Compilation,
-                context.CancellationToken),
+            static _ => true,
             context.CancellationToken);
         foreach (var diagnostic in ContractForValidationEngine.Validate(
                      context.Compilation,
@@ -219,8 +251,13 @@ internal sealed partial class SharpProofAnalyzerEngine
     {
         for (var index = 0; index < text.Length; index++)
         {
-            if (text[index] == '[')
+            if (text[index] == '[' ||
+                (text[index] == '\\' &&
+                 index + 1 < text.Length &&
+                 text[index + 1] is 'u' or 'U'))
             {
+                // Unicode escapes can spell any identifier. The syntax scan
+                // compares decoded Identifier.ValueText before activation.
                 return true;
             }
         }

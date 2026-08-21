@@ -9,6 +9,12 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
 function Get-SpdxPackageId {
     param(
@@ -29,6 +35,9 @@ function Get-SpdxPackageId {
         $suffix -replace '[^A-Za-z0-9.-]', '-')
 }
 
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$releaseVersion = Get-SharpProofReleaseVersion `
+    -RepositoryRoot $repositoryRoot
 $resolvedSource = (Resolve-Path `
     -LiteralPath $PackageSource `
     -ErrorAction Stop).Path
@@ -39,10 +48,15 @@ if ($ExpectedTag -notmatch '^v(?<version>[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]
     throw "Release tag must be v<SemVer>: $ExpectedTag"
 }
 $expectedVersion = $Matches['version']
+Test-SharpProofReleaseVersion `
+    -ExpectedVersion $releaseVersion `
+    -ActualVersion $expectedVersion `
+    -Owner 'Release tag'
 $manifestPath = Join-Path $resolvedSource 'SharpProof.release.json'
 $sumsPath = Join-Path $resolvedSource 'SHA256SUMS'
-$manifest = Get-Content -LiteralPath $manifestPath -Raw |
-    ConvertFrom-Json
+$manifest = Read-SharpProofCanonicalReleaseJson `
+    -Path $manifestPath `
+    -DocumentType ReleaseManifest
 if ($manifest.schemaVersion -ne 2 -or
     [string]$manifest.hashAlgorithm -ne 'SHA256') {
     throw 'Unsupported release evidence schema or hash algorithm.'
@@ -51,7 +65,9 @@ if ([string]$manifest.packageVersion -ne $expectedVersion) {
     throw "Release tag '$ExpectedTag' does not match package version " +
         "'$($manifest.packageVersion)'."
 }
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Test-SharpProofReleaseVersionAuthority `
+    -RepositoryRoot $repositoryRoot `
+    -Authority $manifest.versionAuthority
 $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
     throw 'Could not resolve the release checkout commit.'
@@ -70,6 +86,10 @@ if ($artifacts.Count -ne 7 -or
     @($artifacts | Where-Object { $_.kind -eq 'sbom' }).Count -ne 1) {
     throw 'Release evidence must contain three packages, three symbol packages, and one SBOM.'
 }
+Test-SharpProofReleaseBundleTopology `
+    -Directory $resolvedSource `
+    -Artifacts $artifacts `
+    -Owner 'Release artifact bundle'
 $expectedPackageIds = @(
     'SharpProof',
     'SharpProof.Attributes',
@@ -112,13 +132,86 @@ foreach ($artifact in $artifacts) {
         throw "Release artifact hash or size mismatch: $($artifact.fileName)"
     }
 }
+$payloadSets = @($manifest.packagePayloads)
+if ($payloadSets.Count -ne $expectedPackageIds.Count -or
+    ((@($payloadSets.packageId | Sort-Object) -join '|') -ne
+        ($expectedPackageIds -join '|'))) {
+    throw 'Release evidence does not contain the exact package payload graph.'
+}
+$catalogComponents = @(Get-SharpProofThirdPartyComponentGraph)
+Test-SharpProofThirdPartyComponentProjection `
+    -ActualComponents @($manifest.thirdPartyComponents) `
+    -ExpectedComponents $catalogComponents
+foreach ($packageId in $expectedPackageIds) {
+    $mainArtifact = @(
+        $artifacts |
+            Where-Object {
+                [string]$_.kind -eq 'package' -and
+                [string]$_.packageId -eq $packageId
+            }
+    )[0]
+    $symbolArtifact = @(
+        $artifacts |
+            Where-Object {
+                [string]$_.kind -eq 'symbols' -and
+                [string]$_.packageId -eq $packageId
+            }
+    )[0]
+    $components = @(
+        $catalogComponents |
+            Where-Object { [string]$_.packageId -eq $packageId }
+    )
+    $null = Test-SharpProofPackagePayload `
+        -PackagePath (Join-Path `
+            $resolvedSource `
+            ([string]$mainArtifact.fileName)) `
+        -PackageId $packageId `
+        -RepositoryRoot $repositoryRoot `
+        -Components $components `
+        -ExpectedPayloads @(
+            $payloadSets |
+                Where-Object { [string]$_.packageId -eq $packageId } |
+                ForEach-Object { @($_.entries) }
+        )
+    $null = Test-SharpProofSymbolPackagePair `
+        -PackagePath (Join-Path `
+            $resolvedSource `
+            ([string]$mainArtifact.fileName)) `
+        -SymbolPackagePath (Join-Path `
+            $resolvedSource `
+            ([string]$symbolArtifact.fileName)) `
+        -PackageId $packageId `
+        -PackageVersion $expectedVersion `
+        -RepositoryCommit $head
+}
+$dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
+    -PackagePaths @(
+        $artifacts |
+            Where-Object { [string]$_.kind -in @('package', 'symbols') } |
+            ForEach-Object {
+                Join-Path $resolvedSource ([string]$_.fileName)
+            }
+    ))
+$licenseGraph = @(Get-SharpProofPackageLicenseGraph `
+    -PackagePaths @(
+        $artifacts |
+            Where-Object { [string]$_.kind -in @('package', 'symbols') } |
+            ForEach-Object {
+                Join-Path $resolvedSource ([string]$_.fileName)
+            }
+    ))
+$sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
+    -PackageLicenseGraph $licenseGraph `
+    -PackageVersion $expectedVersion `
+    -ThirdPartyComponents $catalogComponents)
 $sbomArtifact = @(
     $artifacts |
         Where-Object { [string]$_.kind -eq 'sbom' }
 )
 $sbomPath = Join-Path $resolvedSource ([string]$sbomArtifact[0].fileName)
-$sbom = Get-Content -LiteralPath $sbomPath -Raw |
-    ConvertFrom-Json
+$sbom = Read-SharpProofCanonicalReleaseJson `
+    -Path $sbomPath `
+    -DocumentType Spdx
 if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
     [string]$sbom.spdxVersion -ne 'SPDX-2.3' -or
     $null -eq $sbom.PSObject.Properties['dataLicense'] -or
@@ -128,11 +221,33 @@ if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
     $null -eq $sbom.PSObject.Properties['relationships']) {
     throw 'Release SBOM is not a complete supported SPDX 2.3 document.'
 }
+Test-SharpProofSbomReleaseIdentity `
+    -Sbom $sbom `
+    -RepositoryRoot $repositoryRoot `
+    -Version $expectedVersion `
+    -RepositoryCommit $head
 $sbomPackages = @($sbom.packages)
 $documentDescribes = @($sbom.documentDescribes)
 $relationships = @($sbom.relationships)
+Test-SharpProofSbomTopology `
+    -SbomPackages $sbomPackages `
+    -DocumentDescribes $documentDescribes `
+    -Relationships $relationships `
+    -FirstPartyPackageIds $expectedPackageIds `
+    -PackageVersion $expectedVersion `
+    -Components $catalogComponents `
+    -DependencyGraph $dependencyGraph
+Test-SharpProofSbomArtifactScope `
+    -Artifacts $artifacts `
+    -SbomPackages $sbomPackages `
+    -DocumentDescribes $documentDescribes `
+    -FirstPartyPackageIds $expectedPackageIds `
+    -PackageVersion $expectedVersion
+Test-SharpProofSbomAttestationWorkflow -Workflow (
+    Get-Content -LiteralPath (Join-Path `
+        $repositoryRoot '.github/workflows/package-consumers.yml') -Raw)
 $componentKeys = @(
-    $manifest.thirdPartyComponents |
+    $catalogComponents |
         ForEach-Object {
             [string]$_.id + "`0" + [string]$_.version
         } |
@@ -166,13 +281,10 @@ foreach ($packageId in $expectedPackageIds) {
                 [string]$_.packageId -eq $packageId
             }
     )[0].sha256
-    if (@($matches[0].checksums |
-            Where-Object {
-                [string]$_.algorithm -eq 'SHA256' -and
-                [string]$_.checksumValue -eq $expectedHash
-            }).Count -ne 1) {
-        throw "Release SBOM checksum is missing or stale: $packageId"
-    }
+    Test-SharpProofSpdxPackageChecksum `
+        -Package $matches[0] `
+        -ExpectedSha256 $expectedHash `
+        -Identity $packageId
 }
 foreach ($key in $componentKeys) {
     $parts = $key.Split("`0")
@@ -184,7 +296,7 @@ foreach ($key in $componentKeys) {
         throw "Release SBOM component identity is invalid: $($parts[0])"
     }
 }
-foreach ($component in $manifest.thirdPartyComponents) {
+foreach ($component in $catalogComponents) {
     $containerId = Get-SpdxPackageId -Name ([string]$component.packageId)
     $componentId = Get-SpdxPackageId `
         -Name ([string]$component.id) `
@@ -200,46 +312,20 @@ foreach ($component in $manifest.thirdPartyComponents) {
             "$($component.packageId)/$($component.id)")
     }
 }
-$expectedDependencies = @(
-    [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof'
-        to = Get-SpdxPackageId -Name 'SharpProof.Attributes'
-    },
-    [pscustomobject]@{
-        from = Get-SpdxPackageId -Name 'SharpProof.Verifier'
-        to = Get-SpdxPackageId -Name 'SharpProof'
-    }
-)
-$dependencyRelationships = @(
-    $relationships |
-        Where-Object {
-            [string]$_.relationshipType -eq 'DEPENDS_ON'
-        }
-)
-if ($dependencyRelationships.Count -ne $expectedDependencies.Count) {
-    throw 'Release SBOM package dependency graph is not exact.'
-}
-foreach ($dependency in $expectedDependencies) {
-    if (@($dependencyRelationships |
-            Where-Object {
-                [string]$_.spdxElementId -eq $dependency.from -and
-                [string]$_.relatedSpdxElement -eq $dependency.to
-            }).Count -ne 1) {
-        throw (
-            "Release SBOM dependency is missing: " +
-            "$($dependency.from) -> $($dependency.to)")
-    }
-}
-$expectedSums = @(
-    $artifacts |
-        ForEach-Object {
-            [string]$_.sha256 + '  ' + [string]$_.fileName
-        }
-)
-$actualSums = @(Get-Content -LiteralPath $sumsPath)
-if (($actualSums -join "`n") -ne ($expectedSums -join "`n")) {
-    throw 'SHA256SUMS does not match the release evidence manifest.'
-}
+Test-SharpProofSbomDependencyGraph `
+    -Relationships $relationships `
+    -DependencyGraph $dependencyGraph
+Test-SharpProofSbomComponentGraph `
+    -SbomPackages $sbomPackages `
+    -Relationships $relationships `
+    -Components $catalogComponents
+Test-SharpProofSbomLicenseGraph `
+    -SbomPackages $sbomPackages `
+    -LicenseGraph $sbomLicenseGraph
+Test-SharpProofReleaseChecksumFile `
+    -Path $sumsPath `
+    -Artifacts $artifacts `
+    -Owner 'SHA256SUMS'
 if (@($manifest.thirdPartyComponents).Count -eq 0 -or
     @($manifest.thirdPartyComponents |
         Where-Object { [string]$_.license -ne 'MIT' }).Count -ne 0) {

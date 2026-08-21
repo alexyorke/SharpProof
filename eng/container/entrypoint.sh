@@ -39,8 +39,10 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
   exit 125
 fi
 
-git config --global --add safe.directory "${repo_root}"
+source_has_git=false
 if git_directory="$(git -C "${repo_root}" rev-parse --absolute-git-dir 2>/dev/null)"; then
+  source_has_git=true
+  git config --global --add safe.directory "${repo_root}"
   git config --global --add safe.directory "${git_directory}"
 fi
 
@@ -48,25 +50,85 @@ if [[ "${command_name}" = "dev" ]]; then
   exec /bin/bash "$@"
 fi
 
+requires_clean_exact_commit_source() {
+  case "$1" in
+    acceptance|mutation|fuzz-nightly|pack|pilots|release-tag|release-baseline|release-plan|release-qualification|release-publish)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+requires_git_source() {
+  if requires_clean_exact_commit_source "$1"; then
+    return 0
+  fi
+  case "$1" in
+    pr-gates|test-changed|package-consumers|performance|coverage)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+assert_clean_exact_commit_source() {
+  if ! git -C "${repo_root}" diff --quiet --ignore-submodules=none -- ||
+    ! git -C "${repo_root}" diff --cached --quiet \
+      --ignore-submodules=none HEAD --; then
+    echo "SharpProof ${command_name} requires clean exact-commit source; tracked index or working-tree changes were found." >&2
+    exit 2
+  fi
+
+  local untracked_path
+  while IFS= read -r -d '' untracked_path; do
+    case "${untracked_path}" in
+      nupkgs/*)
+        # Release commands receive the exact package-job artifacts here.
+        ;;
+      *)
+        echo "SharpProof ${command_name} requires clean exact-commit source; an untracked source path was found." >&2
+        exit 2
+        ;;
+    esac
+  done < <(git -C "${repo_root}" ls-files \
+    --others --exclude-standard -z --)
+}
+
+if requires_git_source "${command_name}" &&
+  [[ "${source_has_git}" != "true" ]]; then
+  echo "SharpProof ${command_name} requires a Git checkout with an exact commit for source comparison or certifying evidence." >&2
+  exit 2
+fi
+
+if requires_clean_exact_commit_source "${command_name}"; then
+  assert_clean_exact_commit_source
+fi
+
 case "${command_name}" in
   *)
     task_root="$(mktemp -d /tmp/sharpproof-task.XXXXXXXX)"
     mkdir -p "${repo_root}/artifacts"
-    git clone --quiet --shared --no-checkout "${repo_root}" "${task_root}"
-    source_origin="$(git -C "${repo_root}" remote get-url origin 2>/dev/null || true)"
-    if [[ -n "${source_origin}" ]]; then
-      git -C "${task_root}" remote set-url origin "${source_origin}"
+    if [[ "${source_has_git}" = "true" ]]; then
+      git clone --quiet --shared --no-checkout "${repo_root}" "${task_root}"
+      source_origin="$(git -C "${repo_root}" remote get-url origin 2>/dev/null || true)"
+      if [[ -n "${source_origin}" ]]; then
+        git -C "${task_root}" remote set-url origin "${source_origin}"
+      fi
+      git -C "${task_root}" checkout --quiet --detach \
+        "$(git -C "${repo_root}" rev-parse HEAD)"
+      # Docker Desktop bind mounts do not preserve meaningful Git executable
+      # bits. Ignore their synthetic working-tree modes in the disposable clone;
+      # real mode changes committed between Git trees remain part of comparisons.
+      git -C "${task_root}" config core.filemode false
+      while IFS= read -r -d '' deleted_path; do
+        rm -f -- "${task_root}/${deleted_path}"
+      done < <(git -C "${repo_root}" diff \
+        --no-renames --name-only --diff-filter=D -z HEAD --)
     fi
-    git -C "${task_root}" checkout --quiet --detach \
-      "$(git -C "${repo_root}" rev-parse HEAD)"
-    # Docker Desktop bind mounts do not preserve meaningful Git executable
-    # bits. Ignore their synthetic working-tree modes in the disposable clone;
-    # real mode changes committed between Git trees remain part of comparisons.
-    git -C "${task_root}" config core.filemode false
-    while IFS= read -r -d '' deleted_path; do
-      rm -f -- "${task_root}/${deleted_path}"
-    done < <(git -C "${repo_root}" diff \
-      --no-renames --name-only --diff-filter=D -z HEAD --)
     tar \
       --exclude='./artifacts' \
       --exclude='./.git' \
@@ -78,7 +140,14 @@ case "${command_name}" in
       --exclude='./.baseline-check' \
       -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
     ln -s "${repo_root}/artifacts" "${task_root}/artifacts"
-    git config --global --add safe.directory "${task_root}"
+    if [[ "${source_has_git}" = "true" ]] &&
+      [[ -d "${task_root}/.git" ]]; then
+      # The disposable clone uses a symlink so evidence lands in the host
+      # artifact mount. A trailing-slash ignore rule matches directories but
+      # not this symlink, so exclude the exact task-local link explicitly.
+      printf '/artifacts\n' >> "${task_root}/.git/info/exclude"
+      git config --global --add safe.directory "${task_root}"
+    fi
     export SHARPPROOF_REPO_ROOT="${task_root}"
     cd "${task_root}"
     exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofContainer.ps1 \

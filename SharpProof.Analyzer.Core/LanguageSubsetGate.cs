@@ -172,6 +172,9 @@ internal static class LanguageSubsetGate
                 SupportsProperty(property, hasResolvedGenericApiSpec),
             IConversionOperation conversion =>
                 conversion.OperatorMethod == null,
+            IInterpolationOperation interpolation =>
+                interpolation.Alignment == null &&
+                interpolation.FormatString == null,
             IUnaryOperation unary =>
                 unary.OperatorMethod == null,
             IBinaryOperation binary =>

@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
     $CatalogPath = Join-Path $repositoryRoot `
         'eng\diagnostics\diagnostic-descriptors.v1.json'
@@ -68,14 +69,9 @@ function Resolve-RepositoryOutputPath {
     if ([IO.Path]::IsPathRooted($RelativePath)) {
         throw "Diagnostic output path must be repository-relative: $RelativePath"
     }
-    $fullPath = [IO.Path]::GetFullPath(
-        (Join-Path $repositoryRoot $RelativePath))
-    if (-not $fullPath.StartsWith(
-            $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-            [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Diagnostic output path escapes the repository: $RelativePath"
-    }
-    return $fullPath
+    return Resolve-SharpProofContainedPath `
+        -Root $repositoryRoot -Path $RelativePath `
+        -ParameterName 'Diagnostic output path'
 }
 
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw |

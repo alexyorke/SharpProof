@@ -42,6 +42,96 @@ internal static partial class RequiresCallSiteAnalyzer
             .Run(screenForPotentialCalls);
     }
 
+    internal static AnalyzerSemanticOutcome AnalyzePrimaryConstructorInitializer(
+        IMethodSymbol constructor,
+        TypeDeclarationSyntax declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        var initializer = declaration.BaseList?.Types
+            .OfType<PrimaryConstructorBaseTypeSyntax>()
+            .SingleOrDefault();
+        if (initializer == null)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+
+        var target = semanticModel.GetSymbolInfo(
+                initializer,
+                cancellationToken)
+            .Symbol as IMethodSymbol;
+        var arguments = initializer.ArgumentList.Arguments
+            .Select(argument => semanticModel.GetOperation(
+                argument,
+                cancellationToken) as IArgumentOperation)
+            .ToImmutableArray();
+        if (target == null || arguments.IsDefaultOrEmpty ||
+            arguments.Any(static argument => argument == null))
+        {
+            return AnalyzerSemanticOutcome.Unknown;
+        }
+
+        var call = new RequiresCallSiteCandidate(
+            arguments[0]!,
+            target,
+            Instance: null,
+            arguments.OfType<IArgumentOperation>().ToImmutableArray(),
+            ImmutableDictionary<int, IOperation>.Empty,
+            CanReplay: true,
+            Flow: null,
+            ManagedFlowStatus.BudgetExceeded);
+
+        return new Analysis(
+                constructor,
+                declaration,
+                semanticModel,
+                session,
+                reportDiagnostic,
+                graph: null,
+                operationRoot: null,
+                cancellationToken)
+            .AnalyzeCallSite(call);
+    }
+
+    internal static AnalyzerSemanticOutcome AnalyzeInitializerCall(
+        IMethodSymbol constructor,
+        EqualsValueClauseSyntax initializer,
+        IOperation operation,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        var target = operation switch
+        {
+            IInvocationOperation invocation => invocation.TargetMethod,
+            IObjectCreationOperation creation => creation.Constructor,
+            _ => null
+        };
+        if (target == null)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+        var instance = (operation as IInvocationOperation)?.Instance;
+        var arguments = operation switch
+        {
+            IInvocationOperation invocation => invocation.Arguments,
+            IObjectCreationOperation creation => creation.Arguments,
+            _ => default
+        };
+        var call = new RequiresCallSiteCandidate(
+            operation, target, instance, arguments,
+            ImmutableDictionary<int, IOperation>.Empty, CanReplay: true,
+            Flow: null, ManagedFlowStatus.BudgetExceeded);
+        return new Analysis(
+                constructor, initializer, semanticModel, session,
+                reportDiagnostic, graph: null, operationRoot: operation,
+                cancellationToken)
+            .AnalyzeCallSite(call, requireCallerOwnership: false);
+    }
+
     private sealed class Analysis(
         IMethodSymbol caller,
         SyntaxNode declaration,
@@ -89,10 +179,11 @@ internal static partial class RequiresCallSiteAnalyzer
             return outcome;
         }
 
-        private AnalyzerSemanticOutcome AnalyzeCallSite(
-            RequiresCallSiteCandidate candidate)
+        internal AnalyzerSemanticOutcome AnalyzeCallSite(
+            RequiresCallSiteCandidate candidate,
+            bool requireCallerOwnership = true)
         {
-            if (!SymbolEqualityComparer.Default.Equals(
+            if (requireCallerOwnership && !SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetEnclosingSymbol(
                         candidate.Operation.Syntax.SpanStart, cancellationToken),
                     caller))
@@ -109,6 +200,15 @@ internal static partial class RequiresCallSiteAnalyzer
                 contractTarget.ContainingType.StaticConstructors is
                 { Length: > 0 })
             {
+                return AnalyzerSemanticOutcome.Unknown;
+            }
+
+            if (session.HasRejectedMetadataPrecondition(contractTarget))
+            {
+                SharpProofControlAttributePolicy.ReportRejectedContractApi(
+                    contractTarget.Name,
+                    candidate.Operation.Syntax.GetLocation(),
+                    reportDiagnostic);
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
@@ -333,6 +433,14 @@ internal static partial class RequiresCallSiteAnalyzer
     {
         var isReducedExtension =
             callSite.TargetMethod.ReducedFrom != null;
+        if (variable.Role == BoundContractVariableRole.Parameter &&
+            callSite.ExplicitArguments.TryGetValue(
+                variable.Ordinal,
+                out var explicitArgument))
+        {
+            return explicitArgument;
+        }
+
         return variable.Role switch
         {
             BoundContractVariableRole.Receiver => callSite.Instance,
@@ -351,6 +459,11 @@ internal static partial class RequiresCallSiteAnalyzer
         IOperation actual)
     {
         if (variable.Role != BoundContractVariableRole.Parameter)
+        {
+            return CallArgumentEvaluation.Snapshot;
+        }
+
+        if (callSite.ExplicitArguments.ContainsKey(variable.Ordinal))
         {
             return CallArgumentEvaluation.Snapshot;
         }

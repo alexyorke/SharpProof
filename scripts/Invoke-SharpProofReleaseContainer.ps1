@@ -20,19 +20,7 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
-
-function Get-ReleaseVersion {
-    [xml]$release = Get-Content -LiteralPath (
-        Join-Path $repositoryRoot 'SharpProof.Release.props') -Raw
-    $prefix = [string]$release.Project.PropertyGroup.SharpProofVersionPrefix
-    $version = ([string]$release.Project.PropertyGroup.SharpProofPackageVersion).
-        Replace('$(SharpProofVersionPrefix)', $prefix)
-    if ($version -notmatch
-        '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
-        throw "Invalid SharpProof package version '$version'."
-    }
-    return $version
-}
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 
 function Require-Environment([string]$Name) {
     $value = [Environment]::GetEnvironmentVariable($Name)
@@ -59,25 +47,37 @@ function Resolve-RepositoryPath([string]$Path) {
 
 switch ($Mode) {
     'ValidateTag' {
-        $version = Get-ReleaseVersion
+        $version = Get-SharpProofReleaseVersion `
+            -RepositoryRoot $repositoryRoot
         $ref = Require-Environment 'GITHUB_REF'
         $refName = Require-Environment 'GITHUB_REF_NAME'
         $commit = Require-Environment 'GITHUB_SHA'
-        if ($ref.StartsWith('refs/tags/v', [StringComparison]::Ordinal)) {
-            if ($refName -cne "v$version") {
-                throw "Release tag '$refName' does not match '$version'."
-            }
-            $tagRef = "refs/tags/$refName"
-            if ((& git cat-file -t $tagRef).Trim() -cne 'tag') {
-                throw 'Release tag must be annotated.'
-            }
-            if ((& git rev-parse "${tagRef}^{commit}").Trim() -cne $commit) {
-                throw 'Release tag does not identify the checked-out commit.'
-            }
-            & git merge-base --is-ancestor $commit origin/master
-            if ($LASTEXITCODE -ne 0) {
-                throw 'Release tags must identify a commit in origin/master.'
-            }
+        $expectedTag = "v$version"
+        $expectedRef = "refs/tags/$expectedTag"
+        if ($ref -cne $expectedRef) {
+            throw "Release ref '$ref' does not match '$expectedRef'."
+        }
+        if ($refName -cne $expectedTag) {
+            throw "Release tag '$refName' does not match '$version'."
+        }
+        $head = (& git -C $repositoryRoot rev-parse HEAD 2>$null).Trim()
+        if ($LASTEXITCODE -ne 0 -or $commit -cne $head) {
+            throw "Release commit '$commit' does not match checkout HEAD '$head'."
+        }
+        $tagType = (& git -C $repositoryRoot cat-file -t $expectedRef `
+                2>$null)
+        if ($LASTEXITCODE -ne 0 -or ([string]$tagType).Trim() -cne 'tag') {
+            throw 'Release tag must exist as an annotated tag object.'
+        }
+        $tagCommit = (& git -C $repositoryRoot rev-parse `
+                "${expectedRef}^{commit}" 2>$null)
+        if ($LASTEXITCODE -ne 0 -or ([string]$tagCommit).Trim() -cne $commit) {
+            throw 'Release tag does not identify the checked-out commit.'
+        }
+        & git -C $repositoryRoot merge-base --is-ancestor `
+            $commit origin/master 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Release tags must identify a commit in origin/master.'
         }
         Write-Host "Release identity is valid for $version at $commit."
     }
@@ -99,7 +99,33 @@ switch ($Mode) {
     'WriteQualificationEvidence' {
         $commit = Require-Environment 'GITHUB_SHA'
         $tag = Require-Environment 'GITHUB_REF_NAME'
+        $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+        if ($commit -cne $head) {
+            throw "Qualification commit '$commit' does not match checkout HEAD '$head'."
+        }
+        if (@(& git -C $repositoryRoot status --porcelain).Count -ne 0) {
+            throw 'Qualification requires a clean checkout.'
+        }
+        $version = Get-SharpProofReleaseVersion `
+            -RepositoryRoot $repositoryRoot
+        if ($tag -cne "v$version") {
+            throw "Qualification tag '$tag' does not match package version '$version'."
+        }
+        $tagRef = "refs/tags/$tag"
+        if ((& git -C $repositoryRoot cat-file -t $tagRef 2>$null).Trim() -cne
+                'tag' -or
+            (& git -C $repositoryRoot rev-parse "${tagRef}^{commit}").Trim() -cne
+                $head) {
+            throw 'Qualification requires an annotated tag at checkout HEAD.'
+        }
         $packageRoot = Resolve-RepositoryPath $PackageSource
+        & (Join-Path $repositoryRoot `
+            'scripts/Test-SharpProofReleaseArtifacts.ps1') `
+            -PackageSource $packageRoot `
+            -ExpectedTag $tag
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Strict release artifact validation failed.'
+        }
         $inputPaths = @(
             'eng/container/Dockerfile',
             'eng/container/toolchain.json',
@@ -108,15 +134,74 @@ switch ($Mode) {
             }
         $packages = @(Get-ChildItem -LiteralPath $packageRoot -File |
             Where-Object Name -Match '\.(?:nupkg|snupkg)$')
-        if ($packages.Count -eq 0) {
-            throw "No package artifacts were found in $packageRoot."
+        if ($packages.Count -ne 6) {
+            throw "Qualification requires exactly six package artifacts."
         }
-        $files = @($inputPaths) + @($packages.FullName)
+        $packageArtifacts = @($packages |
+            Sort-Object Name |
+            ForEach-Object {
+                [ordered]@{
+                    fileName = $_.Name
+                    bytes = [int64]$_.Length
+                    sha256 = (Get-FileHash `
+                        -LiteralPath $_.FullName `
+                        -Algorithm SHA256).Hash.ToLowerInvariant()
+                }
+            })
+        $packageArtifactJson = $packageArtifacts | ConvertTo-Json -Compress
+        $matrixPath = Join-Path $repositoryRoot `
+            'eng/acceptance/preview-evidence.v1.json'
+        $matrix = Get-Content -LiteralPath $matrixPath -Raw |
+            ConvertFrom-Json -ErrorAction Stop
+        $requiredGates = @($matrix.releaseQualificationMatrix |
+            ForEach-Object { [string]$_.receipt } |
+            Select-Object -Unique)
+        if ($requiredGates.Count -ne 10) {
+            throw 'Release qualification matrix must project exactly ten receipts.'
+        }
+        $receiptDirectory = Join-Path `
+            $repositoryRoot `
+            'artifacts/release-qualification/qualification-receipts'
+        $gateReceipts = [ordered]@{}
+        foreach ($gate in $requiredGates) {
+            $receiptPath = Join-Path $receiptDirectory "$gate.json"
+            if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+                throw "Qualification gate receipt is missing: '$gate'."
+            }
+            $receipt = Get-Content -LiteralPath $receiptPath -Raw |
+                ConvertFrom-Json -ErrorAction Stop
+            $evidencePath = Resolve-RepositoryPath ([string]$receipt.evidence.path)
+            if ([int]$receipt.schemaVersion -ne 1 -or
+                [string]$receipt.gate -cne $gate -or
+                [string]$receipt.status -cne 'passed' -or
+                [string]$receipt.commit -cne $head -or
+                -not (Test-Path -LiteralPath $evidencePath -PathType Leaf) -or
+                [int64](Get-Item -LiteralPath $evidencePath).Length -ne
+                    [int64]$receipt.evidence.bytes -or
+                (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).
+                    Hash.ToLowerInvariant() -cne
+                    [string]$receipt.evidence.sha256) {
+                throw "Qualification gate receipt is stale or failed: '$gate'."
+            }
+            if ($gate -in @(
+                    'package-consumers', 'pilots', 'portable-linux',
+                    'portable-windows', 'portable-macos') -and
+                (@($receipt.packageArtifacts) |
+                    Sort-Object fileName |
+                    ConvertTo-Json -Compress) -cne $packageArtifactJson) {
+                throw "Qualification gate receipt targets different packages: '$gate'."
+            }
+            $gateReceipts[$gate] = (Get-FileHash `
+                -LiteralPath $receiptPath `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+        $files = @($inputPaths) + @($matrixPath) + @($packages.FullName)
         $record = [ordered]@{
-            schemaVersion = 1
+            schemaVersion = 2
             status = 'passed'
-            repositoryCommit = $commit
+            releaseCommit = $commit
             tag = $tag
+            gateReceipts = $gateReceipts
             inputs = @($files | ForEach-Object {
                 [ordered]@{
                     path = [IO.Path]::GetRelativePath(

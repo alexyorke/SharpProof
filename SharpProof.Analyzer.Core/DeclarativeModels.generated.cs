@@ -38,6 +38,7 @@ internal readonly partial record struct RequiresCallSiteCandidate(
     IMethodSymbol TargetMethod,
     IOperation? Instance,
     ImmutableArray<IArgumentOperation> Arguments,
+    ImmutableDictionary<int, IOperation> ExplicitArguments,
     bool CanReplay,
     ManagedFlowResult? Flow,
     ManagedFlowStatus FlowStatus
@@ -73,7 +74,9 @@ internal sealed partial class RequiresCallSiteDiscovery
     private readonly partial record struct RequiresCallTarget(
         IMethodSymbol TargetMethod,
         IOperation? Instance,
-        ImmutableArray<IArgumentOperation> Arguments
+        ImmutableArray<IArgumentOperation> Arguments,
+        ImmutableDictionary<int, IOperation> ExplicitArguments,
+        bool CanReplay
     );
 }
 

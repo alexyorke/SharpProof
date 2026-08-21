@@ -332,7 +332,14 @@ internal sealed partial class ClaimManifestBuilder(
                 var evidence = CreateEffectEvidence(
                     claimId, evaluation, isSupported);
                 CompilerEffectClaimArtifactCodec.Seal(evidence);
-                claims.Add(new ManifestEffectClaim(entry, evidence));
+                var sourceTreePath = attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath;
+                claims.Add(new ManifestEffectClaim(
+                    entry,
+                    evidence,
+                    CompilerEffectAuthority.Create(
+                        entry,
+                        evidence,
+                        sourceTreePath)));
             }
         }
 
@@ -449,6 +456,14 @@ internal sealed partial class ClaimManifestBuilder(
                 cancellationToken.ThrowIfCancellationRequested();
                 switch (node)
                 {
+                    case TypeDeclarationSyntax type
+                        when PrimaryConstructorCallableInventory.TryGet(
+                            type,
+                            model,
+                            cancellationToken,
+                            out var primaryConstructor):
+                        Add(primaryConstructor);
+                        break;
                     case BaseMethodDeclarationSyntax:
                     case AccessorDeclarationSyntax:
                     case LocalFunctionStatementSyntax:
@@ -462,6 +477,13 @@ internal sealed partial class ClaimManifestBuilder(
                         break;
                     case BasePropertyDeclarationSyntax property:
                         AddAccessors(model.GetDeclaredSymbol(property, cancellationToken));
+                        break;
+                    case EventFieldDeclarationSyntax eventField:
+                        foreach (var variable in eventField.Declaration.Variables)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            AddAccessors(model.GetDeclaredSymbol(variable, cancellationToken));
+                        }
                         break;
                 }
             }

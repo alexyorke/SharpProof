@@ -1,10 +1,19 @@
 [CmdletBinding()]
-param()
+param(
+    [string]$DockerfilePath,
+    [string]$ComposePath,
+    [switch]$AuthorityOnly)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+if ([string]::IsNullOrWhiteSpace($DockerfilePath)) {
+    $DockerfilePath = Join-Path $repositoryRoot 'eng/container/Dockerfile'
+}
+if ([string]::IsNullOrWhiteSpace($ComposePath)) {
+    $ComposePath = Join-Path $repositoryRoot 'compose.yaml'
+}
 $catalog = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/container/toolchain.json') -Raw |
     ConvertFrom-Json
@@ -14,10 +23,8 @@ $acceptance = Get-Content -LiteralPath (
 $globalJson = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'global.json') -Raw |
     ConvertFrom-Json
-$dockerfile = Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'eng/container/Dockerfile') -Raw
-$compose = Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'compose.yaml') -Raw
+$dockerfile = Get-Content -LiteralPath $DockerfilePath -Raw
+$compose = Get-Content -LiteralPath $ComposePath -Raw
 $devContainer = Get-Content -LiteralPath (
     Join-Path $repositoryRoot '.devcontainer/devcontainer.json') -Raw |
     ConvertFrom-Json
@@ -42,6 +49,317 @@ function Assert-Exact {
     }
 }
 
+function Assert-SingleMatchingLine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [AllowEmptyString()]
+        [string[]]$Lines,
+        [Parameter(Mandatory = $true)][string]$Pattern,
+        [Parameter(Mandatory = $true)][string]$Expected,
+        [Parameter(Mandatory = $true)][string]$Name)
+
+    $matches = @($Lines | Where-Object { $_ -cmatch $Pattern })
+    if ($matches.Count -cne 1 -or $matches[0] -cne $Expected) {
+        throw "$Name must occur exactly once as '$Expected'."
+    }
+}
+
+function Get-DockerfileStageLines {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string[]]$Lines,
+        [Parameter(Mandatory = $true)][string]$FromLine)
+
+    $start = [array]::IndexOf($Lines, $FromLine)
+    if ($start -lt 0) {
+        throw "Dockerfile stage '$FromLine' was not found."
+    }
+    $end = $Lines.Count
+    for ($index = $start + 1; $index -lt $Lines.Count; $index++) {
+        if ($Lines[$index] -cmatch '^FROM\s+') {
+            $end = $index
+            break
+        }
+    }
+    return @($Lines[($start + 1)..($end - 1)])
+}
+
+function Assert-DockerfileAuthority {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)]$ToolchainCatalog)
+
+    $lines = @($Content -split "`r?`n")
+    if (@($lines | Where-Object { $_ -cmatch '^\s*#\s*syntax\s*=' }).Count -ne 0) {
+        throw (
+            'The Dockerfile must use the bundled Dockerfile grammar and must not ' +
+            'introduce an unpinned external frontend.')
+    }
+
+    $authorities = @(
+        [pscustomobject]@{
+            Argument = 'POWERSHELL_IMAGE'
+            Image = "$($ToolchainCatalog.powershell.image)@$($ToolchainCatalog.powershell.imageDigest)"
+            Stage = 'powershell'
+        },
+        [pscustomobject]@{
+            Argument = 'DOTNET_TEST_RUNTIME_IMAGE'
+            Image = "$($ToolchainCatalog.dotnet.testRuntimeImage)@$($ToolchainCatalog.dotnet.testRuntimeImageDigest)"
+            Stage = 'test-runtime'
+        },
+        [pscustomobject]@{
+            Argument = 'DOTNET_MINIMUM_SDK_IMAGE'
+            Image = "$($ToolchainCatalog.dotnet.minimumSdkImage)@$($ToolchainCatalog.dotnet.minimumSdkImageDigest)"
+            Stage = 'minimum-sdk'
+        },
+        [pscustomobject]@{
+            Argument = 'DOTNET_MINIMUM_FRAMEWORK_IMAGE'
+            Image = "$($ToolchainCatalog.dotnet.minimumSdkFrameworkImage)@$($ToolchainCatalog.dotnet.minimumSdkFrameworkImageDigest)"
+            Stage = 'minimum-framework'
+        },
+        [pscustomobject]@{
+            Argument = 'DOTNET_SDK_IMAGE'
+            Image = "$($ToolchainCatalog.dotnet.baseImage)@$($ToolchainCatalog.dotnet.baseImageDigest)"
+            Stage = 'toolchain'
+        })
+
+    $firstFrom = -1
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -cmatch '^FROM\s+') {
+            $firstFrom = $index
+            break
+        }
+    }
+    if ($firstFrom -lt 0) {
+        throw 'The Dockerfile must contain the canonical build stages.'
+    }
+
+    foreach ($authority in $authorities) {
+        $argumentPattern = '^ARG\s+' + [regex]::Escape($authority.Argument) + '(?:=|$)'
+        $declarations = @()
+        for ($index = 0; $index -lt $lines.Count; $index++) {
+            if ($lines[$index] -cmatch $argumentPattern) {
+                $declarations += [pscustomobject]@{
+                    Index = $index
+                    Text = $lines[$index]
+                }
+            }
+        }
+        $expected = "ARG $($authority.Argument)=$($authority.Image)"
+        if ($declarations.Count -cne 1 -or
+            $declarations[0].Index -ge $firstFrom -or
+            $declarations[0].Text -cne $expected) {
+            throw (
+                "Dockerfile authority $($authority.Argument) must be declared " +
+                "exactly once globally as '$expected'.")
+        }
+    }
+
+    $actualStages = @($lines | Where-Object { $_ -cmatch '^FROM\s+' })
+    $expectedStages = @(
+        'FROM ${POWERSHELL_IMAGE} AS powershell',
+        'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
+        'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
+        'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
+        'FROM ${DOTNET_SDK_IMAGE} AS toolchain',
+        'FROM toolchain AS dev',
+        'FROM toolchain AS build',
+        'FROM build AS test',
+        'FROM build AS package')
+    if ($actualStages.Count -cne $expectedStages.Count) {
+        throw 'The Dockerfile must contain exactly the canonical build stages.'
+    }
+    for ($index = 0; $index -lt $expectedStages.Count; $index++) {
+        if ($actualStages[$index] -cne $expectedStages[$index]) {
+            throw (
+                "Dockerfile stage $index must be '$($expectedStages[$index])'; " +
+                "found '$($actualStages[$index])'.")
+        }
+    }
+
+
+    $toolchainLines = Get-DockerfileStageLines `
+        -Lines $lines `
+        -FromLine 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
+    $toolchainText = $toolchainLines -join "`n"
+    foreach ($required in @(
+            'ARG USER_UID=1000',
+            'ARG USER_GID=1000',
+            'useradd --uid "${USER_UID}"',
+            '/home/sharpproof/.local/share/NuGet',
+            '/home/sharpproof/.nuget/packages',
+            '/home/sharpproof/.dotnet')) {
+        if (-not $toolchainText.Contains(
+                $required,
+                [StringComparison]::Ordinal)) {
+            throw "Dockerfile toolchain stage is missing '$required'."
+        }
+    }
+
+    $stageContracts = @(
+        [pscustomobject]@{
+            From = 'FROM toolchain AS dev'
+            Root = '/workspace/SharpProof'
+            Command = 'dev'
+        },
+        [pscustomobject]@{
+            From = 'FROM toolchain AS build'
+            Root = '/src'
+            Command = 'build'
+        },
+        [pscustomobject]@{
+            From = 'FROM build AS test'
+            Root = '/src'
+            Command = 'portable-tests'
+        },
+        [pscustomobject]@{
+            From = 'FROM build AS package'
+            Root = '/src'
+            Command = 'pack'
+        })
+    foreach ($stage in $stageContracts) {
+        $stageLines = Get-DockerfileStageLines `
+            -Lines $lines `
+            -FromLine $stage.From
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^ENV SHARPPROOF_REPO_ROOT=' `
+            "ENV SHARPPROOF_REPO_ROOT=$($stage.Root)" `
+            "$($stage.Command) repository root"
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^WORKDIR ' `
+            "WORKDIR $($stage.Root)" `
+            "$($stage.Command) working directory"
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^USER ' `
+            'USER sharpproof' `
+            "$($stage.Command) user"
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^ENTRYPOINT ' `
+            'ENTRYPOINT ["/usr/local/bin/sharpproof-container"]' `
+            "$($stage.Command) entrypoint"
+        Assert-SingleMatchingLine `
+            $stageLines `
+            '^CMD ' `
+            "CMD [`"$($stage.Command)`"]" `
+            "$($stage.Command) default command"
+    }
+    $buildLines = Get-DockerfileStageLines `
+        -Lines $lines `
+        -FromLine 'FROM toolchain AS build'
+    Assert-SingleMatchingLine `
+        $buildLines `
+        '^COPY .+ \. \.$' `
+        'COPY --chown=sharpproof:sharpproof . .' `
+        'Build source ownership'
+}
+
+function Assert-ComposeAuthority {
+    param(
+        [Parameter(Mandatory = $true)][string]$Content,
+        [Parameter(Mandatory = $true)][string]$Platform)
+
+    $lines = @($Content -split "`r?`n")
+    if ($Content.Contains("`t", [System.StringComparison]::Ordinal)) {
+        throw 'Compose authority must use spaces, not tabs.'
+    }
+    Assert-SingleMatchingLine `
+        -Lines $lines `
+        -Pattern '^x-sharpproof-common:' `
+        -Expected 'x-sharpproof-common: &sharpproof-common' `
+        -Name 'Compose common authority'
+    Assert-SingleMatchingLine `
+        -Lines $lines `
+        -Pattern '^services:' `
+        -Expected 'services:' `
+        -Name 'Compose services mapping'
+
+    $commonStart = [array]::IndexOf(
+        $lines,
+        'x-sharpproof-common: &sharpproof-common')
+    $servicesStart = [array]::IndexOf($lines, 'services:')
+    if ($commonStart -ge $servicesStart) {
+        throw 'Compose common authority must precede the services mapping.'
+    }
+    $commonLines = @($lines[($commonStart + 1)..($servicesStart - 1)])
+    $expectedImage = '  image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}'
+    Assert-SingleMatchingLine $commonLines '^  image:' $expectedImage 'Compose tooling image'
+    Assert-SingleMatchingLine $commonLines '^  platform:' "  platform: $Platform" 'Compose platform'
+    Assert-SingleMatchingLine `
+        $commonLines `
+        '^    SHARPPROOF_REPO_ROOT:' `
+        '    SHARPPROOF_REPO_ROOT: /workspace/SharpProof' `
+        'Compose repository root'
+    Assert-SingleMatchingLine $commonLines '^  build:' '  build:' 'Compose build mapping'
+
+    $buildStart = [array]::IndexOf($commonLines, '  build:')
+    $buildEnd = $commonLines.Count
+    for ($index = $buildStart + 1; $index -lt $commonLines.Count; $index++) {
+        if ($commonLines[$index] -cmatch '^  \S') {
+            $buildEnd = $index
+            break
+        }
+    }
+    $buildLines = @($commonLines[($buildStart + 1)..($buildEnd - 1)])
+    Assert-SingleMatchingLine $buildLines '^    context:' '    context: .' 'Compose build context'
+    Assert-SingleMatchingLine `
+        $buildLines `
+        '^    dockerfile:' `
+        '    dockerfile: eng/container/Dockerfile' `
+        'Compose Dockerfile'
+    Assert-SingleMatchingLine $buildLines '^    target:' '    target: dev' 'Compose build target'
+
+    $serviceNames = @()
+    for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -cmatch '^\S') {
+            break
+        }
+        if ($lines[$index] -cmatch '^  ([a-z0-9-]+):\s*$') {
+            $serviceNames += $Matches[1]
+        }
+    }
+    if ($serviceNames -cnotcontains 'tooling') {
+        throw 'Compose must define the canonical tooling service.'
+    }
+    foreach ($serviceName in $serviceNames) {
+        $header = "  ${serviceName}:"
+        $serviceStart = -1
+        for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
+            if ($lines[$index] -ceq $header) {
+                $serviceStart = $index
+                break
+            }
+        }
+        if ($serviceStart -lt 0) {
+            throw "Compose service '$serviceName' could not be resolved."
+        }
+        $serviceEnd = $lines.Count
+        for ($index = $serviceStart + 1; $index -lt $lines.Count; $index++) {
+            if ($lines[$index] -cmatch '^\S' -or
+                $lines[$index] -cmatch '^  [a-z0-9-]+:\s*$') {
+                $serviceEnd = $index
+                break
+            }
+        }
+        $serviceLines = @($lines[($serviceStart + 1)..($serviceEnd - 1)])
+        Assert-SingleMatchingLine `
+            $serviceLines `
+            '^    <<:' `
+            '    <<: *sharpproof-common' `
+            "Compose service '$serviceName' authority"
+        if (@($serviceLines | Where-Object {
+                    $_ -cmatch '^    (?:image|build|platform):'
+                }).Count -ne 0) {
+            throw "Compose service '$serviceName' overrides canonical image authority."
+        }
+    }
+}
+
 Assert-Exact $catalog.schemaVersion 1 'Container toolchain schema'
 Assert-Exact $catalog.platform 'linux/amd64' 'Container platform'
 Assert-Exact $globalJson.sdk.version $catalog.dotnet.sdkVersion '.NET SDK version'
@@ -55,40 +373,11 @@ Assert-Exact `
     $catalog.platform `
     'Acceptance container platform'
 
-$dotnetImage = "$($catalog.dotnet.baseImage)@$($catalog.dotnet.baseImageDigest)"
-$dotnetMinimumSdkImage =
-    "$($catalog.dotnet.minimumSdkImage)@$($catalog.dotnet.minimumSdkImageDigest)"
-$dotnetMinimumFrameworkImage =
-    "$($catalog.dotnet.minimumSdkFrameworkImage)@$($catalog.dotnet.minimumSdkFrameworkImageDigest)"
-$dotnetTestRuntimeImage =
-    "$($catalog.dotnet.testRuntimeImage)@$($catalog.dotnet.testRuntimeImageDigest)"
-$powershellImage = "$($catalog.powershell.image)@$($catalog.powershell.imageDigest)"
-if ($dockerfile -cnotmatch [regex]::Escape(
-        "ARG DOTNET_SDK_IMAGE=$dotnetImage")) {
-    throw 'The Dockerfile .NET SDK base does not match the toolchain catalog.'
-}
-if ($dockerfile -cnotmatch [regex]::Escape(
-        "ARG DOTNET_MINIMUM_SDK_IMAGE=$dotnetMinimumSdkImage")) {
-    throw (
-        'The Dockerfile minimum .NET SDK base does not match the ' +
-        'toolchain catalog.')
-}
-if ($dockerfile -cnotmatch [regex]::Escape(
-        "ARG DOTNET_MINIMUM_FRAMEWORK_IMAGE=$dotnetMinimumFrameworkImage")) {
-    throw (
-        'The Dockerfile minimum-SDK framework source does not match the ' +
-        'toolchain catalog.')
-}
-if ($dockerfile -cnotmatch [regex]::Escape(
-        "ARG DOTNET_TEST_RUNTIME_IMAGE=$dotnetTestRuntimeImage")) {
-    throw 'The Dockerfile .NET 8 test runtime does not match the toolchain catalog.'
-}
-if ($dockerfile -cnotmatch [regex]::Escape(
-        "ARG POWERSHELL_IMAGE=$powershellImage")) {
-    throw 'The Dockerfile PowerShell base does not match the toolchain catalog.'
-}
-if ($compose -cnotmatch '(?m)^\s*platform:\s*linux/amd64\s*$') {
-    throw 'Compose must pin linux/amd64.'
+Assert-DockerfileAuthority -Content $dockerfile -ToolchainCatalog $catalog
+Assert-ComposeAuthority -Content $compose -Platform ([string]$catalog.platform)
+if ($AuthorityOnly) {
+    Write-Host 'SharpProof container authority validation passed.'
+    return
 }
 if ($compose -cmatch '/workspace/seed|SHARPPROOF_SEED_ROOT') {
     throw 'The Dev Container must not depend on a host seed checkout.'

@@ -358,6 +358,16 @@ $resolvedCommit = (
 if ($resolvedCommit -ne $Commit) {
     throw 'Release digest commit does not resolve exactly.'
 }
+$inventoryScriptPath = Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1'
+if (-not (Test-Path -LiteralPath $inventoryScriptPath -PathType Leaf)) {
+    throw "The production inventory helper '$inventoryScriptPath' is missing from this checkout."
+}
+$productionInventory = @(& $inventoryScriptPath `
+    -RepositoryRoot $resolvedRepository `
+    -Configuration Release) -join [Environment]::NewLine | ConvertFrom-Json
+if ([string]$productionInventory.commit -cne $Commit) {
+    throw 'Release digest production inventory commit does not match the requested commit.'
+}
 $trackedEntries = @(Get-GitTreeEntries -Revision $Commit)
 $trackedEntriesByPath =
     [Collections.Generic.Dictionary[string, object]]::new(
@@ -394,7 +404,8 @@ $tcbPaths = [Collections.Generic.HashSet[string]]::new(
 $tcbEntries = [Collections.Generic.List[object]]::new()
 foreach ($canonicalPath in @(Get-SharpProofTcbPaths `
         -Contract $acceptanceJson `
-        -IncludeAcceptanceContract)) {
+        -IncludeAcceptanceContract `
+        -ProductionInventory $productionInventory)) {
     [object]$tcbEntry = $null
     if (-not $trackedEntriesByPath.TryGetValue(
             $canonicalPath,
@@ -418,6 +429,9 @@ $result = [pscustomobject][ordered]@{
         -Domain 'SharpProof.tcb.v1' `
         -Entries $tcbEntries.ToArray()
     trustedComputingBaseFileCount = $tcbPaths.Count
+    productionInventorySchemaVersion = [int]$productionInventory.schemaVersion
+    productionSourceUniverseSha256 = [string]$productionInventory.sourceUniverseSha256
+    generatedManifestSha256 = [string]$productionInventory.generatedManifestSha256
 }
 $json = $result | ConvertTo-Json -Compress
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {

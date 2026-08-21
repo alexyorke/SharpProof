@@ -259,19 +259,30 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         return syntax switch
         {
             BaseMethodDeclarationSyntax { Body: { } body } => body,
-            BaseMethodDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
+            BaseMethodDeclarationSyntax { ExpressionBody.Expression: { } expression } method =>
+                GetExpressionBodyOperationRoot(method, expression),
             AccessorDeclarationSyntax { Body: { } body } => body,
             AccessorDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
             PropertyDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
             IndexerDeclarationSyntax { ExpressionBody.Expression: { } expression } => expression,
             LocalFunctionStatementSyntax { Body: { } body } => body,
-            LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression } => expression,
+            LocalFunctionStatementSyntax { ExpressionBody.Expression: { } expression } local =>
+                GetExpressionBodyOperationRoot(local, expression),
             ParenthesizedLambdaExpressionSyntax { Body: { } body } => body,
             SimpleLambdaExpressionSyntax { Body: { } body } => body,
             AnonymousMethodExpressionSyntax { Block: { } block } => block,
             BlockSyntax or ExpressionSyntax or CompilationUnitSyntax => syntax,
             _ => null
         };
+    }
+
+    private static SyntaxNode GetExpressionBodyOperationRoot(
+        SyntaxNode declaration,
+        ExpressionSyntax expression)
+    {
+        // Roslyn exposes no operation for an isolated `ref value` syntax.
+        // The declaration owns the corresponding method-body operation.
+        return expression is RefExpressionSyntax ? declaration : expression;
     }
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)

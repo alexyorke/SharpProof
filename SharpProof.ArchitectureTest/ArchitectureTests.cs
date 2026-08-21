@@ -929,7 +929,7 @@ public sealed class ArchitectureTests
                 Does.Contain("$resolvedPackageSource = Resolve-RepositoryPath $PackageSource"));
             Assert.That(
                 script,
-                Does.Contain("$resolvedOutput = Resolve-RepositoryPath $OutputPath"));
+                Does.Contain("Resolve-SharpProofContainedPath `"));
             Assert.That(script, Does.Not.Contain("Get-CimInstance"));
             Assert.That(
                 script,
@@ -1255,7 +1255,10 @@ public sealed class ArchitectureTests
                 Does.Contain("workerMethods = $workerMethodTimings"));
             Assert.That(
                 mutationDriver,
-                Does.Contain("Group-Object Project"));
+                Does.Contain("Get-SharpProofMutationBaselinePlan"));
+            Assert.That(
+                mutationDriver,
+                Does.Not.Contain("($filters -join '|')"));
             Assert.That(
                 mutationDriver,
                 Does.Contain("baselineInvocationCount"));
@@ -1267,7 +1270,7 @@ public sealed class ArchitectureTests
                 Does.Contain("-BaselineEvidencePath"));
             Assert.That(
                 parallelMutationDriver,
-                Does.Contain("shared-baseline-v2"));
+                Does.Contain("focused-baseline-v3"));
             Assert.That(
                 developerCheck,
                 Does.Contain("Invoke-SharpProofSemanticTests.ps1"));
@@ -1323,7 +1326,7 @@ public sealed class ArchitectureTests
                 Does.Contain("Move-Item -LiteralPath $temporary"));
             Assert.That(
                 container,
-                Does.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
+                Does.Not.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
         }
     }
 
@@ -1752,7 +1755,7 @@ public sealed class ArchitectureTests
             "Invoke-SharpProofGateEvidence.ps1"));
         Assert.That(
             gateEvidence,
-            Does.Contain("[IO.Path]::IsPathRooted($OutputPath)"));
+            Does.Contain("Resolve-SharpProofContainedPath `"));
         foreach (var workflow in new[] {
                      ".github/workflows/coverage.yml",
                      ".github/workflows/package-consumers.yml"
@@ -2252,6 +2255,68 @@ public sealed class ArchitectureTests
             .Select(Relative)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal)];
+    }
+
+    [Test]
+    public void NightlyFuzzCampaignIsContainerConnectedAndEvidenceBound()
+    {
+        var root = RepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(
+            root, ".github", "workflows", "nightly.yml"));
+        var dispatcher = File.ReadAllText(Path.Combine(
+            root, "scripts", "Invoke-SharpProofContainer.ps1"));
+        var entrypoint = File.ReadAllText(Path.Combine(
+            root, "eng", "container", "entrypoint.sh"));
+        var campaign = File.ReadAllText(Path.Combine(
+            root, "scripts", "Invoke-SharpProofFuzzCampaign.ps1"));
+        var acceptance = File.ReadAllText(Path.Combine(
+            root, "eng", "acceptance", "Verify.ps1"));
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root, "eng", "acceptance", "contract.json")));
+        var nightlyCases = contract.RootElement
+            .GetProperty("fuzz")
+            .GetProperty("nightlyCases")
+            .GetInt32();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nightlyCases, Is.Positive);
+            Assert.That(workflow, Does.Contain("tooling fuzz-nightly"));
+            Assert.That(
+                Directory.EnumerateFiles(
+                        Path.Combine(root, ".github", "workflows"))
+                    .Where(path =>
+                        path.EndsWith(".yml", StringComparison.Ordinal) ||
+                        path.EndsWith(".yaml", StringComparison.Ordinal))
+                    .Where(path => !path.EndsWith(
+                        "nightly.yml",
+                        StringComparison.Ordinal))
+                    .Select(File.ReadAllText),
+                Has.None.Contain("tooling fuzz-nightly"));
+            Assert.That(dispatcher,
+                Does.Contain("'fuzz-nightly'")
+                    .And.Contain("Invoke-SharpProofFuzzCampaign.ps1")
+                    .And.Contain("fuzz-nightly requires -Configuration Release."));
+            Assert.That(entrypoint,
+                Does.Contain("fuzz-nightly")
+                    .And.Contain("requires clean exact-commit source"));
+            Assert.That(campaign,
+                Does.Contain("contract.fuzz.nightlyCases")
+                    .And.Contain("ContainsKey('RotatingSeed')")
+                    .And.Contain("retained.seeds")
+                    .And.Contain("Invoke-FuzzRun")
+                    .And.Contain("yyyyMMdd")
+                    .And.Contain("schemaVersion = 3")
+                    .And.Contain("commit = $sourceCommit")
+                    .And.Contain("rotatingCases = $effectiveRotatingCases")
+                    .And.Contain("retainedCasesPerSeed = $effectiveRetainedCases")
+                    .And.Contain("retainedSeeds = @($retained.seeds")
+                    .And.Contain("resultSha256")
+                    .And.Contain("status = if"));
+            Assert.That(acceptance,
+                Does.Contain("contract.fuzz.pullRequestCases")
+                    .And.Not.Contain("contract.fuzz.nightlyCases"));
+        }
     }
 
     private static string Relative(string path)

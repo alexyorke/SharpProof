@@ -12,10 +12,24 @@ internal sealed class CompilerCallableLowerer
     internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention =>
         _summaries.LastImplementationIlAbstention;
 
+    internal ImmutableArray<CompilerSummaryEvidenceAuthority> SummaryEvidenceAuthorities =>
+        _summaries.SummaryEvidenceAuthorities;
+
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
         IrFactory factory,
         IEnumerable<string>? specificationPacks = null)
+        : this(
+            compilation,
+            factory,
+            CompilerSpecificationPackProvider.ResolveAuthority(specificationPacks))
+    {
+    }
+
+    internal CompilerCallableLowerer(
+        CSharpCompilation compilation,
+        IrFactory factory,
+        CompilerSpecificationPackAuthority specificationPackAuthority)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -25,7 +39,7 @@ internal sealed class CompilerCallableLowerer
             compilation,
             factory,
             _apiSpecs,
-            specificationPacks);
+            specificationPackAuthority);
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)
@@ -304,6 +318,14 @@ internal sealed class CompilerCallableLowerer
             return false;
         }
 
+        if (!string.Equals(
+                summary.Signature.Provenance.EvidenceCallIdentity,
+                callIdentity,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         IrSummaryInstantiation instantiated;
         try
         {
@@ -330,6 +352,7 @@ internal sealed class CompilerCallableLowerer
             [.. summary.DependencyProvenance.Select(static provenance =>
                 new CompilerPreparedSummaryEvidence(
                     ToCompilerOrigin(provenance.Origin),
+                    provenance.EvidenceCallIdentity,
                     provenance.EvidenceSha256,
                     provenance.EvidenceIdentity))]);
         return true;
@@ -585,13 +608,20 @@ internal sealed class CompilerCallableLowerer
         CompilerPreparedBody? body)
     {
         return new(_factory, target.Entry,
-            clauses.IsDefault ? [] : clauses, variables.IsDefault ? [] : variables, WorkerClaimReason.None, body);
+            clauses.IsDefault ? [] : clauses, variables.IsDefault ? [] : variables,
+            CompilerCallableProducerReasonCatalog.SuccessReason, body);
     }
 
     private CompilerCallablePreparation Fail(ManifestCallableTarget target, WorkerClaimReason reason,
         ImmutableArray<CompilerPreparedClause> clauses = default,
         ImmutableArray<CompilerCanonicalVariable> variables = default)
     {
+        if (!CompilerCallableProducerReasonCatalog.IsFailureReason(reason))
+        {
+            throw new InvalidOperationException(
+                "The compiler callable failure reason is not producer-owned.");
+        }
+
         return new(_factory, target.Entry,
             clauses.IsDefault ? [] : clauses, variables.IsDefault ? [] : variables, reason, null);
     }

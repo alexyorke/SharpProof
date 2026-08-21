@@ -260,6 +260,25 @@ public sealed class ContractClauseInventoryTests
             Is.EqualTo(ContractClausePlacement.Misplaced));
     }
 
+    [TestCase("ref")]
+    [TestCase("ref readonly")]
+    public void RefExpressionBodyResolvesMethodBodyOperation(string returnKind)
+    {
+        var inventory = CreateInventory(
+            $$"""
+            public static class Target {
+                private static int storage;
+                public static {{returnKind}} int Read() => ref storage;
+            }
+            """,
+            "Target",
+            "Read",
+            includeSharpProofReference: false);
+
+        Assert.That(inventory.ImplementationBody, Is.Not.Null);
+        Assert.That(inventory.Clauses, Is.Empty);
+    }
+
     private static ContractClauseInventory CreateInventory(
         string source,
         string typeName,

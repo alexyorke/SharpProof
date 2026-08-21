@@ -19,6 +19,8 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
 $contract = Get-Content -LiteralPath (Join-Path `
     $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
@@ -49,11 +51,10 @@ if (Test-Path -LiteralPath $output -PathType Leaf) {
     if ([int]$existing.schemaVersion -eq 2 -and
         [string]$existing.commit -eq $ExpectedCommit -and
         [string]$existing.configuration -eq $Configuration -and
-        [string]$existing.selection -eq 'full' -and
-        [int]$existing.catalogCount -eq $catalogCount -and
-        [string]$existing.catalogSha256 -eq $catalogSha256 -and
-        [int]$existing.mutationCount -eq $catalogCount -and
-        [int]$existing.killedCount -eq $catalogCount) {
+        [string]$existing.selection -eq 'full') {
+        & (Join-Path $PSScriptRoot 'Test-SharpProofMutationCatalog.ps1') `
+            -EvidencePath $output `
+            -ExpectedCommit $ExpectedCommit
         Write-Host "Mutation evidence is already complete: $output"
         return
     }
@@ -61,7 +62,7 @@ if (Test-Path -LiteralPath $output -PathType Leaf) {
 
 $shardRoot = Join-Path (Split-Path -Parent $output) (
     'shards/' + $ExpectedCommit + '/' + $Configuration.ToLowerInvariant() +
-    '-weighted-v2-shared-baseline-' + $parallelism)
+    '-weighted-v3-focused-baseline-' + $parallelism)
 [IO.Directory]::CreateDirectory($shardRoot) | Out-Null
 $shards = @()
 for ($index = 0; $index -lt $parallelism; $index++) {
@@ -91,7 +92,15 @@ function Test-CompleteShard([object]$Shard) {
             [int]$evidence.catalogCount -eq $catalogCount -and
             [string]$evidence.catalogSha256 -eq $catalogSha256 -and
             [int]$evidence.mutationCount -gt 0 -and
-            [int]$evidence.mutationCount -eq [int]$evidence.killedCount
+            [int]$evidence.mutationCount -eq [int]$evidence.killedCount -and
+            @($evidence.mutations | Where-Object {
+                    [string]$_.baselineInvocationSha256 -notmatch
+                        '^[0-9a-f]{64}$' -or
+                    [string]$_.assertionProvenanceSha256 -notmatch
+                        '^[0-9a-f]{64}$' -or
+                    @($_.baselineSelectedTests).Count -eq 0 -or
+                    [string]$_.baselineTrxSha256 -notmatch '^[0-9a-f]{64}$'
+                }).Count -eq 0
     }
     catch {
         return $false
@@ -108,14 +117,38 @@ function Test-CompleteBaseline {
     try {
         $baseline = Get-Content -LiteralPath $baselinePath -Raw |
             ConvertFrom-Json
-        return [int]$baseline.schemaVersion -eq 1 -and
-            [string]$baseline.commit -eq $ExpectedCommit -and
-            [string]$baseline.configuration -eq $Configuration -and
-            [string]$baseline.selection -eq 'full' -and
-            [int]$baseline.catalogCount -eq $catalogCount -and
-            [string]$baseline.catalogSha256 -eq $catalogSha256 -and
-            [int]$baseline.testCount -gt 0 -and
-            [int]$baseline.testCount -eq @($baseline.tests).Count
+        $rows = @($baseline.tests)
+        if ([int]$baseline.schemaVersion -ne 2 -or
+            [string]$baseline.commit -ne $ExpectedCommit -or
+            [string]$baseline.configuration -ne $Configuration -or
+            [string]$baseline.selection -ne 'full' -or
+            [int]$baseline.catalogCount -ne $catalogCount -or
+            [string]$baseline.catalogSha256 -ne $catalogSha256 -or
+            [int]$baseline.testCount -le 0 -or
+            [int]$baseline.testCount -ne $rows.Count) {
+            return $false
+        }
+        foreach ($row in $rows) {
+            $invocation = Get-SharpProofMutationBaselineInvocation `
+                -Project ([string]$row.project) `
+                -Filter ([string]$row.filter) `
+                -Configuration $Configuration
+            $trx = [IO.Path]::GetFullPath((Join-Path `
+                    $shardRoot ([string]$row.trx)))
+            if ([string]$row.configuration -ne $Configuration -or
+                [string]$row.invocationSha256 -ne $invocation.Sha256 -or
+                @($row.ledger).Count -eq 0 -or
+                [string]$row.trxSha256 -notmatch '^[0-9a-f]{64}$' -or
+                -not $trx.StartsWith(
+                    $shardRoot + [IO.Path]::DirectorySeparatorChar,
+                    [StringComparison]::Ordinal) -or
+                -not [IO.File]::Exists($trx) -or
+                (Get-FileHash -LiteralPath $trx -Algorithm SHA256).
+                    Hash.ToLowerInvariant() -ne [string]$row.trxSha256) {
+                return $false
+            }
+        }
+        return $true
     }
     catch {
         return $false
@@ -296,7 +329,7 @@ foreach ($shard in $shards) {
     }
     $evidence = Get-Content -LiteralPath $shard.Path -Raw | ConvertFrom-Json
     foreach ($result in @($evidence.mutations)) {
-        foreach ($property in @('log', 'trx')) {
+        foreach ($property in @('log', 'trx', 'baselineTrx')) {
             $source = Join-Path (Split-Path -Parent $shard.Path) `
                 ([string]$result.$property)
             $result.$property = [IO.Path]::GetRelativePath(
@@ -339,7 +372,7 @@ $temporaryTiming = $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp
     command = 'mutation'
     commit = $ExpectedCommit
     configuration = $Configuration
-    strategy = 'weighted-longest-processing-time-first-shared-baseline-v2'
+    strategy = 'weighted-longest-processing-time-first-focused-baseline-v3'
     parallelism = $parallelism
     totalElapsedMilliseconds = [long]$campaignTimer.Elapsed.TotalMilliseconds
     baseline = [ordered]@{

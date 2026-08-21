@@ -147,7 +147,7 @@ function Test-NUnitAssertionMessage {
     }
     if ($assertionIndex -gt 0 -and
         @($lines[0..($assertionIndex - 1)] | Where-Object {
-            $_ -match '(?i)^\s*(?:[A-Za-z0-9_.]*Exception\b|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
+            $_ -match '(?i)^\s*(?:(?:(?:[A-Za-z_][A-Za-z0-9_`+]*\.)+[A-Za-z_][A-Za-z0-9_`+]*|[A-Za-z_][A-Za-z0-9_`+]*(?:Exception|Error|Failure|Fault))\s*:|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
         }).Count -ne 0) {
         return $false
     }
@@ -173,7 +173,7 @@ function Test-NUnitAssertionMessage {
         @()
     }
     if (@($assertionContinuation | Where-Object {
-            $_ -match '(?i)^\s*(?:[A-Za-z0-9_.]*Exception\b|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
+            $_ -match '(?i)^\s*(?:(?:(?:[A-Za-z_][A-Za-z0-9_`+]*\.)+[A-Za-z_][A-Za-z0-9_`+]*|[A-Za-z_][A-Za-z0-9_`+]*(?:Exception|Error|Failure|Fault))\s*:|(?:error|warning|stack trace)\s*:|(?:fatal|unhandled)\s+exception\b)'
         }).Count -ne 0) {
         return $false
     }
@@ -194,6 +194,88 @@ function Test-NUnitAssertionMessage {
     return $scalarFailure -or $collectionFailure
 }
 
+function Test-NUnitAssertionStack {
+    param([AllowNull()][string]$StackTrace)
+
+    if ([string]::IsNullOrWhiteSpace($StackTrace)) {
+        return $false
+    }
+    $lines = @($StackTrace.Replace("`r`n", "`n").Split("`n") |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_.Length -ne 0 })
+    if ($lines.Count -eq 0) {
+        return $false
+    }
+    foreach ($line in $lines) {
+        if ($line -match '(?i)(?:^|\s)(?:[A-Za-z_][A-Za-z0-9_`+]*\.)*[A-Za-z_][A-Za-z0-9_`+]*(?:Exception|Error|Failure|Fault)\b' -or
+            $line -match '(?i)^\s*(?:error|warning|stack trace|fatal|unhandled)\s*:') {
+            return $false
+        }
+        if ($line -notmatch '^\s*(?:\d+\)\s+)?at\s+\S+') {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-NUnitAssertionErrorInfo {
+    param(
+        [Parameter(Mandatory = $true)][Xml.XmlElement]$ErrorInfo,
+        [Parameter(Mandatory = $true)][Xml.XmlNamespaceManager]$NamespaceManager
+    )
+
+    $elements = @($ErrorInfo.ChildNodes | Where-Object {
+            $_.NodeType -eq [Xml.XmlNodeType]::Element
+        })
+    $messages = @($ErrorInfo.SelectNodes('trx:Message', $NamespaceManager))
+    $stacks = @($ErrorInfo.SelectNodes('trx:StackTrace', $NamespaceManager))
+    return $elements.Count -eq 2 -and
+        $messages.Count -eq 1 -and
+        $stacks.Count -eq 1 -and
+        @($elements | Where-Object {
+                $_.NamespaceURI -ne $ErrorInfo.NamespaceURI -or
+                $_.LocalName -notin @('Message', 'StackTrace')
+            }).Count -eq 0 -and
+        (Test-NUnitAssertionMessage -Message $messages[0].InnerText) -and
+        (Test-NUnitAssertionStack -StackTrace $stacks[0].InnerText)
+}
+
+function Get-AssertionProvenanceSha256 {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Results,
+        [Parameter(Mandatory = $true)][Xml.XmlNamespaceManager]$NamespaceManager
+    )
+
+    $frames = [Collections.Generic.List[string]]::new()
+    foreach ($result in @($Results | Sort-Object {
+                $_.GetAttribute('testId')
+            })) {
+        foreach ($value in @(
+                $result.GetAttribute('testId'),
+                $result.GetAttribute('executionId'),
+                $result.SelectSingleNode(
+                    'trx:Output/trx:ErrorInfo/trx:Message',
+                    $NamespaceManager).InnerText,
+                $result.SelectSingleNode(
+                    'trx:Output/trx:ErrorInfo/trx:StackTrace',
+                    $NamespaceManager).InnerText)) {
+            $frames.Add($value.Length.ToString(
+                    [Globalization.CultureInfo]::InvariantCulture) + ':' +
+                $value)
+        }
+    }
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [Text.UTF8Encoding]::new($false).GetBytes(
+            [string]::Concat($frames))
+        return [Convert]::ToHexString(
+            $hasher.ComputeHash($bytes)).ToLowerInvariant()
+    }
+    finally {
+        $hasher.Dispose()
+    }
+}
+
 function Test-NUnitMethodIdentity {
     param(
         [Parameter(Mandatory = $true)]
@@ -208,6 +290,46 @@ function Test-NUnitMethodIdentity {
                 $Expected + '(',
                 [StringComparison]::Ordinal) -and
          $Actual.EndsWith(')', [StringComparison]::Ordinal))
+}
+
+function Get-OrdinalSortedUniqueStrings {
+    param(
+        [AllowEmptyCollection()]
+        [string[]]$Values
+    )
+
+    $unique = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($value in @($Values)) {
+        [void]$unique.Add($value)
+    }
+    $sorted = [Collections.Generic.List[string]]::new()
+    foreach ($value in $unique) {
+        $sorted.Add($value)
+    }
+    $sorted.Sort([StringComparer]::Ordinal)
+    return $sorted.ToArray()
+}
+
+function Test-OrdinalStringSequenceEqual {
+    param(
+        [AllowEmptyCollection()]
+        [string[]]$Left,
+
+        [AllowEmptyCollection()]
+        [string[]]$Right
+    )
+
+    if (@($Left).Count -ne @($Right).Count) {
+        return $false
+    }
+    for ($index = 0; $index -lt @($Left).Count; $index++) {
+        if (-not [StringComparer]::Ordinal.Equals(
+                $Left[$index], $Right[$index])) {
+            return $false
+        }
+    }
+    return $true
 }
 
 function Read-SharpProofMutationTestEvidence {
@@ -240,7 +362,8 @@ function Read-SharpProofMutationTestEvidence {
         ($null -eq $ExpectedLedger -or @($ExpectedLedger).Count -eq 0)) {
         throw "Mutation '$EvidenceName' requires a nonempty baseline ledger."
     }
-    $expectedMethodNames = @($ExpectedMethodName | Sort-Object -Unique)
+    $expectedMethodNames = @(
+        Get-OrdinalSortedUniqueStrings -Values $ExpectedMethodName)
     if ($expectedMethodNames.Count -eq 0 -or
         @($ExpectedMethodName).Count -ne $expectedMethodNames.Count -or
         @($expectedMethodNames | Where-Object {
@@ -441,7 +564,9 @@ function Read-SharpProofMutationTestEvidence {
     }
 
     $ledger = @()
-    $ledgerByMethod = @{}
+    $ledgerByMethod =
+        [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::Ordinal)
     foreach ($methodName in $expectedMethodNames) {
         $ledgerByMethod[$methodName] =
             [Collections.Generic.List[string]]::new()
@@ -491,12 +616,14 @@ function Read-SharpProofMutationTestEvidence {
         }
     }
 
-    $ledger = @($ledger | Sort-Object -Unique)
+    $ledger = @(Get-OrdinalSortedUniqueStrings -Values $ledger)
     if ($ledger.Count -ne $results.Count) {
         throw "TRX for '$EvidenceName' has duplicate stable test identities."
     }
     foreach ($methodName in $expectedMethodNames) {
-        $methodLedger = @($ledgerByMethod[$methodName] | Sort-Object -Unique)
+        $methodLedger = @(
+            Get-OrdinalSortedUniqueStrings `
+                -Values $ledgerByMethod[$methodName])
         if ($methodLedger.Count -eq 0 -or
             $methodLedger.Count -ne $ledgerByMethod[$methodName].Count) {
             throw (
@@ -506,10 +633,13 @@ function Read-SharpProofMutationTestEvidence {
         $ledgerByMethod[$methodName] = $methodLedger
     }
     if ($null -ne $ExpectedLedger) {
-        $expected = @($ExpectedLedger | Sort-Object -Unique)
+        $expected = @(
+            Get-OrdinalSortedUniqueStrings -Values $ExpectedLedger)
         if ($expected.Count -ne @($ExpectedLedger).Count -or
             $ledger.Count -ne $expected.Count -or
-            @(Compare-Object $expected $ledger).Count -ne 0) {
+            -not (Test-OrdinalStringSequenceEqual `
+                -Left $expected `
+                -Right $ledger)) {
             throw "TRX test ledger changed for '$EvidenceName'."
         }
     }
@@ -535,13 +665,11 @@ function Read-SharpProofMutationTestEvidence {
             $errorInfos = @($_.SelectNodes(
                     'trx:Output/trx:ErrorInfo',
                     $namespaceManager))
-            $messages = @($_.SelectNodes(
-                    'trx:Output/trx:ErrorInfo/trx:Message',
-                    $namespaceManager))
             $outputs.Count -eq 1 -and
                 $errorInfos.Count -eq 1 -and
-                $messages.Count -eq 1 -and
-                (Test-NUnitAssertionMessage -Message $messages[0].InnerText)
+                (Test-NUnitAssertionErrorInfo `
+                    -ErrorInfo $errorInfos[0] `
+                    -NamespaceManager $namespaceManager)
         })
     if ($Mode -eq 'Mutation' -and
         $assertionFailures.Count -ne $failedResults.Count) {
@@ -552,6 +680,14 @@ function Read-SharpProofMutationTestEvidence {
         executedCount = $results.Count
         failedCount = $failedResults.Count
         assertionFailureCount = $assertionFailures.Count
+        assertionProvenanceSha256 = $(if ($assertionFailures.Count -eq 0) {
+                $null
+            }
+            else {
+                Get-AssertionProvenanceSha256 `
+                    -Results $assertionFailures `
+                    -NamespaceManager $namespaceManager
+            })
         testLedger = $ledger
         testLedgers = $ledgerByMethod
     }

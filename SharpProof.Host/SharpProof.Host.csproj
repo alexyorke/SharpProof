@@ -14,6 +14,8 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Package.Test" />
+    <InternalsVisibleTo Include="SharpProof.BuildTasks" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
     <InternalsVisibleTo Include="SharpProof.Worker.Test" />
   </ItemGroup>
 </Project>

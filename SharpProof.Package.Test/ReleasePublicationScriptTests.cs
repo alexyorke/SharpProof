@@ -28,12 +28,6 @@ public sealed class ReleasePublicationScriptTests
                 "Publish-SharpProofRelease.ps1"));
 
         Assert.That(script, Does.Not.Contain("--skip-duplicate"));
-        Assert.That(
-            script,
-            Does.Contain("Remote main package already exists"));
-        Assert.That(
-            script,
-            Does.Contain("Remote symbol package already exists"));
     }
 
     [Test]
@@ -107,7 +101,7 @@ public sealed class ReleasePublicationScriptTests
     }
 
     [Test]
-    public async Task OfflinePlanIsOrderedAndRejectsEveryExistingArtifact()
+    public async Task OfflinePlanIsOrderedAndProjectsEveryExistingArtifactCollision()
     {
         var repositoryRoot = FindRepositoryRoot();
         var repositoryHead = await RunProcessAsync(
@@ -154,8 +148,10 @@ public sealed class ReleasePublicationScriptTests
             AssertPlan(
                 absentPlan.RootElement,
                 expectedRepositoryCommit,
-                remoteState: "Absent",
-                action: "Push");
+                mainState: "FixtureAbsent",
+                mainAction: "Push",
+                symbolsState: "FixtureAbsent",
+                symbolsAction: "Push");
         }
 
         var fixtures = feed.Packages
@@ -170,30 +166,50 @@ public sealed class ReleasePublicationScriptTests
             File.Copy(fixture.Package.Path, remotePath);
             try
             {
+                var planPath = Path.Combine(
+                    workspace.Root,
+                    "existing-" + fixture.Kind + "-" +
+                    fixture.Package.Id + "-plan.json");
                 var existing = await RunPublicationScriptAsync(
                     workspace,
-                    Path.Combine(
-                        workspace.Root,
-                        "existing-" + fixture.Kind + "-" +
-                        fixture.Package.Id + "-plan.json"));
+                    planPath);
+                using var existingPlan = JsonDocument.Parse(
+                    await File.ReadAllBytesAsync(planPath));
+                var package = existingPlan.RootElement
+                    .GetProperty("packages")
+                    .EnumerateArray()
+                    .Single(candidate =>
+                        candidate.GetProperty("packageId").GetString() ==
+                        fixture.Package.Id);
                 using (Assert.EnterMultipleScope())
                 {
                     Assert.That(
                         existing.ExitCode,
-                        Is.Not.Zero,
+                        Is.Zero,
                         existing.Output);
                     Assert.That(
-                        existing.Output,
-                        Does.Contain(
-                            fixture.Kind == "main"
-                                ? "Remote main package already exists"
-                                : "Remote symbol package already exists"));
+                        package.GetProperty("remoteState").ValueKind,
+                        Is.EqualTo(JsonValueKind.Null));
                     Assert.That(
-                        existing.Output,
-                        Does.Contain(fixture.Package.Id));
+                        package.GetProperty("mainState").GetString(),
+                        Is.EqualTo(fixture.Kind == "main"
+                            ? "FixturePresent"
+                            : "FixtureAbsent"));
                     Assert.That(
-                        existing.Output,
-                        Does.Contain(fixture.Package.Version));
+                        package.GetProperty("mainAction").GetString(),
+                        Is.EqualTo(fixture.Kind == "main"
+                            ? "Collision"
+                            : "Push"));
+                    Assert.That(
+                        package.GetProperty("symbolsState").GetString(),
+                        Is.EqualTo(fixture.Kind == "symbol"
+                            ? "FixturePresent"
+                            : "FixtureAbsent"));
+                    Assert.That(
+                        package.GetProperty("symbolsAction").GetString(),
+                        Is.EqualTo(fixture.Kind == "symbol"
+                            ? "Collision"
+                            : "Push"));
                 }
             }
             finally
@@ -260,6 +276,453 @@ public sealed class ReleasePublicationScriptTests
             Assert.That(
                 Directory.EnumerateFiles(workspace.RemoteSource),
                 Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task EveryReleaseAuthorityUsesStrictSymbolValidation()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var scriptName in new[]
+                 {
+                     "New-SharpProofReleaseEvidence.ps1",
+                     "Test-SharpProofReleaseArtifacts.ps1",
+                     "Publish-SharpProofRelease.ps1",
+                     "Test-SharpProofPackageConsumers.ps1"
+                 })
+        {
+            var script = await File.ReadAllTextAsync(
+                Path.Combine(root, "scripts", scriptName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofSymbolPackages.ps1"),
+                    scriptName);
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofSymbolPackagePair"),
+                    scriptName);
+            }
+        }
+    }
+
+    [TestCase("missing")]
+    [TestCase("foreign")]
+    [TestCase("wrong-commit")]
+    [TestCase("duplicate")]
+    [TestCase("malformed")]
+    public async Task ReleaseEvidenceRejectsInvalidSymbolPayload(
+        string mutation)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PublicationWorkspace.Create();
+        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
+        {
+            File.Copy(
+                package.Path,
+                Path.Combine(
+                    workspace.PackageSource,
+                    Path.GetFileName(package.Path)));
+        }
+
+        var symbolsPath = Path.Combine(
+            workspace.PackageSource,
+            Path.GetFileName(feed.GetSymbolPackagePath(
+                PackagedProductFeed.AttributesPackageId)));
+        using (var symbols = ZipFile.Open(
+                   symbolsPath,
+                   ZipArchiveMode.Update))
+        {
+            var pdb = symbols.Entries.Single(entry =>
+                entry.FullName.EndsWith(
+                    ".pdb",
+                    StringComparison.Ordinal));
+            var pdbName = pdb.FullName;
+            switch (mutation)
+            {
+                case "missing":
+                    pdb.Delete();
+                    break;
+                case "foreign":
+                    {
+                        var foreignPath = Path.Combine(
+                            workspace.PackageSource,
+                            Path.GetFileName(feed.GetSymbolPackagePath(
+                                PackagedProductFeed.PortablePackageId)));
+                        using var foreign = ZipFile.OpenRead(foreignPath);
+                        var foreignPdb = foreign.Entries.First(entry =>
+                            entry.FullName.EndsWith(
+                                ".pdb",
+                                StringComparison.Ordinal));
+                        using var image = new MemoryStream();
+                        using (var input = foreignPdb.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        RewriteEntry(symbols, pdb, pdbName, image.ToArray());
+                        break;
+                    }
+                case "wrong-commit":
+                    {
+                        using var image = new MemoryStream();
+                        using (var input = pdb.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        var bytes = image.ToArray();
+                        var head = Encoding.ASCII.GetBytes(
+                            (await RunProcessAsync(
+                                FindRepositoryRoot(),
+                                "git",
+                                "rev-parse",
+                                "HEAD")).Output.Trim());
+                        var offset = bytes.AsSpan().IndexOf(head);
+                        Assert.That(offset, Is.GreaterThanOrEqualTo(0));
+                        Encoding.ASCII.GetBytes(new string('0', 40))
+                            .CopyTo(bytes, offset);
+                        RewriteEntry(symbols, pdb, pdbName, bytes);
+                        break;
+                    }
+                case "duplicate":
+                    {
+                        using var image = new MemoryStream();
+                        using (var input = pdb.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        var duplicate = symbols.CreateEntry(pdbName);
+                        await using var output = duplicate.Open();
+                        await output.WriteAsync(image.ToArray());
+                        break;
+                    }
+                case "malformed":
+                    RewriteEntry(
+                        symbols,
+                        pdb,
+                        pdbName,
+                        Encoding.ASCII.GetBytes("not-a-portable-pdb"));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mutation),
+                        mutation,
+                        "Unknown symbol mutation.");
+            }
+        }
+
+        var evidence = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "New-SharpProofReleaseEvidence.ps1"),
+            "-PackageSource",
+            workspace.PackageSource);
+        var expectedFailure = mutation switch
+        {
+            "missing" => "invalid symbol package layout",
+            "foreign" => "debug identifier",
+            "wrong-commit" => "canonical repository commit",
+            "duplicate" => "duplicate entry",
+            "malformed" => "portable PDB",
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation))
+        };
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(evidence.ExitCode, Is.Not.Zero, evidence.Output);
+            Assert.That(
+                evidence.Output,
+                Does.Contain(expectedFailure).IgnoreCase,
+                evidence.Output);
+            Assert.That(
+                evidence.Output,
+                Does.Not.Contain("Unable to find type"),
+                evidence.Output);
+        }
+    }
+
+    [TestCase("valid")]
+    [TestCase("role-swap")]
+    [TestCase("renamed-main")]
+    [TestCase("renamed-symbols")]
+    [TestCase("cross-id")]
+    [TestCase("wrong-commit")]
+    public async Task ReleasePackageRolesAuthenticateNamesArchivesAndNuspecs(
+        string mutation)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PublicationWorkspace.Create();
+        var packageId = PackagedProductFeed.AttributesPackageId;
+        var mainSource = feed.Packages.Single(package =>
+            package.Id == packageId).Path;
+        var symbolsSource = feed.SymbolPackages.Single(package =>
+            package.Id == packageId).Path;
+        var mainPath = Path.Combine(
+            workspace.PackageSource,
+            Path.GetFileName(mainSource));
+        var symbolsPath = Path.Combine(
+            workspace.PackageSource,
+            Path.GetFileName(symbolsSource));
+        File.Copy(mainSource, mainPath);
+        File.Copy(symbolsSource, symbolsPath);
+
+        switch (mutation)
+        {
+            case "valid":
+                break;
+            case "role-swap":
+                var mainBytes = await File.ReadAllBytesAsync(mainPath);
+                var symbolsBytes = await File.ReadAllBytesAsync(symbolsPath);
+                await File.WriteAllBytesAsync(mainPath, symbolsBytes);
+                await File.WriteAllBytesAsync(symbolsPath, mainBytes);
+                break;
+            case "renamed-main":
+                mainPath += ".renamed";
+                File.Move(
+                    Path.Combine(
+                        workspace.PackageSource,
+                        Path.GetFileName(mainSource)),
+                    mainPath);
+                break;
+            case "renamed-symbols":
+                symbolsPath += ".renamed";
+                File.Move(
+                    Path.Combine(
+                        workspace.PackageSource,
+                        Path.GetFileName(symbolsSource)),
+                    symbolsPath);
+                break;
+            case "cross-id":
+                File.Copy(
+                    feed.Packages.Single(package =>
+                        package.Id == PackagedProductFeed.PortablePackageId).Path,
+                    mainPath,
+                    overwrite: true);
+                break;
+            case "wrong-commit":
+                RewriteRepositoryCommit(symbolsPath, new string('0', 40));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(mutation), mutation, "Unknown role mutation.");
+        }
+
+        var probePath = Path.Combine(workspace.Root, "role-probe.ps1");
+        await File.WriteAllTextAsync(
+            probePath,
+            "param($Validator,$Main,$Symbols,$Id,$Version,$Commit)\n" +
+            "$ErrorActionPreference = 'Stop'\n" +
+            ". $Validator\n" +
+            "Test-SharpProofSymbolPackagePair -PackagePath $Main " +
+            "-SymbolPackagePath $Symbols -PackageId $Id " +
+            "-PackageVersion $Version -RepositoryCommit $Commit\n",
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var head = (await RunProcessAsync(
+            FindRepositoryRoot(), "git", "rev-parse", "HEAD")).Output.Trim();
+        var result = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            probePath,
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "Test-SharpProofSymbolPackages.ps1"),
+            mainPath,
+            symbolsPath,
+            packageId,
+            feed.Version,
+            head);
+
+        if (mutation == "valid")
+        {
+            Assert.That(result.ExitCode, Is.Zero, result.Output);
+        }
+        else
+        {
+            Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+        }
+    }
+
+    [Test]
+    public async Task EveryReleaseAuthorityBindsExactPackageRoles()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var scriptName in new[]
+                 {
+                     "New-SharpProofReleaseEvidence.ps1",
+                     "Test-SharpProofReleaseArtifacts.ps1",
+                     "Publish-SharpProofRelease.ps1"
+                 })
+        {
+            var script = await File.ReadAllTextAsync(
+                Path.Combine(root, "scripts", scriptName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofSymbolPackagePair"),
+                    scriptName);
+                Assert.That(
+                    script,
+                    Does.Contain("-PackageVersion"),
+                    scriptName);
+            }
+        }
+    }
+
+    [Test]
+    public async Task EveryReleaseAuthorityUsesExactPackagePayloadValidation()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var scriptName in new[]
+                 {
+                     "New-SharpProofReleaseEvidence.ps1",
+                     "Test-SharpProofReleaseArtifacts.ps1",
+                     "Publish-SharpProofRelease.ps1"
+                 })
+        {
+            var script = await File.ReadAllTextAsync(
+                Path.Combine(root, "scripts", scriptName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofPackagePayloads.ps1"),
+                    scriptName);
+                Assert.That(
+                    script,
+                    Does.Contain("Test-SharpProofPackagePayload"),
+                    scriptName);
+            }
+        }
+    }
+
+    [TestCase("foreign")]
+    [TestCase("z3-byte")]
+    [TestCase("duplicate-first-party")]
+    [TestCase("missing-managed")]
+    [TestCase("missing-native")]
+    [TestCase("valid")]
+    public async Task ReleaseEvidenceAuthenticatesExactPackagePayloadClosure(
+        string mutation)
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PublicationWorkspace.Create();
+        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
+        {
+            File.Copy(
+                package.Path,
+                Path.Combine(
+                    workspace.PackageSource,
+                    Path.GetFileName(package.Path)));
+        }
+
+        if (mutation != "valid")
+        {
+            var packageId = mutation == "duplicate-first-party" ||
+                mutation == "missing-managed"
+                ? PackagedProductFeed.AttributesPackageId
+                : PackagedProductFeed.VerifierPackageId;
+            var packagePath = Path.Combine(
+                workspace.PackageSource,
+                Path.GetFileName(feed.Packages.Single(package =>
+                    package.Id == packageId).Path));
+            using var archive = ZipFile.Open(
+                packagePath,
+                ZipArchiveMode.Update);
+            switch (mutation)
+            {
+                case "foreign":
+                    {
+                        var entry = archive.CreateEntry(
+                            "tools/net9/SharpProof.Untracked.dll");
+                        await using var output = entry.Open();
+                        await output.WriteAsync(new byte[] { 1, 2, 3, 4 });
+                        break;
+                    }
+                case "z3-byte":
+                    {
+                        var entry = archive.GetEntry(
+                            "tools/native/linux-x64/libz3.so")!;
+                        using var image = new MemoryStream();
+                        await using (var input = entry.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        var bytes = image.ToArray();
+                        bytes[^1] ^= 0x01;
+                        RewriteEntry(
+                            archive,
+                            entry,
+                            "tools/native/linux-x64/libz3.so",
+                            bytes);
+                        break;
+                    }
+                case "duplicate-first-party":
+                    {
+                        var entry = archive.GetEntry(
+                            "lib/netstandard2.0/SharpProof.Attributes.dll")!;
+                        using var image = new MemoryStream();
+                        await using (var input = entry.Open())
+                        {
+                            await input.CopyToAsync(image);
+                        }
+                        var duplicate = archive.CreateEntry(
+                            "tools/net9/SharpProof.Attributes.dll");
+                        await using var output = duplicate.Open();
+                        await output.WriteAsync(image.ToArray());
+                        break;
+                    }
+                case "missing-managed":
+                    archive.GetEntry(
+                        "lib/netstandard2.0/SharpProof.Attributes.dll")!
+                        .Delete();
+                    break;
+                case "missing-native":
+                    archive.GetEntry(
+                        "tools/native/linux-x64/libz3.so")!
+                        .Delete();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mutation),
+                        mutation,
+                        "Unknown payload mutation.");
+            }
+        }
+
+        var evidence = await RunProcessAsync(
+            FindRepositoryRoot(),
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "New-SharpProofReleaseEvidence.ps1"),
+            "-PackageSource",
+            workspace.PackageSource);
+        if (mutation == "valid")
+        {
+            Assert.That(evidence.ExitCode, Is.Zero, evidence.Output);
+            return;
+        }
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(evidence.ExitCode, Is.Not.Zero, evidence.Output);
+            Assert.That(
+                evidence.Output,
+                Does.Contain("payload").IgnoreCase,
+                evidence.Output);
         }
     }
 
@@ -339,12 +802,14 @@ public sealed class ReleasePublicationScriptTests
     private static void AssertPlan(
         JsonElement root,
         string expectedRepositoryCommit,
-        string remoteState,
-        string action)
+        string mainState,
+        string mainAction,
+        string symbolsState,
+        string symbolsAction)
     {
         Assert.That(
             root.GetProperty("schemaVersion").GetInt32(),
-            Is.EqualTo(1));
+            Is.EqualTo(2));
         Assert.That(
             root.GetProperty("planOnly").GetBoolean(),
             Is.True);
@@ -361,15 +826,23 @@ public sealed class ReleasePublicationScriptTests
         Assert.That(
             packages.Select(package =>
                 package.GetProperty("remoteState").GetString()),
-            Is.All.EqualTo(remoteState));
+            Is.All.Null);
+        Assert.That(
+            packages.Select(package =>
+                package.GetProperty("mainState").GetString()),
+            Is.All.EqualTo(mainState));
         Assert.That(
             packages.Select(package =>
                 package.GetProperty("mainAction").GetString()),
-            Is.All.EqualTo(action));
+            Is.All.EqualTo(mainAction));
+        Assert.That(
+            packages.Select(package =>
+                package.GetProperty("symbolsState").GetString()),
+            Is.All.EqualTo(symbolsState));
         Assert.That(
             packages.Select(package =>
                 package.GetProperty("symbolsAction").GetString()),
-            Is.All.EqualTo(action));
+            Is.All.EqualTo(symbolsAction));
     }
 
     private static async Task<JsonDocument> RunPlanAsync(
@@ -466,6 +939,20 @@ public sealed class ReleasePublicationScriptTests
             replacement.Open(),
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         document.Save(output);
+    }
+
+    private static void RewriteEntry(
+        ZipArchive archive,
+        ZipArchiveEntry entry,
+        string entryName,
+        byte[] contents)
+    {
+        entry.Delete();
+        var replacement = archive.CreateEntry(
+            entryName,
+            CompressionLevel.Optimal);
+        using var output = replacement.Open();
+        output.Write(contents);
     }
 
     private static string FindRepositoryRoot()

@@ -8,6 +8,7 @@ public static class GuardAdapter
     public static string Required(string value)
     {
         Contract.Requires(value.Length > 0);
+        Contract.Ensures(Contract.Result<string>().Length > 0);
         return Guard.Against.NullOrWhiteSpace(value);
     }
 

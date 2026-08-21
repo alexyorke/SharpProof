@@ -10,6 +10,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Get-SharpProofPilotPackageAuthority.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+. (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 
 function Resolve-RepositoryPath([string]$Path) {
     if ([IO.Path]::IsPathRooted($Path)) {
@@ -95,13 +98,22 @@ $resolvedPackageSource = Resolve-RepositoryPath $PackageSource
 if (-not (Test-Path -LiteralPath $resolvedPackageSource -PathType Container)) {
     throw "Pilot package source is missing: '$resolvedPackageSource'."
 }
-foreach ($id in @('SharpProof.Attributes', 'SharpProof', 'SharpProof.Verifier')) {
-    $package = Join-Path $resolvedPackageSource "$id.$version.nupkg"
-    if (-not (Test-Path -LiteralPath $package -PathType Leaf)) {
-        throw "Pilot package source is missing '$([IO.Path]::GetFileName($package))'."
-    }
+if (@(& git -C $repositoryRoot status --porcelain).Count -ne 0) {
+    throw 'Pilot qualification requires a clean checkout.'
 }
-$nugetConfigPath = Join-Path $repositoryRoot 'artifacts\pilots\NuGet.Config'
+$head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+$packageArtifacts = @(Get-SharpProofPilotPackageAuthority `
+    -PackageSource $resolvedPackageSource `
+    -ExpectedVersion $version `
+    -ExpectedCommit $head)
+$runId = [Guid]::NewGuid().ToString('N')
+$runRoot = Join-Path $repositoryRoot "artifacts/pilots/runs/$runId"
+$nugetCache = Join-Path $runRoot 'nuget'
+$dotnetHome = Join-Path $runRoot 'dotnet-home'
+$qualificationStartedUtc = [DateTimeOffset]::UtcNow
+[IO.Directory]::CreateDirectory($nugetCache) | Out-Null
+[IO.Directory]::CreateDirectory($dotnetHome) | Out-Null
+$nugetConfigPath = Join-Path $runRoot 'NuGet.Config'
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($nugetConfigPath)) |
     Out-Null
 $escapedPackageSource = [Security.SecurityElement]::Escape($resolvedPackageSource)
@@ -115,6 +127,10 @@ $escapedPackageSource = [Security.SecurityElement]::Escape($resolvedPackageSourc
     <add key="candidate" value="$escapedPackageSource" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
+  <packageSourceMapping>
+    <packageSource key="candidate"><package pattern="SharpProof*" /></packageSource>
+    <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+  </packageSourceMapping>
 </configuration>
 "@,
     [Text.UTF8Encoding]::new($false))
@@ -132,6 +148,8 @@ function Invoke-PilotDotNet {
     $startInfo.WorkingDirectory = $WorkingDirectory
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
+    $startInfo.Environment['NUGET_PACKAGES'] = $nugetCache
+    $startInfo.Environment['DOTNET_CLI_HOME'] = $dotnetHome
     $payload = [ordered]@{
         wrapper = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
         log = $LogPath
@@ -169,16 +187,24 @@ exit $LASTEXITCODE
     }
 }
 
-$head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $results = @()
 foreach ($pilot in $catalog.pilots) {
     $project = Join-Path $pilotRoot ([string]$pilot.project)
     $projectDirectory = Split-Path $project
     $artifactDirectory = Join-Path $projectDirectory 'obj\Release\net8.0\SharpProof'
     $sarifPath = Join-Path $artifactDirectory 'result.sarif'
-    $cachePath = Join-Path $projectDirectory 'obj\SharpProofPilotCache'
-    $logDirectory = Join-Path $repositoryRoot 'artifacts\pilots\logs'
+    $cachePath = Join-Path $runRoot "cache/$($pilot.id)"
+    $logDirectory = Join-Path $runRoot 'logs'
     [IO.Directory]::CreateDirectory($logDirectory) | Out-Null
+    $requestPath = Join-Path $artifactDirectory 'request.json'
+    $resultPath = Join-Path $artifactDirectory 'result.json'
+    $manifestPath = Join-Path $artifactDirectory 'compiler-manifest.json'
+    foreach ($stale in @($requestPath, $resultPath, $manifestPath, $sarifPath)) {
+        if (Test-Path -LiteralPath $stale) {
+            Remove-Item -LiteralPath $stale -Force
+        }
+    }
+    $pilotStartedUtc = [DateTimeOffset]::UtcNow
     $restoreLog = Join-Path $logDirectory "$($pilot.id)-restore.log"
     $buildLog = Join-Path $logDirectory "$($pilot.id)-build.log"
     $common = @(
@@ -205,12 +231,29 @@ foreach ($pilot in $catalog.pilots) {
         throw "Pilot '$($pilot.id)' build failed; see '$buildLog'."
     }
 
-    $resultPath = Join-Path $artifactDirectory 'result.json'
-    if (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
-        throw "Pilot '$($pilot.id)' did not publish a worker result."
+    $evidenceFiles = @($requestPath, $resultPath, $manifestPath, $sarifPath)
+    if (@($evidenceFiles | Where-Object {
+                -not (Test-Path -LiteralPath $_ -PathType Leaf) -or
+                (Get-Item -LiteralPath $_).LastWriteTimeUtc -lt $pilotStartedUtc.UtcDateTime
+            }).Count -ne 0) {
+        throw "Pilot '$($pilot.id)' did not publish a fresh complete evidence set."
     }
     $response = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     $claims = @($response.claimResults)
+    $claimEvidence = @($response.manifest.claims | ForEach-Object {
+            $manifestClaim = $_
+            $matches = @($claims | Where-Object {
+                    [string]$_.claimId -ceq [string]$manifestClaim.claimId
+                })
+            if ($matches.Count -ne 1) {
+                throw "Pilot '$($pilot.id)' has an incoherent manifest/result claim set."
+            }
+            [ordered]@{
+                claimId = [string]$manifestClaim.claimId
+                kind = [string]$manifestClaim.kind
+                outcome = [string]$matches[0].outcome
+            }
+        } | Sort-Object claimId)
     $unknownReasons = @($claims |
         Where-Object { [string]$_.outcome -eq 'Unknown' } |
         Group-Object reason |
@@ -248,11 +291,13 @@ foreach ($pilot in $catalog.pilots) {
         })
     $results += [pscustomobject]@{
         id = [string]$pilot.id
+        project = [string]$pilot.project
         category = [string]$pilot.category
         library = [string]$pilot.library
         libraryVersion = [string]$pilot.libraryVersion
         runStatus = [string]$response.runStatus
         claimCount = $claims.Count
+        claimEvidence = $claimEvidence
         outcomes = @($claims | Group-Object outcome | Sort-Object Name |
             ForEach-Object { [pscustomobject]@{ outcome = $_.Name; count = $_.Count } })
         unknownReasons = $unknownReasons
@@ -260,11 +305,24 @@ foreach ($pilot in $catalog.pilots) {
             ForEach-Object { [pscustomobject]@{ id = $_.Name; count = $_.Count } })
         elapsedMilliseconds = [long]$build.elapsedMilliseconds
         observedPeakWorkingSetBytes = [long]$build.observedPeakWorkingSetBytes
-        falsePositiveReports = 0
+        falsePositiveReports = $null
         negativeProbePassed = $negativeProbePassed
         setupFriction = [string]$pilot.setupFriction
         resultPath = [IO.Path]::GetRelativePath($repositoryRoot, $resultPath).Replace('\', '/')
         sarifProduced = Test-Path -LiteralPath $sarifPath -PathType Leaf
+        evidence = @($evidenceFiles | ForEach-Object {
+                [ordered]@{
+                    kind = switch ([IO.Path]::GetFileName($_)) {
+                        'request.json' { 'request' }
+                        'result.json' { 'result' }
+                        'compiler-manifest.json' { 'compilerManifest' }
+                        'result.sarif' { 'sarif' }
+                    }
+                    path = [IO.Path]::GetRelativePath($repositoryRoot, $_).Replace('\', '/')
+                    bytes = [int64](Get-Item -LiteralPath $_).Length
+                    sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+                }
+            })
     }
 }
 
@@ -286,19 +344,26 @@ if (@($results | Where-Object {
 }
 
 $report = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 3
+    reviewStatus = 'Unreviewed'
+    runId = $runId
+    runStartedUtc = $qualificationStartedUtc.ToString('O')
     commit = $head
     packageVersion = $version
     generatedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
     pilotCount = $results.Count
+    packageArtifacts = $packageArtifacts
     pilots = $results
 }
-$resolvedOutput = Resolve-RepositoryPath $OutputPath
-if (-not $resolvedOutput.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'OutputPath must be inside the repository.'
+if (-not (Test-SharpProofPilotReport `
+        -Report ([pscustomobject]$report) `
+        -ExpectedCommit $head `
+        -RepositoryRoot $repositoryRoot `
+        -CatalogPath (Join-Path $pilotRoot 'catalog.json'))) {
+    throw 'Pilot evidence does not satisfy the catalog and category authority.'
 }
+$resolvedOutput = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($resolvedOutput)) | Out-Null
 [IO.File]::WriteAllText(
     $resolvedOutput,

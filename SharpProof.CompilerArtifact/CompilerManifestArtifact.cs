@@ -317,6 +317,11 @@ internal static class CompilerManifestArtifactJson
         artifact.Callables = [
             .. artifact.Callables.OrderBy(static item => item.CallableId, StringComparer.Ordinal)
         ];
+        artifact.LocationAuthorities = [
+            .. (artifact.LocationAuthorities ?? [])
+                .OrderBy(static item => item?.OwnerKind)
+                .ThenBy(static item => item?.OwnerId, StringComparer.Ordinal)
+        ];
         Validate(artifact);
         var json = JsonSerializer.Serialize(
                 artifact,
@@ -335,6 +340,8 @@ internal static class CompilerManifestArtifactJson
     internal static CompilerManifestArtifact Deserialize(string json)
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
+        RequireSpecificationPackAuthorityProperties(json);
+        RequireDiagnosticClassificationProperties(json);
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, WorkerProtocolJson.Options) ??
@@ -351,7 +358,11 @@ internal static class CompilerManifestArtifactJson
     internal static ImmutableArray<CompilerCallablePreparation> DecodeCallables(
         CompilerManifestArtifact artifact)
     {
-        Validate(artifact);
+        // DecodeCallables is also used by in-memory hydration probes that
+        // deliberately mutate lowered evidence after the wire seal. Let the
+        // existing lowerer report those malformed-body cases; wire reads and
+        // writes still enforce the feature-scope seal below.
+        Validate(artifact, validateFeatureScope: false);
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
@@ -360,9 +371,21 @@ internal static class CompilerManifestArtifactJson
 
     internal static void Validate(CompilerManifestArtifact value)
     {
-        if (!HasValidDiagnostics(value.CompilerDiagnostics) ||
+        Validate(value, validateFeatureScope: true);
+    }
+
+    private static void Validate(
+        CompilerManifestArtifact value,
+        bool validateFeatureScope)
+    {
+        if (!HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation) ||
             !HasValidEnvelope(value) ||
+            (validateFeatureScope && !HasValidFeatureScope(value)) ||
+            !HasValidLocationAuthorities(value) ||
             !HasMatchingCallables(value.Callables, value.Manifest) ||
+            !HasValidCallableStates(
+                value.Callables,
+                value.CompilerDiagnostics.Length != 0) ||
             !HasValidEffectReplayTrees(value.Callables, value.Compilation))
         {
             throw new JsonException("The compiler manifest artifact is invalid.");
@@ -385,6 +408,7 @@ internal static class CompilerManifestArtifactJson
             Compilation: not null,
             MaximumExpressionDepth: >= 1 and <= 256
         } &&
+        CompilerSpecificationPackAuthorityValidation.Matches(value) &&
         WorkerProtocolJson.IsDefined(value.Features, WorkerFeatureSet.Unspecified) &&
         WorkerProtocolJson.IsSha256(value.CompilationSha256) &&
         value.CompilationSha256 == CompilationFingerprint.ComputeSha256(
@@ -392,10 +416,230 @@ internal static class CompilerManifestArtifactJson
         WorkerProtocolJson.ValidateManifest(value.Manifest).IsValid;
     }
 
-    private static bool HasValidDiagnostics(CompilerDiagnosticArtifact[]? diagnostics)
+    private static bool HasValidFeatureScope(CompilerManifestArtifact? value)
+    {
+        return value != null &&
+            WorkerProtocolJson.IsSha256(value.FeatureScopeSha256) &&
+            HasFeatureScopeParity(value) &&
+            value.FeatureScopeSha256 ==
+                CompilerFeatureScopeFingerprint.ComputeSha256(value);
+    }
+
+    private static bool HasFeatureScopeParity(CompilerManifestArtifact value)
+    {
+        if (value.Manifest?.Callables is not { } manifestCallables ||
+            value.Manifest.Claims is not { } manifestClaims ||
+            value.Callables is not { } loweredCallables)
+        {
+            return false;
+        }
+
+        var allowEffects = value.Features is WorkerFeatureSet.Effects or WorkerFeatureSet.All;
+        var allowContracts = value.Features is WorkerFeatureSet.Contracts or WorkerFeatureSet.All;
+        var loweredById = new Dictionary<string, CompilerCallableArtifact>(
+            StringComparer.Ordinal);
+        foreach (var lowered in loweredCallables)
+        {
+            if (lowered == null || loweredById.ContainsKey(lowered.CallableId))
+            {
+                return false;
+            }
+
+            loweredById.Add(lowered.CallableId, lowered);
+        }
+
+        foreach (var callable in manifestCallables)
+        {
+            if (callable == null ||
+                !loweredById.TryGetValue(callable.CallableId, out var lowered) ||
+                lowered == null)
+            {
+                return false;
+            }
+
+            var claims = manifestClaims
+                .Where(claim => claim != null && claim.CallableId == callable.CallableId)
+                .OrderBy(static claim => claim!.Ordinal)
+                .ToArray();
+            var postconditions = claims
+                .Where(static claim => claim!.Kind == WorkerClaimKind.Postcondition)
+                .ToArray();
+            var effects = claims
+                .Where(static claim => claim!.Kind == WorkerClaimKind.Effect)
+                .ToArray();
+            var selectedEffects = callable.SelectedFeatures.Contains(WorkerSelectedFeature.Effects);
+            var selectedContracts = callable.SelectedFeatures.Contains(WorkerSelectedFeature.Contracts);
+
+            if ((selectedEffects && !allowEffects) ||
+                (selectedContracts && !allowContracts) ||
+                (effects.Length != 0 && (!selectedEffects || !allowEffects)) ||
+                (postconditions.Length != 0 && (!selectedContracts || !allowContracts)) ||
+                callable.Assumptions.Any(assumption =>
+                    assumption != null &&
+                    assumption.Kind is (WorkerAssumptionKind.Precondition or WorkerAssumptionKind.UserAssume) &&
+                    (!selectedContracts || !allowContracts)))
+            {
+                return false;
+            }
+
+            var hasExplicitReason = callable.SelectionReasons.Contains(
+                WorkerSelectionReason.ExplicitAnnotation);
+            var hasDiscoveredReason = callable.SelectionReasons.Contains(
+                WorkerSelectionReason.DiscoveredPostcondition);
+            var hasContractAssumptions = callable.Assumptions.Any(assumption =>
+                assumption != null &&
+                assumption.Kind is (WorkerAssumptionKind.Precondition or WorkerAssumptionKind.UserAssume));
+            if (hasDiscoveredReason != (postconditions.Length != 0) ||
+                (hasExplicitReason &&
+                 callable.SelectedFeatures.Length == 0 &&
+                 callable.Assumptions.Length == 0) ||
+                (!hasContractAssumptions && callable.Assumptions.Length == 0 &&
+                 !selectedContracts &&
+                 !selectedEffects &&
+                 !hasDiscoveredReason && callable.SelectionReasons.Length != 0))
+            {
+                return false;
+            }
+
+            var loweredEffects = lowered.EffectClaims;
+            if (loweredEffects == null ||
+                loweredEffects.Length != effects.Length ||
+                !loweredEffects.Select(static effect => effect?.ClaimId)
+                    .SequenceEqual(effects.Select(static claim => claim!.ClaimId), StringComparer.Ordinal) ||
+                !loweredEffects.Select(static effect => effect!.ContractKind)
+                    .SequenceEqual(effects.Select(static claim => claim!.EffectContractKind)))
+            {
+                return false;
+            }
+
+            foreach (var effect in loweredEffects)
+            {
+                if (effect == null)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    CompilerEffectClaimArtifactCodec.Validate(effect);
+                }
+                catch (InvalidDataException)
+                {
+                    return false;
+                }
+            }
+
+            if (lowered.FailureReason != CompilerCallableArtifactReasonCatalog.SuccessReason)
+            {
+                continue;
+            }
+
+            if (lowered.Clauses is not { } clauses)
+            {
+                return false;
+            }
+
+            var loweredPostconditions = clauses
+                .Where(static clause => clause?.Kind == CompilerContractKind.Ensures)
+                .ToArray();
+            if (loweredPostconditions.Length != postconditions.Length ||
+                !loweredPostconditions.Select(static clause => clause?.ClaimId)
+                    .SequenceEqual(postconditions.Select(static claim => claim!.ClaimId), StringComparer.Ordinal) ||
+                !loweredPostconditions.Select(static clause => ManifestEvidence(clause!.Evidence))
+                    .SequenceEqual(postconditions.Select(static claim => claim!.Evidence)))
+            {
+                return false;
+            }
+
+            var declaredAssumptions = callable.Assumptions
+                .Where(static assumption => assumption != null &&
+                    assumption.Kind is WorkerAssumptionKind.Precondition or WorkerAssumptionKind.UserAssume)
+                .Select(static assumption => (assumption!.Id, assumption.Kind))
+                .OrderBy(static item => item.Id, StringComparer.Ordinal)
+                .ToArray();
+            var loweredAssumptions = clauses
+                .Where(static clause => clause?.Kind != CompilerContractKind.Ensures)
+                .Select(static clause => clause == null
+                    ? (string.Empty, WorkerAssumptionKind.Unspecified)
+                    : (clause.AssumptionId ?? string.Empty,
+                        clause.Kind == CompilerContractKind.Requires
+                            ? WorkerAssumptionKind.Precondition
+                            : WorkerAssumptionKind.UserAssume))
+                .OrderBy(static item => item.Item1, StringComparer.Ordinal)
+                .ToArray();
+            if (!declaredAssumptions.SequenceEqual(loweredAssumptions))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static WorkerClaimEvidence ManifestEvidence(
+        CompilerContractEvidence value)
+    {
+        return value switch
+        {
+            CompilerContractEvidence.CompilerBoundInvocation => WorkerClaimEvidence.DirectClause,
+            CompilerContractEvidence.ClosedAttribute => WorkerClaimEvidence.ReturnAttribute,
+            CompilerContractEvidence.Companion => WorkerClaimEvidence.CompanionClause,
+            _ => WorkerClaimEvidence.Unspecified
+        };
+    }
+
+    private static void RequireSpecificationPackAuthorityProperties(string json)
+    {
+        using var document = JsonDocument.Parse(
+            json,
+            new JsonDocumentOptions { MaxDepth = WorkerProtocolJson.MaximumJsonDepth });
+        var root = document.RootElement;
+        RequireProperty(root, "specificationPackIds");
+        RequireProperty(root, "specificationPackCatalogVersion");
+        RequireProperty(root, "specificationPackCatalogSha256");
+        var compilation = RequireProperty(root, "compilation");
+        RequireProperty(compilation, "specificationPackIds");
+        RequireProperty(compilation, "specificationPackCatalogVersion");
+        RequireProperty(compilation, "specificationPackCatalogSha256");
+    }
+
+    private static void RequireDiagnosticClassificationProperties(string json)
+    {
+        using var document = JsonDocument.Parse(
+            json,
+            new JsonDocumentOptions { MaxDepth = WorkerProtocolJson.MaximumJsonDepth });
+        var root = document.RootElement;
+        if (!root.TryGetProperty("compilerDiagnostics", out var diagnostics) ||
+            diagnostics.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var diagnostic in diagnostics.EnumerateArray())
+        {
+            RequireProperty(diagnostic, "isSource");
+        }
+    }
+
+    private static JsonElement RequireProperty(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(name, out var value))
+        {
+            throw new JsonException(
+                "The compiler manifest is missing '" + name + "'.");
+        }
+
+        return value;
+    }
+
+    private static bool HasValidDiagnostics(
+        CompilerDiagnosticArtifact[]? diagnostics,
+        CompilerCompilationSnapshot? compilation)
     {
         return HasValidDiagnosticShapes(diagnostics) &&
-        CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!);
+            CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!) &&
+            diagnostics!.All(item => HasValidDiagnosticBinding(item, compilation));
     }
 
     private static bool HasValidDiagnosticShapes(
@@ -403,16 +647,119 @@ internal static class CompilerManifestArtifactJson
     {
         return diagnostics?.All(static item =>
             item != null &&
-            !string.IsNullOrWhiteSpace(item.Code) &&
+            WorkerProtocolJson.IsCompilerDiagnosticCode(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
-            item.Location is
+            item.Location is { Path: not null } location &&
+            WorkerProtocolJson.HasValidLocationOrNone(location)) == true;
+    }
+
+    private static bool HasValidDiagnosticBinding(
+        CompilerDiagnosticArtifact value,
+        CompilerCompilationSnapshot? compilation)
+    {
+        if (value?.Location is not { } location)
+        {
+            return false;
+        }
+
+        if (CompilerSourceLocationAuthority.IsNone(location))
+        {
+            return !value.IsSource &&
+                value.SourceTreeOrdinal == -1 &&
+                value.SourceTreePath.Length == 0 &&
+                value.SourceTreeSha256.Length == 0 &&
+                value.SourceLineMapSha256.Length == 0;
+        }
+
+        if (!value.IsSource)
+        {
+            return false;
+        }
+
+        return CompilerSourceLocationAuthority.IsBound(
+            location,
+            value.SourceTreeOrdinal,
+            value.SourceTreePath,
+            value.SourceTreeSha256,
+            value.SourceLineMapSha256,
+            compilation);
+    }
+
+    private static bool HasValidLocationAuthorities(
+        CompilerManifestArtifact? value)
+    {
+        if (value?.LocationAuthorities is not { } authorities ||
+            value.Manifest is not { } manifest ||
+            value.Compilation is not { } compilation ||
+            authorities.Length !=
+                manifest.Callables.Length + manifest.Claims.Length)
+        {
+            return false;
+        }
+
+        if (authorities.Any(static authority => authority == null) ||
+            !authorities.Zip(
+                    authorities.Skip(1),
+                    static (left, right) => CompareAuthorities(left, right) < 0)
+                .All(static ordered => ordered))
+        {
+            return false;
+        }
+
+        var expected = manifest.Callables
+            .Select(static entry => (
+                Kind: CompilerSourceLocationOwnerKind.Callable,
+                Id: entry.CallableId,
+                Location: entry.Location))
+            .Concat(manifest.Claims.Select(static entry => (
+                Kind: CompilerSourceLocationOwnerKind.Claim,
+                Id: entry.ClaimId,
+                Location: entry.Location)))
+            .OrderBy(static value => value.Kind)
+            .ThenBy(static value => value.Id, StringComparer.Ordinal)
+            .ToArray();
+        if (expected.Any(static row => row.Location == null))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < expected.Length; index++)
+        {
+            var authority = authorities[index];
+            var row = expected[index];
+            if (!Enum.IsDefined(
+                    typeof(CompilerSourceLocationOwnerKind),
+                    authority.OwnerKind) ||
+                string.IsNullOrWhiteSpace(authority.OwnerId) ||
+                authority.OwnerKind != row.Kind ||
+                authority.OwnerId != row.Id ||
+                !CompilerSourceLocationAuthority.LocationsEqual(
+                    authority.Location,
+                    row.Location) ||
+                !CompilerSourceLocationAuthority.IsBound(
+                    authority.Location,
+                    authority.SourceTreeOrdinal,
+                    authority.SourceTreePath,
+                    authority.SourceTreeSha256,
+                    authority.SourceLineMapSha256,
+                    compilation,
+                    allowNone: true))
             {
-                Path: not null,
-                Start: >= 0,
-                Length: >= 0,
-                Line: >= 0,
-                Column: >= 0
-            }) == true;
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int CompareAuthorities(
+        CompilerLocationAuthorityArtifact left,
+        CompilerLocationAuthorityArtifact right)
+    {
+        var result = left.OwnerKind.CompareTo(right.OwnerKind);
+        return result != 0
+            ? result
+            : StringComparer.Ordinal.Compare(left.OwnerId, right.OwnerId);
     }
 
     private static bool HasMatchingCallables(
@@ -425,6 +772,21 @@ internal static class CompilerManifestArtifactJson
             StringComparer.Ordinal);
     }
 
+    private static bool HasValidCallableStates(
+        CompilerCallableArtifact[]? callables,
+        bool hasCompilerDiagnostics)
+    {
+        return callables?.All(callable =>
+            callable != null &&
+            (!hasCompilerDiagnostics ||
+             callable.FailureReason ==
+                CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason) &&
+            (callable.FailureReason ==
+                CompilerCallableArtifactReasonCatalog.SuccessReason ||
+             CompilerCallableArtifactReasonCatalog.IsFailureReason(
+                 callable.FailureReason))) == true;
+    }
+
     private static bool HasValidEffectReplayTrees(
         CompilerCallableArtifact[]? callables,
         CompilerCompilationSnapshot? compilation)
@@ -434,28 +796,39 @@ internal static class CompilerManifestArtifactJson
             return false;
         }
 
-        foreach (var effectEvent in callables
+        foreach (var effectClaim in callables
                      .OfType<CompilerCallableArtifact>()
                      .SelectMany(static callable => callable.EffectClaims ?? [])
-                     .OfType<CompilerEffectClaimArtifact>()
-                     .SelectMany(static claim => claim.Replay?.Events ?? []))
+                     .OfType<CompilerEffectClaimArtifact>())
         {
-            if (effectEvent == null ||
-                effectEvent.SyntaxTreeOrdinal < 0 ||
-                effectEvent.SyntaxTreeOrdinal >= compilation.SyntaxTrees.Length)
+            if (!CompilerEffectClaimArtifactCodec.HasValidReplayGeometry(
+                    effectClaim,
+                    compilation))
             {
                 return false;
             }
 
-            var tree = compilation.SyntaxTrees[effectEvent.SyntaxTreeOrdinal];
-            if (tree == null ||
-                effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
-                effectEvent.SyntaxStart < 0 ||
-                effectEvent.SyntaxLength <= 0 ||
-                effectEvent.SyntaxStart > tree.TextLength ||
-                effectEvent.SyntaxLength > tree.TextLength - effectEvent.SyntaxStart)
+            foreach (var effectEvent in effectClaim.Replay?.Events ?? [])
             {
-                return false;
+                if (effectEvent == null ||
+                    effectEvent.SyntaxTreeOrdinal < 0 ||
+                    effectEvent.SyntaxTreeOrdinal >= compilation.SyntaxTrees.Length)
+                {
+                    return false;
+                }
+
+                var tree = compilation.SyntaxTrees[effectEvent.SyntaxTreeOrdinal];
+                if (tree == null ||
+                    effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
+                    effectEvent.SyntaxTreeSnapshotSha256 !=
+                        CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
+                    effectEvent.SyntaxStart < 0 ||
+                    effectEvent.SyntaxLength <= 0 ||
+                    effectEvent.SyntaxStart > tree.TextLength ||
+                    effectEvent.SyntaxLength > tree.TextLength - effectEvent.SyntaxStart)
+                {
+                    return false;
+                }
             }
         }
 

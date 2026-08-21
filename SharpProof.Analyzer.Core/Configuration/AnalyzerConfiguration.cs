@@ -34,9 +34,17 @@ internal sealed class AnalyzerConfiguration
 
     public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
     {
+        return FromOptions(options.AnalyzerConfigOptionsProvider);
+    }
+
+    internal static AnalyzerConfiguration FromOptions(
+        AnalyzerConfigOptionsProvider optionsProvider)
+    {
         try
         {
-            var invalidConfigurationValues = GetInvalidGlobalConfigurationValues(options);
+            var options = optionsProvider.GlobalOptions;
+            var invalidConfigurationValues =
+                GetInvalidGlobalConfigurationValues(options);
             if (!invalidConfigurationValues.IsEmpty)
             {
                 return new(SharpProofProfile.Off, SharpProofFeatures.All, invalidConfigurationValues);
@@ -60,7 +68,7 @@ internal sealed class AnalyzerConfiguration
     }
 
     private static ImmutableArray<InvalidAnalyzerConfigurationValue>
-        GetInvalidGlobalConfigurationValues(AnalyzerOptions options)
+        GetInvalidGlobalConfigurationValues(AnalyzerConfigOptions options)
     {
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
         foreach (var option in AnalyzerConfigurationOptionRegistry.All)
@@ -90,15 +98,6 @@ internal sealed class AnalyzerConfiguration
         return builder.ToImmutable();
     }
 
-    private static bool TryGet(
-        AnalyzerOptions options,
-        AnalyzerConfigurationOption option,
-        out string value)
-    {
-        return TryGet(
-            options.AnalyzerConfigOptionsProvider.GlobalOptions, option, out value);
-    }
-
     internal static InvalidAnalyzerConfigurationValue ProviderFailure(
         Exception exception)
     {
@@ -106,15 +105,6 @@ internal sealed class AnalyzerConfiguration
             "AnalyzerConfigOptionsProvider",
             exception.GetType().Name,
             "configuration provider failed; analysis was disabled");
-    }
-
-    private static bool TryGetRetiredMode(
-        AnalyzerOptions options,
-        out string value)
-    {
-        return TryGetRetiredMode(
-            options.AnalyzerConfigOptionsProvider.GlobalOptions,
-            out value);
     }
 
     internal static ImmutableArray<InvalidAnalyzerConfigurationValue> GetInvalidTreeConfigurationValues(

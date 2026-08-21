@@ -388,40 +388,90 @@ internal static class CancellationBoundaryAnalyzer
             return false;
         }
 
-        var returnOperation = context.SemanticModel.GetOperation(
+        if (Unwrap(context.SemanticModel.GetOperation(
                 returnExpression,
-                context.CancellationToken);
-        var operations = returnOperation?.DescendantsAndSelf().ToArray() ?? [];
-        var respond = operations.OfType<IInvocationOperation>().FirstOrDefault(
-            candidate => candidate.TargetMethod is
+                context.CancellationToken)) is not IAwaitOperation awaited)
+        {
+            return false;
+        }
+
+        var responseOperation = Unwrap(awaited.Operation);
+        if (responseOperation is IInvocationOperation configureAwait &&
+            configureAwait.TargetMethod is
+            {
+                Name: "ConfigureAwait",
+                IsStatic: false,
+                Parameters.Length: 1
+            } &&
+            SymbolEqualityComparer.Default.Equals(
+                configureAwait.TargetMethod.ContainingType,
+                symbols.TaskOfInt32) &&
+            configureAwait.TargetMethod.Parameters[0].Type.SpecialType ==
+                SpecialType.System_Boolean)
+        {
+            responseOperation = Unwrap(configureAwait.Instance);
+        }
+
+        if (responseOperation is not IInvocationOperation respond ||
+            respond.TargetMethod is not
             {
                 Name: "Respond",
                 MethodKind: MethodKind.LocalFunction,
                 Parameters.Length: 1
-            } &&
+            } respondMethod ||
+            !SymbolEqualityComparer.Default.Equals(
+                respondMethod.ContainingSymbol,
+                method) ||
+            !SymbolEqualityComparer.Default.Equals(
+                respondMethod.ReturnType,
+                symbols.TaskOfInt32) ||
+            !IsSameType(
+                respondMethod.Parameters[0].Type,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.WorkerVerifyResponse]) ||
+            respond.Arguments.SingleOrDefault(candidate =>
+                candidate.Parameter?.Ordinal == 0) is not { Value: { } response } ||
+            Unwrap(response) is not IInvocationOperation create)
+        {
+            return false;
+        }
+
+        if (create.TargetMethod is not
+            {
+                Name: "Create",
+                MethodKind: MethodKind.Ordinary,
+                IsStatic: true
+            } createMethod ||
+            !IsSameType(
+                createMethod.ContainingType,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.WorkerResultAssembler]) ||
+            !IsSameType(
+                createMethod.ReturnType,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.WorkerVerifyResponse]))
+        {
+            return false;
+        }
+
+        var runStatus = createMethod.Parameters.SingleOrDefault(candidate =>
+            string.Equals(
+                candidate.Name,
+                "runStatus",
+                StringComparison.Ordinal) &&
+            IsSameType(
+                candidate.Type,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.WorkerRunStatus]));
+        var runStatusArgument = create.Arguments.SingleOrDefault(candidate =>
             SymbolEqualityComparer.Default.Equals(
-                candidate.TargetMethod.ContainingSymbol,
-                method));
-        if (respond == null)
-        {
-            return false;
-        }
-
-        var create = operations.OfType<IInvocationOperation>().FirstOrDefault(
-            candidate => candidate.TargetMethod.Name == "Create" &&
-                IsSameType(
-                    candidate.TargetMethod.ContainingType,
-                    symbols[
-                        SharpProofSoundnessAnalyzer.KnownType.WorkerResultAssembler]));
-        if (create == null)
-        {
-            return false;
-        }
-
-        return operations.Any(operation => IsNamedStaticField(
-            operation,
-            symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerRunStatus],
-            "Canceled"));
+                candidate.Parameter,
+                runStatus));
+        return runStatus != null &&
+               IsNamedStaticField(
+                   runStatusArgument?.Value,
+                   symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerRunStatus],
+                   "Canceled");
     }
 
     private static bool ReifiesWorkerVerificationCancellation(

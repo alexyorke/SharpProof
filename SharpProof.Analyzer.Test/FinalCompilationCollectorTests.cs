@@ -18,6 +18,210 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class FinalCompilationCollectorTests
 {
+    [TestCase('\uD800')]
+    [TestCase('\uDC00')]
+    public void TextHashRejectsLoneSurrogatesBeforeEncoding(char value)
+    {
+        var malformed = SourceText.From(new string(value, 1), Encoding.Unicode);
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            _ = CompilerCompilationCapture.ComputeTextSha256(malformed)));
+        Assert.That(exception!.Message, Does.Contain("ill-formed UTF-16"));
+    }
+
+    [Test]
+    public void TextHashDistinguishesValidPairFromReplacementCharacter()
+    {
+        var pair = CompilerCompilationCapture.ComputeTextSha256(
+            SourceText.From("\U0001F600", Encoding.Unicode));
+        var replacement = CompilerCompilationCapture.ComputeTextSha256(
+            SourceText.From("\uFFFD", Encoding.Unicode));
+
+        Assert.That(pair, Is.Not.EqualTo(replacement));
+    }
+
+    [TestCase("Source.cs", '\uD800')]
+    [TestCase("Source.cs", '\uDC00')]
+    [TestCase("Generated.Subject.g.cs", '\uD800')]
+    [TestCase("Generated.Subject.g.cs", '\uDC00')]
+    public async Task MalformedSourceOrGeneratedTextProducesTypedDiagnostic(
+        string filePath,
+        char surrogate)
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("ill-formed-text");
+        var compilation = CreateCompilation();
+        var malformed = CSharpSyntaxTree.ParseText(
+            "// " + new string(surrogate, 1),
+            (CSharpParseOptions)compilation.SyntaxTrees.Single().Options,
+            filePath,
+            Encoding.Unicode);
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation.AddSyntaxTrees(malformed),
+            Options(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(
+                diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("ill-formed UTF-16"));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task ValidPairAndReplacementRoundTripWithDistinctFingerprints()
+    {
+        using var workspace = new CollectorWorkspace();
+        var pairPath = workspace.SealPath("pair");
+        var replacementPath = workspace.SealPath("replacement");
+        var prefix =
+            "using SharpProof.Attributes; internal static class Subject { " +
+            "internal static string Identity(string value) { " +
+            "Contract.Ensures(Contract.Result<string>() == \"";
+        const string suffix = "\"); return value; } }";
+        var pair = CreateCompilation(prefix + "\\uD83D\\uDE00" + suffix);
+        var replacement = CreateCompilation(
+            prefix + "\\uFFFD" + suffix);
+
+        var pairArtifact = await EmitArtifact(pair, pairPath);
+        var replacementArtifact = await EmitArtifact(
+            replacement,
+            replacementPath);
+        var pairRoundTrip = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(pairArtifact));
+        var replacementRoundTrip = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactJson.Serialize(replacementArtifact));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                pairArtifact.CompilationSha256,
+                Is.Not.EqualTo(replacementArtifact.CompilationSha256));
+            Assert.That(
+                pairArtifact.Manifest.Hash,
+                Is.Not.EqualTo(replacementArtifact.Manifest.Hash));
+            Assert.That(
+                pairArtifact.Manifest.Claims.Single().ClaimId,
+                Is.Not.EqualTo(
+                    replacementArtifact.Manifest.Claims.Single().ClaimId));
+            Assert.That(
+                pairRoundTrip.Compilation.SyntaxTrees[0].Sha256,
+                Is.EqualTo(pairArtifact.Compilation.SyntaxTrees[0].Sha256));
+            Assert.That(
+                replacementRoundTrip.Compilation.SyntaxTrees[0].Sha256,
+                Is.EqualTo(
+                    replacementArtifact.Compilation.SyntaxTrees[0].Sha256));
+            Assert.That(pairRoundTrip.CompilerDiagnostics, Is.Empty);
+            Assert.That(replacementRoundTrip.CompilerDiagnostics, Is.Empty);
+            Assert.That(pairRoundTrip.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(replacementRoundTrip.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.None));
+        }
+    }
+
+    [TestCase("D800")]
+    [TestCase("DC00")]
+    public async Task IllFormedCompilerStringTermsBecomeUnsupportedExpression(
+        string escape)
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("ill-formed-string-term-" + escape);
+        var compilation = CreateCompilation(
+            "using SharpProof.Attributes; " +
+            "internal static class Subject { " +
+            "internal static string Identity(string value) { " +
+            "Contract.Ensures(Contract.Result<string>() == \"\\u" + escape +
+            "\"); return value; } }");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+            Assert.That(
+                artifact.Callables.Single().FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
+        }
+    }
+
+    [TestCase("class", "public sealed class Subject(int value) { }")]
+    [TestCase("record", "public sealed record Subject(int value);")]
+    public async Task PrimaryConstructorSelectionIsInventoriedExactlyOnce(
+        string _,
+        string declaration)
+    {
+        ArgumentNullException.ThrowIfNull(declaration);
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("primary-constructor");
+        var compilation = CreateCompilation(
+            "using SharpProof.Attributes;\n[method: DoesNotThrow]\n" + declaration);
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        Assert.That(diagnostics, Is.Empty);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+
+        Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+        Assert.That(artifact.Callables, Has.Length.EqualTo(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                artifact.Manifest.Callables[0].SelectedFeatures,
+                Is.EqualTo([WorkerSelectedFeature.Effects]));
+            Assert.That(
+                artifact.Manifest.Callables[0].ClaimIds,
+                Is.EqualTo([artifact.Manifest.Claims[0].ClaimId]));
+            Assert.That(
+                artifact.Callables[0].FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
+        }
+    }
+
+    [Test]
+    public async Task GeneratedPrimaryConstructorSelectionIsInventoried()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("generated-primary-constructor");
+        var compilation = CreateCompilation();
+        var generated = CSharpSyntaxTree.ParseText(
+            """
+            // <auto-generated />
+            using SharpProof.Attributes;
+            [method: DoesNotThrow]
+            internal sealed class GeneratedSubject(int value) { }
+            """,
+            (CSharpParseOptions)compilation.SyntaxTrees.Single().Options,
+            "Generated.PrimaryConstructor.g.cs");
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation.AddSyntaxTrees(generated),
+            Options(path));
+        Assert.That(diagnostics, Is.Empty);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+            Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(artifact.Callables, Has.Length.EqualTo(1));
+        }
+    }
+
     private const string OutputKey =
         "build_property._SharpProofCompilerManifestPath";
     private const string TargetFrameworkKey =
@@ -130,7 +334,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(12));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(14));
             Assert.That(artifact.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
@@ -278,6 +482,62 @@ public sealed class FinalCompilationCollectorTests
                 providerError.Callables.Single().FailureReason,
                 Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
         }
+    }
+
+    [TestCase("?", "first.cs")]
+    [TestCase("class C {\n    void M() {\n        Missing();\n    }\n}", "ordinary.cs")]
+    [TestCase("#line 100 \"mapped.cs\"\nclass C { void M() { Missing(); } }", "physical.cs")]
+    [TestCase("class C {", "end.cs")]
+    [TestCase("class Generated { void M() { Missing(); } }", "Generated.Subject.g.cs")]
+    public async Task CompilerDiagnosticLocationsUseOneBasedMappedCoordinates(
+        string source,
+        string path)
+    {
+        using var workspace = new CollectorWorkspace();
+        var seed = CreateCompilation();
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            (CSharpParseOptions)seed.SyntaxTrees.Single().Options,
+            path,
+            Encoding.UTF8);
+        var compilation = seed.RemoveAllSyntaxTrees().AddSyntaxTrees(tree);
+        var expected = compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error &&
+                diagnostic.Location.IsInSource)
+            .Select(static diagnostic =>
+            {
+                var mapped = diagnostic.Location.GetMappedLineSpan();
+                return new
+                {
+                    Code = "compiler." + diagnostic.Id,
+                    Message = diagnostic.GetMessage(CultureInfo.InvariantCulture),
+                    diagnostic.Location.SourceSpan.Start,
+                    diagnostic.Location.SourceSpan.Length,
+                    Path = mapped.Path ?? string.Empty,
+                    Line = mapped.StartLinePosition.Line + 1,
+                    Column = mapped.StartLinePosition.Character + 1
+                };
+            })
+            .ToArray();
+        Assert.That(expected, Is.Not.Empty);
+
+        var artifact = await EmitArtifact(
+            compilation,
+            workspace.SealPath("diagnostic-location"));
+        var actual = artifact.CompilerDiagnostics.Select(static diagnostic =>
+            new
+            {
+                diagnostic.Code,
+                diagnostic.Message,
+                diagnostic.Location.Start,
+                diagnostic.Location.Length,
+                diagnostic.Location.Path,
+                diagnostic.Location.Line,
+                diagnostic.Location.Column
+            }).ToArray();
+
+        Assert.That(actual, Is.EquivalentTo(expected));
     }
 
     [Test]
@@ -679,6 +939,32 @@ public sealed class FinalCompilationCollectorTests
                 Is.EqualTo(["SP0049"]));
             Assert.That(File.Exists(path), Is.False);
         }
+    }
+
+    [TestCase("advisory", "off", "all", true)]
+    [TestCase("off", "advisory", "all", false)]
+    [TestCase("invalid", "advisory", "all", false)]
+    [TestCase("   ", "off", "all", false)]
+    [TestCase(" AdViSoRy ", "strict", "contracts", true)]
+    [TestCase("advisory", "strict", "effects", true)]
+    [TestCase("advisory", "strict", "invalid", false)]
+    public async Task CollectorUsesAuthoritativeConfigurationAliasOrder(
+        string rawProfile,
+        string buildProfile,
+        string features,
+        bool shouldEmit)
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("profile-alias-order");
+        var options = Options(
+            path,
+            profile: buildProfile,
+            features: features);
+        options["sharpproof_profile"] = rawProfile;
+
+        _ = await AnalyzeCollectorAsync(CreateCompilation(), options);
+
+        Assert.That(File.Exists(path), Is.EqualTo(shouldEmit));
     }
 
     private static async Task<string> EmitHash(

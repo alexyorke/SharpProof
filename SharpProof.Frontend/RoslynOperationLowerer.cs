@@ -368,7 +368,8 @@ public sealed class RoslynOperationLowerer
         {
             bool boolean when type == _factory.BooleanType =>
                 LoweredExpression.Exact(_factory.Boolean(boolean)),
-            string text when type == _factory.StringType =>
+            string text when type == _factory.StringType &&
+                Utf16WellFormedness.IsWellFormed(text) =>
                 LoweredExpression.Exact(_factory.String(text)),
             _ when type == _factory.IntegerType && value is sbyte or byte or short or ushort or int or uint or long or char =>
                 LoweredExpression.Exact(_factory.Integer(Convert.ToInt64(value, CultureInfo.InvariantCulture))),

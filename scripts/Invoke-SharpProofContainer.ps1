@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -169,6 +169,42 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) {
             throw 'Minimum-SDK package consumer validation failed.'
         }
+        $consumerEvidence = Join-Path `
+            $repositoryRoot `
+            'artifacts/release-qualification/package-consumers.json'
+        [IO.Directory]::CreateDirectory(
+            [IO.Path]::GetDirectoryName($consumerEvidence)) | Out-Null
+        [IO.File]::WriteAllText(
+            $consumerEvidence,
+            (([ordered]@{
+                schemaVersion = 1
+                status = 'passed'
+                commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+                packageSource = [IO.Path]::GetRelativePath(
+                    $repositoryRoot,
+                    [IO.Path]::GetFullPath($PackageSource)).Replace('\', '/')
+                packageArtifacts = @(
+                    Get-ChildItem -LiteralPath $PackageSource -File |
+                        Where-Object {
+                            $_.Extension -in @('.nupkg', '.snupkg')
+                        } |
+                        Sort-Object Name |
+                        ForEach-Object {
+                            [ordered]@{
+                                fileName = $_.Name
+                                bytes = [int64]$_.Length
+                                sha256 = (Get-FileHash `
+                                    -LiteralPath $_.FullName `
+                                    -Algorithm SHA256).Hash.ToLowerInvariant()
+                            }
+                        }
+                )
+            } | ConvertTo-Json) + "`n"),
+            [Text.UTF8Encoding]::new($false))
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate package-consumers `
+            -EvidencePath $consumerEvidence
     }
     'samples' {
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofSamples.ps1') `
@@ -207,6 +243,13 @@ switch ($Command) {
             '--no-restore', '--', 'performance-smoke')
     }
     'coverage' {
+        if ([string]::IsNullOrWhiteSpace(
+                $env:SHARPPROOF_COVERAGE_COMPARISON_REF)) {
+            throw (
+                'SHARPPROOF_COVERAGE_COMPARISON_REF is required for ' +
+                'changed-TCB coverage enforcement.')
+        }
+        $comparisonRef = $env:SHARPPROOF_COVERAGE_COMPARISON_REF
         Invoke-DotNet @(
             'restore', 'SharpProof.sln', '--locked-mode')
         Invoke-DotNet @(
@@ -223,13 +266,6 @@ switch ($Command) {
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofCoverage.ps1') `
             @coverageCollectionArguments
         if ($LASTEXITCODE -ne 0) { throw 'Coverage collection failed.' }
-        $comparisonRef = if (-not [string]::IsNullOrWhiteSpace(
-                $env:SHARPPROOF_COVERAGE_COMPARISON_REF)) {
-            $env:SHARPPROOF_COVERAGE_COMPARISON_REF
-        }
-        else {
-            'HEAD^'
-        }
         $summaryPath = Join-Path $coverageRoot 'SharpProof.coverage.json'
         $coverageArguments = @{
             CoverageRoot = $coverageRoot
@@ -243,6 +279,10 @@ switch ($Command) {
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofCoverage.ps1') `
             @coverageArguments
         if ($LASTEXITCODE -ne 0) { throw 'Coverage validation failed.' }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate coverage `
+            -EvidencePath $summaryPath
     }
     'mutation' {
         $mutationOutput = 'artifacts/mutation/trusted-mutations.json'
@@ -256,6 +296,25 @@ switch ($Command) {
             -OutputPath $mutationOutput `
             -ExpectedCommit $commit
         if ($LASTEXITCODE -ne 0) { throw 'Trusted mutation validation failed.' }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate mutation `
+            -EvidencePath (Join-Path $repositoryRoot $mutationOutput)
+    }
+    'fuzz-nightly' {
+        if ($Configuration -ne 'Release') {
+            throw 'fuzz-nightly requires -Configuration Release.'
+        }
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+        Invoke-DotNet @(
+            'build', 'SharpProof.sln', '--configuration', 'Release',
+            '--no-restore')
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofFuzzCampaign.ps1') `
+            -OutputDirectory 'artifacts/fuzz/nightly'
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Nightly fuzz campaign failed.'
+        }
     }
     'dependency-audit' {
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
@@ -268,24 +327,28 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) { throw 'Dependency audit failed.' }
     }
     'acceptance' {
-        $restoreTimer = [Diagnostics.Stopwatch]::StartNew()
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        $restoreTimer.Stop()
-        $env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS =
-            [string][long]$restoreTimer.Elapsed.TotalMilliseconds
-        try {
-            & (Join-Path $repositoryRoot 'eng/acceptance/Verify.ps1') `
-                -Configuration $Configuration
-            if ($LASTEXITCODE -ne 0) {
-                throw 'Acceptance validation failed.'
-            }
+        & (Join-Path $repositoryRoot 'eng/acceptance/Verify.ps1') `
+            -Configuration $Configuration
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Acceptance validation failed.'
         }
-        finally {
-            Remove-Item Env:SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS `
-                -ErrorAction SilentlyContinue
+        if ($Configuration -ceq 'Release') {
+            Invoke-DotNet @(
+                'test', 'SharpProof.Gates.Test/SharpProof.Gates.Test.csproj',
+                '--configuration', 'Release', '--no-build', '--no-restore',
+                '--filter',
+                'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
         }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate ('acceptance-' + $Configuration.ToLowerInvariant()) `
+            -EvidencePath (Join-Path `
+                $repositoryRoot `
+                ('artifacts/timings/acceptance-' +
+                    $Configuration.ToLowerInvariant() + '.json'))
     }
     'pack' {
+        & (Join-Path $repositoryRoot 'scripts/Generate-Readme.ps1') -Verify
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         $output = Join-Path $repositoryRoot 'artifacts/container-packages'
         $artifactsRoot = [IO.Path]::GetFullPath(
@@ -340,6 +403,17 @@ switch ($Command) {
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPilots.ps1') -PackageSource $PackageSource
         if ($LASTEXITCODE -ne 0) { throw 'Pilot validation failed.' }
     }
+    'pilot-review' {
+        & (Join-Path $repositoryRoot 'scripts/Complete-SharpProofPilotReview.ps1') `
+            -SourceReportPath (Join-Path $repositoryRoot 'artifacts/pilots/report.json') `
+            -ReviewLedgerPath (Join-Path $repositoryRoot 'artifacts/pilots/review-ledger.json') `
+            -OutputPath (Join-Path $repositoryRoot 'artifacts/pilots/reviewed-report.json')
+        if ($LASTEXITCODE -ne 0) { throw 'Pilot review validation failed.' }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate pilots `
+            -EvidencePath (Join-Path $repositoryRoot 'artifacts/pilots/reviewed-report.json')
+    }
     'release-tag' {
         & (Join-Path $repositoryRoot `
             'scripts/Invoke-SharpProofReleaseContainer.ps1') `
@@ -364,6 +438,7 @@ switch ($Command) {
             -PlanOutputPath (Join-Path $planDirectory 'publication-plan.json')
     }
     'release-qualification' {
+        & (Join-Path $repositoryRoot 'scripts/Generate-Readme.ps1') -Verify
         & (Join-Path $repositoryRoot `
             'scripts/Invoke-SharpProofReleaseContainer.ps1') `
             -Mode WriteQualificationEvidence `

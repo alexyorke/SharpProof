@@ -77,24 +77,32 @@ sp package-tests
 sp acceptance -Configuration Release
 ```
 
-`sp test-changed` is the shortest edit-loop check. `sp check` runs one
-incremental build plus duration-aware semantic, Worker, package, and performance
-smoke shards. Disposable `docker compose run --rm tooling ...` commands remain
-the clean qualification path and intentionally discard build outputs.
+`sp test-changed` is the shortest edit-loop check.
+The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
+The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
+Both configurations also run duration-aware semantic, Worker, package, and
+performance smoke shards. Disposable `docker compose run --rm tooling ...`
+commands remain the clean qualification path and intentionally discard build
+outputs.
 
-The default container budget is 16 CPUs and 40 GiB. Test-project concurrency is
-derived from the CPUs visible inside the container (one lane per two CPUs), so
-changing `SHARPPROOF_CONTAINER_CPU_LIMIT` also changes orchestration without a
-second hardcoded worker count. `SHARPPROOF_TEST_PROJECT_PARALLELISM` is an
-explicit diagnostic override and cannot exceed the visible CPU count.
+The default container budget is 16 CPUs and 40960 MiB.
+Test-project concurrency uses 8 lanes (one lane per 2 CPUs).
+Trusted mutations use 4 deterministic weighted lanes. Changing
+`SHARPPROOF_CONTAINER_CPU_LIMIT` also changes test-project orchestration without
+a second hardcoded worker count. `SHARPPROOF_TEST_PROJECT_PARALLELISM` is an
+explicit diagnostic override and cannot exceed the visible CPU count; mutation
+parallelism remains catalog-owned.
 
 Compose derives its default project name from the source directory. Put a
 distinct `COMPOSE_PROJECT_NAME` and optional `SHARPPROOF_DEV_REF` in each
 checkout's untracked `.env` file. The persistent source volume, NuGet cache,
 and .NET home are then private to that Compose project. Finite task commands
-clone into a temporary container workspace instead of writing host `bin` or
-`obj` trees; only deliberate evidence is copied to the mounted checkout's
-`artifacts` folder.
+materialize the current source snapshot in a temporary container workspace
+instead of writing host `bin` or `obj` trees; only deliberate evidence is
+copied to the mounted checkout's `artifacts` folder. Archive sources without
+`.git` support contract, build, and ordinary test commands. Revision comparison
+and exact-commit evidence commands require the Git-backed persistent workspace,
+which the container creates without requiring host Git.
 
 The coordinates below are the intended preview packages, but no SharpProof
 package has been promoted to the public NuGet feed yet. Until the first
@@ -137,7 +145,7 @@ both implemented feature groups:
   verification.
 
 `SharpProofFeatures` values are `effects`, `contracts`, and `all` (the
-default). The effective selection is sealed into the schema-12 compiler
+default). The effective selection is sealed into the schema-14 compiler
 artifact and filters its manifest: `contracts` excludes effect-only
 annotations, `effects` excludes postcondition claims and contract assumptions,
 and `all` selects both surfaces. Every effective effect contract has one typed
@@ -417,7 +425,7 @@ Each manifest claim receives:
 
 Effect claims use canonical compiler-produced evidence. They are `Proven` only
 when a complete effect summary establishes the selected contract. Compiler
-artifact schema 12 retains schema 10's independently replayable,
+artifact schema 14 retains schema 10's independently replayable,
 unconditional direct event for a definite managed object or array allocation.
 The worker validates the event's order, source-tree hash and span, semantic
 identity, selected constraint, and compiler witness, then derives the
@@ -452,6 +460,9 @@ non-vacuous proof records `None`. Proven claims do not enter the disk cache.
 declared `Contract.Assume` and trusted-boundary evidence at the matching
 severity. The advisory default is `allow`; strict defaults to `error`.
 
+The schema-owned typed result table includes `VacuousEntry` and the full
+`Unavailable` domain; see [unknown reasons](docs/unknown-reasons.md#worker-verification-records).
+
 Malformed input, compiler errors, protocol/backend/replay errors, containment
 failure, infrastructure failure, and a hard worker timeout fail the build
 under every policy. The worker uses deterministic query, method, project,
@@ -476,6 +487,10 @@ the already validated response. It preserves `Proven`, `Refuted`, `Unknown`,
 SP0047, SP0048, and typed run-failure information with policy-matched levels.
 The SARIF file is published atomically under the same lock as the JSON result
 and cannot make an unsuccessful verifier run succeed.
+For a multitarget project, SharpProof inserts the current target-framework
+name as a directory immediately before the configured SARIF filename. This
+applies to both relative and absolute configured paths; single-target paths
+retain their existing meaning.
 
 The current body executor is capped at 64 reachable blocks, 4,096 lowered body
 instructions, and 65,536 symbolic operations. It merges acyclic predecessor
@@ -509,7 +524,7 @@ unsupported opcodes, recursive dependencies, and exhausted budgets abstain as
 typed `Unknown`; they are never treated as implementation proof authority.
 Every composed call seals its origin, evidence digest, optional pack identity,
 and complete transitive dependency-evidence closure into compiler artifact
-schema 12. Relational-summary schema version 1 and specification-pack schema
+schema 14. Relational-summary schema version 2 and specification-pack schema
 version 1 govern those evidence records.
 
 Specification packs are off by default. The preview ships one data-driven
@@ -705,7 +720,7 @@ host shadowing and arbitrary relative overrides are rejected before any push.
 
 ## Closed compiler artifact and remaining release gaps
 
-The build-only collector now emits compiler artifact schema version 12 from the
+The build-only collector now emits compiler artifact schema version 14 from the
 final post-generator Roslyn `Compilation`. It seals the feature-selected claim
 manifest and, for each selected callable, either a typed lowering failure or
 portable whole-body CFG/IR with bound contract clauses, canonical variables,
@@ -716,7 +731,7 @@ pack identity plus their transitive dependency-evidence closure. For the admitte
 managed object/array allocations, it also seals the ordered unconditional
 event, exact constraint identity, semantic operation identity, and source-tree
 span needed for independent worker replay. Worker protocol version 11 and cache
-schema version 13 carry this wire break. Relational-summary schema version 1
+schema version 13 carry this wire break. Relational-summary schema version 2
 and specification-pack schema version 1 govern the new evidence. The artifact
 also records compiler error
 diagnostics with mapped locations,

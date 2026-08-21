@@ -105,7 +105,7 @@ public sealed class WorkerProgramTests
                 directory);
             var completion = process.WaitForExit(
                 TimeSpan.FromSeconds(10),
-                TimeSpan.FromSeconds(1));
+                TimeSpan.FromSeconds(11));
 
             var response = WorkerProtocolJson.DeserializeResponse(
                 await File.ReadAllTextAsync(resultPath))!;
@@ -239,11 +239,13 @@ public sealed class WorkerProgramTests
             {
                 ProjectDirectory = directory,
                 AssemblyName = "Subject",
-                AssemblyIdentity = "Subject, Version=1.0.0.0",
+                AssemblyIdentity =
+                    "Subject, Version=1.0.0.0, Culture=neutral, " +
+                    "PublicKeyToken=null",
                 TargetFramework = "net9.0",
-                CompilerVersion = "SharpProof.Test",
+                CompilerVersion = "1.0.0.0",
                 CompilerMvid = Guid.NewGuid().ToString("D"),
-                CSharpCompilerVersion = "SharpProof.Test",
+                CSharpCompilerVersion = "1.0.0.0",
                 CSharpCompilerMvid = Guid.NewGuid().ToString("D"),
                 Options = new CompilerCompilationOptionsSnapshot
                 {
@@ -259,6 +261,8 @@ public sealed class WorkerProgramTests
                 CompilationSha256 = CompilationFingerprint.ComputeSha256(compilation, []),
                 Manifest = manifest
             };
+            artifact.FeatureScopeSha256 =
+                CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
             await File.WriteAllTextAsync(
                 manifestPath,
                 CompilerManifestArtifactJson.Serialize(artifact));
