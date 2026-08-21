@@ -482,6 +482,33 @@ public sealed class CoverageScriptTests
     }
 
     [Test]
+    public async Task AuthenticatedCoverageCountsOmittedSequencePointsAsUncovered()
+    {
+        var result = await RunCoverageIdentityFixtureAsync(
+            [
+                new CoverageEntry("Project/First.cs", "Project/First.cs", 1),
+                new CoverageEntry(
+                    "Project/Second.cs",
+                    "Project/Second.cs",
+                    0,
+                    IncludeInReport: false)
+            ]);
+
+        Assert.That(result.ExitCode, Is.Zero, result.Error);
+        using var document = JsonDocument.Parse(result.Output);
+        var aggregate = document.RootElement.GetProperty("aggregate");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                aggregate.GetProperty("coverableLines").GetInt32(),
+                Is.EqualTo(2));
+            Assert.That(
+                aggregate.GetProperty("coveredLines").GetInt32(),
+                Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public async Task AuthenticatedCoverageIgnoresGeneratedObjDocuments()
     {
         var repository = await CreateSingleCommitFixtureAsync();
@@ -1101,7 +1128,9 @@ public sealed class CoverageScriptTests
                 minimumChangedTcbLinePercent = 100
             }) + "\n");
 
-        var classes = entries.Select((entry, index) =>
+        var classes = entries
+            .Where(static entry => entry.IncludeInReport)
+            .Select((entry, index) =>
             new XElement(
                 "class",
                 new XAttribute("name", "Trusted" + index),
@@ -1585,7 +1614,8 @@ public sealed class CoverageScriptTests
     private sealed record CoverageEntry(
         string SourcePath,
         string ReportPath,
-        int Hits);
+        int Hits,
+        bool IncludeInReport = true);
 
     private sealed record SourceFixture(
         string Text,

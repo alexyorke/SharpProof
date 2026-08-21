@@ -339,12 +339,6 @@ if ($expectedLineHits.Count -eq 0 -or $expectedSequencePointCount -eq 0) {
 }
 
 $lineHits = $expectedLineHits
-$observedLineNumbers = [Collections.Generic.Dictionary[string,
-    Collections.Generic.HashSet[int]]]::new([StringComparer]::Ordinal)
-foreach ($path in $expectedLineHits.Keys) {
-    $observedLineNumbers[$path] = [Collections.Generic.HashSet[int]]::new()
-}
-
 function Resolve-CoverageSourcePath {
     param(
         [Parameter(Mandatory = $true)]
@@ -514,27 +508,12 @@ foreach ($report in $reports) {
                 $hits -gt $fileHits[$number]) {
                 $fileHits[$number] = $hits
             }
-            [void]$observedLineNumbers[$relativePath].Add($number)
             $reportLineCount++
         }
     }
     if ($hasProductionPackage -and $reportLineCount -eq 0) {
         throw "Coverage report has no production sequence points: $($report.FullName)"
     }
-}
-
-$missingSequencePoints = [Collections.Generic.List[string]]::new()
-foreach ($path in $expectedLineHits.Keys) {
-    foreach ($number in $expectedLineHits[$path].Keys) {
-        if (-not $observedLineNumbers[$path].Contains($number)) {
-            $missingSequencePoints.Add("${path}:$number")
-        }
-    }
-}
-if ($missingSequencePoints.Count -ne 0) {
-    throw (
-        'Coverage reports omit authenticated sequence points: ' +
-        (($missingSequencePoints | Sort-Object) -join ', '))
 }
 
 function Measure-Coverage {
