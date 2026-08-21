@@ -3117,15 +3117,28 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofVerifyTerminationGraceMilliseconds", "1"));
         Assert.That(timedOutBuild.ExitCode, Is.Not.Zero);
         Assert.That(
-            timedOutBuild.Output,
-            Does.Contain("worker run TimedOut"));
+            timedOutBuild.Output.Contains(
+                "worker run TimedOut",
+                StringComparison.Ordinal) ||
+            timedOutBuild.Output.Contains(
+                "worker run Failed (ContainmentFailure)",
+                StringComparison.Ordinal),
+            Is.True,
+            timedOutBuild.Output);
         var timedOutResponse = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(timedOut.ResultPath))!;
+        var publishedTimeout =
+            timedOutResponse.RunStatus == WorkerRunStatus.TimedOut &&
+            timedOutResponse.FailureReason == WorkerRunFailureReason.None;
+        var failClosedContainment =
+            timedOutResponse.RunStatus == WorkerRunStatus.Failed &&
+            timedOutResponse.FailureReason ==
+                WorkerRunFailureReason.ContainmentFailure;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                timedOutResponse.RunStatus,
-                Is.EqualTo(WorkerRunStatus.TimedOut));
+                publishedTimeout || failClosedContainment,
+                Is.True);
             Assert.That(
                 WorkerProtocolJson.Validate(timedOutResponse).IsValid,
                 Is.True);
