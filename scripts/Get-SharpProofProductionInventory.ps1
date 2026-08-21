@@ -217,11 +217,9 @@ function Get-PortablePdbModule {
             $methodHandle = [System.Reflection.Metadata.Ecma335.MetadataTokens]::MethodDefinitionHandle(
                 [System.Reflection.Metadata.Ecma335.MetadataTokens]::GetRowNumber(
                     $debugHandle))
-            if (Test-CompilerGeneratedMethod `
-                    -Reader $metadata `
-                    -Handle $methodHandle) {
-                continue
-            }
+            $isCompilerGenerated = Test-CompilerGeneratedMethod `
+                -Reader $metadata `
+                -Handle $methodHandle
             $debug = $pdb.GetMethodDebugInformation($debugHandle)
             foreach ($point in $debug.GetSequencePoints()) {
                 if ($point.IsHidden) { continue }
@@ -233,8 +231,10 @@ function Get-PortablePdbModule {
                 if ($relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) { continue }
                 if (-not $CompilePaths.Contains($relativePath)) { throw "Production inventory PDB source is not an evaluated Compile item: '$relativePath'." }
                 if ($point.StartLine -le 0 -or $point.EndLine -lt $point.StartLine) { throw "Production inventory PDB has an invalid sequence-point range for '$relativePath'." }
-                if (-not $sourceLines.ContainsKey($relativePath)) { $sourceLines[$relativePath] = [Collections.Generic.HashSet[int]]::new() }
-                [void]$sourceLines[$relativePath].Add($point.StartLine)
+                if (-not $isCompilerGenerated) {
+                    if (-not $sourceLines.ContainsKey($relativePath)) { $sourceLines[$relativePath] = [Collections.Generic.HashSet[int]]::new() }
+                    [void]$sourceLines[$relativePath].Add($point.StartLine)
+                }
                 if (-not $sourceRanges.ContainsKey($relativePath)) { $sourceRanges[$relativePath] = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal) }
                 $rangeKey = ([string]$point.StartLine) + ':' + ([string]$point.EndLine)
                 if (-not $sourceRanges[$relativePath].ContainsKey($rangeKey)) {
@@ -243,11 +243,17 @@ function Get-PortablePdbModule {
             }
         }
         if ($sourceLines.Count -eq 0) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
-        $documents = foreach ($path in @($sourceLines.Keys | Sort-Object)) {
+        $documents = foreach ($path in @($sourceRanges.Keys | Sort-Object)) {
+            $documentSequencePoints = if ($sourceLines.ContainsKey($path)) {
+                @($sourceLines[$path] | Sort-Object)
+            }
+            else {
+                @()
+            }
             [pscustomobject][ordered]@{
                 path = $path
                 sourceSha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator)))
-                sequencePoints = @($sourceLines[$path] | Sort-Object)
+                sequencePoints = @($documentSequencePoints)
                 sequencePointRanges = @($sourceRanges[$path].Values | Sort-Object startLine, endLine)
             }
         }

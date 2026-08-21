@@ -646,16 +646,23 @@ public sealed class CoverageScriptTests
                         repository,
                         "coverage",
                         "coverage-authority.json")));
-            var sequencePoints = authority.RootElement
+            var sourceDocument = authority.RootElement
                 .GetProperty("modules")[0]
-                .GetProperty("documents")[0]
+                .GetProperty("documents")[0];
+            var sequencePoints = sourceDocument
                 .GetProperty("sequencePoints")
                 .EnumerateArray()
                 .Select(static value => value.GetInt32())
                 .ToArray();
+            var permittedRangeStarts = sourceDocument
+                .GetProperty("sequencePointRanges")
+                .EnumerateArray()
+                .Select(static value => value.GetProperty("startLine").GetInt32())
+                .ToArray();
 
             Assert.That(sequencePoints, Does.Contain(7));
             Assert.That(sequencePoints, Does.Not.Contain(5));
+            Assert.That(permittedRangeStarts, Does.Contain(5));
         }
         finally
         {
