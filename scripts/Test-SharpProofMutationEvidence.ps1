@@ -375,6 +375,96 @@ function Test-MutationReuseValidation {
         -Name valid-complete `
         -Evidence (New-CompleteEvidence) `
         -ExpectSuccess $true
+
+    Remove-Item -LiteralPath $evidencePath -Force
+    $shardRoot = Join-Path $evidenceDirectory (
+        "shards/$commit/release-weighted-v3-focused-baseline-1")
+    New-Item -ItemType Directory -Path $shardRoot -Force | Out-Null
+
+    $baselineTrx = Join-Path $shardRoot 'baseline.trx'
+    Copy-Item -LiteralPath (
+        Join-Path $receiptDirectory 'first-mutation-baseline.trx') `
+        -Destination $baselineTrx
+    $baselineInvocation = Get-SharpProofMutationBaselineInvocation `
+        -Project $catalog[0].Project `
+        -Filter $catalog[0].Filter `
+        -Configuration Release
+    [pscustomobject][ordered]@{
+        schemaVersion = 2
+        commit = $commit
+        configuration = 'Release'
+        selection = 'full'
+        catalogCount = $catalog.Count
+        catalogSha256 = $catalogSha256
+        testCount = 1
+        tests = @([pscustomobject][ordered]@{
+                project = $catalog[0].Project
+                filter = $catalog[0].Filter
+                configuration = 'Release'
+                invocationSha256 = $baselineInvocation.Sha256
+                ledger = @($results[0].baselineSelectedTests)
+                trx = 'baseline.trx'
+                trxSha256 = (Get-FileHash `
+                    -LiteralPath $baselineTrx `
+                    -Algorithm SHA256).Hash.ToLowerInvariant()
+            })
+        timing = [ordered]@{
+            restoreElapsedMilliseconds = 1
+            baselineElapsedMilliseconds = 1
+            baselineInvocationCount = 1
+        }
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
+        Join-Path $shardRoot 'baseline.json') -Encoding utf8NoBOM
+
+    $syntheticRows = @($results | ForEach-Object {
+            $_ | ConvertTo-Json -Depth 5 | ConvertFrom-Json
+        })
+    for ($index = 0; $index -lt $syntheticRows.Count; $index++) {
+        $syntheticRows[$index].name = "synthetic-mutation-$index"
+        $syntheticRows[$index].file = "Synthetic/Source-$index.cs"
+        $syntheticRows[$index].project = "Synthetic.Test/Project-$index.csproj"
+        $syntheticRows[$index].test = "FullyQualifiedName~SyntheticTest$index"
+        $syntheticRows[$index].original = "synthetic-before-$index"
+        $syntheticRows[$index].mutated = "synthetic-after-$index"
+        $syntheticRows[$index] | Add-Member `
+            -NotePropertyName catalogOrdinal `
+            -NotePropertyValue $index
+    }
+    [pscustomobject][ordered]@{
+        schemaVersion = 2
+        commit = $commit
+        configuration = 'Release'
+        selection = 'selected'
+        catalogCount = $catalog.Count
+        catalogSha256 = $catalogSha256
+        mutationCount = $syntheticRows.Count
+        killedCount = $syntheticRows.Count
+        mutations = $syntheticRows
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
+        Join-Path $shardRoot 'shard-01.json') -Encoding utf8NoBOM
+
+    Remove-Item -LiteralPath $campaignSentinel `
+        -Force -ErrorAction SilentlyContinue
+    $caseOutput = & pwsh -NoLogo -NoProfile -File (
+        Join-Path $scripts 'Invoke-SharpProofTrustedMutationsParallel.ps1') `
+        -Configuration Release `
+        -OutputPath 'artifacts/mutation/trusted-mutations.json' `
+        -ExpectedCommit $commit `
+        -Parallelism 1 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -eq 0) {
+        throw 'Synthetic cached mutation shard rows were accepted as full evidence.'
+    }
+    if ([string]::Join("`n", @($caseOutput)) -notlike `
+            '*do not cover the exact mutation catalog*') {
+        throw "Unexpected cached-shard rejection: $caseOutput"
+    }
+    if (Test-Path -LiteralPath $evidencePath) {
+        throw 'Rejected cached mutation shards published full evidence.'
+    }
+    if (Test-Path -LiteralPath $campaignSentinel) {
+        throw 'Mutation campaign launched while validating cached shards.'
+    }
 }
 
 $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
