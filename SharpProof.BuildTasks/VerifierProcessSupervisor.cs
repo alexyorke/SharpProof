@@ -162,7 +162,7 @@ internal static partial class VerifierProcessSupervisor
     internal static bool IsValidNonce(string nonce)
     {
         return nonce.Length == 64 && nonce.All(static character =>
-            character is >= '0' and <= '9' or >= 'a' and <= 'f');
+            character is >= '0' and <= '9' or >= 'A' and <= 'F');
     }
 
     private static void WriteCleanupReceipt(string nonce)
