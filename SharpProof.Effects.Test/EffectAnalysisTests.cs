@@ -6172,6 +6172,54 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void FailingCompoundTargetReadSuppressesValueEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Box {
+                public int Value;
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                public static int Evaluate() {
+                    Box box = null!;
+                    return box.Value += Mutate();
+                }
+
+                public static void EvaluateThenContinue() {
+                    Box box = null!;
+                    box.Value += 1;
+                    Mutate();
+                }
+
+                private static int Mutate() {
+                    s_state++;
+                    return 1;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "Evaluate",
+                     "EvaluateThenContinue"
+                 })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False,
+                methodName);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                methodName);
+        }
+    }
+
+    [Test]
     public void EffectsAfterDefiniteNoncompletionAreSuppressed()
     {
         var compilation = EffectTestHost.CreateCompilation(

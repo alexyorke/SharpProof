@@ -499,19 +499,41 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanCompoundAssignment(ICompoundAssignmentOperation assignment)
     {
+        var result = new EffectStep(
+            Scan(assignment.Target, EffectAccess.Read),
+            _completionEvaluator.CanCompleteNormally(assignment.Target));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        result = result.Then(ScanStep(assignment.Value));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
         var operatorCall = ResolveOperatorEffects(
             assignment.OperatorMethod,
             [assignment.Target, assignment.Value],
             assignment);
         var exceptions = IntegralDivisionExceptions(assignment.OperatorKind, assignment.Type,
             assignment.Target, assignment.Value, assignment);
-        return EffectSummaryOperations.Join(
-            Scan(assignment.Target, EffectAccess.Read),
-            Scan(assignment.Value),
-            ScanWriteTarget(assignment.Target, assignment.Value, valueIsStoredDirectly: false),
+        var operation = EffectSummaryOperations.Join(
             operatorCall,
             exceptions,
             _conversionEffects.CheckedOverflow(assignment.IsChecked, assignment));
+        result = result.Then(new EffectStep(
+            operation,
+            _completionEvaluator.CanCompleteCompoundValue(assignment)));
+        return !result.CompletesNormally
+            ? result.Summary
+            : result.Then(new EffectStep(
+                ScanWriteTarget(
+                    assignment.Target,
+                    assignment.Value,
+                    valueIsStoredDirectly: false),
+                true)).Summary;
     }
 
     private EffectSummary ScanCoalesceAssignment(

@@ -57,6 +57,9 @@ internal sealed class OperationCompletionEvaluator
             ISimpleAssignmentOperation assignment =>
                 CanCompleteWriteTarget(assignment.Target) &&
                 CanCompleteNormally(assignment.Value),
+            ICompoundAssignmentOperation assignment =>
+                CanCompleteCompoundValue(assignment) &&
+                CanCompleteWriteTarget(assignment.Target),
             IParenthesizedOperation parenthesized =>
                 CanCompleteNormally(parenthesized.Operand),
             IConversionOperation conversion =>
@@ -151,6 +154,29 @@ internal sealed class OperationCompletionEvaluator
                 IDiscardOperation => true,
             _ => true
         };
+    }
+
+    internal bool CanCompleteCompoundValue(
+        ICompoundAssignmentOperation assignment)
+    {
+        if (!CanCompleteNormally(assignment.Target) ||
+            !CanCompleteNormally(assignment.Value))
+        {
+            return false;
+        }
+
+        if (assignment.OperatorKind is
+                BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
+            assignment.Value.ConstantValue is { HasValue: true, Value: 0 })
+        {
+            return false;
+        }
+
+        return assignment.OperatorMethod == null ||
+            CanCompleteInvocation(
+                assignment.OperatorMethod,
+                instance: null,
+                assignment);
     }
 
     internal bool CanCompleteConstruction(IObjectCreationOperation creation)
