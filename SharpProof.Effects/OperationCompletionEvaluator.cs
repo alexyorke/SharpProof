@@ -98,6 +98,8 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteWriteTarget(increment.Target),
             IConditionalOperation conditional =>
                 CanCompleteConditional(conditional),
+            ISwitchExpressionOperation switchExpression =>
+                CanCompleteSwitchExpression(switchExpression),
             IBlockOperation or IExpressionStatementOperation or
                 IReturnOperation or IVariableDeclarationGroupOperation or
                 IVariableDeclarationOperation or IVariableDeclaratorOperation or
@@ -105,6 +107,22 @@ internal sealed class OperationCompletionEvaluator
                 ChildrenCanComplete(operation),
             _ => true
         };
+    }
+
+    private bool CanCompleteSwitchExpression(
+        ISwitchExpressionOperation switchExpression)
+    {
+        if (!CanCompleteNormally(switchExpression.Value))
+        {
+            return false;
+        }
+
+        return SwitchExpressionFacts.GetReachableArms(
+                switchExpression,
+                CanCompleteNormally)
+            .Any(arm =>
+                (arm.Guard == null || CanCompleteNormally(arm.Guard)) &&
+                CanCompleteNormally(arm.Value));
     }
 
     internal bool CanCompleteInvocation(
@@ -141,6 +159,12 @@ internal sealed class OperationCompletionEvaluator
     internal static bool RequiresStaticInitializationCompletion(
         ISymbol member)
     {
+        member = NormalizeStaticInitializationMember(member);
+        if (!member.IsStatic && member is not IMethodSymbol
+            { MethodKind: MethodKind.Constructor })
+        {
+            return false;
+        }
         if (member is IMethodSymbol
             { MethodKind: MethodKind.StaticConstructor })
         {
@@ -151,6 +175,27 @@ internal sealed class OperationCompletionEvaluator
             member.ContainingType?.StaticConstructors.Any(
                 static constructor => !constructor.IsImplicitlyDeclared) ==
             true;
+    }
+
+    internal static bool CanAssumeStaticInitializationComplete(
+        IMethodSymbol caller,
+        ISymbol member)
+    {
+        member = NormalizeStaticInitializationMember(member);
+        return SymbolEqualityComparer.Default.Equals(
+                caller.ContainingType,
+                member.ContainingType) &&
+            (caller.MethodKind == MethodKind.StaticConstructor ||
+             caller.ContainingType.StaticConstructors.Any(
+                 static constructor => !constructor.IsImplicitlyDeclared));
+    }
+
+    internal static ISymbol NormalizeStaticInitializationMember(
+        ISymbol member)
+    {
+        return member is IMethodSymbol { ReducedFrom: { } reduced }
+            ? reduced
+            : member;
     }
 
     internal bool CanCompleteWithClone(IWithOperation withOperation)
@@ -280,15 +325,27 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        return !TryGetDeconstructionInfo(
-                _compilation,
-                deconstruction,
-                out var info) ||
+        var phasesMayComplete = !TryGetDeconstructionInfo(
+            _compilation,
+            deconstruction,
+            out var info) ||
             DeconstructionPhasesMayComplete(
                 info,
                 deconstruction.Value,
                 isRoot: true,
                 origin: deconstruction);
+        return phasesMayComplete &&
+            CanCompleteDeconstructionTarget(deconstruction.Target);
+    }
+
+    private bool CanCompleteDeconstructionTarget(IOperation target)
+    {
+        if (target is ITupleOperation tuple)
+        {
+            return tuple.Elements.All(CanCompleteDeconstructionTarget);
+        }
+
+        return CanCompleteWriteTarget(target);
     }
 
     private bool DeconstructionPhasesMayComplete(
@@ -311,7 +368,9 @@ internal sealed class OperationCompletionEvaluator
             }
         }
 
-        foreach (var nested in info.Nested)
+        foreach (var nested in info.Nested.IsDefault
+                     ? ImmutableArray<DeconstructionInfo>.Empty
+                     : info.Nested)
         {
             if (!DeconstructionPhasesMayComplete(
                     nested,
@@ -323,7 +382,7 @@ internal sealed class OperationCompletionEvaluator
             }
         }
 
-        return info.Conversion.MethodSymbol is not { } conversion ||
+        return info.Conversion.Method is not { } conversion ||
             CanMethodCompleteNormally(conversion);
     }
 
@@ -340,12 +399,8 @@ internal sealed class OperationCompletionEvaluator
 
         var model = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(compilation, syntax.SyntaxTree);
-        if (model is not CSharpSemanticModel csharpModel)
-        {
-            return false;
-        }
 
-        info = csharpModel.GetDeconstructionInfo(syntax);
+        info = model.GetDeconstructionInfo(syntax);
         return true;
     }
 
@@ -415,10 +470,9 @@ internal sealed class OperationCompletionEvaluator
 
     private bool StaticInitializationMayComplete(ISymbol member)
     {
+        member = NormalizeStaticInitializationMember(member);
         if (!RequiresStaticInitializationCompletion(member) ||
-            SymbolEqualityComparer.Default.Equals(
-                _caller.ContainingType,
-                member.ContainingType) ||
+            CanAssumeStaticInitializationComplete(_caller, member) ||
             member.ContainingType is not { } type ||
             !EffectMethodNodeBuilder.HasPotentialStaticInitialization(
                 type,

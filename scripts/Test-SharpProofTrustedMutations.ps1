@@ -2208,6 +2208,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~PartialAbstentionIsNotClassifiedAsMismatchEvidence'
     },
     [pscustomobject]@{
+        Name = 'frontend-fuzz-batch-compile-failure-isolation'
+        File = 'Tools\SharpProof.Fuzz\FrontendFuzzing.cs'
+        Original = '            if (generatedCases.Count == 1)'
+        Mutated = '            if (true)'
+        Project = 'SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj'
+        Filter = 'FullyQualifiedName~FrontendBatchCompileFailureIsIsolatedToInvalidCase'
+    },
+    [pscustomobject]@{
         Name = 'verifier-output-drain-rechecks-interruption'
         File = 'SharpProof.BuildTasks\RunVerifier.cs'
         Original = 'if (isInterrupted())'

@@ -209,6 +209,110 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    public void SupervisorReadinessWaitObservesArmedSignal()
+    {
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var waits = 0;
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            System.Threading.Tasks.Task.CompletedTask,
+            static () => false,
+            timeoutMilliseconds: 1000,
+            _ =>
+            {
+                waits++;
+                armed.TrySetResult(true);
+                return true;
+            });
+
+        Assert.That(result, Is.EqualTo(RunVerifier.SupervisorReadiness.Armed));
+        Assert.That(waits, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void SupervisorReadinessWaitObservesPreArmedExit()
+    {
+        var exited = false;
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            System.Threading.Tasks.Task.CompletedTask,
+            () => exited,
+            timeoutMilliseconds: 1000,
+            _ =>
+            {
+                exited = true;
+                return false;
+            });
+
+        Assert.That(
+            result,
+            Is.EqualTo(RunVerifier.SupervisorReadiness.ExitedBeforeArmed));
+    }
+
+    [Test]
+    public void SupervisorReadinessDoesNotInferPreArmedExitBeforeOutputDrain()
+    {
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var output = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            output.Task,
+            static () => true,
+            timeoutMilliseconds: 1,
+            _ => false);
+
+        Assert.That(
+            result,
+            Is.EqualTo(RunVerifier.SupervisorReadiness.NotReady));
+    }
+
+    [Test]
+    public void SupervisorReadinessRechecksArmedAfterExitObservation()
+    {
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            System.Threading.Tasks.Task.CompletedTask,
+            () =>
+            {
+                armed.TrySetResult(true);
+                return true;
+            },
+            timeoutMilliseconds: 1000);
+
+        Assert.That(result, Is.EqualTo(RunVerifier.SupervisorReadiness.Armed));
+    }
+
+    [Test]
+    public void SupervisorReadinessWaitFailsClosedAtBound()
+    {
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously).Task,
+            static () => false,
+            timeoutMilliseconds: 1,
+            _ => false);
+
+        Assert.That(
+            result,
+            Is.EqualTo(RunVerifier.SupervisorReadiness.NotReady));
+    }
+
+    [Test]
     [Platform("Linux")]
     [NonParallelizable]
     public async System.Threading.Tasks.Task
@@ -1117,6 +1221,7 @@ public sealed class BuildTaskTests
         try
         {
             var helper = CreateTimedProcessAssembly(directory.FullName);
+            var containmentFailure = string.Empty;
             var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
@@ -1125,7 +1230,9 @@ public sealed class BuildTaskTests
                 Arguments =
                 [
                     new TaskItem(helper)
-                ]
+                ],
+                ContainmentAuthenticationFailureOverride = message =>
+                    containmentFailure = message
             };
 
             var execution = System.Threading.Tasks.Task.Run(task.Execute);
@@ -1148,6 +1255,7 @@ public sealed class BuildTaskTests
                 Assert.That(canceledPromptly, Is.True);
                 Assert.That(await execution, Is.True);
                 Assert.That(task.ExitCode, Is.Not.Zero);
+                Assert.That(containmentFailure, Is.Empty);
             }
         }
         finally

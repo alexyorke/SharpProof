@@ -3556,6 +3556,7 @@ public sealed class EffectAnalysisTests
         var compilation = EffectTestHost.CreateCompilation(
             """
             public ref struct RefAlias {
+                private static int s_cell;
                 public ref int Cell;
                 public RefAlias(ref int cell) { Cell = ref cell; }
                 public void Bind(ref int cell) { Cell = ref cell; }
@@ -3565,6 +3566,10 @@ public sealed class EffectAnalysisTests
                 public void CopyFrom(RefAlias source) {
                     Cell = ref source.Cell;
                 }
+                private static ref int StaticCell() => ref s_cell;
+                public void BindStatic() { Cell = ref StaticCell(); }
+                private static ref int IgnoreAndReturnStatic(ref int ignored) => ref s_cell;
+                public void BindMisleading(ref int cell) { Cell = ref IgnoreAndReturnStatic(ref cell); }
                 public void Set() => Cell = 1;
                 public void Dispose() => Cell = 1;
             }
@@ -3603,6 +3608,16 @@ public sealed class EffectAnalysisTests
                     BindStatic(ref alias, ref cell);
                     alias.Set();
                 }
+                public static void BindAmbientThenMutate() {
+                    RefAlias alias = default;
+                    alias.BindStatic();
+                    alias.Set();
+                }
+                public static void BindMisleadingThenMutate(ref int cell) {
+                    RefAlias alias = default;
+                    alias.BindMisleading(ref cell);
+                    alias.Set();
+                }
                 public static void CopyReceiverThenMutate(RefAlias source) {
                     RefAlias target = default;
                     source.CopyTo(ref target);
@@ -3636,6 +3651,10 @@ public sealed class EffectAnalysisTests
             Method(compilation, "CopyReceiverThenMutate")).Summary;
         var copiedFromValue = session.Analyze(
             Method(compilation, "CopyValueThenMutate")).Summary;
+        var boundFromAmbient = session.Analyze(
+            Method(compilation, "BindAmbientThenMutate")).Summary;
+        var boundFromMisleadingCall = session.Analyze(
+            Method(compilation, "BindMisleadingThenMutate")).Summary;
 
         using (Assert.EnterMultipleScope())
         {
@@ -3675,6 +3694,14 @@ public sealed class EffectAnalysisTests
                 copiedFromValue.Writes.Contains(EffectRegionId.Parameter(0)),
                 Is.True);
             Assert.That(copiedFromValue.Writes.IsUnknown, Is.False);
+            Assert.That(
+                boundFromAmbient.Writes.Contains(EffectRegionId.Static())
+                || boundFromAmbient.Writes.IsUnknown,
+                Is.True);
+            Assert.That(
+                boundFromMisleadingCall.Writes.Contains(EffectRegionId.Static())
+                || boundFromMisleadingCall.Writes.IsUnknown,
+                Is.True);
         }
     }
 
@@ -4490,6 +4517,9 @@ public sealed class EffectAnalysisTests
                     while (true) { }
                 }
             }
+            public sealed class DivergingDeconstructionTarget {
+                public int Value { set { while (true) { } } }
+            }
             public sealed class NullTarget {
                 public int Value;
                 public void Touch() { }
@@ -4526,6 +4556,25 @@ public sealed class EffectAnalysisTests
                 public static void Run() =>
                     throw new InvalidOperationException();
             }
+            public static class ExternalInitializationState {
+                public static int Value;
+                public static void Mark() => Value++;
+            }
+            public static class SameTypeBeforeFieldInitBomb {
+                private static readonly int Value = FailInitialization();
+                private static int FailInitialization() =>
+                    throw new ApplicationException();
+                public static void CatchInitialization() {
+                    try { _ = Value; }
+                    catch (TypeInitializationException) {
+                        ExternalInitializationState.Mark();
+                    }
+                }
+                public static void AfterInitialization() {
+                    _ = Value;
+                    ExternalInitializationState.Mark();
+                }
+            }
             public sealed class ThrowingStaticConstruction {
                 static ThrowingStaticConstruction() =>
                     throw new ApplicationException();
@@ -4537,6 +4586,10 @@ public sealed class EffectAnalysisTests
                 public static void Touch(this object value) { }
                 public static ExtensionEnumerator GetEnumerator(
                     this ExtensionSequence value) => default;
+            }
+            public static class DivergingExtensions {
+                static DivergingExtensions() { while (true) { } }
+                public static void TouchDiverging(this object value) { }
             }
             public sealed class ExtensionSequence { }
             public struct ExtensionEnumerator {
@@ -4711,8 +4764,17 @@ public sealed class EffectAnalysisTests
                 public static void ShortCircuitedAndCatch() { try { _ = false && FailBoolean(); } catch (InvalidOperationException) { s_state++; } }
                 public static void ShortCircuitedOrCatch() { try { _ = true || FailBoolean(); } catch (InvalidOperationException) { s_state++; } }
                 public static void ConstantSwitchExpressionCatch() { try { _ = 0 switch { 1 => ThrowObject(), _ => new object() }; } catch (InvalidOperationException) { s_state++; } }
+                public static void ConstantUnmatchedSwitchExpressionCatch() { try { _ = 0 switch { 1 => 1 }; } catch (System.Runtime.CompilerServices.SwitchExpressionException) { s_state++; } }
+                public static void ConstantMatchedNonExhaustiveSwitchCatch() { try { _ = 0 switch { 0 => 1 }; } catch (System.Runtime.CompilerServices.SwitchExpressionException) { s_state++; } }
+                public static void ExhaustiveTypePatternSwitchCatch() { try { _ = 0 switch { int value => value }; } catch (System.Runtime.CompilerServices.SwitchExpressionException) { s_state++; } }
+                public static void ConstantRelationalSwitchCatch() { try { _ = 0 switch { >= 0 => new object(), _ => ThrowObject() }; } catch (InvalidOperationException) { s_state++; } }
+                public static void NaNSingleRelationalSwitchCatch() { try { _ = float.NaN switch { < 0f => ThrowObject(), _ => new object() }; } catch (InvalidOperationException) { s_state++; } }
+                public static void NaNDoubleRelationalSwitchCatch() { try { _ = double.NaN switch { < 0d => ThrowObject(), _ => new object() }; } catch (InvalidOperationException) { s_state++; } }
+                public static void AfterConstantUnmatchedSwitchExpression() { _ = 0 switch { 1 => 1 }; s_state++; }
                 public static void ConstantSwitchStatementCatch() { try { switch (0) { case 1: ThrowObject(); break; default: break; } } catch (InvalidOperationException) { s_state++; } }
                 public static void ThrowingSwitchExpressionGuard() { try { _ = 0 switch { 0 when ThrowBoolean() => new object(), _ => ThrowApplicationObject() }; } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void AfterThrowingTotalSwitchGuard(int value) { _ = value switch { _ when ThrowBoolean() => 1, _ => 2 }; s_state++; }
+                public static void VarPatternThrowingGuardBeforeFallback(int value) { try { _ = value switch { var captured when ThrowBoolean() => 1, _ => ThrowInteger() }; } catch (ArgumentException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void ThrowingSwitchStatementGuard() { try { switch (0) { case 0 when ThrowBoolean(): break; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void ThrowingSwitchStatementGuardBeforeGoto() { try { switch (0) { case 0 when ThrowBoolean(): goto default; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void ThrowingSwitchBodyBeforeGoto() { try { switch (0) { case 0: Fail(); goto default; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
@@ -4750,11 +4812,13 @@ public sealed class EffectAnalysisTests
                 public static void StaticPropertyInitializationAfterRhs() { try { StaticBomb.Property = ThrowInteger(); } catch (TypeInitializationException) { s_state++; } catch (ArgumentException) { } }
                 public static void StaticFieldInitializationAfterRhs() { try { StaticBomb.Value = ThrowInteger(); } catch (TypeInitializationException) { s_state++; } catch (ArgumentException) { } }
                 public static void ExtensionInitializationAfterReceiver() { try { ThrowObject().Touch(); } catch (TypeInitializationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void AfterDivergingExtensionInitialization() { new object().TouchDiverging(); s_state++; }
                 public static void NameofOperandIsCompileTime(ThrowingGetter value) { try { _ = nameof(value.Value); } catch (InvalidOperationException) { s_state++; } }
                 public static void WithCloneFailure(ThrowingCloneRecord value) { try { _ = value with { }; } catch (InvalidOperationException) { s_state++; } }
                 public static void AfterDivergingWithClone(DivergingCloneRecord value) { _ = value with { Value = 1 }; s_state++; }
                 public static void DeconstructionFailure(ThrowingDeconstruction value) { try { var (left, right) = value; _ = left + right; } catch (InvalidOperationException) { s_state++; } }
                 public static void AfterDivergingDeconstruction(DivergingDeconstruction value) { var (left, right) = value; _ = left + right; s_state++; }
+                public static void AfterDivergingDeconstructionSetter(DivergingDeconstructionTarget target) { int ignored; (target.Value, ignored) = (1, 2); s_state++; }
                 public static void NullLockWrongCatch() { object gate = null!; try { lock (gate) { } } catch (NullReferenceException) { s_state++; } catch (ArgumentNullException) { } }
                 public static void NullLockCorrectCatch() { object gate = null!; try { lock (gate) { } } catch (ArgumentNullException) { s_state++; } }
                 public static void NullEventWrongCatch() { EventTarget value = null!; Action handler = FailHandler; try { value.Changed += handler; } catch (InvalidOperationException) { s_state++; } catch (NullReferenceException) { } }
@@ -4840,8 +4904,33 @@ public sealed class EffectAnalysisTests
             Assert.That(HasStaticWrite("ShortCircuitedAndCatch"), Is.False);
             Assert.That(HasStaticWrite("ShortCircuitedOrCatch"), Is.False);
             Assert.That(HasStaticWrite("ConstantSwitchExpressionCatch"), Is.False);
+            Assert.That(
+                HasStaticWrite("ConstantUnmatchedSwitchExpressionCatch"),
+                Is.True);
+            Assert.That(
+                HasStaticWrite("ConstantMatchedNonExhaustiveSwitchCatch"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("ExhaustiveTypePatternSwitchCatch"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("ConstantRelationalSwitchCatch"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("NaNSingleRelationalSwitchCatch"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("NaNDoubleRelationalSwitchCatch"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterConstantUnmatchedSwitchExpression"),
+                Is.False);
             Assert.That(HasStaticWrite("ConstantSwitchStatementCatch"), Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchExpressionGuard"), Is.False);
+            Assert.That(HasStaticWrite("AfterThrowingTotalSwitchGuard"), Is.False);
+            Assert.That(
+                HasStaticWrite("VarPatternThrowingGuardBeforeFallback"),
+                Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchStatementGuard"), Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchStatementGuardBeforeGoto"), Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchBodyBeforeGoto"), Is.False);
@@ -4877,6 +4966,8 @@ public sealed class EffectAnalysisTests
                 HasStaticWrite("AfterDivergingStaticInitialization"),
                 Is.False);
             Assert.That(HasStaticWrite("BeforeFieldInitMethodMayRun"), Is.True);
+            Assert.That(HasStaticWrite("CatchInitialization"), Is.True);
+            Assert.That(HasStaticWrite("AfterInitialization"), Is.False);
             Assert.That(
                 HasStaticWrite("StaticInitializationWrongCatch"),
                 Is.False);
@@ -4898,12 +4989,18 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 HasStaticWrite("ExtensionInitializationAfterReceiver"),
                 Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingExtensionInitialization"),
+                Is.False);
             Assert.That(HasStaticWrite("NameofOperandIsCompileTime"), Is.False);
             Assert.That(HasStaticWrite("WithCloneFailure"), Is.True);
             Assert.That(HasStaticWrite("AfterDivergingWithClone"), Is.False);
             Assert.That(HasStaticWrite("DeconstructionFailure"), Is.True);
             Assert.That(
                 HasStaticWrite("AfterDivergingDeconstruction"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingDeconstructionSetter"),
                 Is.False);
             Assert.That(HasStaticWrite("NullLockWrongCatch"), Is.False);
             Assert.That(HasStaticWrite("NullLockCorrectCatch"), Is.True);

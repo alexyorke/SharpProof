@@ -31,4 +31,6 @@ public static class FrameworkTypeMetadataNames
         "System.NullReferenceException";
     public const string OverflowException = "System.OverflowException";
     public const string ReferenceAssemblyAttribute = "System.Runtime.CompilerServices.ReferenceAssemblyAttribute";
+    public const string SwitchExpressionException =
+        "System.Runtime.CompilerServices.SwitchExpressionException";
 }

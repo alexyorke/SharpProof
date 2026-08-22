@@ -3,6 +3,7 @@ namespace SharpProof.Effects;
 internal sealed class ConversionOwnershipClassifier
 {
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures;
+    private readonly Compilation _compilation;
     private readonly CreationFlowCaptures _creationCaptures;
     private readonly Dictionary<ISymbol, EffectRegionSet> _localRegions =
         new(SymbolEqualityComparer.Default);
@@ -10,10 +11,12 @@ internal sealed class ConversionOwnershipClassifier
 
     internal ConversionOwnershipClassifier(
         IMethodSymbol method,
+        Compilation compilation,
         CoalesceAssignmentFlowCaptures coalesceCaptures,
         CreationFlowCaptures creationCaptures)
     {
         _method = method;
+        _compilation = compilation;
         _coalesceCaptures = coalesceCaptures;
         _creationCaptures = creationCaptures;
     }
@@ -161,6 +164,14 @@ internal sealed class ConversionOwnershipClassifier
                         refLikeLocals.Add(receiver.Local);
                     }
 
+                    if (refLikeLocals.Count != 0 &&
+                        MethodMayIntroduceUnknownRefAlias(
+                            invocation.TargetMethod))
+                    {
+                        argumentRegions = argumentRegions.Union(
+                            EffectRegionSet.Unknown);
+                    }
+
                     foreach (var refLikeLocal in refLikeLocals)
                     {
                         var previousReceiverRegions =
@@ -236,6 +247,57 @@ internal sealed class ConversionOwnershipClassifier
         }
 
         return false;
+    }
+
+    private bool MethodMayIntroduceUnknownRefAlias(IMethodSymbol method)
+    {
+        method = method.ReducedFrom ?? method;
+        if (method.DeclaringSyntaxReferences.Length != 1)
+        {
+            return true;
+        }
+
+        var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_compilation, declaration.SyntaxTree);
+        var root = model.GetOperation(declaration);
+        if (root == null)
+        {
+            return true;
+        }
+
+        foreach (var assignment in root.DescendantsAndSelf()
+                     .OfType<ISimpleAssignmentOperation>()
+                     .Where(static assignment => assignment.IsRef))
+        {
+            if (!IsCallMappedRefSource(assignment.Value, method))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsCallMappedRefSource(
+        IOperation operation,
+        IMethodSymbol method)
+    {
+        operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
+        return operation switch
+        {
+            IInstanceReferenceOperation => true,
+            IParameterReferenceOperation parameter =>
+                SymbolEqualityComparer.Default.Equals(
+                    parameter.Parameter.ContainingSymbol.OriginalDefinition,
+                    method.OriginalDefinition),
+            IFieldReferenceOperation { Field.IsStatic: false, Instance: { } instance } =>
+                IsCallMappedRefSource(instance, method),
+            IConditionalOperation conditional =>
+                IsCallMappedRefSource(conditional.WhenTrue, method) &&
+                IsCallMappedRefSource(conditional.WhenFalse, method),
+            _ => false
+        };
     }
 
     private EffectRegionSet ClassifyConversionRegion(

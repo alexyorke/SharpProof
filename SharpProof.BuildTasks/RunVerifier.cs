@@ -36,6 +36,10 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
     private Process? _process;
     private int _processGroupId;
     private int _processGroupPidFd = -1;
+    private System.Threading.Tasks.TaskCompletionSource<bool>?
+        _supervisorArmedSignal;
+    private System.Threading.Tasks.Task<BoundedProcessOutput>?
+        _supervisorOutputCompletion;
     private bool _canceled;
 
     internal Func<int, int>? OpenPidFdOverride { get; set; }
@@ -165,19 +169,21 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
                 _process = process;
                 _processGroupId = processGroupId;
                 _processGroupPidFd = processGroupPidFd;
+                _supervisorArmedSignal = supervisorArmedSignal;
+                standardOutput = ReadBoundedOutputAsync(
+                    process.StandardOutput,
+                    supervisorNonce,
+                    _outputLimitSignal,
+                    supervisorArmedSignal);
+                standardError = ReadBoundedOutputAsync(
+                    process.StandardError,
+                    supervisorNonce: null,
+                    _outputLimitSignal);
+                _supervisorOutputCompletion = standardOutput;
                 process.StandardInput.WriteLine(
                     ProcessGateStartMessage + " " + supervisorNonce);
                 process.StandardInput.Close();
             }
-            standardOutput = ReadBoundedOutputAsync(
-                process.StandardOutput,
-                supervisorNonce,
-                _outputLimitSignal,
-                supervisorArmedSignal);
-            standardError = ReadBoundedOutputAsync(
-                process.StandardError,
-                supervisorNonce: null,
-                _outputLimitSignal);
             var timedOut = !WaitForExitOrCancellation(
                 process,
                 Math.Min(
@@ -304,6 +310,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
                     _processGroupId = 0;
                     processGroupPidFd = _processGroupPidFd;
                     _processGroupPidFd = -1;
+                    _supervisorArmedSignal = null;
+                    _supervisorOutputCompletion = null;
                 }
             }
             if (processGroupPidFd >= 0)
@@ -372,6 +380,45 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
             {
                 return true;
             }
+        }
+    }
+
+    internal static SupervisorReadiness WaitForSupervisorReadiness(
+        System.Threading.Tasks.Task armed,
+        System.Threading.Tasks.Task outputCompletion,
+        Func<bool> hasExited,
+        int timeoutMilliseconds,
+        Func<int, bool>? waitOverride = null)
+    {
+        ArgumentNullException.ThrowIfNull(armed);
+        ArgumentNullException.ThrowIfNull(outputCompletion);
+        ArgumentNullException.ThrowIfNull(hasExited);
+        var stopwatch = Stopwatch.StartNew();
+        while (true)
+        {
+            if (armed.IsCompletedSuccessfully)
+            {
+                return SupervisorReadiness.Armed;
+            }
+            if (hasExited() && outputCompletion.IsCompletedSuccessfully)
+            {
+                return armed.IsCompletedSuccessfully
+                    ? SupervisorReadiness.Armed
+                    : SupervisorReadiness.ExitedBeforeArmed;
+            }
+
+            var remaining = RemainingMilliseconds(
+                stopwatch,
+                timeoutMilliseconds);
+            if (remaining <= 0)
+            {
+                return SupervisorReadiness.NotReady;
+            }
+
+            var slice = Math.Min(OutputDrainPollingMilliseconds, remaining);
+            _ = waitOverride == null
+                ? armed.Wait(slice)
+                : waitOverride(slice);
         }
     }
 
@@ -770,11 +817,40 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
             }
 
             var terminationStopwatch = Stopwatch.StartNew();
+            if (_supervisorArmedSignal == null ||
+                _supervisorOutputCompletion == null)
+            {
+                HandleContainmentAuthenticationFailure(
+                    "SharpProof verifier supervisor readiness was not " +
+                    "published before termination.");
+                return false;
+            }
+            var readiness = WaitForSupervisorReadiness(
+                _supervisorArmedSignal.Task,
+                _supervisorOutputCompletion,
+                () => process.HasExited,
+                Math.Min(
+                    terminationWaitMilliseconds,
+                    LauncherProcessReserveMilliseconds));
+            if (readiness == SupervisorReadiness.ExitedBeforeArmed)
+            {
+                return process.ExitCode == 125;
+            }
+            if (readiness != SupervisorReadiness.Armed)
+            {
+                HandleContainmentAuthenticationFailure(
+                    "SharpProof verifier supervisor readiness could not be " +
+                    "authenticated before termination.");
+                return false;
+            }
+
             var terminateSent = SendPidFdSignal(
                 _processGroupPidFd,
                 SignalTerminate) == 0;
             var boundedWait = Math.Min(
-                terminationWaitMilliseconds,
+                RemainingMilliseconds(
+                    terminationStopwatch,
+                    terminationWaitMilliseconds),
                 LauncherProcessReserveMilliseconds);
             if (terminateSent && boundedWait > 0 &&
                 process.WaitForExit(boundedWait))
@@ -1043,6 +1119,13 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
             process,
             processGroupId,
             LauncherProcessReserveMilliseconds);
+    }
+
+    internal enum SupervisorReadiness
+    {
+        Armed,
+        ExitedBeforeArmed,
+        NotReady
     }
 
     private static string ResolveDotNetFromPath()

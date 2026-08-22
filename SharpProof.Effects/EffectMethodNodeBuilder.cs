@@ -330,7 +330,7 @@ internal sealed class EffectMethodNodeBuilder
             summary = EffectSummaryOperations.Join(summary, step.Summary);
             if (!step.Summary.Throws.IsEmpty)
             {
-                AddReachableFinallyEntries(block);
+                AddReachableFinallyEntriesForBlock(block);
             }
             AddControlTransferFinally(block.FallThroughSuccessor, step);
             AddControlTransferFinally(block.ConditionalSuccessor, step);
@@ -422,7 +422,7 @@ internal sealed class EffectMethodNodeBuilder
             return true;
         }
 
-        void AddReachableFinallyEntries(BasicBlock block)
+        void AddReachableFinallyEntriesForBlock(BasicBlock block)
         {
             for (var region = block.EnclosingRegion;
                  region != null;

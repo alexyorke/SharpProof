@@ -1008,7 +1008,19 @@ public sealed class FrontendDifferentialOracle
             var failure = Mismatch(
                 "Generated C# did not compile: " +
                 FormatErrors(emit.Diagnostics));
-            return [.. Enumerable.Repeat(failure, generatedCases.Count)];
+            if (generatedCases.Count == 1)
+            {
+                return [failure];
+            }
+
+            var midpoint = generatedCases.Count / 2;
+            var left = CompareBatch(
+                generatedCases.Take(midpoint).ToArray(),
+                cancellationToken);
+            var right = CompareBatch(
+                generatedCases.Skip(midpoint).ToArray(),
+                cancellationToken);
+            return [.. left, .. right];
         }
 
         cancellationToken.ThrowIfCancellationRequested();

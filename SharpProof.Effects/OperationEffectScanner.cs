@@ -52,6 +52,7 @@ internal sealed partial class OperationEffectScanner
         _conversionEffects = new ConversionEffectClassifier(session, abstractFlow);
         _conversionOwnership = new ConversionOwnershipClassifier(
             _method,
+            session.Compilation,
             _coalesceCaptures,
             _creationCaptures);
         _allowDirectWitnesses = allowDirectWitnesses;
@@ -257,6 +258,8 @@ internal sealed partial class OperationEffectScanner
             IConversionOperation conversion => ScanConversion(conversion),
             IConditionalAccessOperation conditional =>
                 ScanConditionalAccess(conditional),
+            ISwitchExpressionOperation switchExpression =>
+                ScanSwitchExpression(switchExpression),
             IWithOperation withOperation => ScanWith(withOperation),
             ILockOperation @lock => ScanLock(@lock),
             ILoopOperation loop => EffectSummaryOperations.Join(
@@ -795,6 +798,31 @@ internal sealed partial class OperationEffectScanner
         return EffectSummaryDomain.Instance.Join(
             receiver.Summary,
             whenNotNullStep.Summary);
+    }
+
+    private EffectSummary ScanSwitchExpression(
+        ISwitchExpressionOperation switchExpression)
+    {
+        var value = ScanStep(switchExpression.Value);
+        if (!value.CompletesNormally)
+        {
+            return value.Summary;
+        }
+
+        var arms = EffectSummary.Empty;
+        foreach (var arm in SwitchExpressionFacts.GetReachableArms(
+                     switchExpression,
+                     _completionEvaluator.CanCompleteNormally))
+        {
+            arms = EffectSummaryDomain.Instance.Join(arms, Scan(arm));
+        }
+
+        var unmatched = SwitchExpressionFacts.HasReachableUnmatchedPath(
+            switchExpression,
+            _completionEvaluator.CanCompleteNormally)
+                ? Throw(FrameworkTypeMetadataNames.SwitchExpressionException)
+                : EffectSummary.Empty;
+        return EffectSummaryOperations.Join(value.Summary, arms, unmatched);
     }
 
     private EffectSummary ScanDeconstruction(

@@ -25,6 +25,9 @@ internal sealed class ExceptionHandlerReachability(
         compilation.GetTypeByMetadataName("System.ArgumentNullException");
     private readonly INamedTypeSymbol? _typeInitializationExceptionType =
         compilation.GetTypeByMetadataName("System.TypeInitializationException");
+    private readonly INamedTypeSymbol? _switchExpressionExceptionType =
+        compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.SwitchExpressionException);
     private readonly DefiniteOperationFacts _staticInitializationFacts =
         new(compilation, CancellationToken.None);
 
@@ -128,6 +131,25 @@ internal sealed class ExceptionHandlerReachability(
                     }
                     continue;
                 }
+            }
+            if (operation is ISwitchExpressionOperation switchExpression)
+            {
+                if (SwitchExpressionFacts.HasReachableUnmatchedPath(
+                        switchExpression,
+                        canCompleteNormally))
+                {
+                    Add(
+                        _switchExpressionExceptionType is { } exceptionType
+                            ? new PotentialExceptions(
+                                ImmutableHashSet.Create<INamedTypeSymbol>(
+                                    SymbolEqualityComparer.Default,
+                                    exceptionType),
+                                Unknown: false)
+                            : UnknownPotential,
+                        switchExpression);
+                }
+                PushChildren(switchExpression);
+                continue;
             }
             if (operation is IThrowOperation thrown)
             {
@@ -1480,12 +1502,13 @@ internal sealed class ExceptionHandlerReachability(
         IOperation origin,
         Action<PotentialExceptions, IOperation> add)
     {
+        member = OperationCompletionEvaluator
+            .NormalizeStaticInitializationMember(member);
         if ((!member.IsStatic && member is not IMethodSymbol
                 { MethodKind: MethodKind.Constructor }) ||
             member is IFieldSymbol { IsConst: true } ||
-            SymbolEqualityComparer.Default.Equals(
-                caller.ContainingType,
-                member.ContainingType) ||
+            OperationCompletionEvaluator
+                .CanAssumeStaticInitializationComplete(caller, member) ||
             member.ContainingType is not { } type ||
             !EffectMethodNodeBuilder.HasPotentialStaticInitialization(
                 type,
@@ -2472,7 +2495,8 @@ internal sealed class ExceptionHandlerReachability(
     private static PotentialExceptions FromThrowSet(EffectThrowSet throws)
     {
         return new PotentialExceptions(
-            throws.Types.ToImmutableHashSet(SymbolEqualityComparer.Default),
+            throws.Types.ToImmutableHashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default),
             throws.IncludesUnknown);
     }
 

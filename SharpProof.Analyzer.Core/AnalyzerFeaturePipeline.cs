@@ -485,8 +485,13 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
+        var operationFacts = new DefiniteOperationFacts(
+            context.Compilation,
+            context.CancellationToken);
         foreach (var operation in RequiresCallSiteDiscovery
-                     .ExecutableUnflowedDescendantsAndSelf(root))
+                     .ExecutableUnflowedDescendantsAndSelf(
+                         root,
+                         operationFacts))
         {
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,

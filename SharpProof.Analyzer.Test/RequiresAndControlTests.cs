@@ -288,6 +288,33 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task MemberInitializersStopAfterNonCompletingOperands()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Fail() =>
+                    throw new InvalidOperationException();
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed class Subject {
+                private int field = Guard.Fail() + Guard.Positive(-1);
+                private int Property { get; } =
+                    Guard.Fail() + Guard.Positive(-2);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task GeneratedInitializersAreNotAnalyzed()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

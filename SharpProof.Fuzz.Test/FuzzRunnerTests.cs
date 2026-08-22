@@ -301,6 +301,33 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void FrontendBatchCompileFailureIsIsolatedToInvalidCase()
+    {
+        var valid = new GeneratedCSharpCase(
+            GeneratedCSharpExpression.Integer(0),
+            Left: 0,
+            Right: 0,
+            Condition: false);
+        var invalid = new GeneratedCSharpCase(
+            GeneratedCSharpExpression.Binary(
+                GeneratedExpressionKind.Add,
+                GeneratedCSharpExpression.Integer(long.MaxValue),
+                GeneratedCSharpExpression.Integer(1)),
+            Left: 0,
+            Right: 0,
+            Condition: false);
+
+        var results = new FrontendDifferentialOracle()
+            .CompareBatch([valid, invalid]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
     public void ExpandedCoverageRequirementFailsClosed()
     {
         var empty = new FrontendFuzzCoverage(
