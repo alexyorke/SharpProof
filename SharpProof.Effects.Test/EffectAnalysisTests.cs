@@ -2074,6 +2074,34 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void UnreachableAliasAssignmentDoesNotTaintLocalOwnership()
+    {
+        var result = Analyze(
+            """
+            public sealed class Box {
+                public int Value;
+            }
+
+            public static class Sample {
+                public static void Mutate(Box parameter) {
+                    var local = new Box();
+                    if (false) {
+                        local = parameter;
+                    }
+
+                    local.Value = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Mutate");
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+            Is.False);
+    }
+
+    [Test]
     public void FreshArrayContentsDoNotBecomeFreshOwnedAliases()
     {
         var result = Analyze(

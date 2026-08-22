@@ -87,7 +87,9 @@ internal sealed class ConversionOwnershipClassifier
         return EffectRegionSet.Create(EffectRegionId.Captured(parameter.Ordinal));
     }
 
-    internal void BuildLocalRegions(IOperation root)
+    internal void BuildLocalRegions(
+        IOperation root,
+        Func<IOperation, bool> isReachable)
     {
         var relevant = root.DescendantsAndSelf()
             .Where(operation => !IsInsideNestedCallable(operation, root))
@@ -106,6 +108,11 @@ internal sealed class ConversionOwnershipClassifier
             changed = false;
             foreach (var operation in relevant)
             {
+                if (!isReachable(operation))
+                {
+                    continue;
+                }
+
                 (ILocalSymbol? Target, IOperation? Value) source = operation switch
                 {
                     IVariableDeclaratorOperation declarator =>

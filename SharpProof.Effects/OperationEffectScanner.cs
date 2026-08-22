@@ -85,7 +85,7 @@ internal sealed class OperationEffectScanner
                 _freshArrayTypes[creation.Syntax.SpanStart] = type;
             }
         }
-        _conversionOwnership.BuildLocalRegions(root);
+        _conversionOwnership.BuildLocalRegions(root, IsReachable);
     }
 
     internal ImmutableArray<EffectDirectWitness> DirectWitnesses =>
