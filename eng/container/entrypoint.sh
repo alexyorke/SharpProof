@@ -40,7 +40,8 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
 fi
 
 source_has_git=false
-if git_directory="$(git -C "${repo_root}" rev-parse --absolute-git-dir 2>/dev/null)"; then
+if git_directory="$(git -c safe.directory="${repo_root}" -C "${repo_root}" \
+  rev-parse --absolute-git-dir 2>/dev/null)"; then
   source_has_git=true
   git config --global --add safe.directory "${repo_root}"
   git config --global --add safe.directory "${git_directory}"
@@ -114,6 +115,7 @@ case "${command_name}" in
     mkdir -p "${repo_root}/artifacts"
     if [[ "${source_has_git}" = "true" ]]; then
       git clone --quiet --shared --no-checkout "${repo_root}" "${task_root}"
+      git config --global --add safe.directory "${task_root}"
       source_origin="$(git -C "${repo_root}" remote get-url origin 2>/dev/null || true)"
       if [[ -n "${source_origin}" ]]; then
         git -C "${task_root}" remote set-url origin "${source_origin}"
@@ -146,7 +148,6 @@ case "${command_name}" in
       # artifact mount. A trailing-slash ignore rule matches directories but
       # not this symlink, so exclude the exact task-local link explicitly.
       printf '/artifacts\n' >> "${task_root}/.git/info/exclude"
-      git config --global --add safe.directory "${task_root}"
     fi
     export SHARPPROOF_REPO_ROOT="${task_root}"
     cd "${task_root}"
