@@ -335,10 +335,13 @@ function Get-SharpProofRemoteMainPackageUrl {
         [Parameter(Mandatory = $true)][string]$Version
     )
 
+    $normalizedBaseAddress = Resolve-SharpProofPublicationHttpsDestination `
+        -Value $BaseAddress `
+        -Owner 'NuGet PackageBaseAddress'
     $normalizedId = $PackageId.ToLowerInvariant()
     $normalizedVersion = $Version.ToLowerInvariant()
     return (
-        $BaseAddress.TrimEnd('/') + '/' +
+        $normalizedBaseAddress.TrimEnd('/') + '/' +
         [Uri]::EscapeDataString($normalizedId) + '/' +
         [Uri]::EscapeDataString($normalizedVersion) + '/' +
         [Uri]::EscapeDataString(

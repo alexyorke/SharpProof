@@ -650,7 +650,9 @@ function Get-V3PackageBaseAddress {
         $baseUri.Scheme -ne 'https') {
         throw 'NuGet PackageBaseAddress must resolve to HTTPS.'
     }
-    return $baseUri.AbsoluteUri.TrimEnd('/')
+    return (Resolve-SharpProofPublicationHttpsDestination `
+        -Value $baseUri.AbsoluteUri `
+        -Owner 'NuGet PackageBaseAddress').TrimEnd('/')
 }
 
 function Get-RemotePackageState {
