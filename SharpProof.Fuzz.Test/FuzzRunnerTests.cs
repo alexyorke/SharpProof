@@ -108,6 +108,7 @@ public sealed class FuzzRunnerTests
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var empty = new FrontendFuzzCoverage(
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var negative = empty with { TextParameters = -1 };
         var valid = new FuzzSummary(
             SchemaVersion: 4,
             Cases: FuzzOptions.DefaultCases,
@@ -136,6 +137,17 @@ public sealed class FuzzRunnerTests
                 Is.False);
             Assert.That(
                 (valid with { FrontendCoverage = empty }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with
+                {
+                    Cases = 1,
+                    Agreements = 1,
+                    FrontendAgreements = 1,
+                    SmtAgreements = 1,
+                    PartialSmtAgreements = 1,
+                    FrontendCoverage = negative
+                }).Passed,
                 Is.False);
         }
     }

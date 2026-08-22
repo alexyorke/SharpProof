@@ -31,6 +31,21 @@ public sealed record FrontendFuzzCoverage(
     int IndexOutOfRangeExceptions,
     int InvalidCastExceptions)
 {
+    public bool HasValidCounts =>
+        TextParameters >= 0 &&
+        StringLiterals >= 0 &&
+        NullStrings >= 0 &&
+        StringConcatenations >= 0 &&
+        StringLengths >= 0 &&
+        StringCasts >= 0 &&
+        ArrayLengths >= 0 &&
+        ArrayIndexes >= 0 &&
+        DivideByZeroExceptions >= 0 &&
+        OverflowExceptions >= 0 &&
+        NullReferenceExceptions >= 0 &&
+        IndexOutOfRangeExceptions >= 0 &&
+        InvalidCastExceptions >= 0;
+
     public bool HasExpandedCategories =>
         TextParameters > 0 &&
         StringLiterals > 0 &&
@@ -68,6 +83,7 @@ public sealed record FuzzSummary(
         !Failures.IsDefault &&
         Failures.IsEmpty &&
         FrontendCoverage != null &&
+        FrontendCoverage.HasValidCounts &&
         CoverageSatisfied ==
             (Cases < FuzzOptions.DefaultCases ||
              FrontendCoverage.HasExpandedCategories) &&
