@@ -1258,6 +1258,56 @@ internal static class PerformanceGate
                 "'$(_SharpProofProfileNormalized)'!='off'AND" +
                 "'$(DesignTimeBuild)'!='true'",
                 StringComparison.Ordinal));
+        const string analyzerDependencies =
+            "$(_SharpProofSharedDirectory)/SharpProof.Analyzer.Core.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.Contracts.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.Dataflow.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.Effects.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.Frontend.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.Ir.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.Specs.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Buffers.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Collections.Immutable.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Memory.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Numerics.Vectors.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Reflection.Metadata.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Runtime.CompilerServices.Unsafe.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Text.Encoding.CodePages.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Threading.Tasks.Extensions.dll";
+        const string collectorDependencies =
+            "$(_SharpProofSharedDirectory)/Microsoft.Bcl.AsyncInterfaces.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.CompilerArtifact.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.Summaries.dll;" +
+            "$(_SharpProofSharedDirectory)/SharpProof.Worker.Protocol.dll;" +
+            "$(_SharpProofSharedDirectory)/System.IO.Pipelines.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Text.Encodings.Web.dll;" +
+            "$(_SharpProofSharedDirectory)/System.Text.Json.dll";
+        var analyzerItemsValid =
+            analyzerGroup?.Elements("Analyzer").Count() == 3 &&
+            HasAnalyzerItem(
+                analyzerGroup,
+                "$(_SharpProofAnalyzerPath)",
+                "EntryPoint") &&
+            HasAnalyzerItem(
+                analyzerGroup,
+                "$(_SharpProofContractForGeneratorPath)",
+                "Generator") &&
+            HasAnalyzerItem(
+                analyzerGroup,
+                analyzerDependencies,
+                "Dependency",
+                "false");
+        var collectorItemsValid =
+            collectorGroup?.Elements("Analyzer").Count() == 2 &&
+            HasAnalyzerItem(
+                collectorGroup,
+                "$(SharpProofCompilerCollectorPath)",
+                "Collector") &&
+            HasAnalyzerItem(
+                collectorGroup,
+                collectorDependencies,
+                "CollectorDependency",
+                "false");
         var verifierMarker = verifierProps
             .Descendants("_SharpProofVerifierPackagePresent")
             .SingleOrDefault();
@@ -1344,6 +1394,8 @@ internal static class PerformanceGate
             portableContainsVerifierWork ||
             analyzerGroups.Length != 2 ||
             collectorGroup == null ||
+            !analyzerItemsValid ||
+            !collectorItemsValid ||
             !string.Equals(
                 normalizedCondition,
                 "'$(_SharpProofProfileNormalized)'!='off'",
@@ -1403,6 +1455,37 @@ internal static class PerformanceGate
     {
         return string.Concat((condition ?? string.Empty)
             .Where(static character => !char.IsWhiteSpace(character)));
+    }
+
+    private static bool HasAnalyzerItem(
+        XElement? group,
+        string expectedInclude,
+        string expectedRole,
+        string? expectedVisibility = null)
+    {
+        var expectedPaths = SplitMsBuildList(expectedInclude);
+        return group?.Elements("Analyzer").Count(analyzer =>
+            SplitMsBuildList((string?)analyzer.Attribute("Include"))
+                .SequenceEqual(expectedPaths, StringComparer.Ordinal) &&
+            string.Equals(
+                analyzer.Element("SharpProofAnalyzerRole")?.Value,
+                expectedRole,
+                StringComparison.Ordinal) &&
+            string.Equals(
+                analyzer.Element("Visible")?.Value,
+                expectedVisibility,
+                StringComparison.Ordinal)) == 1;
+    }
+
+    private static ImmutableArray<string> SplitMsBuildList(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? []
+            : [.. value.Split(
+                    [';'],
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Select(static item => item.Trim())
+                .Where(static item => item.Length != 0)];
     }
 
     private static ImmutableArray<string> SplitTargetList(string? value)

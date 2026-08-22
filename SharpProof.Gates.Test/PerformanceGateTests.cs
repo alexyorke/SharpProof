@@ -408,6 +408,48 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public void AdvisoryPolicyRejectsSubstitutedAnalyzerEntryPoint()
+    {
+        var root = RepositoryLayout.FindRoot();
+        var portableProps = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.props"));
+        var portableTargets = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.targets"));
+        var verifierProps = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Verifier",
+            "buildTransitive",
+            "SharpProof.Verifier.props"));
+        var verifierTargets = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Verifier",
+            "buildTransitive",
+            "SharpProof.Verifier.targets"));
+        var entryPoint = portableTargets.Descendants("Analyzer")
+            .Single(analyzer => string.Equals(
+                analyzer.Element("SharpProofAnalyzerRole")?.Value,
+                "EntryPoint",
+                StringComparison.Ordinal));
+        entryPoint.SetAttributeValue(
+            "Include",
+            "$(_SharpProofContractForGeneratorPath)");
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() =>
+                PerformanceGate.ValidateAdvisoryPackagePolicy(
+                    portableProps,
+                    portableTargets,
+                    verifierProps,
+                    verifierTargets)));
+    }
+
+    [Test]
     public void AdvisoryPolicyRejectsAWidenedVerifierCondition()
     {
         var root = RepositoryLayout.FindRoot();
