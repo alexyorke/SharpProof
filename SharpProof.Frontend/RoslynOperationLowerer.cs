@@ -109,6 +109,12 @@ public sealed class RoslynOperationLowerer
                 CompilerIdentityBridge.CreateTypeDisplay(type));
     }
 
+    private bool IsSupportedValueDomain(ITypeSymbol? type)
+    {
+        return CompilerIdentityBridge.IsSupportedValueDomain(
+            TypeSpecializer(type));
+    }
+
     internal IrVariableTerm GetVariable(ISymbol symbol, ITypeSymbol? type)
     {
         if (!_variables.TryGetValue(symbol, out var variable))
@@ -448,7 +454,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitLocalReference(
             ILocalReferenceOperation operation, LoweringContext argument)
         {
-            return CompilerIdentityBridge.IsSupportedValueDomain(operation.Type)
+            return _owner.IsSupportedValueDomain(operation.Type)
                 ? LoweredExpression.Exact(
                     _owner.GetVariable(operation.Local, operation.Type))
                 : _owner.Opaque(
@@ -459,7 +465,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitParameterReference(
             IParameterReferenceOperation operation, LoweringContext argument)
         {
-            return CompilerIdentityBridge.IsSupportedValueDomain(operation.Type)
+            return _owner.IsSupportedValueDomain(operation.Type)
                 ? LoweredExpression.Exact(
                     _owner.GetVariable(operation.Parameter, operation.Type))
                 : _owner.Opaque(
@@ -477,7 +483,7 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitFlowCaptureReference(
             IFlowCaptureReferenceOperation operation, LoweringContext argument)
         {
-            return CompilerIdentityBridge.IsSupportedValueDomain(operation.Type)
+            return _owner.IsSupportedValueDomain(operation.Type)
                 ? LoweredExpression.Exact(
                     _owner.GetCapture(operation.Id, operation.Type))
                 : _owner.Opaque(

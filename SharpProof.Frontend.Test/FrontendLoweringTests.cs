@@ -270,6 +270,13 @@ public sealed class FrontendLoweringTests
     {
         AssertClassification(
             """
+            public static bool Target<T>(T left, T right)
+                where T : class => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
             public static bool Target(double left, double right) => left == right;
             """,
             FrontendSubsetDecision.ClosedAbstention,

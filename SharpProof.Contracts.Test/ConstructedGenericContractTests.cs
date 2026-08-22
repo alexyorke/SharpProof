@@ -132,9 +132,9 @@ public sealed class ConstructedGenericContractTests
     }
 
     [Test]
-    public void PointerTargetTypesAreRecursivelySpecialized()
+    public void PointerContractExpressionsAbstain()
     {
-        AssertBinds(
+        AssertFailure(
             """
             using SharpProof.Attributes;
 
@@ -158,13 +158,13 @@ public sealed class ConstructedGenericContractTests
                     int* value) => buffer.Read(value);
             }
             """,
-            expectedClauses: 1);
+            ContractBindingFailure.UnsupportedExpression);
     }
 
     [Test]
-    public void FunctionPointerTargetTypesAreRecursivelySpecialized()
+    public void FunctionPointerContractExpressionsAbstain()
     {
-        AssertBinds(
+        AssertFailure(
             """
             using SharpProof.Attributes;
 
@@ -189,13 +189,13 @@ public sealed class ConstructedGenericContractTests
                     delegate*<int, int> value) => transformer.Map(value);
             }
             """,
-            expectedClauses: 1);
+            ContractBindingFailure.UnsupportedExpression);
     }
 
     [Test]
-    public void FunctionPointerRefReadonlyModifiersSurviveConstruction()
+    public void FunctionPointerRefReadonlyContractExpressionsAbstain()
     {
-        AssertBinds(
+        AssertFailure(
             """
             using SharpProof.Attributes;
 
@@ -220,7 +220,7 @@ public sealed class ConstructedGenericContractTests
                     reader.Read(callback);
             }
             """,
-            expectedClauses: 1);
+            ContractBindingFailure.UnsupportedExpression);
     }
 
     [Test]
