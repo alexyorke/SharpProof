@@ -3573,6 +3573,10 @@ public sealed class EffectAnalysisTests
                 public RefAlias Source { set { Cell = ref value.Cell; } }
                 public int BindOnRead { get { Cell = ref StaticCell(); return 0; } }
                 public int BindOnSet { get => 0; set { Cell = ref StaticCell(); } }
+                public static RefAlias operator +(RefAlias value, int ignored) {
+                    value.BindStatic();
+                    return value;
+                }
                 public void Set() => Cell = 1;
                 public void Dispose() => Cell = 1;
             }
@@ -3636,6 +3640,21 @@ public sealed class EffectAnalysisTests
                     alias.BindOnSet += 1;
                     alias.Set();
                 }
+                public static void ParameterSetterThenMutate(RefAlias alias) {
+                    alias.BindOnSet = 1;
+                    alias.Set();
+                }
+                public static void ReassignParameterThenMutate(
+                    RefAlias alias,
+                    RefAlias source) {
+                    alias = source;
+                    alias.Set();
+                }
+                public static void CompoundReassignThenMutate() {
+                    RefAlias alias = default;
+                    alias += 1;
+                    alias.Set();
+                }
                 public static void CopyReceiverThenMutate(RefAlias source) {
                     RefAlias target = default;
                     source.CopyTo(ref target);
@@ -3679,6 +3698,12 @@ public sealed class EffectAnalysisTests
             Method(compilation, "GetterThenMutate")).Summary;
         var reboundByCompoundSetter = session.Analyze(
             Method(compilation, "CompoundSetterThenMutate")).Summary;
+        var reboundParameter = session.Analyze(
+            Method(compilation, "ParameterSetterThenMutate")).Summary;
+        var reassignedParameter = session.Analyze(
+            Method(compilation, "ReassignParameterThenMutate")).Summary;
+        var compoundReassigned = session.Analyze(
+            Method(compilation, "CompoundReassignThenMutate")).Summary;
 
         using (Assert.EnterMultipleScope())
         {
@@ -3737,6 +3762,18 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 reboundByCompoundSetter.Writes.Contains(EffectRegionId.Static())
                 || reboundByCompoundSetter.Writes.IsUnknown,
+                Is.True);
+            Assert.That(
+                reboundParameter.Writes.Contains(EffectRegionId.Static())
+                || reboundParameter.Writes.IsUnknown,
+                Is.True);
+            Assert.That(
+                reassignedParameter.Writes.Contains(
+                    EffectRegionId.Parameter(1)),
+                Is.True);
+            Assert.That(
+                compoundReassigned.Writes.Contains(EffectRegionId.Static())
+                || compoundReassigned.Writes.IsUnknown,
                 Is.True);
         }
     }
@@ -4572,6 +4609,43 @@ public sealed class EffectAnalysisTests
                 public int Length { get { while (true) { } } }
                 public int this[int index] => 0;
             }
+            public sealed class ReferenceIndexerPatternBomb {
+                public int Length => 1;
+                public int this[int index] { get { while (true) { } } }
+            }
+            public sealed class ReferenceSlicePatternBomb {
+                public int Length => 1;
+                public int this[int index] => 0;
+                public ReferenceSlicePatternBomb Slice(int start, int length) {
+                    while (true) { }
+                }
+            }
+            public sealed class VariableLengthSlicePatternBomb {
+                private readonly int length;
+                public VariableLengthSlicePatternBomb(int length) {
+                    this.length = length;
+                }
+                public int Length => length;
+                public int this[int index] => 0;
+                public VariableLengthSlicePatternBomb Slice(
+                    int start,
+                    int sliceLength) {
+                    while (true) { }
+                }
+            }
+            public readonly struct VariableLengthSlicePatternStructBomb {
+                private readonly int length;
+                public VariableLengthSlicePatternStructBomb(int length) {
+                    this.length = length;
+                }
+                public int Length => length;
+                public int this[int index] => 0;
+                public VariableLengthSlicePatternStructBomb Slice(
+                    int start,
+                    int sliceLength) {
+                    while (true) { }
+                }
+            }
             public sealed class NullTarget {
                 public int Value;
                 public void Touch() { }
@@ -4828,6 +4902,8 @@ public sealed class EffectAnalysisTests
                 public static void ConstantRelationalSwitchStatementCatch() { try { switch (0) { case >= 0: break; default: ThrowObject(); break; } } catch (InvalidOperationException) { s_state++; } }
                 public static void NaNSwitchStatementCatch() { try { switch (double.NaN) { case < 0d: ThrowObject(); break; default: break; } } catch (InvalidOperationException) { s_state++; } }
                 public static void ConstantLogicalSwitchStatementCatch() { try { switch (0) { case not 1: break; default: ThrowObject(); break; } } catch (InvalidOperationException) { s_state++; } }
+                public static void TotalSliceSwitchExpressionGuardCatch(Span<int> value) { try { _ = value switch { [..] when ThrowBoolean() => 1, _ => ThrowInteger() }; } catch (ArgumentException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void TotalSliceSwitchStatementGuardCatch(Span<int> value) { try { switch (value) { case [..] when ThrowBoolean(): break; default: ThrowInteger(); break; } } catch (ArgumentException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void ThrowingSwitchExpressionGuard() { try { _ = 0 switch { 0 when ThrowBoolean() => new object(), _ => ThrowApplicationObject() }; } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void AfterThrowingTotalSwitchGuard(int value) { _ = value switch { _ when ThrowBoolean() => 1, _ => 2 }; s_state++; }
                 public static void VarPatternThrowingGuardBeforeFallback(int value) { try { _ = value switch { var captured when ThrowBoolean() => 1, _ => ThrowInteger() }; } catch (ArgumentException) { s_state++; } catch (InvalidOperationException) { } }
@@ -4835,6 +4911,15 @@ public sealed class EffectAnalysisTests
                 public static void AfterDivergingReferencePropertyPattern() { _ = new ReferencePatternBomb() switch { { Value: 0 } => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingReferencePositionalPattern() { _ = new ReferencePositionalPatternBomb() switch { ReferencePositionalPatternBomb(0) => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingReferenceListPattern() { _ = new ReferenceListPatternBomb() switch { [] => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingReferenceIndexerPattern() { _ = new ReferenceIndexerPatternBomb() switch { [0] => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingParenthesizedIndexerPattern() { _ = (new ReferenceIndexerPatternBomb()) switch { [0] => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingReferenceSlicePattern() { _ = new ReferenceSlicePatternBomb() switch { [.. var rest] => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingVariableLengthSlicePattern(int length) { _ = new VariableLengthSlicePatternBomb(length) switch { [.. var rest] => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingNestedSlicePattern(VariableLengthSlicePatternStructBomb value) { _ = value switch { [.. { Length: 0 }] => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingNegatedPattern() { _ = new PatternBomb() switch { not { Value: 0 } => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingAndPattern() { _ = new PatternBomb() switch { { Value: 0 } and _ => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingOrPattern() { _ = new ReferencePatternBomb() switch { null or { Value: 0 } => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingNotNullAndPattern() { _ = new ReferencePatternBomb() switch { not null and { Value: 0 } => 1, _ => 2 }; s_state++; }
                 public static void ThrowingSwitchStatementGuard() { try { switch (0) { case 0 when ThrowBoolean(): break; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void VarPatternThrowingSwitchGuard(int value) { try { switch (value) { case var captured when ThrowBoolean(): break; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void ThrowingSwitchStatementGuardBeforeGoto() { try { switch (0) { case 0 when ThrowBoolean(): goto default; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
@@ -4997,6 +5082,12 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 HasStaticWrite("ConstantLogicalSwitchStatementCatch"),
                 Is.False);
+            Assert.That(
+                HasStaticWrite("TotalSliceSwitchExpressionGuardCatch"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("TotalSliceSwitchStatementGuardCatch"),
+                Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchExpressionGuard"), Is.False);
             Assert.That(HasStaticWrite("AfterThrowingTotalSwitchGuard"), Is.False);
             Assert.That(
@@ -5013,6 +5104,33 @@ public sealed class EffectAnalysisTests
                 Is.False);
             Assert.That(
                 HasStaticWrite("AfterDivergingReferenceListPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingReferenceIndexerPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingParenthesizedIndexerPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingReferenceSlicePattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingVariableLengthSlicePattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingNestedSlicePattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingNegatedPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingAndPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingOrPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingNotNullAndPattern"),
                 Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchStatementGuard"), Is.False);
             Assert.That(HasStaticWrite("VarPatternThrowingSwitchGuard"), Is.False);

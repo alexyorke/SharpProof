@@ -178,7 +178,7 @@ internal sealed class ExceptionHandlerReachability(
                 if (operandCompletes &&
                     (abstractFlow?.ProvesNull(thrown, exception) == true ||
                      exception.ConstantValue is
-                         { HasValue: true, Value: null }) &&
+                     { HasValue: true, Value: null }) &&
                     _nullReferenceExceptionType is { } nullReferenceException)
                 {
                     Add(
@@ -368,7 +368,7 @@ internal sealed class ExceptionHandlerReachability(
                     }
                 }
                 if (simple.Target is IFieldReferenceOperation
-                        { Field.IsStatic: true } field &&
+                    { Field.IsStatic: true } field &&
                     canCompleteNormally(simple.Value))
                 {
                     AddStaticInitializationPotential(
@@ -377,7 +377,7 @@ internal sealed class ExceptionHandlerReachability(
                         Add);
                 }
                 if (simple.Target is IFieldReferenceOperation
-                        { Instance: { } instanceField } instanceTarget &&
+                    { Instance: { } instanceField } instanceTarget &&
                     canCompleteNormally(instanceField) &&
                     canCompleteNormally(simple.Value))
                 {
@@ -861,7 +861,7 @@ internal sealed class ExceptionHandlerReachability(
                                 if (returnNullability !=
                                         ReturnNullability.NonNull &&
                                     _nullReferenceExceptionType is
-                                        { } nullAwaiter)
+                                    { } nullAwaiter)
                                 {
                                     Add(
                                         new PotentialExceptions(
@@ -963,15 +963,15 @@ internal sealed class ExceptionHandlerReachability(
                     PushSequential(inputs);
                     return;
                 case IBinaryOperation
-                    {
-                        OperatorMethod: null,
-                        OperatorKind: BinaryOperatorKind.ConditionalAnd or
+                {
+                    OperatorMethod: null,
+                    OperatorKind: BinaryOperatorKind.ConditionalAnd or
                             BinaryOperatorKind.ConditionalOr
-                    } binary:
+                } binary:
                     var leftCompletes = canCompleteNormally(
                         binary.LeftOperand);
                     var leftConstant = binary.LeftOperand.ConstantValue is
-                        { HasValue: true, Value: bool leftValue }
+                    { HasValue: true, Value: bool leftValue }
                             ? leftValue
                             : (bool?)null;
                     var evaluatesRight = leftCompletes &&
@@ -992,7 +992,7 @@ internal sealed class ExceptionHandlerReachability(
                         return;
                     }
                     var condition = conditional.Condition.ConstantValue is
-                        { HasValue: true, Value: bool conditionValue }
+                    { HasValue: true, Value: bool conditionValue }
                             ? conditionValue
                             : (bool?)null;
                     if (condition != true &&
@@ -1177,7 +1177,8 @@ internal sealed class ExceptionHandlerReachability(
                             patternClause.Pattern,
                             @switch.Value.Type,
                             hasConstant,
-                            value)
+                            value,
+                            inputDefinitelyNonNull)
                         : SwitchSelection.Never;
                 var clauseSelection = clause switch
                 {
@@ -1194,7 +1195,8 @@ internal sealed class ExceptionHandlerReachability(
                                 pattern.Pattern,
                                 @switch.Value.Type,
                                 hasConstant,
-                                value),
+                                value,
+                                inputDefinitelyNonNull),
                             pattern.Guard),
                     _ => SwitchSelection.Maybe
                 };
@@ -1214,7 +1216,7 @@ internal sealed class ExceptionHandlerReachability(
                     !canCompleteNormally(barrierClause.Pattern) ||
                     patternSelection == SwitchSelection.Always &&
                     clause is IPatternCaseClauseOperation
-                        { Guard: not null } guarded &&
+                    { Guard: not null } guarded &&
                     !canCompleteNormally(guarded.Guard);
                 if (stopsSelection)
                 {
@@ -1349,7 +1351,7 @@ internal sealed class ExceptionHandlerReachability(
             return true;
         }
         return pattern.Guard.ConstantValue is
-            { HasValue: true, Value: bool guard }
+        { HasValue: true, Value: bool guard }
                 ? guard
                 : canCompleteNormally(pattern.Guard);
     }
@@ -1358,13 +1360,15 @@ internal sealed class ExceptionHandlerReachability(
         IPatternOperation pattern,
         ITypeSymbol? inputType,
         bool hasConstant,
-        object? value)
+        object? value,
+        bool inputDefinitelyNonNull)
     {
         var selection = hasConstant
             ? SwitchExpressionFacts.GetPatternSelection(pattern, value)
             : SwitchExpressionFacts.GetPatternSelectionForUnknownValue(
                 pattern,
-                inputType);
+                inputType,
+                inputDefinitelyNonNull);
         return selection switch
         {
             SwitchExpressionSelection.Never => SwitchSelection.Never,
@@ -1505,7 +1509,7 @@ internal sealed class ExceptionHandlerReachability(
         member = OperationCompletionEvaluator
             .NormalizeStaticInitializationMember(member);
         if ((!member.IsStatic && member is not IMethodSymbol
-                { MethodKind: MethodKind.Constructor }) ||
+            { MethodKind: MethodKind.Constructor }) ||
             member is IFieldSymbol { IsConst: true } ||
             OperationCompletionEvaluator
                 .CanAssumeStaticInitializationComplete(caller, member) ||
@@ -1843,7 +1847,7 @@ internal sealed class ExceptionHandlerReachability(
                 return false;
             }
             var condition = conditional.Condition.ConstantValue is
-                { HasValue: true, Value: bool value }
+            { HasValue: true, Value: bool value }
                     ? value
                     : (bool?)null;
             return condition != false &&
@@ -1876,7 +1880,7 @@ internal sealed class ExceptionHandlerReachability(
                 return leftAbrupt;
             }
             var left = binary.LeftOperand.ConstantValue is
-                { HasValue: true, Value: bool value }
+            { HasValue: true, Value: bool value }
                     ? value
                     : (bool?)null;
             var reachesRight = binary.OperatorKind ==
@@ -2334,7 +2338,7 @@ internal sealed class ExceptionHandlerReachability(
                 .ToArray();
             if (returnedValues.Length == 0 && directBody != null &&
                 declaration is BaseMethodDeclarationSyntax
-                    { ExpressionBody: not null } or
+                { ExpressionBody: not null } or
                     AccessorDeclarationSyntax { ExpressionBody: not null } or
                     LocalFunctionStatementSyntax { ExpressionBody: not null })
             {
@@ -2550,7 +2554,7 @@ internal sealed class ExceptionHandlerReachability(
             IPropertyReferenceOperation or
             ILockOperation or
             IConversionOperation
-                { IsChecked: true, OperatorMethod: null } or
+            { IsChecked: true, OperatorMethod: null } or
             ICompoundAssignmentOperation
             {
                 IsChecked: true,
@@ -2574,9 +2578,9 @@ internal sealed class ExceptionHandlerReachability(
                     BinaryOperatorKind.Remainder
             } or
             IUnaryOperation
-                { IsChecked: true, OperatorMethod: null } or
+            { IsChecked: true, OperatorMethod: null } or
             IIncrementOrDecrementOperation
-                { IsChecked: true, OperatorMethod: null };
+            { IsChecked: true, OperatorMethod: null };
     }
 
     private bool CanThrowUnknownAfterPrerequisites(IOperation operation)

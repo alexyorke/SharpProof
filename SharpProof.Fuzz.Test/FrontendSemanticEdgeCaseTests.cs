@@ -183,6 +183,49 @@ public sealed class FrontendSemanticEdgeCaseTests
         }
     }
 
+    [Test]
+    public void StaticInitializerInjectionDoesNotPoisonValidPeer()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact(
+                "long",
+                "",
+                "0L; static readonly long Poison = Throw(); " +
+                "static long Throw() => throw new System.Exception()")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
+    public void TopLevelInitializerInjectionDoesNotPoisonValidPeer()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact(
+                "long",
+                "",
+                "0L; } public static class Injected { " +
+                "[System.Runtime.CompilerServices.ModuleInitializer] " +
+                "public static void Initialize() => " +
+                "throw new System.Exception(); } public static class Tail { " +
+                "public static long Value => 0L")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
     private static FrontendSemanticEdgeCase Exact(
         string returnType,
         string parameters,

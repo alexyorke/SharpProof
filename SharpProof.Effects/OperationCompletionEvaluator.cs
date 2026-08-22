@@ -143,14 +143,38 @@ internal sealed class OperationCompletionEvaluator
         IPatternOperation pattern,
         bool inputDefinitelyNonNull = false)
     {
-        if (pattern is IListPatternOperation listPattern &&
-            (pattern.InputType?.IsValueType == true ||
-             inputDefinitelyNonNull) &&
-            listPattern.LengthSymbol is IPropertySymbol
+        if (pattern is INegatedPatternOperation negated)
+        {
+            return CanCompletePatternEvaluation(
+                negated.Pattern,
+                inputDefinitelyNonNull);
+        }
+        if (pattern is IBinaryPatternOperation binary)
+        {
+            if (!CanCompletePatternEvaluation(
+                    binary.LeftPattern,
+                    inputDefinitelyNonNull))
             {
-                GetMethod: { } lengthGetter
-            } &&
-            !CanMethodCompleteNormally(lengthGetter))
+                return false;
+            }
+            var leftSelection =
+                SwitchExpressionFacts.GetPatternSelectionForUnknownValue(
+                    binary.LeftPattern,
+                    binary.LeftPattern.InputType,
+                    inputDefinitelyNonNull);
+            var rightIsRequired =
+                binary.OperatorKind == BinaryOperatorKind.And &&
+                leftSelection == SwitchExpressionSelection.Always ||
+                binary.OperatorKind == BinaryOperatorKind.Or &&
+                leftSelection == SwitchExpressionSelection.Never;
+            return !rightIsRequired || CanCompletePatternEvaluation(
+                binary.RightPattern,
+                inputDefinitelyNonNull);
+        }
+        if (pattern is IListPatternOperation listPattern &&
+            !CanCompleteListPattern(
+                listPattern,
+                inputDefinitelyNonNull))
         {
             return false;
         }
@@ -205,6 +229,200 @@ internal sealed class OperationCompletionEvaluator
             }
         }
         return true;
+    }
+
+    private bool CanCompleteListPattern(
+        IListPatternOperation pattern,
+        bool inputDefinitelyNonNull)
+    {
+        if (pattern.InputType?.IsValueType != true &&
+            !inputDefinitelyNonNull)
+        {
+            return true;
+        }
+        if (!CanListPatternMemberCompleteNormally(pattern.LengthSymbol))
+        {
+            return false;
+        }
+        var requiredLength = pattern.Patterns.Count(
+            static item => item is not ISlicePatternOperation);
+        var hasSlice = pattern.Patterns.Any(
+            static item => item is ISlicePatternOperation);
+        if (!TryGetGoverningListLength(pattern, out var length))
+        {
+            if (requiredLength != 0 || !hasSlice ||
+                pattern.Patterns.Length != 1 ||
+                pattern.Patterns[0] is not ISlicePatternOperation
+                { Pattern: { } slicePattern } totalSlice)
+            {
+                return true;
+            }
+            return CanListPatternMemberCompleteNormally(
+                    totalSlice.SliceSymbol) &&
+                CanCompletePatternEvaluation(slicePattern);
+        }
+
+        if (hasSlice ? length < requiredLength : length != requiredLength)
+        {
+            return true;
+        }
+
+        foreach (var item in pattern.Patterns)
+        {
+            if (item is ISlicePatternOperation slice)
+            {
+                if (slice.Pattern == null)
+                {
+                    continue;
+                }
+                if (!CanListPatternMemberCompleteNormally(slice.SliceSymbol) ||
+                    !CanCompletePatternEvaluation(slice.Pattern))
+                {
+                    return false;
+                }
+                if (!SwitchExpressionFacts.IsTotalPattern(
+                        slice.Pattern,
+                        slice.Pattern.InputType))
+                {
+                    return true;
+                }
+                continue;
+            }
+
+            if (!CanListPatternMemberCompleteNormally(pattern.IndexerSymbol) ||
+                !CanCompletePatternEvaluation(item))
+            {
+                return false;
+            }
+            if (!SwitchExpressionFacts.IsTotalPattern(
+                    item,
+                    item.InputType))
+            {
+                return true;
+            }
+        }
+        return true;
+    }
+
+    private bool CanListPatternMemberCompleteNormally(ISymbol? symbol)
+    {
+        return symbol switch
+        {
+            IPropertySymbol { GetMethod: { } getter } =>
+                CanMethodCompleteNormally(getter),
+            IMethodSymbol method => CanMethodCompleteNormally(method),
+            _ => true
+        };
+    }
+
+    private bool TryGetGoverningListLength(
+        IListPatternOperation pattern,
+        out long length)
+    {
+        var current = (IOperation)pattern;
+        while (current.Parent is IPatternOperation parentPattern)
+        {
+            current = parentPattern;
+        }
+
+        var value = current.Parent switch
+        {
+            ISwitchExpressionArmOperation
+            { Parent: ISwitchExpressionOperation expression } =>
+                expression.Value,
+            IPatternCaseClauseOperation
+            {
+                Parent: ISwitchCaseOperation
+                { Parent: ISwitchOperation statement }
+            } =>
+                statement.Value,
+            _ => null
+        };
+        if (value != null)
+        {
+            value = DefiniteOperationFacts.UnwrapHarmlessValue(value);
+        }
+        if (value is IArrayCreationOperation
+            { DimensionSizes.Length: 1 } arrayCreation &&
+            arrayCreation.DimensionSizes[0].ConstantValue is
+            { HasValue: true, Value: int arrayLength })
+        {
+            length = arrayLength;
+            return true;
+        }
+        if (value is IObjectCreationOperation &&
+            pattern.LengthSymbol is IPropertySymbol
+            { GetMethod: { } lengthGetter } &&
+            TryGetIntegralConstantReturn(lengthGetter, out length))
+        {
+            return true;
+        }
+
+        length = 0;
+        return false;
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1508:Avoid dead conditional code",
+        Justification = "The analyzer misreads the multi-branch nullable " +
+            "assignment above the null check as unreachable.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1508:Avoid dead conditional code",
+        Justification = "The analyzer misreads the multi-branch nullable " +
+            "assignment above the null check as unreachable.")]
+    private bool TryGetIntegralConstantReturn(
+        IMethodSymbol method,
+        out long value)
+    {
+        value = 0;
+        if (method.DeclaringSyntaxReferences.Length != 1)
+        {
+            return false;
+        }
+        var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
+        ExpressionSyntax? expression = null;
+        if (declaration is PropertyDeclarationSyntax
+            { ExpressionBody.Expression: { } propertyBody })
+        {
+            expression = propertyBody;
+        }
+        else if (declaration is AccessorDeclarationSyntax
+        { ExpressionBody.Expression: { } accessorBody })
+        {
+            expression = accessorBody;
+        }
+        else if (declaration is AccessorDeclarationSyntax
+        { Body.Statements.Count: 1 } accessor &&
+                 accessor.Body!.Statements[0] is ReturnStatementSyntax
+                 { Expression: { } returnBody })
+        {
+            expression = returnBody;
+        }
+        if (expression == null)
+        {
+            return false;
+        }
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_compilation, expression.SyntaxTree);
+        var constant = model.GetConstantValue(expression);
+        if (!constant.HasValue || constant.Value == null)
+        {
+            return false;
+        }
+        try
+        {
+            value = Convert.ToInt64(
+                constant.Value,
+                System.Globalization.CultureInfo.InvariantCulture);
+            return value >= 0;
+        }
+        catch (Exception exception) when (exception is
+            FormatException or InvalidCastException or OverflowException)
+        {
+            return false;
+        }
     }
 
     private bool IsPatternInputDefinitelyNonNull(IPatternOperation pattern)

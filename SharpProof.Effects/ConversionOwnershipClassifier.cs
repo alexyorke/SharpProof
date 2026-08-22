@@ -70,14 +70,14 @@ internal sealed class ConversionOwnershipClassifier
 
     internal EffectRegionSet ClassifyParameter(IParameterSymbol parameter)
     {
+        EffectRegionSet declaredRegion;
         if (PrimaryConstructorParameterOwnership.IsReceiverBacked(
                 parameter,
                 _method))
         {
-            return EffectRegionSet.Create(EffectRegionId.Receiver);
+            declaredRegion = EffectRegionSet.Create(EffectRegionId.Receiver);
         }
-
-        if (SymbolEqualityComparer.Default.Equals(
+        else if (SymbolEqualityComparer.Default.Equals(
                 parameter.ContainingSymbol?.OriginalDefinition,
                 _method.OriginalDefinition))
         {
@@ -85,13 +85,24 @@ internal sealed class ConversionOwnershipClassifier
                 !parameter.Type.IsRefLikeType &&
                 parameter.RefKind == RefKind.None)
             {
-                return EffectRegionSet.Empty;
+                declaredRegion = EffectRegionSet.Empty;
             }
-
-            return EffectRegionSet.Create(EffectRegionId.Parameter(parameter.Ordinal));
+            else
+            {
+                declaredRegion = EffectRegionSet.Create(
+                    EffectRegionId.Parameter(parameter.Ordinal));
+            }
+        }
+        else
+        {
+            declaredRegion = EffectRegionSet.Create(
+                EffectRegionId.Captured(parameter.Ordinal));
         }
 
-        return EffectRegionSet.Create(EffectRegionId.Captured(parameter.Ordinal));
+        return parameter.Type.IsRefLikeType &&
+            _localRegions.TryGetValue(parameter, out var learnedRegions)
+                ? declaredRegion.Union(learnedRegions)
+                : declaredRegion;
     }
 
     internal void BuildLocalRegions(
@@ -123,7 +134,7 @@ internal sealed class ConversionOwnershipClassifier
                 if (operation is IInvocationOperation invocation)
                 {
                     var argumentRegions = EffectRegionSet.Empty;
-                    var refLikeLocals = new List<ILocalSymbol>();
+                    var refLikeTargets = new List<ISymbol>();
                     foreach (var argument in invocation.Arguments)
                     {
                         var canRebind = argument.Parameter?.RefKind is
@@ -135,13 +146,11 @@ internal sealed class ConversionOwnershipClassifier
                                 ClassifyRegion(
                                     argument.Value,
                                     aliasSource: true));
-                            if (canRebind &&
-                                DefiniteOperationFacts.UnwrapHarmlessValue(
-                                    argument.Value) is
-                                ILocalReferenceOperation argumentLocal &&
-                                argumentLocal.Local.Type.IsRefLikeType)
+                            if (canRebind && TryGetRefLikeStorageSymbol(
+                                    argument.Value,
+                                    out var argumentTarget))
                             {
-                                refLikeLocals.Add(argumentLocal.Local);
+                                refLikeTargets.Add(argumentTarget);
                             }
                         }
                     }
@@ -156,15 +165,14 @@ internal sealed class ConversionOwnershipClassifier
                     }
 
                     if (invocation.Instance is { } invocationInstanceLocal &&
-                        DefiniteOperationFacts.UnwrapHarmlessValue(
-                            invocationInstanceLocal) is
-                            ILocalReferenceOperation receiver &&
-                        receiver.Local.Type.IsRefLikeType)
+                        TryGetRefLikeStorageSymbol(
+                            invocationInstanceLocal,
+                            out var receiver))
                     {
-                        refLikeLocals.Add(receiver.Local);
+                        refLikeTargets.Add(receiver);
                     }
 
-                    if (refLikeLocals.Count != 0 &&
+                    if (refLikeTargets.Count != 0 &&
                         MethodMayIntroduceUnknownRefAlias(
                             invocation.TargetMethod))
                     {
@@ -172,11 +180,11 @@ internal sealed class ConversionOwnershipClassifier
                             EffectRegionSet.Unknown);
                     }
 
-                    foreach (var refLikeLocal in refLikeLocals)
+                    foreach (var refLikeTarget in refLikeTargets)
                     {
                         var previousReceiverRegions =
                             _localRegions.TryGetValue(
-                                refLikeLocal,
+                                refLikeTarget,
                                 out var receiverRegions)
                                 ? receiverRegions
                                 : EffectRegionSet.Empty;
@@ -184,7 +192,7 @@ internal sealed class ConversionOwnershipClassifier
                             previousReceiverRegions.Union(argumentRegions);
                         if (joinedReceiverRegions != previousReceiverRegions)
                         {
-                            _localRegions[refLikeLocal] =
+                            _localRegions[refLikeTarget] =
                                 joinedReceiverRegions;
                             changed = true;
                         }
@@ -201,10 +209,9 @@ internal sealed class ConversionOwnershipClassifier
                         Instance: { } propertyInstance,
                         Property.SetMethod: { } setter
                     } &&
-                    DefiniteOperationFacts.UnwrapHarmlessValue(
-                        propertyInstance) is ILocalReferenceOperation
-                        propertyReceiver &&
-                    propertyReceiver.Local.Type.IsRefLikeType)
+                    TryGetRefLikeStorageSymbol(
+                        propertyInstance,
+                        out var propertyReceiver))
                 {
                     var setterRegions = ClassifyRegion(
                         propertyInstance,
@@ -238,16 +245,15 @@ internal sealed class ConversionOwnershipClassifier
                             EffectRegionSet.Unknown);
                     }
 
-                    var receiverLocal = propertyReceiver.Local;
                     var previousRegions = _localRegions.TryGetValue(
-                        receiverLocal,
+                        propertyReceiver,
                         out var existingRegions)
                             ? existingRegions
                             : EffectRegionSet.Empty;
                     var joinedRegions = previousRegions.Union(setterRegions);
                     if (joinedRegions != previousRegions)
                     {
-                        _localRegions[receiverLocal] = joinedRegions;
+                        _localRegions[propertyReceiver] = joinedRegions;
                         changed = true;
                     }
                 }
@@ -258,10 +264,9 @@ internal sealed class ConversionOwnershipClassifier
                         Property.GetMethod: { } getter
                     } propertyAccess &&
                     !IsSimpleSetterTarget(propertyAccess) &&
-                    DefiniteOperationFacts.UnwrapHarmlessValue(
-                        getterInstance) is ILocalReferenceOperation
-                        getterReceiver &&
-                    getterReceiver.Local.Type.IsRefLikeType)
+                    TryGetRefLikeStorageSymbol(
+                        getterInstance,
+                        out var getterReceiver))
                 {
                     var getterRegions = ClassifyRegion(
                         getterInstance,
@@ -283,26 +288,41 @@ internal sealed class ConversionOwnershipClassifier
                             EffectRegionSet.Unknown);
                     }
 
-                    var receiverLocal = getterReceiver.Local;
                     var previousRegions = _localRegions.TryGetValue(
-                        receiverLocal,
+                        getterReceiver,
                         out var existingRegions)
                             ? existingRegions
                             : EffectRegionSet.Empty;
                     var joinedRegions = previousRegions.Union(getterRegions);
                     if (joinedRegions != previousRegions)
                     {
-                        _localRegions[receiverLocal] = joinedRegions;
+                        _localRegions[getterReceiver] = joinedRegions;
                         changed = true;
                     }
                 }
 
-                (ILocalSymbol? Target, IOperation? Value) source = operation switch
+                (ISymbol? Target, IOperation? Value) source = operation switch
                 {
                     IVariableDeclaratorOperation declarator =>
                         (declarator.Symbol, declarator.Initializer?.Value),
-                    IAssignmentOperation { Target: ILocalReferenceOperation local } assignment =>
+                    ISimpleAssignmentOperation
+                        { Target: ILocalReferenceOperation local } assignment =>
                         (local.Local, assignment.Value),
+                    ISimpleAssignmentOperation
+                        { Target: IParameterReferenceOperation parameter } assignment =>
+                        (parameter.Parameter, assignment.Value),
+                    ICompoundAssignmentOperation
+                        { Target: { } target } assignment
+                        when TryGetRefLikeStorageSymbol(
+                            target,
+                            out var compoundTarget) =>
+                        (compoundTarget, assignment),
+                    IIncrementOrDecrementOperation
+                        { Target: { } target } increment
+                        when TryGetRefLikeStorageSymbol(
+                            target,
+                            out var incrementTarget) =>
+                        (incrementTarget, increment),
                     ISimpleAssignmentOperation
                     {
                         IsRef: true,
@@ -312,9 +332,10 @@ internal sealed class ConversionOwnershipClassifier
                             Instance: { } instance
                         }
                     } assignment
-                        when DefiniteOperationFacts.UnwrapHarmlessValue(
-                            instance) is ILocalReferenceOperation local =>
-                        (local.Local, assignment.Value),
+                        when TryGetRefLikeStorageSymbol(
+                            instance,
+                            out var target) =>
+                        (target, assignment.Value),
                     _ => default
                 };
                 if (source.Value == null || source.Target == null)
@@ -322,9 +343,21 @@ internal sealed class ConversionOwnershipClassifier
                     continue;
                 }
 
-                var discovered = source.Target.Type.IsValueType &&
-                    !source.Target.Type.IsRefLikeType &&
-                    source.Target.RefKind == RefKind.None
+                var targetType = source.Target switch
+                {
+                    ILocalSymbol local => local.Type,
+                    IParameterSymbol parameter => parameter.Type,
+                    _ => null
+                };
+                var targetRefKind = source.Target switch
+                {
+                    ILocalSymbol local => local.RefKind,
+                    IParameterSymbol parameter => parameter.RefKind,
+                    _ => RefKind.None
+                };
+                var discovered = targetType?.IsValueType == true &&
+                    !targetType.IsRefLikeType &&
+                    targetRefKind == RefKind.None
                     ? EffectRegionSet.Empty
                     : ClassifyRegion(source.Value, aliasSource: true);
                 var previous = _localRegions.TryGetValue(source.Target, out var existing)
@@ -349,28 +382,65 @@ internal sealed class ConversionOwnershipClassifier
             ReferenceEquals(assignment.Target, property);
     }
 
+    private static bool TryGetRefLikeStorageSymbol(
+        IOperation operation,
+        out ISymbol symbol)
+    {
+        operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
+        switch (operation)
+        {
+            case ILocalReferenceOperation local
+                when local.Local.Type.IsRefLikeType:
+                symbol = local.Local;
+                return true;
+            case IParameterReferenceOperation parameter
+                when parameter.Parameter.Type.IsRefLikeType:
+                symbol = parameter.Parameter;
+                return true;
+            default:
+                symbol = null!;
+                return false;
+        }
+    }
+
     private static bool TryGetPropertySetter(
         IOperation operation,
         out IPropertyReferenceOperation? property,
         out IOperation? storedValue,
         out bool valueIsStoredDirectly)
     {
-        (property, storedValue, valueIsStoredDirectly) = operation switch
+        switch (operation)
         {
-            ISimpleAssignmentOperation
-                { Target: IPropertyReferenceOperation target } assignment =>
-                (target, assignment.Value, true),
-            ICoalesceAssignmentOperation
-                { Target: IPropertyReferenceOperation target } assignment =>
-                (target, assignment.Value, true),
-            ICompoundAssignmentOperation
-                { Target: IPropertyReferenceOperation target } assignment =>
-                (target, assignment.Value, false),
-            IIncrementOrDecrementOperation
-                { Target: IPropertyReferenceOperation target } =>
-                (target, null, false),
-            _ => default
-        };
+            case ISimpleAssignmentOperation
+            { Target: IPropertyReferenceOperation target } assignment:
+                property = target;
+                storedValue = assignment.Value;
+                valueIsStoredDirectly = true;
+                break;
+            case ICoalesceAssignmentOperation
+            { Target: IPropertyReferenceOperation target } assignment:
+                property = target;
+                storedValue = assignment.Value;
+                valueIsStoredDirectly = true;
+                break;
+            case ICompoundAssignmentOperation
+            { Target: IPropertyReferenceOperation target } assignment:
+                property = target;
+                storedValue = assignment.Value;
+                valueIsStoredDirectly = false;
+                break;
+            case IIncrementOrDecrementOperation
+            { Target: IPropertyReferenceOperation target }:
+                property = target;
+                storedValue = null;
+                valueIsStoredDirectly = false;
+                break;
+            default:
+                property = null;
+                storedValue = null;
+                valueIsStoredDirectly = false;
+                break;
+        }
         return property?.Property.SetMethod != null;
     }
 
@@ -432,10 +502,10 @@ internal sealed class ConversionOwnershipClassifier
             IFieldReferenceOperation { Field.IsStatic: false, Instance: { } instance } =>
                 IsCallMappedRefSource(instance, method),
             IConditionalOperation
-                {
-                    WhenTrue: { } whenTrue,
-                    WhenFalse: { } whenFalse
-                } =>
+            {
+                WhenTrue: { } whenTrue,
+                WhenFalse: { } whenFalse
+            } =>
                 IsCallMappedRefSource(whenTrue, method) &&
                 IsCallMappedRefSource(whenFalse, method),
             _ => false

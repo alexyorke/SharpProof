@@ -76,7 +76,8 @@ internal static class SwitchExpressionFacts
             {
                 var pattern = GetPatternSelectionForUnknownValue(
                     arm.Pattern,
-                    operation.Value.Type);
+                    operation.Value.Type,
+                    inputDefinitelyNonNull);
                 var selection = ApplyGuard(pattern, arm.Guard);
                 if (selection == SwitchExpressionSelection.Always)
                 {
@@ -145,7 +146,8 @@ internal static class SwitchExpressionFacts
         {
             var pattern = GetPatternSelectionForUnknownValue(
                 arm.Pattern,
-                operation.Value.Type);
+                operation.Value.Type,
+                inputDefinitelyNonNull);
             var selection = ApplyGuard(pattern, arm.Guard);
             if (selection != SwitchExpressionSelection.Never)
             {
@@ -169,11 +171,45 @@ internal static class SwitchExpressionFacts
 
     internal static SwitchExpressionSelection GetPatternSelectionForUnknownValue(
         IPatternOperation pattern,
-        ITypeSymbol? inputType)
+        ITypeSymbol? inputType,
+        bool inputDefinitelyNonNull = false)
     {
-        return IsTotalPattern(pattern, inputType)
-                ? SwitchExpressionSelection.Always
-                : SwitchExpressionSelection.Maybe;
+        return pattern switch
+        {
+            IConstantPatternOperation
+            { Value.ConstantValue: { HasValue: true, Value: null } }
+                when inputDefinitelyNonNull => SwitchExpressionSelection.Never,
+            INegatedPatternOperation negated => Negate(
+                GetPatternSelectionForUnknownValue(
+                    negated.Pattern,
+                    inputType,
+                    inputDefinitelyNonNull)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.And => And(
+                    GetPatternSelectionForUnknownValue(
+                        binary.LeftPattern,
+                        inputType,
+                        inputDefinitelyNonNull),
+                    GetPatternSelectionForUnknownValue(
+                        binary.RightPattern,
+                        inputType,
+                        inputDefinitelyNonNull)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.Or => Or(
+                    GetPatternSelectionForUnknownValue(
+                        binary.LeftPattern,
+                        inputType,
+                        inputDefinitelyNonNull),
+                    GetPatternSelectionForUnknownValue(
+                        binary.RightPattern,
+                        inputType,
+                        inputDefinitelyNonNull)),
+            _ when IsTotalPattern(
+                pattern,
+                inputType,
+                inputDefinitelyNonNull) => SwitchExpressionSelection.Always,
+            _ => SwitchExpressionSelection.Maybe
+        };
     }
 
     internal static bool IsTotalPattern(
@@ -186,9 +222,17 @@ internal static class SwitchExpressionFacts
         {
             return true;
         }
-        if (pattern is IListPatternOperation)
+        if (pattern is IListPatternOperation listPattern)
         {
-            return inputType?.IsValueType == true || inputDefinitelyNonNull;
+            return (inputType?.IsValueType == true ||
+                    inputDefinitelyNonNull) &&
+                listPattern.Patterns.Length == 1 &&
+                listPattern.Patterns[0] is
+                    ISlicePatternOperation slicePattern &&
+                (slicePattern.Pattern == null ||
+                 IsTotalPattern(
+                     slicePattern.Pattern,
+                     slicePattern.Pattern.InputType));
         }
         var matchedType = pattern switch
         {
@@ -198,7 +242,7 @@ internal static class SwitchExpressionFacts
             IRecursivePatternOperation recursive => recursive.MatchedType,
             _ => null
         };
-        if (inputType?.IsValueType != true ||
+        if (inputType?.IsValueType != true && !inputDefinitelyNonNull ||
             !SymbolEqualityComparer.Default.Equals(matchedType, inputType))
         {
             return false;
@@ -223,6 +267,41 @@ internal static class SwitchExpressionFacts
             IDeclarationPatternOperation { MatchesNull: true })
         {
             return true;
+        }
+        if (pattern is IListPatternOperation)
+        {
+            return inputType?.IsValueType == true || inputDefinitelyNonNull;
+        }
+        if (pattern is INegatedPatternOperation negated)
+        {
+            return IsPatternEvaluationUnavoidable(
+                negated.Pattern,
+                inputType,
+                inputDefinitelyNonNull);
+        }
+        if (pattern is IBinaryPatternOperation binary)
+        {
+            var leftIsUnavoidable = IsPatternEvaluationUnavoidable(
+                binary.LeftPattern,
+                inputType,
+                inputDefinitelyNonNull);
+            var leftSelection = GetPatternSelectionForUnknownValue(
+                binary.LeftPattern,
+                inputType,
+                inputDefinitelyNonNull);
+            return leftIsUnavoidable ||
+                binary.OperatorKind == BinaryOperatorKind.And &&
+                leftSelection == SwitchExpressionSelection.Always &&
+                IsPatternEvaluationUnavoidable(
+                    binary.RightPattern,
+                    inputType,
+                    inputDefinitelyNonNull) ||
+                binary.OperatorKind == BinaryOperatorKind.Or &&
+                leftSelection == SwitchExpressionSelection.Never &&
+                IsPatternEvaluationUnavoidable(
+                    binary.RightPattern,
+                    inputType,
+                    inputDefinitelyNonNull);
         }
         var matchedType = pattern switch
         {

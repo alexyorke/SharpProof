@@ -1173,14 +1173,43 @@ public sealed class FrontendDifferentialOracle
         }
 
         var model = compilation.GetSemanticModel(syntaxTree);
-        var methods = syntaxTree.GetRoot(cancellationToken)
+        var compilationUnit = (CompilationUnitSyntax)syntaxTree.GetRoot(
+            cancellationToken);
+        var generatedTypes = compilationUnit
             .DescendantNodes()
+            .OfType<ClassDeclarationSyntax>()
+            .Where(static type => type.Identifier.ValueText ==
+                "SharpProofGeneratedFrontendEdges")
+            .ToArray();
+        if (generatedTypes.Length != 1)
+        {
+            return IsolateSemanticEdgeFailure(
+                cases,
+                "Roslyn exposed an unexpected semantic-edge type shape.",
+                cancellationToken);
+        }
+        var generatedType = generatedTypes[0];
+        var hasExpectedTopology =
+            compilationUnit.AttributeLists.Count == 0 &&
+            compilationUnit.Members.Count == 3 &&
+            compilationUnit.Members[0] is EnumDeclarationSyntax
+                { Identifier.ValueText: "SharpProofGeneratedEdgeEnum" } &&
+            compilationUnit.Members[1] is StructDeclarationSyntax
+                { Identifier.ValueText: "SharpProofGeneratedConvertible" } &&
+            compilationUnit.Members[2] is ClassDeclarationSyntax
+                { Identifier.ValueText: "SharpProofGeneratedFrontendEdges" };
+        if (!hasExpectedTopology)
+        {
+            return IsolateSemanticEdgeFailure(
+                cases,
+                "Roslyn exposed an unexpected semantic-edge file shape.",
+                cancellationToken);
+        }
+        var methods = generatedType.Members
             .OfType<MethodDeclarationSyntax>()
-            .Where(static method => method.Identifier.ValueText.StartsWith(
-                SemanticEdgeMethodPrefix,
-                StringComparison.Ordinal))
             .ToArray();
         if (methods.Length != cases.Count ||
+            generatedType.Members.Count != cases.Count ||
             Enumerable.Range(0, cases.Count).Any(index =>
                 methods.All(method =>
                     method.Identifier.ValueText !=

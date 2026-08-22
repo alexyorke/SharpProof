@@ -2135,10 +2135,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 operation = parenthesized.Operand;
             }
             else if (operation is IConversionOperation
-                     {
-                         OperatorMethod: null,
-                         IsTryCast: false
-                     } conversion)
+            {
+                OperatorMethod: null,
+                IsTryCast: false
+            } conversion)
             {
                 operation = conversion.Operand;
             }
