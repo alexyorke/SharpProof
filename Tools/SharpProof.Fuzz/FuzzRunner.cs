@@ -62,6 +62,8 @@ public sealed record FuzzSummary(
     ImmutableArray<FuzzFailure> Failures)
 {
     public bool Passed =>
+        Cases > 0 &&
+        MaximumParallelism is >= 1 and <= 4 &&
         Failures.IsDefaultOrEmpty &&
         CoverageSatisfied &&
         Abstentions == 0 &&
@@ -83,6 +85,20 @@ public static class FuzzRunner
         if (options == null)
         {
             throw new ArgumentNullException(nameof(options));
+        }
+        if (options.Cases <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.Cases,
+                "The fuzz case count must be positive.");
+        }
+        if (options.MaximumParallelism is < 1 or > 4)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.MaximumParallelism,
+                "Maximum parallelism must be between 1 and 4.");
         }
 
         var failures = new ConcurrentQueue<FuzzFailure>();

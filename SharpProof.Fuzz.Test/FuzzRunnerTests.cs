@@ -75,6 +75,32 @@ public sealed class FuzzRunnerTests
         Assert.That(summary.Passed, Is.False);
     }
 
+    [TestCase(0, 1)]
+    [TestCase(1, 0)]
+    [TestCase(1, 5)]
+    public void InvalidSummaryOptionsDoNotPass(
+        int cases,
+        int maximumParallelism)
+    {
+        var coverage = new FrontendFuzzCoverage(
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+        var summary = new FuzzSummary(
+            SchemaVersion: 4,
+            Cases: cases,
+            Seed: 7,
+            MaximumParallelism: maximumParallelism,
+            Agreements: cases,
+            Abstentions: 0,
+            FrontendAgreements: cases,
+            SmtAgreements: cases,
+            PartialSmtAgreements: cases,
+            FrontendCoverage: coverage,
+            CoverageSatisfied: true,
+            Failures: []);
+
+        Assert.That(summary.Passed, Is.False);
+    }
+
     [Test]
     public async Task CancellationPropagates()
     {
@@ -316,6 +342,21 @@ public sealed class FuzzRunnerTests
         {
             Assert.Pass();
         }
+    }
+
+    [TestCase(0, 1)]
+    [TestCase(1, 0)]
+    [TestCase(1, 5)]
+    public void DirectRunnerRejectsInvalidOptions(
+        int cases,
+        int maximumParallelism)
+    {
+        Func<Task> run = () => FuzzRunner.RunAsync(new FuzzOptions(
+            cases,
+            Seed: 1,
+            maximumParallelism));
+
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(run);
     }
 
     private static bool Contains(IrTerm term, IrVarId variable)
