@@ -67,14 +67,17 @@ internal static partial class RequiresCallSiteAnalyzer
                 argument,
                 cancellationToken) as IArgumentOperation)
             .ToImmutableArray();
-        if (target == null || arguments.IsDefaultOrEmpty ||
+        var origin = arguments.IsDefaultOrEmpty
+            ? semanticModel.GetOperation(initializer, cancellationToken)
+            : arguments[0];
+        if (target == null || origin == null ||
             arguments.Any(static argument => argument == null))
         {
             return AnalyzerSemanticOutcome.Unknown;
         }
 
         var call = new RequiresCallSiteCandidate(
-            arguments[0]!,
+            origin,
             target,
             Instance: null,
             arguments.OfType<IArgumentOperation>().ToImmutableArray(),
@@ -92,7 +95,7 @@ internal static partial class RequiresCallSiteAnalyzer
                 graph: null,
                 operationRoot: null,
                 cancellationToken)
-            .AnalyzeCallSite(call);
+            .AnalyzeCallSite(call, requireCallerOwnership: false);
     }
 
     internal static AnalyzerSemanticOutcome AnalyzeInitializerCall(
