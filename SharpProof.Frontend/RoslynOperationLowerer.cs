@@ -448,13 +448,23 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitLocalReference(
             ILocalReferenceOperation operation, LoweringContext argument)
         {
-            return LoweredExpression.Exact(_owner.GetVariable(operation.Local, operation.Type));
+            return CompilerIdentityBridge.IsSupportedValueDomain(operation.Type)
+                ? LoweredExpression.Exact(
+                    _owner.GetVariable(operation.Local, operation.Type))
+                : _owner.Opaque(
+                    operation,
+                    FrontendAbstention.UnsupportedType);
         }
 
         public override LoweredExpression VisitParameterReference(
             IParameterReferenceOperation operation, LoweringContext argument)
         {
-            return LoweredExpression.Exact(_owner.GetVariable(operation.Parameter, operation.Type));
+            return CompilerIdentityBridge.IsSupportedValueDomain(operation.Type)
+                ? LoweredExpression.Exact(
+                    _owner.GetVariable(operation.Parameter, operation.Type))
+                : _owner.Opaque(
+                    operation,
+                    FrontendAbstention.UnsupportedType);
         }
 
         public override LoweredExpression VisitFlowCapture(
@@ -467,7 +477,12 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitFlowCaptureReference(
             IFlowCaptureReferenceOperation operation, LoweringContext argument)
         {
-            return LoweredExpression.Exact(_owner.GetCapture(operation.Id, operation.Type));
+            return CompilerIdentityBridge.IsSupportedValueDomain(operation.Type)
+                ? LoweredExpression.Exact(
+                    _owner.GetCapture(operation.Id, operation.Type))
+                : _owner.Opaque(
+                    operation,
+                    FrontendAbstention.UnsupportedType);
         }
 
         public override LoweredExpression VisitInstanceReference(

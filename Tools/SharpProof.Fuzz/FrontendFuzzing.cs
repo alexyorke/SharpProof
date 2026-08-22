@@ -1349,6 +1349,8 @@ public sealed class FrontendDifferentialOracle
             IReadOnlyList<object?> arguments)
     {
         var environment = new Dictionary<IrVarId, IrValue>();
+        var sequenceValues = new Dictionary<object, Dictionary<IrTypeId, IrValue>>(
+            ReferenceEqualityComparer.Instance);
         foreach (var binding in lowering.Variables)
         {
             if (binding.Symbol is not IParameterSymbol parameter ||
@@ -1365,7 +1367,8 @@ public sealed class FrontendDifferentialOracle
                 CreateSemanticEdgeValue(
                     factory,
                     type,
-                    arguments[parameter.Ordinal]));
+                    arguments[parameter.Ordinal],
+                    sequenceValues));
         }
         return environment;
     }
@@ -1373,7 +1376,8 @@ public sealed class FrontendDifferentialOracle
     private static IrValue CreateSemanticEdgeValue(
         IrFactory factory,
         IrTypeId type,
-        object? value)
+        object? value,
+        Dictionary<object, Dictionary<IrTypeId, IrValue>> sequenceValues)
     {
         var kind = factory.GetTypeInfo(type).Kind;
         if (value == null)
@@ -1401,9 +1405,39 @@ public sealed class FrontendDifferentialOracle
                 factory.CreateStringValue(text),
             IrTypeKind.Reference =>
                 factory.CreateReferenceValue(type, value),
+            IrTypeKind.Sequence when value is Array array =>
+                CreateSequenceValue(array),
             _ => throw new InvalidOperationException(
                 "A semantic-edge value is outside the executable IR subset.")
         };
+
+        IrValue CreateSequenceValue(Array array)
+        {
+            if (sequenceValues.TryGetValue(array, out var typedValues) &&
+                typedValues.TryGetValue(type, out var existing))
+            {
+                return existing;
+            }
+
+            var elementType = factory.GetTypeInfo(type).ElementType ??
+                throw new InvalidOperationException(
+                    "A semantic-edge sequence has no element type.");
+            var created = factory.CreateSequenceValue(
+                type,
+                array.Cast<object?>().Select(element =>
+                    CreateSemanticEdgeValue(
+                        factory,
+                        elementType,
+                        element,
+                        sequenceValues)));
+            if (!sequenceValues.TryGetValue(array, out typedValues))
+            {
+                typedValues = [];
+                sequenceValues.Add(array, typedValues);
+            }
+            typedValues.Add(type, created);
+            return created;
+        }
     }
 
     private static IOperation? GetExpressionOperation(
@@ -1601,27 +1635,58 @@ public sealed class FrontendDifferentialOracle
                 ".");
         }
 
-        var agrees = interpreted.Value!.Kind switch
-        {
-            IrValueKind.Boolean =>
-                actual.Value is bool value &&
-                value == interpreted.Value.Boolean,
-            IrValueKind.Integer =>
-                actual.Value is long value &&
-                value == interpreted.Value.Integer,
-            IrValueKind.String =>
-                actual.Value is string value &&
-                string.Equals(
-                    value,
-                    interpreted.Value.String,
-                    StringComparison.Ordinal),
-            IrValueKind.Null => actual.Value == null,
-            _ => false
-        };
+        var agrees = SemanticValueEquals(actual.Value, interpreted.Value!);
         return agrees
             ? Agreement()
             : Mismatch(
                 "Compiled C# and the lowered IR produced different values.");
+    }
+
+    private static bool SemanticValueEquals(object? actual, IrValue interpreted)
+    {
+        return interpreted.Kind switch
+        {
+            IrValueKind.Boolean =>
+                actual is bool value &&
+                value == interpreted.Boolean,
+            IrValueKind.Integer =>
+                IntegralValueEquals(
+                    actual,
+                    interpreted.Integer),
+            IrValueKind.String =>
+                actual is string value &&
+                string.Equals(
+                    value,
+                    interpreted.String,
+                    StringComparison.Ordinal),
+            IrValueKind.Reference =>
+                ReferenceEquals(actual, interpreted.Reference),
+            IrValueKind.Sequence =>
+                actual is Array array &&
+                array.Length == interpreted.Elements.Length &&
+                array.Cast<object?>().Zip(
+                    interpreted.Elements,
+                    SemanticValueEquals).All(static equal => equal),
+            IrValueKind.Null => actual == null,
+            _ => false
+        };
+    }
+
+    private static bool IntegralValueEquals(object? value, long expected)
+    {
+        return value switch
+        {
+            sbyte item => item == expected,
+            byte item => item == expected,
+            short item => item == expected,
+            ushort item => item == expected,
+            int item => item == expected,
+            uint item => item == expected,
+            long item => item == expected,
+            ulong item => item <= long.MaxValue && (long)item == expected,
+            char item => item == expected,
+            _ => false
+        };
     }
 
     private static string Describe(IrEvaluationResult result)

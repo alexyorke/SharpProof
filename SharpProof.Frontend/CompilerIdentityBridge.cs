@@ -94,6 +94,29 @@ public static class CompilerIdentityBridge
              definition.Type.SpecialType == SpecialType.System_Int64);
     }
 
+    internal static bool IsSupportedValueDomain(ITypeSymbol? type)
+    {
+        if (type is IArrayTypeSymbol array)
+        {
+            return IsSupportedValueDomain(array.ElementType);
+        }
+        if (type == null || type.TypeKind == TypeKind.Error)
+        {
+            return false;
+        }
+        if (type.TypeKind is TypeKind.Pointer or
+            TypeKind.FunctionPointer or TypeKind.TypeParameter)
+        {
+            return false;
+        }
+        if (type.IsReferenceType)
+        {
+            return true;
+        }
+        return type.SpecialType == SpecialType.System_Boolean ||
+            CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
+    }
+
     private static readonly IEqualityComparer<OperationSemanticIdentity>
         OperationSemanticIdentityComparer =
             EqualityComparer<OperationSemanticIdentity>.Default;

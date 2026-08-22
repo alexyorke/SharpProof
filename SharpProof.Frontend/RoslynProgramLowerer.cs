@@ -159,7 +159,11 @@ public sealed class RoslynProgramLowerer(
                     LowerUnsupportedMutation(block, operation, mutation.Target);
                     return false;
                 case ICompoundAssignmentOperation mutation:
-                    LowerUnsupportedMutation(block, operation, mutation.Target);
+                    LowerUnsupportedMutation(
+                        block,
+                        operation,
+                        mutation.Target,
+                        mutation.Value);
                     return false;
                 default:
                     Abstain(operation, FrontendAbstention.UnsupportedStatement);
@@ -201,21 +205,30 @@ public sealed class RoslynProgramLowerer(
         private void LowerAssignment(
             IrBlockId block, OperationId operation, ISimpleAssignmentOperation assignment)
         {
-            var value = LowerValue(block, operation, assignment.Value);
             var variable = _expressions.GetReferencedVariable(assignment.Target, unwrapConversions: false);
             if (variable.HasValue)
             {
-                AssignOrHavoc(block, operation, variable.Value, value);
+                var directValue = LowerValue(
+                    block,
+                    operation,
+                    assignment.Value);
+                AssignOrHavoc(
+                    block,
+                    operation,
+                    variable.Value,
+                    directValue);
                 return;
             }
 
             var location = LowerLocation(block, operation, assignment.Target);
             if (location.Location == null)
             {
+                _ = LowerValue(block, operation, assignment.Value);
                 Abstain(operation, location.Abstention);
-                Havoc(block, operation, IrHavocKind.Memory);
+                HavocKnownState(block, operation);
                 return;
             }
+            var value = LowerValue(block, operation, assignment.Value);
             if (location.Location.Type != value.Type)
             {
                 Abstain(operation, FrontendAbstention.UnsupportedType);
@@ -232,8 +245,6 @@ public sealed class RoslynProgramLowerer(
                 case IInvocationOperation invocation:
                     return LowerInvocation(block, operation, invocation, wantsResult: true)!;
                 case IFieldReferenceOperation:
-                case IPropertyReferenceOperation property
-                    when !RoslynOperationLowerer.IsIntrinsicLength(property):
                 case IArrayElementReferenceOperation:
                     var location = LowerLocation(block, operation, value);
                     if (location.Location != null)
@@ -258,6 +269,8 @@ public sealed class RoslynProgramLowerer(
             var receiver = LowerOptionalValue(block, operation, invocation.Instance);
             var arguments = LowerInvocationArguments(block, operation, invocation);
             var resultType = _expressions.GetTypeId(invocation.Type);
+            var hasSupportedResult = invocation.TargetMethod.ReturnsVoid ||
+                CompilerIdentityBridge.IsSupportedValueDomain(invocation.Type);
             var member = _expressions.GetMember(invocation.TargetMethod, receiver, "call:", invocation.Type, arguments);
             var isDirect = IsDirectInvocation(invocation);
             if (!isDirect)
@@ -266,7 +279,8 @@ public sealed class RoslynProgramLowerer(
             }
 
             IrVarId? target = null;
-            if (wantsResult && !invocation.TargetMethod.ReturnsVoid)
+            if (wantsResult && !invocation.TargetMethod.ReturnsVoid &&
+                hasSupportedResult)
             {
                 target = CreateTemporary("call", resultType);
             }
@@ -328,20 +342,24 @@ public sealed class RoslynProgramLowerer(
                         var fieldMember = _expressions.GetMember(field.Field, fieldReceiver, "field:", field.Type);
                         return LocationLowering.FromLocation(_builder.MemberLocation(fieldMember, fieldReceiver));
                     case IPropertyReferenceOperation property:
-                        var propertyReceiver = LowerOptionalValue(block, operation, property.Instance);
-                        var propertyArguments = LowerValues(block, operation,
-                            property.Arguments.Select(static argument => argument.Value));
-                        var propertyMember = _expressions.GetMember(
-                            property.Property, propertyReceiver, "property:",
-                            property.Type, propertyArguments);
-                        return LocationLowering.FromLocation(
-                            _builder.MemberLocation(propertyMember, propertyReceiver, propertyArguments));
+                        _ = LowerOptionalValue(block, operation, property.Instance);
+                        foreach (var argument in property.Arguments)
+                        {
+                            _ = LowerValue(block, operation, argument.Value);
+                        }
+                        return LocationLowering.Abstain(
+                            FrontendAbstention.UnsupportedMemberAccess);
                     case IArrayElementReferenceOperation element
                         when element.Indices.Length == 1:
                         return LocationLowering.FromLocation(_builder.SequenceLocation(
                             LowerValue(block, operation, element.ArrayReference),
                             LowerValue(block, operation, element.Indices[0])));
-                    case IArrayElementReferenceOperation:
+                    case IArrayElementReferenceOperation element:
+                        _ = LowerValue(block, operation, element.ArrayReference);
+                        foreach (var index in element.Indices)
+                        {
+                            _ = LowerValue(block, operation, index);
+                        }
                         return LocationLowering.Abstain(FrontendAbstention.UnsupportedMemberAccess);
                     default:
                         return LocationLowering.Abstain(FrontendAbstention.UnsupportedMutation);
@@ -425,22 +443,22 @@ public sealed class RoslynProgramLowerer(
         }
 
         private void LowerUnsupportedMutation(
-            IrBlockId block, OperationId operation, IOperation target)
-        {
-            Abstain(operation, FrontendAbstention.UnsupportedMutation);
-            HavocTarget(block, operation, target);
-        }
-
-        private void HavocTarget(
-            IrBlockId block, OperationId operation, IOperation target)
+            IrBlockId block,
+            OperationId operation,
+            IOperation target,
+            IOperation? value = null)
         {
             var variable = _expressions.GetReferencedVariable(target);
-            if (variable.HasValue)
+            if (!variable.HasValue)
             {
-                Havoc(block, operation, IrHavocKind.Variables, variable.Value);
-                return;
+                _ = LowerLocation(block, operation, target);
             }
-            Havoc(block, operation, IrHavocKind.Memory);
+            if (value != null)
+            {
+                _ = LowerValue(block, operation, value);
+            }
+            Abstain(operation, FrontendAbstention.UnsupportedMutation);
+            HavocKnownState(block, operation);
         }
 
         private void HavocKnownState(IrBlockId block, OperationId operation)
@@ -465,12 +483,6 @@ public sealed class RoslynProgramLowerer(
             IrBlockId block, OperationId operation, IOperation? value)
         {
             return value == null ? null : LowerValue(block, operation, value);
-        }
-
-        private IrTerm[] LowerValues(
-            IrBlockId block, OperationId operation, IEnumerable<IOperation> values)
-        {
-            return [.. values.Select(value => LowerValue(block, operation, value))];
         }
 
         private void Havoc(IrBlockId block, OperationId operation, IrHavocKind kind, params IrVarId[] variables)
