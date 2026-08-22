@@ -209,7 +209,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "6285bf4670402f8922d33f6d42a8a70f11bda0616ce2930e719d7bd7c41ae422",
+    "inventorySha256": "1b22bbf46daea57a6469e970a2ce9a56234a2d7eb8d04a9acc937436faedc85d",
     "components": [
       {
         "name": "discovery",
@@ -498,6 +498,7 @@
           "SharpProof.Effects/EffectContractMappings.cs",
           "SharpProof.Effects/CreationFlowCaptures.cs",
           "SharpProof.Effects/ConversionOwnershipClassifier.cs",
+          "SharpProof.Effects/OperationEffectScanner.Assignments.cs",
           "SharpProof.Effects/OperationEffectScanner.cs",
           "SharpProof.Effects/PropertyDispatchFacts.cs",
           "SharpProof.Effects/EffectExceptionFlow.cs",

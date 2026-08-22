@@ -489,6 +489,7 @@ public sealed class ArchitectureTests
             "SharpProof.Dataflow/SequenceCardinalityDomain.cs",
             "SharpProof.Effects/EffectAnalysisSession.cs",
             "SharpProof.Effects/ExternalEffectResolver.cs",
+            "SharpProof.Effects/OperationEffectScanner.Assignments.cs",
             "SharpProof.Effects/OperationEffectScanner.cs",
             "SharpProof.Frontend/RoslynOperationLowerer.cs",
             "SharpProof.Frontend/RoslynProgramLowerer.cs",
