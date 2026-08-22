@@ -25,7 +25,7 @@ public sealed class BuildTaskTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(nonce, Has.Length.EqualTo(64));
-            Assert.That(nonce, Is.EqualTo(nonce.ToLowerInvariant()));
+            Assert.That(nonce, Is.EqualTo(nonce.ToUpperInvariant()));
             Assert.That(VerifierProcessSupervisor.IsValidNonce(nonce), Is.True);
         }
     }
@@ -65,11 +65,8 @@ public sealed class BuildTaskTests
     [Test]
     public void MissingCleanupReceiptInvokesContainmentFailureDecision()
     {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
         var failure = string.Empty;
-        var task = new RunVerifier
+        using var task = new RunVerifier
         {
             ContainmentAuthenticationFailureOverride = message =>
                 failure = message
@@ -129,7 +126,7 @@ public sealed class BuildTaskTests
         var armed = new System.Threading.Tasks.TaskCompletionSource<bool>(
             System.Threading.Tasks.TaskCreationOptions
                 .RunContinuationsAsynchronously);
-        var reader = new GatedTextReader(
+        using var reader = new GatedTextReader(
             "SharpProof.Armed/1 " + nonce + "\n");
 
         var read = RunVerifier.ReadBoundedOutputAsync(
@@ -368,7 +365,7 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "System.Console.Out.Write(\"partial\");");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -403,7 +400,7 @@ public sealed class BuildTaskTests
                 (RunVerifier.MaximumCapturedOutputCharacters + 1)
                     .ToString(CultureInfo.InvariantCulture) +
                 ")); System.Threading.Thread.Sleep(5000);");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -446,7 +443,7 @@ public sealed class BuildTaskTests
                 (RunVerifier.MaximumCapturedOutputCharacters + 1)
                     .ToString(CultureInfo.InvariantCulture) +
                 ")); System.Threading.Thread.Sleep(1500);");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -545,7 +542,7 @@ public sealed class BuildTaskTests
     public void CanceledVerifierTaskDoesNotLaunchAProcess()
     {
         var engine = new RecordingBuildEngine();
-        var task = new RunVerifier
+        using var task = new RunVerifier
         {
             BuildEngine = engine,
             Executable = "dotnet",
@@ -555,7 +552,7 @@ public sealed class BuildTaskTests
 
         task.Cancel();
 
-        Assert.Multiple((Action)(() =>
+        Assert.Multiple((() =>
         {
             Assert.That(task, Is.InstanceOf<ICancelableTask>());
             Assert.That(task.Execute(), Is.True);
@@ -568,7 +565,7 @@ public sealed class BuildTaskTests
     public void VerifierWarningsReachTheMsBuildWarningChannel()
     {
         var engine = new RecordingBuildEngine();
-        var task = new RunVerifier { BuildEngine = engine };
+        using var task = new RunVerifier { BuildEngine = engine };
 
         task.LogStandardError(
             "source.cs(12,3): warning SP0047: incomplete" + Environment.NewLine +
@@ -576,7 +573,7 @@ public sealed class BuildTaskTests
             "source.cs(x,3): warning SP0047: malformed location" + Environment.NewLine +
             "worker stderr");
 
-        Assert.Multiple((Action)(() =>
+        Assert.Multiple((() =>
         {
             Assert.That(
                 engine.Warnings.Select(static warning => warning.Code),
@@ -597,7 +594,7 @@ public sealed class BuildTaskTests
     public void VerifierDiagnosticGrammarPreservesMarkerLikePathsAndSeverity()
     {
         var engine = new RecordingBuildEngine();
-        var task = new RunVerifier { BuildEngine = engine };
+        using var task = new RunVerifier { BuildEngine = engine };
 
         task.LogStandardError(
             "/tmp/source: warning SP0047: detail.cs(4,5): warning SP0048: assumptions" +
@@ -606,7 +603,7 @@ public sealed class BuildTaskTests
             Environment.NewLine +
             "SharpProof: error SP0048: strict assumptions");
 
-        Assert.Multiple((Action)(() =>
+        Assert.Multiple((() =>
         {
             Assert.That(engine.Warnings, Has.Count.EqualTo(1));
             Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
@@ -634,7 +631,7 @@ public sealed class BuildTaskTests
     public void StructuredVerifierDiagnosticsPreserveArbitraryPathText()
     {
         var engine = new RecordingBuildEngine();
-        var task = new RunVerifier { BuildEngine = engine };
+        using var task = new RunVerifier { BuildEngine = engine };
         var path = "/tmp/line\nbreak: warning SP0047: (draft), \u03c0.cs";
         var warning = VerifierDiagnosticTransport.Serialize(
             new VerifierDiagnostic(
@@ -663,7 +660,7 @@ public sealed class BuildTaskTests
             unknown + Environment.NewLine +
             VerifierDiagnosticTransport.Prefix + "{malformed");
 
-        Assert.Multiple((Action)(() =>
+        Assert.Multiple((() =>
         {
             Assert.That(engine.Warnings, Has.Count.EqualTo(1));
             Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
@@ -694,11 +691,11 @@ public sealed class BuildTaskTests
             var trusted = RunVerifier.ResolveDotNetHost("dotnet");
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost(string.Empty)))!.Message,
+                    (() => RunVerifier.ResolveDotNetHost(string.Empty)))!.Message,
                 Does.Contain("direct dotnet muxer"));
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("./dotnet")))!.Message,
+                    (() => RunVerifier.ResolveDotNetHost("./dotnet")))!.Message,
                 Does.Contain("direct dotnet muxer"));
 
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", null);
@@ -707,7 +704,7 @@ public sealed class BuildTaskTests
                 "relative" + Path.PathSeparator + ".");
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    (() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
                 Does.Contain("resolve a trusted dotnet muxer"));
 
             var wrongName = Path.Combine(directory.FullName, "not-dotnet");
@@ -715,7 +712,7 @@ public sealed class BuildTaskTests
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", wrongName);
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    (() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
                 Does.Contain("direct dotnet muxer"));
 
             var incompleteDirectory = Directory.CreateDirectory(
@@ -725,7 +722,7 @@ public sealed class BuildTaskTests
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", incomplete);
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    (() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
                 Does.Contain("complete dotnet installation"));
 
             var alternateDirectory = Directory.CreateDirectory(
@@ -737,7 +734,7 @@ public sealed class BuildTaskTests
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", trusted);
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost(alternate)))!.Message,
+                    (() => RunVerifier.ResolveDotNetHost(alternate)))!.Message,
                 Does.Contain("trusted current dotnet muxer"));
         }
         finally
@@ -753,7 +750,7 @@ public sealed class BuildTaskTests
     public void VerifierTaskCapturesDotNetOutputAndErrors()
     {
         var outputEngine = new RecordingBuildEngine();
-        var outputTask = new RunVerifier
+        using var outputTask = new RunVerifier
         {
             BuildEngine = outputEngine,
             Executable = "dotnet",
@@ -761,7 +758,7 @@ public sealed class BuildTaskTests
             Arguments = [new TaskItem("--info")]
         };
         var errorEngine = new RecordingBuildEngine();
-        var errorTask = new RunVerifier
+        using var errorTask = new RunVerifier
         {
             BuildEngine = errorEngine,
             Executable = "dotnet",
@@ -789,7 +786,7 @@ public sealed class BuildTaskTests
         try
         {
             var helper = CreateTimedProcessAssembly(directory.FullName);
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -831,7 +828,7 @@ public sealed class BuildTaskTests
                 directory.FullName,
                 "System.IO.File.WriteAllText(\"started.txt\", \"started\"); " +
                 "System.Threading.Thread.Sleep(3000);");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -875,7 +872,7 @@ public sealed class BuildTaskTests
                 "var child = Process.Start(start)!; " +
                 "File.WriteAllText(\"descendant.pid\", child.Id.ToString()); " +
                 "Thread.Sleep(800);");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -935,7 +932,7 @@ public sealed class BuildTaskTests
                 "start.UseShellExecute = false; Process.Start(start); " +
                 "var wait = Stopwatch.StartNew(); " +
                 "while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1);");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -1037,7 +1034,7 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "using System.Threading; Thread.Sleep(1500);");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -1081,7 +1078,7 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "using System.Threading; Thread.Sleep(1500);");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -1138,7 +1135,7 @@ public sealed class BuildTaskTests
                 "var wait = Stopwatch.StartNew(); while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1); " +
                 "Native.Kill(Native.GetParent(), 9); Thread.Sleep(1000); " +
                 "internal static class Native { [DllImport(\"libc\", EntryPoint=\"getppid\")] internal static extern int GetParent(); [DllImport(\"libc\", EntryPoint=\"kill\")] internal static extern int Kill(int processId, int signal); }");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -1187,7 +1184,7 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "using System.IO; File.WriteAllText(\"started.txt\", \"started\");");
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable(
@@ -1235,7 +1232,7 @@ public sealed class BuildTaskTests
         {
             var helper = CreateTimedProcessAssembly(directory.FullName);
             var containmentFailure = string.Empty;
-            var task = new RunVerifier
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
@@ -1487,7 +1484,7 @@ public sealed class BuildTaskTests
                 CachePath = Path.Combine(directory.FullName, "cache")
             };
 
-            Assert.Multiple((Action)(() =>
+            Assert.Multiple((() =>
             {
                 Assert.That(task.Execute(), Is.True);
                 Assert.That(File.Exists(result), Is.False);
@@ -1862,7 +1859,10 @@ public sealed class BuildTaskTests
                     .RunContinuationsAsynchronously);
         private int position;
 
-        public void Complete() => completion.TrySetResult(true);
+        public void Complete()
+        {
+            completion.TrySetResult(true);
+        }
 
         public override async System.Threading.Tasks.Task<int> ReadAsync(
             char[] buffer,

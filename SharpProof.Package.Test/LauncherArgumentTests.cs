@@ -7,6 +7,7 @@ using SharpProof.Host;
 using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
+using Program = SharpProof.Worker.Launcher.Program;
 
 namespace SharpProof.Package.Test;
 
@@ -632,7 +633,7 @@ public sealed class LauncherArgumentTests
             TestContext.CurrentContext.WorkDirectory,
             "missing-worker-" + Guid.NewGuid().ToString("N"));
 
-        var exception = Assert.Throws<FileNotFoundException>((Action)(() =>
+        var exception = Assert.Throws<FileNotFoundException>((() =>
             Program.ComputeExpectedInputHash(
                 worker,
                 new WorkerVerifyRequest(),
@@ -1742,9 +1743,9 @@ public sealed class LauncherArgumentTests
         using (Assert.EnterMultipleScope())
         {
             Assert.Throws<ArgumentException>(
-                (Action)(() => LauncherPresentation.ParseVerifyPolicy("1")));
+                (() => LauncherPresentation.ParseVerifyPolicy("1")));
             Assert.Throws<ArgumentException>(
-                (Action)(() => LauncherPresentation.ParseAssumptionPolicy("1")));
+                (() => LauncherPresentation.ParseAssumptionPolicy("1")));
         }
     }
 
@@ -1754,13 +1755,13 @@ public sealed class LauncherArgumentTests
         using (Assert.EnterMultipleScope())
         {
             Assert.Throws<ArgumentOutOfRangeException>(
-                (Action)(() => LauncherPresentation.ClaimKind(
+                (() => LauncherPresentation.ClaimKind(
                     new WorkerClaimManifestEntry
                     {
                         Kind = (WorkerClaimKind)int.MaxValue
                     })));
             Assert.Throws<ArgumentOutOfRangeException>(
-                (Action)(() => LauncherPresentation.ClaimKind(
+                (() => LauncherPresentation.ClaimKind(
                     new WorkerClaimManifestEntry
                     {
                         Kind = WorkerClaimKind.Effect,
@@ -1774,7 +1775,7 @@ public sealed class LauncherArgumentTests
     public void UnknownPresentationPolicyIsRejectedExhaustively()
     {
         Assert.Throws<InvalidOperationException>(
-            (Action)(() => LauncherPresentation.Level(
+            (() => LauncherPresentation.Level(
                 (WorkerVerifyPolicy)int.MaxValue,
                 "info")));
     }
