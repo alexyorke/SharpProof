@@ -46,31 +46,44 @@ internal sealed class EffectMethodNodeBuilder
             allowDirectWitnesses:
                 graph != null &&
                 HasDefiniteBodyEntry(method, _session.ApiSpecs));
-        var localSummary = graph == null
-            ? EffectSummaryOperations.Join(
-                scanner.Scan(root),
-                EffectSummaryOperations.Unsupported())
-            : AnalyzeControlFlowGraph(graph, scanner);
-
-        // Cyclic scalar flow does not invalidate the conservative all-block effect scan.
-        if (abstractAnalysis is
-            {
-                IsComplete: false,
-                IncompleteReason: not EffectAnalysisIncompleteReason.CyclicControlFlow
-            })
+        var initializers = ScanConstructorMemberInitializers(
+            method,
+            scanner,
+            cancellationToken);
+        var localSummary = initializers.Summary;
+        if (initializers.CompletesNormally)
         {
+            var bodySummary = graph == null
+                ? EffectSummaryOperations.Join(
+                    scanner.Scan(root),
+                    EffectSummaryOperations.Unsupported())
+                : AnalyzeControlFlowGraph(graph, scanner);
+
+            // Cyclic scalar flow does not invalidate the conservative
+            // all-block effect scan.
+            if (abstractAnalysis is
+                {
+                    IsComplete: false,
+                    IncompleteReason: not
+                        EffectAnalysisIncompleteReason.CyclicControlFlow
+                })
+            {
+                bodySummary = EffectSummaryOperations.Join(
+                    bodySummary,
+                    EffectSummaryOperations.IncompleteAnalysis(
+                        abstractAnalysis.IncompleteReason));
+            }
+
             localSummary = EffectSummaryOperations.Join(
                 localSummary,
-                EffectSummaryOperations.IncompleteAnalysis(
-                    abstractAnalysis.IncompleteReason));
+                bodySummary,
+                scanner.ScanLexicalControlEffects(root),
+                scanner.ScanUsingDisposalEffects(root));
         }
 
         localSummary = EffectSummaryOperations.Join(
             localSummary,
             _session.ResolveEntryPreconditions(method),
-            scanner.ScanLexicalControlEffects(root),
-            scanner.ScanUsingDisposalEffects(root),
-            ScanConstructorMemberInitializers(method, scanner, cancellationToken),
             CanTriggerOwnTypeInitialization(method) &&
             HasPotentialStaticInitialization(
                 method.ContainingType,
@@ -80,7 +93,7 @@ internal sealed class EffectMethodNodeBuilder
         return new EffectMethodNode(localSummary, [.. calls], scanner.DirectWitnesses);
     }
 
-    private EffectSummary ScanConstructorMemberInitializers(
+    private EffectStep ScanConstructorMemberInitializers(
         IMethodSymbol method,
         OperationEffectScanner scanner,
         CancellationToken cancellationToken)
@@ -88,43 +101,58 @@ internal sealed class EffectMethodNodeBuilder
         var staticInitializers = method.MethodKind == MethodKind.StaticConstructor;
         if (!staticInitializers && method.MethodKind != MethodKind.Constructor)
         {
-            return EffectSummary.Empty;
+            return EffectStep.Empty;
         }
 
-        var summary = EffectSummary.Empty;
+        var result = EffectStep.Empty;
         var write = EffectSummaryOperations.Write(EffectRegionSet.Create(
             staticInitializers ? EffectRegionId.Static() : EffectRegionId.Receiver));
-        foreach (var member in method.ContainingType.GetMembers()
-                     .Where(member => !member.IsImplicitlyDeclared &&
-                         IsInitializableMember(member, staticInitializers))
-                     .OrderBy(static member => member.MetadataName, StringComparer.Ordinal))
+        var syntaxTreeOrder = _compilation.SyntaxTrees
+            .Select(static (tree, ordinal) => (tree, ordinal))
+            .ToDictionary(
+                static item => item.tree,
+                static item => item.ordinal);
+        var references = method.ContainingType.GetMembers()
+            .Where(member => !member.IsImplicitlyDeclared &&
+                IsInitializableMember(member, staticInitializers))
+            .SelectMany(static member => member.DeclaringSyntaxReferences)
+            .OrderBy(reference => syntaxTreeOrder.TryGetValue(
+                    reference.SyntaxTree,
+                    out var ordinal)
+                ? ordinal
+                : int.MaxValue)
+            .ThenBy(static reference => reference.Span.Start);
+        foreach (var syntaxReference in references)
         {
-            foreach (var syntaxReference in member.DeclaringSyntaxReferences
-                         .OrderBy(
-                             static reference => reference.SyntaxTree.FilePath,
-                             StringComparer.Ordinal)
-                         .ThenBy(static reference => reference.Span.Start))
+            cancellationToken.ThrowIfCancellationRequested();
+            var declaration = syntaxReference.GetSyntax(cancellationToken);
+            var expression = EffectProjections.GetInitializerExpression(declaration);
+            if (expression == null)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var declaration = syntaxReference.GetSyntax(cancellationToken);
-                var expression = EffectProjections.GetInitializerExpression(declaration);
-                if (expression == null)
-                {
-                    continue;
-                }
-
-                var model = SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(_compilation, expression.SyntaxTree);
-                var operation = model.GetOperation(expression, cancellationToken);
-                summary = EffectSummaryDomain.Instance.Join(
-                    summary,
-                    operation == null
-                        ? EffectSummaryOperations.Unsupported()
-                        : EffectSummaryOperations.Join(scanner.Scan(operation), write));
+                continue;
             }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(_compilation, expression.SyntaxTree);
+            var operation = model.GetOperation(expression, cancellationToken);
+            if (operation == null)
+            {
+                result = result.Then(new EffectStep(
+                    EffectSummaryOperations.Unsupported(),
+                    true));
+                continue;
+            }
+
+            result = result.Then(scanner.ScanSequence([operation]));
+            if (!result.CompletesNormally)
+            {
+                break;
+            }
+
+            result = result.Then(new EffectStep(write, true));
         }
 
-        return summary;
+        return result;
     }
 
     internal static bool HasPotentialStaticInitialization(

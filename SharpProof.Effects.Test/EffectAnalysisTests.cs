@@ -1439,6 +1439,48 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ThrowingMemberInitializerSuppressesLaterInitializationAndBody()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Sample {
+                private static int s_state;
+                private readonly int _zFirst = Fail();
+                private readonly int _aSecond = Mutate();
+
+                public Sample() {
+                    s_state++;
+                }
+
+                private static int Fail() =>
+                    throw new System.InvalidOperationException();
+
+                private static int Mutate() {
+                    s_state++;
+                    return 1;
+                }
+            }
+            """);
+        var constructor = EffectTestHost.RequireType(compilation, "Sample")
+            .InstanceConstructors
+            .Single(static method => !method.IsImplicitlyDeclared);
+        var result = new EffectAnalysisSession(compilation).Analyze(constructor);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Receiver),
+                Is.False);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void PossibleTypeInitializationFailsClosed()
     {
         var compilation = EffectTestHost.CreateCompilation(
