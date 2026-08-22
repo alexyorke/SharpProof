@@ -79,45 +79,57 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanCompoundAssignment(
         ICompoundAssignmentOperation assignment)
     {
-        var result = new EffectStep(
-            Scan(assignment.Target, EffectAccess.Read),
-            _completionEvaluator.CanCompleteNormally(assignment.Target));
-        if (!result.CompletesNormally)
-        {
-            return result.Summary;
-        }
-
-        result = result.Then(ScanStep(assignment.Value));
-        if (!result.CompletesNormally)
-        {
-            return result.Summary;
-        }
-
-        var operatorCall = ResolveOperatorEffects(
-            assignment.OperatorMethod,
-            [assignment.Target, assignment.Value],
-            assignment);
-        var exceptions = IntegralDivisionExceptions(
-            assignment.OperatorKind,
-            assignment.Type,
+        return ScanReadModifyWrite(
             assignment.Target,
-            assignment.Value,
-            assignment);
-        var operation = EffectSummaryOperations.Join(
-            operatorCall,
-            exceptions,
-            _conversionEffects.CheckedOverflow(
-                assignment.IsChecked,
-                assignment));
+            () => ScanStep(assignment.Value),
+            () => EffectSummaryOperations.Join(
+                ResolveOperatorEffects(
+                    assignment.OperatorMethod,
+                    [assignment.Target, assignment.Value],
+                    assignment),
+                IntegralDivisionExceptions(
+                    assignment.OperatorKind,
+                    assignment.Type,
+                    assignment.Target,
+                    assignment.Value,
+                    assignment),
+                _conversionEffects.CheckedOverflow(
+                    assignment.IsChecked,
+                    assignment)),
+            () => _completionEvaluator.CanCompleteCompoundValue(assignment),
+            assignment.Value);
+    }
+
+    private EffectSummary ScanReadModifyWrite(
+        IOperation target,
+        Func<EffectStep> scanValue,
+        Func<EffectSummary> scanOperation,
+        Func<bool> canCompleteOperation,
+        IOperation storedValue)
+    {
+        var result = new EffectStep(
+            Scan(target, EffectAccess.Read),
+            _completionEvaluator.CanCompleteNormally(target));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        result = result.Then(scanValue());
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
         result = result.Then(new EffectStep(
-            operation,
-            _completionEvaluator.CanCompleteCompoundValue(assignment)));
+            scanOperation(),
+            canCompleteOperation()));
         return !result.CompletesNormally
             ? result.Summary
             : result.Then(new EffectStep(
                 ScanWriteTarget(
-                    assignment.Target,
-                    assignment.Value,
+                    target,
+                    storedValue,
                     valueIsStoredDirectly: false),
                 true)).Summary;
     }

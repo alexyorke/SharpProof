@@ -6242,6 +6242,136 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ThrowingOperatorsAndInterpolationHolesSuppressLaterEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public readonly struct Source {
+                public static Source operator -(Source value) =>
+                    throw new System.InvalidOperationException();
+                public static Source operator +(Source left, Source right) =>
+                    throw new System.InvalidOperationException();
+                public static Source operator ++(Source value) =>
+                    throw new System.InvalidOperationException();
+                public static explicit operator Target(Source value) =>
+                    throw new System.InvalidOperationException();
+            }
+
+            public readonly struct Target {
+            }
+
+            public readonly struct Formatted {
+                public override string ToString() =>
+                    throw new System.InvalidOperationException();
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                public static void Unary(Source value) {
+                    _ = -value;
+                    s_state++;
+                }
+
+                public static void Binary(Source value) {
+                    _ = value + value;
+                    s_state++;
+                }
+
+                public static void Increment(Source value) {
+                    value++;
+                    s_state++;
+                }
+
+                public static void Conversion(Source value) {
+                    _ = (Target)value;
+                    s_state++;
+                }
+
+                public static string Interpolation() =>
+                    $"{Fail()}{Mutate()}";
+
+                public static string InterpolationFormatting(Formatted value) =>
+                    $"{value}{Mutate()}";
+
+                private static int Fail() =>
+                    throw new System.InvalidOperationException();
+
+                private static int Mutate() {
+                    s_state++;
+                    return 1;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var methodName in new[] {
+                         "Unary", "Binary", "Conversion", "Interpolation",
+                         "InterpolationFormatting", "Increment"
+                     })
+            {
+                var result = session.Analyze(Method(compilation, methodName));
+                Assert.That(
+                    result.Summary.Writes.Contains(EffectRegionId.Static()),
+                    Is.False,
+                    methodName);
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+            }
+        }
+    }
+
+    [Test]
+    public void ThrowingIncrementAndConstructorArgumentsSuppressLaterEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public struct Counter {
+                public static Counter operator ++(Counter value) =>
+                    throw new System.InvalidOperationException();
+            }
+
+            public sealed class Box {
+                public Box(int value) { }
+            }
+
+            public sealed class Sample {
+                private Counter _counter;
+                private static int s_state;
+
+                public void Increment() {
+                    _counter++;
+                    s_state++;
+                }
+
+                public static Box Allocate() => new Box(Fail());
+
+                private static int Fail() => throw null!;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var increment = session.Analyze(Method(compilation, "Increment"));
+        var allocation = session.Analyze(Method(compilation, "Allocate"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                increment.Summary.Writes.Contains(EffectRegionId.Receiver),
+                Is.False);
+            Assert.That(
+                increment.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+            Assert.That(
+                allocation.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.None));
+        }
+    }
+
+    [Test]
     public void FailingCompoundTargetReadSuppressesValueEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(

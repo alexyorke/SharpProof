@@ -214,11 +214,8 @@ internal sealed partial class OperationEffectScanner
             ISimpleAssignmentOperation assignment =>
                 ScanSimpleAssignment(assignment),
             ICompoundAssignmentOperation assignment => ScanCompoundAssignment(assignment),
-            IIncrementOrDecrementOperation increment => EffectSummaryOperations.Join(
-                Scan(increment.Target, EffectAccess.Read),
-                ScanWriteTarget(increment.Target, increment.Target, valueIsStoredDirectly: false),
-                _conversionEffects.CheckedOverflow(increment.IsChecked, increment),
-                ResolveOperatorEffects(increment.OperatorMethod, [increment.Target], increment)),
+            IIncrementOrDecrementOperation increment =>
+                ScanIncrementOrDecrement(increment),
             IInvocationOperation invocation => ScanInvocation(invocation),
             IObjectCreationOperation creation => ScanObjectCreation(creation),
             IArrayCreationOperation array => ScanArrayCreation(array),
@@ -610,9 +607,7 @@ internal sealed partial class OperationEffectScanner
             : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         if (!arguments.CompletesNormally)
         {
-            return EffectSummaryDomain.Instance.Join(
-                arguments.Summary,
-                allocation);
+            return arguments.Summary;
         }
 
         var construction = _callResolver.ResolveConstruction(
@@ -706,6 +701,24 @@ internal sealed partial class OperationEffectScanner
         return result.Summary;
     }
 
+    private EffectSummary ScanIncrementOrDecrement(
+        IIncrementOrDecrementOperation increment)
+    {
+        return ScanReadModifyWrite(
+            increment.Target,
+            () => EffectStep.Empty,
+            () => EffectSummaryOperations.Join(
+                _conversionEffects.CheckedOverflow(
+                    increment.IsChecked,
+                    increment),
+                ResolveOperatorEffects(
+                    increment.OperatorMethod,
+                    [increment.Target],
+                    increment)),
+            () => _completionEvaluator.CanCompleteIncrementValue(increment),
+            increment.Target);
+    }
+
     private EffectSummary ScanBinary(IBinaryOperation binary)
     {
         var operands = ScanStep(binary.LeftOperand);
@@ -734,7 +747,9 @@ internal sealed partial class OperationEffectScanner
                 binary.OperatorMethod,
                 [binary.LeftOperand, binary.RightOperand],
                 binary));
-        return operands.Then(new EffectStep(operation, true)).Summary;
+        return operands.Then(new EffectStep(
+            operation,
+            _completionEvaluator.CanCompleteNormally(binary))).Summary;
     }
 
     private EffectSummary ScanInterpolatedString(
@@ -745,43 +760,81 @@ internal sealed partial class OperationEffectScanner
             return EffectSummary.Empty;
         }
 
-        var summary = EffectSummaryOperations.Allocate(
-            EffectAllocationKind.Managed);
+        var result = EffectStep.Empty;
         foreach (var part in interpolation.Parts)
         {
             if (part is not IInterpolationOperation value)
             {
                 continue;
             }
+
+            result = result.Then(ScanStep(value.Expression));
+            if (!result.CompletesNormally)
+            {
+                return result.Summary;
+            }
+
             if (value.Alignment != null || value.FormatString != null)
             {
-                summary = EffectSummaryOperations.Join(
-                    summary,
-                    ScanChildren(value),
-                    EffectSummaryOperations.Unsupported());
+                if (value.Alignment != null)
+                {
+                    result = result.Then(ScanStep(value.Alignment));
+                }
+                if (result.CompletesNormally && value.FormatString != null)
+                {
+                    result = result.Then(ScanStep(value.FormatString));
+                }
+                if (!result.CompletesNormally)
+                {
+                    return result.Summary;
+                }
+                result = result.Then(new EffectStep(
+                    EffectSummaryOperations.Unsupported(),
+                    CompletesNormally: true));
                 continue;
             }
 
-            summary = EffectSummaryOperations.Join(
-                summary,
-                Scan(value.Expression),
+            var formattedValue =
                 StringConcatenationEffectResolver.ResolveFormattedValue(
                     value.Expression,
                     value,
                     _session.Compilation,
                     _callResolver,
                     _abstractFlow,
-                    _conversionOwnership.ClassifyRegion));
+                    _conversionOwnership.ClassifyRegion);
+            result = result.Then(new EffectStep(
+                formattedValue,
+                StringConcatenationEffectResolver
+                    .CanFormattedValueCompleteNormally(
+                        value.Expression,
+                        value,
+                        _session.Compilation,
+                        _abstractFlow,
+                        _completionEvaluator)));
+            if (!result.CompletesNormally)
+            {
+                return result.Summary;
+            }
         }
-        return summary;
+        return result.Then(new EffectStep(
+            EffectSummaryOperations.Allocate(EffectAllocationKind.Managed),
+            CompletesNormally: true)).Summary;
     }
 
     private EffectSummary ScanUnary(IUnaryOperation unary)
     {
-        return EffectSummaryOperations.Join(
-            Scan(unary.Operand),
+        var operand = ScanStep(unary.Operand);
+        if (!operand.CompletesNormally)
+        {
+            return operand.Summary;
+        }
+
+        var operation = EffectSummaryOperations.Join(
             _conversionEffects.CheckedOverflow(unary.IsChecked, unary),
             ResolveOperatorEffects(unary.OperatorMethod, [unary.Operand], unary));
+        return operand.Then(new EffectStep(
+            operation,
+            _completionEvaluator.CanCompleteNormally(unary))).Summary;
     }
 
     private EffectSummary ScanConversion(IConversionOperation operation)
@@ -793,11 +846,19 @@ internal sealed partial class OperationEffectScanner
                 EffectSummaryOperations.Unsupported());
         }
 
+        var operand = ScanStep(operation.Operand);
+        if (!operand.CompletesNormally)
+        {
+            return operand.Summary;
+        }
+
         var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(operation);
-        return EffectSummaryOperations.Join(
-            Scan(operation.Operand),
+        var conversionEffect = EffectSummaryOperations.Join(
             _conversionEffects.Classify(operation, conversion),
             ResolveOperatorEffects(operation.OperatorMethod, [operation.Operand], operation));
+        return operand.Then(new EffectStep(
+            conversionEffect,
+            _completionEvaluator.CanCompleteNormally(operation))).Summary;
     }
 
     private EffectSummary ResolveOperatorEffects(

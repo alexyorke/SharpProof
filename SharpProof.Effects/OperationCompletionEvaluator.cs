@@ -66,9 +66,10 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteConversion(conversion),
             IBinaryOperation binary => CanCompleteBinary(binary),
             IUnaryOperation unary =>
-                ChildrenCanComplete(unary),
+                CanCompleteUnary(unary),
             IIncrementOrDecrementOperation increment =>
-                CanCompleteNormally(increment.Target),
+                CanCompleteIncrementValue(increment) &&
+                CanCompleteWriteTarget(increment.Target),
             IConditionalOperation conditional =>
                 CanCompleteConditional(conditional),
             IBlockOperation or IExpressionStatementOperation or
@@ -179,6 +180,17 @@ internal sealed class OperationCompletionEvaluator
                 assignment);
     }
 
+    internal bool CanCompleteIncrementValue(
+        IIncrementOrDecrementOperation increment)
+    {
+        return CanCompleteNormally(increment.Target) &&
+            (increment.OperatorMethod == null ||
+             CanCompleteInvocation(
+                 increment.OperatorMethod,
+                 instance: null,
+                 increment));
+    }
+
     internal bool CanCompleteConstruction(IObjectCreationOperation creation)
     {
         if (creation.Arguments.Any(argument =>
@@ -239,9 +251,18 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        return !(conversion.Type?.IsValueType == true &&
-                 conversion.Operand.ConstantValue is
-                 { HasValue: true, Value: null });
+        if (conversion.Type?.IsValueType == true &&
+            conversion.Operand.ConstantValue is
+            { HasValue: true, Value: null })
+        {
+            return false;
+        }
+
+        return conversion.OperatorMethod == null ||
+            CanCompleteInvocation(
+                conversion.OperatorMethod,
+                instance: null,
+                conversion);
     }
 
     private bool CanCompleteBinary(IBinaryOperation binary)
@@ -251,9 +272,28 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        return binary.OperatorKind is not (
-            BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) ||
-            binary.RightOperand.ConstantValue is not { HasValue: true, Value: 0 };
+        if (binary.OperatorKind is
+                BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
+            binary.RightOperand.ConstantValue is { HasValue: true, Value: 0 })
+        {
+            return false;
+        }
+
+        return binary.OperatorMethod == null ||
+            CanCompleteInvocation(
+                binary.OperatorMethod,
+                instance: null,
+                binary);
+    }
+
+    private bool CanCompleteUnary(IUnaryOperation unary)
+    {
+        return CanCompleteNormally(unary.Operand) &&
+            (unary.OperatorMethod == null ||
+             CanCompleteInvocation(
+                 unary.OperatorMethod,
+                 instance: null,
+                 unary));
     }
 
     private bool CanCompleteConditional(IConditionalOperation conditional)
