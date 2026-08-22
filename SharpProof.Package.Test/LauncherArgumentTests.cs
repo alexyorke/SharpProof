@@ -633,7 +633,7 @@ public sealed class LauncherArgumentTests
             TestContext.CurrentContext.WorkDirectory,
             "missing-worker-" + Guid.NewGuid().ToString("N"));
 
-        var exception = Assert.Throws<FileNotFoundException>((() =>
+        var exception = Assert.Throws<FileNotFoundException>((Action)(() =>
             Program.ComputeExpectedInputHash(
                 worker,
                 new WorkerVerifyRequest(),
@@ -1743,9 +1743,9 @@ public sealed class LauncherArgumentTests
         using (Assert.EnterMultipleScope())
         {
             Assert.Throws<ArgumentException>(
-                (() => LauncherPresentation.ParseVerifyPolicy("1")));
+                (Action)(() => LauncherPresentation.ParseVerifyPolicy("1")));
             Assert.Throws<ArgumentException>(
-                (() => LauncherPresentation.ParseAssumptionPolicy("1")));
+                (Action)(() => LauncherPresentation.ParseAssumptionPolicy("1")));
         }
     }
 
@@ -1755,13 +1755,13 @@ public sealed class LauncherArgumentTests
         using (Assert.EnterMultipleScope())
         {
             Assert.Throws<ArgumentOutOfRangeException>(
-                (() => LauncherPresentation.ClaimKind(
+                (Action)(() => LauncherPresentation.ClaimKind(
                     new WorkerClaimManifestEntry
                     {
                         Kind = (WorkerClaimKind)int.MaxValue
                     })));
             Assert.Throws<ArgumentOutOfRangeException>(
-                (() => LauncherPresentation.ClaimKind(
+                (Action)(() => LauncherPresentation.ClaimKind(
                     new WorkerClaimManifestEntry
                     {
                         Kind = WorkerClaimKind.Effect,
@@ -1775,7 +1775,7 @@ public sealed class LauncherArgumentTests
     public void UnknownPresentationPolicyIsRejectedExhaustively()
     {
         Assert.Throws<InvalidOperationException>(
-            (() => LauncherPresentation.Level(
+            (Action)(() => LauncherPresentation.Level(
                 (WorkerVerifyPolicy)int.MaxValue,
                 "info")));
     }

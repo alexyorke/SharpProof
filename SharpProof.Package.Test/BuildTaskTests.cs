@@ -552,7 +552,7 @@ public sealed class BuildTaskTests
 
         task.Cancel();
 
-        Assert.Multiple((() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(task, Is.InstanceOf<ICancelableTask>());
             Assert.That(task.Execute(), Is.True);
@@ -573,7 +573,7 @@ public sealed class BuildTaskTests
             "source.cs(x,3): warning SP0047: malformed location" + Environment.NewLine +
             "worker stderr");
 
-        Assert.Multiple((() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(
                 engine.Warnings.Select(static warning => warning.Code),
@@ -603,7 +603,7 @@ public sealed class BuildTaskTests
             Environment.NewLine +
             "SharpProof: error SP0048: strict assumptions");
 
-        Assert.Multiple((() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(engine.Warnings, Has.Count.EqualTo(1));
             Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
@@ -660,7 +660,7 @@ public sealed class BuildTaskTests
             unknown + Environment.NewLine +
             VerifierDiagnosticTransport.Prefix + "{malformed");
 
-        Assert.Multiple((() =>
+        Assert.Multiple((Action)(() =>
         {
             Assert.That(engine.Warnings, Has.Count.EqualTo(1));
             Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
@@ -691,11 +691,11 @@ public sealed class BuildTaskTests
             var trusted = RunVerifier.ResolveDotNetHost("dotnet");
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (() => RunVerifier.ResolveDotNetHost(string.Empty)))!.Message,
+                    (Action)(() => RunVerifier.ResolveDotNetHost(string.Empty)))!.Message,
                 Does.Contain("direct dotnet muxer"));
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (() => RunVerifier.ResolveDotNetHost("./dotnet")))!.Message,
+                    (Action)(() => RunVerifier.ResolveDotNetHost("./dotnet")))!.Message,
                 Does.Contain("direct dotnet muxer"));
 
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", null);
@@ -704,7 +704,7 @@ public sealed class BuildTaskTests
                 "relative" + Path.PathSeparator + ".");
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
                 Does.Contain("resolve a trusted dotnet muxer"));
 
             var wrongName = Path.Combine(directory.FullName, "not-dotnet");
@@ -712,7 +712,7 @@ public sealed class BuildTaskTests
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", wrongName);
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
                 Does.Contain("direct dotnet muxer"));
 
             var incompleteDirectory = Directory.CreateDirectory(
@@ -722,7 +722,7 @@ public sealed class BuildTaskTests
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", incomplete);
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
                 Does.Contain("complete dotnet installation"));
 
             var alternateDirectory = Directory.CreateDirectory(
@@ -734,7 +734,7 @@ public sealed class BuildTaskTests
             Environment.SetEnvironmentVariable("DOTNET_HOST_PATH", trusted);
             Assert.That(
                 Assert.Throws<InvalidOperationException>(
-                    (() => RunVerifier.ResolveDotNetHost(alternate)))!.Message,
+                    (Action)(() => RunVerifier.ResolveDotNetHost(alternate)))!.Message,
                 Does.Contain("trusted current dotnet muxer"));
         }
         finally
@@ -1484,7 +1484,7 @@ public sealed class BuildTaskTests
                 CachePath = Path.Combine(directory.FullName, "cache")
             };
 
-            Assert.Multiple((() =>
+            Assert.Multiple((Action)(() =>
             {
                 Assert.That(task.Execute(), Is.True);
                 Assert.That(File.Exists(result), Is.False);
