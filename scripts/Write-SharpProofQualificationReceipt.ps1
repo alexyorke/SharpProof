@@ -89,6 +89,7 @@ $valid = switch -Regex ($Gate) {
         $packageArtifacts.Count -eq 6
     }
     'pilots' {
+        [string]$evidence.reviewStatus -ceq 'Reviewed' -and
         (Test-SharpProofPilotReport -Report $evidence -ExpectedCommit $commit `
             -RepositoryRoot $repositoryRoot) -and
         $packageArtifacts.Count -eq 6

@@ -140,6 +140,88 @@ public sealed partial class ReleaseQualificationMatrixTests
         }
     }
 
+    [Test]
+    public async Task ReceiptWriterRequiresReviewedPilotEvidence()
+    {
+        var sourceRoot = RepositoryRoot();
+        var fixture = Directory.CreateTempSubdirectory("sp004-pilot-receipt-");
+        try
+        {
+            var scripts = Directory.CreateDirectory(Path.Combine(
+                fixture.FullName,
+                "scripts"));
+            File.Copy(
+                Path.Combine(
+                    sourceRoot,
+                    "scripts",
+                    "Write-SharpProofQualificationReceipt.ps1"),
+                Path.Combine(
+                    scripts.FullName,
+                    "Write-SharpProofQualificationReceipt.ps1"));
+            await File.WriteAllTextAsync(
+                Path.Combine(scripts.FullName, "Test-SharpProofPilotReport.ps1"),
+                "function Test-SharpProofPilotReport { return $true }\n");
+            await RunAsync(fixture.FullName, "git", "init", "-q");
+            await RunAsync(
+                fixture.FullName,
+                "git",
+                "config",
+                "user.email",
+                "fixture@example.invalid");
+            await RunAsync(
+                fixture.FullName,
+                "git",
+                "config",
+                "user.name",
+                "Fixture");
+            await File.WriteAllTextAsync(
+                Path.Combine(fixture.FullName, "tracked.txt"),
+                "fixture\n");
+            await RunAsync(fixture.FullName, "git", "add", "tracked.txt");
+            await RunAsync(
+                fixture.FullName,
+                "git",
+                "commit",
+                "-q",
+                "-m",
+                "fixture");
+            var evidence = Path.Combine(fixture.FullName, "pilots.json");
+            var packages = Enumerable.Range(0, 6).Select(index => new
+            {
+                fileName = $"package-{index}.nupkg",
+                bytes = 1,
+                sha256 = new string((char)('a' + index), 64)
+            }).ToArray();
+
+            async Task<int> WriteAsync(string reviewStatus)
+            {
+                await File.WriteAllTextAsync(evidence, JsonSerializer.Serialize(new
+                {
+                    reviewStatus,
+                    packageArtifacts = packages,
+                    pilots = Array.Empty<object>()
+                }));
+                return await RunExitCodeAsync(
+                    fixture.FullName,
+                    "pwsh", "-NoLogo", "-NoProfile", "-File",
+                    Path.Combine(
+                        scripts.FullName,
+                        "Write-SharpProofQualificationReceipt.ps1"),
+                    "-Gate", "pilots", "-EvidencePath", evidence);
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(await WriteAsync("Reviewed"), Is.Zero);
+                Assert.That(await WriteAsync("Unreviewed"), Is.Not.Zero);
+            }
+        }
+        finally
+        {
+            fixture.Delete(recursive: true);
+        }
+    }
+
     private static string Job(string workflow, string name, string next)
     {
         var start = workflow.IndexOf("  " + name + ":", StringComparison.Ordinal);
