@@ -79,6 +79,7 @@ internal sealed partial class OperationEffectScanner
             _completionEvaluator.CanCompleteCompoundValue,
             _completionEvaluator.CanCompleteIncrementValue,
             _completionEvaluator.CanCompleteWithClone,
+            _completionEvaluator.GetReachableImplicitListPatternMembers,
             session.ApiSpecs,
             HasNonThrowingMethodSpec);
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
@@ -260,6 +261,8 @@ internal sealed partial class OperationEffectScanner
                 ScanConditionalAccess(conditional),
             ISwitchExpressionOperation switchExpression =>
                 ScanSwitchExpression(switchExpression),
+            IListPatternOperation listPattern =>
+                ScanListPattern(listPattern),
             IWithOperation withOperation => ScanWith(withOperation),
             ILockOperation @lock => ScanLock(@lock),
             ILoopOperation loop => EffectSummaryOperations.Join(
@@ -829,6 +832,39 @@ internal sealed partial class OperationEffectScanner
                 ? Throw(FrameworkTypeMetadataNames.SwitchExpressionException)
                 : EffectSummary.Empty;
         return EffectSummaryOperations.Join(value.Summary, arms, unmatched);
+    }
+
+    private EffectSummary ScanListPattern(IListPatternOperation pattern)
+    {
+        var summary = ScanDefault(pattern);
+        var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
+        var receiver = _conversionOwnership.ClassifyRegion(
+            instance,
+            aliasSource: true);
+        foreach (var method in _completionEvaluator
+                     .GetReachableImplicitListPatternMembers(pattern))
+        {
+            var argumentRegions = Enumerable.Repeat(
+                    EffectRegionSet.Empty,
+                    method.Parameters.Length)
+                .ToImmutableArray();
+            var actualArguments = Enumerable.Repeat<IOperation?>(
+                    null,
+                    method.Parameters.Length)
+                .ToImmutableArray();
+            var call = _callResolver.Resolve(
+                method,
+                receiver,
+                receiver,
+                argumentRegions,
+                actualArguments,
+                method.IsVirtual || method.IsAbstract,
+                pattern,
+                instance,
+                ImmutableArray<IArgumentOperation>.Empty);
+            summary = EffectSummaryDomain.Instance.Join(summary, call);
+        }
+        return summary;
     }
 
     private EffectSummary ScanDeconstruction(

@@ -306,19 +306,19 @@ internal sealed class ConversionOwnershipClassifier
                     IVariableDeclaratorOperation declarator =>
                         (declarator.Symbol, declarator.Initializer?.Value),
                     ISimpleAssignmentOperation
-                        { Target: ILocalReferenceOperation local } assignment =>
+                    { Target: ILocalReferenceOperation local } assignment =>
                         (local.Local, assignment.Value),
                     ISimpleAssignmentOperation
-                        { Target: IParameterReferenceOperation parameter } assignment =>
+                    { Target: IParameterReferenceOperation parameter } assignment =>
                         (parameter.Parameter, assignment.Value),
                     ICompoundAssignmentOperation
-                        { Target: { } target } assignment
+                    { Target: { } target } assignment
                         when TryGetRefLikeStorageSymbol(
                             target,
                             out var compoundTarget) =>
                         (compoundTarget, assignment),
                     IIncrementOrDecrementOperation
-                        { Target: { } target } increment
+                    { Target: { } target } increment
                         when TryGetRefLikeStorageSymbol(
                             target,
                             out var incrementTarget) =>

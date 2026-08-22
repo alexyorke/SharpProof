@@ -209,7 +209,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-      "inventorySha256": "5b950efa02e78389ba815ebb7e3cb9a7f0c42b532fff1303618ec1a370661fd4",
+      "inventorySha256": "4be7320425beeb1a8f702e0b16b80aa742ed479d9b51fa3ec8555f8a539de580",
     "components": [
       {
         "name": "discovery",
@@ -727,6 +727,15 @@
       {
         "name": "fuzzEvidenceAuthority",
         "paths": [
+          "Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs",
+          "Tools/SharpProof.Fuzz/FrontendFuzzing.cs",
+          "Tools/SharpProof.Fuzz/FuzzDifferential.cs",
+          "Tools/SharpProof.Fuzz/FuzzOptions.cs",
+          "Tools/SharpProof.Fuzz/FuzzRunner.cs",
+          "Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs",
+          "Tools/SharpProof.Fuzz/Program.cs",
+          "Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
+          "Tools/SharpProof.Fuzz/packages.lock.json",
           "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
           "scripts/SharpProof.FuzzEvidenceLifecycle.ps1",
           "scripts/Test-SharpProofFuzzEvidenceLifecycle.ps1",

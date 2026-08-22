@@ -4646,6 +4646,53 @@ public sealed class EffectAnalysisTests
                     while (true) { }
                 }
             }
+            public readonly struct NestedListPatternBomb {
+                public int Length => 1;
+                public int this[int index] { get { while (true) { } } }
+            }
+            public class VirtualLengthPatternBase {
+                public virtual int Length => 1;
+                public int this[int index] { get { while (true) { } } }
+            }
+            public sealed class VirtualLengthPatternDerived :
+                VirtualLengthPatternBase {
+                public override int Length => 0;
+            }
+            public sealed class ThrowingListLengthPattern {
+                public int Length => throw new InvalidOperationException();
+                public int this[int index] => 0;
+            }
+            public sealed class ThrowingListIndexerPattern {
+                public int Length => 1;
+                public int this[int index] =>
+                    throw new ApplicationException();
+            }
+            public sealed class ThrowingListSlicePattern {
+                public int Length => 1;
+                public int this[int index] => 0;
+                public ThrowingListSlicePattern Slice(int start, int length) =>
+                    throw new ArgumentException();
+            }
+            public sealed class EmptyThrowingListIndexerPattern {
+                public int Length => 0;
+                public int this[int index] =>
+                    throw new ApplicationException();
+            }
+            public sealed class ThrowingLengthAndIndexerPattern {
+                public int Length => throw new InvalidOperationException();
+                public int this[int index] =>
+                    throw new ApplicationException();
+            }
+            public sealed class ReceiverMutatingListPattern {
+                private int state;
+                public int Length => 1;
+                public int this[int index] {
+                    get { state++; return 0; }
+                }
+            }
+            public sealed class NestedListPatternHolder {
+                public ReceiverMutatingListPattern Child { get; } = new();
+            }
             public sealed class NullTarget {
                 public int Value;
                 public void Touch() { }
@@ -4916,6 +4963,15 @@ public sealed class EffectAnalysisTests
                 public static void AfterDivergingReferenceSlicePattern() { _ = new ReferenceSlicePatternBomb() switch { [.. var rest] => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingVariableLengthSlicePattern(int length) { _ = new VariableLengthSlicePatternBomb(length) switch { [.. var rest] => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingNestedSlicePattern(VariableLengthSlicePatternStructBomb value) { _ = value switch { [.. { Length: 0 }] => 1, _ => 2 }; s_state++; }
+                public static void VirtualLengthMismatchCompletes() { _ = ((VirtualLengthPatternBase)new VirtualLengthPatternDerived()) switch { [0] => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingNestedListPattern() { _ = new NestedListPatternBomb[2] switch { [[0], _] => 1, _ => 2 }; s_state++; }
+                public static void ThrowingListLengthCatch(ThrowingListLengthPattern value) { if (value is null) return; try { _ = value switch { [] => 1, _ => 2 }; } catch (InvalidOperationException) { s_state++; } }
+                public static void ThrowingListIndexerCatch() { try { _ = new ThrowingListIndexerPattern() switch { [0] => 1, _ => 2 }; } catch (ApplicationException) { s_state++; } }
+                public static void ThrowingListSliceCatch() { try { _ = new ThrowingListSlicePattern() switch { [.. var rest] => 1, _ => 2 }; } catch (ArgumentException) { s_state++; } }
+                public static void LengthMismatchSkipsIndexerCatch() { try { _ = new EmptyThrowingListIndexerPattern() switch { [0] => 1, _ => 2 }; } catch (ApplicationException) { s_state++; } }
+                public static void NullListSkipsLengthCatch() { try { _ = ((ThrowingListLengthPattern)null!) switch { [] => 1, _ => 2 }; } catch (InvalidOperationException) { s_state++; } }
+                public static void ThrowingLengthSkipsIndexerCatch() { try { _ = new ThrowingLengthAndIndexerPattern() switch { [0] => 1, _ => 2 }; } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static bool NestedListReceiverWrite(NestedListPatternHolder value) => value is { Child: [0] };
                 public static void AfterDivergingNegatedPattern() { _ = new PatternBomb() switch { not { Value: 0 } => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingAndPattern() { _ = new PatternBomb() switch { { Value: 0 } and _ => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingOrPattern() { _ = new ReferencePatternBomb() switch { null or { Value: 0 } => 1, _ => 2 }; s_state++; }
@@ -5120,6 +5176,26 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 HasStaticWrite("AfterDivergingNestedSlicePattern"),
                 Is.False);
+            Assert.That(
+                HasStaticWrite("VirtualLengthMismatchCompletes"),
+                Is.True);
+            Assert.That(
+                HasStaticWrite("AfterDivergingNestedListPattern"),
+                Is.False);
+            Assert.That(HasStaticWrite("ThrowingListLengthCatch"), Is.True);
+            Assert.That(HasStaticWrite("ThrowingListIndexerCatch"), Is.True);
+            Assert.That(HasStaticWrite("ThrowingListSliceCatch"), Is.True);
+            Assert.That(
+                HasStaticWrite("LengthMismatchSkipsIndexerCatch"),
+                Is.False);
+            Assert.That(HasStaticWrite("NullListSkipsLengthCatch"), Is.False);
+            Assert.That(
+                HasStaticWrite("ThrowingLengthSkipsIndexerCatch"),
+                Is.False);
+            Assert.That(
+                session.Analyze(Method(compilation, "NestedListReceiverWrite"))
+                    .Summary.Writes.IsUnknown,
+                Is.True);
             Assert.That(
                 HasStaticWrite("AfterDivergingNegatedPattern"),
                 Is.False);

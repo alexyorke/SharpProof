@@ -1193,11 +1193,11 @@ public sealed class FrontendDifferentialOracle
             compilationUnit.AttributeLists.Count == 0 &&
             compilationUnit.Members.Count == 3 &&
             compilationUnit.Members[0] is EnumDeclarationSyntax
-                { Identifier.ValueText: "SharpProofGeneratedEdgeEnum" } &&
+            { Identifier.ValueText: "SharpProofGeneratedEdgeEnum" } &&
             compilationUnit.Members[1] is StructDeclarationSyntax
-                { Identifier.ValueText: "SharpProofGeneratedConvertible" } &&
+            { Identifier.ValueText: "SharpProofGeneratedConvertible" } &&
             compilationUnit.Members[2] is ClassDeclarationSyntax
-                { Identifier.ValueText: "SharpProofGeneratedFrontendEdges" };
+            { Identifier.ValueText: "SharpProofGeneratedFrontendEdges" };
         if (!hasExpectedTopology)
         {
             return IsolateSemanticEdgeFailure(

@@ -306,38 +306,85 @@ internal sealed class OperationCompletionEvaluator
 
     private bool CanListPatternMemberCompleteNormally(ISymbol? symbol)
     {
-        return symbol switch
+        var method = SwitchExpressionFacts.GetCallableListPatternMember(symbol);
+        return method == null ||
+            CanDirectListPatternMemberCompleteNormally(method);
+    }
+
+    internal IReadOnlyList<IMethodSymbol>
+        GetReachableImplicitListPatternMembers(IListPatternOperation pattern)
+    {
+        var methods = new List<IMethodSymbol>();
+        var governingValue = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (governingValue != null &&
+            _isProvenNull(governingValue, pattern))
         {
-            IPropertySymbol { GetMethod: { } getter } =>
-                CanMethodCompleteNormally(getter),
-            IMethodSymbol method => CanMethodCompleteNormally(method),
-            _ => true
-        };
+            return methods;
+        }
+
+        var lengthMember = SwitchExpressionFacts
+            .GetCallableListPatternMember(pattern.LengthSymbol);
+        if (lengthMember != null)
+        {
+            methods.Add(lengthMember);
+            if (!CanDirectListPatternMemberCompleteNormally(lengthMember))
+            {
+                return methods;
+            }
+        }
+
+        var requiredLength = pattern.Patterns.Count(
+            static item => item is not ISlicePatternOperation);
+        var hasSlice = pattern.Patterns.Any(
+            static item => item is ISlicePatternOperation);
+        if (TryGetGoverningListLength(pattern, out var length) &&
+            (hasSlice ? length < requiredLength : length != requiredLength))
+        {
+            return methods;
+        }
+
+        foreach (var item in pattern.Patterns)
+        {
+            var member = item is ISlicePatternOperation slice
+                ? slice.Pattern == null
+                    ? null
+                    : SwitchExpressionFacts.GetCallableListPatternMember(
+                        slice.SliceSymbol)
+                : SwitchExpressionFacts.GetCallableListPatternMember(
+                    pattern.IndexerSymbol);
+            if (member != null)
+            {
+                methods.Add(member);
+                if (!CanDirectListPatternMemberCompleteNormally(member))
+                {
+                    return methods;
+                }
+            }
+
+            var nestedPattern = item is ISlicePatternOperation nestedSlice
+                ? nestedSlice.Pattern
+                : item;
+            if (nestedPattern != null &&
+                !CanCompletePatternEvaluation(nestedPattern))
+            {
+                return methods;
+            }
+        }
+        return methods;
+    }
+
+    private bool CanDirectListPatternMemberCompleteNormally(
+        IMethodSymbol method)
+    {
+        return method.IsAbstract || method.IsVirtual && !method.IsSealed ||
+            CanMethodCompleteNormally(method);
     }
 
     private bool TryGetGoverningListLength(
         IListPatternOperation pattern,
         out long length)
     {
-        var current = (IOperation)pattern;
-        while (current.Parent is IPatternOperation parentPattern)
-        {
-            current = parentPattern;
-        }
-
-        var value = current.Parent switch
-        {
-            ISwitchExpressionArmOperation
-            { Parent: ISwitchExpressionOperation expression } =>
-                expression.Value,
-            IPatternCaseClauseOperation
-            {
-                Parent: ISwitchCaseOperation
-                { Parent: ISwitchOperation statement }
-            } =>
-                statement.Value,
-            _ => null
-        };
+        var value = SwitchExpressionFacts.GetGoverningValue(pattern);
         if (value != null)
         {
             value = DefiniteOperationFacts.UnwrapHarmlessValue(value);
@@ -350,9 +397,9 @@ internal sealed class OperationCompletionEvaluator
             length = arrayLength;
             return true;
         }
-        if (value is IObjectCreationOperation &&
-            pattern.LengthSymbol is IPropertySymbol
+        if (pattern.LengthSymbol is IPropertySymbol
             { GetMethod: { } lengthGetter } &&
+            (!lengthGetter.IsVirtual || lengthGetter.IsSealed) &&
             TryGetIntegralConstantReturn(lengthGetter, out length))
         {
             return true;

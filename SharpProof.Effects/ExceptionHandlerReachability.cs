@@ -12,6 +12,8 @@ internal sealed class ExceptionHandlerReachability(
     Func<ICompoundAssignmentOperation, bool> canCompoundValueComplete,
     Func<IIncrementOrDecrementOperation, bool> canIncrementValueComplete,
     Func<IWithOperation, bool> canWithCloneComplete,
+    Func<IListPatternOperation, IReadOnlyList<IMethodSymbol>>
+        getReachableListPatternMembers,
     ResolvedApiSpecTable apiSpecs,
     Func<IMethodSymbol, bool> isKnownNonThrowing)
 {
@@ -722,6 +724,23 @@ internal sealed class ExceptionHandlerReachability(
                     }
                 }
                 PushChildren(propertyReference);
+                continue;
+            }
+            if (operation is IListPatternOperation listPattern)
+            {
+                foreach (var member in
+                         getReachableListPatternMembers(listPattern))
+                {
+                    Add(
+                        member.IsVirtual || member.IsAbstract
+                            ? UnknownPotential
+                            : GetCallableExceptions(
+                                member,
+                                activeMethods,
+                                depth + 1),
+                        listPattern);
+                }
+                PushChildren(listPattern);
                 continue;
             }
             if (operation is IFieldReferenceOperation fieldReference)

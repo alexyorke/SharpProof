@@ -9,6 +9,38 @@ internal enum SwitchExpressionSelection
 
 internal static class SwitchExpressionFacts
 {
+    internal static IOperation? GetGoverningValue(IPatternOperation pattern)
+    {
+        var current = (IOperation)pattern;
+        while (current.Parent is INegatedPatternOperation or
+            IBinaryPatternOperation)
+        {
+            current = current.Parent;
+        }
+        return current.Parent switch
+        {
+            ISwitchExpressionArmOperation
+            { Parent: ISwitchExpressionOperation expression } =>
+                expression.Value,
+            IPatternCaseClauseOperation
+            {
+                Parent: ISwitchCaseOperation
+                { Parent: ISwitchOperation statement }
+            } => statement.Value,
+            _ => null
+        };
+    }
+
+    internal static IMethodSymbol? GetCallableListPatternMember(ISymbol? symbol)
+    {
+        return symbol switch
+        {
+            IPropertySymbol property => property.GetMethod,
+            IMethodSymbol method => method,
+            _ => null
+        };
+    }
+
     internal static IReadOnlyList<ISwitchExpressionArmOperation> GetReachableArms(
         ISwitchExpressionOperation operation,
         Func<IOperation?, bool> canCompleteNormally,
