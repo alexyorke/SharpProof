@@ -133,7 +133,8 @@ internal sealed partial class OperationEffectScanner
                 {
                     RecordDirectLock(directLock);
                 }
-                else if (operation is IThrowOperation)
+                else if (operation is IThrowOperation thrown &&
+                         CanReachThrow(thrown))
                 {
                     RecordDirect(operation);
                 }
@@ -143,7 +144,8 @@ internal sealed partial class OperationEffectScanner
                 ILockOperation @lock => EffectSummaryOperations.Join(
                     PotentialNullLock(@lock.LockedValue, @lock),
                     EffectSummaryOperations.Capability(EffectCapabilityKind.Synchronization)),
-                IThrowOperation thrown when IsSourceThrow(thrown) => EffectExceptionFlow.KeepEscaping(
+                IThrowOperation thrown when IsSourceThrow(thrown) &&
+                    CanReachThrow(thrown) => EffectExceptionFlow.KeepEscaping(
                     EffectSummaryOperations.Throw(
                         ResolveThrownException(thrown)),
                     thrown, _session.Compilation),
@@ -224,10 +226,8 @@ internal sealed partial class OperationEffectScanner
                 EffectSummaryOperations.Join(
                     ScanChildren(allocation),
                     EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
-            IThrowOperation thrown when IsSourceThrow(thrown) => EffectSummaryOperations.Join(
-                ScanChildren(thrown),
-                EffectSummaryOperations.Throw(
-                    ResolveThrownException(thrown))),
+            IThrowOperation thrown when IsSourceThrow(thrown) =>
+                ScanThrow(thrown),
             IInterpolatedStringOperation interpolation =>
                 ScanInterpolatedString(interpolation),
             IThrowOperation => EffectSummary.Empty,
@@ -626,6 +626,19 @@ internal sealed partial class OperationEffectScanner
         }
 
         return result.Summary;
+    }
+
+    private EffectSummary ScanThrow(IThrowOperation thrown)
+    {
+        var expression = thrown.Exception == null
+            ? EffectStep.Empty
+            : ScanStep(thrown.Exception);
+        return expression.CompletesNormally
+            ? expression.Then(new EffectStep(
+                EffectSummaryOperations.Throw(
+                    ResolveThrownException(thrown)),
+                false)).Summary
+            : expression.Summary;
     }
 
     private EffectSummary ScanArrayCreation(IArrayCreationOperation array)
@@ -1220,6 +1233,12 @@ internal sealed partial class OperationEffectScanner
     private static bool IsSourceThrow(IThrowOperation operation)
     {
         return operation.Syntax is ThrowStatementSyntax or ThrowExpressionSyntax;
+    }
+
+    private bool CanReachThrow(IThrowOperation thrown)
+    {
+        return thrown.Exception == null ||
+            _completionEvaluator.CanCompleteNormally(thrown.Exception);
     }
 
     private ImmutableArray<EffectRegionSet> ClassifyArguments(

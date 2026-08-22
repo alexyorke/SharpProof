@@ -6372,6 +6372,42 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void FailingThrowExpressionsStaySequenced()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                public static void OuterThrow() => throw Make();
+
+                private static InvalidOperationException Make() =>
+                    throw new ArgumentException();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var outerThrow = session.Analyze(Method(compilation, "OuterThrow"));
+        var invalidOperation = compilation.GetTypeByMetadataName(
+            "System.InvalidOperationException")!;
+        var argument = compilation.GetTypeByMetadataName(
+            "System.ArgumentException")!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                outerThrow.Summary.Throws.Types.Any(type =>
+                    SymbolEqualityComparer.Default.Equals(
+                        type,
+                        invalidOperation)),
+                Is.False);
+            Assert.That(
+                outerThrow.Summary.Throws.Types.Any(type =>
+                    SymbolEqualityComparer.Default.Equals(type, argument)),
+                Is.True);
+        }
+    }
+
+    [Test]
     public void FailingCompoundTargetReadSuppressesValueEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(
