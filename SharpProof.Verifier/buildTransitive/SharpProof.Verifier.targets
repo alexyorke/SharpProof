@@ -1,4 +1,4 @@
-<Project>
+<Project TreatAsLocalProperty="_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained">
   <PropertyGroup>
     <_SharpProofToolsDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofToolsDirectory)'))</_SharpProofToolsDirectory>
     <_SharpProofWorkerPathConfigured>$([System.String]::Copy('$(SharpProofWorkerPath)').Trim())</_SharpProofWorkerPathConfigured>
@@ -54,11 +54,23 @@
       <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'cache'))</_SharpProofEffectiveCacheDirectory>
       <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' != ''">$(SharpProofVerifyCacheDirectory)</_SharpProofEffectiveCacheDirectory>
       <_SharpProofActiveCacheDirectory Condition="'$(_SharpProofVerifyCacheEnabledNormalized)' == 'true'">$(_SharpProofEffectiveCacheDirectory)</_SharpProofActiveCacheDirectory>
+      <_SharpProofInvocationRunsDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'runs'))))</_SharpProofInvocationRunsDirectory>
       <_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''">$([System.Guid]::NewGuid().ToString('N'))</_SharpProofInvocationId>
-      <_SharpProofInvocationDirectory>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'runs', '$(_SharpProofInvocationId)'))</_SharpProofInvocationDirectory>
+      <_SharpProofInvocationIdIsSafe>$([System.Text.RegularExpressions.Regex]::IsMatch('$(_SharpProofInvocationId)', '\A[0-9a-f]{32}\z'))</_SharpProofInvocationIdIsSafe>
+      <_SharpProofExpectedInvocationDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(_SharpProofInvocationRunsDirectory)', '$(_SharpProofInvocationId)'))))</_SharpProofExpectedInvocationDirectory>
+      <_SharpProofInvocationDirectory>$(_SharpProofExpectedInvocationDirectory)</_SharpProofInvocationDirectory>
+      <_SharpProofInvocationDirectoryFullPath>$([System.IO.Path]::GetFullPath('$(_SharpProofInvocationDirectory)'))</_SharpProofInvocationDirectoryFullPath>
+      <_SharpProofInvocationDirectoryIsCanonical>$([System.String]::Equals('$(_SharpProofInvocationDirectory)', '$(_SharpProofInvocationDirectoryFullPath)', System.StringComparison.Ordinal))</_SharpProofInvocationDirectoryIsCanonical>
+      <_SharpProofInvocationDirectoryMatchesExpected>$([System.String]::Equals('$(_SharpProofInvocationDirectoryFullPath)', '$(_SharpProofExpectedInvocationDirectory)', System.StringComparison.Ordinal))</_SharpProofInvocationDirectoryMatchesExpected>
+      <_SharpProofInvocationDirectoryParent>$([System.IO.Path]::GetDirectoryName('$(_SharpProofInvocationDirectoryFullPath)'))</_SharpProofInvocationDirectoryParent>
+      <_SharpProofInvocationDirectoryIsContained>$([System.String]::Equals('$(_SharpProofInvocationDirectoryParent)', '$(_SharpProofInvocationRunsDirectory)', System.StringComparison.Ordinal))</_SharpProofInvocationDirectoryIsContained>
       <_SharpProofInvocationRequestFile>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'request.json'))</_SharpProofInvocationRequestFile>
       <_SharpProofInvocationResultFile>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'result.json'))</_SharpProofInvocationResultFile>
     </PropertyGroup>
+    <Error Condition="'$(_SharpProofInvocationIdIsSafe)' != 'True'"
+           Text="SharpProof invocation ID must be an exact safe identifier of 32 lowercase hexadecimal characters." />
+    <Error Condition="'$(_SharpProofInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofInvocationDirectoryIsContained)' != 'True'"
+           Text="SharpProof invocation directory must resolve canonically to a direct child of the package-owned runs directory." />
     <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
       <_SharpProofCompilerManifestPath>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'compiler-manifest.json'))</_SharpProofCompilerManifestPath>
@@ -103,8 +115,24 @@
   </Target>
 
   <Target Name="_SharpProofCleanupInvocation"
-          Condition="'$(_SharpProofInvocationDirectory)' != ''">
-    <RemoveDir Directories="$(_SharpProofInvocationDirectory)" />
+          Condition="'$(_SharpProofInvocationId)' != ''">
+    <PropertyGroup>
+      <_SharpProofCleanupVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofCleanupVerifyDirectory>
+      <_SharpProofCleanupRunsDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(_SharpProofCleanupVerifyDirectory)', 'runs'))))</_SharpProofCleanupRunsDirectory>
+      <_SharpProofCleanupInvocationIdIsSafe>$([System.Text.RegularExpressions.Regex]::IsMatch('$(_SharpProofInvocationId)', '\A[0-9a-f]{32}\z'))</_SharpProofCleanupInvocationIdIsSafe>
+      <_SharpProofCleanupExpectedInvocationDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(_SharpProofCleanupRunsDirectory)', '$(_SharpProofInvocationId)'))))</_SharpProofCleanupExpectedInvocationDirectory>
+      <_SharpProofInvocationDirectory Condition="'$(_SharpProofInvocationDirectory)' == ''">$(_SharpProofCleanupExpectedInvocationDirectory)</_SharpProofInvocationDirectory>
+      <_SharpProofCleanupInvocationDirectoryFullPath>$([System.IO.Path]::GetFullPath('$(_SharpProofInvocationDirectory)'))</_SharpProofCleanupInvocationDirectoryFullPath>
+      <_SharpProofCleanupInvocationDirectoryIsCanonical>$([System.String]::Equals('$(_SharpProofInvocationDirectory)', '$(_SharpProofCleanupInvocationDirectoryFullPath)', System.StringComparison.Ordinal))</_SharpProofCleanupInvocationDirectoryIsCanonical>
+      <_SharpProofCleanupInvocationDirectoryMatchesExpected>$([System.String]::Equals('$(_SharpProofCleanupInvocationDirectoryFullPath)', '$(_SharpProofCleanupExpectedInvocationDirectory)', System.StringComparison.Ordinal))</_SharpProofCleanupInvocationDirectoryMatchesExpected>
+      <_SharpProofCleanupInvocationDirectoryParent>$([System.IO.Path]::GetDirectoryName('$(_SharpProofCleanupInvocationDirectoryFullPath)'))</_SharpProofCleanupInvocationDirectoryParent>
+      <_SharpProofCleanupInvocationDirectoryIsContained>$([System.String]::Equals('$(_SharpProofCleanupInvocationDirectoryParent)', '$(_SharpProofCleanupRunsDirectory)', System.StringComparison.Ordinal))</_SharpProofCleanupInvocationDirectoryIsContained>
+    </PropertyGroup>
+    <Error Condition="'$(_SharpProofCleanupInvocationIdIsSafe)' != 'True'"
+           Text="SharpProof invocation ID must be an exact safe identifier of 32 lowercase hexadecimal characters." />
+    <Error Condition="'$(_SharpProofCleanupInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryIsContained)' != 'True'"
+           Text="SharpProof invocation cleanup directory must resolve canonically to a direct child of the package-owned runs directory." />
+    <RemoveDir Directories="$(_SharpProofCleanupInvocationDirectoryFullPath)" />
   </Target>
 
   <Target Name="_SharpProofVerifyCore"

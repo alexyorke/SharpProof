@@ -1780,7 +1780,7 @@ public sealed class WorkerMsBuildIntegrationTests
             ("_SharpProofPackageNativeZ3Path", nativeZ3Path));
         Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
 
-        var prelaunchId = "prelaunch-" + Guid.NewGuid().ToString("N");
+        var prelaunchId = Guid.NewGuid().ToString("N");
         var prelaunchRoot = project.CreateInvocationRunRoot(prelaunchId);
         var prelaunch = await project.RunVerificationTargetWithInvocationIdAsync(
             prelaunchId,
@@ -1797,7 +1797,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 prelaunch.Output);
         }
 
-        var launchFailureId = "launch-" + Guid.NewGuid().ToString("N");
+        var launchFailureId = Guid.NewGuid().ToString("N");
         var launchFailureRoot = project.CreateInvocationRunRoot(launchFailureId);
         await File.WriteAllTextAsync(
             Path.Combine(launchFailureRoot, "compiler-manifest.json"),
@@ -1826,6 +1826,67 @@ public sealed class WorkerMsBuildIntegrationTests
 
     [Test]
     [SupportedOSPlatform("linux")]
+    public async Task NoncanonicalInvocationIdCannotEscapeRunsRoot()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var nativeZ3Path = ContainerContract.ResolveZ3LibraryRequired();
+        var baseline = await project.BuildAsync(
+            verify: false,
+            ("_SharpProofPackageNativeZ3Path", nativeZ3Path));
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var sentinelDirectory = Path.Combine(
+            project.Root,
+            "invocation-escape-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(sentinelDirectory);
+        var sentinel = Path.Combine(sentinelDirectory, "harmless-sentinel.txt");
+        await File.WriteAllTextAsync(sentinel, "preserve");
+        var traversalId = Path.GetRelativePath(
+                project.InvocationRunsDirectory,
+                sentinelDirectory)
+            .Replace(Path.DirectorySeparatorChar, '/');
+
+        var result = await project.RunVerificationTargetWithInvocationIdAsync(
+            traversalId,
+            ("_SharpProofPackageNativeZ3Path", nativeZ3Path),
+            ("_SharpProofInvocationIdIsSafe", "True"),
+            ("_SharpProofInvocationDirectoryIsContained", "True"),
+            ("_SharpProofCleanupInvocationIdIsSafe", "True"),
+            ("_SharpProofCleanupInvocationDirectoryIsContained", "True"),
+            ("SharpProofVerifyPolicy", "invalid"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+            Assert.That(
+                result.Output,
+                Does.Contain("invocation ID must be an exact safe identifier"));
+            Assert.That(Directory.Exists(sentinelDirectory), Is.True,
+                result.Output);
+            Assert.That(File.Exists(sentinel), Is.True, result.Output);
+        }
+
+        var safeId = Guid.NewGuid().ToString("N");
+        var noncontained = await project.RunCleanupTargetAsync(
+            safeId,
+            sentinelDirectory);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(noncontained.ExitCode, Is.Not.Zero, noncontained.Output);
+            Assert.That(
+                noncontained.Output,
+                Does.Contain(
+                    "invocation cleanup directory must resolve canonically"));
+            Assert.That(Directory.Exists(sentinelDirectory), Is.True,
+                noncontained.Output);
+            Assert.That(File.Exists(sentinel), Is.True, noncontained.Output);
+        }
+    }
+
+    [Test]
+    [SupportedOSPlatform("linux")]
     public async Task InvocationCleanupFailurePreservesDiagnosticAndRecovers()
     {
         RequireContainerWorker();
@@ -1836,7 +1897,7 @@ public sealed class WorkerMsBuildIntegrationTests
             ("_SharpProofPackageNativeZ3Path", nativeZ3Path));
         Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
 
-        var invocationId = "cleanup-failure-" + Guid.NewGuid().ToString("N");
+        var invocationId = Guid.NewGuid().ToString("N");
         var invocationRoot = project.CreateInvocationRunRoot(invocationId);
         var runsMode = File.GetUnixFileMode(project.InvocationRunsDirectory);
         File.SetUnixFileMode(
@@ -1865,7 +1926,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 failure.Output);
         }
 
-        var recovery = await project.RunCleanupTargetAsync(invocationRoot);
+        var recovery = await project.RunCleanupTargetAsync(invocationId);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(recovery.ExitCode, Is.Zero, recovery.Output);
@@ -1919,9 +1980,8 @@ public sealed class WorkerMsBuildIntegrationTests
         File.Delete(sarifPath);
         var publicationDirectory = Path.GetDirectoryName(
             project.RequestPath)!;
-        var invocationDirectory = Path.Combine(
-            project.Root,
-            "publication-failure-invocation");
+        var invocationId = Guid.NewGuid().ToString("N");
+        var invocationDirectory = project.InvocationRunRoot(invocationId);
         Directory.CreateDirectory(invocationDirectory);
         File.SetUnixFileMode(
             publicationDirectory,
@@ -1929,14 +1989,8 @@ public sealed class WorkerMsBuildIntegrationTests
         BuildResult failed;
         try
         {
-            failed = await project.RunVerificationTargetAsync(
-                ("_SharpProofInvocationDirectory", invocationDirectory),
-                ("_SharpProofInvocationRequestFile", Path.Combine(
-                    invocationDirectory,
-                    "request.json")),
-                ("_SharpProofInvocationResultFile", Path.Combine(
-                    invocationDirectory,
-                    "result.json")),
+            failed = await project.RunVerificationTargetWithInvocationIdAsync(
+                invocationId,
                 ("_SharpProofCompilerManifestPath", failedInvocationManifest),
                 ("SharpProofCompilerManifestFile", failedManifestPath),
                 ("SharpProofVerifyPolicy", "advisory"),
@@ -2833,6 +2887,9 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static onError =>
                 onError.Attribute("ExecuteTargets")?.Value ==
                 "_SharpProofCleanupInvocation");
+        var cleanupElements = cleanup.Elements().ToList();
+        var cleanupRemove = cleanup.Elements("RemoveDir").Single();
+        var cleanupSafetyErrors = cleanup.Elements("Error").ToArray();
         var verifyCoreElements = verifyCore.Elements().ToList();
         var runnerTask = targets.Descendants("UsingTask")
             .Single(static task => task.Attribute("TaskName")?.Value ==
@@ -2902,11 +2959,27 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.True);
             Assert.That(
                 cleanup.Attribute("Condition")?.Value,
-                Is.EqualTo("'$(_SharpProofInvocationDirectory)' != ''"));
+                Is.EqualTo("'$(_SharpProofInvocationId)' != ''"));
             Assert.That(
-                cleanup.Descendants("RemoveDir").Single()
-                    .Attribute("Directories")?.Value,
-                Is.EqualTo("$(_SharpProofInvocationDirectory)"));
+                cleanupRemove.Attribute("Directories")?.Value,
+                Is.EqualTo("$(_SharpProofCleanupInvocationDirectoryFullPath)"));
+            Assert.That(
+                cleanupSafetyErrors.Count(static error =>
+                    error.Attribute("Text")?.Value.Contains(
+                        "exact safe identifier",
+                        StringComparison.Ordinal) == true),
+                Is.EqualTo(1));
+            Assert.That(
+                cleanupSafetyErrors.Count(static error =>
+                    error.Attribute("Text")?.Value.Contains(
+                        "resolve canonically",
+                        StringComparison.Ordinal) == true),
+                Is.EqualTo(1));
+            Assert.That(
+                cleanupSafetyErrors.Select(error =>
+                    cleanupElements.IndexOf(error)),
+                Is.All.LessThan(cleanupElements.IndexOf(cleanupRemove)),
+                "Cleanup validation must run before RemoveDir.");
             Assert.That(
                 cleanupCall.Attribute("Condition"),
                 Is.Null,
@@ -3848,14 +3921,7 @@ public sealed class WorkerMsBuildIntegrationTests
         internal Task<BuildResult> RunVerificationTargetAsync(
             params (string Name, string Value)[] properties)
         {
-            var invocationDirectory = Path.Combine(
-                _root,
-                "obj",
-                "Release",
-                "net8.0",
-                "SharpProof",
-                "runs",
-                "direct-" + Guid.NewGuid().ToString("N"));
+            var invocationId = Guid.NewGuid().ToString("N");
             var arguments = new List<string> {
                 "msbuild",
                 ProjectPath,
@@ -3875,12 +3941,7 @@ public sealed class WorkerMsBuildIntegrationTests
                         "net8.0",
                         "SharpProof",
                         "cache"),
-                "-p:_SharpProofInvocationDirectory=" +
-                    invocationDirectory,
-                "-p:_SharpProofInvocationRequestFile=" +
-                    Path.Combine(invocationDirectory, "request.json"),
-                "-p:_SharpProofInvocationResultFile=" +
-                    Path.Combine(invocationDirectory, "result.json")
+                "-p:_SharpProofInvocationId=" + invocationId
             };
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));
@@ -3918,16 +3979,25 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         internal Task<BuildResult> RunCleanupTargetAsync(
-            string invocationRoot)
+            string invocationId,
+            string? invocationDirectory = null)
         {
-            return RunDotNetAsync([
+            var arguments = new List<string> {
                 "msbuild",
                 ProjectPath,
                 "/t:_SharpProofCleanupInvocation",
                 "/nologo",
                 "/nodeReuse:false",
-                "-p:_SharpProofInvocationDirectory=" + invocationRoot
-            ]);
+                "-p:Configuration=Release",
+                "-p:TargetFramework=net8.0",
+                "-p:_SharpProofInvocationId=" + invocationId
+            };
+            if (!string.IsNullOrEmpty(invocationDirectory))
+            {
+                arguments.Add(
+                    "-p:_SharpProofInvocationDirectory=" + invocationDirectory);
+            }
+            return RunDotNetAsync(arguments);
         }
 
         internal Task<BuildResult> RunNonBuildingInitializationAsync(
