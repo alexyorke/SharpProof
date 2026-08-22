@@ -315,6 +315,37 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task MemberInitializerSequencesStopAfterNonCompletion()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Fail() =>
+                    throw new InvalidOperationException();
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed class Subject {
+                private int first = Guard.Fail(), second = Guard.Positive(-1);
+                private int third = Guard.Positive(-2);
+                private int Fourth { get; } = Guard.Positive(-3);
+
+                private static int staticFirst = Guard.Fail();
+                private static int staticSecond = Guard.Positive(-4);
+                private static int StaticThird { get; } = Guard.Positive(-5);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task GeneratedInitializersAreNotAnalyzed()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
@@ -370,6 +401,42 @@ public sealed class RequiresAndControlTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task PrimaryConstructorBaseInitializerChecksViolatingOptionalDefault()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public class Base {
+                public Base(int value = -1) { Contract.Requires(value > 0); }
+            }
+            public sealed class Derived() : Base() { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task PrimaryConstructorBaseInitializerAcceptsSatisfyingOptionalDefault()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public class Base {
+                public Base(int value = 1) { Contract.Requires(value > 0); }
+            }
+            public sealed class Derived() : Base() { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
     }
 
     [Test]

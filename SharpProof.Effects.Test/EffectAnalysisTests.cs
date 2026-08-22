@@ -3570,6 +3570,9 @@ public sealed class EffectAnalysisTests
                 public void BindStatic() { Cell = ref StaticCell(); }
                 private static ref int IgnoreAndReturnStatic(ref int ignored) => ref s_cell;
                 public void BindMisleading(ref int cell) { Cell = ref IgnoreAndReturnStatic(ref cell); }
+                public RefAlias Source { set { Cell = ref value.Cell; } }
+                public int BindOnRead { get { Cell = ref StaticCell(); return 0; } }
+                public int BindOnSet { get => 0; set { Cell = ref StaticCell(); } }
                 public void Set() => Cell = 1;
                 public void Dispose() => Cell = 1;
             }
@@ -3618,6 +3621,21 @@ public sealed class EffectAnalysisTests
                     alias.BindMisleading(ref cell);
                     alias.Set();
                 }
+                public static void CopyPropertyThenMutate(RefAlias source) {
+                    RefAlias target = default;
+                    target.Source = source;
+                    target.Set();
+                }
+                public static void GetterThenMutate() {
+                    RefAlias alias = default;
+                    _ = alias.BindOnRead;
+                    alias.Set();
+                }
+                public static void CompoundSetterThenMutate() {
+                    RefAlias alias = default;
+                    alias.BindOnSet += 1;
+                    alias.Set();
+                }
                 public static void CopyReceiverThenMutate(RefAlias source) {
                     RefAlias target = default;
                     source.CopyTo(ref target);
@@ -3655,6 +3673,12 @@ public sealed class EffectAnalysisTests
             Method(compilation, "BindAmbientThenMutate")).Summary;
         var boundFromMisleadingCall = session.Analyze(
             Method(compilation, "BindMisleadingThenMutate")).Summary;
+        var copiedByProperty = session.Analyze(
+            Method(compilation, "CopyPropertyThenMutate")).Summary;
+        var reboundByGetter = session.Analyze(
+            Method(compilation, "GetterThenMutate")).Summary;
+        var reboundByCompoundSetter = session.Analyze(
+            Method(compilation, "CompoundSetterThenMutate")).Summary;
 
         using (Assert.EnterMultipleScope())
         {
@@ -3701,6 +3725,18 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 boundFromMisleadingCall.Writes.Contains(EffectRegionId.Static())
                 || boundFromMisleadingCall.Writes.IsUnknown,
+                Is.True);
+            Assert.That(
+                copiedByProperty.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(copiedByProperty.Writes.IsUnknown, Is.False);
+            Assert.That(
+                reboundByGetter.Writes.Contains(EffectRegionId.Static())
+                || reboundByGetter.Writes.IsUnknown,
+                Is.True);
+            Assert.That(
+                reboundByCompoundSetter.Writes.Contains(EffectRegionId.Static())
+                || reboundByCompoundSetter.Writes.IsUnknown,
                 Is.True);
         }
     }
@@ -4520,6 +4556,22 @@ public sealed class EffectAnalysisTests
             public sealed class DivergingDeconstructionTarget {
                 public int Value { set { while (true) { } } }
             }
+            public readonly struct PatternBomb {
+                public int Value { get { while (true) { } } }
+            }
+            public sealed class ReferencePatternBomb {
+                public int Value { get { while (true) { } } }
+            }
+            public sealed class ReferencePositionalPatternBomb {
+                public void Deconstruct(out int value) {
+                    value = 0;
+                    while (true) { }
+                }
+            }
+            public sealed class ReferenceListPatternBomb {
+                public int Length { get { while (true) { } } }
+                public int this[int index] => 0;
+            }
             public sealed class NullTarget {
                 public int Value;
                 public void Touch() { }
@@ -4770,12 +4822,21 @@ public sealed class EffectAnalysisTests
                 public static void ConstantRelationalSwitchCatch() { try { _ = 0 switch { >= 0 => new object(), _ => ThrowObject() }; } catch (InvalidOperationException) { s_state++; } }
                 public static void NaNSingleRelationalSwitchCatch() { try { _ = float.NaN switch { < 0f => ThrowObject(), _ => new object() }; } catch (InvalidOperationException) { s_state++; } }
                 public static void NaNDoubleRelationalSwitchCatch() { try { _ = double.NaN switch { < 0d => ThrowObject(), _ => new object() }; } catch (InvalidOperationException) { s_state++; } }
+                public static void ConstantLogicalSwitchExpressionCatch() { try { _ = 0 switch { not 1 => new object(), _ => ThrowObject() }; } catch (InvalidOperationException) { s_state++; } }
                 public static void AfterConstantUnmatchedSwitchExpression() { _ = 0 switch { 1 => 1 }; s_state++; }
                 public static void ConstantSwitchStatementCatch() { try { switch (0) { case 1: ThrowObject(); break; default: break; } } catch (InvalidOperationException) { s_state++; } }
+                public static void ConstantRelationalSwitchStatementCatch() { try { switch (0) { case >= 0: break; default: ThrowObject(); break; } } catch (InvalidOperationException) { s_state++; } }
+                public static void NaNSwitchStatementCatch() { try { switch (double.NaN) { case < 0d: ThrowObject(); break; default: break; } } catch (InvalidOperationException) { s_state++; } }
+                public static void ConstantLogicalSwitchStatementCatch() { try { switch (0) { case not 1: break; default: ThrowObject(); break; } } catch (InvalidOperationException) { s_state++; } }
                 public static void ThrowingSwitchExpressionGuard() { try { _ = 0 switch { 0 when ThrowBoolean() => new object(), _ => ThrowApplicationObject() }; } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void AfterThrowingTotalSwitchGuard(int value) { _ = value switch { _ when ThrowBoolean() => 1, _ => 2 }; s_state++; }
                 public static void VarPatternThrowingGuardBeforeFallback(int value) { try { _ = value switch { var captured when ThrowBoolean() => 1, _ => ThrowInteger() }; } catch (ArgumentException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void AfterDivergingPropertyPattern() { _ = new PatternBomb() switch { { Value: 0 } => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingReferencePropertyPattern() { _ = new ReferencePatternBomb() switch { { Value: 0 } => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingReferencePositionalPattern() { _ = new ReferencePositionalPatternBomb() switch { ReferencePositionalPatternBomb(0) => 1, _ => 2 }; s_state++; }
+                public static void AfterDivergingReferenceListPattern() { _ = new ReferenceListPatternBomb() switch { [] => 1, _ => 2 }; s_state++; }
                 public static void ThrowingSwitchStatementGuard() { try { switch (0) { case 0 when ThrowBoolean(): break; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void VarPatternThrowingSwitchGuard(int value) { try { switch (value) { case var captured when ThrowBoolean(): break; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void ThrowingSwitchStatementGuardBeforeGoto() { try { switch (0) { case 0 when ThrowBoolean(): goto default; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void ThrowingSwitchBodyBeforeGoto() { try { switch (0) { case 0: Fail(); goto default; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static void SwitchGotoOrdinaryLabel() { try { switch (0) { case 0: goto Done; throw new InvalidOperationException(); Done: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } }
@@ -4923,15 +4984,38 @@ public sealed class EffectAnalysisTests
                 HasStaticWrite("NaNDoubleRelationalSwitchCatch"),
                 Is.False);
             Assert.That(
+                HasStaticWrite("ConstantLogicalSwitchExpressionCatch"),
+                Is.False);
+            Assert.That(
                 HasStaticWrite("AfterConstantUnmatchedSwitchExpression"),
                 Is.False);
             Assert.That(HasStaticWrite("ConstantSwitchStatementCatch"), Is.False);
+            Assert.That(
+                HasStaticWrite("ConstantRelationalSwitchStatementCatch"),
+                Is.False);
+            Assert.That(HasStaticWrite("NaNSwitchStatementCatch"), Is.False);
+            Assert.That(
+                HasStaticWrite("ConstantLogicalSwitchStatementCatch"),
+                Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchExpressionGuard"), Is.False);
             Assert.That(HasStaticWrite("AfterThrowingTotalSwitchGuard"), Is.False);
             Assert.That(
                 HasStaticWrite("VarPatternThrowingGuardBeforeFallback"),
                 Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingPropertyPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingReferencePropertyPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingReferencePositionalPattern"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("AfterDivergingReferenceListPattern"),
+                Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchStatementGuard"), Is.False);
+            Assert.That(HasStaticWrite("VarPatternThrowingSwitchGuard"), Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchStatementGuardBeforeGoto"), Is.False);
             Assert.That(HasStaticWrite("ThrowingSwitchBodyBeforeGoto"), Is.False);
             Assert.That(HasStaticWrite("SwitchGotoOrdinaryLabel"), Is.True);

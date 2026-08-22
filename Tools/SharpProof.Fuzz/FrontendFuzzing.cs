@@ -1165,10 +1165,11 @@ public sealed class FrontendDifferentialOracle
         var emit = compilation.Emit(image, cancellationToken: cancellationToken);
         if (!emit.Success)
         {
-            return RepeatSemanticFailure(
-                cases.Count,
+            return IsolateSemanticEdgeFailure(
+                cases,
                 "Generated semantic-edge C# did not compile: " +
-                FormatErrors(emit.Diagnostics));
+                FormatErrors(emit.Diagnostics),
+                cancellationToken);
         }
 
         var model = compilation.GetSemanticModel(syntaxTree);
@@ -1178,15 +1179,22 @@ public sealed class FrontendDifferentialOracle
             .Where(static method => method.Identifier.ValueText.StartsWith(
                 SemanticEdgeMethodPrefix,
                 StringComparison.Ordinal))
-            .OrderBy(static method => ParseSemanticEdgeMethodIndex(
-                method.Identifier.ValueText))
             .ToArray();
-        if (methods.Length != cases.Count)
+        if (methods.Length != cases.Count ||
+            Enumerable.Range(0, cases.Count).Any(index =>
+                methods.All(method =>
+                    method.Identifier.ValueText !=
+                    SemanticEdgeMethodName(index))))
         {
-            return RepeatSemanticFailure(
-                cases.Count,
-                "Roslyn exposed an unexpected semantic-edge method count.");
+            return IsolateSemanticEdgeFailure(
+                cases,
+                "Roslyn exposed an unexpected semantic-edge method shape.",
+                cancellationToken);
         }
+        methods = Enumerable.Range(0, cases.Count)
+            .Select(index => methods.Single(method =>
+                method.Identifier.ValueText == SemanticEdgeMethodName(index)))
+            .ToArray();
 
         image.Position = 0;
         var loadContext = new AssemblyLoadContext(
@@ -1217,6 +1225,27 @@ public sealed class FrontendDifferentialOracle
         {
             loadContext.Unload();
         }
+    }
+
+    private ImmutableArray<FrontendSemanticEdgeResult>
+        IsolateSemanticEdgeFailure(
+            IReadOnlyList<FrontendSemanticEdgeCase> cases,
+            string detail,
+            CancellationToken cancellationToken)
+    {
+        if (cases.Count == 1)
+        {
+            return RepeatSemanticFailure(1, detail);
+        }
+
+        var midpoint = cases.Count / 2;
+        var left = CompareSemanticEdges(
+            cases.Take(midpoint).ToArray(),
+            cancellationToken);
+        var right = CompareSemanticEdges(
+            cases.Skip(midpoint).ToArray(),
+            cancellationToken);
+        return [.. left, .. right];
     }
 
     private static Dictionary<IrVarId, IrValue> CreateEnvironment(
@@ -1586,14 +1615,6 @@ public sealed class FrontendDifferentialOracle
     {
         return int.Parse(
             name.AsSpan("Target".Length),
-            NumberStyles.None,
-            CultureInfo.InvariantCulture);
-    }
-
-    private static int ParseSemanticEdgeMethodIndex(string name)
-    {
-        return int.Parse(
-            name.AsSpan(SemanticEdgeMethodPrefix.Length),
             NumberStyles.None,
             CultureInfo.InvariantCulture);
     }

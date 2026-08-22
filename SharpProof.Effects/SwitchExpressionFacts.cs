@@ -11,18 +11,23 @@ internal static class SwitchExpressionFacts
 {
     internal static IReadOnlyList<ISwitchExpressionArmOperation> GetReachableArms(
         ISwitchExpressionOperation operation,
-        Func<IOperation?, bool> canCompleteNormally)
+        Func<IOperation?, bool> canCompleteNormally,
+        bool inputDefinitelyNonNull = false)
     {
         if (!canCompleteNormally(operation.Value))
         {
             return [];
         }
 
+        inputDefinitelyNonNull |=
+            DefiniteOperationFacts.IsDefinitelyNonNull(operation.Value);
+
         if (operation.Value.ConstantValue is not { HasValue: true } constant)
         {
             return GetReachableArmsForUnknownValue(
                 operation,
-                canCompleteNormally);
+                canCompleteNormally,
+                inputDefinitelyNonNull);
         }
 
         var reachable = new List<ISwitchExpressionArmOperation>();
@@ -35,6 +40,11 @@ internal static class SwitchExpressionFacts
                 reachable.Add(arm);
             }
             if (selection == SwitchExpressionSelection.Always ||
+                IsPatternEvaluationUnavoidable(
+                    arm.Pattern,
+                    operation.Value.Type,
+                    inputDefinitelyNonNull) &&
+                !canCompleteNormally(arm.Pattern) ||
                 pattern == SwitchExpressionSelection.Always &&
                 arm.Guard != null &&
                 !canCompleteNormally(arm.Guard))
@@ -47,7 +57,8 @@ internal static class SwitchExpressionFacts
 
     internal static bool HasReachableUnmatchedPath(
         ISwitchExpressionOperation operation,
-        Func<IOperation?, bool> canCompleteNormally)
+        Func<IOperation?, bool> canCompleteNormally,
+        bool inputDefinitelyNonNull = false)
     {
         if (!canCompleteNormally(operation.Value))
         {
@@ -57,6 +68,8 @@ internal static class SwitchExpressionFacts
         {
             return false;
         }
+        inputDefinitelyNonNull |=
+            DefiniteOperationFacts.IsDefinitelyNonNull(operation.Value);
         if (operation.Value.ConstantValue is not { HasValue: true } constant)
         {
             foreach (var arm in operation.Arms)
@@ -66,6 +79,14 @@ internal static class SwitchExpressionFacts
                     operation.Value.Type);
                 var selection = ApplyGuard(pattern, arm.Guard);
                 if (selection == SwitchExpressionSelection.Always)
+                {
+                    return false;
+                }
+                if (IsPatternEvaluationUnavoidable(
+                        arm.Pattern,
+                        operation.Value.Type,
+                        inputDefinitelyNonNull) &&
+                    !canCompleteNormally(arm.Pattern))
                 {
                     return false;
                 }
@@ -87,6 +108,14 @@ internal static class SwitchExpressionFacts
             {
                 return false;
             }
+            if (IsPatternEvaluationUnavoidable(
+                    arm.Pattern,
+                    operation.Value.Type,
+                    inputDefinitelyNonNull) &&
+                !canCompleteNormally(arm.Pattern))
+            {
+                return false;
+            }
             if (pattern == SwitchExpressionSelection.Always &&
                 arm.Guard != null &&
                 !canCompleteNormally(arm.Guard))
@@ -105,10 +134,11 @@ internal static class SwitchExpressionFacts
         return ApplyGuard(pattern, arm.Guard);
     }
 
-    private static IReadOnlyList<ISwitchExpressionArmOperation>
+    private static List<ISwitchExpressionArmOperation>
         GetReachableArmsForUnknownValue(
             ISwitchExpressionOperation operation,
-            Func<IOperation?, bool> canCompleteNormally)
+            Func<IOperation?, bool> canCompleteNormally,
+            bool inputDefinitelyNonNull)
     {
         var reachable = new List<ISwitchExpressionArmOperation>();
         foreach (var arm in operation.Arms)
@@ -122,6 +152,11 @@ internal static class SwitchExpressionFacts
                 reachable.Add(arm);
             }
             if (selection == SwitchExpressionSelection.Always ||
+                IsPatternEvaluationUnavoidable(
+                    arm.Pattern,
+                    operation.Value.Type,
+                    inputDefinitelyNonNull) &&
+                !canCompleteNormally(arm.Pattern) ||
                 pattern == SwitchExpressionSelection.Always &&
                 arm.Guard != null &&
                 !canCompleteNormally(arm.Guard))
@@ -132,26 +167,73 @@ internal static class SwitchExpressionFacts
         return reachable;
     }
 
-    private static SwitchExpressionSelection GetPatternSelectionForUnknownValue(
+    internal static SwitchExpressionSelection GetPatternSelectionForUnknownValue(
         IPatternOperation pattern,
         ITypeSymbol? inputType)
+    {
+        return IsTotalPattern(pattern, inputType)
+                ? SwitchExpressionSelection.Always
+                : SwitchExpressionSelection.Maybe;
+    }
+
+    internal static bool IsTotalPattern(
+        IPatternOperation pattern,
+        ITypeSymbol? inputType,
+        bool inputDefinitelyNonNull = false)
     {
         if (pattern is IDiscardPatternOperation or
             IDeclarationPatternOperation { MatchesNull: true })
         {
-            return SwitchExpressionSelection.Always;
+            return true;
+        }
+        if (pattern is IListPatternOperation)
+        {
+            return inputType?.IsValueType == true || inputDefinitelyNonNull;
         }
         var matchedType = pattern switch
         {
             ITypePatternOperation typePattern => typePattern.MatchedType,
             IDeclarationPatternOperation declarationPattern =>
                 declarationPattern.MatchedType,
+            IRecursivePatternOperation recursive => recursive.MatchedType,
             _ => null
         };
-        return inputType?.IsValueType == true &&
-            SymbolEqualityComparer.Default.Equals(matchedType, inputType)
-                ? SwitchExpressionSelection.Always
-                : SwitchExpressionSelection.Maybe;
+        if (inputType?.IsValueType != true ||
+            !SymbolEqualityComparer.Default.Equals(matchedType, inputType))
+        {
+            return false;
+        }
+        return pattern is not IRecursivePatternOperation recursivePattern ||
+            recursivePattern.DeconstructionSubpatterns.All(
+                subpattern => IsTotalPattern(
+                    subpattern,
+                    subpattern.InputType)) &&
+            recursivePattern.PropertySubpatterns.All(
+                subpattern => IsTotalPattern(
+                    subpattern.Pattern,
+                    subpattern.Pattern.InputType));
+    }
+
+    internal static bool IsPatternEvaluationUnavoidable(
+        IPatternOperation pattern,
+        ITypeSymbol? inputType,
+        bool inputDefinitelyNonNull = false)
+    {
+        if (pattern is IDiscardPatternOperation or
+            IDeclarationPatternOperation { MatchesNull: true })
+        {
+            return true;
+        }
+        var matchedType = pattern switch
+        {
+            ITypePatternOperation typePattern => typePattern.MatchedType,
+            IDeclarationPatternOperation declarationPattern =>
+                declarationPattern.MatchedType,
+            IRecursivePatternOperation recursive => recursive.MatchedType,
+            _ => null
+        };
+        return (inputType?.IsValueType == true || inputDefinitelyNonNull) &&
+            SymbolEqualityComparer.Default.Equals(matchedType, inputType);
     }
 
     private static SwitchExpressionSelection ApplyGuard(
@@ -189,8 +271,63 @@ internal static class SwitchExpressionFacts
                 matches
                     ? SwitchExpressionSelection.Always
                     : SwitchExpressionSelection.Never,
+            INegatedPatternOperation negated =>
+                Negate(GetPatternSelection(negated.Pattern, value)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.And =>
+                And(
+                    GetPatternSelection(binary.LeftPattern, value),
+                    GetPatternSelection(binary.RightPattern, value)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.Or =>
+                Or(
+                    GetPatternSelection(binary.LeftPattern, value),
+                    GetPatternSelection(binary.RightPattern, value)),
+            _ when IsTotalPattern(pattern, pattern.InputType) =>
+                SwitchExpressionSelection.Always,
             _ => SwitchExpressionSelection.Maybe
         };
+    }
+
+    private static SwitchExpressionSelection Negate(
+        SwitchExpressionSelection selection)
+    {
+        return selection switch
+        {
+            SwitchExpressionSelection.Never => SwitchExpressionSelection.Always,
+            SwitchExpressionSelection.Always => SwitchExpressionSelection.Never,
+            _ => SwitchExpressionSelection.Maybe
+        };
+    }
+
+    private static SwitchExpressionSelection And(
+        SwitchExpressionSelection left,
+        SwitchExpressionSelection right)
+    {
+        if (left == SwitchExpressionSelection.Never ||
+            right == SwitchExpressionSelection.Never)
+        {
+            return SwitchExpressionSelection.Never;
+        }
+        return left == SwitchExpressionSelection.Always &&
+            right == SwitchExpressionSelection.Always
+                ? SwitchExpressionSelection.Always
+                : SwitchExpressionSelection.Maybe;
+    }
+
+    private static SwitchExpressionSelection Or(
+        SwitchExpressionSelection left,
+        SwitchExpressionSelection right)
+    {
+        if (left == SwitchExpressionSelection.Always ||
+            right == SwitchExpressionSelection.Always)
+        {
+            return SwitchExpressionSelection.Always;
+        }
+        return left == SwitchExpressionSelection.Never &&
+            right == SwitchExpressionSelection.Never
+                ? SwitchExpressionSelection.Never
+                : SwitchExpressionSelection.Maybe;
     }
 
     private static bool TryMatchRelationalConstants(

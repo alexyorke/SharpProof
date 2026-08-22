@@ -191,6 +191,112 @@ internal sealed class ConversionOwnershipClassifier
                     }
                 }
 
+                if (TryGetPropertySetter(
+                        operation,
+                        out var property,
+                        out var storedValue,
+                        out var valueIsStoredDirectly) &&
+                    property is
+                    {
+                        Instance: { } propertyInstance,
+                        Property.SetMethod: { } setter
+                    } &&
+                    DefiniteOperationFacts.UnwrapHarmlessValue(
+                        propertyInstance) is ILocalReferenceOperation
+                        propertyReceiver &&
+                    propertyReceiver.Local.Type.IsRefLikeType)
+                {
+                    var setterRegions = ClassifyRegion(
+                        propertyInstance,
+                        aliasSource: true);
+                    if (storedValue?.Type?.IsRefLikeType == true)
+                    {
+                        setterRegions = setterRegions.Union(ClassifyRegion(
+                            storedValue,
+                            aliasSource: true));
+                    }
+                    if (!valueIsStoredDirectly &&
+                        property.Type?.IsRefLikeType == true)
+                    {
+                        setterRegions = setterRegions.Union(
+                            EffectRegionSet.Unknown);
+                    }
+                    foreach (var argument in property.Arguments)
+                    {
+                        if (argument.Parameter?.RefKind is
+                                RefKind.Ref or RefKind.Out ||
+                            argument.Value.Type?.IsRefLikeType == true)
+                        {
+                            setterRegions = setterRegions.Union(ClassifyRegion(
+                                argument.Value,
+                                aliasSource: true));
+                        }
+                    }
+                    if (MethodMayIntroduceUnknownRefAlias(setter))
+                    {
+                        setterRegions = setterRegions.Union(
+                            EffectRegionSet.Unknown);
+                    }
+
+                    var receiverLocal = propertyReceiver.Local;
+                    var previousRegions = _localRegions.TryGetValue(
+                        receiverLocal,
+                        out var existingRegions)
+                            ? existingRegions
+                            : EffectRegionSet.Empty;
+                    var joinedRegions = previousRegions.Union(setterRegions);
+                    if (joinedRegions != previousRegions)
+                    {
+                        _localRegions[receiverLocal] = joinedRegions;
+                        changed = true;
+                    }
+                }
+
+                if (operation is IPropertyReferenceOperation
+                    {
+                        Instance: { } getterInstance,
+                        Property.GetMethod: { } getter
+                    } propertyAccess &&
+                    !IsSimpleSetterTarget(propertyAccess) &&
+                    DefiniteOperationFacts.UnwrapHarmlessValue(
+                        getterInstance) is ILocalReferenceOperation
+                        getterReceiver &&
+                    getterReceiver.Local.Type.IsRefLikeType)
+                {
+                    var getterRegions = ClassifyRegion(
+                        getterInstance,
+                        aliasSource: true);
+                    foreach (var argument in propertyAccess.Arguments)
+                    {
+                        if (argument.Parameter?.RefKind is
+                                RefKind.Ref or RefKind.Out ||
+                            argument.Value.Type?.IsRefLikeType == true)
+                        {
+                            getterRegions = getterRegions.Union(ClassifyRegion(
+                                argument.Value,
+                                aliasSource: true));
+                        }
+                    }
+                    if (MethodMayIntroduceUnknownRefAlias(getter))
+                    {
+                        getterRegions = getterRegions.Union(
+                            EffectRegionSet.Unknown);
+                    }
+
+                    var receiverLocal = getterReceiver.Local;
+                    var previousRegions = _localRegions.TryGetValue(
+                        receiverLocal,
+                        out var existingRegions)
+                            ? existingRegions
+                            : EffectRegionSet.Empty;
+                    var joinedRegions = previousRegions.Union(getterRegions);
+                    if (joinedRegions != previousRegions)
+                    {
+                        _localRegions[receiverLocal] = joinedRegions;
+                        changed = true;
+                    }
+                }
+
                 (ILocalSymbol? Target, IOperation? Value) source = operation switch
                 {
                     IVariableDeclaratorOperation declarator =>
@@ -234,6 +340,38 @@ internal sealed class ConversionOwnershipClassifier
                 changed = true;
             }
         }
+    }
+
+    private static bool IsSimpleSetterTarget(
+        IPropertyReferenceOperation property)
+    {
+        return property.Parent is ISimpleAssignmentOperation assignment &&
+            ReferenceEquals(assignment.Target, property);
+    }
+
+    private static bool TryGetPropertySetter(
+        IOperation operation,
+        out IPropertyReferenceOperation? property,
+        out IOperation? storedValue,
+        out bool valueIsStoredDirectly)
+    {
+        (property, storedValue, valueIsStoredDirectly) = operation switch
+        {
+            ISimpleAssignmentOperation
+                { Target: IPropertyReferenceOperation target } assignment =>
+                (target, assignment.Value, true),
+            ICoalesceAssignmentOperation
+                { Target: IPropertyReferenceOperation target } assignment =>
+                (target, assignment.Value, true),
+            ICompoundAssignmentOperation
+                { Target: IPropertyReferenceOperation target } assignment =>
+                (target, assignment.Value, false),
+            IIncrementOrDecrementOperation
+                { Target: IPropertyReferenceOperation target } =>
+                (target, null, false),
+            _ => default
+        };
+        return property?.Property.SetMethod != null;
     }
 
     internal static bool IsInsideNestedCallable(IOperation operation, IOperation root)
@@ -293,9 +431,13 @@ internal sealed class ConversionOwnershipClassifier
                     method.OriginalDefinition),
             IFieldReferenceOperation { Field.IsStatic: false, Instance: { } instance } =>
                 IsCallMappedRefSource(instance, method),
-            IConditionalOperation conditional =>
-                IsCallMappedRefSource(conditional.WhenTrue, method) &&
-                IsCallMappedRefSource(conditional.WhenFalse, method),
+            IConditionalOperation
+                {
+                    WhenTrue: { } whenTrue,
+                    WhenFalse: { } whenFalse
+                } =>
+                IsCallMappedRefSource(whenTrue, method) &&
+                IsCallMappedRefSource(whenFalse, method),
             _ => false
         };
     }

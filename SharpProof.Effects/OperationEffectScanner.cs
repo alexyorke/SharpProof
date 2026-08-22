@@ -812,14 +812,20 @@ internal sealed partial class OperationEffectScanner
         var arms = EffectSummary.Empty;
         foreach (var arm in SwitchExpressionFacts.GetReachableArms(
                      switchExpression,
-                     _completionEvaluator.CanCompleteNormally))
+                     _completionEvaluator.CanCompleteNormally,
+                     _nullnessEvaluator.IsProvenNonNull(
+                         switchExpression.Value,
+                         switchExpression)))
         {
             arms = EffectSummaryDomain.Instance.Join(arms, Scan(arm));
         }
 
         var unmatched = SwitchExpressionFacts.HasReachableUnmatchedPath(
             switchExpression,
-            _completionEvaluator.CanCompleteNormally)
+            _completionEvaluator.CanCompleteNormally,
+            _nullnessEvaluator.IsProvenNonNull(
+                switchExpression.Value,
+                switchExpression))
                 ? Throw(FrameworkTypeMetadataNames.SwitchExpressionException)
                 : EffectSummary.Empty;
         return EffectSummaryOperations.Join(value.Summary, arms, unmatched);

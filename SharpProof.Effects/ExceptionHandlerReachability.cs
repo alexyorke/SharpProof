@@ -136,7 +136,12 @@ internal sealed class ExceptionHandlerReachability(
             {
                 if (SwitchExpressionFacts.HasReachableUnmatchedPath(
                         switchExpression,
-                        canCompleteNormally))
+                        canCompleteNormally,
+                        DefiniteOperationFacts.IsDefinitelyNonNull(
+                            switchExpression.Value) ||
+                        abstractFlow?.ProvesNonNull(
+                            switchExpression,
+                            switchExpression.Value) == true))
                 {
                     Add(
                         _switchExpressionExceptionType is { } exceptionType
@@ -283,7 +288,13 @@ internal sealed class ExceptionHandlerReachability(
             }
             if (operation is IEventAssignmentOperation eventAssignment)
             {
-                var eventReference = eventAssignment.EventReference;
+                if (eventAssignment.EventReference is not
+                    IEventReferenceOperation eventReference)
+                {
+                    Add(UnknownPotential, eventAssignment);
+                    PushChildren(eventAssignment);
+                    continue;
+                }
                 var prerequisitesComplete =
                     eventReference.Instance is not { } receiver ||
                     canCompleteNormally(receiver);
@@ -655,40 +666,43 @@ internal sealed class ExceptionHandlerReachability(
                 }
                 continue;
             }
-            if (operation is IPropertyReferenceOperation property)
+            if (operation is IPropertyReferenceOperation propertyReference)
             {
-                if (property.Parent is ISimpleAssignmentOperation simple &&
-                    ReferenceEquals(simple.Target, property))
+                if (propertyReference.Parent is ISimpleAssignmentOperation
+                        enclosingAssignment &&
+                    ReferenceEquals(
+                        enclosingAssignment.Target,
+                        propertyReference))
                 {
-                    PushChildren(property);
+                    PushChildren(propertyReference);
                     continue;
                 }
                 var prerequisitesComplete =
-                    property.Instance is not { } receiver ||
+                    propertyReference.Instance is not { } receiver ||
                     canCompleteNormally(receiver);
-                prerequisitesComplete &= property.Arguments.All(argument =>
-                    canCompleteNormally(argument.Value));
+                prerequisitesComplete &= propertyReference.Arguments.All(
+                    argument => canCompleteNormally(argument.Value));
                 var dereferenceCompletes = prerequisitesComplete;
                 if (prerequisitesComplete &&
-                    property.Instance is { } instance)
+                    propertyReference.Instance is { } instance)
                 {
                     Add(
                         GetPotentialNullReceiver(
-                            property,
+                            propertyReference,
                             instance,
                             out dereferenceCompletes),
-                        property);
+                        propertyReference);
                 }
                 if (dereferenceCompletes)
                 {
-                    var accessors = GetAccessors(property).ToArray();
+                    var accessors = GetAccessors(propertyReference).ToArray();
                     var initializationCompletes = true;
                     if (accessors.Length != 0)
                     {
                         initializationCompletes =
                             AddStaticInitializationPotential(
-                            property.Property,
-                            property,
+                            propertyReference.Property,
+                            propertyReference,
                             Add);
                     }
                     if (initializationCompletes)
@@ -703,36 +717,39 @@ internal sealed class ExceptionHandlerReachability(
                                         accessor,
                                         activeMethods,
                                         depth + 1),
-                                property);
+                                propertyReference);
                         }
                     }
                 }
-                PushChildren(property);
+                PushChildren(propertyReference);
                 continue;
             }
-            if (operation is IFieldReferenceOperation field)
+            if (operation is IFieldReferenceOperation fieldReference)
             {
-                if (field.Instance is { } fieldInstance)
+                if (fieldReference.Instance is { } fieldInstance)
                 {
                     Add(
                         GetPotentialNullReceiver(
-                            field,
+                            fieldReference,
                             fieldInstance,
                             out _),
-                        field);
+                        fieldReference);
                 }
                 else
                 {
-                    if (field.Parent is not ISimpleAssignmentOperation simple ||
-                        !ReferenceEquals(simple.Target, field))
+                    if (fieldReference.Parent is not
+                            ISimpleAssignmentOperation enclosingAssignment ||
+                        !ReferenceEquals(
+                            enclosingAssignment.Target,
+                            fieldReference))
                     {
                         AddStaticInitializationPotential(
-                            field.Field,
-                            field,
+                            fieldReference.Field,
+                            fieldReference,
                             Add);
                     }
                 }
-                PushChildren(field);
+                PushChildren(fieldReference);
                 continue;
             }
             if (operation is IArrayElementReferenceOperation element)
@@ -1063,19 +1080,13 @@ internal sealed class ExceptionHandlerReachability(
                 case ISwitchOperation @switch:
                     if (canCompleteNormally(@switch.Value))
                     {
-                        if (@switch.Value.ConstantValue is
-                            { HasValue: true } constant)
-                        {
-                            PushAll(GetReachableSwitchCases(
-                                @switch,
-                                constant.Value,
-                                scheduledSwitchBodies,
-                                switchCaseReachability));
-                        }
-                        else
-                        {
-                            PushAll(@switch.Cases);
-                        }
+                        var constant = @switch.Value.ConstantValue;
+                        PushAll(GetReachableSwitchCases(
+                            @switch,
+                            constant.HasValue,
+                            constant.Value,
+                            scheduledSwitchBodies,
+                            switchCaseReachability));
                     }
                     remaining.Push(@switch.Value);
                     return;
@@ -1092,37 +1103,14 @@ internal sealed class ExceptionHandlerReachability(
                 case ISwitchExpressionOperation @switch:
                     if (canCompleteNormally(@switch.Value))
                     {
-                        if (@switch.Value.ConstantValue is
-                            { HasValue: true } constant)
-                        {
-                            var reachableArms = new List<
-                                ISwitchExpressionArmOperation>();
-                            foreach (var arm in @switch.Arms)
-                            {
-                                var pattern = GetPatternSelection(
-                                    arm.Pattern,
-                                    constant.Value);
-                                var selection = GetSwitchArmSelection(
-                                    arm,
-                                    constant.Value);
-                                if (selection != SwitchSelection.Never)
-                                {
-                                    reachableArms.Add(arm);
-                                }
-                                if (selection == SwitchSelection.Always ||
-                                    pattern == SwitchSelection.Always &&
-                                    arm.Guard != null &&
-                                    !canCompleteNormally(arm.Guard))
-                                {
-                                    break;
-                                }
-                            }
-                            PushAll(reachableArms);
-                        }
-                        else
-                        {
-                            PushAll(@switch.Arms);
-                        }
+                        PushAll(SwitchExpressionFacts.GetReachableArms(
+                            @switch,
+                            canCompleteNormally,
+                            DefiniteOperationFacts.IsDefinitelyNonNull(
+                                @switch.Value) ||
+                            abstractFlow?.ProvesNonNull(
+                                @switch,
+                                @switch.Value) == true));
                     }
                     remaining.Push(@switch.Value);
                     return;
@@ -1130,49 +1118,34 @@ internal sealed class ExceptionHandlerReachability(
                     PushSequential(operation.ChildOperations);
                     return;
             }
-
-            void PushSequential(IEnumerable<IOperation> children)
-            {
-                var reachable = new List<IOperation>();
-                foreach (var child in children)
-                {
-                    reachable.Add(child);
-                    if (!canCompleteNormally(child))
-                    {
-                        break;
-                    }
-                }
-                PushAll(reachable);
-            }
-
-            void PushAll(IEnumerable<IOperation> children)
-            {
-                foreach (var child in children.Reverse())
-                {
-                    remaining.Push(child);
-                }
-            }
         }
-    }
 
-    private static SwitchSelection GetSwitchArmSelection(
-        ISwitchExpressionArmOperation arm,
-        object? value)
-    {
-        var pattern = GetPatternSelection(arm.Pattern, value);
-        if (pattern == SwitchSelection.Never || arm.Guard == null)
+        void PushSequential(IEnumerable<IOperation> children)
         {
-            return pattern;
+            var reachable = new List<IOperation>();
+            foreach (var child in children)
+            {
+                reachable.Add(child);
+                if (!canCompleteNormally(child))
+                {
+                    break;
+                }
+            }
+            PushAll(reachable);
         }
-        return arm.Guard.ConstantValue is { HasValue: true, Value: bool guard }
-            ? guard
-                ? pattern
-                : SwitchSelection.Never
-            : SwitchSelection.Maybe;
+
+        void PushAll(IEnumerable<IOperation> children)
+        {
+            foreach (var child in children.Reverse())
+            {
+                remaining.Push(child);
+            }
+        }
     }
 
-    private IReadOnlyList<ISwitchCaseOperation> GetReachableSwitchCases(
+    private ISwitchCaseOperation[] GetReachableSwitchCases(
         ISwitchOperation @switch,
+        bool hasConstant,
         object? value,
         HashSet<ISwitchCaseOperation> scheduledSwitchBodies,
         Dictionary<ISwitchCaseOperation, SwitchCaseReachability>
@@ -1181,6 +1154,9 @@ internal sealed class ExceptionHandlerReachability(
         var selected = new Dictionary<
             ISwitchCaseOperation,
             SwitchCaseReachability>();
+        var inputDefinitelyNonNull =
+            DefiniteOperationFacts.IsDefinitelyNonNull(@switch.Value) ||
+            abstractFlow?.ProvesNonNull(@switch, @switch.Value) == true;
         ISwitchCaseOperation? defaultCase = null;
         var definiteMatch = false;
         foreach (var @case in @switch.Cases)
@@ -1197,19 +1173,28 @@ internal sealed class ExceptionHandlerReachability(
                 }
                 var patternSelection = clause is
                     IPatternCaseClauseOperation patternClause
-                        ? GetPatternSelection(patternClause.Pattern, value)
+                        ? GetPatternSelection(
+                            patternClause.Pattern,
+                            @switch.Value.Type,
+                            hasConstant,
+                            value)
                         : SwitchSelection.Never;
                 var clauseSelection = clause switch
                 {
                     ISingleValueCaseClauseOperation single
-                        when single.Value.ConstantValue is
+                        when hasConstant &&
+                            single.Value.ConstantValue is
                             { HasValue: true } item =>
                         Equals(value, item.Value)
                             ? SwitchSelection.Always
                             : SwitchSelection.Never,
                     IPatternCaseClauseOperation pattern =>
                         ApplySwitchGuard(
-                            GetPatternSelection(pattern.Pattern, value),
+                            GetPatternSelection(
+                                pattern.Pattern,
+                                @switch.Value.Type,
+                                hasConstant,
+                                value),
                             pattern.Guard),
                     _ => SwitchSelection.Maybe
                 };
@@ -1221,6 +1206,12 @@ internal sealed class ExceptionHandlerReachability(
                         clauseSelection);
                 }
                 stopsSelection |= clauseSelection == SwitchSelection.Always ||
+                    clause is IPatternCaseClauseOperation barrierClause &&
+                    SwitchExpressionFacts.IsPatternEvaluationUnavoidable(
+                        barrierClause.Pattern,
+                        @switch.Value.Type,
+                        inputDefinitelyNonNull) &&
+                    !canCompleteNormally(barrierClause.Pattern) ||
                     patternSelection == SwitchSelection.Always &&
                     clause is IPatternCaseClauseOperation
                         { Guard: not null } guarded &&
@@ -1301,7 +1292,7 @@ internal sealed class ExceptionHandlerReachability(
             candidate.Syntax.Span.Contains(target.Span));
     }
 
-    private IReadOnlyList<IOperation>? GetGotoTargetContinuation(
+    private IOperation[]? GetGotoTargetContinuation(
         IBranchOperation branch)
     {
         var target = branch.Target.DeclaringSyntaxReferences
@@ -1349,7 +1340,11 @@ internal sealed class ExceptionHandlerReachability(
             return false;
         }
         if (clause is not IPatternCaseClauseOperation pattern ||
-            pattern.Guard == null)
+            !canCompleteNormally(pattern.Pattern))
+        {
+            return false;
+        }
+        if (pattern.Guard == null)
         {
             return true;
         }
@@ -1361,17 +1356,22 @@ internal sealed class ExceptionHandlerReachability(
 
     private static SwitchSelection GetPatternSelection(
         IPatternOperation pattern,
+        ITypeSymbol? inputType,
+        bool hasConstant,
         object? value)
     {
-        return pattern switch
+        var selection = hasConstant
+            ? SwitchExpressionFacts.GetPatternSelection(pattern, value)
+            : SwitchExpressionFacts.GetPatternSelectionForUnknownValue(
+                pattern,
+                inputType);
+        return selection switch
         {
-            IDiscardPatternOperation => SwitchSelection.Always,
-            IConstantPatternOperation constant
-                when constant.Value.ConstantValue is { HasValue: true } item =>
-                Equals(value, item.Value)
-                    ? SwitchSelection.Always
-                    : SwitchSelection.Never,
-            _ => SwitchSelection.Maybe
+            SwitchExpressionSelection.Never => SwitchSelection.Never,
+            SwitchExpressionSelection.Maybe => SwitchSelection.Maybe,
+            SwitchExpressionSelection.Always => SwitchSelection.Always,
+            _ => throw new InvalidOperationException(
+                "Unknown switch-pattern selection.")
         };
     }
 

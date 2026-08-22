@@ -2216,6 +2216,22 @@ $mutations = @(
         Filter = 'FullyQualifiedName~FrontendBatchCompileFailureIsIsolatedToInvalidCase'
     },
     [pscustomobject]@{
+        Name = 'frontend-semantic-edge-compile-failure-isolation'
+        File = 'Tools\SharpProof.Fuzz\FrontendFuzzing.cs'
+        Original = '        if (cases.Count == 1)'
+        Mutated = '        if (true)'
+        Project = 'SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj'
+        Filter = 'FullyQualifiedName~CompileInvalidSemanticEdgeDoesNotPoisonValidPeer'
+    },
+    [pscustomobject]@{
+        Name = 'frontend-semantic-edge-shape-failure-isolation'
+        File = 'Tools\SharpProof.Fuzz\FrontendFuzzing.cs'
+        Original = '        if (methods.Length != cases.Count ||'
+        Mutated = '        if (true ||'
+        Project = 'SharpProof.Fuzz.Test\SharpProof.Fuzz.Test.csproj'
+        Filter = 'FullyQualifiedName~CompileSuccessfulSemanticEdgeInjectionDoesNotPoisonValidPeer'
+    },
+    [pscustomobject]@{
         Name = 'verifier-output-drain-rechecks-interruption'
         File = 'SharpProof.BuildTasks\RunVerifier.cs'
         Original = 'if (isInterrupted())'

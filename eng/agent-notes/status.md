@@ -15,7 +15,7 @@ Current architecture:
   `SharpProof.Verifier`.
 
 Static acceptance is green for deterministic generation, schema/catalog pins,
-the 259-entry mutation catalog identity, the 336-path TCB inventory, frozen
+the 261-entry mutation catalog identity, the 339-path TCB inventory, frozen
 preview interface, and structural complexity. Broad Debug and full Release
 acceptance are also green.
 

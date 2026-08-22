@@ -58,18 +58,22 @@ internal static partial class RequiresCallSiteAnalyzer
             return AnalyzerSemanticOutcome.NotApplicable;
         }
 
-        var target = semanticModel.GetSymbolInfo(
-                initializer,
-                cancellationToken)
-            .Symbol as IMethodSymbol;
-        var arguments = initializer.ArgumentList.Arguments
-            .Select(argument => semanticModel.GetOperation(
-                argument,
-                cancellationToken) as IArgumentOperation)
-            .ToImmutableArray();
-        var origin = arguments.IsDefaultOrEmpty
-            ? semanticModel.GetOperation(initializer, cancellationToken)
-            : arguments[0];
+        var initializerOperation = semanticModel.GetOperation(
+            initializer,
+            cancellationToken);
+        var target = initializerOperation is IInvocationOperation invocation
+            ? invocation.TargetMethod
+            : semanticModel.GetSymbolInfo(initializer, cancellationToken)
+                .Symbol as IMethodSymbol;
+        var arguments = initializerOperation is IInvocationOperation baseCall
+            ? baseCall.Arguments.Cast<IArgumentOperation?>().ToImmutableArray()
+            : initializer.ArgumentList.Arguments
+                .Select(argument => semanticModel.GetOperation(
+                    argument,
+                    cancellationToken) as IArgumentOperation)
+                .ToImmutableArray();
+        var origin = initializerOperation ??
+            (arguments.IsDefaultOrEmpty ? null : arguments[0]);
         if (target == null || origin == null ||
             arguments.Any(static argument => argument == null))
         {

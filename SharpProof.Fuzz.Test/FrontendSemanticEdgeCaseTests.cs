@@ -129,6 +129,60 @@ public sealed class FrontendSemanticEdgeCaseTests
         }
     }
 
+    [Test]
+    public void CompileInvalidSemanticEdgeDoesNotPoisonValidPeer()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact("long", "", "long.MaxValue + 1L")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
+    public void CompileSuccessfulSemanticEdgeInjectionDoesNotPoisonValidPeer()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact(
+                "long",
+                "",
+                "0L; public static long EdgeTarget999() => 0L")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
+    public void NonnumericSemanticEdgeInjectionDoesNotEscapeBatchIsolation()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact(
+                "long",
+                "",
+                "0L; public static long EdgeTargetOops() => 0L")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
     private static FrontendSemanticEdgeCase Exact(
         string returnType,
         string parameters,

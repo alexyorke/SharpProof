@@ -12,7 +12,8 @@ using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
-public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTask
+public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
+    ICancelableTask, IDisposable
 {
     internal const int LauncherProcessReserveMilliseconds = 1000;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
@@ -43,10 +44,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
     private bool _canceled;
 
     internal Func<int, int>? OpenPidFdOverride { get; set; }
-    internal Func<Process?, int, int, bool>? TryTerminateOverride
-        { get; set; }
-    internal Action<string>? ContainmentAuthenticationFailureOverride
-        { get; set; }
+    internal Func<Process?, int, int, bool>? TryTerminateOverride { get; set; }
+    internal Action<string>? ContainmentAuthenticationFailureOverride { get; set; }
 
     internal static int RetainedCleanupAnchorCount =>
         RetainedCleanupAnchors.Count;
@@ -85,6 +84,13 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
         }
     }
 
+    public void Dispose()
+    {
+        _cancellationSignal.Dispose();
+        _outputLimitSignal.Dispose();
+        _process?.Dispose();
+    }
+
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
@@ -120,7 +126,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
             var processStopwatch = Stopwatch.StartNew();
             var resolvedExecutable = ResolveDotNetHost(Executable);
             supervisorNonce = Convert.ToHexString(
-                RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+                RandomNumberGenerator.GetBytes(32)).ToUpperInvariant();
             process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -675,7 +681,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICance
                 LauncherProcessReserveMilliseconds)).ConfigureAwait(false);
         return ReferenceEquals(completed, output) &&
             output.IsCompletedSuccessfully
-                ? output.Result
+                ? await output.ConfigureAwait(false)
                 : null;
     }
 

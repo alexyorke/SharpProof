@@ -39,6 +39,18 @@ dotnet_style_collection_initializer = true:suggestion
 dotnet_style_object_initializer = true:suggestion
 dotnet_style_prefer_collection_expression = true:suggestion
 
+[SharpProof.BuildTasks/InvalidatePublishedResult.cs]
+dotnet_diagnostic.CA1515.severity = none
+
+[SharpProof.BuildTasks/ResetPublishedVerification.cs]
+dotnet_diagnostic.CA1515.severity = none
+
+[SharpProof.BuildTasks/RunVerifier.cs]
+dotnet_diagnostic.CA1515.severity = none
+
+[SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs]
+dotnet_diagnostic.CA1515.severity = none
+
 [SharpProof.Dataflow/IntervalDomain.cs]
 dotnet_diagnostic.CA1822.severity = none
 

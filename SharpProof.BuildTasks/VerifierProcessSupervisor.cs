@@ -313,7 +313,7 @@ internal static partial class VerifierProcessSupervisor
     private static bool IsDescendant(
         int processId,
         int supervisorId,
-        IReadOnlyDictionary<int, int> parents)
+        Dictionary<int, int> parents)
     {
         var seen = new HashSet<int>();
         for (var current = processId;

@@ -488,6 +488,15 @@ internal static partial class AnalyzerFeaturePipeline
         var operationFacts = new DefiniteOperationFacts(
             context.Compilation,
             context.CancellationToken);
+        if (!CanReachMemberInitializer(
+                initializer,
+                isStatic,
+                context.SemanticModel,
+                operationFacts,
+                context.CancellationToken))
+        {
+            return;
+        }
         foreach (var operation in RequiresCallSiteDiscovery
                      .ExecutableUnflowedDescendantsAndSelf(
                          root,
@@ -501,6 +510,89 @@ internal static partial class AnalyzerFeaturePipeline
                     context.ReportDiagnostic, context.CancellationToken));
         }
         session.RecordSemanticOutcome(constructor, outcome);
+    }
+
+    private static bool CanReachMemberInitializer(
+        EqualsValueClauseSyntax target,
+        bool isStatic,
+        SemanticModel semanticModel,
+        DefiniteOperationFacts operationFacts,
+        CancellationToken cancellationToken)
+    {
+        var containingType = target.FirstAncestorOrSelf<TypeDeclarationSyntax>();
+        var targetMember = target.FirstAncestorOrSelf<MemberDeclarationSyntax>();
+        if (containingType == null || targetMember == null)
+        {
+            return true;
+        }
+
+        foreach (var member in containingType.Members)
+        {
+            foreach (var initializer in GetMemberInitializers(member))
+            {
+                if (initializer.SyntaxTree == target.SyntaxTree &&
+                    initializer.Span == target.Span)
+                {
+                    return true;
+                }
+                if (!HasMatchingInitializationKind(
+                        initializer,
+                        isStatic,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    continue;
+                }
+                var operation = semanticModel.GetOperation(
+                    initializer.Value,
+                    cancellationToken);
+                if (operation != null &&
+                    !operationFacts.MayCompleteNormally(operation))
+                {
+                    return false;
+                }
+            }
+            if (member.SyntaxTree == targetMember.SyntaxTree &&
+                member.Span == targetMember.Span)
+            {
+                return true;
+            }
+        }
+        return true;
+    }
+
+    private static IEnumerable<EqualsValueClauseSyntax> GetMemberInitializers(
+        MemberDeclarationSyntax member)
+    {
+        return member switch
+        {
+            BaseFieldDeclarationSyntax field => field.Declaration.Variables
+                .Select(static variable => variable.Initializer)
+                .OfType<EqualsValueClauseSyntax>(),
+            PropertyDeclarationSyntax { Initializer: { } initializer } =>
+                [initializer],
+            _ => []
+        };
+    }
+
+    private static bool HasMatchingInitializationKind(
+        EqualsValueClauseSyntax initializer,
+        bool isStatic,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var symbol = initializer.Parent switch
+        {
+            VariableDeclaratorSyntax variable => semanticModel.GetDeclaredSymbol(
+                variable,
+                cancellationToken),
+            PropertyDeclarationSyntax property => semanticModel.GetDeclaredSymbol(
+                property,
+                cancellationToken),
+            _ => null
+        };
+        return symbol is IFieldSymbol or IPropertySymbol or IEventSymbol &&
+            symbol.IsStatic == isStatic;
     }
 
     private static bool ValidateContractClauses(

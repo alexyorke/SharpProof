@@ -57,8 +57,8 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 259,
-    "expectedCatalogSha256": "9ffdd04c0d9b7e4548f6d420747aeeb1cd5239b590f33fd8dfa18c7da55b412e"
+    "expectedCatalogCount": 261,
+    "expectedCatalogSha256": "66c1d833f29a5f6f6997ba443f0d3f077b6d1094f16b7ba28deeeee32fa5fa81"
   },
   "worker": {
     "protocolVersion": 11,
@@ -209,7 +209,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-      "inventorySha256": "f3d4f92362b477b3ec7271d247e8ff07eb5a90bbefe2f199414a2f79014b6694",
+      "inventorySha256": "5b950efa02e78389ba815ebb7e3cb9a7f0c42b532fff1303618ec1a370661fd4",
     "components": [
       {
         "name": "discovery",
@@ -500,6 +500,9 @@
           "SharpProof.Effects/ConversionOwnershipClassifier.cs",
           "SharpProof.Effects/OperationEffectScanner.Assignments.cs",
           "SharpProof.Effects/OperationEffectScanner.cs",
+          "SharpProof.Effects/OperationCompletionEvaluator.cs",
+          "SharpProof.Effects/ExceptionHandlerReachability.cs",
+          "SharpProof.Effects/SwitchExpressionFacts.cs",
           "SharpProof.Effects/PropertyDispatchFacts.cs",
           "SharpProof.Effects/EffectExceptionFlow.cs",
           "SharpProof.Effects/ManagedAbstractFlow.cs",

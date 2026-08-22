@@ -100,6 +100,19 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteConditional(conditional),
             ISwitchExpressionOperation switchExpression =>
                 CanCompleteSwitchExpression(switchExpression),
+            ISwitchExpressionArmOperation arm =>
+                CanCompletePatternEvaluation(
+                    arm.Pattern,
+                    IsPatternInputDefinitelyNonNull(arm.Pattern)) &&
+                (arm.Guard == null || CanCompleteNormally(arm.Guard)) &&
+                CanCompleteNormally(arm.Value),
+            IPropertySubpatternOperation propertySubpattern =>
+                CanCompleteNormally(propertySubpattern.Member) &&
+                CanCompletePatternEvaluation(propertySubpattern.Pattern),
+            IPatternOperation pattern =>
+                CanCompletePatternEvaluation(
+                    pattern,
+                    IsPatternInputDefinitelyNonNull(pattern)),
             IBlockOperation or IExpressionStatementOperation or
                 IReturnOperation or IVariableDeclarationGroupOperation or
                 IVariableDeclarationOperation or IVariableDeclaratorOperation or
@@ -119,10 +132,102 @@ internal sealed class OperationCompletionEvaluator
 
         return SwitchExpressionFacts.GetReachableArms(
                 switchExpression,
-                CanCompleteNormally)
-            .Any(arm =>
-                (arm.Guard == null || CanCompleteNormally(arm.Guard)) &&
-                CanCompleteNormally(arm.Value));
+                CanCompleteNormally,
+                _isProvenNonNull(
+                    switchExpression.Value,
+                    switchExpression))
+            .Any(CanCompleteNormally);
+    }
+
+    private bool CanCompletePatternEvaluation(
+        IPatternOperation pattern,
+        bool inputDefinitelyNonNull = false)
+    {
+        if (pattern is IListPatternOperation listPattern &&
+            (pattern.InputType?.IsValueType == true ||
+             inputDefinitelyNonNull) &&
+            listPattern.LengthSymbol is IPropertySymbol
+            {
+                GetMethod: { } lengthGetter
+            } &&
+            !CanMethodCompleteNormally(lengthGetter))
+        {
+            return false;
+        }
+        if (pattern is not IRecursivePatternOperation recursive ||
+            pattern.InputType?.IsValueType != true &&
+                !inputDefinitelyNonNull ||
+            !SymbolEqualityComparer.Default.Equals(
+                recursive.MatchedType,
+                pattern.InputType))
+        {
+            return true;
+        }
+        if (recursive.DeconstructSymbol is IMethodSymbol deconstruct &&
+            !CanMethodCompleteNormally(deconstruct))
+        {
+            return false;
+        }
+        foreach (var subpattern in recursive.DeconstructionSubpatterns)
+        {
+            if (!CanCompletePatternEvaluation(subpattern) &&
+                SwitchExpressionFacts.IsTotalPattern(
+                    subpattern,
+                    subpattern.InputType))
+            {
+                return false;
+            }
+            if (!SwitchExpressionFacts.IsTotalPattern(
+                    subpattern,
+                    subpattern.InputType))
+            {
+                return true;
+            }
+        }
+        foreach (var subpattern in recursive.PropertySubpatterns)
+        {
+            if (!CanCompleteNormally(subpattern.Member))
+            {
+                return false;
+            }
+            if (!CanCompletePatternEvaluation(subpattern.Pattern) &&
+                SwitchExpressionFacts.IsTotalPattern(
+                    subpattern.Pattern,
+                    subpattern.Pattern.InputType))
+            {
+                return false;
+            }
+            if (!SwitchExpressionFacts.IsTotalPattern(
+                    subpattern.Pattern,
+                    subpattern.Pattern.InputType))
+            {
+                return true;
+            }
+        }
+        return true;
+    }
+
+    private bool IsPatternInputDefinitelyNonNull(IPatternOperation pattern)
+    {
+        IOperation? switchValue = null;
+        IOperation? origin = null;
+        if (pattern.Parent is ISwitchExpressionArmOperation arm &&
+            arm.Parent is ISwitchExpressionOperation switchExpression)
+        {
+            switchValue = switchExpression.Value;
+            origin = switchExpression;
+        }
+        else if (pattern.Parent is IPatternCaseClauseOperation clause &&
+            clause.Parent is ISwitchCaseOperation @case &&
+            @case.Parent is ISwitchOperation switchStatement)
+        {
+            switchValue = switchStatement.Value;
+            origin = switchStatement;
+        }
+
+        return switchValue != null && origin != null &&
+            (DefiniteOperationFacts.IsDefinitelyNonNull(switchValue) ||
+             _isProvenNonNull(switchValue, origin));
     }
 
     internal bool CanCompleteInvocation(
@@ -382,7 +487,7 @@ internal sealed class OperationCompletionEvaluator
             }
         }
 
-        return info.Conversion.Method is not { } conversion ||
+        return info.Conversion?.MethodSymbol is not { } conversion ||
             CanMethodCompleteNormally(conversion);
     }
 
