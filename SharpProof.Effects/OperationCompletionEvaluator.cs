@@ -54,6 +54,9 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteNormally(capture.Value),
             IArgumentOperation argument =>
                 CanCompleteNormally(argument.Value),
+            ISimpleAssignmentOperation assignment =>
+                CanCompleteWriteTarget(assignment.Target) &&
+                CanCompleteNormally(assignment.Value),
             IParenthesizedOperation parenthesized =>
                 CanCompleteNormally(parenthesized.Operand),
             IConversionOperation conversion =>
@@ -126,6 +129,28 @@ internal sealed class OperationCompletionEvaluator
         return CanCompleteNormally(element.ArrayReference) &&
             !_isProvenNull(element.ArrayReference, element) &&
             element.Indices.All(CanCompleteNormally);
+    }
+
+    private bool CanCompleteWriteTarget(IOperation target)
+    {
+        return target switch
+        {
+            IFieldReferenceOperation field =>
+                CanCompleteField(field),
+            IArrayElementReferenceOperation element =>
+                CanCompleteArrayElement(element),
+            IPropertyReferenceOperation property
+                when property.Property.SetMethod is { } setter =>
+                CanCompleteInvocation(
+                    setter,
+                    property.Instance,
+                    property,
+                    property.Arguments),
+            ILocalReferenceOperation or
+                IParameterReferenceOperation or
+                IDiscardOperation => true,
+            _ => true
+        };
     }
 
     internal bool CanCompleteConstruction(IObjectCreationOperation creation)

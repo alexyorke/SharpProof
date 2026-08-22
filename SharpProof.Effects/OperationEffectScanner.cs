@@ -211,9 +211,8 @@ internal sealed class OperationEffectScanner
             IArrayElementReferenceOperation element => ScanArrayElement(element, access),
             ICoalesceAssignmentOperation assignment =>
                 ScanCoalesceAssignment(assignment),
-            ISimpleAssignmentOperation assignment => EffectSummaryOperations.Join(
-                Scan(assignment.Value),
-                ScanWriteTarget(assignment.Target, assignment.Value)),
+            ISimpleAssignmentOperation assignment =>
+                ScanSimpleAssignment(assignment),
             ICompoundAssignmentOperation assignment => ScanCompoundAssignment(assignment),
             IIncrementOrDecrementOperation increment => EffectSummaryOperations.Join(
                 Scan(increment.Target, EffectAccess.Read),
@@ -445,6 +444,49 @@ internal sealed class OperationEffectScanner
             _ => EffectSummaryOperations.Join(
                 Scan(target),
                 EffectSummaryOperations.Unsupported())
+        };
+    }
+
+    private EffectSummary ScanSimpleAssignment(
+        ISimpleAssignmentOperation assignment)
+    {
+        var result = ScanWriteTargetEvaluation(assignment.Target);
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        result = result.Then(ScanStep(assignment.Value));
+        return !result.CompletesNormally
+            ? result.Summary
+            : result.Then(new EffectStep(
+                ScanWriteTarget(assignment.Target, assignment.Value),
+                true)).Summary;
+    }
+
+    private EffectStep ScanWriteTargetEvaluation(IOperation target)
+    {
+        target = _coalesceCaptures.Resolve(target);
+        return target switch
+        {
+            IFieldReferenceOperation { Instance: { } instance } =>
+                ScanStep(instance),
+            IArrayElementReferenceOperation element =>
+                ScanStep(element.ArrayReference).Then(
+                    ScanSequence(element.Indices)),
+            IPropertyReferenceOperation property =>
+                ScanSequence(
+                    property.Instance == null
+                        ? property.Arguments.Select(
+                            static argument => argument.Value)
+                        : new[] { property.Instance }.Concat(
+                            property.Arguments.Select(
+                                static argument => argument.Value))),
+            IFieldReferenceOperation or
+                ILocalReferenceOperation or
+                IParameterReferenceOperation or
+                IDiscardOperation => EffectStep.Empty,
+            _ => ScanStep(target)
         };
     }
 

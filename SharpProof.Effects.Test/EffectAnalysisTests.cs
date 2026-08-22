@@ -6066,6 +6066,79 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ThrowingAssignmentValueSuppressesTargetWrite()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                private static int s_state;
+
+                public static void Assign() {
+                    s_state = Fail();
+                    s_state++;
+                }
+
+                private static int Fail() =>
+                    throw new System.InvalidOperationException();
+            }
+            """,
+            "Sample",
+            "Assign");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
+    public void AssignmentTargetEvaluationPrecedesThrowingValue()
+    {
+        var result = Analyze(
+            """
+            public sealed class Box {
+                public int[] Values = new int[1];
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                public static void Assign(Box box) {
+                    box.Values[RecordIndex()] = Fail();
+                }
+
+                private static int RecordIndex() {
+                    s_state++;
+                    return 0;
+                }
+
+                private static int Fail() =>
+                    throw new System.InvalidOperationException();
+            }
+            """,
+            "Sample",
+            "Assign");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.False);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void EffectsAfterDefiniteNoncompletionAreSuppressed()
     {
         var compilation = EffectTestHost.CreateCompilation(
