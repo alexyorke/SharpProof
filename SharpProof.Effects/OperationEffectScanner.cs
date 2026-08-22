@@ -815,9 +815,19 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanBinary(IBinaryOperation binary)
     {
-        return EffectSummaryOperations.Join(
-            Scan(binary.LeftOperand),
-            Scan(binary.RightOperand),
+        var operands = ScanStep(binary.LeftOperand);
+        if (!operands.CompletesNormally)
+        {
+            return operands.Summary;
+        }
+
+        operands = operands.Then(ScanStep(binary.RightOperand));
+        if (!operands.CompletesNormally)
+        {
+            return operands.Summary;
+        }
+
+        var operation = EffectSummaryOperations.Join(
             StringConcatenationEffectResolver.Resolve(
                 binary,
                 _session.Compilation,
@@ -831,6 +841,7 @@ internal sealed class OperationEffectScanner
                 binary.OperatorMethod,
                 [binary.LeftOperand, binary.RightOperand],
                 binary));
+        return operands.Then(new EffectStep(operation, true)).Summary;
     }
 
     private EffectSummary ScanInterpolatedString(

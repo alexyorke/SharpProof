@@ -6139,6 +6139,39 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ThrowingLeftBinaryOperandSuppressesRightOperandEffects()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                private static int s_state;
+
+                public static int Evaluate() => Fail() + Mutate();
+
+                private static int Fail() =>
+                    throw new System.InvalidOperationException();
+
+                private static int Mutate() {
+                    s_state++;
+                    return 1;
+                }
+            }
+            """,
+            "Sample",
+            "Evaluate");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void EffectsAfterDefiniteNoncompletionAreSuppressed()
     {
         var compilation = EffectTestHost.CreateCompilation(
