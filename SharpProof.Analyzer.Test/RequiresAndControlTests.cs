@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 
 namespace SharpProof.Analyzer.Test;
@@ -258,12 +259,21 @@ public sealed class RequiresAndControlTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using SharpProof.Attributes;
-            public static class Guard { public static int Positive(int value) { Contract.Requires(value > 0); return value; } }
+            public static class Guard {
+                public static int Invalid {
+                    get { Contract.Requires(false); return 0; }
+                }
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
             public sealed class Subject {
                 private int instanceField = Guard.Positive(-1);
                 private static int staticField = Guard.Positive(-2);
                 private int InstanceProperty { get; } = Guard.Positive(-3);
                 private static int StaticProperty { get; } = Guard.Positive(-4);
+                private int accessor = Guard.Invalid;
                 private int valid = Guard.Positive(1);
                 public Subject() { }
                 public Subject(int value) { }
@@ -274,7 +284,7 @@ public sealed class RequiresAndControlTests
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 4)));
+            Is.EqualTo(Enumerable.Repeat("SP0027", 5)));
     }
 
     [Test]
@@ -333,6 +343,488 @@ public sealed class RequiresAndControlTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task PrimaryConstructorBaseArgumentsCheckNestedCalls()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base {
+                public Base(int value) { }
+            }
+            public sealed class Derived(int marker) :
+                Base(Guard.Positive(-1)) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task PrimaryConstructorSkipsUnreachableNestedCalls()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base { public Base(int value) { } }
+            public sealed class Derived(int marker) :
+                Base(false ? Guard.Positive(-1) : 0) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task PrimaryConstructorStopsAfterNonCompletingArgument()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base {
+                public Base(string text, int value) {
+                    Contract.Requires(false);
+                }
+            }
+            public sealed class Derived(int marker) : Base(
+                (string?)null ?? throw new InvalidOperationException(),
+                Guard.Positive(-1)) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task PrimaryConstructorHonorsNestedEvaluationOrder()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+                public static int Fail() =>
+                    throw new InvalidOperationException();
+                public static bool FailBool() =>
+                    throw new InvalidOperationException();
+                public static Box Wrap(int value) {
+                    Contract.Requires(false);
+                    return new Box();
+                }
+            }
+            public sealed class Box {
+                public int A { get; set; }
+                public int B { get; set; }
+            }
+            public sealed class CheckedBox {
+                public CheckedBox(int value) {
+                    Contract.Requires(false);
+                }
+            }
+            public class BoxBase { public BoxBase(Box value) { } }
+            public class CheckedBase { public CheckedBase(CheckedBox value) { } }
+            public sealed class InitializerDerived(int marker) : BoxBase(
+                new Box {
+                    A = Guard.Fail(),
+                    B = Guard.Positive(-1)
+                }) { }
+            public sealed class InvocationDerived(int marker) : BoxBase(
+                Guard.Wrap(Guard.Fail())) { }
+            public sealed class CreationDerived(int marker) : CheckedBase(
+                new CheckedBox(Guard.Fail())) { }
+            public sealed class ConditionalDerived(int marker) : CheckedBase(
+                Guard.FailBool()
+                    ? new CheckedBox(Guard.Positive(-1))
+                    : new CheckedBox(0)) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task PrimaryConstructorStopsAtNonCompletingSwitchGuard()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+                public static bool FailBool() =>
+                    throw new InvalidOperationException();
+            }
+            public class Base { public Base(int value) { } }
+            public sealed class Derived(int marker) : Base(
+                0 switch {
+                    _ when Guard.FailBool() => Guard.Positive(-1),
+                    _ => 0
+                }) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task GeneratedCodeAttributeSuppressesMemberInitializerCalls()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.CodeDom.Compiler;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            [GeneratedCode("test", "1")]
+            public sealed class GeneratedSubject {
+                private int _value = Guard.Positive(-1);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+        var propertyDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.CodeDom.Compiler;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed class Subject {
+                [GeneratedCode("test", "1")]
+                private int Value { get; } = Guard.Positive(-1);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(propertyDiagnostics, Is.Empty);
+        }
+    }
+
+    [Test]
+    public async Task ControlSuppressionAppliesToMemberInitializers()
+    {
+        var suppressed = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+                public static Action Create(int value) {
+                    Contract.Requires(value > 0);
+                    return () => { };
+                }
+            }
+            [SharpProofSuppress("reviewed initializers")]
+            public sealed class Subject {
+                private int _field = Guard.Positive(-1);
+                private int Property { get; } = Guard.Positive(-1);
+                private event Action Changed = Guard.Create(-1);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+        var mixed = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed class Subject {
+                private int _field = Guard.Positive(-1);
+                [SharpProofSuppress("reviewed constructor")]
+                public Subject() { }
+                public Subject(int value) { }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(suppressed, Is.Empty);
+            Assert.That(
+                mixed.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0027"]));
+        }
+    }
+
+    [Test]
+    public async Task NonGeneratedConstructorRetainsMemberInitializerCalls()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.CodeDom.Compiler;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed class Subject {
+                private int _value = Guard.Positive(-1);
+
+                [GeneratedCode("test", "1")]
+                public Subject() { }
+
+                public Subject(int value) { }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task FieldLikeEventInitializersCheckRequires()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static Action Create(int value) {
+                    Contract.Requires(value > 0);
+                    return () => { };
+                }
+            }
+            public sealed class Subject {
+                private event Action Changed = Guard.Create(-1);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task GeneratedPartialConstructorSuppressesMemberInitializerCalls()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed partial class Subject {
+                private int _value = Guard.Positive(-1);
+            }
+            """,
+            ["SP0027"],
+            filePath: "Subject.cs");
+        compilation = compilation.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(
+                """
+                public sealed partial class Subject {
+                    public Subject() { }
+                }
+                """,
+                (CSharpParseOptions)compilation.SyntaxTrees.Single().Options,
+                path: "Subject.g.cs"));
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            "contracts");
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task UnflowedCallDiscoverySkipsNonexecutedOperations()
+    {
+        var lambda = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base { public Base(Func<int> value) { } }
+            public sealed class Derived(int marker) :
+                Base(() => Guard.Positive(-1)) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+        var switchArm = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base { public Base(int value) { } }
+            public sealed class Derived(int marker) : Base(
+                0 switch { 0 => 0, _ => Guard.Positive(-1) }) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+        var relationalSwitchArm = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base { public Base(int value) { } }
+            public sealed class Derived(int marker) : Base(
+                0 switch { > 0 => Guard.Positive(-1), _ => 0 }) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+        var typeSwitchArm = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base { public Base(int value) { } }
+            public sealed class Derived(int marker) : Base(
+                "value" switch {
+                    string => 0,
+                    _ => Guard.Positive(-1)
+                }) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+        var nanRelationalArm = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base { public Base(int value) { } }
+            public sealed class Derived(int marker) : Base(
+                double.NaN switch {
+                    < 0.0 => Guard.Positive(-1),
+                    _ => 0
+                }) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+        var nanDefaultArm = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base { public Base(int value) { } }
+            public sealed class Derived(int marker) : Base(
+                double.NaN switch {
+                    < 0.0 => 0,
+                    _ => Guard.Positive(-1)
+                }) { }
+            """,
+            "contracts",
+            ["SP0027"]);
+        var initializer = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed class Subject {
+                private int _value = false ? Guard.Positive(-1) : 0;
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                lambda.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0027"]),
+                "The lambda body is analyzed as its own callable, but the " +
+                "primary-constructor traversal must not duplicate it.");
+            Assert.That(switchArm, Is.Empty);
+            Assert.That(relationalSwitchArm, Is.Empty);
+            Assert.That(typeSwitchArm, Is.Empty);
+            Assert.That(nanRelationalArm, Is.Empty);
+            Assert.That(
+                nanDefaultArm.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0027"]));
+            Assert.That(initializer, Is.Empty);
+        }
     }
 
     [Test]

@@ -273,8 +273,7 @@ function Get-ValidatedRelease {
         $manifest `
         'packageVersion' `
         'Release manifest')
-    if ($version -notmatch
-        '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+    if (-not (Test-SharpProofReleaseVersionSyntax -Version $version)) {
         throw "Release manifest package version is invalid: '$version'."
     }
     Test-SharpProofReleaseVersion `
@@ -725,6 +724,71 @@ function Invoke-NuGetPush {
     }
 }
 
+function New-SharpProofPublicationStage {
+    param(
+        [Parameter(Mandatory = $true)][object]$Plan,
+        [Parameter(Mandatory = $true)][object]$InputSnapshot,
+        [Parameter(Mandatory = $true)][string]$RepositoryCommit
+    )
+
+    Test-SharpProofPublicationInputSnapshot -Snapshot $InputSnapshot
+    $stageRoot = Join-Path `
+        ([IO.Path]::GetTempPath()) `
+        ('sharpproof-publish-' + [Guid]::NewGuid().ToString('N'))
+    try {
+        [IO.Directory]::CreateDirectory($stageRoot) | Out-Null
+        & chmod 0700 -- $stageRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not protect the private publication staging directory.'
+        }
+
+        foreach ($entry in @($InputSnapshot.entries)) {
+            $destination = Join-Path `
+                $stageRoot `
+                ([IO.Path]::GetFileName([string]$entry.path))
+            [IO.File]::Copy([string]$entry.path, $destination, $false)
+            & chmod 0400 -- $destination
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not protect staged publication input '$destination'."
+            }
+        }
+
+        $stagedRelease = Get-ValidatedRelease `
+            -Directory $stageRoot `
+            -RepositoryCommit $RepositoryCommit
+        $stagedArtifacts = @(New-SharpProofPublicationPlanIdentities `
+            -Packages @($stagedRelease.packages) `
+            -Directory $stageRoot `
+            -Version $stagedRelease.version `
+            -RepositoryCommit $RepositoryCommit)
+        $stagedPlan = $Plan.PSObject.Copy()
+        $stagedPlan.artifacts = $stagedArtifacts
+        Test-SharpProofPublicationPlanIdentity -Plan $stagedPlan
+
+        $identityProperties = @(
+            'fileName','bytes','sha256','role','version','repositoryCommit')
+        $expectedIdentities = @($Plan.artifacts | Select-Object $identityProperties) |
+            ConvertTo-Json -Compress
+        $stagedIdentities = @($stagedArtifacts | Select-Object $identityProperties) |
+            ConvertTo-Json -Compress
+        if ($stagedIdentities -cne $expectedIdentities) {
+            throw 'Staged publication bytes do not match the certified release plan.'
+        }
+
+        return [pscustomobject]@{
+            Root = $stageRoot
+            Release = $stagedRelease
+            Plan = $stagedPlan
+        }
+    }
+    catch {
+        if (Test-Path -LiteralPath $stageRoot -PathType Container) {
+            Remove-Item -LiteralPath $stageRoot -Recurse -Force
+        }
+        throw
+    }
+}
+
 function Write-PublicationPlan {
     param(
         [Parameter(Mandatory = $true)]
@@ -807,6 +871,7 @@ $baseAddress = $null
 if (-not $PlanOnly) {
     $baseAddress = Get-V3PackageBaseAddress `
         -ServiceIndex $publicationDestination.mainDestination
+    $publicationDestination.packageBaseAddress = $baseAddress
 }
 $entries = [Collections.Generic.List[object]]::new()
 $fixtureCatalog = if ($publicationDestination.mode -ceq 'fixture') {
@@ -892,8 +957,8 @@ $plan = [pscustomobject][ordered]@{
         -Version $release.version `
         -RepositoryCommit $repositoryHead)
 }
+Test-SharpProofPublicationPlanIdentity -Plan $plan
 if ($PlanOnly) {
-    Test-SharpProofPublicationPlanIdentity -Plan $plan
     Write-PublicationPlan `
         -Plan $plan `
         -OutputPath $resolvedPlanOutputPath `
@@ -912,23 +977,38 @@ $effectiveSymbolApiKey = if (
 else {
     $SymbolApiKey
 }
-for ($index = 0; $index -lt $release.packages.Count; $index++) {
-    $package = $release.packages[$index]
-    Write-Host (
-        "Publishing $($package.packageId) $($package.version) " +
-        "main package.")
-    Invoke-NuGetPush `
-        -Path $package.mainPath `
-        -Destination $publicationDestination.mainDestination `
-        -Key $ApiKey `
-        -NoSymbols $true
-    Write-Host (
-        "Publishing $($package.packageId) $($package.version) " +
-        "symbol package.")
-    Invoke-NuGetPush `
-        -Path $package.symbolsPath `
-        -Destination $publicationDestination.symbolDestination `
-        -Key $effectiveSymbolApiKey `
-        -NoSymbols $false
+$publicationStage = New-SharpProofPublicationStage `
+    -Plan $plan `
+    -InputSnapshot $publicationInputSnapshot `
+    -RepositoryCommit $repositoryHead
+try {
+    for ($index = 0; $index -lt $publicationStage.Release.packages.Count; $index++) {
+        $package = $publicationStage.Release.packages[$index]
+        Test-SharpProofPublicationPlanIdentity `
+            -Plan $publicationStage.Plan
+        Write-Host (
+            "Publishing $($package.packageId) $($package.version) " +
+            "main package.")
+        Invoke-NuGetPush `
+            -Path $package.mainPath `
+            -Destination $publicationDestination.mainDestination `
+            -Key $ApiKey `
+            -NoSymbols $true
+        Test-SharpProofPublicationPlanIdentity `
+            -Plan $publicationStage.Plan
+        Write-Host (
+            "Publishing $($package.packageId) $($package.version) " +
+            "symbol package.")
+        Invoke-NuGetPush `
+            -Path $package.symbolsPath `
+            -Destination $publicationDestination.symbolDestination `
+            -Key $effectiveSymbolApiKey `
+            -NoSymbols $false
+    }
+}
+finally {
+    if (Test-Path -LiteralPath $publicationStage.Root -PathType Container) {
+        Remove-Item -LiteralPath $publicationStage.Root -Recurse -Force
+    }
 }
 Write-PublicationPlan -Plan $plan

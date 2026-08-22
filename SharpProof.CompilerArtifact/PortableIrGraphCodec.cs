@@ -230,6 +230,7 @@ internal static partial class PortableIrGraphCodec
         private readonly EncodingTable<IrMemberId, PortableIrMember> _members;
         private readonly EncodingTable<OperationId, PortableIrOperation> _operations;
         private readonly EncodingTable<IrId, PortableIrTerm> _terms;
+        private readonly Dictionary<IrId, int> _termDepths = [];
         private IrBasicBlock[] _blocks = [];
         private Dictionary<IrBlockId, int> _blockIndices = [];
         private Dictionary<IrInstructionId, int> _instructionIndices = [];
@@ -364,6 +365,22 @@ internal static partial class PortableIrGraphCodec
 
         private int TypeIndex(IrTypeId id)
         {
+            var depth = 0;
+            for (var current = id; ;)
+            {
+                depth++;
+                if (depth > MaximumGraphDepth)
+                {
+                    throw Bad("Portable IR type depth exceeds the supported limit.");
+                }
+                var info = _factory.GetTypeInfo(current);
+                if (info.Kind != IrTypeKind.Sequence ||
+                    !info.ElementType.HasValue)
+                {
+                    break;
+                }
+                current = info.ElementType.Value;
+            }
             return _types.Add(id);
         }
 
@@ -385,6 +402,14 @@ internal static partial class PortableIrGraphCodec
         private int TermIndex(IrTerm term)
         {
             _factory.EnsureTerm(term, nameof(term));
+            if (_terms.Indices.TryGetValue(term.Id, out var existing))
+            {
+                return existing;
+            }
+            if (IrTermAnalysis.GetDepth(term, _termDepths) > MaximumGraphDepth)
+            {
+                throw Bad("Portable IR term depth exceeds the supported limit.");
+            }
             return _terms.Add(term.Id);
         }
 

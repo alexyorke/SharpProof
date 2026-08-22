@@ -372,7 +372,11 @@
     "excludedReferenceTypeKinds": [
       "Delegate"
     ],
-    "excludeAbstractReferenceTypes": true,
+    "excludedSpecialTypes": [
+      "System_Delegate",
+      "System_MulticastDelegate"
+    ],
+    "excludeAbstractReferenceTypes": false,
     "specialTypes": [
       "System_Boolean"
     ]

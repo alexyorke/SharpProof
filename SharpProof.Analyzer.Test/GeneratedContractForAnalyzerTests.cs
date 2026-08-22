@@ -211,7 +211,7 @@ public sealed class GeneratedContractForAnalyzerTests
     }
 
     [Test]
-    public async Task GeneratedFinalValidationUsesAuthoritativeAliasOrder()
+    public async Task GeneratedFinalValidationRejectsConflictingAliases()
     {
         const string malformed = """
             using SharpProof.Attributes;
@@ -235,13 +235,21 @@ public sealed class GeneratedContractForAnalyzerTests
                 ["sharpproof_profile"] = "invalid",
                 ["build_property.SharpProofProfile"] = "advisory"
             });
+        var matching = await AnalyzeGeneratedAsync(
+            malformed,
+            globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["sharpproof_profile"] = " advisory ",
+                ["build_property.SharpProofProfile"] = "ADVISORY"
+            });
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                conflicting.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SPCF0004"]));
+            Assert.That(conflicting, Is.Empty);
             Assert.That(invalid, Is.Empty);
+            Assert.That(
+                matching.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SPCF0004"]));
         }
     }
 

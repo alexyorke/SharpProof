@@ -334,7 +334,7 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(14));
+            Assert.That(artifact.SchemaVersion, Is.EqualTo(15));
             Assert.That(artifact.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
@@ -941,14 +941,15 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
-    [TestCase("advisory", "off", "all", true)]
+    [TestCase("advisory", "off", "all", false)]
     [TestCase("off", "advisory", "all", false)]
     [TestCase("invalid", "advisory", "all", false)]
     [TestCase("   ", "off", "all", false)]
-    [TestCase(" AdViSoRy ", "strict", "contracts", true)]
-    [TestCase("advisory", "strict", "effects", true)]
+    [TestCase(" AdViSoRy ", "strict", "contracts", false)]
+    [TestCase("advisory", "strict", "effects", false)]
     [TestCase("advisory", "strict", "invalid", false)]
-    public async Task CollectorUsesAuthoritativeConfigurationAliasOrder(
+    [TestCase(" strict ", "strict", "all", true)]
+    public async Task CollectorRejectsConflictingConfigurationAliases(
         string rawProfile,
         string buildProfile,
         string features,

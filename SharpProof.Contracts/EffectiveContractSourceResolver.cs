@@ -22,7 +22,7 @@ internal sealed class EffectiveContractSourceResolver
     private readonly ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> _companions;
     private readonly ConcurrentDictionary<
         IMethodSymbol, EffectiveContractSourceResolution> _cache =
-        new(SymbolEqualityComparer.Default);
+        new(SymbolEqualityComparer.IncludeNullability);
 
     internal EffectiveContractSourceResolver(
         Compilation compilation,

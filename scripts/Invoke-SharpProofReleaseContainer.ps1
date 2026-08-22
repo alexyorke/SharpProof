@@ -21,6 +21,7 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 
 function Require-Environment([string]$Name) {
     $value = [Environment]::GetEnvironmentVariable($Name)
@@ -31,18 +32,10 @@ function Require-Environment([string]$Name) {
 }
 
 function Resolve-RepositoryPath([string]$Path) {
-    $candidate = if ([IO.Path]::IsPathRooted($Path)) {
-        $Path
-    }
-    else {
-        Join-Path $repositoryRoot $Path
-    }
-    $resolved = [IO.Path]::GetFullPath($candidate)
-    $prefix = $repositoryRoot + [IO.Path]::DirectorySeparatorChar
-    if (-not $resolved.StartsWith($prefix, [StringComparison]::Ordinal)) {
-        throw "Path must be inside the repository: $resolved"
-    }
-    return $resolved
+    return Resolve-SharpProofContainedPath `
+        -Root $repositoryRoot `
+        -Path $Path `
+        -ParameterName 'Release path'
 }
 
 switch ($Mode) {
@@ -99,11 +92,32 @@ switch ($Mode) {
     'WriteQualificationEvidence' {
         $commit = Require-Environment 'GITHUB_SHA'
         $tag = Require-Environment 'GITHUB_REF_NAME'
+        $packageRoot = Resolve-RepositoryPath $PackageSource
         $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
         if ($commit -cne $head) {
             throw "Qualification commit '$commit' does not match checkout HEAD '$head'."
         }
-        if (@(& git -C $repositoryRoot status --porcelain).Count -ne 0) {
+        $trackedChanges = @(& git -C $repositoryRoot status --porcelain `
+                --untracked-files=no)
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Qualification could not inspect tracked checkout state.'
+        }
+        $packageRelativePath = [IO.Path]::GetRelativePath(
+            $repositoryRoot,
+            $packageRoot).Replace('\', '/')
+        $allUntrackedChanges = @(& git -C $repositoryRoot ls-files `
+                --others --exclude-standard -- .)
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Qualification could not inspect untracked checkout state.'
+        }
+        $packagePrefix = $packageRelativePath.TrimEnd('/') + '/'
+        $untrackedChanges = @($allUntrackedChanges | Where-Object {
+                -not $_.StartsWith(
+                    $packagePrefix,
+                    [StringComparison]::Ordinal)
+            })
+        if ($trackedChanges.Count -ne 0 -or
+            $untrackedChanges.Count -ne 0) {
             throw 'Qualification requires a clean checkout.'
         }
         $version = Get-SharpProofReleaseVersion `
@@ -118,7 +132,6 @@ switch ($Mode) {
                 $head) {
             throw 'Qualification requires an annotated tag at checkout HEAD.'
         }
-        $packageRoot = Resolve-RepositoryPath $PackageSource
         & (Join-Path $repositoryRoot `
             'scripts/Test-SharpProofReleaseArtifacts.ps1') `
             -PackageSource $packageRoot `

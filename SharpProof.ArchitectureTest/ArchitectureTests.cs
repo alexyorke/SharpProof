@@ -2278,10 +2278,15 @@ public sealed class ArchitectureTests
             .GetProperty("fuzz")
             .GetProperty("nightlyCases")
             .GetInt32();
+        var maximumCampaignCases = contract.RootElement
+            .GetProperty("fuzz")
+            .GetProperty("maximumCampaignCases")
+            .GetInt32();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(nightlyCases, Is.Positive);
+            Assert.That(maximumCampaignCases, Is.GreaterThan(nightlyCases));
             Assert.That(workflow, Does.Contain("tooling fuzz-nightly"));
             Assert.That(
                 Directory.EnumerateFiles(
@@ -2303,15 +2308,19 @@ public sealed class ArchitectureTests
                     .And.Contain("requires clean exact-commit source"));
             Assert.That(campaign,
                 Does.Contain("contract.fuzz.nightlyCases")
+                    .And.Contain("contract.fuzz.maximumCampaignCases")
+                    .And.Contain("Assert-SharpProofFuzzCampaignBudget")
                     .And.Contain("ContainsKey('RotatingSeed')")
-                    .And.Contain("retained.seeds")
+                    .And.Contain("Read-SharpProofRetainedFuzzSeedManifest")
+                    .And.Contain("$retained.Seeds")
                     .And.Contain("Invoke-FuzzRun")
                     .And.Contain("yyyyMMdd")
                     .And.Contain("schemaVersion = 3")
                     .And.Contain("commit = $sourceCommit")
                     .And.Contain("rotatingCases = $effectiveRotatingCases")
                     .And.Contain("retainedCasesPerSeed = $effectiveRetainedCases")
-                    .And.Contain("retainedSeeds = @($retained.seeds")
+                    .And.Contain("retainedSeeds = $retainedSeeds")
+                    .And.Contain("retainedSeedManifestSha256 = $retained.Sha256")
                     .And.Contain("resultSha256")
                     .And.Contain("status = if"));
             Assert.That(acceptance,

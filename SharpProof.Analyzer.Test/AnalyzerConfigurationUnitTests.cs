@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Analyzer.Configuration;
@@ -42,6 +43,38 @@ public sealed class AnalyzerConfigurationUnitTests
     }
 
     [Test]
+    public void ConflictingGlobalAliasesFailClosed()
+    {
+        var configuration = AnalyzerConfiguration.FromOptions(
+            new DictionaryProvider(new DictionaryOptions(
+                ("sharpproof_profile", "strict"),
+                ("build_property.SharpProofProfile", "advisory"))));
+
+        Assert.That(configuration.Profile, Is.EqualTo(SharpProofProfile.Off));
+        Assert.That(configuration.InvalidConfigurationValues, Has.Length.EqualTo(1));
+        Assert.That(
+            configuration.InvalidConfigurationValues[0].Reason,
+            Does.Contain("aliases disagree"));
+    }
+
+    [Test]
+    public void ConflictingTreeAliasesCannotHideBehindMatchingGlobalValue()
+    {
+        var tree = new DictionaryOptions(
+            ("sharpproof_profile", "advisory"),
+            ("build_property.SharpProofProfile", "strict"));
+        var global = new DictionaryOptions(
+            ("sharpproof_profile", "advisory"));
+
+        var invalid = AnalyzerConfiguration.GetInvalidTreeConfigurationValues(
+            tree,
+            global);
+
+        Assert.That(invalid, Has.Length.EqualTo(1));
+        Assert.That(invalid[0].Reason, Does.Contain("aliases disagree"));
+    }
+
+    [Test]
     public void SemanticOutcomeOrderingIsExhaustiveAndValidated()
     {
         Assert.That(
@@ -71,6 +104,23 @@ public sealed class AnalyzerConfigurationUnitTests
             out string value)
         {
             return _values.TryGetValue(key, out value!);
+        }
+    }
+
+    private sealed class DictionaryProvider(AnalyzerConfigOptions globalOptions)
+        : AnalyzerConfigOptionsProvider
+    {
+        public override AnalyzerConfigOptions GlobalOptions { get; } = globalOptions;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            return GlobalOptions;
+        }
+
+        public override AnalyzerConfigOptions GetOptions(
+            AdditionalText textFile)
+        {
+            return GlobalOptions;
         }
     }
 }

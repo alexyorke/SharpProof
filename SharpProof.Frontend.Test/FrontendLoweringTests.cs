@@ -341,6 +341,25 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void AbstractAndInterfaceReferenceEqualityLowersExactly()
+    {
+        AssertClassification(
+            """
+            public abstract class Base {}
+            public static bool Target(Base left, Base right) => left == right;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
+            public interface IItem {}
+            public static bool Target(IItem left, IItem right) => left == right;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+    }
+
+    [Test]
     public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
     {
         var classification = default(FrontendSubsetClassification);
@@ -957,7 +976,10 @@ public sealed class FrontendLoweringTests
     {
         using var compiled = CompiledMethod.Create(members);
         var result = compiled.Lower();
-        Assert.That(result.Classification.Decision, Is.EqualTo(decision));
+        Assert.That(
+            result.Classification.Decision,
+            Is.EqualTo(decision),
+            result.Classification.Abstention.ToString());
         Assert.That(result.Classification.Abstention, Is.EqualTo(abstention));
     }
 

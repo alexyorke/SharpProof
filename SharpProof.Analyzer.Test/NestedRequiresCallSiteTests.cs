@@ -372,7 +372,7 @@ public sealed class NestedRequiresCallSiteTests
             """;
         var diagnostics = await Analyze(source);
 
-        AssertRequiresDiagnostics(diagnostics, 1);
+        AssertRequiresDiagnostics(diagnostics, 2);
         Assert.That(
             diagnostics[0].Location.SourceSpan.Start,
             Is.EqualTo(source.IndexOf(
@@ -397,11 +397,13 @@ public sealed class NestedRequiresCallSiteTests
                 public static int Outer() {
                     Expression<Func<int>> quoted = () => Dead();
                     Func<int> explicitReference = Reachable<int>;
+                    Func<int> unusedReference = Unused;
                     return explicitReference() + Inferred(0);
 
                     int Dead() => Positive(-1);
                     int Reachable<T>() => Positive(-2);
                     int Inferred<T>(T value) => Positive(-3);
+                    int Unused() => Positive(-4);
                 }
             }
             """;
@@ -416,6 +418,609 @@ public sealed class NestedRequiresCallSiteTests
                 source.IndexOf("Positive(-2)", StringComparison.Ordinal),
                 source.IndexOf("Positive(-3)", StringComparison.Ordinal)
             }));
+    }
+
+    [Test]
+    public async Task OverwrittenMethodGroupsDoNotReachLocalFunctions()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer(bool condition) {
+                    Func<int> overwritten = Dead;
+                    if (condition) overwritten = () => 1;
+                    else overwritten = () => 2;
+                    Func<int> source = Reachable;
+                    Func<int> alias = source;
+                    source = () => 3;
+                    return overwritten() + alias();
+
+                    int Dead() => Positive(-1);
+                    int Reachable() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-2)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task ObservingMethodGroupsDoesNotReachLocalFunctions()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    Func<int> value = Dead;
+                    return value == null ? 0 : 1;
+
+                    int Dead() => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 0);
+    }
+
+    [Test]
+    public async Task CoalesceAssignmentOnlyReachesLaterConsumedMethodGroups()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    Func<int>? unused = Dead;
+                    unused ??= () => 1;
+                    Func<int>? consumed = Reachable;
+                    consumed ??= () => 2;
+                    return consumed();
+
+                    int Dead() => Positive(-1);
+                    int Reachable() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-2)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task TupleMethodGroupsOnlyReachThroughTheirOwnComponent()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    var unused = (Callback: (Func<int>)Dead, Number: 1);
+                    _ = unused.Number;
+                    var consumed =
+                        (Callback: (Func<int>)Reachable, Number: 2);
+                    return consumed.Callback();
+
+                    int Dead() => Positive(-1);
+                    int Reachable() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-2)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task NestedTupleMethodGroupsTrackTheirFullProjectionPath()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    var unused = (Inner: (
+                        Callback: (Func<int>)Dead,
+                        Number: 1), Other: 0);
+                    _ = unused.Inner.Number;
+                    var consumed = (Inner: (
+                        Callback: (Func<int>)Reachable,
+                        Number: 2), Other: 0);
+                    var inner = consumed.Inner;
+                    return inner.Callback();
+
+                    int Dead() => Positive(-1);
+                    int Reachable() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-2)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task NestedTupleProjectionAliasDoesNotConsumeSiblingDelegate()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    var outer = (Inner: (
+                        Callback: (Func<int>)Dead,
+                        Number: 1), Other: 0);
+                    var inner = outer.Inner;
+                    return inner.Number;
+
+                    int Dead() => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task TupleAssignmentsKillOnlyOverwrittenComponents()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int SiblingAssignment() {
+                    var pair = (
+                        Callback: (Func<int>)Reachable,
+                        Number: 1);
+                    pair.Number = 2;
+                    return pair.Callback();
+
+                    int Reachable() => Positive(-1);
+                }
+
+                public static int CallbackAssignment() {
+                    var pair = (
+                        Callback: (Func<int>)Dead,
+                        Number: 1);
+                    pair.Callback = Safe;
+                    return pair.Callback();
+
+                    int Dead() => Positive(-2);
+                    int Safe() => 0;
+                }
+
+                public static int OuterAssignment() {
+                    var outer = (Inner: (
+                        Callback: (Func<int>)Dead,
+                        Number: 1), Other: 0);
+                    outer.Inner = (Safe, 2);
+                    return outer.Inner.Callback();
+
+                    int Dead() => Positive(-3);
+                    int Safe() => 0;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-1)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task TupleComponentNullObservationsDoNotConsumeDelegates()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Equality() {
+                    var pair = (
+                        Callback: (Func<int>)Dead,
+                        Number: 1);
+                    return pair.Callback == null ? 0 : 1;
+
+                    int Dead() => Positive(-1);
+                }
+
+                public static int Pattern() {
+                    var outer = (Inner: (
+                        Callback: (Func<int>)Dead,
+                        Number: 1), Other: 0);
+                    return outer.Inner.Callback is null ? 0 : 1;
+
+                    int Dead() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task TupleDeconstructionTracksOnlyTheDelegateDestination()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Unused() {
+                    var pair = (Callback: (Func<int>)Dead, Number: 1);
+                    var (callback, number) = pair;
+                    return number;
+
+                    int Dead() => Positive(-1);
+                }
+
+                public static int Invoked() {
+                    var pair = (Callback: (Func<int>)Reachable, Number: 1);
+                    var (callback, number) = pair;
+                    return callback();
+
+                    int Reachable() => Positive(-2);
+                }
+
+                public static int Discarded() {
+                    var pair = (Callback: (Func<int>)Dead, Number: 1);
+                    var (_, number) = pair;
+                    return number;
+
+                    int Dead() => Positive(-3);
+                }
+
+                public static int NestedUnused() {
+                    var outer = (Inner: (
+                        Callback: (Func<int>)Dead,
+                        Number: 1), Other: 0);
+                    var (inner, other) = outer;
+                    return inner.Number;
+
+                    int Dead() => Positive(-4);
+                }
+
+                public static int NestedInvoked() {
+                    var outer = (Inner: (
+                        Callback: (Func<int>)Reachable,
+                        Number: 1), Other: 0);
+                    var (inner, other) = outer;
+                    return inner.Callback();
+
+                    int Reachable() => Positive(-5);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 2);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-2)", StringComparison.Ordinal)));
+        Assert.That(
+            diagnostics[1].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-5)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task ExceptionHandlersCanConsumeTrackedDelegates()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private sealed class Holder {
+                    public Func<int> Callback = null!;
+                }
+                private sealed class Boom {
+                    public Boom(int value) =>
+                        throw new InvalidOperationException();
+                }
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+                private static void Fail() =>
+                    throw new InvalidOperationException();
+                private static Func<int> FailDelegate() =>
+                    throw new InvalidOperationException();
+
+                public static int CatchUse() {
+                    Func<int> callback = Reachable;
+                    try { Fail(); }
+                    catch { return callback(); }
+
+                    int Reachable() => Positive(-1);
+                }
+
+                public static int FinallyUse() {
+                    Func<int> callback = Reachable;
+                    try { Fail(); }
+                    finally { _ = callback(); }
+
+                    int Reachable() => Positive(-2);
+                }
+
+                public static int OverwrittenBeforeThrow() {
+                    Func<int> callback = Dead;
+                    callback = Safe;
+                    try { Fail(); }
+                    catch { return callback(); }
+
+                    int Dead() => Positive(-3);
+                    int Safe() => 0;
+                }
+
+                public static int ThrowingOverwrite() {
+                    Func<int> callback = Reachable;
+                    try { callback = FailDelegate(); }
+                    catch { return callback(); }
+
+                    int Reachable() => Positive(-4);
+                }
+
+                public static int ThrowingTupleOverwrite() {
+                    (Func<int> callback, int other) pair = (Reachable, 0);
+                    try { pair.callback = FailDelegate(); }
+                    catch { return pair.callback(); }
+
+                    int Reachable() => Positive(-5);
+                }
+
+                public static int ThrowingFieldOverwrite() {
+                    Holder holder = null!;
+                    Func<int> callback = Reachable;
+                    try { callback = holder.Callback; }
+                    catch { return callback(); }
+
+                    int Reachable() => Positive(-6);
+                }
+
+                public static int ThrowingTupleFieldOverwrite() {
+                    Holder holder = null!;
+                    (Func<int> callback, int other) pair = (Reachable, 0);
+                    try { pair.callback = holder.Callback; }
+                    catch { return pair.callback(); }
+
+                    int Reachable() => Positive(-7);
+                }
+
+                public static int ThrowingCastOverwrite(object source) {
+                    Func<int> callback = Reachable;
+                    try { callback = (Func<int>)source; }
+                    catch { return callback(); }
+
+                    int Reachable() => Positive(-8);
+                }
+
+                public static int ThrowingTupleCastOverwrite(object source) {
+                    (Func<int> callback, int other) pair = (Reachable, 0);
+                    try { pair.callback = (Func<int>)source; }
+                    catch { return pair.callback(); }
+
+                    int Reachable() => Positive(-9);
+                }
+
+                public static int ThrowingArrayLengthOverwrite() {
+                    Func<int>[] values = null!;
+                    Func<int> callback = Reachable;
+                    try { callback = values.Length == 0 ? Safe : Safe; }
+                    catch { return callback(); }
+
+                    int Reachable() => Positive(-10);
+                    int Safe() => 0;
+                }
+
+                public static int ThrowingTupleArrayLengthOverwrite() {
+                    Func<int>[] values = null!;
+                    (Func<int> callback, int other) pair = (Reachable, 0);
+                    try { pair.callback = values.Length == 0 ? Safe : Safe; }
+                    catch { return pair.callback(); }
+
+                    int Reachable() => Positive(-11);
+                    int Safe() => 0;
+                }
+
+                public static int ThrowingCheckedOverwrite(int value) {
+                    Func<int> callback = Reachable;
+                    try {
+                        callback = checked(int.MaxValue + value) > 0
+                            ? Safe
+                            : Safe;
+                    }
+                    catch { return callback(); }
+
+                    int Reachable() => Positive(-12);
+                    int Safe() => 0;
+                }
+
+                public static int ThrowingTupleCheckedOverwrite(int value) {
+                    (Func<int> callback, int other) pair = (Reachable, 0);
+                    try {
+                        pair.callback = checked(int.MaxValue + value) > 0
+                            ? Safe
+                            : Safe;
+                    }
+                    catch { return pair.callback(); }
+
+                    int Reachable() => Positive(-13);
+                    int Safe() => 0;
+                }
+
+                public static int ThrowingDynamicCreationOverwrite(
+                    dynamic value) {
+                    Func<int> callback = Reachable;
+                    try {
+                        callback = new Boom(value) != null ? Safe : Safe;
+                    }
+                    catch { return callback(); }
+
+                    int Reachable() => Positive(-14);
+                    int Safe() => 0;
+                }
+
+                public static int ThrowingTupleDynamicCreationOverwrite(
+                    dynamic value) {
+                    (Func<int> callback, int other) pair = (Reachable, 0);
+                    try {
+                        pair.callback = new Boom(value) != null ? Safe : Safe;
+                    }
+                    catch { return pair.callback(); }
+
+                    int Reachable() => Positive(-15);
+                    int Safe() => 0;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 14);
+        Assert.That(
+            diagnostics.Select(diagnostic => diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[] {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-4)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-5)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-6)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-7)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-8)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-9)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-10)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-11)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-12)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-13)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-14)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-15)", StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
+    public async Task PatternAliasesReachLocalFunctions()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    Func<int> value = Reachable;
+                    if (value is (var alias)) return alias();
+                    return 0;
+
+                    int Reachable() => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
     }
 
     [Test]
@@ -605,6 +1210,55 @@ public sealed class NestedRequiresCallSiteTests
             filePath: "Fixture.g.cs");
 
         Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task GeneratedNestedCallablesInHandwrittenCodeAreExcluded()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using System.CodeDom.Compiler;
+            using System.Linq.Expressions;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    [GeneratedCode("test", "1")]
+                    int Local() {
+                        int Inner() => Positive(-1);
+                        return Inner();
+                    }
+                    Func<int> lambda =
+                        [GeneratedCode("test", "1")]
+                        () => Positive(-2);
+                    Expression<Func<int>> expression =
+                        [GeneratedCode("test", "1")]
+                        () => Positive(-3);
+                    return Local() + lambda() + expression.Compile()();
+                }
+            }
+            """,
+            factory);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(
+                factory.GetNamedOutcome("Inner"),
+                Is.EqualTo(AnalyzerSemanticOutcome.NotApplicable));
+            Assert.That(
+                factory.GetOutcomes(MethodKind.AnonymousFunction),
+                Is.EqualTo(Enumerable.Repeat(
+                    AnalyzerSemanticOutcome.NotApplicable,
+                    2)));
+        }
     }
 
     private static Task<ImmutableArray<Diagnostic>> Analyze(

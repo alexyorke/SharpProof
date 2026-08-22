@@ -10,12 +10,12 @@ Current architecture:
 - container-only verifier package and Core MSBuild host;
 - one analyzer Core implementation shared by the analyzer, generator, and
   compiler collector;
-- compiler artifact schema 14 and worker protocol 11;
+- compiler artifact schema 15 and worker protocol 11;
 - exact three-package release graph: `SharpProof.Attributes`, `SharpProof`, and
   `SharpProof.Verifier`.
 
 Static acceptance is green for deterministic generation, schema/catalog pins,
-the 234-entry mutation catalog identity, the 263-path TCB inventory, frozen
+the 257-entry mutation catalog identity, the 336-path TCB inventory, frozen
 preview interface, and structural complexity. Broad Debug and full Release
 acceptance are also green.
 

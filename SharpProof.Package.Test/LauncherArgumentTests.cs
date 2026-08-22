@@ -962,6 +962,40 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void CompilerManifestFifoIsRejectedBeforeBlockingOpen()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".fifo");
+        try
+        {
+            using var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "mkfifo",
+                    UseShellExecute = false,
+                    ArgumentList = { path }
+                })!;
+            process.WaitForExit();
+            Assert.That(process.ExitCode, Is.Zero);
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Assert.That(
+                (Action)(() => LauncherArguments.ReadCompilerManifest(path)),
+                Throws.TypeOf<InvalidDataException>());
+            stopwatch.Stop();
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromSeconds(1)));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
     public void WorkerResultByteLimitIsEnforcedBeforeDeserialization()
     {
         var path = Path.Combine(

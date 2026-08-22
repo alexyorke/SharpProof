@@ -214,6 +214,21 @@ public sealed class RoslynOperationLowerer
         return operation;
     }
 
+    private static IOperation UnwrapImplicitReferenceConversions(
+        IOperation operation)
+    {
+        while (operation is IConversionOperation
+            {
+                IsImplicit: true,
+                OperatorMethod: null
+            } conversion && conversion.Conversion.IsReference)
+        {
+            operation = conversion.Operand;
+        }
+
+        return operation;
+    }
+
     private static bool IsNullConstant(IOperation operation)
     {
         return operation.ConstantValue is { HasValue: true, Value: null };
@@ -500,7 +515,8 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitDefaultValue(
             IDefaultValueOperation operation, LoweringContext argument)
         {
-            var specialType = operation.Type?.SpecialType ?? SpecialType.None;
+            var type = _owner.TypeSpecializer(operation.Type);
+            var specialType = type?.SpecialType ?? SpecialType.None;
             if (specialType == SpecialType.System_Boolean)
             {
                 return LoweredExpression.Exact(
@@ -513,16 +529,16 @@ public sealed class RoslynOperationLowerer
                     _owner._factory.Integer(0));
             }
 
-            if (operation.Type?.IsReferenceType != true)
+            if (type?.IsReferenceType != true)
             {
                 return _owner.Opaque(
                     operation,
                     FrontendAbstention.UnsupportedType);
             }
 
-            var type = _owner.GetTypeId(operation.Type);
+            var typeId = _owner.GetTypeId(type);
             return LoweredExpression.Exact(
-                _owner._factory.Null(type));
+                _owner._factory.Null(typeId));
         }
 
         public override LoweredExpression VisitUnaryOperator(
@@ -643,15 +659,30 @@ public sealed class RoslynOperationLowerer
                     return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
                 }
             }
+            var leftOperand = operation.LeftOperand;
+            var rightOperand = operation.RightOperand;
+            if (operation.OperatorKind is
+                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals)
+            {
+                leftOperand = UnwrapImplicitReferenceConversions(leftOperand);
+                rightOperand = UnwrapImplicitReferenceConversions(rightOperand);
+                if (ChangesReferenceEqualityToString(leftOperand) ||
+                    ChangesReferenceEqualityToString(rightOperand))
+                {
+                    return OpaqueBinary(
+                        operation,
+                        FrontendAbstention.UnsupportedType);
+                }
+            }
             if (!CSharpScalarSemantics.SupportsBuiltInOperands(
                     operation.OperatorKind,
-                    operation.LeftOperand.Type,
-                    operation.RightOperand.Type))
+                    leftOperand.Type,
+                    rightOperand.Type))
             {
                 return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
             }
 
-            var left = _owner.LowerCore(operation.LeftOperand);
+            var left = _owner.LowerCore(leftOperand);
             if (operation.OperatorKind == BinaryOperatorKind.ConditionalAnd &&
                 left.Term is IrBooleanTerm { Value: false })
             {
@@ -664,7 +695,7 @@ public sealed class RoslynOperationLowerer
                 return LoweredExpression.Exact(left.Term);
             }
 
-            var right = _owner.LowerCore(operation.RightOperand);
+            var right = _owner.LowerCore(rightOperand);
             if (!left.Classification.IsExact || !right.Classification.IsExact)
             {
                 return OpaqueBinary(operation, FirstAbstention(left, right));
@@ -707,6 +738,13 @@ public sealed class RoslynOperationLowerer
             {
                 return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
             }
+        }
+
+        private bool ChangesReferenceEqualityToString(IOperation operand)
+        {
+            return operand.Type is ITypeParameterSymbol &&
+                _owner.TypeSpecializer(operand.Type)?.SpecialType ==
+                    SpecialType.System_String;
         }
 
         public override LoweredExpression VisitConditional(

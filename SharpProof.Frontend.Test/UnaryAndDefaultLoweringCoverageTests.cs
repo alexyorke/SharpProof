@@ -118,6 +118,40 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
     }
 
     [Test]
+    public void SpecializedTypeParameterDefaultsUseTheConstructedDomain()
+    {
+        var text = Lower(
+            "private static T Target<T>() => default(T);",
+            SpecialType.System_String);
+        var integer = Lower(
+            "private static T Target<T>() => default(T);",
+            SpecialType.System_Int64);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(text.IsExact, Is.True);
+            Assert.That(text.Term, Is.TypeOf<IrNullTerm>());
+            Assert.That(integer.IsExact, Is.True);
+            Assert.That(
+                ((IrIntegerTerm)integer.Term).Value,
+                Is.Zero);
+        }
+    }
+
+    [Test]
+    public void SpecializedStringTypeParameterEqualityDoesNotChangeToValueEquality()
+    {
+        var result = Lower(
+            """
+            private static bool Target<T>(T left, T right)
+                where T : class => left == right;
+            """,
+            SpecialType.System_String);
+
+        AssertAbstention(result, FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
     public void UnaryScalarPoliciesDistinguishExactAndFailClosedCases()
     {
         var identity = Lower(
@@ -239,7 +273,9 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
             Is.EqualTo(abstention));
     }
 
-    private static FrontendLoweringResult Lower(string members)
+    private static FrontendLoweringResult Lower(
+        string members,
+        SpecialType? specializedType = null)
     {
         var tree = CSharpSyntaxTree.ParseText(
             "public static class Subject {" +
@@ -277,8 +313,15 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         var operation = GetExpressionOperation(
             compilation.GetSemanticModel(tree),
             expression);
-        return new RoslynOperationLowerer(new IrFactory())
-            .Lower(operation);
+        var lowerer = new RoslynOperationLowerer(new IrFactory());
+        if (specializedType.HasValue)
+        {
+            var replacement = compilation.GetSpecialType(
+                specializedType.Value);
+            lowerer.TypeSpecializer = type =>
+                type is ITypeParameterSymbol ? replacement : type;
+        }
+        return lowerer.Lower(operation);
     }
 
     private static IOperation GetExpressionOperation(

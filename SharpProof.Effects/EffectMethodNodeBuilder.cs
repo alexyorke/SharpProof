@@ -291,8 +291,33 @@ internal sealed class EffectMethodNodeBuilder
         OperationEffectScanner scanner)
     {
         var summary = EffectSummary.Empty;
-        foreach (var block in graph.Blocks.Where(static block => block.IsReachable))
+        var pending = new SortedSet<int> { graph.Blocks[0].Ordinal };
+        var exceptionalRegionOperations =
+            CreateExceptionalRegionOperations(graph);
+        var finallyEntries = CreateFinallyEntries(graph);
+        foreach (var block in graph.Blocks.Where(static block =>
+                     block.IsReachable &&
+                     block.Predecessors.All(static predecessor =>
+                         predecessor.Semantics !=
+                             ControlFlowBranchSemantics.Regular)))
         {
+            if (IsExceptionalEntryReachable(block))
+            {
+                pending.Add(block.Ordinal);
+            }
+        }
+
+        var visited = new HashSet<int>();
+        while (pending.Count != 0)
+        {
+            var ordinal = pending.Min;
+            pending.Remove(ordinal);
+            if (!visited.Add(ordinal))
+            {
+                continue;
+            }
+
+            var block = graph.Blocks[ordinal];
             var step = scanner.ScanSequence(
                 block.Operations.Where(scanner.IsReachable));
             if (step.CompletesNormally &&
@@ -303,6 +328,19 @@ internal sealed class EffectMethodNodeBuilder
             }
 
             summary = EffectSummaryOperations.Join(summary, step.Summary);
+            if (!step.Summary.Throws.IsEmpty)
+            {
+                AddReachableFinallyEntries(block);
+            }
+            AddControlTransferFinally(block.FallThroughSuccessor, step);
+            AddControlTransferFinally(block.ConditionalSuccessor, step);
+            if (!step.CompletesNormally)
+            {
+                continue;
+            }
+
+            AddRegularSuccessor(block.FallThroughSuccessor);
+            AddRegularSuccessor(block.ConditionalSuccessor);
         }
 
         return ManagedAbstractFlow.IsAcyclic(graph)
@@ -310,6 +348,219 @@ internal sealed class EffectMethodNodeBuilder
             : EffectSummaryOperations.Join(
                 summary,
                 EffectSummaryOperations.MayDiverge());
+
+        void AddRegularSuccessor(ControlFlowBranch? branch)
+        {
+            if (branch is
+                {
+                    Semantics: ControlFlowBranchSemantics.Regular,
+                    Destination: { IsReachable: true } destination
+                } && LeavingFinallysMayComplete(branch))
+            {
+                pending.Add(destination.Ordinal);
+            }
+        }
+
+        bool LeavingFinallysMayComplete(ControlFlowBranch branch)
+        {
+            foreach (var region in branch.LeavingRegions)
+            {
+                if (finallyEntries.TryGetValue(region, out var entry) &&
+                    entry.Operation is { } operation &&
+                    !scanner.CanCompleteNormally(operation))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        void AddControlTransferFinally(
+            ControlFlowBranch? branch,
+            EffectStep step)
+        {
+            if (branch == null ||
+                !step.CompletesNormally &&
+                branch.Semantics is not (
+                    ControlFlowBranchSemantics.Throw or
+                    ControlFlowBranchSemantics.Rethrow))
+            {
+                return;
+            }
+            AddReachableFinallyEntries(branch);
+        }
+
+        void AddReachableFinallyEntries(ControlFlowBranch branch)
+        {
+            foreach (var region in branch.LeavingRegions)
+            {
+                if (finallyEntries.TryGetValue(region, out var entry))
+                {
+                    pending.Add(entry.EntryOrdinal);
+                    return;
+                }
+            }
+        }
+
+        bool IsExceptionalEntryReachable(BasicBlock block)
+        {
+            for (var region = block.EnclosingRegion;
+                 region != null;
+                 region = region.EnclosingRegion)
+            {
+                if (region.Kind == ControlFlowRegionKind.Finally)
+                {
+                    return false;
+                }
+                if (exceptionalRegionOperations.TryGetValue(
+                        region,
+                        out var operation))
+                {
+                    return scanner.IsReachable(operation);
+                }
+            }
+            return true;
+        }
+
+        void AddReachableFinallyEntries(BasicBlock block)
+        {
+            for (var region = block.EnclosingRegion;
+                 region != null;
+                 region = region.EnclosingRegion)
+            {
+                if (finallyEntries.TryGetValue(region, out var entry))
+                {
+                    pending.Add(entry.EntryOrdinal);
+                    return;
+                }
+            }
+        }
+    }
+
+    private readonly record struct FinallyEntry(
+        int EntryOrdinal,
+        IOperation? Operation);
+
+    private static Dictionary<ControlFlowRegion, FinallyEntry> CreateFinallyEntries(
+        ControlFlowGraph graph)
+    {
+        var regions = graph.Blocks
+            .SelectMany(static block => EnclosingRegions(block.EnclosingRegion))
+            .Distinct()
+            .ToArray();
+        var finallyRegions = regions
+            .Where(static region =>
+                region.Kind == ControlFlowRegionKind.Finally)
+            .OrderBy(static region => region.FirstBlockOrdinal)
+            .ToArray();
+        var finallyOperations = graph.OriginalOperation.DescendantsAndSelf()
+            .OfType<ITryOperation>()
+            .Where(@try =>
+                @try.Finally != null &&
+                !ConversionOwnershipClassifier.IsInsideNestedCallable(
+                    @try,
+                    graph.OriginalOperation))
+            .OrderBy(static @try => @try.Finally!.Syntax.SpanStart)
+            .Select(static @try => (IOperation)@try.Finally!)
+            .ToArray();
+        var operationByRegion = new Dictionary<ControlFlowRegion, IOperation>();
+        if (finallyRegions.Length == finallyOperations.Length)
+        {
+            for (var index = 0; index < finallyRegions.Length; index++)
+            {
+                operationByRegion.Add(
+                    finallyRegions[index],
+                    finallyOperations[index]);
+            }
+        }
+        var result = new Dictionary<ControlFlowRegion, FinallyEntry>();
+        foreach (var tryRegion in regions.Where(static region =>
+                     region.Kind == ControlFlowRegionKind.Try))
+        {
+            var finallyRegion = regions.FirstOrDefault(region =>
+                region.Kind == ControlFlowRegionKind.Finally &&
+                ReferenceEquals(
+                    region.EnclosingRegion,
+                    tryRegion.EnclosingRegion));
+            if (finallyRegion != null)
+            {
+                result.Add(
+                    tryRegion,
+                    new FinallyEntry(
+                        finallyRegion.FirstBlockOrdinal,
+                        operationByRegion.TryGetValue(
+                            finallyRegion,
+                            out var operation)
+                                ? operation
+                                : null));
+            }
+        }
+        return result;
+
+        static IEnumerable<ControlFlowRegion> EnclosingRegions(
+            ControlFlowRegion? region)
+        {
+            for (; region != null; region = region.EnclosingRegion)
+            {
+                yield return region;
+            }
+        }
+    }
+
+    private static Dictionary<ControlFlowRegion, IOperation>
+        CreateExceptionalRegionOperations(ControlFlowGraph graph)
+    {
+        var regions = graph.Blocks
+            .SelectMany(static block => EnclosingRegions(block.EnclosingRegion))
+            .Distinct()
+            .ToArray();
+        var catches = graph.OriginalOperation.DescendantsAndSelf()
+            .OfType<ICatchClauseOperation>()
+            .Where(@catch =>
+                !ConversionOwnershipClassifier.IsInsideNestedCallable(
+                    @catch,
+                    graph.OriginalOperation))
+            .OrderBy(static @catch => @catch.Syntax.SpanStart)
+            .ToArray();
+        var result = new Dictionary<ControlFlowRegion, IOperation>();
+        AddMappings(
+            regions.Where(static region =>
+                    region.Kind == ControlFlowRegionKind.Catch)
+                .OrderBy(static region => region.FirstBlockOrdinal)
+                .ToArray(),
+            catches.Select(static @catch => @catch.Handler).ToArray());
+        AddMappings(
+            regions.Where(static region =>
+                    region.Kind == ControlFlowRegionKind.Filter)
+                .OrderBy(static region => region.FirstBlockOrdinal)
+                .ToArray(),
+            catches.Where(static @catch => @catch.Filter != null)
+                .Select(static @catch => @catch.Filter!)
+                .ToArray());
+        return result;
+
+        void AddMappings(
+            ControlFlowRegion[] candidates,
+            IOperation[] operations)
+        {
+            if (candidates.Length != operations.Length)
+            {
+                return;
+            }
+            for (var index = 0; index < candidates.Length; index++)
+            {
+                result.Add(candidates[index], operations[index]);
+            }
+        }
+
+        static IEnumerable<ControlFlowRegion> EnclosingRegions(
+            ControlFlowRegion? region)
+        {
+            for (; region != null; region = region.EnclosingRegion)
+            {
+                yield return region;
+            }
+        }
     }
 
     private IOperation? GetOperationRoot(

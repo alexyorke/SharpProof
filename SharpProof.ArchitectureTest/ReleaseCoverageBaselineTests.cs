@@ -127,6 +127,15 @@ public sealed class ReleaseCoverageBaselineTests
             Assert.That(writer, Does.Contain("packages.Count -ne 6"));
             Assert.That(writer, Does.Contain("does not match checkout HEAD"));
             Assert.That(writer, Does.Contain("requires a clean checkout"));
+            Assert.That(
+                writer,
+                Does.Contain("Resolve-SharpProofContainedPath.ps1"));
+            Assert.That(
+                writer,
+                Does.Contain("Resolve-SharpProofContainedPath"));
+            Assert.That(writer, Does.Contain("$allUntrackedChanges"));
+            Assert.That(writer, Does.Contain("$packagePrefix"));
+            Assert.That(writer, Does.Not.Contain(":(exclude)"));
             Assert.That(writer, Does.Contain("annotated tag at checkout HEAD"));
             foreach (var gate in new[]
                      {

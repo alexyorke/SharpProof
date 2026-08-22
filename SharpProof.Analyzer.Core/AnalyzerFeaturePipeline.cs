@@ -417,9 +417,7 @@ internal static partial class AnalyzerFeaturePipeline
     {
         context.CancellationToken.ThrowIfCancellationRequested();
         if (context.Node is not EqualsValueClauseSyntax initializer ||
-            initializer.Parent is not VariableDeclaratorSyntax and not PropertyDeclarationSyntax ||
-            AnalyzerGeneratedCodePolicy.IsGenerated(
-                initializer.SyntaxTree, context.Compilation, context.CancellationToken))
+            initializer.Parent is not VariableDeclaratorSyntax and not PropertyDeclarationSyntax)
         {
             return;
         }
@@ -431,31 +429,65 @@ internal static partial class AnalyzerFeaturePipeline
                 property, context.CancellationToken),
             _ => null
         };
-        if (symbol is not IFieldSymbol and not IPropertySymbol ||
+        if (symbol is not IFieldSymbol and
+            not IPropertySymbol and
+            not IEventSymbol ||
             symbol.ContainingType is not { } type)
         {
             return;
         }
         var isStatic = symbol.IsStatic;
-        var constructor = (isStatic
+        var constructors = (isStatic
                 ? type.StaticConstructors
                 : type.InstanceConstructors)
             .OrderBy(static candidate => candidate.DeclaringSyntaxReferences
+                .FirstOrDefault()?.SyntaxTree.FilePath, StringComparer.Ordinal)
+            .ThenBy(static candidate => candidate.DeclaringSyntaxReferences
                 .FirstOrDefault()?.Span.Start ?? int.MaxValue)
-            .FirstOrDefault();
+            .Where(candidate =>
+                !AnalyzerGeneratedCodePolicy.IsGenerated(
+                    candidate,
+                    candidate.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree ??
+                        initializer.SyntaxTree,
+                    context.Compilation,
+                    context.CancellationToken))
+            .ToArray();
         var root = context.SemanticModel.GetOperation(
             initializer.Value, context.CancellationToken);
-        if (constructor == null || root == null)
+        if (constructors.Length == 0 || root == null ||
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                symbol,
+                initializer.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+        IMethodSymbol? constructor = null;
+        foreach (var candidate in constructors)
+        {
+            if (SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
+                    candidate,
+                    session,
+                    context.ReportDiagnostic,
+                    context.CancellationToken))
+            {
+                session.RecordSemanticOutcome(
+                    candidate,
+                    AnalyzerSemanticOutcome.Suppressed);
+                continue;
+            }
+            constructor = candidate;
+            break;
+        }
+        if (constructor == null)
         {
             return;
         }
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
-        foreach (var operation in root.DescendantsAndSelf())
+        foreach (var operation in RequiresCallSiteDiscovery
+                     .ExecutableUnflowedDescendantsAndSelf(root))
         {
-            if (operation is not IInvocationOperation and not IObjectCreationOperation)
-            {
-                continue;
-            }
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
                 RequiresCallSiteAnalyzer.AnalyzeInitializerCall(

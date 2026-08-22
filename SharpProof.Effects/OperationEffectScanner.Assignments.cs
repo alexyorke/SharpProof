@@ -137,17 +137,26 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanCoalesceAssignment(
         ICoalesceAssignmentOperation assignment)
     {
-        var targetRead = Scan(assignment.Target, EffectAccess.Read);
+        var result = new EffectStep(
+            Scan(assignment.Target, EffectAccess.Read),
+            _completionEvaluator.CanCompleteNormally(assignment.Target));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
         if (_abstractFlow?.ProvesNonNull(
                 assignment,
                 assignment.Target) == true)
         {
-            return targetRead;
+            return result.Summary;
         }
 
-        return EffectSummaryOperations.Join(
-            targetRead,
-            Scan(assignment.Value),
-            ScanWriteTarget(assignment.Target, assignment.Value));
+        result = result.Then(ScanStep(assignment.Value));
+        return !result.CompletesNormally
+            ? result.Summary
+            : result.Then(new EffectStep(
+                ScanWriteTarget(assignment.Target, assignment.Value),
+                true)).Summary;
     }
 }

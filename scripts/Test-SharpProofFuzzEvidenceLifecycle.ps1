@@ -16,18 +16,131 @@ try {
     [IO.File]::WriteAllText((Join-Path $root 'rotating-1.stderr.txt'), 'old')
     [IO.File]::WriteAllText((Join-Path $root 'retained-2.stdout.json'), 'old')
     [IO.File]::WriteAllText((Join-Path $root 'retained-2.stderr.txt'), 'old')
+    [IO.File]::WriteAllText((Join-Path $root 'rotating--1.stdout.json'), 'old')
+    [IO.File]::WriteAllText((Join-Path $root 'retained--2.stderr.txt'), 'old')
+    $noncanonical = @(
+        'rotating-2147483648.stdout.json',
+        'retained--2147483649.stderr.txt',
+        'retained-0007.stdout.json')
+    foreach ($name in $noncanonical) {
+        [IO.File]::WriteAllText((Join-Path $root $name), 'keep')
+    }
     [IO.File]::WriteAllText($unrelated, 'keep')
 
     Initialize-SharpProofFuzzEvidence -OutputDirectory $root
     if ([IO.File]::Exists($campaign) -or
-        @([IO.Directory]::EnumerateFiles($root) | Where-Object {
-                [IO.Path]::GetFileName($_) -cmatch
-                    '^(?:rotating|retained)-[0-9]+\.(?:stdout\.json|stderr\.txt)$'
-            }).Count -ne 0) {
+        [IO.File]::Exists((Join-Path $root 'rotating-1.stdout.json')) -or
+        [IO.File]::Exists((Join-Path $root 'rotating-1.stderr.txt')) -or
+        [IO.File]::Exists((Join-Path $root 'retained-2.stdout.json')) -or
+        [IO.File]::Exists((Join-Path $root 'retained-2.stderr.txt')) -or
+        [IO.File]::Exists((Join-Path $root 'rotating--1.stdout.json')) -or
+        [IO.File]::Exists((Join-Path $root 'retained--2.stderr.txt'))) {
         throw 'Owned stale fuzz evidence survived initialization.'
+    }
+    foreach ($name in $noncanonical) {
+        if ([IO.File]::ReadAllText((Join-Path $root $name)) -cne 'keep') {
+            throw "Noncanonical fuzz-like output was changed: $name"
+        }
     }
     if ([IO.File]::ReadAllText($unrelated) -cne 'keep') {
         throw 'Unrelated fuzz output was changed.'
+    }
+
+    $manifest = Join-Path $root 'retained-seeds.json'
+    [IO.File]::WriteAllText(
+        $manifest,
+        '{"schemaVersion":1,"casesPerSeed":5,"seeds":[-1,2]}')
+    $parsed = Read-SharpProofRetainedFuzzSeedManifest -Path $manifest
+    if ($parsed.CasesPerSeed -ne 5 -or
+        @($parsed.Seeds).Count -ne 2 -or $parsed.Seeds[0] -ne -1) {
+        throw 'A strict retained fuzz seed manifest was not preserved.'
+    }
+    $expectedManifestHash = (Get-FileHash -LiteralPath $manifest `
+        -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($parsed.Sha256 -cne $expectedManifestHash) {
+        throw 'Retained fuzz seed parsing did not bind the exact input bytes.'
+    }
+    $manifestBytes = [IO.File]::ReadAllBytes($manifest)
+    $raced = Read-SharpProofRetainedFuzzSeedManifest `
+        -Path $manifest `
+        -AfterValidation {
+            param($validatedPath)
+            [IO.File]::WriteAllText(
+                $validatedPath,
+                '{"schemaVersion":1,"casesPerSeed":9,"seeds":[7]}')
+        }
+    $expectedRacedHash = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData(
+            $manifestBytes)).ToLowerInvariant()
+    if ($raced.CasesPerSeed -ne 5 -or
+        $raced.Sha256 -cne $expectedRacedHash) {
+        throw 'Retained fuzz seed parsing changed after its validated read.'
+    }
+    foreach ($invalid in @(
+            '{"schemaVersion":1,"casesPerSeed":"5","seeds":[1]}',
+            '{"schemaVersion":1,"casesPerSeed":5,"seeds":[null]}',
+            '{"schemaVersion":1,"casesPerSeed":5,"seeds":[true]}',
+            '{"schemaVersion":1,"casesPerSeed":5,"seeds":[1.6]}',
+            '{"schemaVersion":1,"casesPerSeed":1000001,"seeds":[1]}',
+            '{"schemaVersion":1,"casesPerSeed":5,"seeds":["7"]}')) {
+        [IO.File]::WriteAllText($manifest, $invalid)
+        $rejected = $false
+        try { [void](Read-SharpProofRetainedFuzzSeedManifest -Path $manifest) }
+        catch { $rejected = $true }
+        if (-not $rejected) {
+            throw "Malformed retained seed manifest was accepted: $invalid"
+        }
+    }
+    foreach ($invalidBudget in @(0, 1000001, '5')) {
+        $rejected = $false
+        try {
+            [void](Assert-SharpProofFuzzCaseBudget `
+                -Value $invalidBudget -Name 'fixture budget')
+        }
+        catch { $rejected = $true }
+        if (-not $rejected) {
+            throw "Invalid fuzz case budget was accepted: $invalidBudget"
+        }
+    }
+    $boundedManifest =
+        '{"schemaVersion":1,"casesPerSeed":1,"seeds":[1]}'
+    $encoding = [Text.UTF8Encoding]::new($false)
+    $exactManifest = $boundedManifest +
+        (' ' * (1048576 - $encoding.GetByteCount($boundedManifest)))
+    [IO.File]::WriteAllText($manifest, $exactManifest, $encoding)
+    $exactParsed = Read-SharpProofRetainedFuzzSeedManifest -Path $manifest
+    if ($exactParsed.CasesPerSeed -ne 1 -or
+        @($exactParsed.Seeds).Count -ne 1) {
+        throw 'The exact-limit retained manifest was not accepted.'
+    }
+    [IO.File]::AppendAllText($manifest, ' ', $encoding)
+    $rejected = $false
+    try { [void](Read-SharpProofRetainedFuzzSeedManifest -Path $manifest) }
+    catch { $rejected = $true }
+    if (-not $rejected) {
+        throw 'An oversized retained fuzz seed manifest was accepted.'
+    }
+    [void](Assert-SharpProofFuzzCampaignBudget `
+        -RotatingCases 10000 -RetainedCases 1000 `
+        -RetainedRunCount 1 -MaximumCases 1000000)
+    $rejected = $false
+    try {
+        [void](Assert-SharpProofFuzzCampaignBudget `
+            -RotatingCases 1000000 -RetainedCases 1 `
+            -RetainedRunCount 1 -MaximumCases 1000000)
+    }
+    catch { $rejected = $true }
+    if (-not $rejected) {
+        throw 'An aggregate fuzz campaign above the maximum was accepted.'
+    }
+    $tooManySeeds = '{"schemaVersion":1,"casesPerSeed":1,"seeds":[' +
+        ((1..1025) -join ',') + ']}'
+    [IO.File]::WriteAllText($manifest, $tooManySeeds)
+    $rejected = $false
+    try { [void](Read-SharpProofRetainedFuzzSeedManifest -Path $manifest) }
+    catch { $rejected = $true }
+    if (-not $rejected) {
+        throw 'A retained manifest above the seed-count limit was accepted.'
     }
 
     # A prerequisite or launcher failure after initialization publishes nothing.
@@ -51,7 +164,7 @@ try {
         throw 'Retry did not replace only the owned stable evidence.'
     }
 
-    Write-Host 'Fuzz evidence lifecycle fixtures: 6'
+    Write-Host 'Fuzz evidence lifecycle fixtures: 22'
 }
 finally {
     if ([IO.Directory]::Exists($root)) {

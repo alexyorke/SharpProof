@@ -66,6 +66,24 @@ internal static class EffectExceptionFlow
         return EffectThrowSet.Unknown;
     }
 
+    internal static EffectThrowSet KeepEscapingThroughTry(
+        EffectThrowSet thrown,
+        TryStatementSyntax @try,
+        Compilation compilation)
+    {
+        var known = thrown.Types;
+        var includesUnknown = thrown.IncludesUnknown;
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, @try.SyntaxTree);
+        ApplyCatches(
+            @try,
+            model,
+            ref known,
+            ref includesUnknown,
+            includeRethrows: false);
+        return EffectThrowSet.Create(known, includesUnknown);
+    }
+
     private static EffectThrowSet KeepEscaping(
         EffectThrowSet thrown, SyntaxNode origin, Compilation compilation)
     {
@@ -94,7 +112,12 @@ internal static class EffectExceptionFlow
             var inHandler = @try.Catches.Any(@catch => @catch.Block.Span.Contains(origin.Span));
             if (inBody)
             {
-                ApplyCatches(@try, model, ref known, ref includesUnknown);
+                ApplyCatches(
+                    @try,
+                    model,
+                    ref known,
+                    ref includesUnknown,
+                    includeRethrows: true);
             }
 
             if ((inBody || inHandler) &&
@@ -113,7 +136,9 @@ internal static class EffectExceptionFlow
 
     private static void ApplyCatches(
         TryStatementSyntax @try, SemanticModel model,
-        ref ImmutableArray<INamedTypeSymbol> known, ref bool includesUnknown)
+        ref ImmutableArray<INamedTypeSymbol> known,
+        ref bool includesUnknown,
+        bool includeRethrows)
     {
         var exceptionType = model.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         var catches = @try.Catches.Select(@catch =>
@@ -125,7 +150,7 @@ internal static class EffectExceptionFlow
             return new CatchFlow(
                 caught,
                 filter,
-                ContainsRethrow(@catch.Block));
+                includeRethrows && ContainsRethrow(@catch.Block));
         }).ToImmutableArray();
 
         known = [.. known.Where(type => CanEscape(type, catches))];

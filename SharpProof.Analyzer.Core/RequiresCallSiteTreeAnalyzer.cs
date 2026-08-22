@@ -153,6 +153,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             cancellationToken.ThrowIfCancellationRequested();
             caller = ContractClauseInventoryBuilder
                 .NormalizeCallable(caller);
+            if (!isRoot && IsGenerated(caller, declaration))
+            {
+                RecordGeneratedSubtree(declaration);
+                return;
+            }
             if (potentialOwners.Contains(caller))
             {
                 _visitedPotentialOwners.Add(caller);
@@ -195,6 +200,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             {
                 cancellationToken
                     .ThrowIfCancellationRequested();
+                if (IsGenerated(nested.Method, nested.Declaration))
+                {
+                    RecordGeneratedSubtree(nested.Declaration);
+                    continue;
+                }
                 if (nested.IsExpressionTree)
                 {
                     RecordUnsupportedNested(
@@ -231,6 +241,38 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     childGraph,
                     childGraph.OriginalOperation,
                     isRoot: false);
+            }
+        }
+
+        private bool IsGenerated(
+            IMethodSymbol method,
+            SyntaxNode declaration)
+        {
+            return AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                declaration.SyntaxTree,
+                semanticModel.Compilation,
+                cancellationToken);
+        }
+
+        private void RecordGeneratedSubtree(SyntaxNode declaration)
+        {
+            foreach (var owner in potentialOwners)
+            {
+                var belongsToGeneratedSubtree = owner
+                    .DeclaringSyntaxReferences.Any(reference =>
+                        ReferenceEquals(
+                            reference.SyntaxTree,
+                            declaration.SyntaxTree) &&
+                        declaration.FullSpan.Contains(reference.Span));
+                if (belongsToGeneratedSubtree &&
+                    _visitedPotentialOwners.Add(owner) &&
+                    session.TryBeginRequiresCallSiteAnalysis(owner))
+                {
+                    session.RecordSemanticOutcome(
+                        owner,
+                        AnalyzerSemanticOutcome.NotApplicable);
+                }
             }
         }
 
@@ -300,7 +342,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 if (!expressionTree &&
                     !IsAnonymousExecutableOrEscaped(
                         graph,
-                        anonymous.Syntax))
+                        anonymous))
                 {
                     _visitedPotentialOwners.Add(method);
                     continue;
@@ -401,7 +443,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     IInvocationOperation invocation =>
                         invocation.TargetMethod,
                     IMethodReferenceOperation methodReference =>
-                        methodReference.Method,
+                        IsAnonymousExecutableOrEscaped(
+                            graph,
+                            methodReference)
+                            ? methodReference.Method
+                            : null,
                     _ => null
                 };
                 if (referenced != null)
@@ -419,7 +465,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 if (IsExpressionTree(anonymous.Syntax) ||
                     !IsAnonymousExecutableOrEscaped(
                         graph,
-                        anonymous.Syntax))
+                        anonymous))
                 {
                     continue;
                 }
@@ -453,60 +499,33 @@ internal static partial class RequiresCallSiteTreeAnalyzer
 
         private bool IsAnonymousExecutableOrEscaped(
             ControlFlowGraph graph,
-            SyntaxNode declaration)
+            IOperation value)
         {
             if (!TryGetLocalDestination(
-                    declaration,
-                    out var initialLocal))
+                    value.Syntax,
+                    out var initialLocal,
+                    out var definition))
             {
                 return true;
             }
-
-            var pending = new Queue<ILocalSymbol>();
-            var tracked = new HashSet<ILocalSymbol>(
-                SymbolEqualityComparer.Default);
-            pending.Enqueue(initialLocal);
-            while (pending.Count != 0)
+            var block = FindContainingBlock(graph, value.Syntax);
+            if (block == null)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var local = pending.Dequeue();
-                if (!tracked.Add(local))
-                {
-                    continue;
-                }
-
-                foreach (var reference in ReachableOperations(graph)
-                             .OfType<ILocalReferenceOperation>()
-                             .Where(reference =>
-                                 SymbolEqualityComparer.Default.Equals(
-                                     reference.Local,
-                                     local)))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (reference.IsDeclaration ||
-                        IsAssignmentTarget(reference.Syntax))
-                    {
-                        continue;
-                    }
-
-                    if (TryGetLocalDestination(
-                            reference.Syntax,
-                            out var alias))
-                    {
-                        pending.Enqueue(alias);
-                        continue;
-                    }
-
-                    return true;
-                }
+                return true;
             }
-
-            return false;
+            return CanReachConsumption(
+                graph,
+                initialLocal,
+                block.Ordinal,
+                definition.Span.End,
+                new HashSet<SyntaxNode> { definition },
+                GetTuplePath(value.Syntax, definition));
         }
 
         private bool TryGetLocalDestination(
             SyntaxNode value,
-            out ILocalSymbol local)
+            out ILocalSymbol local,
+            out SyntaxNode definition)
         {
             foreach (var ancestor in value.Ancestors())
             {
@@ -519,6 +538,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                         cancellationToken) is ILocalSymbol declared)
                 {
                     local = declared;
+                    definition = variable;
                     return true;
                 }
 
@@ -529,6 +549,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                         cancellationToken).Symbol is ILocalSymbol assigned)
                 {
                     local = assigned;
+                    definition = assignment;
                     return true;
                 }
 
@@ -539,7 +560,656 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             }
 
             local = null!;
+            definition = null!;
             return false;
+        }
+
+        private bool CanReachConsumption(
+            ControlFlowGraph graph,
+            ILocalSymbol local,
+            int definitionBlock,
+            int definitionEnd,
+            HashSet<SyntaxNode> activeDefinitions,
+            IReadOnlyList<string>? tuplePath = null)
+        {
+            var pending = new Queue<(int Ordinal, int After)>();
+            var visited = new HashSet<(int Ordinal, bool FromStart)>();
+            pending.Enqueue((definitionBlock, definitionEnd));
+            while (pending.Count != 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var (ordinal, after) = pending.Dequeue();
+                if (!visited.Add((ordinal, after < 0)))
+                {
+                    continue;
+                }
+                var block = graph.Blocks[ordinal];
+                var killed = false;
+                var exceptionalStateSurvivesKill = false;
+                foreach (var reference in BlockOperations(block)
+                             .SelectMany(static operation =>
+                                 operation.DescendantsAndSelf())
+                             .OfType<ILocalReferenceOperation>()
+                             .Where(reference =>
+                                 SymbolEqualityComparer.Default.Equals(
+                                     reference.Local,
+                                     local))
+                             .OrderBy(GetReferenceOrder))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var order = GetReferenceOrder(reference);
+                    if (order <= after || reference.IsDeclaration)
+                    {
+                        continue;
+                    }
+                    var accessedTuplePath = GetAccessedTuplePath(reference);
+                    if (IsAssignmentTarget(reference.Syntax))
+                    {
+                        if (AssignmentKillsTrackedValue(
+                                tuplePath,
+                                accessedTuplePath))
+                        {
+                            exceptionalStateSurvivesKill =
+                                BlockMayThrowBeforeAssignmentCommit(
+                                    block,
+                                    after,
+                                    reference);
+                            killed = true;
+                            break;
+                        }
+                        continue;
+                    }
+                    IReadOnlyList<string>? propagatedTuplePath = tuplePath;
+                    if (tuplePath != null && accessedTuplePath.Count != 0)
+                    {
+                        var shared = 0;
+                        while (shared < tuplePath.Count &&
+                               shared < accessedTuplePath.Count &&
+                               string.Equals(
+                                   tuplePath[shared],
+                                   accessedTuplePath[shared],
+                                   StringComparison.Ordinal))
+                        {
+                            shared++;
+                        }
+                        if (shared < accessedTuplePath.Count &&
+                            shared < tuplePath.Count)
+                        {
+                            continue;
+                        }
+                        propagatedTuplePath = shared < tuplePath.Count
+                            ? tuplePath.Skip(shared).ToArray()
+                            : null;
+                    }
+                    if (TryGetLocalDestination(
+                            reference.Syntax,
+                            out var alias,
+                            out var aliasDefinition) &&
+                        (accessedTuplePath.Count != 0 ||
+                         IsDirectDelegatePropagation(
+                             reference.Syntax,
+                             aliasDefinition)))
+                    {
+                        if (activeDefinitions.Add(aliasDefinition))
+                        {
+                            try
+                            {
+                                if (CanReachConsumption(
+                                        graph,
+                                        alias,
+                                        ordinal,
+                                        aliasDefinition.Span.End,
+                                        activeDefinitions,
+                                        propagatedTuplePath))
+                                {
+                                    return true;
+                                }
+                            }
+                            finally
+                            {
+                                activeDefinitions.Remove(aliasDefinition);
+                            }
+                        }
+                        continue;
+                    }
+                    if (TryGetDeconstructionDestination(
+                            reference.Syntax,
+                            propagatedTuplePath,
+                            out var deconstructionAlias,
+                            out var deconstructionDefinition,
+                            out var remainingTuplePath))
+                    {
+                        if (deconstructionAlias != null &&
+                            activeDefinitions.Add(deconstructionDefinition))
+                        {
+                            try
+                            {
+                                if (CanReachConsumption(
+                                        graph,
+                                        deconstructionAlias,
+                                        ordinal,
+                                        deconstructionDefinition.Span.End,
+                                        activeDefinitions,
+                                        remainingTuplePath))
+                                {
+                                    return true;
+                                }
+                            }
+                            finally
+                            {
+                                activeDefinitions.Remove(
+                                    deconstructionDefinition);
+                            }
+                        }
+                        continue;
+                    }
+                    var patternDestinations = GetPatternDestinations(
+                        reference.Syntax);
+                    if (patternDestinations.Count != 0)
+                    {
+                        foreach (var patternAlias in patternDestinations)
+                        {
+                            if (!activeDefinitions.Add(
+                                    patternAlias.Definition))
+                            {
+                                continue;
+                            }
+                            try
+                            {
+                                if (CanReachConsumption(
+                                        graph,
+                                        patternAlias.Local,
+                                        ordinal,
+                                        patternAlias.Definition.Span.End,
+                                        activeDefinitions,
+                                        propagatedTuplePath))
+                                {
+                                    return true;
+                                }
+                            }
+                            finally
+                            {
+                                activeDefinitions.Remove(
+                                    patternAlias.Definition);
+                            }
+                        }
+                        continue;
+                    }
+                    if (IsNonExecutingObservation(reference))
+                    {
+                        continue;
+                    }
+                    return true;
+                }
+                if (killed)
+                {
+                    if (exceptionalStateSurvivesKill)
+                    {
+                        foreach (var successor in ExceptionalSuccessors(
+                                     graph,
+                                     block))
+                        {
+                            pending.Enqueue((successor.Ordinal, -1));
+                        }
+                    }
+                    continue;
+                }
+                foreach (var successor in RegularSuccessors(block))
+                {
+                    pending.Enqueue((successor.Ordinal, -1));
+                }
+                if (BlockMayThrow(block, after))
+                {
+                    foreach (var successor in ExceptionalSuccessors(
+                                 graph,
+                                 block))
+                    {
+                        pending.Enqueue((successor.Ordinal, -1));
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static IReadOnlyList<string>? GetTuplePath(
+            SyntaxNode value,
+            SyntaxNode definition)
+        {
+            var components = value.Ancestors()
+                .OfType<ArgumentSyntax>()
+                .Where(candidate =>
+                    candidate.Parent?.Parent is TupleExpressionSyntax tuple &&
+                    definition.Span.Contains(tuple.Span))
+                .Select(argument =>
+                {
+                    var owner = (TupleExpressionSyntax)argument.Parent!.Parent!;
+                    var index = owner.Arguments.IndexOf(argument);
+                    return argument.NameColon?.Name.Identifier.ValueText ??
+                        $"Item{index + 1}";
+                })
+                .Reverse()
+                .ToArray();
+            return components.Length == 0 ? null : components;
+        }
+
+        private static IReadOnlyList<string> GetAccessedTuplePath(
+            ILocalReferenceOperation reference)
+        {
+            var components = new List<string>();
+            for (var operation = reference.Parent;
+                 operation != null;
+                 operation = operation.Parent)
+            {
+                if (operation is IConversionOperation or
+                    IParenthesizedOperation)
+                {
+                    continue;
+                }
+                if (operation is IFieldReferenceOperation field &&
+                    field.Field.ContainingType?.IsTupleType == true)
+                {
+                    components.Add(field.Field.Name);
+                    continue;
+                }
+                break;
+            }
+            return components;
+        }
+
+        private bool TryGetDeconstructionDestination(
+            SyntaxNode reference,
+            IReadOnlyList<string>? tuplePath,
+            out ILocalSymbol? local,
+            out SyntaxNode definition,
+            out IReadOnlyList<string>? remainingTuplePath)
+        {
+            local = null;
+            definition = null!;
+            remainingTuplePath = null;
+            if (tuplePath == null || tuplePath.Count == 0)
+            {
+                return false;
+            }
+
+            var assignment = reference.AncestorsAndSelf()
+                .OfType<AssignmentExpressionSyntax>()
+                .FirstOrDefault(candidate =>
+                    candidate.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                    candidate.Right.Span.Contains(reference.Span));
+            if (assignment == null)
+            {
+                return false;
+            }
+
+            var target = assignment.Left;
+            var sourceType = semanticModel.GetTypeInfo(
+                assignment.Right,
+                cancellationToken).Type as INamedTypeSymbol;
+            var consumed = 0;
+            while (sourceType?.IsTupleType == true &&
+                   consumed < tuplePath.Count)
+            {
+                var component = tuplePath[consumed];
+                var index = -1;
+                for (var candidate = 0;
+                     candidate < sourceType.TupleElements.Length;
+                     candidate++)
+                {
+                    var element = sourceType.TupleElements[candidate];
+                    if (string.Equals(
+                            element.Name,
+                            component,
+                            StringComparison.Ordinal) ||
+                        string.Equals(
+                            element.CorrespondingTupleField?.Name,
+                            component,
+                            StringComparison.Ordinal))
+                    {
+                        index = candidate;
+                        break;
+                    }
+                }
+                var elements = GetDeconstructionElements(target);
+                if (index < 0 || index >= elements.Count)
+                {
+                    return false;
+                }
+                target = elements[index];
+                sourceType = sourceType.TupleElements[index].Type as
+                    INamedTypeSymbol;
+                consumed++;
+                if (consumed < tuplePath.Count &&
+                    GetDeconstructionElements(target).Count == 0)
+                {
+                    break;
+                }
+            }
+
+            if (consumed == 0)
+            {
+                return false;
+            }
+            definition = assignment;
+            remainingTuplePath = consumed < tuplePath.Count
+                ? tuplePath.Skip(consumed).ToArray()
+                : null;
+            local = target switch
+            {
+                SingleVariableDesignationSyntax designation =>
+                    semanticModel.GetDeclaredSymbol(
+                        designation,
+                        cancellationToken) as ILocalSymbol,
+                DeclarationExpressionSyntax
+                    { Designation: SingleVariableDesignationSyntax designation } =>
+                    semanticModel.GetDeclaredSymbol(
+                        designation,
+                        cancellationToken) as ILocalSymbol,
+                IdentifierNameSyntax identifier => semanticModel.GetSymbolInfo(
+                    identifier,
+                    cancellationToken).Symbol as ILocalSymbol,
+                _ => null
+            };
+            return local != null || IsDiscardDeconstructionTarget(target);
+        }
+
+        private static IReadOnlyList<SyntaxNode> GetDeconstructionElements(
+            SyntaxNode target)
+        {
+            return target switch
+            {
+                TupleExpressionSyntax tuple => tuple.Arguments
+                    .Select(static argument => (SyntaxNode)argument.Expression)
+                    .ToArray(),
+                DeclarationExpressionSyntax
+                    { Designation: ParenthesizedVariableDesignationSyntax tuple } =>
+                    tuple.Variables.Cast<SyntaxNode>().ToArray(),
+                ParenthesizedVariableDesignationSyntax tuple =>
+                    tuple.Variables.Cast<SyntaxNode>().ToArray(),
+                _ => []
+            };
+        }
+
+        private static bool IsDiscardDeconstructionTarget(SyntaxNode target)
+        {
+            return target is DiscardDesignationSyntax or DiscardPatternSyntax ||
+                target is IdentifierNameSyntax identifier &&
+                identifier.Identifier.ValueText == "_";
+        }
+
+        private static BasicBlock? FindContainingBlock(
+            ControlFlowGraph graph,
+            SyntaxNode syntax)
+        {
+            return graph.Blocks.FirstOrDefault(block =>
+                BlockOperations(block).Any(operation =>
+                    operation.DescendantsAndSelf().Any(descendant =>
+                        descendant.Syntax.SyntaxTree == syntax.SyntaxTree &&
+                        descendant.Syntax.Span.Contains(syntax.Span))));
+        }
+
+        private static IEnumerable<IOperation> BlockOperations(
+            BasicBlock block)
+        {
+            return block.Operations.Concat(
+                block.BranchValue == null
+                    ? []
+                    : [block.BranchValue]);
+        }
+
+        private static IEnumerable<BasicBlock> RegularSuccessors(
+            BasicBlock block)
+        {
+            if (block.FallThroughSuccessor is
+                { Semantics: ControlFlowBranchSemantics.Regular or
+                    ControlFlowBranchSemantics.StructuredExceptionHandling,
+                  Destination: not null } fallThrough)
+            {
+                yield return fallThrough.Destination!;
+            }
+            if (block.ConditionalSuccessor is
+                { Semantics: ControlFlowBranchSemantics.Regular or
+                    ControlFlowBranchSemantics.StructuredExceptionHandling,
+                  Destination: not null } conditional &&
+                conditional.Destination.Ordinal !=
+                    block.FallThroughSuccessor?.Destination?.Ordinal)
+            {
+                yield return conditional.Destination!;
+            }
+        }
+
+        private static bool BlockMayThrow(BasicBlock block, int after)
+        {
+            return BlockOperations(block)
+                .Where(operation => operation.Syntax.Span.End > after)
+                .SelectMany(static operation =>
+                    operation.DescendantsAndSelf())
+                .Any(static operation => OperationMayThrow(operation));
+        }
+
+        private static bool BlockMayThrowBeforeAssignmentCommit(
+            BasicBlock block,
+            int after,
+            ILocalReferenceOperation reference)
+        {
+            for (var operation = reference.Parent;
+                 operation != null;
+                 operation = operation.Parent)
+            {
+                if (operation is ISimpleAssignmentOperation assignment)
+                {
+                    var commitEnd = assignment.Syntax.Span.End;
+                    return BlockOperations(block)
+                        .Where(candidate =>
+                            candidate.Syntax.Span.End > after &&
+                            candidate.Syntax.SpanStart < commitEnd)
+                        .SelectMany(static candidate =>
+                            candidate.DescendantsAndSelf())
+                        .Any(static candidate =>
+                            OperationMayThrow(candidate));
+                }
+            }
+            return false;
+        }
+
+        private static bool OperationMayThrow(IOperation operation)
+        {
+            if (operation is IConversionOperation conversion)
+            {
+                return conversion.IsChecked ||
+                    (!conversion.IsTryCast && !conversion.IsImplicit &&
+                     (conversion.Conversion.IsReference ||
+                      conversion.Operand.Type?.IsReferenceType == true &&
+                      conversion.Type?.IsValueType == true));
+            }
+            return operation is
+                IThrowOperation or
+                IInvocationOperation or
+                IDynamicInvocationOperation or
+                IDynamicObjectCreationOperation or
+                IDynamicIndexerAccessOperation or
+                IFunctionPointerInvocationOperation or
+                IObjectCreationOperation or
+                IArrayCreationOperation or
+                IArrayLengthOperation or
+                IArrayElementReferenceOperation or
+                IDynamicMemberReferenceOperation or
+                IFieldReferenceOperation { Instance: not null } or
+                IPropertyReferenceOperation or
+                IEventAssignmentOperation or
+                ILockOperation or
+                IAwaitOperation or
+                ICompoundAssignmentOperation
+                    { IsChecked: true } or
+                ICompoundAssignmentOperation
+                {
+                    OperatorKind: BinaryOperatorKind.Divide or
+                        BinaryOperatorKind.Remainder
+                } or
+                IBinaryOperation { IsChecked: true } or
+                IBinaryOperation
+                {
+                    OperatorKind: BinaryOperatorKind.Divide or
+                        BinaryOperatorKind.Remainder
+                } or
+                IUnaryOperation { IsChecked: true } or
+                IIncrementOrDecrementOperation { IsChecked: true };
+        }
+
+        private static IEnumerable<BasicBlock> ExceptionalSuccessors(
+            ControlFlowGraph graph,
+            BasicBlock block)
+        {
+            var yielded = new HashSet<int>();
+            for (var region = block.EnclosingRegion;
+                 region != null;
+                 region = region.EnclosingRegion)
+            {
+                if (region.Kind != ControlFlowRegionKind.Try ||
+                    region.EnclosingRegion is not { } owner)
+                {
+                    continue;
+                }
+                foreach (var handler in owner.NestedRegions.Where(candidate =>
+                             candidate.Kind is ControlFlowRegionKind.Filter or
+                                 ControlFlowRegionKind.Catch or
+                                 ControlFlowRegionKind.FilterAndHandler or
+                                 ControlFlowRegionKind.Finally))
+                {
+                    if (yielded.Add(handler.FirstBlockOrdinal))
+                    {
+                        yield return graph.Blocks[handler.FirstBlockOrdinal];
+                    }
+                }
+            }
+        }
+
+        private static int GetReferenceOrder(
+            ILocalReferenceOperation reference)
+        {
+            var assignment = reference.Syntax.AncestorsAndSelf()
+                .OfType<AssignmentExpressionSyntax>()
+                .FirstOrDefault(candidate =>
+                    candidate.Left.Span.Contains(reference.Syntax.Span));
+            return assignment?.Span.End ?? reference.Syntax.SpanStart;
+        }
+
+        private static bool IsDirectDelegatePropagation(
+            SyntaxNode reference,
+            SyntaxNode definition)
+        {
+            for (var current = reference.Parent;
+                 current != null && current != definition;
+                 current = current.Parent)
+            {
+                if (current is InvocationExpressionSyntax or
+                    ObjectCreationExpressionSyntax or
+                    ElementAccessExpressionSyntax or
+                    MemberAccessExpressionSyntax)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool IsNonExecutingObservation(
+            ILocalReferenceOperation reference)
+        {
+            if (reference.Syntax.Ancestors()
+                .OfType<AssignmentExpressionSyntax>()
+                .Any(assignment =>
+                    assignment.IsKind(
+                        SyntaxKind.CoalesceAssignmentExpression) &&
+                    assignment.Left.Span.Contains(reference.Syntax.Span)))
+            {
+                return true;
+            }
+            for (var operation = reference.Parent;
+                 operation != null;
+                 operation = operation.Parent)
+            {
+                if (operation is IConversionOperation or
+                    IParenthesizedOperation ||
+                    operation is IFieldReferenceOperation tupleField &&
+                    tupleField.Field.ContainingType?.IsTupleType == true)
+                {
+                    continue;
+                }
+                return operation is IBinaryOperation
+                    {
+                        OperatorMethod: null,
+                        OperatorKind: BinaryOperatorKind.Equals or
+                            BinaryOperatorKind.NotEquals
+                    } or IIsPatternOperation;
+            }
+            return false;
+        }
+
+        private IReadOnlyList<(ILocalSymbol Local, SyntaxNode Definition)>
+            GetPatternDestinations(SyntaxNode reference)
+        {
+            var pattern = reference.Ancestors()
+                .OfType<IsPatternExpressionSyntax>()
+                .FirstOrDefault();
+            if (pattern == null)
+            {
+                return [];
+            }
+            var result = new List<(
+                ILocalSymbol Local,
+                SyntaxNode Definition)>();
+            foreach (var designation in WholeInputDesignations(
+                         pattern.Pattern))
+            {
+                if (semanticModel.GetDeclaredSymbol(
+                        designation,
+                        cancellationToken) is ILocalSymbol declared &&
+                    !result.Any(candidate =>
+                        SymbolEqualityComparer.Default.Equals(
+                            candidate.Local,
+                            declared)))
+                {
+                    result.Add((declared, pattern));
+                }
+            }
+            return result;
+        }
+
+        private static IEnumerable<VariableDesignationSyntax>
+            WholeInputDesignations(PatternSyntax pattern)
+        {
+            switch (pattern)
+            {
+                case DeclarationPatternSyntax declaration:
+                    yield return declaration.Designation;
+                    yield break;
+                case VarPatternSyntax varPattern:
+                    yield return varPattern.Designation;
+                    yield break;
+                case RecursivePatternSyntax
+                    { Designation: { } designation }:
+                    yield return designation;
+                    yield break;
+                case ParenthesizedPatternSyntax parenthesized:
+                    foreach (var nested in WholeInputDesignations(
+                                 parenthesized.Pattern))
+                    {
+                        yield return nested;
+                    }
+                    yield break;
+                case BinaryPatternSyntax binary:
+                    foreach (var nested in WholeInputDesignations(
+                                 binary.Left))
+                    {
+                        yield return nested;
+                    }
+                    foreach (var nested in WholeInputDesignations(
+                                 binary.Right))
+                    {
+                        yield return nested;
+                    }
+                    yield break;
+            }
         }
 
         private static bool IsAssignmentTarget(
@@ -548,7 +1218,29 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return reference.Ancestors()
                 .OfType<AssignmentExpressionSyntax>()
                 .Any(assignment =>
+                    assignment.IsKind(
+                        SyntaxKind.SimpleAssignmentExpression) &&
                     assignment.Left.Span.Contains(reference.Span));
+        }
+
+        private static bool AssignmentKillsTrackedValue(
+            IReadOnlyList<string>? trackedPath,
+            IReadOnlyList<string> assignedPath)
+        {
+            if (trackedPath == null || assignedPath.Count == 0)
+            {
+                return true;
+            }
+            if (assignedPath.Count > trackedPath.Count)
+            {
+                return false;
+            }
+            return assignedPath
+                .Select((component, index) => (component, index))
+                .All(pair => string.Equals(
+                    pair.component,
+                    trackedPath[pair.index],
+                    StringComparison.Ordinal));
         }
 
         private static IEnumerable<IOperation> ReachableOperations(

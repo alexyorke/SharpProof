@@ -66,6 +66,25 @@ public sealed class WorkerBinaryIdentityTests
     }
 
     [Test]
+    public void CompilerManifestReaderRejectsEmptyOpenedFile()
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.EmptyManifest." + Guid.NewGuid().ToString("N"));
+        try
+        {
+            File.WriteAllBytes(path, []);
+            Assert.That(
+                (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
+                Throws.TypeOf<InvalidDataException>());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
     public void RuntimeClosureLimitsFailClosedAtEveryBoundary()
     {
         const long expectedMaximumComponentBytes = 32L * 1024 * 1024;

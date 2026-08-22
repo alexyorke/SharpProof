@@ -201,7 +201,9 @@
     <SharpProof.BuildTasks.RunVerifier
         Executable="$(_SharpProofDotNetHost)"
         Arguments="@(_SharpProofVerifierArgument)"
-        WorkingDirectory="$(MSBuildProjectDirectory)">
+        WorkingDirectory="$(MSBuildProjectDirectory)"
+        ProjectWallTimeMilliseconds="$(SharpProofVerifyProjectWallTimeMilliseconds)"
+        TerminationGraceMilliseconds="$(SharpProofVerifyTerminationGraceMilliseconds)">
       <Output TaskParameter="ExitCode"
               PropertyName="_SharpProofVerifierExitCode" />
       <Output TaskParameter="HasStructuredError"

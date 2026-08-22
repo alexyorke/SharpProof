@@ -99,6 +99,15 @@ internal static class EffectSummaryOperations
         EffectRegionSet receiver,
         ImmutableArray<EffectRegionSet> arguments)
     {
+        return Remap(summary, receiver, receiver, arguments);
+    }
+
+    internal static EffectSummary Remap(
+        EffectSummary summary,
+        EffectRegionSet receiver,
+        EffectRegionSet writeReceiver,
+        ImmutableArray<EffectRegionSet> arguments)
+    {
         if (summary.IsBottom)
         {
             return summary;
@@ -106,7 +115,7 @@ internal static class EffectSummaryOperations
 
         return new EffectSummary(
             RemapRegions(summary.Reads, receiver, arguments),
-            RemapRegions(summary.Writes, receiver, arguments),
+            RemapRegions(summary.Writes, writeReceiver, arguments),
             summary.Allocation, summary.Capabilities,
             summary.Throws, summary.Termination,
             summary.Completeness, summary.Uncertainty, summary.AnalysisIncompleteReason);

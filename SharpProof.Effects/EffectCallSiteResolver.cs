@@ -24,10 +24,34 @@ internal sealed class EffectCallSiteResolver(
         IOperation? instance,
         IEnumerable<IArgumentOperation>? callArguments = null)
     {
+        return Resolve(
+            target,
+            receiver,
+            receiver,
+            arguments,
+            actualArguments,
+            dispatchUncertain,
+            origin,
+            instance,
+            callArguments);
+    }
+
+    internal EffectSummary Resolve(
+        IMethodSymbol target,
+        EffectRegionSet receiver,
+        EffectRegionSet writeReceiver,
+        ImmutableArray<EffectRegionSet> arguments,
+        ImmutableArray<IOperation?> actualArguments,
+        bool dispatchUncertain,
+        IOperation origin,
+        IOperation? instance,
+        IEnumerable<IArgumentOperation>? callArguments = null)
+    {
         var summary = _session.ResolveCall(
             _caller,
             target,
             receiver,
+            writeReceiver,
             arguments,
             dispatchUncertain,
             _sourceCalls,
@@ -53,6 +77,7 @@ internal sealed class EffectCallSiteResolver(
             ? EffectSummary.Empty
             : Resolve(
                 target,
+                receiver,
                 receiver,
                 arguments,
                 actualArguments,
@@ -109,6 +134,7 @@ internal sealed class EffectCallSiteResolver(
             implicitLayers,
             Resolve(
                 constructor,
+                receiver,
                 receiver,
                 arguments,
                 AlignActualArguments(

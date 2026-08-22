@@ -697,6 +697,40 @@ public sealed class PortableIrGraphCodecTests
             (Action)(() => PortableIrGraphCodec.Decode(graph)));
     }
 
+    [Test]
+    public void EncoderRejectsTermsDeeperThanTheDecoderLimit()
+    {
+        var factory = new IrFactory();
+        IrTerm term = factory.Variable(
+            factory.CreateVariable("value", factory.BooleanType));
+        for (var index = 0;
+             index < PortableIrGraphCodec.MaximumGraphDepth;
+             index++)
+        {
+            term = factory.Unary(IrUnaryOperator.Not, term);
+        }
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            PortableIrGraphCodec.Encode(factory, null, [term])));
+    }
+
+    [Test]
+    public void EncoderRejectsTypesDeeperThanTheDecoderLimit()
+    {
+        var factory = new IrFactory();
+        var type = factory.IntegerType;
+        for (var index = 0;
+             index < PortableIrGraphCodec.MaximumGraphDepth;
+             index++)
+        {
+            type = factory.GetOrCreateSequenceType(type);
+        }
+        var term = factory.Variable(factory.CreateVariable("value", type));
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            PortableIrGraphCodec.Encode(factory, null, [term])));
+    }
+
     private static PortableIrGraph DeepGraph(
         DeepGraphKind kind,
         bool cyclic,

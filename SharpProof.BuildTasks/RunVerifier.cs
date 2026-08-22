@@ -1,18 +1,51 @@
 using System.ComponentModel;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
-public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTask
+public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTask
 {
+    internal const int LauncherProcessReserveMilliseconds = 1000;
+    internal const int MaximumCapturedOutputCharacters = 1_048_576;
+    internal const int OutputDrainPollingMilliseconds = 25;
+    private const int MaximumProtocolLineCharacters = 160;
+    private const int PidFdSendSignalSystemCall = 424;
+    private const int PidFdOpenSystemCall = 434;
+    private const int SignalTerminate = 15;
+    private const int SignalStop = 19;
+    private const int SignalKill = 9;
+    private const string ProcessGroupLauncher = "/usr/bin/setsid";
+    private const string ProcessGateStartMessage = "SharpProof.Start/1";
+    private const string SupervisorArmedMessage = "SharpProof.Armed/1";
+    private const string SupervisorCleanupMessage = "SharpProof.Cleanup/1";
+    private static readonly ConcurrentDictionary<long, CleanupAnchor>
+        RetainedCleanupAnchors = new();
+    private static long _nextCleanupAnchor;
     private readonly object _synchronization = new();
+    private readonly ManualResetEventSlim _cancellationSignal = new();
+    private readonly ManualResetEventSlim _outputLimitSignal = new();
     private Process? _process;
+    private int _processGroupId;
+    private int _processGroupPidFd = -1;
     private bool _canceled;
+
+    internal Func<int, int>? OpenPidFdOverride { get; set; }
+    internal Func<Process?, int, int, bool>? TryTerminateOverride
+        { get; set; }
+    internal Action<string>? ContainmentAuthenticationFailureOverride
+        { get; set; }
+
+    internal static int RetainedCleanupAnchorCount =>
+        RetainedCleanupAnchors.Count;
 
     [Required]
     public string Executable { get; set; } = string.Empty;
@@ -26,6 +59,10 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
 
     [Required]
     public string WorkingDirectory { get; set; } = string.Empty;
+
+    public int ProjectWallTimeMilliseconds { get; set; } = 300000;
+
+    public int TerminationGraceMilliseconds { get; set; } = 1000;
 
     [Output]
     public int ExitCode { get; set; }
@@ -51,23 +88,53 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
     public override bool Execute()
     {
         Process? process = null;
+        var processGroupId = 0;
+        System.Threading.Tasks.Task<BoundedProcessOutput>? standardOutput = null;
+        System.Threading.Tasks.Task<BoundedProcessOutput>? standardError = null;
+        var supervisorArmedSignal =
+            new System.Threading.Tasks.TaskCompletionSource<bool>(
+                System.Threading.Tasks.TaskCreationOptions
+                    .RunContinuationsAsynchronously);
+        var supervisorNonce = string.Empty;
+        var retainCleanupAnchor = false;
         HasStructuredError = false;
+        ExitCode = 0;
+        var containmentFailed = false;
+        if (!_canceled)
+        {
+            _cancellationSignal.Reset();
+        }
+        _outputLimitSignal.Reset();
         try
         {
             ContainerContract.ValidateRequired();
+            var processTimeout = ComputeProcessTimeout(
+                ProjectWallTimeMilliseconds,
+                TerminationGraceMilliseconds);
+            var verifierTimeout = processTimeout -
+                LauncherProcessReserveMilliseconds;
+            var processStopwatch = Stopwatch.StartNew();
             var resolvedExecutable = ResolveDotNetHost(Executable);
+            supervisorNonce = Convert.ToHexString(
+                RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
             process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = resolvedExecutable,
+                    FileName = ResolveProcessGroupLauncherRequired(),
                     WorkingDirectory = Path.GetFullPath(WorkingDirectory),
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
+                    RedirectStandardInput = true,
                     CreateNoWindow = true
                 }
             };
+            process.StartInfo.ArgumentList.Add(resolvedExecutable);
+            process.StartInfo.ArgumentList.Add(
+                ResolveSupervisorAssemblyRequired());
+            process.StartInfo.ArgumentList.Add("--supervise-verifier");
+            process.StartInfo.ArgumentList.Add(resolvedExecutable);
             foreach (var argument in Arguments)
             {
                 process.StartInfo.ArgumentList.Add(argument.ItemSpec);
@@ -84,13 +151,93 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
                     throw new InvalidOperationException(
                         "The SharpProof verifier process could not be started.");
                 }
+                processGroupId = process.Id;
+                int processGroupPidFd;
+                try
+                {
+                    processGroupPidFd = OpenPidFdRequired(processGroupId);
+                }
+                catch
+                {
+                    TerminateBootstrapProcess(process);
+                    throw;
+                }
                 _process = process;
+                _processGroupId = processGroupId;
+                _processGroupPidFd = processGroupPidFd;
+                process.StandardInput.WriteLine(
+                    ProcessGateStartMessage + " " + supervisorNonce);
+                process.StandardInput.Close();
             }
-            var standardOutput = process.StandardOutput.ReadToEndAsync();
-            var standardError = process.StandardError.ReadToEndAsync();
-            process.WaitForExit();
-            var output = standardOutput.GetAwaiter().GetResult();
-            var error = standardError.GetAwaiter().GetResult();
+            standardOutput = ReadBoundedOutputAsync(
+                process.StandardOutput,
+                supervisorNonce,
+                _outputLimitSignal,
+                supervisorArmedSignal);
+            standardError = ReadBoundedOutputAsync(
+                process.StandardError,
+                supervisorNonce: null,
+                _outputLimitSignal);
+            var timedOut = !WaitForExitOrCancellation(
+                process,
+                Math.Min(
+                    verifierTimeout,
+                    RemainingMilliseconds(
+                        processStopwatch,
+                        processTimeout)));
+            var canceled = _cancellationSignal.IsSet;
+            if (timedOut)
+            {
+                var contained = TryTerminate(
+                    process,
+                    processGroupId,
+                    RemainingMilliseconds(
+                        processStopwatch,
+                        processTimeout));
+                if (!contained)
+                {
+                    containmentFailed = true;
+                    retainCleanupAnchor = !process.HasExited;
+                }
+                canceled = _cancellationSignal.IsSet;
+                if (!canceled && !_outputLimitSignal.IsSet)
+                {
+                    _ = process.WaitForExit(RemainingMilliseconds(
+                        processStopwatch,
+                        processTimeout));
+                }
+            }
+            var outputCompleted = WaitForOutputCompletion(
+                System.Threading.Tasks.Task.WhenAll(
+                    standardOutput,
+                    standardError),
+                RemainingMilliseconds(
+                    processStopwatch,
+                    processTimeout),
+                () => _cancellationSignal.IsSet ||
+                    _outputLimitSignal.IsSet);
+            var interrupted = _cancellationSignal.IsSet ||
+                _outputLimitSignal.IsSet;
+            if (!outputCompleted)
+            {
+                timedOut = true;
+                var contained = TryTerminate(
+                    process,
+                    processGroupId,
+                    RemainingMilliseconds(
+                        processStopwatch,
+                        processTimeout));
+                containmentFailed |= !contained;
+                retainCleanupAnchor |= !contained && !process.HasExited;
+            }
+            var outputResult = standardOutput.IsCompletedSuccessfully
+                ? standardOutput.Result
+                : null;
+            var errorResult = standardError.IsCompletedSuccessfully
+                ? standardError.Result
+                : null;
+            var output = outputResult?.Text ?? string.Empty;
+            var error = errorResult?.Text ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(output))
             {
                 Log.LogMessage(MessageImportance.High, "{0}", output);
@@ -99,10 +246,47 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
             {
                 LogStandardError(error);
             }
-            ExitCode = process.ExitCode;
+            if (_outputLimitSignal.IsSet ||
+                outputResult?.LimitExceeded == true ||
+                errorResult?.LimitExceeded == true)
+            {
+                Log.LogError(
+                    "SharpProof verifier output exceeded the bounded " +
+                    "diagnostic capture limit.");
+            }
+            var supervisorArmed = outputResult?.SupervisorArmed == true ||
+                supervisorArmedSignal.Task.IsCompletedSuccessfully;
+            var authenticationRequired = supervisorArmed ||
+                process.HasExited && process.ExitCode != 125;
+            var deferAuthentication =
+                ShouldDeferSupervisorAuthentication(
+                    authenticationRequired,
+                    interrupted,
+                    outputCompleted);
+            if (deferAuthentication)
+            {
+                retainCleanupAnchor = true;
+            }
+            else if (!RequireSupervisorCleanupReceipt(
+                    outputResult?.CleanupAuthenticated == true,
+                    authenticationRequired))
+            {
+                containmentFailed = true;
+            }
+            ExitCode = containmentFailed
+                ? -1
+                : timedOut
+                    ? 124
+                    : process.ExitCode;
         }
         catch (Exception exception)
         {
+            var contained = TryTerminate(
+                process,
+                processGroupId,
+                LauncherProcessReserveMilliseconds);
+            retainCleanupAnchor = !contained &&
+                process is { HasExited: false };
             ExitCode = -1;
             Log.LogMessage(
                 MessageImportance.High,
@@ -111,16 +295,551 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         }
         finally
         {
+            var processGroupPidFd = -1;
             lock (_synchronization)
             {
                 if (ReferenceEquals(_process, process))
                 {
                     _process = null;
+                    _processGroupId = 0;
+                    processGroupPidFd = _processGroupPidFd;
+                    _processGroupPidFd = -1;
+                }
+            }
+            if (processGroupPidFd >= 0)
+            {
+                if (retainCleanupAnchor && process != null)
+                {
+                    RetainCleanupAnchor(
+                        process,
+                        processGroupPidFd,
+                        standardOutput,
+                        standardError,
+                        supervisorNonce,
+                        HandleContainmentAuthenticationFailure);
+                    process = null;
+                }
+                else
+                {
+                    _ = NativeMethods.Close(processGroupPidFd);
                 }
             }
             process?.Dispose();
         }
         return true;
+    }
+
+    internal static bool WaitForOutputCompletion(
+        System.Threading.Tasks.Task outputCompletion,
+        int timeoutMilliseconds,
+        Func<bool> isInterrupted,
+        Func<int, bool>? waitOverride = null)
+    {
+        ArgumentNullException.ThrowIfNull(outputCompletion);
+        ArgumentNullException.ThrowIfNull(isInterrupted);
+        if (timeoutMilliseconds <= 0)
+        {
+            return outputCompletion.IsCompleted;
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        while (true)
+        {
+            if (outputCompletion.IsCompleted)
+            {
+                return true;
+            }
+            if (isInterrupted())
+            {
+                return false;
+            }
+
+            var remaining = RemainingMilliseconds(
+                stopwatch,
+                timeoutMilliseconds);
+            if (remaining <= 0)
+            {
+                return outputCompletion.IsCompleted;
+            }
+
+            var slice = Math.Min(
+                OutputDrainPollingMilliseconds,
+                remaining);
+            var completed = waitOverride == null
+                ? outputCompletion.Wait(slice)
+                : waitOverride(slice);
+            if (completed)
+            {
+                return true;
+            }
+        }
+    }
+
+    internal static bool HasSupervisorProtocolRecord(
+        string output,
+        string message,
+        string nonce)
+    {
+        var expected = message + " " + nonce;
+        return output.Split('\n').Any(line =>
+            string.Equals(
+                line.EndsWith('\r') ? line[..^1] : line,
+                expected,
+                StringComparison.Ordinal));
+    }
+
+    internal static bool ShouldDeferSupervisorAuthentication(
+        bool authenticationRequired,
+        bool interrupted,
+        bool outputCompleted)
+    {
+        _ = interrupted;
+        return authenticationRequired && !outputCompleted;
+    }
+
+    internal static async System.Threading.Tasks.Task<BoundedProcessOutput>
+        ReadBoundedOutputAsync(
+            TextReader reader,
+            string? supervisorNonce,
+            ManualResetEventSlim outputLimitSignal,
+            System.Threading.Tasks.TaskCompletionSource<bool>?
+                supervisorArmedSignal = null)
+    {
+        var captured = new StringBuilder();
+        var protocolLine = new StringBuilder();
+        var protocolLineTooLong = false;
+        var limitExceeded = false;
+        var supervisorArmed = false;
+        var cleanupAuthenticated = false;
+        var buffer = new char[4096];
+        while (true)
+        {
+            var count = await reader.ReadAsync(
+                buffer,
+                0,
+                buffer.Length).ConfigureAwait(false);
+            if (count == 0)
+            {
+                break;
+            }
+            var remaining = MaximumCapturedOutputCharacters -
+                captured.Length;
+            if (remaining > 0)
+            {
+                captured.Append(buffer, 0, Math.Min(remaining, count));
+            }
+            if (count > remaining)
+            {
+                limitExceeded = true;
+                outputLimitSignal.Set();
+            }
+            if (supervisorNonce == null)
+            {
+                continue;
+            }
+            for (var index = 0; index < count; index++)
+            {
+                var character = buffer[index];
+                if (character == '\n')
+                {
+                    if (!protocolLineTooLong)
+                    {
+                        var line = protocolLine.ToString();
+                        if (line.EndsWith('\r'))
+                        {
+                            line = line[..^1];
+                        }
+                        var armedRecord = string.Equals(
+                            line,
+                            SupervisorArmedMessage + " " + supervisorNonce,
+                            StringComparison.Ordinal);
+                        supervisorArmed |= armedRecord;
+                        if (armedRecord)
+                        {
+                            supervisorArmedSignal?.TrySetResult(true);
+                        }
+                        cleanupAuthenticated |= string.Equals(
+                            line,
+                            SupervisorCleanupMessage + " " + supervisorNonce,
+                            StringComparison.Ordinal);
+                    }
+                    protocolLine.Clear();
+                    protocolLineTooLong = false;
+                    continue;
+                }
+                if (!protocolLineTooLong)
+                {
+                    if (protocolLine.Length < MaximumProtocolLineCharacters)
+                    {
+                        protocolLine.Append(character);
+                    }
+                    else
+                    {
+                        protocolLine.Clear();
+                        protocolLineTooLong = true;
+                    }
+                }
+            }
+        }
+        return new BoundedProcessOutput(
+            captured.ToString(),
+            limitExceeded,
+            supervisorArmed,
+            cleanupAuthenticated);
+    }
+
+    internal bool RequireSupervisorCleanupReceipt(
+        bool cleanupAuthenticated,
+        bool authenticationRequired)
+    {
+        if (!authenticationRequired || cleanupAuthenticated)
+        {
+            return true;
+        }
+        HandleContainmentAuthenticationFailure(
+            "The SharpProof verifier containment supervisor exited " +
+            "without an authenticated cleanup receipt.");
+        return false;
+    }
+
+    private void HandleContainmentAuthenticationFailure(string message)
+    {
+        if (ContainmentAuthenticationFailureOverride is { } handler)
+        {
+            handler(message);
+            return;
+        }
+        Environment.FailFast(message);
+    }
+
+    internal static void RetainCleanupAnchorForTest(Process process)
+    {
+        RetainCleanupAnchor(process, -1, null, null, null, null);
+    }
+
+    internal static void RetainCleanupAnchorForTest(
+        Process process,
+        System.Threading.Tasks.Task<string>? standardOutput,
+        string? supervisorNonce,
+        Action<string>? authenticationFailure)
+    {
+        var boundedOutput = standardOutput == null
+            ? null
+            : ConvertTestOutputAsync(standardOutput, supervisorNonce);
+        RetainCleanupAnchor(
+            process,
+            -1,
+            boundedOutput,
+            null,
+            supervisorNonce,
+            authenticationFailure);
+    }
+
+    private static async System.Threading.Tasks.Task<BoundedProcessOutput>
+        ConvertTestOutputAsync(
+            System.Threading.Tasks.Task<string> output,
+            string? supervisorNonce)
+    {
+        var text = await output.ConfigureAwait(false);
+        return new BoundedProcessOutput(
+            text,
+            LimitExceeded: false,
+            SupervisorArmed: supervisorNonce != null &&
+                HasSupervisorProtocolRecord(
+                    text,
+                    SupervisorArmedMessage,
+                    supervisorNonce),
+            CleanupAuthenticated: supervisorNonce != null &&
+                HasSupervisorProtocolRecord(
+                    text,
+                    SupervisorCleanupMessage,
+                    supervisorNonce));
+    }
+
+    private static void RetainCleanupAnchor(
+        Process process,
+        int processGroupPidFd,
+        System.Threading.Tasks.Task<BoundedProcessOutput>? standardOutput,
+        System.Threading.Tasks.Task<BoundedProcessOutput>? standardError,
+        string? supervisorNonce = null,
+        Action<string>? authenticationFailure = null)
+    {
+        var token = Interlocked.Increment(ref _nextCleanupAnchor);
+        var anchor = new CleanupAnchor(
+            process,
+            processGroupPidFd,
+            standardOutput,
+            standardError,
+            supervisorNonce,
+            authenticationFailure);
+        if (!RetainedCleanupAnchors.TryAdd(token, anchor))
+        {
+            throw new InvalidOperationException(
+                "SharpProof could not retain its cleanup anchor.");
+        }
+        ObserveFault(anchor.StandardOutput);
+        ObserveFault(anchor.StandardError);
+        _ = ObserveCleanupAnchorAsync(token, anchor);
+    }
+
+    private static async System.Threading.Tasks.Task
+        ObserveCleanupAnchorAsync(long token, CleanupAnchor anchor)
+    {
+        try
+        {
+            await anchor.Process.WaitForExitAsync().ConfigureAwait(false);
+            if (anchor.SupervisorNonce != null &&
+                anchor.AuthenticationFailure != null)
+            {
+                var output = anchor.StandardOutput == null
+                    ? null
+                    : await AwaitOutputAfterSupervisorExit(
+                        anchor.StandardOutput).ConfigureAwait(false);
+                if (output == null ||
+                    !output.SupervisorArmed ||
+                    !output.CleanupAuthenticated)
+                {
+                    anchor.AuthenticationFailure(
+                        "The retained SharpProof verifier containment " +
+                        "supervisor exited without an authenticated " +
+                        "cleanup receipt.");
+                }
+            }
+        }
+        catch (InvalidOperationException) { }
+        finally
+        {
+            if (anchor.ProcessGroupPidFd >= 0)
+            {
+                _ = NativeMethods.Close(anchor.ProcessGroupPidFd);
+            }
+            anchor.Process.Dispose();
+            _ = RetainedCleanupAnchors.TryRemove(token, out _);
+        }
+    }
+
+    private static async System.Threading.Tasks.Task<BoundedProcessOutput?>
+        AwaitOutputAfterSupervisorExit(
+            System.Threading.Tasks.Task<BoundedProcessOutput> output)
+    {
+        var completed = await System.Threading.Tasks.Task.WhenAny(
+            output,
+            System.Threading.Tasks.Task.Delay(
+                LauncherProcessReserveMilliseconds)).ConfigureAwait(false);
+        return ReferenceEquals(completed, output) &&
+            output.IsCompletedSuccessfully
+                ? output.Result
+                : null;
+    }
+
+    private static void ObserveFault(
+        System.Threading.Tasks.Task<BoundedProcessOutput>? task)
+    {
+        if (task == null)
+        {
+            return;
+        }
+        _ = task.ContinueWith(
+            static completed => _ = completed.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted |
+                TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private sealed record CleanupAnchor(
+        Process Process,
+        int ProcessGroupPidFd,
+        System.Threading.Tasks.Task<BoundedProcessOutput>? StandardOutput,
+        System.Threading.Tasks.Task<BoundedProcessOutput>? StandardError,
+        string? SupervisorNonce,
+        Action<string>? AuthenticationFailure);
+
+    internal sealed record BoundedProcessOutput(
+        string Text,
+        bool LimitExceeded,
+        bool SupervisorArmed,
+        bool CleanupAuthenticated);
+
+    internal static int ComputeProcessTimeout(
+        int projectWallTimeMilliseconds,
+        int terminationGraceMilliseconds)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            projectWallTimeMilliseconds,
+            1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            terminationGraceMilliseconds,
+            1);
+        return checked(
+            projectWallTimeMilliseconds +
+            terminationGraceMilliseconds +
+            LauncherProcessReserveMilliseconds);
+    }
+
+    private static int RemainingMilliseconds(
+        Stopwatch stopwatch,
+        int timeoutMilliseconds)
+    {
+        var remaining = timeoutMilliseconds - stopwatch.ElapsedMilliseconds;
+        return remaining <= 0
+            ? 0
+            : (int)Math.Min(remaining, int.MaxValue);
+    }
+
+    private bool WaitForExitOrCancellation(
+        Process process,
+        int timeoutMilliseconds)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        while (!_cancellationSignal.IsSet && !_outputLimitSignal.IsSet)
+        {
+            var remaining = RemainingMilliseconds(
+                stopwatch,
+                timeoutMilliseconds);
+            if (remaining == 0)
+            {
+                return process.HasExited;
+            }
+            if (process.WaitForExit(Math.Min(remaining, 25)))
+            {
+                return true;
+            }
+        }
+        return process.HasExited;
+    }
+
+    private static string ResolveProcessGroupLauncherRequired()
+    {
+        if (!File.Exists(ProcessGroupLauncher))
+        {
+            throw new InvalidOperationException(
+                "SharpProof could not establish the verifier process boundary.");
+        }
+        return LinuxPathIdentity.Canonicalize(ProcessGroupLauncher);
+    }
+
+    private static string ResolveSupervisorAssemblyRequired()
+    {
+        var assembly = typeof(RunVerifier).Assembly.Location;
+        if (!File.Exists(assembly) ||
+            !File.Exists(Path.ChangeExtension(
+                assembly,
+                ".runtimeconfig.json")))
+        {
+            throw new InvalidOperationException(
+                "SharpProof could not establish the verifier supervisor.");
+        }
+        return LinuxPathIdentity.Canonicalize(assembly);
+    }
+
+    private static void TerminateBootstrapProcess(Process process)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+            _ = process.WaitForExit(1000);
+        }
+        catch (InvalidOperationException) { }
+        catch (Win32Exception) { }
+    }
+
+    private bool TryTerminate(
+        Process? process,
+        int processGroupId,
+        int terminationWaitMilliseconds)
+    {
+        if (TryTerminateOverride is { } terminateOverride)
+        {
+            return terminateOverride(
+                process,
+                processGroupId,
+                terminationWaitMilliseconds);
+        }
+        if (process == null)
+        {
+            return true;
+        }
+        lock (_synchronization)
+        {
+            if (!ReferenceEquals(_process, process) ||
+                _processGroupId != processGroupId ||
+                _processGroupPidFd < 0)
+            {
+                return true;
+            }
+
+            var terminationStopwatch = Stopwatch.StartNew();
+            var terminateSent = SendPidFdSignal(
+                _processGroupPidFd,
+                SignalTerminate) == 0;
+            var boundedWait = Math.Min(
+                terminationWaitMilliseconds,
+                LauncherProcessReserveMilliseconds);
+            if (terminateSent && boundedWait > 0 &&
+                process.WaitForExit(boundedWait))
+            {
+                return process.ExitCode != 125;
+            }
+            if (terminateSent && !process.HasExited)
+            {
+                // The supervisor remains the subreaper while it retries its
+                // individually bounded cleanup batches. Killing it here
+                // would reparent session-escaping descendants beyond the
+                // containment boundary.
+                return false;
+            }
+            var cleanup = VerifierProcessSupervisor.StopDescendants(
+                processGroupId,
+                Math.Min(RemainingMilliseconds(
+                    terminationStopwatch,
+                    terminationWaitMilliseconds),
+                    LauncherProcessReserveMilliseconds));
+            if (SendPidFdSignal(_processGroupPidFd, SignalStop) == 0)
+            {
+                // The stopped session leader keeps this process-group identity
+                // live while the group-directed signal is delivered.
+                _ = NativeMethods.Kill(-processGroupId, SignalKill);
+                _ = SendPidFdSignal(_processGroupPidFd, SignalKill);
+            }
+            else if (Marshal.GetLastPInvokeError() != 3)
+            {
+                _ = SendPidFdSignal(_processGroupPidFd, SignalKill);
+            }
+            return cleanup.Complete;
+        }
+    }
+
+    private int OpenPidFdRequired(int processId)
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            throw new PlatformNotSupportedException(
+                "SharpProof verifier containment requires Linux amd64.");
+        }
+        var descriptor = OpenPidFdOverride?.Invoke(processId) ??
+            checked((int)NativeMethods.SystemCall2(
+                PidFdOpenSystemCall,
+                processId,
+                0));
+        if (descriptor < 0)
+        {
+            throw new InvalidOperationException(
+                "SharpProof could not pin the verifier process boundary " +
+                $"(errno {Marshal.GetLastPInvokeError()}).");
+        }
+        return descriptor;
+    }
+
+    private static int SendPidFdSignal(int descriptor, int signal)
+    {
+        return checked((int)NativeMethods.SystemCall4(
+            PidFdSendSignalSystemCall,
+            descriptor,
+            signal,
+            0,
+            0));
     }
 
     internal void LogStandardError(string standardError)
@@ -308,24 +1027,22 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
     public void Cancel()
     {
         Process? process;
+        int processGroupId;
         lock (_synchronization)
         {
             _canceled = true;
+            _cancellationSignal.Set();
             process = _process;
+            processGroupId = _processGroupId;
         }
         if (process == null)
         {
             return;
         }
-        try
-        {
-            if (!process.HasExited)
-            {
-                process.Kill();
-            }
-        }
-        catch (InvalidOperationException) { }
-        catch (Win32Exception) { }
+        _ = TryTerminate(
+            process,
+            processGroupId,
+            LauncherProcessReserveMilliseconds);
     }
 
     private static string ResolveDotNetFromPath()
@@ -375,6 +1092,33 @@ public sealed class RunVerifier : Microsoft.Build.Utilities.Task, ICancelableTas
         LinuxPathIdentity.Canonicalize(
             Path.Combine(directoryPath, "host", "fxr"));
         return resolved;
+    }
+
+    private static partial class NativeMethods
+    {
+        [LibraryImport("libc", EntryPoint = "close", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int Close(int descriptor);
+
+        [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int Kill(int processId, int signal);
+
+        [LibraryImport("libc", EntryPoint = "syscall", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial nint SystemCall2(
+            nint number,
+            int argument1,
+            uint argument2);
+
+        [LibraryImport("libc", EntryPoint = "syscall", SetLastError = true)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial nint SystemCall4(
+            nint number,
+            int argument1,
+            int argument2,
+            nint argument3,
+            uint argument4);
     }
 
 }

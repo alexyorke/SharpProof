@@ -525,8 +525,8 @@ internal static class CompilerLoweredArtifact
                 CompilerVariableRole.PreState => item.Ordinal == -1 && item.CurrentStateVariable.HasValue &&
                     current.Contains(item.CurrentStateVariable.Value) &&
                     item.ModelLabel.StartsWith("pre:", StringComparison.Ordinal) &&
-                    int.TryParse(item.ModelLabel.Substring(4), NumberStyles.None, CultureInfo.InvariantCulture, out var ordinal) &&
-                    ordinal >= 0,
+                    int.TryParse(item.ModelLabel.Substring(4), NumberStyles.None,
+                        CultureInfo.InvariantCulture, out var ordinal) && ordinal >= 0,
                 _ => false
             };
             if (!shape || item.ModelLabel != label ||

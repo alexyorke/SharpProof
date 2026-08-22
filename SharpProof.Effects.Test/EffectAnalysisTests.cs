@@ -1290,7 +1290,6 @@ public sealed class EffectAnalysisTests
             }
             """);
         var session = new EffectAnalysisSession(compilation);
-
         using (Assert.EnterMultipleScope())
         {
             foreach (var name in new[] {
@@ -1936,6 +1935,40 @@ public sealed class EffectAnalysisTests
                 Assert.That(result.Summary.Completeness,
                     Is.EqualTo(EffectCompleteness.Complete), methodName);
             }
+        }
+    }
+
+    [Test]
+    public void UsingValueTypesDisposeOnlyTheirAcquiredCopies()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public struct Resource : IDisposable {
+                public int Value;
+                public void Dispose() => Value++;
+            }
+
+            public static class Sample {
+                public static void Statement(ref Resource input) {
+                    using (input) { }
+                }
+
+                public static void Declaration(ref Resource input) {
+                    using Resource copy = input;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] { "Statement", "Declaration" })
+        {
+            var result = session.Analyze(Method(compilation, methodName));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.False,
+                methodName);
         }
     }
 
@@ -3436,6 +3469,9 @@ public sealed class EffectAnalysisTests
             public struct Counter {
                 public int Value;
                 public void ClearValue() => Value = 0;
+                public readonly int ReadValue() => Value;
+                public readonly void MutateReadonlyThis() => ClearValue();
+                public readonly int ReadReadonlyThis() => ReadValue();
             }
 
             public static class Sample {
@@ -3445,6 +3481,14 @@ public sealed class EffectAnalysisTests
                     value.ClearValue();
                 public static void WriteRef(ref Counter value) =>
                     value.Value = 0;
+                public static void MutateLocalCopy(ref Counter source) {
+                    Counter copy = source;
+                    copy.ClearValue();
+                }
+                public static void MutateIn(in Counter source) =>
+                    source.ClearValue();
+                public static int ReadIn(in Counter source) =>
+                    source.ReadValue();
             }
             """);
         var session = new EffectAnalysisSession(compilation);
@@ -3454,6 +3498,22 @@ public sealed class EffectAnalysisTests
             Method(compilation, "MutateCopy")).Summary;
         var byReference = session.Analyze(
             Method(compilation, "WriteRef")).Summary;
+        var localCopy = session.Analyze(
+            Method(compilation, "MutateLocalCopy")).Summary;
+        var mutateIn = session.Analyze(
+            Method(compilation, "MutateIn")).Summary;
+        var readIn = session.Analyze(
+            Method(compilation, "ReadIn")).Summary;
+        var mutateReadonlyThis = session.Analyze(
+            EffectTestHost.RequireMethod(
+                compilation,
+                "Counter",
+                "MutateReadonlyThis")).Summary;
+        var readReadonlyThis = session.Analyze(
+            EffectTestHost.RequireMethod(
+                compilation,
+                "Counter",
+                "ReadReadonlyThis")).Summary;
         var mutableThis = session.Analyze(
             EffectTestHost.RequireMethod(
                 compilation,
@@ -3470,8 +3530,151 @@ public sealed class EffectAnalysisTests
                 byReference.Writes.Contains(EffectRegionId.Parameter(0)),
                 Is.True);
             Assert.That(
+                localCopy.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.False);
+            Assert.That(
+                mutateIn.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.False);
+            Assert.That(
+                readIn.Reads.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(
+                mutateReadonlyThis.Writes.Contains(EffectRegionId.Receiver),
+                Is.False);
+            Assert.That(
+                readReadonlyThis.Reads.Contains(EffectRegionId.Receiver),
+                Is.True);
+            Assert.That(
                 mutableThis.Writes.Contains(EffectRegionId.Receiver),
                 Is.True);
+        }
+    }
+
+    [Test]
+    public void RefLikeValueCopiesPreserveExternalAliases()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public ref struct RefAlias {
+                public ref int Cell;
+                public RefAlias(ref int cell) { Cell = ref cell; }
+                public void Bind(ref int cell) { Cell = ref cell; }
+                public void CopyTo(ref RefAlias target) {
+                    target.Cell = ref Cell;
+                }
+                public void CopyFrom(RefAlias source) {
+                    Cell = ref source.Cell;
+                }
+                public void Set() => Cell = 1;
+                public void Dispose() => Cell = 1;
+            }
+
+            public static class Sample {
+                public static void MutateValue(RefAlias value) => value.Set();
+                public static void MutateIn(in RefAlias value) => value.Set();
+                public static void MutateLocal(ref RefAlias source) {
+                    RefAlias copy = source;
+                    copy.Set();
+                }
+                public static void MutateConstruction(ref int cell) {
+                    var alias = new RefAlias(ref cell);
+                    alias.Set();
+                }
+                public static void DisposeValue(RefAlias value) {
+                    using (value) { }
+                }
+                public static void BindThenMutate(ref int cell) {
+                    RefAlias alias = default;
+                    alias.Cell = ref cell;
+                    alias.Set();
+                }
+                public static void CallBindThenMutate(ref int cell) {
+                    RefAlias alias = default;
+                    alias.Bind(ref cell);
+                    alias.Set();
+                }
+                private static void BindStatic(
+                    ref RefAlias alias,
+                    ref int cell) {
+                    alias.Cell = ref cell;
+                }
+                public static void CallStaticBindThenMutate(ref int cell) {
+                    RefAlias alias = default;
+                    BindStatic(ref alias, ref cell);
+                    alias.Set();
+                }
+                public static void CopyReceiverThenMutate(RefAlias source) {
+                    RefAlias target = default;
+                    source.CopyTo(ref target);
+                    target.Set();
+                }
+                public static void CopyValueThenMutate(RefAlias source) {
+                    RefAlias target = default;
+                    target.CopyFrom(source);
+                    target.Set();
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var value = session.Analyze(
+            Method(compilation, "MutateValue")).Summary;
+        var local = session.Analyze(
+            Method(compilation, "MutateLocal")).Summary;
+        var mutateIn = session.Analyze(
+            Method(compilation, "MutateIn")).Summary;
+        var construction = session.Analyze(
+            Method(compilation, "MutateConstruction")).Summary;
+        var disposal = session.Analyze(
+            Method(compilation, "DisposeValue")).Summary;
+        var rebound = session.Analyze(
+            Method(compilation, "BindThenMutate")).Summary;
+        var reboundByCall = session.Analyze(
+            Method(compilation, "CallBindThenMutate")).Summary;
+        var reboundByStaticCall = session.Analyze(
+            Method(compilation, "CallStaticBindThenMutate")).Summary;
+        var copiedFromReceiver = session.Analyze(
+            Method(compilation, "CopyReceiverThenMutate")).Summary;
+        var copiedFromValue = session.Analyze(
+            Method(compilation, "CopyValueThenMutate")).Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                value.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(value.Writes.IsUnknown, Is.False);
+            Assert.That(
+                local.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(local.Writes.IsUnknown, Is.False);
+            Assert.That(
+                mutateIn.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(construction.Writes.IsUnknown, Is.True);
+            Assert.That(
+                disposal.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(
+                rebound.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(
+                reboundByCall.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(reboundByCall.Writes.IsUnknown, Is.False);
+            Assert.That(
+                reboundByStaticCall.Writes.Contains(
+                    EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(reboundByStaticCall.Writes.IsUnknown, Is.False);
+            Assert.That(
+                copiedFromReceiver.Writes.Contains(
+                    EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(copiedFromReceiver.Writes.IsUnknown, Is.False);
+            Assert.That(
+                copiedFromValue.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(copiedFromValue.Writes.IsUnknown, Is.False);
         }
     }
 
@@ -4238,7 +4441,204 @@ public sealed class EffectAnalysisTests
         var compilation = EffectTestHost.CreateCompilation(
             """
             using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
             public interface IExternal { void Run(); }
+            public sealed class UserException : Exception {
+                public UserException(bool fail) {
+                    if (fail) throw new ArgumentException();
+                }
+            }
+            public sealed class ThrowingConstructionWithInitializer {
+                public ThrowingConstructionWithInitializer() =>
+                    throw new ArgumentException();
+                public int Value {
+                    set => throw new InvalidOperationException();
+                }
+            }
+            public sealed class ThrowingSetter {
+                public int Value {
+                    get => 0;
+                    set => throw new InvalidOperationException();
+                }
+            }
+            public sealed class ThrowingGetter {
+                public int Value => throw new InvalidOperationException();
+            }
+            public record ThrowingCloneRecord {
+                public ThrowingCloneRecord() { }
+                protected ThrowingCloneRecord(ThrowingCloneRecord other) =>
+                    throw new InvalidOperationException();
+                public int Value { get; init; }
+            }
+            public record DivergingCloneRecord {
+                public DivergingCloneRecord() { }
+                protected DivergingCloneRecord(DivergingCloneRecord other) {
+                    while (true) { }
+                }
+                public int Value { get; init; }
+            }
+            public sealed class ThrowingDeconstruction {
+                public void Deconstruct(out int left, out int right) {
+                    left = right = 0;
+                    throw new InvalidOperationException();
+                }
+            }
+            public sealed class DivergingDeconstruction {
+                public void Deconstruct(out int left, out int right) {
+                    left = right = 0;
+                    while (true) { }
+                }
+            }
+            public sealed class NullTarget {
+                public int Value;
+                public void Touch() { }
+                public void TouchValue(int value) { }
+                public int SetOnly { set { } }
+                public void Fail() => throw new InvalidOperationException();
+            }
+            public sealed class EventTarget {
+                public event Action Changed { add { } remove { } }
+            }
+            public sealed class NullAwaitable {
+                public NullAwaiter GetAwaiter() => null!;
+            }
+            public sealed class NullAwaiter : INotifyCompletion {
+                public bool IsCompleted => true;
+                public void OnCompleted(Action continuation) { }
+                public void GetResult() { }
+            }
+            public sealed class StaticBomb {
+                static StaticBomb() => throw new ApplicationException();
+                public StaticBomb() { }
+                public static int Value;
+                public static int Property { set { } }
+            }
+            public sealed class DivergingStaticBomb {
+                static DivergingStaticBomb() { while (true) { } }
+                public static int Value => 0;
+            }
+            public static class BeforeFieldInitBomb {
+                private static readonly int Value = FailInitialization();
+                private static int FailInitialization() =>
+                    throw new ApplicationException();
+                public static int Read() => Value;
+                public static void Run() =>
+                    throw new InvalidOperationException();
+            }
+            public sealed class ThrowingStaticConstruction {
+                static ThrowingStaticConstruction() =>
+                    throw new ApplicationException();
+                public ThrowingStaticConstruction() =>
+                    throw new InvalidOperationException();
+            }
+            public static class Extensions {
+                static Extensions() => throw new ApplicationException();
+                public static void Touch(this object value) { }
+                public static ExtensionEnumerator GetEnumerator(
+                    this ExtensionSequence value) => default;
+            }
+            public sealed class ExtensionSequence { }
+            public struct ExtensionEnumerator {
+                public bool MoveNext() => false;
+                public int Current => 0;
+            }
+            public sealed class GenericStaticBomb<T> {
+                static GenericStaticBomb() {
+                    if (typeof(T) == typeof(string))
+                        throw new ApplicationException();
+                }
+                public static int Value;
+                private static int s_genericState;
+                public static void GenericStaticProbe() {
+                    try { _ = GenericStaticBomb<string>.Value; }
+                    catch (TypeInitializationException) { s_genericState++; }
+                }
+            }
+            public readonly struct ThrowingOperator {
+                public static ThrowingOperator operator +(
+                    ThrowingOperator left,
+                    ThrowingOperator right) =>
+                    throw new InvalidOperationException();
+            }
+            public readonly struct ThrowingStaticOperator {
+                static ThrowingStaticOperator() =>
+                    throw new ApplicationException();
+                public static ThrowingStaticOperator operator +(
+                    ThrowingStaticOperator left,
+                    ThrowingStaticOperator right) => default;
+            }
+            public readonly struct NonThrowingDivide {
+                public static NonThrowingDivide operator /(
+                    NonThrowingDivide left,
+                    NonThrowingDivide right) => default;
+            }
+            public readonly struct ShortCircuitGate {
+                public static bool operator false(ShortCircuitGate value) =>
+                    true;
+                public static bool operator true(ShortCircuitGate value) =>
+                    false;
+                public static ShortCircuitGate operator &(
+                    ShortCircuitGate left,
+                    ShortCircuitGate right) => left;
+            }
+            public sealed class ThrowingCompoundSetter {
+                public ThrowingOperator Item {
+                    get => default;
+                    set => throw new ApplicationException();
+                }
+            }
+            public sealed class ThrowingResource : IDisposable {
+                public void Dispose() =>
+                    throw new InvalidOperationException();
+            }
+            public sealed class DivergingResource : IDisposable {
+                public void Dispose() { while (true) { } }
+            }
+            public sealed class ApplicationThrowingResource : IDisposable {
+                public void Dispose() => throw new ApplicationException();
+            }
+            public sealed class ThrowingMutatingResource : IDisposable {
+                private int _state;
+                public void Dispose() {
+                    _state++;
+                    throw new InvalidOperationException();
+                }
+            }
+            public sealed class RecursiveResource : IDisposable {
+                public void Dispose() => Dispose();
+            }
+            public sealed class RecursiveThrowingResource : IDisposable {
+                private static bool s_throw;
+                public void Dispose() {
+                    if (s_throw) throw new InvalidOperationException();
+                    Dispose();
+                }
+            }
+            public sealed class ThrowingSequence {
+                public Enumerator GetEnumerator() =>
+                    throw new InvalidOperationException();
+                public struct Enumerator {
+                    public bool MoveNext() => false;
+                    public int Current => 0;
+                }
+            }
+            public sealed class ThrowingMoveNextSequence {
+                public Enumerator GetEnumerator() => new Enumerator();
+                public struct Enumerator {
+                    public bool MoveNext() =>
+                        throw new InvalidOperationException();
+                    public int Current =>
+                        throw new ApplicationException();
+                }
+            }
+            public sealed class NullEnumeratorSequence {
+                public Enumerator GetEnumerator() => null!;
+                public sealed class Enumerator {
+                    public bool MoveNext() => false;
+                    public int Current => 0;
+                }
+            }
             public static class Sample {
                 private static int s_state;
                 public static void EmptyTry() { try { } catch { s_state++; } }
@@ -4248,12 +4648,130 @@ public sealed class EffectAnalysisTests
                 public static void FalseFilter() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) when (false) { s_state++; } }
                 public static void TrueFilter() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) when (true) { s_state++; } }
                 public static void OrderedHierarchy() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { } catch (Exception) { s_state++; } }
+                public static void MismatchedCatch() { try { throw new InvalidOperationException(); } catch (ArgumentException) { } s_state++; }
+                public static void FinallyAfterFailure() { Fail(); try { } finally { s_state++; } }
+                public static void FinallyAfterDivergence() { try { Spin(); } finally { s_state++; } }
+                public static void AfterNonreturningFinally() { try { } finally { Spin(); } s_state++; }
+                public static void AfterConstantNonreturningFinally() { try { } finally { _ = true ? SpinInteger() : 0; } s_state++; }
+                public static void AfterShortCircuitedFinally() { try { } finally { _ = false && SpinInteger() == 0; } s_state++; }
+                private static ShortCircuitGate SpinGate() { while (true) { } }
+                public static void AfterUserShortCircuitedFinally() { try { } finally { _ = new ShortCircuitGate() && SpinGate(); } s_state++; }
+                public static void AfterNonreturningArgument() { Sink(SpinInteger()); s_state++; }
+                private static void Sink(int value) { }
+                private static int SpinInteger() { while (true) { } }
+                public static void AfterNestedNonreturningFinally() { try { try { } finally { _ = 1; } } finally { Spin(); } s_state++; }
+                public static void NestedFinallyAfterDivergence() { try { try { throw new InvalidOperationException(); } finally { Spin(); } } finally { s_state++; } }
+                public static void BranchedFinallyAfterDivergence(bool condition) { try { if (condition) Spin(); else Spin(); } finally { s_state++; } }
+                public static void InnerFinallyCaughtOutside() { try { try { throw new InvalidOperationException(); } finally { s_state++; } } catch (InvalidOperationException) { } }
+                public static int ReturnThroughFinally() { try { return 1; } finally { s_state++; } }
+                private static void Fail() => throw new InvalidOperationException();
+                private static void Spin() { while (true) { } }
+                public static void ThrowOperandFailure() { try { throw Make(); } catch (ArgumentException) { s_state++; } }
+                public static void MismatchedThrowOperandFailure() { try { throw Make(); } catch (InvalidOperationException) { s_state++; } }
+                private static Exception Make() => throw new ArgumentException();
+                public static void DivergentThrowOperand() { try { throw SpinException(); } catch { s_state++; } }
+                private static Exception SpinException() { while (true) { } }
+                public static void ConstructorOperandFailure(bool fail) { try { throw new UserException(fail); } catch (ArgumentException) { s_state++; } catch (UserException) { } }
+                public static void ConstructorNotReached() { try { _ = new UserException(ThrowBoolean()); } catch (ArgumentException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void CheckedConversionAfterFailure() { try { _ = checked((int)ThrowLong()); } catch (OverflowException) { s_state++; } catch (ArgumentException) { } }
+                public static void DivisionAfterFailure() { try { _ = ThrowInteger() / 0; } catch (DivideByZeroException) { s_state++; } catch (ArgumentException) { } }
+                public static void UserDivisionHasNoIntrinsicFailure(NonThrowingDivide left, NonThrowingDivide right) { try { _ = left / right; } catch (DivideByZeroException) { s_state++; } }
+                public static void CheckedBinaryOverflow(int value) { try { _ = checked(int.MaxValue + value); } catch (OverflowException) { s_state++; } }
+                public static void CheckedUnaryOverflow(int value) { try { _ = checked(-value); } catch (OverflowException) { s_state++; } }
+                public static void CheckedCompoundOverflow(int value) { try { var total = int.MaxValue; checked { total += value; } } catch (OverflowException) { s_state++; } }
+                private static long ThrowLong() => throw new ArgumentException();
+                private static int ThrowInteger() => throw new ArgumentException();
+                public static void InitializerAfterThrowingConstructor() { try { _ = new ThrowingConstructionWithInitializer { Value = 1 }; } catch (InvalidOperationException) { s_state++; } catch (ArgumentException) { } }
+                private static bool ThrowBoolean() => throw new InvalidOperationException();
+                public static void OperatorFailure(ThrowingOperator left, ThrowingOperator right) { try { _ = left + right; } catch (InvalidOperationException) { s_state++; } }
+                public static void CompoundSetterNotReached(ThrowingCompoundSetter box, ThrowingOperator value) { try { box.Item += value; } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void UsingDisposalFailure(ThrowingResource resource) { try { using (resource) { } } catch (InvalidOperationException) { s_state++; } }
+                public static void UsingDisposalAfterDivergence(ThrowingResource resource) { try { using (resource) { Spin(); } } catch (InvalidOperationException) { s_state++; } }
+                public static void UsingDeclarationAfterDivergence(ThrowingResource resource) { try { using var value = resource; Spin(); } catch (InvalidOperationException) { s_state++; } }
+                public static void UsingDeclarationGotoSkipsDivergence(ThrowingResource resource) { try { using var value = resource; goto Done; Spin(); Done: ; } catch (InvalidOperationException) { s_state++; } }
+                public static void UsingDeclarationGotoBeforeLifetime(ThrowingResource resource) { try { Retry: ; using var value = resource; goto Retry; } catch (InvalidOperationException) { s_state++; } }
+                public static void UsingDeclarationGotoInsideLifetimeThenDiverges(ThrowingResource resource) { try { using var value = resource; Retry: ; goto Retry; } catch (InvalidOperationException) { s_state++; } }
+                public static void UsingInitialAcquisitionFails() { try { using ThrowingResource first = FailResource(), second = new ThrowingResource(); } catch (InvalidOperationException) { s_state++; } catch (ArgumentException) { } }
+                public static void UsingLaterAcquisitionFails(ThrowingResource resource) { try { using ThrowingResource first = resource, second = FailResource(); } catch (InvalidOperationException) { s_state++; } catch (ArgumentException) { } }
+                public static void UsingLaterAcquisitionFailsBeforeDivergentBody(ThrowingResource resource) { try { using (ThrowingResource first = resource, second = FailResource()) { Spin(); } } catch (InvalidOperationException) { s_state++; } catch (ArgumentException) { } }
+                public static void LaterDeclarationDivergesBeforeEarlierDispose(ThrowingResource outer, DivergingResource inner) { try { using var first = outer; using var second = inner; } catch (InvalidOperationException) { s_state++; } }
+                public static void LaterDeclaratorDivergesBeforeEarlierDispose(ThrowingResource outer, DivergingResource inner) { try { using (IDisposable first = outer, second = inner) { } } catch (InvalidOperationException) { s_state++; } }
+                public static void LaterDisposeThrowsThenEarlierDisposeRuns(ThrowingResource outer, ApplicationThrowingResource inner) { try { using var first = outer; using var second = inner; } catch (InvalidOperationException) { s_state++; } catch (ApplicationException) { } }
+                public static void ThrowingDeclaratorsUnwindInReverse(ThrowingMutatingResource outer, ThrowingMutatingResource inner) { using (ThrowingMutatingResource first = outer, second = inner) { } }
+                public static void RecursiveDeclaratorDoesNotUnwindOuter(ThrowingMutatingResource outer, RecursiveResource inner) { using (IDisposable first = outer, second = inner) { } }
+                public static void RecursiveThrowingDeclaratorMayUnwindOuter(ThrowingMutatingResource outer, RecursiveThrowingResource inner) { using (IDisposable first = outer, second = inner) { } }
+                private static ThrowingResource FailResource() => throw new ArgumentException();
+                public static void ForeachAcquisitionFailure(ThrowingSequence values) { try { foreach (var value in values) { _ = value; } } catch (InvalidOperationException) { s_state++; } }
+                public static void ForeachNullReceiverFailure() { ThrowingSequence values = null!; try { foreach (var value in values) { _ = value; } } catch (NullReferenceException) { s_state++; } }
+                public static void ForeachCurrentAfterMoveNextFailure(ThrowingMoveNextSequence values) { try { foreach (var value in values) { _ = value; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void ForeachNullEnumeratorFailure(NullEnumeratorSequence values) { try { foreach (var value in values) { _ = value; } } catch (NullReferenceException) { s_state++; } }
+                public static void ForeachExtensionInitializationFailure(ExtensionSequence values) { try { foreach (var value in values) { _ = value; } } catch (TypeInitializationException) { s_state++; } }
+                public static void UnreachableWhileCatch() { try { while (false) { throw new InvalidOperationException(); } } catch (InvalidOperationException) { s_state++; } }
+                public static void UnreachableForCatch() { try { for (; false;) { throw new InvalidOperationException(); } } catch (InvalidOperationException) { s_state++; } }
+                public static void ShortCircuitedAndCatch() { try { _ = false && FailBoolean(); } catch (InvalidOperationException) { s_state++; } }
+                public static void ShortCircuitedOrCatch() { try { _ = true || FailBoolean(); } catch (InvalidOperationException) { s_state++; } }
+                public static void ConstantSwitchExpressionCatch() { try { _ = 0 switch { 1 => ThrowObject(), _ => new object() }; } catch (InvalidOperationException) { s_state++; } }
+                public static void ConstantSwitchStatementCatch() { try { switch (0) { case 1: ThrowObject(); break; default: break; } } catch (InvalidOperationException) { s_state++; } }
+                public static void ThrowingSwitchExpressionGuard() { try { _ = 0 switch { 0 when ThrowBoolean() => new object(), _ => ThrowApplicationObject() }; } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void ThrowingSwitchStatementGuard() { try { switch (0) { case 0 when ThrowBoolean(): break; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void ThrowingSwitchStatementGuardBeforeGoto() { try { switch (0) { case 0 when ThrowBoolean(): goto default; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void ThrowingSwitchBodyBeforeGoto() { try { switch (0) { case 0: Fail(); goto default; default: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void SwitchGotoOrdinaryLabel() { try { switch (0) { case 0: goto Done; throw new InvalidOperationException(); Done: ThrowApplicationObject(); break; } } catch (ApplicationException) { s_state++; } }
+                public static void GotoNestedOrdinaryLabel() { try { goto Inner; Outer: Inner: ; ThrowApplicationObject(); } catch (ApplicationException) { s_state++; } }
+                public static void AfterNonreturningCallCatch() { try { Fail(); throw new ApplicationException(); } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void NestedSwallowedCatch() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { } } catch (InvalidOperationException) { s_state++; } }
+                public static void NestedUnreachableHandler() { try { try { throw new InvalidOperationException(); } catch (ArgumentException) { throw new ApplicationException(); } } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void NestedRethrowCatch() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { throw; } } catch (InvalidOperationException) { s_state++; } }
+                public static void UnreachableNestedRethrowCatch() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { Spin(); throw; } } catch (InvalidOperationException) { s_state++; } }
+                public static void NestedFinallyAfterPureDivergence() { try { try { Spin(); } finally { throw new ApplicationException(); } } catch (ApplicationException) { s_state++; } }
+                public static void UsingDeclarationNestedBreakThenDivergence(ThrowingResource resource) { try { using var value = resource; while (true) { break; } Spin(); } catch (InvalidOperationException) { s_state++; } }
+                public static void UsingDeclarationInternalGotoThenDivergence(ThrowingResource resource) { try { using var value = resource; goto Loop; Loop: Spin(); } catch (InvalidOperationException) { s_state++; } }
+                public static void NonNullCoalesceAssignment() { object value = new object(); try { value ??= ThrowObject(); } catch (InvalidOperationException) { s_state++; } }
+                public static void NullConditionalAccess() { NullTarget? value = null; try { value?.Fail(); } catch (InvalidOperationException) { s_state++; } }
+                public static void UnreachableReturnAfterDivergence(ThrowingResource resource) { try { using var value = resource; if (true) { Spin(); return; } } catch (InvalidOperationException) { s_state++; } }
+                public static void ReturnBlockedByDivergentFinally(ThrowingResource resource) { try { using var value = resource; try { return; } finally { Spin(); } } catch (InvalidOperationException) { s_state++; } }
+                public static void ReturnThroughCompletingFinally(ThrowingResource resource) { try { using var value = resource; try { return; } finally { _ = 1; } } catch (InvalidOperationException) { s_state++; } }
+                private static object ThrowObject() => throw new InvalidOperationException();
+                private static object ThrowApplicationObject() => throw new ApplicationException();
+                private static bool FailBoolean() => throw new InvalidOperationException();
+                public static void SetterFailure(ThrowingSetter value) { try { value.Value = 1; } catch (InvalidOperationException) { s_state++; } }
+                public static void NullReceiverFailure() { NullTarget value = null!; try { value.Touch(); } catch (NullReferenceException) { s_state++; } }
+                public static void NullReceiverAfterThrowingArgument() { NullTarget value = null!; try { value.TouchValue(ThrowInteger()); } catch (NullReferenceException) { s_state++; } catch (ArgumentException) { } }
+                public static void ThrowingRhsBeforeNullSetter() { NullTarget value = null!; try { value.SetOnly = ThrowInteger(); } catch (ArgumentException) { s_state++; } catch (NullReferenceException) { } }
+                public static void NullFieldFailure() { NullTarget value = null!; try { _ = value.Value; } catch (NullReferenceException) { s_state++; } }
+                public static void NullArrayCannotReachBoundsCatch() { int[] values = null!; try { _ = values[0]; } catch (IndexOutOfRangeException) { s_state++; } catch (NullReferenceException) { } }
+                public static void StaticInitializationFailure() { try { _ = StaticBomb.Value; } catch (TypeInitializationException) { s_state++; } }
+                public static void AfterDivergingStaticInitialization() { try { } finally { _ = DivergingStaticBomb.Value; } s_state++; }
+                public static void BeforeFieldInitMethodMayRun() { try { BeforeFieldInitBomb.Run(); } catch (InvalidOperationException) { s_state++; } catch (TypeInitializationException) { } }
+                public static void StaticInitializationWrongCatch() { try { _ = StaticBomb.Value; } catch (ApplicationException) { s_state++; } catch (TypeInitializationException) { } }
+                public static void ConstructionAfterFailingStaticInitialization() { try { _ = new ThrowingStaticConstruction(); } catch (InvalidOperationException) { s_state++; } catch (TypeInitializationException) { } }
+                public static void StaticOperatorInitializationFailure(ThrowingStaticOperator left, ThrowingStaticOperator right) { try { _ = left + right; } catch (TypeInitializationException) { s_state++; } }
+                public static void ConstructionInitializationFailure() { try { _ = new StaticBomb(); } catch (TypeInitializationException) { s_state++; } }
+                public static void StaticPropertyInitializationAfterRhs() { try { StaticBomb.Property = ThrowInteger(); } catch (TypeInitializationException) { s_state++; } catch (ArgumentException) { } }
+                public static void StaticFieldInitializationAfterRhs() { try { StaticBomb.Value = ThrowInteger(); } catch (TypeInitializationException) { s_state++; } catch (ArgumentException) { } }
+                public static void ExtensionInitializationAfterReceiver() { try { ThrowObject().Touch(); } catch (TypeInitializationException) { s_state++; } catch (InvalidOperationException) { } }
+                public static void NameofOperandIsCompileTime(ThrowingGetter value) { try { _ = nameof(value.Value); } catch (InvalidOperationException) { s_state++; } }
+                public static void WithCloneFailure(ThrowingCloneRecord value) { try { _ = value with { }; } catch (InvalidOperationException) { s_state++; } }
+                public static void AfterDivergingWithClone(DivergingCloneRecord value) { _ = value with { Value = 1 }; s_state++; }
+                public static void DeconstructionFailure(ThrowingDeconstruction value) { try { var (left, right) = value; _ = left + right; } catch (InvalidOperationException) { s_state++; } }
+                public static void AfterDivergingDeconstruction(DivergingDeconstruction value) { var (left, right) = value; _ = left + right; s_state++; }
+                public static void NullLockWrongCatch() { object gate = null!; try { lock (gate) { } } catch (NullReferenceException) { s_state++; } catch (ArgumentNullException) { } }
+                public static void NullLockCorrectCatch() { object gate = null!; try { lock (gate) { } } catch (ArgumentNullException) { s_state++; } }
+                public static void NullEventWrongCatch() { EventTarget value = null!; Action handler = FailHandler; try { value.Changed += handler; } catch (InvalidOperationException) { s_state++; } catch (NullReferenceException) { } }
+                public static void NullEventCorrectCatch() { EventTarget value = null!; Action handler = FailHandler; try { value.Changed += handler; } catch (NullReferenceException) { s_state++; } }
+                public static async Task NullAwaitWrongCatch() { Task value = null!; try { await value; } catch (InvalidOperationException) { s_state++; } catch (NullReferenceException) { } }
+                public static async Task NullAwaitCorrectCatch() { Task value = null!; try { await value; } catch (NullReferenceException) { s_state++; } }
+                public static async Task NullAwaitAfterThrowingOperand() { try { await ThrowTask(); } catch (NullReferenceException) { s_state++; } catch (ArgumentException) { } }
+                public static async Task NullCustomAwaiterCatch() { try { await new NullAwaitable(); } catch (NullReferenceException) { s_state++; } }
+                private static Task ThrowTask() => throw new ArgumentException();
+                private static void FailHandler() { }
+                public static void ThrowingFilter() { try { throw new InvalidOperationException(); } catch (InvalidOperationException) when (Filter()) { s_state++; } }
+                private static bool Filter() => throw new ApplicationException();
                 public static void Rethrow() { try { try { throw new InvalidOperationException(); } catch (InvalidOperationException) { throw; } } catch (Exception) { s_state++; } }
                 public static void FinallyRuns() { try { } finally { s_state++; } }
             }
             """);
         var session = new EffectAnalysisSession(compilation);
-
         using (Assert.EnterMultipleScope())
         {
             Assert.That(HasStaticWrite("EmptyTry"), Is.False);
@@ -4263,8 +4781,167 @@ public sealed class EffectAnalysisTests
             Assert.That(HasStaticWrite("FalseFilter"), Is.False);
             Assert.That(HasStaticWrite("TrueFilter"), Is.True);
             Assert.That(HasStaticWrite("OrderedHierarchy"), Is.False);
+            Assert.That(HasStaticWrite("MismatchedCatch"), Is.False);
+            Assert.That(HasStaticWrite("FinallyAfterFailure"), Is.False);
+            Assert.That(HasStaticWrite("FinallyAfterDivergence"), Is.False);
+            Assert.That(HasStaticWrite("AfterNonreturningFinally"), Is.False);
+            Assert.That(
+                HasStaticWrite("AfterConstantNonreturningFinally"),
+                Is.False);
+            Assert.That(HasStaticWrite("AfterShortCircuitedFinally"), Is.True);
+            Assert.That(
+                HasStaticWrite("AfterUserShortCircuitedFinally"),
+                Is.True);
+            Assert.That(HasStaticWrite("AfterNonreturningArgument"), Is.False);
+            Assert.That(
+                HasStaticWrite("AfterNestedNonreturningFinally"),
+                Is.False);
+            Assert.That(HasStaticWrite("NestedFinallyAfterDivergence"), Is.False);
+            Assert.That(HasStaticWrite("BranchedFinallyAfterDivergence"), Is.False);
+            Assert.That(HasStaticWrite("InnerFinallyCaughtOutside"), Is.True);
+            Assert.That(HasStaticWrite("ReturnThroughFinally"), Is.True);
+            Assert.That(HasStaticWrite("ThrowOperandFailure"), Is.True);
+            Assert.That(HasStaticWrite("MismatchedThrowOperandFailure"), Is.False);
+            Assert.That(HasStaticWrite("DivergentThrowOperand"), Is.False);
+            Assert.That(HasStaticWrite("ConstructorOperandFailure"), Is.True);
+            Assert.That(HasStaticWrite("ConstructorNotReached"), Is.False);
+            Assert.That(HasStaticWrite("CheckedConversionAfterFailure"), Is.False);
+            Assert.That(HasStaticWrite("DivisionAfterFailure"), Is.False);
+            Assert.That(
+                HasStaticWrite("UserDivisionHasNoIntrinsicFailure"),
+                Is.False);
+            Assert.That(HasStaticWrite("CheckedBinaryOverflow"), Is.True);
+            Assert.That(HasStaticWrite("CheckedUnaryOverflow"), Is.True);
+            Assert.That(HasStaticWrite("CheckedCompoundOverflow"), Is.True);
+            Assert.That(HasStaticWrite("InitializerAfterThrowingConstructor"), Is.False);
+            Assert.That(HasStaticWrite("OperatorFailure"), Is.True);
+            Assert.That(HasStaticWrite("CompoundSetterNotReached"), Is.False);
+            Assert.That(HasStaticWrite("UsingDisposalFailure"), Is.True);
+            Assert.That(HasStaticWrite("UsingDisposalAfterDivergence"), Is.False);
+            Assert.That(HasStaticWrite("UsingDeclarationAfterDivergence"), Is.False);
+            Assert.That(HasStaticWrite("UsingDeclarationGotoSkipsDivergence"), Is.True);
+            Assert.That(HasStaticWrite("UsingDeclarationGotoBeforeLifetime"), Is.True);
+            Assert.That(HasStaticWrite("UsingDeclarationGotoInsideLifetimeThenDiverges"), Is.False);
+            Assert.That(HasStaticWrite("UsingInitialAcquisitionFails"), Is.False);
+            Assert.That(HasStaticWrite("UsingLaterAcquisitionFails"), Is.True);
+            Assert.That(HasStaticWrite("UsingLaterAcquisitionFailsBeforeDivergentBody"), Is.True);
+            Assert.That(HasStaticWrite("LaterDeclarationDivergesBeforeEarlierDispose"), Is.False);
+            Assert.That(HasStaticWrite("LaterDeclaratorDivergesBeforeEarlierDispose"), Is.False);
+            Assert.That(HasStaticWrite("LaterDisposeThrowsThenEarlierDisposeRuns"), Is.True);
+            Assert.That(HasStaticWrite("ForeachAcquisitionFailure"), Is.True);
+            Assert.That(HasStaticWrite("ForeachNullReceiverFailure"), Is.True);
+            Assert.That(HasStaticWrite("ForeachCurrentAfterMoveNextFailure"), Is.False);
+            Assert.That(HasStaticWrite("ForeachNullEnumeratorFailure"), Is.True);
+            Assert.That(
+                HasStaticWrite("ForeachExtensionInitializationFailure"),
+                Is.True);
+            Assert.That(HasStaticWrite("UnreachableWhileCatch"), Is.False);
+            Assert.That(HasStaticWrite("UnreachableForCatch"), Is.False);
+            Assert.That(HasStaticWrite("ShortCircuitedAndCatch"), Is.False);
+            Assert.That(HasStaticWrite("ShortCircuitedOrCatch"), Is.False);
+            Assert.That(HasStaticWrite("ConstantSwitchExpressionCatch"), Is.False);
+            Assert.That(HasStaticWrite("ConstantSwitchStatementCatch"), Is.False);
+            Assert.That(HasStaticWrite("ThrowingSwitchExpressionGuard"), Is.False);
+            Assert.That(HasStaticWrite("ThrowingSwitchStatementGuard"), Is.False);
+            Assert.That(HasStaticWrite("ThrowingSwitchStatementGuardBeforeGoto"), Is.False);
+            Assert.That(HasStaticWrite("ThrowingSwitchBodyBeforeGoto"), Is.False);
+            Assert.That(HasStaticWrite("SwitchGotoOrdinaryLabel"), Is.True);
+            Assert.That(HasStaticWrite("GotoNestedOrdinaryLabel"), Is.True);
+            Assert.That(HasStaticWrite("AfterNonreturningCallCatch"), Is.False);
+            Assert.That(HasStaticWrite("NestedSwallowedCatch"), Is.False);
+            Assert.That(HasStaticWrite("NestedUnreachableHandler"), Is.False);
+            Assert.That(HasStaticWrite("NestedRethrowCatch"), Is.True);
+            Assert.That(HasStaticWrite("UnreachableNestedRethrowCatch"), Is.False);
+            Assert.That(HasStaticWrite("NestedFinallyAfterPureDivergence"), Is.False);
+            Assert.That(HasStaticWrite("UsingDeclarationNestedBreakThenDivergence"), Is.False);
+            Assert.That(HasStaticWrite("UsingDeclarationInternalGotoThenDivergence"), Is.False);
+            Assert.That(HasStaticWrite("NonNullCoalesceAssignment"), Is.False);
+            Assert.That(HasStaticWrite("NullConditionalAccess"), Is.False);
+            Assert.That(HasStaticWrite("UnreachableReturnAfterDivergence"), Is.False);
+            Assert.That(HasStaticWrite("ReturnBlockedByDivergentFinally"), Is.False);
+            Assert.That(HasStaticWrite("ReturnThroughCompletingFinally"), Is.True);
+            Assert.That(HasStaticWrite("SetterFailure"), Is.True);
+            Assert.That(HasStaticWrite("NullReceiverFailure"), Is.True);
+            Assert.That(
+                HasStaticWrite("NullReceiverAfterThrowingArgument"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("ThrowingRhsBeforeNullSetter"),
+                Is.True);
+            Assert.That(HasStaticWrite("NullFieldFailure"), Is.True);
+            Assert.That(
+                HasStaticWrite("NullArrayCannotReachBoundsCatch"),
+                Is.False);
+            Assert.That(HasStaticWrite("StaticInitializationFailure"), Is.True);
+            Assert.That(
+                HasStaticWrite("AfterDivergingStaticInitialization"),
+                Is.False);
+            Assert.That(HasStaticWrite("BeforeFieldInitMethodMayRun"), Is.True);
+            Assert.That(
+                HasStaticWrite("StaticInitializationWrongCatch"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("ConstructionAfterFailingStaticInitialization"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("StaticOperatorInitializationFailure"),
+                Is.True);
+            Assert.That(
+                HasStaticWrite("ConstructionInitializationFailure"),
+                Is.True);
+            Assert.That(
+                HasStaticWrite("StaticPropertyInitializationAfterRhs"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("StaticFieldInitializationAfterRhs"),
+                Is.False);
+            Assert.That(
+                HasStaticWrite("ExtensionInitializationAfterReceiver"),
+                Is.False);
+            Assert.That(HasStaticWrite("NameofOperandIsCompileTime"), Is.False);
+            Assert.That(HasStaticWrite("WithCloneFailure"), Is.True);
+            Assert.That(HasStaticWrite("AfterDivergingWithClone"), Is.False);
+            Assert.That(HasStaticWrite("DeconstructionFailure"), Is.True);
+            Assert.That(
+                HasStaticWrite("AfterDivergingDeconstruction"),
+                Is.False);
+            Assert.That(HasStaticWrite("NullLockWrongCatch"), Is.False);
+            Assert.That(HasStaticWrite("NullLockCorrectCatch"), Is.True);
+            Assert.That(HasStaticWrite("NullEventWrongCatch"), Is.False);
+            Assert.That(HasStaticWrite("NullEventCorrectCatch"), Is.True);
+            Assert.That(HasStaticWrite("NullAwaitWrongCatch"), Is.False);
+            Assert.That(HasStaticWrite("NullAwaitCorrectCatch"), Is.True);
+            Assert.That(
+                HasStaticWrite("NullAwaitAfterThrowingOperand"),
+                Is.False);
+            Assert.That(HasStaticWrite("NullCustomAwaiterCatch"), Is.True);
+            Assert.That(HasStaticWrite("GenericStaticProbe"), Is.True);
+            Assert.That(HasStaticWrite("ThrowingFilter"), Is.False);
             Assert.That(HasStaticWrite("Rethrow"), Is.True);
             Assert.That(HasStaticWrite("FinallyRuns"), Is.True);
+            var reverseDisposal = session.Analyze(
+                Method(compilation, "ThrowingDeclaratorsUnwindInReverse"));
+            Assert.That(
+                reverseDisposal.Summary.Writes.Contains(
+                    EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(
+                reverseDisposal.Summary.Writes.Contains(
+                    EffectRegionId.Parameter(1)),
+                Is.True);
+            var recursiveDisposal = session.Analyze(
+                Method(compilation, "RecursiveDeclaratorDoesNotUnwindOuter"));
+            Assert.That(
+                recursiveDisposal.Summary.Writes.Contains(
+                    EffectRegionId.Parameter(0)),
+                Is.False);
+            var recursiveThrowingDisposal = session.Analyze(Method(
+                compilation,
+                "RecursiveThrowingDeclaratorMayUnwindOuter"));
+            Assert.That(
+                recursiveThrowingDisposal.Summary.Writes.Contains(
+                    EffectRegionId.Parameter(0)),
+                Is.True);
         }
 
         bool HasStaticWrite(string methodName)
@@ -5884,6 +6561,13 @@ public sealed class EffectAnalysisTests
             """);
         var session = new EffectAnalysisSession(compilation);
 
+        var throwingSummary = session.Analyze(
+            Method(compilation, "ThrowingObjectReceiver")).Summary;
+        Assert.That(
+            throwingSummary.Capabilities.Contains(
+                EffectCapabilityKind.Synchronization),
+            Is.False);
+
         AssertKinds(
             "ObjectReceiver",
             "managed-allocation",
@@ -6404,6 +7088,139 @@ public sealed class EffectAnalysisTests
                 outerThrow.Summary.Throws.Types.Any(type =>
                     SymbolEqualityComparer.Default.Equals(type, argument)),
                 Is.True);
+        }
+    }
+
+    [Test]
+    public void FailingAnonymousInitializerDoesNotAllocate()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static object Anonymous() =>
+                    new { Value = Fail() };
+
+                private static int Fail() => throw null!;
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation)
+            .Analyze(Method(compilation, "Anonymous"));
+
+        Assert.That(
+            result.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.None));
+    }
+
+    [Test]
+    public void FailingManagedAllocationsStopEnclosingSequences()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class Box {
+                public void Run() { }
+            }
+
+            public static class Sample {
+                public static object Anonymous() {
+                    var value = new { Value = FailValue() };
+                    return new object();
+                }
+
+                public static object Delegate() {
+                    Action value = FailReceiver().Run;
+                    return new object();
+                }
+
+                public static object NullDelegate() {
+                    Box value = null!;
+                    Action callback = value.Run;
+                    return new object();
+                }
+
+                private static int FailValue() => throw null!;
+
+                private static Box FailReceiver() => throw null!;
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] {
+                     "Anonymous", "Delegate", "NullDelegate"
+                 })
+        {
+            var method = Method(compilation, methodName);
+            Assert.That(
+                session.Analyze(method)
+                    .Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.None),
+                methodName);
+        }
+        Assert.That(
+            session.Analyze(Method(compilation, "NullDelegate"))
+                .Summary.Throws.Types.Any(type =>
+                    type.ToDisplayString() == "System.NullReferenceException"),
+            Is.True);
+    }
+
+    [Test]
+    public void ThrowingCoalesceTargetSuppressesValueAndWriteEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Box {
+                public object? Value { get; set; }
+            }
+
+            public static class Sample {
+                private static object? s_state;
+
+                public static void Evaluate() {
+                    Box box = null!;
+                    box.Value ??= Mutate();
+                }
+
+                private static object Mutate() =>
+                    s_state = new object();
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation)
+            .Analyze(Method(compilation, "Evaluate"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.False);
+    }
+
+    [Test]
+    public void ThrowingArrayLengthReceiverSuppressesAccessEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                public static int Read() => Fail().Length;
+
+                private static int[] Fail() =>
+                    throw new InvalidOperationException();
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation)
+            .Analyze(Method(compilation, "Read"));
+        var nullReference = compilation.GetTypeByMetadataName(
+            "System.NullReferenceException")!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Throws.Types.Any(type =>
+                    SymbolEqualityComparer.Default.Equals(
+                        type,
+                        nullReference)),
+                Is.False);
+            Assert.That(result.Summary.Reads.Regions, Is.Empty);
         }
     }
 

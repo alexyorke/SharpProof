@@ -57,11 +57,18 @@ function Resolve-SharpProofContainedPath {
     )
 
     $canonicalRoot = [IO.Path]::GetFullPath($Root)
+    $pathComparison = if (
+        [IO.Path]::DirectorySeparatorChar -eq [char]'\') {
+        [StringComparison]::OrdinalIgnoreCase
+    }
+    else {
+        [StringComparison]::Ordinal
+    }
     $rootPath = [IO.Path]::GetPathRoot($canonicalRoot)
     if (-not [string]::Equals(
             $canonicalRoot,
             $rootPath,
-            [StringComparison]::Ordinal)) {
+            $pathComparison)) {
         $canonicalRoot = $canonicalRoot.TrimEnd(
             [IO.Path]::DirectorySeparatorChar,
             [IO.Path]::AltDirectorySeparatorChar)
@@ -76,7 +83,7 @@ function Resolve-SharpProofContainedPath {
     $prefix = $canonicalRoot + [IO.Path]::DirectorySeparatorChar
     if (-not $canonicalPath.StartsWith(
             $prefix,
-            [StringComparison]::Ordinal)) {
+            $pathComparison)) {
         throw "$ParameterName must be a child of '$canonicalRoot': $canonicalPath"
     }
     if (-not [IO.Directory]::Exists($canonicalRoot)) {

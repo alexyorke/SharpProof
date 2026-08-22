@@ -146,6 +146,7 @@ public sealed class EffectAnalysisSession
     internal EffectSummary ResolveCall(
         IMethodSymbol caller, IMethodSymbol target,
         EffectRegionSet receiver,
+        EffectRegionSet writeReceiver,
         ImmutableArray<EffectRegionSet> arguments, bool dispatchUncertain,
         List<EffectCallSite> sourceCalls, IOperation origin,
         IOperation? instance,
@@ -158,6 +159,7 @@ public sealed class EffectAnalysisSession
             instance = null;
             arguments = arguments.Insert(0, receiver);
             receiver = EffectRegionSet.Empty;
+            writeReceiver = EffectRegionSet.Empty;
         }
         var normalized = NormalizeMethod(target);
         var preconditions = _callPreconditions.Assess(
@@ -186,7 +188,12 @@ public sealed class EffectAnalysisSession
 
         if (IsSourceMethod(normalized))
         {
-            sourceCalls.Add(new EffectCallSite(normalized, receiver, arguments, origin));
+            sourceCalls.Add(new EffectCallSite(
+                normalized,
+                receiver,
+                writeReceiver,
+                arguments,
+                origin));
             return EffectSummaryOperations.Join(
                 preconditionEvidence,
                 EffectSummaryOperations.DirectCall());
@@ -194,7 +201,11 @@ public sealed class EffectAnalysisSession
         return EffectSummaryOperations.Join(
             preconditionEvidence,
             EffectSummaryOperations.DirectCall(),
-            EffectSummaryOperations.Remap(_external.Resolve(normalized), receiver, arguments));
+            EffectSummaryOperations.Remap(
+                _external.Resolve(normalized),
+                receiver,
+                writeReceiver,
+                arguments));
     }
 
     internal EffectSummary ResolveEntryPreconditions(
@@ -331,7 +342,10 @@ public sealed class EffectAnalysisSession
             {
                 summary = EffectSummaryDomain.Instance.Join(summary,
                     EffectExceptionFlow.KeepEscaping(EffectSummaryOperations.Remap(
-                        Compute(call.Target), call.Receiver, call.Arguments),
+                        Compute(call.Target),
+                        call.Receiver,
+                        call.WriteReceiver,
+                        call.Arguments),
                         call.Origin, _compilation));
             }
 

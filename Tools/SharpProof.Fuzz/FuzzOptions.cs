@@ -5,6 +5,7 @@ namespace SharpProof.Fuzz;
 public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
 {
     public const int DefaultCases = 1000;
+    public const int MaximumCases = 1_000_000;
     public const int DefaultSeed = 0x5A17;
     public const int DefaultMaximumParallelism = 4;
 
@@ -37,6 +38,13 @@ public sealed record FuzzOptions(int Cases, int Seed, int MaximumParallelism)
             {
                 case "--cases":
                     cases = ParsePositive(value, argument);
+                    if (cases > MaximumCases)
+                    {
+                        throw new FuzzUsageException(
+                            "--cases cannot exceed the limit of " +
+                            MaximumCases.ToString(CultureInfo.InvariantCulture) +
+                            ".");
+                    }
                     break;
                 case "--seed":
                     if (!int.TryParse(

@@ -872,6 +872,12 @@ internal static class CompilerManifestArtifactFile
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
+        if (stream.Length <= 0)
+        {
+            stream.Dispose();
+            throw new InvalidDataException(
+                "The compiler manifest must be a nonempty regular file.");
+        }
         if (stream.Length > maximumBytes)
         {
             stream.Dispose();

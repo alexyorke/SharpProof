@@ -32,7 +32,20 @@ try {
         -Path $exact -ParameterName absolute
     if ($absolute -cne $exact) { throw 'Absolute contained child was rejected.' }
     Require-Rejection $root root-equality
-    Require-Rejection (Join-Path $fixture 'repo/out.json') case-distinct-sibling
+    $caseVariant = Join-Path $fixture 'repo/out.json'
+    if ([IO.Path]::DirectorySeparatorChar -eq [char]'\') {
+        $caseResolved = Resolve-SharpProofContainedPath -Root $root `
+            -Path $caseVariant -ParameterName case-variant-child
+        if (-not [string]::Equals(
+                $caseResolved,
+                $caseVariant,
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Windows case-variant child did not retain filesystem identity.'
+        }
+    }
+    else {
+        Require-Rejection $caseVariant case-distinct-sibling
+    }
     Require-Rejection (Join-Path $fixture 'RepoSibling/out.json') prefix-sibling
     Require-Rejection '../outside.json' traversal-escape
 

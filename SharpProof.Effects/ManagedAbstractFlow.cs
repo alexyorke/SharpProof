@@ -1798,6 +1798,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 IDiscardOperation or IInstanceReferenceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation => true,
             IInvocationOperation invocation => CompletesNormally(invocation),
+            IMethodReferenceOperation methodReference =>
+                ChildrenCompleteNormally(methodReference) &&
+                (methodReference.Method.IsStatic ||
+                 methodReference.Instance != null &&
+                 IsDefinitelyNonNull(methodReference.Instance)),
             ISimpleAssignmentOperation assignment =>
                 assignment.Target is ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation &&
                 CompletesNormally(assignment.Value),
@@ -1907,7 +1912,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     /// ordinary assignments, writes, external calls, and unsupported shapes
     /// are all treated as potentially completing.
     /// </summary>
-    private bool MayCompleteNormally(IOperation? operation)
+    internal bool MayCompleteNormally(IOperation? operation)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return operation switch
@@ -1933,6 +1938,14 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                      conditionalAccess.Operation)),
             IInvocationOperation invocation =>
                 InvocationMayCompleteNormally(invocation),
+            IAnonymousObjectCreationOperation or
+                IDelegateCreationOperation =>
+                ChildrenMayCompleteNormally(operation),
+            IMethodReferenceOperation methodReference =>
+                ChildrenMayCompleteNormally(methodReference) &&
+                (methodReference.Method.IsStatic ||
+                 methodReference.Instance == null ||
+                 !IsDefinitelyNull(methodReference.Instance)),
             IObjectCreationOperation creation =>
                 CreationMayCompleteNormally(creation),
             IArrayCreationOperation array =>
@@ -2111,6 +2124,30 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         return operation is IInstanceReferenceOperation or IConditionalAccessInstanceOperation or
             IObjectCreationOperation or IArrayCreationOperation or ITypeOfOperation ||
             operation.ConstantValue is { HasValue: true, Value: not null };
+    }
+
+    internal static bool IsDefinitelyNull(IOperation operation)
+    {
+        while (operation is IParenthesizedOperation or IConversionOperation)
+        {
+            if (operation is IParenthesizedOperation parenthesized)
+            {
+                operation = parenthesized.Operand;
+            }
+            else if (operation is IConversionOperation
+                     {
+                         OperatorMethod: null,
+                         IsTryCast: false
+                     } conversion)
+            {
+                operation = conversion.Operand;
+            }
+            else
+            {
+                break;
+            }
+        }
+        return operation.ConstantValue is { HasValue: true, Value: null };
     }
 
     private static bool HarmlessConversion(IConversionOperation conversion)

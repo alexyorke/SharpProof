@@ -8,6 +8,59 @@ namespace SharpProof.Fuzz.Test;
 public sealed class FuzzRunnerTests
 {
     [Test]
+    public void FailureEvidenceRetentionUsesDeterministicBoundedKeys()
+    {
+        var statuses = Enumerable.Repeat(
+                FuzzOracleStatus.Mismatch,
+                FuzzRunner.MaximumRetainedFailures)
+            .ToArray();
+        var keys = FuzzRunner.SelectFailureKeys(
+            statuses,
+            statuses,
+            statuses);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                keys.Length,
+                Is.EqualTo(FuzzRunner.MaximumRetainedFailures));
+            Assert.That(
+                keys.Take(3),
+                Is.EqualTo(new[]
+                {
+                    new FuzzFailureKey(0, "finite-domain-smt"),
+                    new FuzzFailureKey(0, "frontend"),
+                    new FuzzFailureKey(0, "partial-term-smt")
+                }));
+            Assert.That(
+                keys[^1],
+                Is.EqualTo(new FuzzFailureKey(
+                    21,
+                    "finite-domain-smt")));
+        }
+    }
+
+    [Test]
+    public void PartialAbstentionIsNotClassifiedAsMismatchEvidence()
+    {
+        var classification = FuzzRunner.ClassifyCase(
+            FuzzOracleStatus.Agreement,
+            FuzzOracleStatus.Agreement,
+            FuzzOracleStatus.Abstained);
+        var keys = FuzzRunner.SelectFailureKeys(
+            new[] { FuzzOracleStatus.Agreement },
+            new[] { FuzzOracleStatus.Agreement },
+            new[] { FuzzOracleStatus.Abstained });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(classification.HasMismatch, Is.False);
+            Assert.That(classification.HasAbstention, Is.True);
+            Assert.That(keys, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task FixedSeedIsDeterministicAndSound()
     {
         var options = new FuzzOptions(Cases: 24, Seed: 12345, MaximumParallelism: 4);
@@ -109,6 +162,11 @@ public sealed class FuzzRunnerTests
         var empty = new FrontendFuzzCoverage(
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         var negative = empty with { TextParameters = -1 };
+        var impossibleExceptions = empty with
+        {
+            DivideByZeroExceptions = 1,
+            OverflowExceptions = 1
+        };
         var valid = new FuzzSummary(
             SchemaVersion: 4,
             Cases: FuzzOptions.DefaultCases,
@@ -147,6 +205,17 @@ public sealed class FuzzRunnerTests
                     SmtAgreements = 1,
                     PartialSmtAgreements = 1,
                     FrontendCoverage = negative
+                }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with
+                {
+                    Cases = 1,
+                    Agreements = 1,
+                    FrontendAgreements = 1,
+                    SmtAgreements = 1,
+                    PartialSmtAgreements = 1,
+                    FrontendCoverage = impossibleExceptions
                 }).Passed,
                 Is.False);
         }
@@ -380,6 +449,7 @@ public sealed class FuzzRunnerTests
     }
 
     [TestCase("--cases", "0")]
+    [TestCase("--cases", "1000001")]
     [TestCase("--max-parallelism", "5")]
     [TestCase("--unknown", "1")]
     public void InvalidOptionsFailClosed(string option, string value)
@@ -396,6 +466,7 @@ public sealed class FuzzRunnerTests
     }
 
     [TestCase(0, 1)]
+    [TestCase(1000001, 1)]
     [TestCase(1, 0)]
     [TestCase(1, 5)]
     public void DirectRunnerRejectsInvalidOptions(

@@ -4,9 +4,12 @@
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>
-    <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').ToLowerInvariant())</_SharpProofProfileNormalized>
+    <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').Trim().ToLowerInvariant())</_SharpProofProfileNormalized>
+    <_SharpProofFeaturesNormalized>$([System.String]::Copy('$(SharpProofFeatures)').Trim().ToLowerInvariant())</_SharpProofFeaturesNormalized>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
+    <_SharpProofContractsRuntimeEnabled
+        Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(DefineConstants)', '(^|[;,])\s*SHARPPROOF_CONTRACTS\s*($|[;,])'))">true</_SharpProofContractsRuntimeEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -61,4 +64,30 @@
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.Text.Encodings.Web.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.Text.Json.dll" />
   </ItemGroup>
+
+  <Target Name="_SharpProofValidateSourceTreeConfiguration"
+          BeforeTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(SharpProofMode)' != ''"
+           Text="SharpProofMode was removed before preview.1. Use SharpProofProfile and SharpProofFeatures." />
+    <Error Condition="'$(SharpProofPortableAnalyzerPath)' != ''"
+           Text="SharpProofPortableAnalyzerPath was removed before preview.1. Analyzer layout is package-owned; use SharpProofAnalyzerDirectory only for package testing." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
+           Text="SharpProofProfile must be advisory, strict, or off." />
+    <Error Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"
+           Text="SharpProofFeatures must be effects, contracts, or all." />
+    <Error Condition="'$(SharpProofVerify)' != 'true' AND '$(SharpProofVerify)' != 'false'"
+           Text="SharpProofVerify must be true or false." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' == 'strict' AND '$(SharpProofVerify)' != 'true'"
+           Text="SharpProofProfile=strict requires SharpProofVerify=true; use the advisory profile to make verification optional." />
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofContractsRuntimeEnabled)' == 'true'"
+           Text="SHARPPROOF_CONTRACTS enables runtime evaluation of ghost contracts and is not supported while SharpProof analysis is enabled. Remove it from DefineConstants or set SharpProofProfile=off." />
+  </Target>
+
+  <Target Name="_SharpProofRequireSourceTreeVerifierPackage"
+          BeforeTargets="CoreCompile"
+          DependsOnTargets="_SharpProofValidateSourceTreeConfiguration"
+          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierPackagePresent)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <Error Text="SharpProof verification requires the matching SharpProof.Verifier package. The source-tree analyzer consumer cannot run verification by itself." />
+  </Target>
 </Project>

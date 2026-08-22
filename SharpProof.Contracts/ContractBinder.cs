@@ -14,9 +14,9 @@ public sealed class ContractBinder(
     private readonly ContractClauseInventoryBuilder _clauseInventory =
         clauseInventory ?? ContractClauseInventoryBuilder.ForCompilation(compilation);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _bindings =
-        new(SymbolEqualityComparer.Default);
+        new(SymbolEqualityComparer.IncludeNullability);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _requiresBindings =
-        new(SymbolEqualityComparer.Default);
+        new(SymbolEqualityComparer.IncludeNullability);
     private readonly EffectiveContractSourceResolver _contractSources =
         clauseInventory == null
             ? EffectiveContractSourceResolver.ForCompilation(compilation)

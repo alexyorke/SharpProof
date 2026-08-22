@@ -610,7 +610,8 @@ public sealed class CompilerManifestArtifactTests
     public void NullableSchemaShapesFailWithJsonException()
     {
         var previousSchema = CreateArtifact();
-        previousSchema.SchemaVersion = 11;
+        previousSchema.SchemaVersion =
+            CompilerManifestArtifactVersions.Current - 1;
         var modules = CreateArtifact();
         modules.Compilation.References[0].Modules = null!;
         modules.CompilationSha256 = CompilationFingerprint.ComputeSha256(
@@ -2082,6 +2083,15 @@ public sealed class CompilerManifestArtifactTests
             (bindings[1].Target, bindings[0].Target);
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(parameterSwap)));
+
+        var pairedSwap = CreateContractArtifact(parameterSource);
+        bindings = pairedSwap.Callables[0].Body!.ParameterBindings;
+        (bindings[0].Target, bindings[1].Target) =
+            (bindings[1].Target, bindings[0].Target);
+        (bindings[0].SourceOrdinal, bindings[1].SourceOrdinal) =
+            (bindings[1].SourceOrdinal, bindings[0].SourceOrdinal);
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(pairedSwap)));
     }
 
     [Test]
@@ -2107,6 +2117,17 @@ public sealed class CompilerManifestArtifactTests
             (preStates[1].CurrentStateVariable, preStates[0].CurrentStateVariable);
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(preStateSwap)));
+
+        var pairedSwap = CreateContractArtifact(preStateSource);
+        preStates = pairedSwap.Callables[0].Variables
+            .Where(static item => item.Role == CompilerVariableRole.PreState)
+            .ToArray();
+        (preStates[0].CurrentStateVariable, preStates[1].CurrentStateVariable) =
+            (preStates[1].CurrentStateVariable, preStates[0].CurrentStateVariable);
+        (preStates[0].SourceOrdinal, preStates[1].SourceOrdinal) =
+            (preStates[1].SourceOrdinal, preStates[0].SourceOrdinal);
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(pairedSwap)));
     }
 
     [Test]
@@ -2146,8 +2167,7 @@ public sealed class CompilerManifestArtifactTests
                 artifact.Callables[0].Body!.SummaryCalls,
                 Has.Length.EqualTo(1));
             corrupt(artifact.Callables[0]);
-            var resealed = CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact));
+            var resealed = CanonicalRoundTrip(artifact);
 
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(resealed)));
@@ -2184,8 +2204,7 @@ public sealed class CompilerManifestArtifactTests
         {
             var artifact = CreateContractArtifact(source);
             corrupt(artifact.Callables[0]);
-            var resealed = CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact));
+            var resealed = CanonicalRoundTrip(artifact);
 
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(resealed)));
@@ -2210,8 +2229,7 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateContractArtifact(source);
         var call = FindCall(artifact.Callables[0]);
         (call.Items[0], call.Items[1]) = (call.Items[1], call.Items[0]);
-        var resealed = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(artifact));
+        var resealed = CanonicalRoundTrip(artifact);
 
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(resealed)));
@@ -2244,8 +2262,7 @@ public sealed class CompilerManifestArtifactTests
         call.C = Array.FindIndex(callable.Graph.Terms, value =>
             value.Kind == IrTermKind.Variable && value.A == boxIndex);
         Assert.That(call.C, Is.GreaterThanOrEqualTo(0));
-        var resealed = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(artifact));
+        var resealed = CanonicalRoundTrip(artifact);
 
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(resealed)));
@@ -2282,8 +2299,7 @@ public sealed class CompilerManifestArtifactTests
         {
             var artifact = CreateContractArtifact(source);
             corrupt(artifact.Callables.Single());
-            var resealed = CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact));
+            var resealed = CanonicalRoundTrip(artifact);
 
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(resealed)));
@@ -2459,6 +2475,8 @@ public sealed class CompilerManifestArtifactTests
     private static CompilerManifestArtifact CanonicalRoundTrip(
         CompilerManifestArtifact artifact)
     {
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
         return CompilerManifestArtifactJson.Deserialize(
             CompilerManifestArtifactJson.Serialize(artifact));
     }

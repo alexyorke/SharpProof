@@ -44,10 +44,12 @@ $resolvedSource = (Resolve-Path `
 if (-not (Test-Path -LiteralPath $resolvedSource -PathType Container)) {
     throw "PackageSource is not a directory: $resolvedSource"
 }
-if ($ExpectedTag -notmatch '^v(?<version>[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)$') {
+if (-not $ExpectedTag.StartsWith('v', [StringComparison]::Ordinal) -or
+    -not (Test-SharpProofReleaseVersionSyntax `
+        -Version $ExpectedTag.Substring(1))) {
     throw "Release tag must be v<SemVer>: $ExpectedTag"
 }
-$expectedVersion = $Matches['version']
+$expectedVersion = $ExpectedTag.Substring(1)
 Test-SharpProofReleaseVersion `
     -ExpectedVersion $releaseVersion `
     -ActualVersion $expectedVersion `

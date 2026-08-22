@@ -1,3 +1,8 @@
+if (-not (Get-Command Test-SharpProofReleaseVersionSyntax `
+        -CommandType Function -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
+}
+
 function Resolve-SharpProofPublicationHttpsDestination {
     param(
         [Parameter(Mandatory = $true)][string]$Value,
@@ -103,8 +108,8 @@ function Get-SharpProofPublicationFixtureArchiveCatalog {
             $id = [string]$ids[0].InnerText
             $version = [string]$versions[0].InnerText
             if ($id -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or
-                $version -notmatch
-                    '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+                -not (Test-SharpProofReleaseVersionSyntax `
+                    -Version $version)) {
                 throw "Fixture archive nuspec identity is invalid: '$($file.FullName)'."
             }
             $hasDll = @($archive.Entries | Where-Object {
@@ -185,6 +190,7 @@ function New-SharpProofPublicationDestinationAuthority {
             mode = 'fixture'
             mainDestination = $null
             symbolDestination = $null
+            packageBaseAddress = $null
             fixture = Get-SharpProofPublicationFixtureAuthority `
                 -FixtureDirectory $FixtureDirectory `
                 -InputSnapshot $InputSnapshot
@@ -196,6 +202,7 @@ function New-SharpProofPublicationDestinationAuthority {
             mode = 'targetless'
             mainDestination = $null
             symbolDestination = $null
+            packageBaseAddress = $null
             fixture = $null
         }
     }
@@ -211,6 +218,7 @@ function New-SharpProofPublicationDestinationAuthority {
         mode = 'registry'
         mainDestination = $main
         symbolDestination = $symbols
+        packageBaseAddress = $null
         fixture = $null
     }
 }

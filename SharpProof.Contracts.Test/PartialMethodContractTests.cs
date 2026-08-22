@@ -77,6 +77,108 @@ public sealed class PartialMethodContractTests
         Assert.That(inventory.Clauses[0].IsValid, Is.True);
     }
 
+    [TestCase(MethodKind.PropertyGet)]
+    [TestCase(MethodKind.PropertySet)]
+    public void PartialPropertyAccessorsUseImplementationBodies(
+        MethodKind accessorKind)
+    {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                public partial class Subject {
+                    public partial int Value { get; set; }
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                using SharpProof.Attributes;
+                public partial class Subject {
+                    public partial int Value {
+                        get {
+                            Contract.Requires(true);
+                            return 1;
+                        }
+                        set {
+                            Contract.Requires(value >= 0);
+                        }
+                    }
+                }
+                """));
+        var property = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Value")
+            .OfType<IPropertySymbol>()
+            .Single(static property =>
+                property.PartialImplementationPart != null);
+        var definitionAccessor = accessorKind == MethodKind.PropertyGet
+            ? property.GetMethod!
+            : property.SetMethod!;
+
+        var inventory = new ContractClauseInventoryBuilder(compilation)
+            .Create(definitionAccessor);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(inventory.ImplementationBody, Is.Not.Null);
+            Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
+            Assert.That(inventory.Clauses[0].IsValid, Is.True);
+        }
+    }
+
+    [TestCase(MethodKind.PropertyGet)]
+    [TestCase(MethodKind.PropertySet)]
+    public void ConstructedPartialPropertyAccessorsKeepSpecialization(
+        MethodKind accessorKind)
+    {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                public partial class Subject<T> where T : class {
+                    public partial T Value { get; set; }
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                using SharpProof.Attributes;
+                public partial class Subject<T> where T : class {
+                    public partial T Value {
+                        get {
+                            Contract.Requires(true);
+                            return null!;
+                        }
+                        set {
+                            Contract.Requires(value != null);
+                        }
+                    }
+                }
+                """));
+        var generic = compilation.GetTypeByMetadataName("Subject`1")!;
+        var constructed = generic.Construct(
+            compilation.GetSpecialType(SpecialType.System_String));
+        var property = constructed.GetMembers("Value")
+            .OfType<IPropertySymbol>()
+            .Single();
+        var accessor = accessorKind == MethodKind.PropertyGet
+            ? property.GetMethod!
+            : property.SetMethod!;
+
+        var result = new ContractBinder(compilation, new IrFactory())
+            .BindRequires(accessor);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+            Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
+            Assert.That(
+                result.Contracts.Source.ContainingType.TypeArguments[0]
+                    .SpecialType,
+                Is.EqualTo(SpecialType.System_String));
+        }
+    }
+
     [Test]
     public void CompanionContractsBindFromTheImplementationAcrossSyntaxTrees()
     {
@@ -166,7 +268,7 @@ public sealed class PartialMethodContractTests
         params (string FileName, string Source)[] sources)
     {
         var parseOptions = new CSharpParseOptions(
-            LanguageVersion.CSharp12,
+            LanguageVersion.Preview,
             preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]);
         var compilation = CSharpCompilation.Create(
             "PartialContracts_" + Guid.NewGuid().ToString("N"),

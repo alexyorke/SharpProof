@@ -57,13 +57,13 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 234,
-    "expectedCatalogSha256": "83298b80c8dd16de224ba72b94b2d0e3ea84d1103868b4e9cbc1db2c9ffecd53"
+    "expectedCatalogCount": 257,
+    "expectedCatalogSha256": "c8342f6484e5dd477d5602041ce47dcec0f3f79e3e0b0f610a6abe952e3d7588"
   },
   "worker": {
     "protocolVersion": 11,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 14,
+    "compilerArtifactSchemaVersion": 15,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -209,7 +209,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "1b22bbf46daea57a6469e970a2ce9a56234a2d7eb8d04a9acc937436faedc85d",
+      "inventorySha256": "f3d4f92362b477b3ec7271d247e8ff07eb5a90bbefe2f199414a2f79014b6694",
     "components": [
       {
         "name": "discovery",
@@ -613,8 +613,10 @@
         "paths": [
           "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
+          "SharpProof.BuildTasks/Program.cs",
           "SharpProof.BuildTasks/ResetPublishedVerification.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
+          "SharpProof.BuildTasks/VerifierProcessSupervisor.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",
           "SharpProof.Host/ContainerNativeLibrary.cs",
@@ -841,6 +843,7 @@
   "fuzz": {
     "pullRequestCases": 1000,
     "nightlyCases": 10000,
+    "maximumCampaignCases": 1000000,
     "maximumParallelism": 4
   },
   "performance": {
