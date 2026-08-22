@@ -124,8 +124,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     {
         var enclosing = model.GetEnclosingSymbol(invocation.Syntax.SpanStart);
         if (enclosing is not IMethodSymbol method ||
-            !SymbolEqualityComparer.Default.Equals(
-                callable.OriginalDefinition, method.OriginalDefinition))
+            !HaveSameDefinition(callable, method))
         {
             return ContractClausePlacement.NestedCallable;
         }
@@ -246,12 +245,28 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IOperation? implementationBody)
     {
-        return implementationBody != null
-            ? [GetBody(implementationBody.Syntax) ?? implementationBody.Syntax]
-            : [.. callable.DeclaringSyntaxReferences
-                .Select(static reference => GetBody(reference.GetSyntax()))
-                .Where(static body => body != null)
-                .Select(static body => body!)];
+        if (implementationBody != null)
+        {
+            return [GetBody(implementationBody.Syntax) ?? implementationBody.Syntax];
+        }
+
+        var bodies = GetDeclaredBodies(callable);
+        if (!bodies.IsDefaultOrEmpty ||
+            callable.OriginalDefinition.PartialImplementationPart is not { } implementation)
+        {
+            return bodies;
+        }
+
+        return GetDeclaredBodies(implementation);
+    }
+
+    private static ImmutableArray<SyntaxNode> GetDeclaredBodies(
+        IMethodSymbol callable)
+    {
+        return [.. callable.DeclaringSyntaxReferences
+            .Select(static reference => GetBody(reference.GetSyntax()))
+            .Where(static body => body != null)
+            .Select(static body => body!)];
     }
 
     internal static SyntaxNode? GetBody(SyntaxNode syntax)
@@ -293,5 +308,20 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     internal static IMethodSymbol NormalizeCallable(IMethodSymbol method)
     {
         return method.PartialImplementationPart ?? method;
+    }
+
+    internal static bool HaveSameDefinition(
+        IMethodSymbol left,
+        IMethodSymbol right)
+    {
+        return SymbolEqualityComparer.Default.Equals(
+            GetPartialDefinition(left),
+            GetPartialDefinition(right));
+    }
+
+    private static IMethodSymbol GetPartialDefinition(IMethodSymbol method)
+    {
+        var definition = method.OriginalDefinition;
+        return definition.PartialDefinitionPart ?? definition;
     }
 }

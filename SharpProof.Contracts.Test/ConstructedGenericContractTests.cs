@@ -223,6 +223,170 @@ public sealed class ConstructedGenericContractTests
             expectedClauses: 1);
     }
 
+    [Test]
+    public void ConstructedPartialGenericMethodUsesItsImplementationBody()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public static partial class Target<T> where T : class {
+                public static partial T Read(T value);
+                public static partial T Read(T value) {
+                    Contract.Requires(value != null);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static string Call(string value) =>
+                    Target<string>.Read(value);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
+    [Test]
+    public void ConstructedPartialGenericCompanionUsesItsImplementationBody()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget<T> where T : class {
+                T Read(T value);
+            }
+
+            [ContractFor(typeof(ITarget<>))]
+            public static partial class TargetContracts<T> where T : class {
+                public static partial T Read(
+                    ITarget<T> receiver,
+                    T value);
+                public static partial T Read(
+                    ITarget<T> receiver,
+                    T value) {
+                    Contract.Requires(value != null);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static string Call(
+                    ITarget<string> target,
+                    string value) => target.Read(value);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
+    [Test]
+    public void ConstructedPartialMethodTypeParametersAreSpecialized()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public static partial class Target {
+                public static partial T Read<T>(T value) where T : class;
+                public static partial T Read<T>(T value) where T : class {
+                    Contract.Requires(value != null);
+                    Contract.Ensures(Contract.Result<T>() != null);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static string Call(string value) =>
+                    Target.Read<string>(value);
+            }
+            """,
+            expectedClauses: 2);
+    }
+
+    [Test]
+    public void ConstructedPartialCompanionMethodTypeParametersAreSpecialized()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget {
+                T Read<T>(T value) where T : class;
+            }
+
+            [ContractFor(typeof(ITarget))]
+            public static partial class TargetContracts {
+                public static partial T Read<T>(
+                    ITarget receiver,
+                    T value) where T : class;
+                public static partial T Read<T>(
+                    ITarget receiver,
+                    T value) where T : class {
+                    Contract.Requires(value != null);
+                    Contract.Ensures(Contract.Result<T>() != null);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static string Call(ITarget target, string value) =>
+                    target.Read<string>(value);
+            }
+            """,
+            expectedClauses: 2);
+    }
+
+    [Test]
+    public void ConstructedPartialRejectsResultInsideRequires()
+    {
+        AssertFailure(
+            """
+            using SharpProof.Attributes;
+
+            public static partial class Target<T> where T : class {
+                public static partial T Read(T value);
+                public static partial T Read(T value) {
+                    Contract.Requires(Contract.Result<T>() != null);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static string Call(string value) =>
+                    Target<string>.Read(value);
+            }
+            """,
+            ContractBindingFailure.ResultOutsideEnsures);
+    }
+
+    [Test]
+    public void ConstructedPartialCompanionRejectsResultInsideRequires()
+    {
+        AssertFailure(
+            """
+            using SharpProof.Attributes;
+
+            public interface ITarget<T> where T : class {
+                T Read(T value);
+            }
+
+            [ContractFor(typeof(ITarget<>))]
+            public static partial class TargetContracts<T> where T : class {
+                public static partial T Read(ITarget<T> receiver, T value);
+                public static partial T Read(ITarget<T> receiver, T value) {
+                    Contract.Requires(Contract.Result<T>() != null);
+                    return value;
+                }
+            }
+
+            public static class Caller {
+                public static string Call(ITarget<string> target, string value) =>
+                    target.Read(value);
+            }
+            """,
+            ContractBindingFailure.ResultOutsideEnsures);
+    }
+
     private static void AssertBinds(string source, int expectedClauses)
     {
         var compilation = CreateCompilation(source);
@@ -243,6 +407,28 @@ public sealed class ConstructedGenericContractTests
         Assert.That(
             result.Contracts!.Clauses,
             Has.Length.EqualTo(expectedClauses));
+    }
+
+    private static void AssertFailure(
+        string source,
+        ContractBindingFailure expectedFailure)
+    {
+        var compilation = CreateCompilation(source);
+        var tree = compilation.SyntaxTrees.Single();
+        var invocation = tree.GetRoot()
+            .DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Last();
+        var target = compilation.GetSemanticModel(tree)
+            .GetSymbolInfo(invocation)
+            .Symbol as IMethodSymbol ??
+            throw new InvalidOperationException(invocation.ToString());
+
+        var result = new ContractBinder(compilation, new IrFactory())
+            .Bind(target);
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Failure, Is.EqualTo(expectedFailure));
     }
 
     private static CSharpCompilation CreateCompilation(string source)
