@@ -4693,6 +4693,17 @@ public sealed class EffectAnalysisTests
             public sealed class NestedListPatternHolder {
                 public ReceiverMutatingListPattern Child { get; } = new();
             }
+            public sealed class NonNullNestedSliceListPatternBomb {
+                public int Length { get { while (true) { } } }
+                public int this[int index] => 0;
+            }
+            public sealed class NonNullSliceOuterPattern {
+                public int Length => 1;
+                public int this[int index] => 0;
+                public NonNullNestedSliceListPatternBomb Slice(
+                    int start,
+                    int length) => new();
+            }
             public sealed class NullTarget {
                 public int Value;
                 public void Touch() { }
@@ -4972,6 +4983,7 @@ public sealed class EffectAnalysisTests
                 public static void NullListSkipsLengthCatch() { try { _ = ((ThrowingListLengthPattern)null!) switch { [] => 1, _ => 2 }; } catch (InvalidOperationException) { s_state++; } }
                 public static void ThrowingLengthSkipsIndexerCatch() { try { _ = new ThrowingLengthAndIndexerPattern() switch { [0] => 1, _ => 2 }; } catch (ApplicationException) { s_state++; } catch (InvalidOperationException) { } }
                 public static bool NestedListReceiverWrite(NestedListPatternHolder value) => value is { Child: [0] };
+                public static void AfterDivergingNonNullNestedSliceList() { _ = new NonNullSliceOuterPattern() switch { [.. []] => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingNegatedPattern() { _ = new PatternBomb() switch { not { Value: 0 } => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingAndPattern() { _ = new PatternBomb() switch { { Value: 0 } and _ => 1, _ => 2 }; s_state++; }
                 public static void AfterDivergingOrPattern() { _ = new ReferencePatternBomb() switch { null or { Value: 0 } => 1, _ => 2 }; s_state++; }
@@ -5196,6 +5208,9 @@ public sealed class EffectAnalysisTests
                 session.Analyze(Method(compilation, "NestedListReceiverWrite"))
                     .Summary.Writes.IsUnknown,
                 Is.True);
+            Assert.That(
+                HasStaticWrite("AfterDivergingNonNullNestedSliceList"),
+                Is.False);
             Assert.That(
                 HasStaticWrite("AfterDivergingNegatedPattern"),
                 Is.False);

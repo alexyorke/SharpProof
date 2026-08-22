@@ -1,4 +1,5 @@
 namespace SharpProof.Analyzer;
+
 internal static class InvalidContractArgumentDiagnostics
 {
     internal static Diagnostic Create(string attributeName, string argument, string reason, Location location)

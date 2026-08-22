@@ -18,6 +18,19 @@ namespace SharpProof.Package.Test;
 public sealed class BuildTaskTests
 {
     [Test]
+    public void GeneratedSupervisorNoncePassesSupervisorGateValidation()
+    {
+        var nonce = RunVerifier.CreateSupervisorNonce();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nonce, Has.Length.EqualTo(64));
+            Assert.That(nonce, Is.EqualTo(nonce.ToLowerInvariant()));
+            Assert.That(VerifierProcessSupervisor.IsValidNonce(nonce), Is.True);
+        }
+    }
+
+    [Test]
     public void SupervisorCleanupReceiptsRequireAnExactNonceAndRecord()
     {
         const string nonce =

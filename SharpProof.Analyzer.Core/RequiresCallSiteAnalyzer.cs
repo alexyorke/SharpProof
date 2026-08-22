@@ -65,8 +65,8 @@ internal static partial class RequiresCallSiteAnalyzer
             ? invocation.TargetMethod
             : semanticModel.GetSymbolInfo(initializer, cancellationToken)
                 .Symbol as IMethodSymbol;
-        var arguments = initializerOperation is IInvocationOperation baseCall
-            ? baseCall.Arguments.Cast<IArgumentOperation?>().ToImmutableArray()
+        var arguments = initializerOperation is IInvocationOperation baseCallOperation
+            ? baseCallOperation.Arguments.Cast<IArgumentOperation?>().ToImmutableArray()
             : initializer.ArgumentList.Arguments
                 .Select(argument => semanticModel.GetOperation(
                     argument,
@@ -316,7 +316,9 @@ internal static partial class RequiresCallSiteAnalyzer
 
             var variables = new Dictionary<IrVarId, ManagedAbstractValue>();
             var definitelyStrings = new HashSet<IrVarId>();
-            foreach (var variable in GetInputVariables(contracts))
+            foreach (var variable in GetInputVariablesUsedBy(
+                         contracts,
+                         requires))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var actual = GetActual(candidate, variable);
@@ -389,7 +391,9 @@ internal static partial class RequiresCallSiteAnalyzer
                 session.IsKnownPure);
             var interpreter = new IrInterpreter(_factory);
             var substitutions = new Dictionary<IrVarId, IrTerm>();
-            foreach (var variable in GetInputVariables(contracts))
+            foreach (var variable in GetInputVariablesUsedBy(
+                         contracts,
+                         requires))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var actual = GetActual(callSite, variable);
@@ -475,6 +479,18 @@ internal static partial class RequiresCallSiteAnalyzer
             variable.Role is not (
                 BoundContractVariableRole.Result or
                 BoundContractVariableRole.PreState));
+    }
+
+    private static IEnumerable<BoundContractVariable> GetInputVariablesUsedBy(
+        BoundMethodContracts contracts,
+        ImmutableArray<BoundContractClause> clauses)
+    {
+        var used = clauses
+            .SelectMany(static clause =>
+                IrTermAnalysis.CollectVariables(clause.Condition))
+            .ToImmutableHashSet();
+        return GetInputVariables(contracts).Where(variable =>
+            used.Contains(variable.Variable));
     }
 
     private static IOperation? GetActual(

@@ -771,7 +771,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return false;
         }
 
-        private static IReadOnlyList<string>? GetTuplePath(
+        private static string[]? GetTuplePath(
             SyntaxNode value,
             SyntaxNode definition)
         {
@@ -792,7 +792,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return components.Length == 0 ? null : components;
         }
 
-        private static IReadOnlyList<string> GetAccessedTuplePath(
+        private static List<string> GetAccessedTuplePath(
             ILocalReferenceOperation reference)
         {
             var components = new List<string>();
@@ -841,7 +841,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 return false;
             }
 
-            var target = assignment.Left;
+            SyntaxNode target = assignment.Left;
             var sourceType = semanticModel.GetTypeInfo(
                 assignment.Right,
                 cancellationToken).Type as INamedTypeSymbol;
@@ -870,7 +870,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     }
                 }
                 var elements = GetDeconstructionElements(target);
-                if (index < 0 || index >= elements.Count)
+                if (index < 0 || index >= elements.Length)
                 {
                     return false;
                 }
@@ -879,7 +879,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     INamedTypeSymbol;
                 consumed++;
                 if (consumed < tuplePath.Count &&
-                    GetDeconstructionElements(target).Count == 0)
+                    GetDeconstructionElements(target).Length == 0)
                 {
                     break;
                 }
@@ -900,7 +900,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                         designation,
                         cancellationToken) as ILocalSymbol,
                 DeclarationExpressionSyntax
-                    { Designation: SingleVariableDesignationSyntax designation } =>
+                { Designation: SingleVariableDesignationSyntax designation } =>
                     semanticModel.GetDeclaredSymbol(
                         designation,
                         cancellationToken) as ILocalSymbol,
@@ -912,7 +912,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return local != null || IsDiscardDeconstructionTarget(target);
         }
 
-        private static IReadOnlyList<SyntaxNode> GetDeconstructionElements(
+        private static SyntaxNode[] GetDeconstructionElements(
             SyntaxNode target)
         {
             return target switch
@@ -921,7 +921,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     .Select(static argument => (SyntaxNode)argument.Expression)
                     .ToArray(),
                 DeclarationExpressionSyntax
-                    { Designation: ParenthesizedVariableDesignationSyntax tuple } =>
+                { Designation: ParenthesizedVariableDesignationSyntax tuple } =>
                     tuple.Variables.Cast<SyntaxNode>().ToArray(),
                 ParenthesizedVariableDesignationSyntax tuple =>
                     tuple.Variables.Cast<SyntaxNode>().ToArray(),
@@ -960,16 +960,20 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             BasicBlock block)
         {
             if (block.FallThroughSuccessor is
-                { Semantics: ControlFlowBranchSemantics.Regular or
+                {
+                    Semantics: ControlFlowBranchSemantics.Regular or
                     ControlFlowBranchSemantics.StructuredExceptionHandling,
-                  Destination: not null } fallThrough)
+                    Destination: not null
+                } fallThrough)
             {
                 yield return fallThrough.Destination!;
             }
             if (block.ConditionalSuccessor is
-                { Semantics: ControlFlowBranchSemantics.Regular or
+                {
+                    Semantics: ControlFlowBranchSemantics.Regular or
                     ControlFlowBranchSemantics.StructuredExceptionHandling,
-                  Destination: not null } conditional &&
+                    Destination: not null
+                } conditional &&
                 conditional.Destination.Ordinal !=
                     block.FallThroughSuccessor?.Destination?.Ordinal)
             {
@@ -1030,7 +1034,6 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 IFunctionPointerInvocationOperation or
                 IObjectCreationOperation or
                 IArrayCreationOperation or
-                IArrayLengthOperation or
                 IArrayElementReferenceOperation or
                 IDynamicMemberReferenceOperation or
                 IFieldReferenceOperation { Instance: not null } or
@@ -1039,7 +1042,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 ILockOperation or
                 IAwaitOperation or
                 ICompoundAssignmentOperation
-                    { IsChecked: true } or
+                { IsChecked: true } or
                 ICompoundAssignmentOperation
                 {
                     OperatorKind: BinaryOperatorKind.Divide or
@@ -1136,16 +1139,16 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     continue;
                 }
                 return operation is IBinaryOperation
-                    {
-                        OperatorMethod: null,
-                        OperatorKind: BinaryOperatorKind.Equals or
+                {
+                    OperatorMethod: null,
+                    OperatorKind: BinaryOperatorKind.Equals or
                             BinaryOperatorKind.NotEquals
-                    } or IIsPatternOperation;
+                } or IIsPatternOperation;
             }
             return false;
         }
 
-        private IReadOnlyList<(ILocalSymbol Local, SyntaxNode Definition)>
+        private List<(ILocalSymbol Local, SyntaxNode Definition)>
             GetPatternDestinations(SyntaxNode reference)
         {
             var pattern = reference.Ancestors()
@@ -1161,8 +1164,9 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             foreach (var designation in WholeInputDesignations(
                          pattern.Pattern))
             {
-                if (semanticModel.GetDeclaredSymbol(
-                        designation,
+                if (designation is SingleVariableDesignationSyntax single &&
+                    semanticModel.GetDeclaredSymbol(
+                        single,
                         cancellationToken) is ILocalSymbol declared &&
                     !result.Any(candidate =>
                         SymbolEqualityComparer.Default.Equals(
@@ -1187,7 +1191,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     yield return varPattern.Designation;
                     yield break;
                 case RecursivePatternSyntax
-                    { Designation: { } designation }:
+                { Designation: { } designation }:
                     yield return designation;
                     yield break;
                 case ParenthesizedPatternSyntax parenthesized:
@@ -1225,7 +1229,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
 
         private static bool AssignmentKillsTrackedValue(
             IReadOnlyList<string>? trackedPath,
-            IReadOnlyList<string> assignedPath)
+            List<string> assignedPath)
         {
             if (trackedPath == null || assignedPath.Count == 0)
             {

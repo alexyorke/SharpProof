@@ -86,9 +86,7 @@ internal static partial class VerifierProcessSupervisor
                     StringComparison.Ordinal)
                 ? gate[(StartMessage.Length + 1)..]
                 : string.Empty;
-            if (nonce.Length != 64 || nonce.Any(static character =>
-                    character is not (>= '0' and <= '9') and
-                        not (>= 'a' and <= 'f')))
+            if (!IsValidNonce(nonce))
             {
                 return 125;
             }
@@ -159,6 +157,12 @@ internal static partial class VerifierProcessSupervisor
         {
             CloseDescriptors(cleanupDescriptorReserves);
         }
+    }
+
+    internal static bool IsValidNonce(string nonce)
+    {
+        return nonce.Length == 64 && nonce.All(static character =>
+            character is >= '0' and <= '9' or >= 'a' and <= 'f');
     }
 
     private static void WriteCleanupReceipt(string nonce)

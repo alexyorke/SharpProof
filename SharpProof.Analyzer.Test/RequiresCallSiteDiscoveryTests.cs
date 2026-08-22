@@ -770,6 +770,60 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public async Task ListPatternImplicitAccessorsHonorPreconditionsAndOrder()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public sealed class LengthContractList {
+                public int Length {
+                    get { Contract.Requires(false); return 0; }
+                }
+                public int this[int index] => 0;
+            }
+            public sealed class EmptyIndexerContractList {
+                public int Length => 0;
+                public int this[int index] {
+                    get { Contract.Requires(false); return 0; }
+                }
+            }
+            public sealed class OneIndexerContractList {
+                public int Length => 1;
+                public int this[int index] {
+                    get { Contract.Requires(false); return 0; }
+                }
+            }
+            public sealed class SliceContractList {
+                public int Length => 1;
+                public int this[int index] => 0;
+                public SliceContractList Slice(int start, int length) {
+                    Contract.Requires(false);
+                    return this;
+                }
+            }
+            public static class Subject {
+                public static bool EmptyLength(LengthContractList value) =>
+                    value is [];
+                public static bool LengthMismatchSkipsIndexer() =>
+                    new EmptyIndexerContractList() is [0];
+                public static bool ReachableIndexer() =>
+                    new OneIndexerContractList() is [0];
+                public static bool ReachableSlice() =>
+                    new SliceContractList() is [.. var rest];
+            }
+            """,
+            ["SP0027"]);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", 3)));
+    }
+
+    [Test]
     public void PotentialPreconditionScreenFailsClosedWithoutTrustedApiIdentity()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(

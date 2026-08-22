@@ -1,4 +1,5 @@
 namespace SharpProof.Analyzer.Configuration;
+
 internal static class AnalyzerConfigurationOptionRegistry
 {
     internal static AnalyzerConfigurationOption Profile { get; } =

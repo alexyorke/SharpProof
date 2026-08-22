@@ -38,11 +38,18 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var owners = ImmutableHashSet.CreateBuilder<
             IMethodSymbol>(
             SymbolEqualityComparer.Default);
+        var operationFacts = new DefiniteOperationFacts(
+            semanticModel.Compilation,
+            cancellationToken);
         foreach (var operation in
                  ExecutableDescendantsAndSelf(operationRoot))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var calls = GetCalls(operation);
+            var calls = GetCalls(
+                operation,
+                operationFacts,
+                semanticModel.Compilation,
+                cancellationToken);
             if (calls.IsDefaultOrEmpty)
             {
                 continue;
@@ -143,7 +150,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     operation.Syntax.SyntaxTree,
                     operation.Syntax.SpanStart,
                     operation.Syntax.Span.Length));
-                var calls = GetCalls(operation);
+                var calls = GetCalls(
+                    operation,
+                    operationFacts,
+                    semanticModel.Compilation,
+                    cancellationToken);
                 if (calls.IsDefaultOrEmpty ||
                     !SymbolEqualityComparer.Default.Equals(
                         semanticModel.GetEnclosingSymbol(
@@ -181,7 +192,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         call.ExplicitArguments,
                         call.CanReplay &&
                         (hasFlowState || !flowAnalysis.IsComplete) &&
-                        (IsAccessorCall(call.TargetMethod)
+                        (IsAccessorCall(call.TargetMethod) ||
+                            operation is IListPatternOperation
                             ? HasReplayableAccessorEvaluation(
                                 call,
                                 operationFacts)
@@ -544,7 +556,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
     }
 
     private static ImmutableArray<RequiresCallTarget> GetCalls(
-        IOperation operation)
+        IOperation operation,
+        DefiniteOperationFacts? operationFacts = null,
+        Compilation? compilation = null,
+        CancellationToken cancellationToken = default)
     {
         return operation switch
         {
@@ -567,8 +582,166 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 GetPropertyCalls(property),
             IEventReferenceOperation eventReference =>
                 GetEventCalls(eventReference),
+            IListPatternOperation listPattern => GetListPatternCalls(
+                listPattern,
+                operationFacts,
+                compilation,
+                cancellationToken),
             _ => []
         };
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetListPatternCalls(
+        IListPatternOperation pattern,
+        DefiniteOperationFacts? operationFacts,
+        Compilation? compilation,
+        CancellationToken cancellationToken)
+    {
+        var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (instance != null &&
+            DefiniteOperationFacts.IsDefinitelyNull(instance))
+        {
+            return [];
+        }
+
+        var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>();
+        var length = SwitchExpressionFacts.GetCallableListPatternMember(
+            pattern.LengthSymbol);
+        if (length != null)
+        {
+            calls.Add(CreateImplicitListPatternCall(length, instance));
+            if (operationFacts != null &&
+                !operationFacts.MethodCanCompleteNormally(length))
+            {
+                return calls.ToImmutable();
+            }
+        }
+
+        var requiredLength = pattern.Patterns.Count(
+            static item => item is not ISlicePatternOperation);
+        var hasSlice = pattern.Patterns.Any(
+            static item => item is ISlicePatternOperation);
+        if (compilation != null &&
+            TryGetKnownListLength(
+                pattern,
+                instance,
+                compilation,
+                cancellationToken,
+                out var knownLength) &&
+            (hasSlice
+                ? knownLength < requiredLength
+                : knownLength != requiredLength))
+        {
+            return calls.ToImmutable();
+        }
+
+        foreach (var item in pattern.Patterns)
+        {
+            var member = item is ISlicePatternOperation slice
+                ? slice.Pattern == null
+                    ? null
+                    : SwitchExpressionFacts.GetCallableListPatternMember(
+                        slice.SliceSymbol)
+                : SwitchExpressionFacts.GetCallableListPatternMember(
+                    pattern.IndexerSymbol);
+            if (member == null)
+            {
+                continue;
+            }
+            calls.Add(CreateImplicitListPatternCall(member, instance));
+            if (operationFacts != null &&
+                !operationFacts.MethodCanCompleteNormally(member))
+            {
+                break;
+            }
+        }
+        return calls.ToImmutable();
+    }
+
+    private static RequiresCallTarget CreateImplicitListPatternCall(
+        IMethodSymbol method,
+        IOperation? instance)
+    {
+        return new RequiresCallTarget(
+            method,
+            instance,
+            [],
+            ImmutableDictionary<int, IOperation>.Empty,
+            true);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1508:Avoid dead conditional code",
+        Justification = "The analyzer misreads the multi-branch nullable " +
+            "assignment above the null check as unreachable.")]
+    private static bool TryGetKnownListLength(
+        IListPatternOperation pattern,
+        IOperation? instance,
+        Compilation compilation,
+        CancellationToken cancellationToken,
+        out long length)
+    {
+        instance = instance == null
+            ? null
+            : DefiniteOperationFacts.UnwrapHarmlessValue(instance);
+        if (instance is IArrayCreationOperation
+            { DimensionSizes.Length: 1 } arrayCreation &&
+            arrayCreation.DimensionSizes[0].ConstantValue is
+            { HasValue: true, Value: int arrayLength })
+        {
+            length = arrayLength;
+            return true;
+        }
+        if (pattern.LengthSymbol is not IPropertySymbol
+            { GetMethod: { } getter } ||
+            getter.IsVirtual && !getter.IsSealed ||
+            getter.DeclaringSyntaxReferences.Length != 1)
+        {
+            length = 0;
+            return false;
+        }
+
+        var declaration = getter.DeclaringSyntaxReferences[0]
+            .GetSyntax(cancellationToken);
+        var expression = declaration switch
+        {
+            PropertyDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            AccessorDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            AccessorDeclarationSyntax
+            { Body.Statements.Count: 1 } accessor
+                when accessor.Body!.Statements[0] is ReturnStatementSyntax
+                { Expression: { } body } => body,
+            _ => null
+        };
+        if (expression == null)
+        {
+            length = 0;
+            return false;
+        }
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, expression.SyntaxTree);
+        var constant = model.GetConstantValue(expression, cancellationToken);
+        if (!constant.HasValue || constant.Value == null)
+        {
+            length = 0;
+            return false;
+        }
+        try
+        {
+            length = Convert.ToInt64(
+                constant.Value,
+                System.Globalization.CultureInfo.InvariantCulture);
+            return length >= 0;
+        }
+        catch (Exception exception) when (exception is
+            FormatException or InvalidCastException or OverflowException)
+        {
+            length = 0;
+            return false;
+        }
     }
 
     internal static ImmutableArray<RequiresCallSiteCandidate>
@@ -863,7 +1036,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 yield break;
             }
             var skipRight = factBinary.LeftOperand.ConstantValue is
-                { HasValue: true, Value: bool leftValue } &&
+            { HasValue: true, Value: bool leftValue } &&
                 leftValue == (factBinary.OperatorKind ==
                     BinaryOperatorKind.ConditionalOr);
             if (!skipRight)
@@ -920,7 +1093,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             }
             if (!operationFacts.MayCompleteNormally(factAccess.Operation) ||
                 factAccess.Operation.ConstantValue is
-                    { HasValue: true, Value: null })
+                { HasValue: true, Value: null })
             {
                 yield break;
             }
@@ -1044,12 +1217,16 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 yield break;
             }
             var input = switchExpression.Value.ConstantValue.Value;
+            var switchCompilation = switchExpression.SemanticModel?.Compilation;
             foreach (var arm in switchExpression.Arms)
             {
-                var match = GetConstantPatternMatch(
-                    arm.Pattern,
-                    input,
-                    switchExpression.Value.Type);
+                var match = switchCompilation == null
+                    ? ConstantPatternMatch.Unknown
+                    : GetConstantPatternMatch(
+                        switchCompilation,
+                        arm.Pattern,
+                        input,
+                        switchExpression.Value.Type);
                 if (match == ConstantPatternMatch.No)
                 {
                     continue;
@@ -1112,7 +1289,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
     }
 
-    private ConstantPatternMatch GetConstantPatternMatch(
+    private static ConstantPatternMatch GetConstantPatternMatch(
+        Compilation compilation,
         IPatternOperation pattern,
         object? input,
         ITypeSymbol? inputType)
@@ -1122,16 +1300,20 @@ internal sealed partial class RequiresCallSiteDiscovery(
             IDiscardPatternOperation => ConstantPatternMatch.Yes,
             ITypePatternOperation typePattern =>
                 MatchTypePattern(
+                    compilation,
                     typePattern.MatchedType,
                     input,
                     inputType,
                     matchesNull: false),
-            IDeclarationPatternOperation declarationPattern =>
+            IDeclarationPatternOperation
+            { MatchedType: { } declarationMatchedType } declarationPattern =>
                 MatchTypePattern(
-                    declarationPattern.MatchedType,
+                    compilation,
+                    declarationMatchedType,
                     input,
                     inputType,
                     declarationPattern.MatchesNull),
+            IDeclarationPatternOperation => ConstantPatternMatch.Unknown,
             IConstantPatternOperation
             {
                 Value.ConstantValue: { HasValue: true } constant
@@ -1142,6 +1324,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 MatchRelationalPattern(relational, input),
             INegatedPatternOperation negated =>
                 Negate(GetConstantPatternMatch(
+                    compilation,
                     negated.Pattern,
                     input,
                     inputType)),
@@ -1149,10 +1332,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 when binary.OperatorKind == BinaryOperatorKind.And =>
                 And(
                     GetConstantPatternMatch(
+                        compilation,
                         binary.LeftPattern,
                         input,
                         inputType),
                     GetConstantPatternMatch(
+                        compilation,
                         binary.RightPattern,
                         input,
                         inputType)),
@@ -1160,10 +1345,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 when binary.OperatorKind == BinaryOperatorKind.Or =>
                 Or(
                     GetConstantPatternMatch(
+                        compilation,
                         binary.LeftPattern,
                         input,
                         inputType),
                     GetConstantPatternMatch(
+                        compilation,
                         binary.RightPattern,
                         input,
                         inputType)),
@@ -1171,7 +1358,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         };
     }
 
-    private ConstantPatternMatch MatchTypePattern(
+    private static ConstantPatternMatch MatchTypePattern(
+        Compilation compilation,
         ITypeSymbol matchedType,
         object? input,
         ITypeSymbol? inputType,
@@ -1187,33 +1375,33 @@ internal sealed partial class RequiresCallSiteDiscovery(
             ? inputType
             : input switch
             {
-                bool => semanticModel.Compilation.GetSpecialType(
+                bool => compilation.GetSpecialType(
                     SpecialType.System_Boolean),
-                byte => semanticModel.Compilation.GetSpecialType(
+                byte => compilation.GetSpecialType(
                     SpecialType.System_Byte),
-                sbyte => semanticModel.Compilation.GetSpecialType(
+                sbyte => compilation.GetSpecialType(
                     SpecialType.System_SByte),
-                short => semanticModel.Compilation.GetSpecialType(
+                short => compilation.GetSpecialType(
                     SpecialType.System_Int16),
-                ushort => semanticModel.Compilation.GetSpecialType(
+                ushort => compilation.GetSpecialType(
                     SpecialType.System_UInt16),
-                int => semanticModel.Compilation.GetSpecialType(
+                int => compilation.GetSpecialType(
                     SpecialType.System_Int32),
-                uint => semanticModel.Compilation.GetSpecialType(
+                uint => compilation.GetSpecialType(
                     SpecialType.System_UInt32),
-                long => semanticModel.Compilation.GetSpecialType(
+                long => compilation.GetSpecialType(
                     SpecialType.System_Int64),
-                ulong => semanticModel.Compilation.GetSpecialType(
+                ulong => compilation.GetSpecialType(
                     SpecialType.System_UInt64),
-                char => semanticModel.Compilation.GetSpecialType(
+                char => compilation.GetSpecialType(
                     SpecialType.System_Char),
-                float => semanticModel.Compilation.GetSpecialType(
+                float => compilation.GetSpecialType(
                     SpecialType.System_Single),
-                double => semanticModel.Compilation.GetSpecialType(
+                double => compilation.GetSpecialType(
                     SpecialType.System_Double),
-                decimal => semanticModel.Compilation.GetSpecialType(
+                decimal => compilation.GetSpecialType(
                     SpecialType.System_Decimal),
-                string => semanticModel.Compilation.GetSpecialType(
+                string => compilation.GetSpecialType(
                     SpecialType.System_String),
                 _ => null
             };
@@ -1221,7 +1409,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             return ConstantPatternMatch.Unknown;
         }
-        return semanticModel.Compilation
+        return compilation
             .ClassifyCommonConversion(actualType, matchedType)
             .IsImplicit
             ? ConstantPatternMatch.Yes

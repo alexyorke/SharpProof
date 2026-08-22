@@ -125,8 +125,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 LauncherProcessReserveMilliseconds;
             var processStopwatch = Stopwatch.StartNew();
             var resolvedExecutable = ResolveDotNetHost(Executable);
-            supervisorNonce = Convert.ToHexString(
-                RandomNumberGenerator.GetBytes(32)).ToUpperInvariant();
+            supervisorNonce = CreateSupervisorNonce();
             process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -341,6 +340,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             process?.Dispose();
         }
         return true;
+    }
+
+    internal static string CreateSupervisorNonce()
+    {
+        return Convert.ToHexString(
+            RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
     }
 
     internal static bool WaitForOutputCompletion(

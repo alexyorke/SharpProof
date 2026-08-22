@@ -19,6 +19,9 @@ internal static class SwitchExpressionFacts
         }
         return current.Parent switch
         {
+            IIsPatternOperation isPattern
+                when ReferenceEquals(isPattern.Pattern, current) =>
+                isPattern.Value,
             ISwitchExpressionArmOperation
             { Parent: ISwitchExpressionOperation expression } =>
                 expression.Value,

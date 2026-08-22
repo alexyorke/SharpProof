@@ -259,7 +259,10 @@ internal sealed class OperationCompletionEvaluator
             }
             return CanListPatternMemberCompleteNormally(
                     totalSlice.SliceSymbol) &&
-                CanCompletePatternEvaluation(slicePattern);
+                CanCompletePatternEvaluation(
+                    slicePattern,
+                    IsListPatternMemberResultDefinitelyNonNull(
+                        totalSlice.SliceSymbol));
         }
 
         if (hasSlice ? length < requiredLength : length != requiredLength)
@@ -276,7 +279,10 @@ internal sealed class OperationCompletionEvaluator
                     continue;
                 }
                 if (!CanListPatternMemberCompleteNormally(slice.SliceSymbol) ||
-                    !CanCompletePatternEvaluation(slice.Pattern))
+                    !CanCompletePatternEvaluation(
+                        slice.Pattern,
+                        IsListPatternMemberResultDefinitelyNonNull(
+                            slice.SliceSymbol)))
                 {
                     return false;
                 }
@@ -290,7 +296,10 @@ internal sealed class OperationCompletionEvaluator
             }
 
             if (!CanListPatternMemberCompleteNormally(pattern.IndexerSymbol) ||
-                !CanCompletePatternEvaluation(item))
+                !CanCompletePatternEvaluation(
+                    item,
+                    IsListPatternMemberResultDefinitelyNonNull(
+                        pattern.IndexerSymbol)))
             {
                 return false;
             }
@@ -365,7 +374,12 @@ internal sealed class OperationCompletionEvaluator
                 ? nestedSlice.Pattern
                 : item;
             if (nestedPattern != null &&
-                !CanCompletePatternEvaluation(nestedPattern))
+                !CanCompletePatternEvaluation(
+                    nestedPattern,
+                    IsListPatternMemberResultDefinitelyNonNull(
+                        item is ISlicePatternOperation nestedSliceMember
+                            ? nestedSliceMember.SliceSymbol
+                            : pattern.IndexerSymbol)))
             {
                 return methods;
             }
@@ -378,6 +392,49 @@ internal sealed class OperationCompletionEvaluator
     {
         return method.IsAbstract || method.IsVirtual && !method.IsSealed ||
             CanMethodCompleteNormally(method);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1508:Avoid dead conditional code",
+        Justification = "The analyzer misreads the multi-branch nullable " +
+            "assignment above the null check as unreachable.")]
+    private bool IsListPatternMemberResultDefinitelyNonNull(ISymbol? symbol)
+    {
+        var method = SwitchExpressionFacts.GetCallableListPatternMember(symbol);
+        if (method?.ReturnType.IsReferenceType != true ||
+            method.DeclaringSyntaxReferences.Length != 1)
+        {
+            return false;
+        }
+
+        var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
+        var expression = declaration switch
+        {
+            MethodDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            PropertyDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            AccessorDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            MethodDeclarationSyntax
+            { Body.Statements.Count: 1 } methodDeclaration
+                when methodDeclaration.Body!.Statements[0] is
+                    ReturnStatementSyntax { Expression: { } body } => body,
+            AccessorDeclarationSyntax
+            { Body.Statements.Count: 1 } accessor
+                when accessor.Body!.Statements[0] is
+                    ReturnStatementSyntax { Expression: { } body } => body,
+            _ => null
+        };
+        if (expression == null)
+        {
+            return false;
+        }
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_compilation, expression.SyntaxTree);
+        return model.GetOperation(expression) is { } operation &&
+            DefiniteOperationFacts.IsDefinitelyNonNull(operation);
     }
 
     private bool TryGetGoverningListLength(
@@ -409,11 +466,6 @@ internal sealed class OperationCompletionEvaluator
         return false;
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "CA1508:Avoid dead conditional code",
-        Justification = "The analyzer misreads the multi-branch nullable " +
-            "assignment above the null check as unreachable.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
         "CA1508:Avoid dead conditional code",
