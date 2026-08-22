@@ -36,6 +36,22 @@ try {
     Require-Rejection (Join-Path $fixture 'RepoSibling/out.json') prefix-sibling
     Require-Rejection '../outside.json' traversal-escape
 
+    $insideTarget = Join-Path $root 'artifacts/linked-target'
+    $outsideTarget = Join-Path $fixture 'Outside'
+    [IO.Directory]::CreateDirectory($insideTarget) | Out-Null
+    [IO.Directory]::CreateDirectory($outsideTarget) | Out-Null
+    $insideLink = Join-Path $root 'inside-link'
+    $outsideLink = Join-Path $root 'outside-link'
+    [IO.Directory]::CreateSymbolicLink($insideLink, $insideTarget) | Out-Null
+    [IO.Directory]::CreateSymbolicLink($outsideLink, $outsideTarget) | Out-Null
+    $linkedInside = Resolve-SharpProofContainedPath -Root $root `
+        -Path 'inside-link/report.json' -ParameterName inside-link
+    $expectedLinkedInside = Join-Path $insideTarget 'report.json'
+    if ($linkedInside -cne $expectedLinkedInside) {
+        throw 'Contained symbolic link did not resolve to its physical target.'
+    }
+    Require-Rejection 'outside-link/report.json' symbolic-link-escape
+
     $consumers = @(
         'eng/acceptance/Verify.ps1',
         'scripts/Generate-DiagnosticDescriptors.ps1',
