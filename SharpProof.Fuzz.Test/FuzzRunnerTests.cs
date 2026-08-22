@@ -102,6 +102,45 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void MalformedSummaryEvidenceDoesNotPass()
+    {
+        var complete = new FrontendFuzzCoverage(
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+        var empty = new FrontendFuzzCoverage(
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        var valid = new FuzzSummary(
+            SchemaVersion: 4,
+            Cases: FuzzOptions.DefaultCases,
+            Seed: 7,
+            MaximumParallelism: 1,
+            Agreements: FuzzOptions.DefaultCases,
+            Abstentions: 0,
+            FrontendAgreements: FuzzOptions.DefaultCases,
+            SmtAgreements: FuzzOptions.DefaultCases,
+            PartialSmtAgreements: FuzzOptions.DefaultCases,
+            FrontendCoverage: complete,
+            CoverageSatisfied: true,
+            Failures: []);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(valid.Passed, Is.True);
+            Assert.That(
+                (valid with { SchemaVersion = 999 }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { Failures = default }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { FrontendCoverage = null! }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { FrontendCoverage = empty }).Passed,
+                Is.False);
+        }
+    }
+
+    [Test]
     public async Task CancellationPropagates()
     {
         var cancellation = new CancellationToken(canceled: true);

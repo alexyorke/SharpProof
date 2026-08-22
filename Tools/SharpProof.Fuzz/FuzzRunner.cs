@@ -62,9 +62,15 @@ public sealed record FuzzSummary(
     ImmutableArray<FuzzFailure> Failures)
 {
     public bool Passed =>
+        SchemaVersion == 4 &&
         Cases > 0 &&
         MaximumParallelism is >= 1 and <= 4 &&
-        Failures.IsDefaultOrEmpty &&
+        !Failures.IsDefault &&
+        Failures.IsEmpty &&
+        FrontendCoverage != null &&
+        CoverageSatisfied ==
+            (Cases < FuzzOptions.DefaultCases ||
+             FrontendCoverage.HasExpandedCategories) &&
         CoverageSatisfied &&
         Abstentions == 0 &&
         Agreements == Cases &&
