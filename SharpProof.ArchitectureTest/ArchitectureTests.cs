@@ -43,6 +43,7 @@ public sealed class ArchitectureTests
         "SharpProof.Specs",
         "SharpProof.Dataflow",
         "SharpProof.Frontend",
+        "SharpProof.Fuzz",
         "SharpProof.Host",
         "SharpProof.Contracts",
         "SharpProof.Effects",
