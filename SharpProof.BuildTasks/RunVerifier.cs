@@ -15,10 +15,13 @@ namespace SharpProof.BuildTasks;
 public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     ICancelableTask, IDisposable
 {
-    // The supervisor and launcher run from this instrumentable assembly. Keep
-    // a bounded reserve for their final timeout publication and authenticated
-    // cleanup when coverage or a heavily loaded host slows managed startup.
-    internal const int LauncherProcessReserveMilliseconds = 5000;
+    internal const int LauncherProcessReserveMilliseconds = 1000;
+    // The supervisor and worker launcher run from this instrumentable
+    // assembly. Keep additional bounded room for their final timeout
+    // publication and authenticated cleanup when coverage or a heavily loaded
+    // host slows managed startup. Direct task callers retain their original
+    // deadline semantics.
+    private const int WorkerLauncherProcessReserveMilliseconds = 5000;
     private const int CleanupAuthenticationWaitMilliseconds = 5000;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     internal const int OutputDrainPollingMilliseconds = 25;
@@ -129,12 +132,19 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             var processTimeout = ComputeProcessTimeout(
                 ProjectWallTimeMilliseconds,
                 TerminationGraceMilliseconds);
+            var workerLauncherBudget = HasWorkerLauncherBudgetArguments();
+            if (workerLauncherBudget)
+            {
+                processTimeout = checked(processTimeout +
+                    WorkerLauncherProcessReserveMilliseconds -
+                    LauncherProcessReserveMilliseconds);
+            }
             // The verifier launcher uses the project timeout plus termination
             // grace as its own final deadline. Keep the full process deadline
             // for that invocation so the reserve remains available for
             // containment and output drain. Direct task callers do not have
             // that inner deadline and retain the task's original timeout.
-            var verifierTimeout = HasWorkerLauncherBudgetArguments()
+            var verifierTimeout = workerLauncherBudget
                 ? processTimeout
                 : processTimeout - LauncherProcessReserveMilliseconds;
             var processStopwatch = Stopwatch.StartNew();
