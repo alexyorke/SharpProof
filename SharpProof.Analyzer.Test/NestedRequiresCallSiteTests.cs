@@ -372,7 +372,7 @@ public sealed class NestedRequiresCallSiteTests
             """;
         var diagnostics = await Analyze(source);
 
-        AssertRequiresDiagnostics(diagnostics, 2);
+        AssertRequiresDiagnostics(diagnostics, 1);
         Assert.That(
             diagnostics[0].Location.SourceSpan.Start,
             Is.EqualTo(source.IndexOf(

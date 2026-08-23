@@ -412,7 +412,7 @@ public sealed class RequiresCallSiteDiscoveryTests
         Assert.That(
             candidates!.Value.Select(static candidate =>
                 candidate.TargetMethod.MethodKind),
-            Is.EqualTo([MethodKind.PropertyGet]));
+            Is.EqualTo([MethodKind.PropertyGet, MethodKind.Ordinary]));
     }
 
     [Test]
@@ -445,7 +445,10 @@ public sealed class RequiresCallSiteDiscoveryTests
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
-        Assert.That(candidates!.Value, Is.Empty);
+        Assert.That(
+            candidates!.Value.Select(static candidate =>
+                candidate.TargetMethod.MethodKind),
+            Is.EqualTo([MethodKind.PropertyGet, MethodKind.Ordinary]));
     }
 
     [Test]
@@ -480,7 +483,7 @@ public sealed class RequiresCallSiteDiscoveryTests
         Assert.That(
             candidates!.Value.Select(static candidate =>
                 candidate.TargetMethod.MethodKind),
-            Is.EqualTo([MethodKind.PropertyGet]));
+            Is.EqualTo([MethodKind.PropertyGet, MethodKind.Ordinary]));
     }
 
     [Test]
