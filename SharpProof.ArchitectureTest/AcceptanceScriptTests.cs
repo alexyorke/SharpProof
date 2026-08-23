@@ -171,6 +171,13 @@ public sealed class AcceptanceScriptTests
         File.Copy(
             Path.Combine(root, "eng", "acceptance", "contract.json"),
             Path.Combine(acceptance, "contract.json"));
+        var fixtureScripts = Path.Combine(fixture, "scripts");
+        Directory.CreateDirectory(fixtureScripts);
+        File.Copy(
+            Path.Combine(
+                root, "scripts", "SharpProof.FuzzEvidenceLifecycle.ps1"),
+            Path.Combine(
+                fixtureScripts, "SharpProof.FuzzEvidenceLifecycle.ps1"));
         var harnessPath = Path.Combine(acceptance, "VerifyHarness.ps1");
         var setup = """
             $contract = Get-Content -LiteralPath $contractPath -Raw |

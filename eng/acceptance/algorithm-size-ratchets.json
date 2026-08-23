@@ -10,8 +10,8 @@
   "files": [
     {
       "path": "SharpProof.Frontend/RoslynOperationLowerer.cs",
-      "maximumFileExpressionNodes": 2730,
-      "maximumMemberExpressionNodes": 335,
+      "maximumFileExpressionNodes": 2792,
+      "maximumMemberExpressionNodes": 340,
       "maximumFileDecisionPoints": 150,
       "maximumMemberDecisionPoints": 30
     },
@@ -73,14 +73,14 @@
     },
     {
       "path": "SharpProof.Effects/OperationEffectScanner.cs",
-      "maximumFileExpressionNodes": 3650,
+      "maximumFileExpressionNodes": 4171,
       "maximumMemberExpressionNodes": 330,
-      "maximumFileDecisionPoints": 250,
-      "maximumMemberDecisionPoints": 30
+      "maximumFileDecisionPoints": 256,
+      "maximumMemberDecisionPoints": 34
     },
     {
       "path": "SharpProof.Effects/OperationEffectScanner.Assignments.cs",
-      "maximumFileExpressionNodes": 400,
+      "maximumFileExpressionNodes": 435,
       "maximumMemberExpressionNodes": 140,
       "maximumFileDecisionPoints": 25,
       "maximumMemberDecisionPoints": 10

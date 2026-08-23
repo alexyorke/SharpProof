@@ -3555,11 +3555,12 @@ public sealed class EffectAnalysisTests
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
+            using System.Diagnostics.CodeAnalysis;
             public ref struct RefAlias {
                 private static int s_cell;
                 public ref int Cell;
-                public RefAlias(ref int cell) { Cell = ref cell; }
-                public void Bind(ref int cell) { Cell = ref cell; }
+                public RefAlias([UnscopedRef] ref int cell) { Cell = ref cell; }
+                public void Bind([UnscopedRef] ref int cell) { Cell = ref cell; }
                 public void CopyTo(ref RefAlias target) {
                     target.Cell = ref Cell;
                 }
@@ -3568,8 +3569,8 @@ public sealed class EffectAnalysisTests
                 }
                 private static ref int StaticCell() => ref s_cell;
                 public void BindStatic() { Cell = ref StaticCell(); }
-                private static ref int IgnoreAndReturnStatic(ref int ignored) => ref s_cell;
-                public void BindMisleading(ref int cell) { Cell = ref IgnoreAndReturnStatic(ref cell); }
+                private static ref int IgnoreAndReturnStatic([UnscopedRef] ref int ignored) => ref s_cell;
+                public void BindMisleading([UnscopedRef] ref int cell) { Cell = ref IgnoreAndReturnStatic(ref cell); }
                 public RefAlias Source { set { Cell = ref value.Cell; } }
                 public int BindOnRead { get { Cell = ref StaticCell(); return 0; } }
                 public int BindOnSet { get => 0; set { Cell = ref StaticCell(); } }
@@ -3595,22 +3596,22 @@ public sealed class EffectAnalysisTests
                 public static void DisposeValue(RefAlias value) {
                     using (value) { }
                 }
-                public static void BindThenMutate(ref int cell) {
+                public static void BindThenMutate([UnscopedRef] ref int cell) {
                     RefAlias alias = default;
                     alias.Cell = ref cell;
                     alias.Set();
                 }
-                public static void CallBindThenMutate(ref int cell) {
+                public static void CallBindThenMutate([UnscopedRef] ref int cell) {
                     RefAlias alias = default;
                     alias.Bind(ref cell);
                     alias.Set();
                 }
                 private static void BindStatic(
                     ref RefAlias alias,
-                    ref int cell) {
+                    [UnscopedRef] ref int cell) {
                     alias.Cell = ref cell;
                 }
-                public static void CallStaticBindThenMutate(ref int cell) {
+                public static void CallStaticBindThenMutate([UnscopedRef] ref int cell) {
                     RefAlias alias = default;
                     BindStatic(ref alias, ref cell);
                     alias.Set();
@@ -3620,7 +3621,7 @@ public sealed class EffectAnalysisTests
                     alias.BindStatic();
                     alias.Set();
                 }
-                public static void BindMisleadingThenMutate(ref int cell) {
+                public static void BindMisleadingThenMutate([UnscopedRef] ref int cell) {
                     RefAlias alias = default;
                     alias.BindMisleading(ref cell);
                     alias.Set();
@@ -4926,7 +4927,7 @@ public sealed class EffectAnalysisTests
                 public static void UsingDisposalAfterDivergence(ThrowingResource resource) { try { using (resource) { Spin(); } } catch (InvalidOperationException) { s_state++; } }
                 public static void UsingDeclarationAfterDivergence(ThrowingResource resource) { try { using var value = resource; Spin(); } catch (InvalidOperationException) { s_state++; } }
                 public static void UsingDeclarationGotoSkipsDivergence(ThrowingResource resource) { try { using var value = resource; goto Done; Spin(); Done: ; } catch (InvalidOperationException) { s_state++; } }
-                public static void UsingDeclarationGotoBeforeLifetime(ThrowingResource resource) { try { Retry: ; using var value = resource; goto Retry; } catch (InvalidOperationException) { s_state++; } }
+                public static void UsingDeclarationGotoBeforeLifetime(ThrowingResource resource) { try { Retry: ; { using var value = resource; } goto Retry; } catch (InvalidOperationException) { s_state++; } }
                 public static void UsingDeclarationGotoInsideLifetimeThenDiverges(ThrowingResource resource) { try { using var value = resource; Retry: ; goto Retry; } catch (InvalidOperationException) { s_state++; } }
                 public static void UsingInitialAcquisitionFails() { try { using ThrowingResource first = FailResource(), second = new ThrowingResource(); } catch (InvalidOperationException) { s_state++; } catch (ArgumentException) { } }
                 public static void UsingLaterAcquisitionFails(ThrowingResource resource) { try { using ThrowingResource first = resource, second = FailResource(); } catch (InvalidOperationException) { s_state++; } catch (ArgumentException) { } }
