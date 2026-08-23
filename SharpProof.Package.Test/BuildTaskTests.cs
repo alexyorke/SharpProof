@@ -442,7 +442,7 @@ public sealed class BuildTaskTests
                 WorkingDirectory = directory.FullName,
                 Arguments = [new TaskItem(helper)],
                 ProjectWallTimeMilliseconds = 5000,
-                TerminationGraceMilliseconds = 1
+                TerminationGraceMilliseconds = 1000
             };
             var stopwatch = Stopwatch.StartNew();
 

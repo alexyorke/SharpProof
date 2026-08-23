@@ -556,10 +556,26 @@ function Measure-Coverage {
 }
 
 $projects = [Collections.Generic.List[object]]::new()
+$productionPathSet = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
 foreach ($property in $baseline.projects.PSObject.Properties |
         Sort-Object Name) {
     $projectName = $property.Name
-    $prefix = $projectName + '/'
+    $authorityProjects = @(
+        $recomputedAuthority.projects |
+            Where-Object { $_.name -ceq $projectName })
+    if ($authorityProjects.Count -ne 1) {
+        throw (
+            "Coverage authority expected exactly one production project " +
+            "named '$projectName', but found $($authorityProjects.Count).")
+    }
+    $projectPath = [string]$authorityProjects[0].projectPath
+    $projectDirectory =
+        [IO.Path]::GetDirectoryName($projectPath).Replace('\', '/')
+    if ([string]::IsNullOrWhiteSpace($projectDirectory)) {
+        throw "Coverage authority project has no directory: '$projectPath'."
+    }
+    $prefix = $projectDirectory.TrimEnd('/') + '/'
     $paths = @(
         $lineHits.Keys |
             Where-Object {
@@ -572,6 +588,7 @@ foreach ($property in $baseline.projects.PSObject.Properties |
     if ($paths.Count -eq 0) {
         throw "Coverage did not contain production project '$projectName'."
     }
+    foreach ($path in $paths) { [void]$productionPathSet.Add($path) }
     $measurement = Measure-Coverage -Paths $paths
     $minimum = [double]$property.Value
     $projects.Add([pscustomobject][ordered]@{
@@ -584,18 +601,6 @@ foreach ($property in $baseline.projects.PSObject.Properties |
     })
 }
 
-$productionPathSet = [Collections.Generic.HashSet[string]]::new(
-    [StringComparer]::Ordinal)
-foreach ($project in $projects) {
-    $prefix = $project.name + '/'
-    foreach ($path in $lineHits.Keys) {
-        if ($path.StartsWith(
-                $prefix,
-                [StringComparison]::Ordinal)) {
-            [void]$productionPathSet.Add($path)
-        }
-    }
-}
 $productionPaths = @(ConvertTo-OrdinalSortedArray `
     -Values @($productionPathSet))
 $aggregate = Measure-Coverage -Paths $productionPaths
