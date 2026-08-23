@@ -169,7 +169,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     flowResult?.TryGetState(operation, out _) == true;
                 if (flowAnalysis.IsComplete &&
                     !hasFlowState &&
-                    !IsInsideExceptionHandler(operation))
+                    !IsInsideExceptionHandler(operation) &&
+                    operation is not IListPatternOperation)
                 {
                     continue;
                 }
@@ -191,15 +192,15 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         call.Arguments,
                         call.ExplicitArguments,
                         call.CanReplay &&
-                        (hasFlowState || !flowAnalysis.IsComplete) &&
                         (IsAccessorCall(call.TargetMethod) ||
                             operation is IListPatternOperation
                             ? HasReplayableAccessorEvaluation(
                                 call,
                                 operationFacts)
-                            : HasReplayablePrefix(
-                                operation,
-                                operationFacts)),
+                            : (hasFlowState || !flowAnalysis.IsComplete) &&
+                                HasReplayablePrefix(
+                                    operation,
+                                    operationFacts)),
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status);
                     var existingIndex = callSites.FindIndex(existing =>
@@ -710,6 +711,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
             { ExpressionBody.Expression: { } body } => body,
             AccessorDeclarationSyntax
             { ExpressionBody.Expression: { } body } => body,
+            ArrowExpressionClauseSyntax
+            { Expression: { } body } => body,
             AccessorDeclarationSyntax
             { Body.Statements.Count: 1 } accessor
                 when accessor.Body!.Statements[0] is ReturnStatementSyntax

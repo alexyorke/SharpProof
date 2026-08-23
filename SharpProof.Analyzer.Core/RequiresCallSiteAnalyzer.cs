@@ -308,6 +308,9 @@ internal static partial class RequiresCallSiteAnalyzer
             if (candidate.Instance != null &&
                 candidate.Instance is not IInstanceReferenceOperation &&
                 !operationFacts.CompletesNormally(candidate.Instance) ||
+                !candidate.TargetMethod.IsStatic &&
+                candidate.Instance != null &&
+                DefiniteOperationFacts.IsDefinitelyNull(candidate.Instance) ||
                 candidate.Arguments.Any(argument =>
                     !operationFacts.CompletesNormally(argument.Value)))
             {
@@ -382,6 +385,19 @@ internal static partial class RequiresCallSiteAnalyzer
                 requires.Any(static clause =>
                     ManagedContractFacts.ContainsPotentiallyFailingCast(
                         clause.Condition)))
+            {
+                return null;
+            }
+
+            var operationFacts = new DefiniteOperationFacts(
+                semanticModel.Compilation, cancellationToken);
+            if (callSite.Instance != null &&
+                    !operationFacts.MayCompleteNormally(callSite.Instance) ||
+                !callSite.TargetMethod.IsStatic &&
+                callSite.Instance != null &&
+                DefiniteOperationFacts.IsDefinitelyNull(callSite.Instance) ||
+                callSite.Arguments.Any(argument =>
+                    !operationFacts.MayCompleteNormally(argument.Value)))
             {
                 return null;
             }

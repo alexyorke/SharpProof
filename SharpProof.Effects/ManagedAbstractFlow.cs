@@ -1798,11 +1798,22 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 IDiscardOperation or IInstanceReferenceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation => true,
             IInvocationOperation invocation => CompletesNormally(invocation),
+            IObjectCreationOperation creation =>
+                creation.Arguments.All(argument =>
+                    CompletesNormally(argument.Value)) &&
+                (creation.Constructor == null ||
+                 creation.Constructor.DeclaringSyntaxReferences.Length != 1 ||
+                 CompletesNormally(creation.Constructor)),
             IMethodReferenceOperation methodReference =>
                 ChildrenCompleteNormally(methodReference) &&
                 (methodReference.Method.IsStatic ||
                  methodReference.Instance != null &&
                  IsDefinitelyNonNull(methodReference.Instance)),
+            IFieldReferenceOperation fieldReference =>
+                ChildrenCompleteNormally(fieldReference) &&
+                (fieldReference.Field.IsStatic ||
+                 fieldReference.Instance != null &&
+                 IsDefinitelyNonNull(fieldReference.Instance)),
             ISimpleAssignmentOperation assignment =>
                 assignment.Target is ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation &&
                 CompletesNormally(assignment.Value),
@@ -1936,6 +1947,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 (MayCompleteNormally(conditionalAccess.WhenNotNull) ||
                  !DefiniteOperationFacts.IsDefinitelyNonNull(
                      conditionalAccess.Operation)),
+            ICoalesceOperation coalesce =>
+                MayCompleteNormally(coalesce.Value) &&
+                (!IsDefinitelyNull(coalesce.Value) ||
+                 MayCompleteNormally(coalesce.WhenNull)),
             IInvocationOperation invocation =>
                 InvocationMayCompleteNormally(invocation),
             IAnonymousObjectCreationOperation or
@@ -1959,10 +1974,15 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
                 ISimpleAssignmentOperation or IArrayElementReferenceOperation or
-                IFieldReferenceOperation or IPropertyReferenceOperation or
+                IFieldReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
                 ChildrenMayCompleteNormally(operation),
+            IPropertyReferenceOperation property =>
+                ChildrenMayCompleteNormally(property) &&
+                (property.Property.IsStatic ||
+                 property.Instance == null ||
+                 !IsDefinitelyNull(property.Instance)),
             IObjectOrCollectionInitializerOperation initializer =>
                 SequenceMayCompleteNormally(initializer.ChildOperations),
             IExpressionStatementOperation or
@@ -1982,6 +2002,13 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         if (!MayCompleteNormally(invocation.Instance) ||
             invocation.Arguments.Any(argument =>
                 !MayCompleteNormally(argument.Value)))
+        {
+            return false;
+        }
+
+        if (!invocation.TargetMethod.IsStatic &&
+            invocation.Instance != null &&
+            IsDefinitelyNull(invocation.Instance))
         {
             return false;
         }

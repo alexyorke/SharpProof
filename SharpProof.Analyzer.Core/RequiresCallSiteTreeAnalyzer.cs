@@ -611,7 +611,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                         {
                             exceptionalStateSurvivesKill =
                                 BlockMayThrowBeforeAssignmentCommit(
-                                    block,
+                                    graph,
                                     after,
                                     reference);
                             killed = true;
@@ -771,25 +771,40 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return false;
         }
 
-        private static string[]? GetTuplePath(
+        private string[]? GetTuplePath(
             SyntaxNode value,
             SyntaxNode definition)
         {
             var components = value.Ancestors()
                 .OfType<ArgumentSyntax>()
                 .Where(candidate =>
-                    candidate.Parent?.Parent is TupleExpressionSyntax tuple &&
+                    candidate.Parent is TupleExpressionSyntax tuple &&
                     definition.Span.Contains(tuple.Span))
                 .Select(argument =>
                 {
-                    var owner = (TupleExpressionSyntax)argument.Parent!.Parent!;
+                    var owner = (TupleExpressionSyntax)argument.Parent!;
                     var index = owner.Arguments.IndexOf(argument);
-                    return argument.NameColon?.Name.Identifier.ValueText ??
+                    return GetConvertedTupleElementName(owner, index) ??
+                        argument.NameColon?.Name.Identifier.ValueText ??
                         $"Item{index + 1}";
                 })
                 .Reverse()
                 .ToArray();
             return components.Length == 0 ? null : components;
+        }
+
+        private string? GetConvertedTupleElementName(
+            TupleExpressionSyntax owner,
+            int index)
+        {
+            var convertedType = semanticModel.GetTypeInfo(
+                    owner,
+                    cancellationToken)
+                .ConvertedType as INamedTypeSymbol;
+            return convertedType is { IsTupleType: true } &&
+                index < convertedType.TupleElements.Length
+                ? convertedType.TupleElements[index].Name
+                : null;
         }
 
         private static List<string> GetAccessedTuplePath(
@@ -991,7 +1006,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         }
 
         private static bool BlockMayThrowBeforeAssignmentCommit(
-            BasicBlock block,
+            ControlFlowGraph graph,
             int after,
             ILocalReferenceOperation reference)
         {
@@ -1002,7 +1017,14 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 if (operation is ISimpleAssignmentOperation assignment)
                 {
                     var commitEnd = assignment.Syntax.Span.End;
-                    return BlockOperations(block)
+
+                    // The assignment's RHS may be lowered across several
+                    // basic blocks (e.g. a ternary or coalesce), so the
+                    // throwing sub-expression is not necessarily in the
+                    // same block as the commit. Scan every block, bounded
+                    // by the assignment's own syntax span.
+                    return graph.Blocks
+                        .SelectMany(BlockOperations)
                         .Where(candidate =>
                             candidate.Syntax.Span.End > after &&
                             candidate.Syntax.SpanStart < commitEnd)
