@@ -605,6 +605,17 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     var accessedTuplePath = GetAccessedTuplePath(reference);
                     if (IsAssignmentTarget(reference.Syntax))
                     {
+                        // A target-shaped reference that has no enclosing
+                        // ISimpleAssignmentOperation isn't the real commit:
+                        // a multi-block RHS (e.g. a ternary) can lower into
+                        // a flow-capture that happens to share the target's
+                        // syntax span in an earlier block. Only the
+                        // reference embedded in the actual assignment
+                        // operation represents the commit.
+                        if (!HasEnclosingSimpleAssignment(reference))
+                        {
+                            continue;
+                        }
                         if (AssignmentKillsTrackedValue(
                                 tuplePath,
                                 accessedTuplePath))
@@ -1003,6 +1014,21 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 .SelectMany(static operation =>
                     operation.DescendantsAndSelf())
                 .Any(static operation => OperationMayThrow(operation));
+        }
+
+        private static bool HasEnclosingSimpleAssignment(
+            ILocalReferenceOperation reference)
+        {
+            for (var operation = reference.Parent;
+                 operation != null;
+                 operation = operation.Parent)
+            {
+                if (operation is ISimpleAssignmentOperation)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool BlockMayThrowBeforeAssignmentCommit(
