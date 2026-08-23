@@ -89,10 +89,32 @@ function Resolve-SharpProofContainedPath {
     if (-not [IO.Directory]::Exists($canonicalRoot)) {
         throw "Containment root does not exist: $canonicalRoot"
     }
-    $physicalRoot = Resolve-SharpProofPhysicalPath -Path $canonicalRoot
+    # The disposable task workspace intentionally symlinks its "artifacts"
+    # directory back to the host-mounted repository root so that evidence
+    # written there survives the container. Physical containment for paths
+    # under that known, infrastructure-created redirect is checked against
+    # the symlink's own resolved target rather than the task root; every
+    # other path is still required to physically resolve inside the task
+    # root, which catches an unexpected symlink anywhere else in the tree.
+    $artifactsRoot = Join-Path $canonicalRoot 'artifacts'
+    $artifactsPrefix = $artifactsRoot + [IO.Path]::DirectorySeparatorChar
+    $rootForContainment = if (
+        [IO.Directory]::Exists($artifactsRoot) -and
+        ([string]::Equals($canonicalPath, $artifactsRoot, $pathComparison) -or
+            $canonicalPath.StartsWith($artifactsPrefix, $pathComparison))) {
+        $artifactsRoot
+    }
+    else {
+        $canonicalRoot
+    }
+    $physicalRoot = Resolve-SharpProofPhysicalPath -Path $rootForContainment
     $physicalPath = Resolve-SharpProofPhysicalPath -Path $canonicalPath
     $physicalPrefix = $physicalRoot + [IO.Path]::DirectorySeparatorChar
-    if (-not $physicalPath.StartsWith(
+    if (-not [string]::Equals(
+            $physicalPath,
+            $physicalRoot,
+            [StringComparison]::Ordinal) -and
+        -not $physicalPath.StartsWith(
             $physicalPrefix,
             [StringComparison]::Ordinal)) {
         throw "$ParameterName must resolve to a child of '$physicalRoot': $physicalPath"
