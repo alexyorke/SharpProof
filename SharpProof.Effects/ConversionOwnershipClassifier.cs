@@ -49,6 +49,12 @@ internal sealed class ConversionOwnershipClassifier
                 ClassifyRegion(captured, aliasSource),
             IFlowCaptureReferenceOperation => EffectRegionSet.Unknown,
             IFieldReferenceOperation { Field.IsStatic: true } => EffectRegionSet.Create(EffectRegionId.Static()),
+            IFieldReferenceOperation
+            {
+                Field.RefKind: not RefKind.None,
+                Instance: { } fieldInstance
+            } when aliasSource =>
+                ClassifyRegion(fieldInstance, aliasSource),
             IFieldReferenceOperation or IArrayElementReferenceOperation =>
                 EffectRegionSet.Unknown,
             IObjectCreationOperation creation
