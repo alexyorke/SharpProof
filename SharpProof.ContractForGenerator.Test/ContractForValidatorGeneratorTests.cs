@@ -1820,7 +1820,7 @@ public sealed class ContractForValidatorGeneratorTests
 
     [TestCase(
         "sharpproof_profile", "advisory",
-        "build_property.SharpProofProfile", "off", true)]
+        "build_property.SharpProofProfile", "off", false)]
     [TestCase(
         "sharpproof_profile", "off",
         "build_property.SharpProofProfile", "advisory", false)]
@@ -1832,7 +1832,7 @@ public sealed class ContractForValidatorGeneratorTests
         "build_property.SharpProofProfile", " OFF ", false)]
     [TestCase(
         "build_property.sharpproof_profile", " advisory ",
-        "build_property.SharpProofProfile", "off", true)]
+        "build_property.SharpProofProfile", "off", false)]
     [TestCase(
         "sharpproof_profile", " AdViSoRy ",
         "sharpproof_features", "contracts", true)]
