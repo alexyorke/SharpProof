@@ -867,25 +867,35 @@ internal static class CompilerManifestArtifactFile
         out int length,
         int maximumBytes)
     {
+        // Inspect the directory entry before opening it. On Unix, opening a
+        // FIFO for reading blocks until a writer arrives, so the regular-file
+        // and byte-limit checks must happen before FileStream opens the path.
+        var fileInfo = new FileInfo(path);
+        var fileLength = fileInfo.Length;
+        if (fileLength <= 0)
+        {
+            throw new InvalidDataException(
+                "The compiler manifest must be a nonempty regular file.");
+        }
+        if (fileLength > maximumBytes)
+        {
+            throw new InvalidDataException(
+                "The compiler manifest exceeds the byte limit.");
+        }
+
         var stream = new FileStream(
             path,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-        if (stream.Length <= 0)
+        if (stream.Length != fileLength)
         {
             stream.Dispose();
             throw new InvalidDataException(
-                "The compiler manifest must be a nonempty regular file.");
-        }
-        if (stream.Length > maximumBytes)
-        {
-            stream.Dispose();
-            throw new InvalidDataException(
-                "The compiler manifest exceeds the byte limit.");
+                "The compiler manifest changed while it was opened.");
         }
 
-        length = checked((int)stream.Length);
+        length = checked((int)fileLength);
         return stream;
     }
 
