@@ -15,7 +15,10 @@ namespace SharpProof.BuildTasks;
 public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     ICancelableTask, IDisposable
 {
-    internal const int LauncherProcessReserveMilliseconds = 1000;
+    // The supervisor and launcher run from this instrumentable assembly. Keep
+    // a bounded reserve for their final timeout publication and authenticated
+    // cleanup when coverage or a heavily loaded host slows managed startup.
+    internal const int LauncherProcessReserveMilliseconds = 5000;
     private const int CleanupAuthenticationWaitMilliseconds = 5000;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     internal const int OutputDrainPollingMilliseconds = 25;

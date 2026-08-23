@@ -917,7 +917,9 @@ public sealed class BuildTaskTests
                     "DOTNET_HOST_PATH") ?? "dotnet",
                 WorkingDirectory = directory.FullName,
                 Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 50,
+                // Leave enough launch budget for instrumented supervisor
+                // startup before asserting descendant cleanup behavior.
+                ProjectWallTimeMilliseconds = 500,
                 TerminationGraceMilliseconds = 50
             };
 
