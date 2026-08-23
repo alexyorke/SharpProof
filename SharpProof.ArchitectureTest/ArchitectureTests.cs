@@ -475,8 +475,9 @@ public sealed class ArchitectureTests
         Assert.That(
             FindRelativeCallers(productionFiles, "new Assumption("),
             Is.EqualTo([
-            "SharpProof.Worker/CallableEvidenceBuilder.cs",
-                "SharpProof.Worker/PostconditionObligationBuilder.cs"
+                "SharpProof.Worker/CallableEvidenceBuilder.cs",
+                "SharpProof.Worker/PostconditionObligationBuilder.cs",
+                "Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs"
             ]));
         Assert.That(
             FindRelativeCallers(productionFiles, "new EffectSummary("),
