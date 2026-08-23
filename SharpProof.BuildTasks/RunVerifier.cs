@@ -16,6 +16,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     ICancelableTask, IDisposable
 {
     internal const int LauncherProcessReserveMilliseconds = 1000;
+    private const int CleanupAuthenticationWaitMilliseconds = 5000;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     internal const int OutputDrainPollingMilliseconds = 25;
     private const int MaximumProtocolLineCharacters = 160;
@@ -694,7 +695,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         var completed = await System.Threading.Tasks.Task.WhenAny(
             output,
             System.Threading.Tasks.Task.Delay(
-                LauncherProcessReserveMilliseconds)).ConfigureAwait(false);
+                CleanupAuthenticationWaitMilliseconds)).ConfigureAwait(false);
         return ReferenceEquals(completed, output) &&
             output.IsCompletedSuccessfully
                 ? await output.ConfigureAwait(false)
