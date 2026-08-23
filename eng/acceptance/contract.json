@@ -210,7 +210,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-      "inventorySha256": "4be7320425beeb1a8f702e0b16b80aa742ed479d9b51fa3ec8555f8a539de580",
+      "inventorySha256": "bfe6906b52cc86d83a1e9279889fa48e75a69a4b4d40358cc433d7917a0dd9a7",
     "components": [
       {
         "name": "discovery",
