@@ -96,7 +96,6 @@ internal sealed class EffectCallSiteResolver(
         {
             return EffectSummaryOperations.Unsupported();
         }
-
         var implicitLayers = EffectSummary.Empty;
         var implicitDepth = 0;
         while (EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer(
@@ -132,6 +131,9 @@ internal sealed class EffectCallSiteResolver(
 
         return EffectSummaryOperations.Join(
             implicitLayers,
+            HasExplicitSourceTypeInitialization(constructor)
+                ? EffectSummaryOperations.TypeInitializationBoundary()
+                : EffectSummary.Empty,
             Resolve(
                 constructor,
                 receiver,
@@ -144,6 +146,18 @@ internal sealed class EffectCallSiteResolver(
                 creation,
                 instance: null,
                 creation.Arguments));
+    }
+
+    private bool HasExplicitSourceTypeInitialization(IMethodSymbol constructor)
+    {
+        return SymbolEqualityComparer.Default.Equals(
+                constructor.ContainingAssembly,
+                _session.Compilation.Assembly) &&
+            EffectMethodNodeBuilder.HasPotentialStaticInitialization(
+                constructor.ContainingType,
+                _session.ApiSpecs) &&
+            constructor.ContainingType.StaticConstructors.Any(
+                static candidate => !candidate.IsImplicitlyDeclared);
     }
 
     internal static ImmutableArray<IOperation?> AlignActualArguments(

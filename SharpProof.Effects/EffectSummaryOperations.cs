@@ -53,6 +53,22 @@ internal static class EffectSummaryOperations
             summary.AnalysisIncompleteReason);
     }
 
+    internal static EffectSummary ExceptionConstructionThrow(
+        EffectSummary construction,
+        EffectThrowSet exceptions)
+    {
+        return new EffectSummary(
+            EffectRegionSet.Empty,
+            EffectRegionSet.Empty,
+            EffectAllocationKind.None,
+            construction.Capabilities,
+            exceptions,
+            EffectTermination.Unknown,
+            construction.Completeness,
+            construction.Uncertainty,
+            construction.AnalysisIncompleteReason);
+    }
+
     internal static EffectSummary Capability(EffectCapabilityKind capabilities)
     {
         return Create(capabilities: new EffectCapabilitySet(capabilities));
@@ -70,6 +86,15 @@ internal static class EffectSummaryOperations
             EffectAllocationKind.Unknown, EffectCapabilitySet.Unknown,
             EffectThrowSet.Unknown, EffectTermination.Unknown,
             EffectCompleteness.Incomplete, uncertainty);
+    }
+
+    internal static EffectSummary TypeInitializationBoundary()
+    {
+        return new(
+            EffectRegionSet.Empty, EffectRegionSet.Empty,
+            EffectAllocationKind.Unknown, EffectCapabilitySet.Unknown,
+            EffectThrowSet.Unknown, EffectTermination.Unknown,
+            EffectCompleteness.Incomplete, EffectUncertainty.UnmodeledCall);
     }
 
     internal static EffectSummary IncompleteAnalysis(EffectAnalysisIncompleteReason reason)

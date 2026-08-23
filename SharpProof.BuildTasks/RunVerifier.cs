@@ -121,8 +121,14 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             var processTimeout = ComputeProcessTimeout(
                 ProjectWallTimeMilliseconds,
                 TerminationGraceMilliseconds);
-            var verifierTimeout = processTimeout -
-                LauncherProcessReserveMilliseconds;
+            // The verifier launcher uses the project timeout plus termination
+            // grace as its own final deadline. Keep the full process deadline
+            // for that invocation so the reserve remains available for
+            // containment and output drain. Direct task callers do not have
+            // that inner deadline and retain the task's original timeout.
+            var verifierTimeout = HasWorkerLauncherBudgetArguments()
+                ? processTimeout
+                : processTimeout - LauncherProcessReserveMilliseconds;
             var processStopwatch = Stopwatch.StartNew();
             var resolvedExecutable = ResolveDotNetHost(Executable);
             supervisorNonce = CreateSupervisorNonce();
@@ -270,6 +276,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             var authenticationRequired = supervisorArmed ||
                 process.HasExited && process.ExitCode != 125;
             var deferAuthentication =
+                canceled ||
                 ShouldDeferSupervisorAuthentication(
                     authenticationRequired,
                     interrupted,
@@ -323,13 +330,17 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 if (retainCleanupAnchor && process != null)
                 {
+                    Action<string>? authenticationFailure =
+                        _canceled
+                            ? null
+                            : HandleContainmentAuthenticationFailure;
                     RetainCleanupAnchor(
                         process,
                         processGroupPidFd,
                         standardOutput,
                         standardError,
                         supervisorNonce,
-                        HandleContainmentAuthenticationFailure);
+                        authenticationFailure);
                     process = null;
                 }
                 else
@@ -775,6 +786,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 "SharpProof could not establish the verifier process boundary.");
         }
         return LinuxPathIdentity.Canonicalize(ProcessGroupLauncher);
+    }
+
+    private bool HasWorkerLauncherBudgetArguments()
+    {
+        return Arguments.Any(static argument =>
+            string.Equals(
+                argument.ItemSpec,
+                "--project-wall-ms",
+                StringComparison.Ordinal));
     }
 
     private static string ResolveSupervisorAssemblyRequired()

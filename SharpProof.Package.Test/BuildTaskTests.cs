@@ -747,6 +747,7 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierTaskCapturesDotNetOutputAndErrors()
     {
         var outputEngine = new RecordingBuildEngine();
@@ -779,6 +780,7 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierTaskBoundsTheWholeLauncherProcess()
     {
         var directory = Directory.CreateTempSubdirectory(
@@ -817,6 +819,7 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierTaskRejectsOverflowingTimeoutBeforeLaunch()
     {
         var directory = Directory.CreateTempSubdirectory(
@@ -856,6 +859,7 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierTaskUsesOneDeadlineAndStopsOutputHoldingDescendants()
     {
         var directory = Directory.CreateTempSubdirectory(
@@ -914,6 +918,7 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierSupervisorStopsSessionEscapingDescendants()
     {
         var directory = Directory.CreateTempSubdirectory(
@@ -1174,6 +1179,7 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierTaskDoesNotReleaseCommandBeforePidFdAcquisition()
     {
         var directory = Directory.CreateTempSubdirectory(
@@ -1225,6 +1231,7 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public async System.Threading.Tasks.Task ActiveVerifierTaskCancellationStopsTheProcess()
     {
         var directory = Directory.CreateTempSubdirectory("sharpproof-cancel-");

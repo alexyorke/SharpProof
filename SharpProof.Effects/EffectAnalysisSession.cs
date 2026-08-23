@@ -259,16 +259,77 @@ public sealed class EffectAnalysisSession
         {
             return EffectSummary.Empty;
         }
+        if (OperationCompletionEvaluator
+                .CanAssumeStaticInitializationComplete(caller, field))
+        {
+            return EffectSummary.Empty;
+        }
 
         var isSourceType = SymbolEqualityComparer.Default.Equals(
             normalizedTarget.ContainingAssembly, _compilation.Assembly);
+        if (isSourceType &&
+            field.ContainingType.IsGenericType &&
+            !SymbolEqualityComparer.Default.Equals(
+                caller.ContainingType,
+                field.ContainingType) &&
+            normalizedTarget.StaticConstructors.Any(
+                static constructor => !constructor.IsImplicitlyDeclared))
+        {
+            return EffectSummaryOperations.Throw(
+                ResolveExceptionSet(
+                    FrameworkTypeMetadataNames.TypeInitializationException));
+        }
         var mayInitialize = !isSourceType ||
             EffectMethodNodeBuilder.HasPotentialStaticInitialization(
                 normalizedTarget,
                 ApiSpecs);
-        return mayInitialize
-            ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
-            : EffectSummary.Empty;
+        if (!mayInitialize ||
+            isSourceType && StaticInitializationCannotComplete(normalizedTarget))
+        {
+            return EffectSummary.Empty;
+        }
+        return EffectSummaryOperations.UnknownBoundary(
+            EffectUncertainty.UnmodeledCall);
+    }
+
+    private bool StaticInitializationCannotComplete(INamedTypeSymbol type)
+    {
+        var facts = new DefiniteOperationFacts(
+            _compilation,
+            CancellationToken.None);
+        foreach (var member in type.GetMembers())
+        {
+            var isStaticInitializable = member switch
+            {
+                IFieldSymbol field => field.IsStatic && !field.IsConst,
+                IPropertySymbol property => property.IsStatic,
+                IEventSymbol @event => @event.IsStatic,
+                _ => false
+            };
+            if (!isStaticInitializable)
+            {
+                continue;
+            }
+            foreach (var reference in member.DeclaringSyntaxReferences)
+            {
+                var expression = EffectProjections.GetInitializerExpression(
+                    reference.GetSyntax());
+                if (expression == null)
+                {
+                    continue;
+                }
+                var model = SharpProof.Frontend.Host.CompilationModelProvider
+                    .GetSemanticModel(_compilation, expression.SyntaxTree);
+                if (model.GetOperation(expression) is { } operation &&
+                    !facts.MayCompleteNormally(operation))
+                {
+                    return true;
+                }
+            }
+        }
+        return type.StaticConstructors.Any(
+            constructor => constructor.DeclaringSyntaxReferences.Length != 0 &&
+                !facts.MethodCanCompleteNormally(constructor));
     }
 
     private void EnsureAnalyzed(

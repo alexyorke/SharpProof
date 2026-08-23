@@ -95,6 +95,7 @@ internal sealed class ExceptionHandlerReachability(
         var scheduledSwitchBodies = new HashSet<ISwitchCaseOperation>();
         var scheduledGotoLabels = new HashSet<ILabelSymbol>(
             SymbolEqualityComparer.Default);
+        var forcedGotoOperations = new HashSet<IOperation>();
         var switchCaseReachability = new Dictionary<
             ISwitchCaseOperation,
             SwitchCaseReachability>();
@@ -104,7 +105,12 @@ internal sealed class ExceptionHandlerReachability(
             var operation = remaining.Pop();
             if (ManagedAbstractFlow.IsCompileTimeUnreachable(
                     compilation,
-                    operation))
+                    operation) &&
+                !forcedGotoOperations.Contains(operation) &&
+                operation is not IBranchOperation
+                {
+                    Syntax: GotoStatementSyntax
+                })
             {
                 continue;
             }
@@ -129,6 +135,11 @@ internal sealed class ExceptionHandlerReachability(
                 var continuation = GetGotoTargetContinuation(branch);
                 if (continuation != null)
                 {
+                    foreach (var targetOperation in continuation.SelectMany(
+                                 static item => item.DescendantsAndSelf()))
+                    {
+                        forcedGotoOperations.Add(targetOperation);
+                    }
                     if (scheduledGotoLabels.Add(branch.Target))
                     {
                         PushSequential(continuation);
@@ -529,7 +540,8 @@ internal sealed class ExceptionHandlerReachability(
                 if (argumentsComplete)
                 {
                     var initializationCompletes = true;
-                    if (creation.Constructor is { } constructor)
+                    if (creation.Constructor is { } constructor &&
+                        !IsExceptionType(creation.Type))
                     {
                         initializationCompletes =
                             AddStaticInitializationPotential(
@@ -539,13 +551,21 @@ internal sealed class ExceptionHandlerReachability(
                     }
                     if (initializationCompletes)
                     {
-                        Add(
+                        var constructorExceptions =
                             creation.Constructor == null
                                 ? UnknownPotential
                                 : GetCallableExceptions(
                                     creation.Constructor,
                                     activeMethods,
-                                    depth + 1),
+                                    depth + 1);
+                        if (IsExceptionType(creation.Type) &&
+                            creation.Constructor is
+                            { DeclaringSyntaxReferences.Length: 0 })
+                        {
+                            constructorExceptions = EmptyPotential;
+                        }
+                        Add(
+                            constructorExceptions,
                             creation);
                     }
                 }
@@ -717,6 +737,10 @@ internal sealed class ExceptionHandlerReachability(
                                 accessor == null || accessor.IsVirtual ||
                                 accessor.IsAbstract
                                     ? UnknownPotential
+                                    : accessor.DeclaringSyntaxReferences.Length == 0 &&
+                                        propertyReference.Property.ContainingType
+                                            ?.IsRefLikeType == true
+                                    ? EmptyPotential
                                     : GetCallableExceptions(
                                         accessor,
                                         activeMethods,
@@ -730,9 +754,13 @@ internal sealed class ExceptionHandlerReachability(
             }
             if (operation is IListPatternOperation listPattern)
             {
-                foreach (var member in
-                         getReachableListPatternMembers(listPattern))
+                var members = getReachableListPatternMembers(listPattern);
+                foreach (var member in members)
                 {
+                    if (member.DeclaringSyntaxReferences.Length == 0)
+                    {
+                        continue;
+                    }
                     Add(
                         member.IsVirtual || member.IsAbstract
                             ? UnknownPotential
@@ -742,7 +770,7 @@ internal sealed class ExceptionHandlerReachability(
                                 depth + 1),
                         listPattern);
                 }
-                PushChildren(listPattern);
+                PushSequential(listPattern.Patterns);
                 continue;
             }
             if (operation is IFieldReferenceOperation fieldReference)
@@ -1102,19 +1130,20 @@ internal sealed class ExceptionHandlerReachability(
                     if (canCompleteNormally(@switch.Value))
                     {
                         var constant = @switch.Value.ConstantValue;
-                        PushAll(GetReachableSwitchCases(
+                        var cases = GetReachableSwitchCases(
                             @switch,
                             constant.HasValue,
                             constant.Value,
                             scheduledSwitchBodies,
-                            switchCaseReachability));
+                            switchCaseReachability);
+                        PushAll(cases);
                     }
                     remaining.Push(@switch.Value);
                     return;
                 case ISwitchCaseOperation @case
                     when switchCaseReachability.TryGetValue(
                         @case,
-                        out var reachability):
+                    out var reachability):
                     if (reachability.BodyReachable)
                     {
                         PushSequential(@case.Body);
@@ -1332,6 +1361,47 @@ internal sealed class ExceptionHandlerReachability(
         {
             return null;
         }
+        var labeledStatement = target is LabeledStatementSyntax labeledSyntax
+            ? model.GetOperation(labeledSyntax.Statement)
+            : null;
+        var labeledInvocations = target.DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Select(syntax => model.GetOperation(syntax))
+            .Where(static operation => operation != null)
+            .Cast<IOperation>()
+            .ToArray();
+        if (labeledInvocations.Length == 0 &&
+            target.AncestorsAndSelf()
+                .OfType<BaseMethodDeclarationSyntax>()
+                .FirstOrDefault() is { } methodSyntax)
+        {
+            labeledInvocations = methodSyntax.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(invocation => invocation.SpanStart > target.Span.End)
+                .Select(syntax => model.GetOperation(syntax))
+                .Where(static operation => operation != null)
+                .Cast<IOperation>()
+                .Take(1)
+                .ToArray();
+        }
+
+        IOperation[] IncludeLabeledStatement(IEnumerable<IOperation> operations)
+        {
+            var result = operations.ToList();
+            if (labeledStatement != null &&
+                !result.Any(operation => ReferenceEquals(operation, labeledStatement)))
+            {
+                result.Insert(1, labeledStatement);
+            }
+            foreach (var invocation in labeledInvocations.Reverse())
+            {
+                if (!result.Any(operation => ReferenceEquals(operation, invocation)))
+                {
+                    result.Insert(1, invocation);
+                }
+            }
+            return result.ToArray();
+        }
         var sequenceEntry = labeled;
         while (sequenceEntry.Parent is ILabeledOperation outerLabel)
         {
@@ -1342,14 +1412,14 @@ internal sealed class ExceptionHandlerReachability(
             var index = block.Operations.IndexOf(sequenceEntry);
             return index < 0
                 ? null
-                : block.Operations.Skip(index).ToArray();
+                : IncludeLabeledStatement(block.Operations.Skip(index));
         }
         if (sequenceEntry.Parent is ISwitchCaseOperation @case)
         {
             var index = @case.Body.IndexOf(sequenceEntry);
             return index < 0
                 ? null
-                : @case.Body.Skip(index).ToArray();
+                : IncludeLabeledStatement(@case.Body.Skip(index));
         }
         return [sequenceEntry];
     }
@@ -1362,8 +1432,11 @@ internal sealed class ExceptionHandlerReachability(
         {
             return false;
         }
-        if (clause is not IPatternCaseClauseOperation pattern ||
-            !canCompleteNormally(pattern.Pattern))
+        if (clause is not IPatternCaseClauseOperation pattern)
+        {
+            return true;
+        }
+        if (!canCompleteNormally(pattern.Pattern))
         {
             return false;
         }
@@ -1782,8 +1855,9 @@ internal sealed class ExceptionHandlerReachability(
         IOperation scope)
     {
         var potential = GetPotentialExceptions(operation);
-        return potential.Unknown || !potential.Known.IsEmpty ||
+        var abrupt = potential.Unknown || !potential.Known.IsEmpty ||
             CanExitAbruptlyWithoutExceptions(operation, scope);
+        return abrupt;
     }
 
     private bool CanExitAbruptlyWithoutExceptions(
@@ -2044,7 +2118,9 @@ internal sealed class ExceptionHandlerReachability(
             {
                 continue;
             }
-            if (canCompleteNormally(operation) &&
+            if ((canCompleteNormally(operation) ||
+                    operation is ILabeledOperation labeled &&
+                    labeled.ChildOperations.All(canCompleteNormally)) &&
                 !internalBranches.HasUnconditionalGoto)
             {
                 pending.Enqueue(operationIndex + 1);
@@ -2052,6 +2128,7 @@ internal sealed class ExceptionHandlerReachability(
         }
         return false;
     }
+
 
     private bool CanDisposalsCompleteNormally(
         IUsingDeclarationOperation declaration)
@@ -2078,7 +2155,7 @@ internal sealed class ExceptionHandlerReachability(
         var dispose = UsingDisposalEffectResolver.ResolveDispose(
             compilation,
             caller,
-            resourceType);
+            GetConcreteResourceType(resourceType, resource));
         return dispose == null ||
             UsingDisposalEffectResolver.IsDispatchUncertain(dispose) ||
             canMethodCompleteNormally(dispose);
@@ -2099,7 +2176,7 @@ internal sealed class ExceptionHandlerReachability(
             : UsingDisposalEffectResolver.ResolveDispose(
                 compilation,
                 caller,
-                resourceType);
+                GetConcreteResourceType(resourceType, resource));
         return dispose == null ||
             UsingDisposalEffectResolver.IsDispatchUncertain(dispose) ||
             canMethodCompleteNormally(dispose) ||
@@ -2114,7 +2191,24 @@ internal sealed class ExceptionHandlerReachability(
             abstractFlow?.ProvesNull(origin, resource) == true;
     }
 
-    private InternalGotoTargets GetInternalGotoTargets(
+    private static ITypeSymbol GetConcreteResourceType(
+        ITypeSymbol declaredType,
+        IOperation resource)
+    {
+        resource = DefiniteOperationFacts.UnwrapHarmlessValue(resource);
+        return declaredType is INamedTypeSymbol
+        {
+            TypeKind: TypeKind.Interface
+        } &&
+        resource.Type is INamedTypeSymbol
+        {
+            TypeKind: not TypeKind.Interface
+        } concrete
+            ? concrete
+            : declaredType;
+    }
+
+    private static InternalGotoTargets GetInternalGotoTargets(
         IOperation operation,
         IBlockOperation scope,
         int firstActiveOperation)
@@ -2122,8 +2216,7 @@ internal sealed class ExceptionHandlerReachability(
         var branches = operation.DescendantsAndSelf()
             .OfType<IBranchOperation>()
             .Where(branch =>
-                branch.Syntax is GotoStatementSyntax &&
-                (abstractFlow == null || abstractFlow.IsReachable(branch)))
+                branch.Syntax is GotoStatementSyntax)
             .ToArray();
         var allTargets = branches
             .SelectMany(static branch =>
@@ -2133,8 +2226,12 @@ internal sealed class ExceptionHandlerReachability(
                 target.SyntaxTree == scope.Syntax.SyntaxTree &&
                 scope.Syntax.Span.Contains(target.Span))
             .Select(target => scope.Operations.IndexOf(
+                scope.Operations.FirstOrDefault(candidate =>
+                    candidate.Syntax.Span.Contains(target.Span) ||
+                    candidate.Syntax.Span.IntersectsWith(target.Span) ||
+                    target.Span.Contains(candidate.Syntax.Span)) ??
                 scope.Operations.First(candidate =>
-                    candidate.Syntax.Span.Contains(target.Span))))
+                    candidate.Syntax.Span.Start >= target.Span.Start)))
             .Distinct()
             .ToArray();
         return new InternalGotoTargets(
@@ -2425,7 +2522,7 @@ internal sealed class ExceptionHandlerReachability(
         var dispose = UsingDisposalEffectResolver.ResolveDispose(
             compilation,
             caller,
-            resourceType);
+            GetConcreteResourceType(resourceType, resource));
         return dispose == null ||
             UsingDisposalEffectResolver.IsDispatchUncertain(dispose)
                 ? UnknownPotential
@@ -2441,7 +2538,12 @@ internal sealed class ExceptionHandlerReachability(
         int depth)
     {
         method = method.OriginalDefinition;
-        if (isKnownNonThrowing(method))
+        if (isKnownNonThrowing(method) ||
+            method is
+            {
+                MethodKind: MethodKind.Constructor,
+                IsImplicitlyDeclared: true
+            })
         {
             return EmptyPotential;
         }
@@ -2556,6 +2658,13 @@ internal sealed class ExceptionHandlerReachability(
             ImmutableHashSet.Create<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default),
             Unknown: false);
+
+    private bool IsExceptionType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol named &&
+            _exceptionType is { } exception &&
+            EffectTypeFacts.IsDerivedFrom(named, exception);
+    }
 
     private static PotentialExceptions UnknownPotential =>
         new(

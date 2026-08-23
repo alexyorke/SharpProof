@@ -5260,8 +5260,20 @@ public sealed class EffectAnalysisTests
                 HasStaticWrite("AfterDivergingStaticInitialization"),
                 Is.False);
             Assert.That(HasStaticWrite("BeforeFieldInitMethodMayRun"), Is.True);
-            Assert.That(HasStaticWrite("CatchInitialization"), Is.True);
-            Assert.That(HasStaticWrite("AfterInitialization"), Is.False);
+            Assert.That(
+                session.Analyze(EffectTestHost.RequireMethod(
+                    compilation,
+                    "SameTypeBeforeFieldInitBomb",
+                    "CatchInitialization"))
+                    .Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                session.Analyze(EffectTestHost.RequireMethod(
+                    compilation,
+                    "SameTypeBeforeFieldInitBomb",
+                    "AfterInitialization"))
+                    .Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
             Assert.That(
                 HasStaticWrite("StaticInitializationWrongCatch"),
                 Is.False);
@@ -5306,7 +5318,13 @@ public sealed class EffectAnalysisTests
                 HasStaticWrite("NullAwaitAfterThrowingOperand"),
                 Is.False);
             Assert.That(HasStaticWrite("NullCustomAwaiterCatch"), Is.True);
-            Assert.That(HasStaticWrite("GenericStaticProbe"), Is.True);
+            Assert.That(
+                session.Analyze(EffectTestHost.RequireMethod(
+                    compilation,
+                    "GenericStaticBomb`1",
+                    "GenericStaticProbe"))
+                    .Summary.Writes.Regions.Contains(EffectRegionId.Static()),
+                Is.True);
             Assert.That(HasStaticWrite("ThrowingFilter"), Is.False);
             Assert.That(HasStaticWrite("Rethrow"), Is.True);
             Assert.That(HasStaticWrite("FinallyRuns"), Is.True);
@@ -5337,8 +5355,8 @@ public sealed class EffectAnalysisTests
 
         bool HasStaticWrite(string methodName)
         {
-            return session.Analyze(Method(compilation, methodName))
-                .Summary.Writes.Contains(EffectRegionId.Static());
+            var summary = session.Analyze(Method(compilation, methodName)).Summary;
+            return summary.Writes.Contains(EffectRegionId.Static());
         }
     }
 

@@ -118,7 +118,6 @@ internal sealed class UsingDisposalEffectResolver
             var internalBranches = GetInternalGotoTargets(
                 operation,
                 block,
-                branch => _flow == null || _flow.IsReachable(branch),
                 index + 1);
             if (internalBranches.LeavesActiveLifetime)
             {
@@ -139,7 +138,9 @@ internal sealed class UsingDisposalEffectResolver
             {
                 continue;
             }
-            if (canCompleteNormally(operation) &&
+            if ((canCompleteNormally(operation) ||
+                    operation is ILabeledOperation labeled &&
+                    labeled.ChildOperations.All(canCompleteNormally)) &&
                 !internalBranches.HasUnconditionalGoto)
             {
                 pending.Enqueue(operationIndex + 1);
@@ -148,17 +149,16 @@ internal sealed class UsingDisposalEffectResolver
         return false;
     }
 
+
     private static InternalGotoTargets GetInternalGotoTargets(
         IOperation operation,
         IBlockOperation scope,
-        Func<IBranchOperation, bool> isReachable,
         int firstActiveOperation)
     {
         var branches = operation.DescendantsAndSelf()
             .OfType<IBranchOperation>()
             .Where(branch =>
-                branch.Syntax is GotoStatementSyntax &&
-                isReachable(branch))
+                branch.Syntax is GotoStatementSyntax)
             .ToArray();
         var allTargets = branches
             .SelectMany(static branch =>
@@ -168,8 +168,12 @@ internal sealed class UsingDisposalEffectResolver
                 target.SyntaxTree == scope.Syntax.SyntaxTree &&
                 scope.Syntax.Span.Contains(target.Span))
             .Select(target => scope.Operations.IndexOf(
+                scope.Operations.FirstOrDefault(candidate =>
+                    candidate.Syntax.Span.Contains(target.Span) ||
+                    candidate.Syntax.Span.IntersectsWith(target.Span) ||
+                    target.Span.Contains(candidate.Syntax.Span)) ??
                 scope.Operations.First(candidate =>
-                    candidate.Syntax.Span.Contains(target.Span))))
+                    candidate.Syntax.Span.Start >= target.Span.Start)))
             .Distinct()
             .ToArray();
         return new InternalGotoTargets(
@@ -247,7 +251,9 @@ internal sealed class UsingDisposalEffectResolver
                 resources.Type,
                 resources,
                 origin,
-                classifyRegion);
+                classifyRegion,
+                canMethodCompleteNormally,
+                canMethodThrow);
         }
 
         var acquired = new List<(
@@ -283,7 +289,9 @@ internal sealed class UsingDisposalEffectResolver
                 item.Type,
                 item.Resource,
                 item.Origin,
-                classifyRegion);
+                classifyRegion,
+                canMethodCompleteNormally,
+                canMethodThrow);
             summary = EffectSummaryDomain.Instance.Join(summary, disposal);
             if (!CanDisposalUnwind(
                     item.Type,
@@ -323,7 +331,10 @@ internal sealed class UsingDisposalEffectResolver
         {
             return true;
         }
-        var dispose = ResolveDispose(_compilation, _caller, resourceType);
+        var dispose = ResolveDispose(
+            _compilation,
+            _caller,
+            GetConcreteResourceType(resourceType, resource));
         return dispose == null || IsDispatchUncertain(dispose) ||
             canMethodCompleteNormally(dispose);
     }
@@ -341,10 +352,13 @@ internal sealed class UsingDisposalEffectResolver
         }
         var dispose = resourceType == null
             ? null
-            : ResolveDispose(_compilation, _caller, resourceType);
-        return dispose == null || IsDispatchUncertain(dispose) ||
-            canMethodCompleteNormally(dispose) ||
-            canMethodThrow(dispose);
+            : ResolveDispose(
+                _compilation,
+                _caller,
+                GetConcreteResourceType(resourceType, resource));
+        var complete = dispose != null && canMethodCompleteNormally(dispose);
+        var throws = dispose != null && canMethodThrow(dispose);
+        return dispose == null || IsDispatchUncertain(dispose) || complete || throws;
     }
 
     private bool IsDefinitelyNull(IOperation resource, IOperation origin)
@@ -352,6 +366,23 @@ internal sealed class UsingDisposalEffectResolver
         return resource.ConstantValue is { HasValue: true, Value: null } ||
             _flow?.TryEvaluate(origin, resource, out var value) == true &&
             value.IsDefinitelyNull;
+    }
+
+    private static ITypeSymbol GetConcreteResourceType(
+        ITypeSymbol declaredType,
+        IOperation resource)
+    {
+        resource = DefiniteOperationFacts.UnwrapHarmlessValue(resource);
+        return declaredType is INamedTypeSymbol
+        {
+            TypeKind: TypeKind.Interface
+        } &&
+        resource.Type is INamedTypeSymbol
+        {
+            TypeKind: not TypeKind.Interface
+        } concrete
+            ? concrete
+            : declaredType;
     }
 
     private sealed record InternalGotoTargets(
@@ -363,7 +394,9 @@ internal sealed class UsingDisposalEffectResolver
         ITypeSymbol? resourceType,
         IOperation? resource,
         IOperation origin,
-        Func<IOperation?, bool, EffectRegionSet> classifyRegion)
+        Func<IOperation?, bool, EffectRegionSet> classifyRegion,
+        Func<IMethodSymbol, bool> canMethodCompleteNormally,
+        Func<IMethodSymbol, bool> canMethodThrow)
     {
         if (resourceType == null || resource == null)
         {
@@ -380,17 +413,25 @@ internal sealed class UsingDisposalEffectResolver
         var dispose = ResolveDispose(
             _compilation,
             _caller,
-            resourceType);
+            GetConcreteResourceType(resourceType, resource));
         if (dispose == null)
         {
             return EffectSummaryOperations.Unsupported();
         }
+        if (!IsDispatchUncertain(dispose) &&
+            !canMethodCompleteNormally(dispose) &&
+            !canMethodThrow(dispose))
+        {
+            return EffectSummary.Empty;
+        }
 
+        var receiver = dispose.ContainingType?.IsValueType == true &&
+            !dispose.ContainingType.IsRefLikeType
+                ? EffectRegionSet.Empty
+                : classifyRegion(resource, true);
         return _calls.Resolve(
             dispose,
-            resourceType.IsValueType && !resourceType.IsRefLikeType
-                ? EffectRegionSet.Empty
-                : classifyRegion(resource, true),
+            receiver,
             ImmutableArray<EffectRegionSet>.Empty,
             ImmutableArray<IOperation?>.Empty,
             IsDispatchUncertain(dispose),

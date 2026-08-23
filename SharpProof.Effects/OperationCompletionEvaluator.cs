@@ -45,6 +45,16 @@ internal sealed class OperationCompletionEvaluator
         return operation switch
         {
             IThrowOperation => false,
+            IInvocationOperation invocation when
+                invocation.TargetMethod.Name == "<Clone>$" &&
+                invocation.Syntax.ToString().IndexOf(
+                    "with",
+                    StringComparison.Ordinal) >= 0 &&
+                GetRecordCopyConstructor(invocation.TargetMethod) is { } copyConstructor =>
+                CanCompleteInvocation(
+                    copyConstructor,
+                    instance: null,
+                    invocation),
             IInvocationOperation invocation =>
                 !_isImplicitLockEnterWithNullValue(invocation) &&
                 CanCompleteInvocation(
@@ -98,6 +108,9 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteWriteTarget(increment.Target),
             IConditionalOperation conditional =>
                 CanCompleteConditional(conditional),
+            ITryOperation @try =>
+                (@try.Finally == null || CanCompleteNormally(@try.Finally)) &&
+                ChildrenCanComplete(@try),
             ISwitchExpressionOperation switchExpression =>
                 CanCompleteSwitchExpression(switchExpression),
             ISwitchExpressionArmOperation arm =>
@@ -118,6 +131,8 @@ internal sealed class OperationCompletionEvaluator
                 IVariableDeclarationOperation or IVariableDeclaratorOperation or
                 IVariableInitializerOperation or IObjectOrCollectionInitializerOperation =>
                 ChildrenCanComplete(operation),
+            ILabeledOperation labeled =>
+                ChildrenCanComplete(labeled),
             _ => true
         };
     }
@@ -346,7 +361,8 @@ internal sealed class OperationCompletionEvaluator
             static item => item is not ISlicePatternOperation);
         var hasSlice = pattern.Patterns.Any(
             static item => item is ISlicePatternOperation);
-        if (TryGetGoverningListLength(pattern, out var length) &&
+        var hasKnownLength = TryGetGoverningListLength(pattern, out var length);
+        if (hasKnownLength &&
             (hasSlice ? length < requiredLength : length != requiredLength))
         {
             return methods;
@@ -498,6 +514,16 @@ internal sealed class OperationCompletionEvaluator
                  { Expression: { } returnBody })
         {
             expression = returnBody;
+        }
+        else if (declaration.DescendantNodes()
+                     .OfType<ArrowExpressionClauseSyntax>()
+                     .FirstOrDefault() is { Expression: { } arrowBody })
+        {
+            expression = arrowBody;
+        }
+        else if (declaration is ArrowExpressionClauseSyntax arrow)
+        {
+            expression = arrow.Expression;
         }
         if (expression == null)
         {

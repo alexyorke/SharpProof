@@ -85,6 +85,18 @@ internal sealed class EffectMethodNodeBuilder
             localSummary,
             _session.ResolveEntryPreconditions(method),
             CanTriggerOwnTypeInitialization(method) &&
+            (!SymbolEqualityComparer.Default.Equals(
+                method.ContainingAssembly,
+                _compilation.Assembly)
+                ? true
+                : method.MethodKind == MethodKind.Constructor
+                    ? method.ContainingType.StaticConstructors.All(
+                        static constructor => constructor.IsImplicitlyDeclared)
+                    : !method.ContainingType.IsGenericType &&
+                      method.ContainingType.StaticConstructors.Any(
+                          constructor =>
+                              !constructor.IsImplicitlyDeclared &&
+                              StaticConstructorCanAffectEntry(constructor))) &&
             HasPotentialStaticInitialization(
                 method.ContainingType,
                 _session.ApiSpecs)
@@ -175,12 +187,14 @@ internal sealed class EffectMethodNodeBuilder
             return true;
         }
 
-        return type.StaticConstructors.Any() ||
-        type.GetMembers().Any(member =>
+        var result = type.StaticConstructors.Any(static constructor =>
+            constructor.DeclaringSyntaxReferences.Length != 0) ||
+            type.GetMembers().Any(member =>
             !member.IsImplicitlyDeclared &&
             IsInitializableMember(member, staticInitializers: true) &&
             member.DeclaringSyntaxReferences.Any(reference =>
                 EffectProjections.GetInitializerExpression(reference.GetSyntax()) != null));
+        return result;
     }
 
     internal static bool HasPotentialConstructionInitialization(
@@ -272,6 +286,23 @@ internal sealed class EffectMethodNodeBuilder
         (method.IsStatic || method.ContainingType.IsValueType);
     }
 
+    private bool StaticConstructorCanAffectEntry(
+        IMethodSymbol constructor)
+    {
+        if (constructor.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax().DescendantNodesAndSelf().Any(
+                static syntax => syntax is ThrowStatementSyntax or
+                    ThrowExpressionSyntax)))
+        {
+            return true;
+        }
+        return constructor.DeclaringSyntaxReferences.Length == 0 ||
+            new DefiniteOperationFacts(
+                _compilation,
+                CancellationToken.None).MethodCanCompleteNormally(
+                    constructor);
+    }
+
     private static bool IsInitializableMember(
         ISymbol member,
         bool staticInitializers)
@@ -296,7 +327,6 @@ internal sealed class EffectMethodNodeBuilder
             CreateExceptionalRegionOperations(graph);
         var finallyEntries = CreateFinallyEntries(graph);
         foreach (var block in graph.Blocks.Where(static block =>
-                     block.IsReachable &&
                      block.Predecessors.All(static predecessor =>
                          predecessor.Semantics !=
                              ControlFlowBranchSemantics.Regular)))
@@ -332,8 +362,8 @@ internal sealed class EffectMethodNodeBuilder
             {
                 AddReachableFinallyEntriesForBlock(block);
             }
-            AddControlTransferFinally(block.FallThroughSuccessor, step);
-            AddControlTransferFinally(block.ConditionalSuccessor, step);
+            AddControlTransferFinally(block, block.FallThroughSuccessor, step);
+            AddControlTransferFinally(block, block.ConditionalSuccessor, step);
             if (!step.CompletesNormally)
             {
                 continue;
@@ -376,6 +406,7 @@ internal sealed class EffectMethodNodeBuilder
         }
 
         void AddControlTransferFinally(
+            BasicBlock source,
             ControlFlowBranch? branch,
             EffectStep step)
         {
@@ -385,6 +416,13 @@ internal sealed class EffectMethodNodeBuilder
                     ControlFlowBranchSemantics.Throw or
                     ControlFlowBranchSemantics.Rethrow))
             {
+                return;
+            }
+            if (branch.Semantics is
+                ControlFlowBranchSemantics.Throw or
+                ControlFlowBranchSemantics.Rethrow)
+            {
+                AddReachableFinallyEntriesForBlock(source);
                 return;
             }
             AddReachableFinallyEntries(branch);
