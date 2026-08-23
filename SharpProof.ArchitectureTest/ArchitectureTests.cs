@@ -192,6 +192,14 @@ public sealed class ArchitectureTests
                 "SharpProof.Attributes",
                 "SharpProof.Ir"
             ],
+            ["SharpProof.Fuzz"] = [
+                "SharpProof.Frontend",
+                "SharpProof.Host",
+                "SharpProof.Ir",
+                "SharpProof.Smt",
+                "SharpProof.Testing",
+                "SharpProof.Verify"
+            ],
             ["SharpProof.Contracts"] = [
                 "SharpProof.Frontend",
                 "SharpProof.Ir"
@@ -308,7 +316,7 @@ public sealed class ArchitectureTests
     }
 
     [Test]
-    public void OnlyTheSmtLayerReferencesZ3InTheProductionGraph()
+    public void OnlyTheSmtLayerAndFuzzHarnessReferenceZ3InTheProductionGraph()
     {
         foreach (var project in ProductionProjects)
         {
@@ -320,7 +328,7 @@ public sealed class ArchitectureTests
                 .ToArray();
             Assert.That(
                 packages.Contains("Microsoft.Z3", StringComparer.Ordinal),
-                Is.EqualTo(project == "SharpProof.Smt"),
+                Is.EqualTo(project is "SharpProof.Smt" or "SharpProof.Fuzz"),
                 project);
         }
     }
@@ -2217,7 +2225,14 @@ public sealed class ArchitectureTests
 
     private static string ProjectFile(string project)
     {
-        return Path.Combine(RepositoryRoot(), project, project + ".csproj");
+        return Path.Combine(ProjectDirectory(project), project + ".csproj");
+    }
+
+    private static string ProjectDirectory(string project)
+    {
+        return project == "SharpProof.Fuzz"
+            ? Path.Combine(RepositoryRoot(), "Tools", project)
+            : Path.Combine(RepositoryRoot(), project);
     }
 
     private static string ReadProductionSources(string project)
@@ -2231,7 +2246,7 @@ public sealed class ArchitectureTests
     private static IEnumerable<string> ProductionSourceFiles(string project)
     {
         return Directory.GetFiles(
-                Path.Combine(RepositoryRoot(), project),
+                ProjectDirectory(project),
                 "*.cs",
                 SearchOption.AllDirectories)
             .Where(static path =>
