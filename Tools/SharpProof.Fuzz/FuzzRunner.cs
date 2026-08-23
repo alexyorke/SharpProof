@@ -383,6 +383,7 @@ public static class FuzzRunner
             }
         }
 
+        keys.Capacity = keys.Count;
         return keys.MoveToImmutable();
 
         void Add(int index, string oracle, bool failed)

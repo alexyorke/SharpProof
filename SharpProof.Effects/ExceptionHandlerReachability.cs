@@ -24,9 +24,11 @@ internal sealed class ExceptionHandlerReachability(
         compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.NullReferenceException);
     private readonly INamedTypeSymbol? _argumentNullExceptionType =
-        compilation.GetTypeByMetadataName("System.ArgumentNullException");
+        compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.ArgumentNullException);
     private readonly INamedTypeSymbol? _typeInitializationExceptionType =
-        compilation.GetTypeByMetadataName("System.TypeInitializationException");
+        compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.TypeInitializationException);
     private readonly INamedTypeSymbol? _switchExpressionExceptionType =
         compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.SwitchExpressionException);

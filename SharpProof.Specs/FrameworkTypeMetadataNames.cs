@@ -33,4 +33,6 @@ public static class FrameworkTypeMetadataNames
     public const string ReferenceAssemblyAttribute = "System.Runtime.CompilerServices.ReferenceAssemblyAttribute";
     public const string SwitchExpressionException =
         "System.Runtime.CompilerServices.SwitchExpressionException";
+    public const string TypeInitializationException =
+        "System.TypeInitializationException";
 }
