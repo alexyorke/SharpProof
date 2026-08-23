@@ -106,6 +106,10 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             new System.Threading.Tasks.TaskCompletionSource<bool>(
                 System.Threading.Tasks.TaskCreationOptions
                     .RunContinuationsAsynchronously);
+        var supervisorCleanupSignal =
+            new System.Threading.Tasks.TaskCompletionSource<bool>(
+                System.Threading.Tasks.TaskCreationOptions
+                    .RunContinuationsAsynchronously);
         var supervisorNonce = string.Empty;
         var retainCleanupAnchor = false;
         HasStructuredError = false;
@@ -186,7 +190,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     process.StandardOutput,
                     supervisorNonce,
                     _outputLimitSignal,
-                    supervisorArmedSignal);
+                    supervisorArmedSignal,
+                    supervisorCleanupSignal);
                 standardError = ReadBoundedOutputAsync(
                     process.StandardError,
                     supervisorNonce: null,
@@ -341,6 +346,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                         standardOutput,
                         standardError,
                         supervisorNonce,
+                        supervisorCleanupSignal.Task,
                         authenticationFailure);
                     process = null;
                 }
@@ -473,7 +479,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             string? supervisorNonce,
             ManualResetEventSlim outputLimitSignal,
             System.Threading.Tasks.TaskCompletionSource<bool>?
-                supervisorArmedSignal = null)
+                supervisorArmedSignal = null,
+            System.Threading.Tasks.TaskCompletionSource<bool>?
+                supervisorCleanupSignal = null)
     {
         var captured = new StringBuilder();
         var protocolLine = new StringBuilder();
@@ -528,10 +536,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                         {
                             supervisorArmedSignal?.TrySetResult(true);
                         }
-                        cleanupAuthenticated |= string.Equals(
+                        var cleanupRecord = string.Equals(
                             line,
                             SupervisorCleanupMessage + " " + supervisorNonce,
                             StringComparison.Ordinal);
+                        cleanupAuthenticated |= cleanupRecord;
+                        if (cleanupRecord)
+                        {
+                            supervisorCleanupSignal?.TrySetResult(true);
+                        }
                     }
                     protocolLine.Clear();
                     protocolLineTooLong = false;
@@ -584,7 +597,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     internal static void RetainCleanupAnchorForTest(Process process)
     {
-        RetainCleanupAnchor(process, -1, null, null, null, null);
+        RetainCleanupAnchor(process, -1, null, null, null, null, null);
     }
 
     internal static void RetainCleanupAnchorForTest(
@@ -602,6 +615,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             boundedOutput,
             null,
             supervisorNonce,
+            null,
             authenticationFailure);
     }
 
@@ -632,6 +646,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         System.Threading.Tasks.Task<BoundedProcessOutput>? standardOutput,
         System.Threading.Tasks.Task<BoundedProcessOutput>? standardError,
         string? supervisorNonce = null,
+        System.Threading.Tasks.Task? supervisorCleanupSignal = null,
         Action<string>? authenticationFailure = null)
     {
         var token = Interlocked.Increment(ref _nextCleanupAnchor);
@@ -641,6 +656,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             standardOutput,
             standardError,
             supervisorNonce,
+            supervisorCleanupSignal,
             authenticationFailure);
         if (!RetainedCleanupAnchors.TryAdd(token, anchor))
         {
@@ -661,13 +677,11 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             if (anchor.SupervisorNonce != null &&
                 anchor.AuthenticationFailure != null)
             {
-                var output = anchor.StandardOutput == null
-                    ? null
-                    : await AwaitOutputAfterSupervisorExit(
-                        anchor.StandardOutput).ConfigureAwait(false);
-                if (output == null ||
-                    !output.SupervisorArmed ||
-                    !output.CleanupAuthenticated)
+                var authenticated = anchor.StandardOutput != null &&
+                    await AwaitCleanupAuthenticationAfterSupervisorExit(
+                        anchor.StandardOutput,
+                        anchor.SupervisorCleanupSignal).ConfigureAwait(false);
+                if (!authenticated)
                 {
                     anchor.AuthenticationFailure(
                         "The retained SharpProof verifier containment " +
@@ -688,18 +702,33 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         }
     }
 
-    private static async System.Threading.Tasks.Task<BoundedProcessOutput?>
-        AwaitOutputAfterSupervisorExit(
-            System.Threading.Tasks.Task<BoundedProcessOutput> output)
+    private static async System.Threading.Tasks.Task<bool>
+        AwaitCleanupAuthenticationAfterSupervisorExit(
+            System.Threading.Tasks.Task<BoundedProcessOutput> output,
+            System.Threading.Tasks.Task? supervisorCleanupSignal)
     {
-        var completed = await System.Threading.Tasks.Task.WhenAny(
-            output,
-            System.Threading.Tasks.Task.Delay(
-                CleanupAuthenticationWaitMilliseconds)).ConfigureAwait(false);
-        return ReferenceEquals(completed, output) &&
-            output.IsCompletedSuccessfully
-                ? await output.ConfigureAwait(false)
-                : null;
+        var delay = System.Threading.Tasks.Task.Delay(
+            CleanupAuthenticationWaitMilliseconds);
+        var completed = supervisorCleanupSignal == null
+            ? await System.Threading.Tasks.Task.WhenAny(output, delay)
+                .ConfigureAwait(false)
+            : await System.Threading.Tasks.Task.WhenAny(
+                output,
+                supervisorCleanupSignal,
+                delay).ConfigureAwait(false);
+        if (supervisorCleanupSignal != null &&
+            ReferenceEquals(completed, supervisorCleanupSignal))
+        {
+            return true;
+        }
+        if (!ReferenceEquals(completed, output) ||
+            !output.IsCompletedSuccessfully)
+        {
+            return false;
+        }
+        var outputResult = await output.ConfigureAwait(false);
+        return outputResult.SupervisorArmed &&
+            outputResult.CleanupAuthenticated;
     }
 
     private static void ObserveFault(
@@ -723,6 +752,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         System.Threading.Tasks.Task<BoundedProcessOutput>? StandardOutput,
         System.Threading.Tasks.Task<BoundedProcessOutput>? StandardError,
         string? SupervisorNonce,
+        System.Threading.Tasks.Task? SupervisorCleanupSignal,
         Action<string>? AuthenticationFailure);
 
     internal sealed record BoundedProcessOutput(

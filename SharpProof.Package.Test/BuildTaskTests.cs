@@ -149,6 +149,40 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    public async System.Threading.Tasks.Task
+        VerifierCleanupStateIsPublishedIndependentlyOfOutputCompletion()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        using var signal = new ManualResetEventSlim();
+        var cleanup = new System.Threading.Tasks.TaskCompletionSource<bool>(
+            System.Threading.Tasks.TaskCreationOptions
+                .RunContinuationsAsynchronously);
+        using var reader = new GatedTextReader(
+            "SharpProof.Armed/1 " + nonce + "\n" +
+            "SharpProof.Cleanup/1 " + nonce + "\n");
+
+        var read = RunVerifier.ReadBoundedOutputAsync(
+            reader,
+            nonce,
+            signal,
+            supervisorCleanupSignal: cleanup);
+        try
+        {
+            Assert.That(
+                await cleanup.Task.WaitAsync(TimeSpan.FromSeconds(1)),
+                Is.True);
+            Assert.That(read.IsCompleted, Is.False);
+        }
+        finally
+        {
+            reader.Complete();
+            await read;
+        }
+    }
+
+    [Test]
     public void InterruptedAuthenticationWaitDefersIncompleteProtocolDrain()
     {
         using (Assert.EnterMultipleScope())
