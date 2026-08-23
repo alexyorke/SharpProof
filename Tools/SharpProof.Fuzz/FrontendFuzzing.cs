@@ -1024,7 +1024,9 @@ public sealed class FrontendDifferentialOracle
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var model = compilation.GetSemanticModel(syntaxTree);
+        var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+            compilation,
+            syntaxTree);
         var methodSyntaxes = syntaxTree.GetRoot(cancellationToken)
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
@@ -1172,7 +1174,9 @@ public sealed class FrontendDifferentialOracle
                 cancellationToken);
         }
 
-        var model = compilation.GetSemanticModel(syntaxTree);
+        var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+            compilation,
+            syntaxTree);
         var compilationUnit = (CompilationUnitSyntax)syntaxTree.GetRoot(
             cancellationToken);
         var generatedTypes = compilationUnit
