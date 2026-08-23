@@ -17,6 +17,7 @@
     "SharpProof.Dataflow": 91.47,
     "SharpProof.Effects": 89.05,
     "SharpProof.Frontend": 81.0,
+    "SharpProof.Fuzz": 80.09,
     "SharpProof.Gates": 74.85,
     "SharpProof.Host": 70.0,
     "SharpProof.Ir": 88.67,
