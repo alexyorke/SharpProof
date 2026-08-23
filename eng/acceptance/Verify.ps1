@@ -16,6 +16,10 @@ $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+. (Join-Path $repositoryRoot 'scripts\SharpProof.FuzzEvidenceLifecycle.ps1')
+$pullRequestCases = Assert-SharpProofFuzzCaseBudget `
+    -Value $contract.fuzz.pullRequestCases `
+    -Name 'contract.fuzz.pullRequestCases'
 
 # BEGIN ACCEPTANCE TIMELINE AUTHORITY
 function Test-AcceptanceTimingTimeline {
@@ -498,7 +502,7 @@ Assert-Equal `
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
 Assert-Equal $contract.worker.protocolVersion 11 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 14 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 15 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumCompilerReferenceModuleBytes 268435456 'worker.maximumCompilerReferenceModuleBytes'
 Assert-Equal $contract.worker.maximumCompilerReferenceClosureBytes 1073741824 'worker.maximumCompilerReferenceClosureBytes'
 Assert-Equal $contract.worker.maximumCompilerReferenceModules 4096 'worker.maximumCompilerReferenceModules'
@@ -740,7 +744,7 @@ try {
             '--no-build',
             '--',
             '--cases',
-            [string]$contract.fuzz.pullRequestCases,
+            [string]$pullRequestCases,
             '--seed',
             '23063',
             '--max-parallelism',

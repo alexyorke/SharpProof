@@ -110,8 +110,8 @@ internal sealed class ContractIntrinsicValidator
 
     private static bool SameCallable(IMethodSymbol? left, IMethodSymbol right)
     {
-        return left != null && SymbolEqualityComparer.Default.Equals(left.OriginalDefinition,
-                right.OriginalDefinition);
+        return left != null &&
+            ContractClauseInventoryBuilder.HaveSameDefinition(left, right);
     }
 
     private readonly struct IntrinsicContext(BoundContractKind? clause, bool insideOld)

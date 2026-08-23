@@ -47,12 +47,17 @@ function Assert-Accepted(
         -ExpectedMaximumParallelism 4 | Out-Null
 }
 
-function Assert-Rejected([object]$Value, [string]$Name) {
+function Assert-Rejected(
+    [object]$Value,
+    [string]$Name,
+    [int]$Cases = 10,
+    [int]$Seed = 123,
+    [int]$MaximumParallelism = 4) {
     try {
         Assert-SharpProofFuzzRunnerResult `
             -Path (Write-Result $Value $Name) `
-            -ExpectedCases 10 -ExpectedSeed 123 `
-            -ExpectedMaximumParallelism 4 | Out-Null
+            -ExpectedCases $Cases -ExpectedSeed $Seed `
+            -ExpectedMaximumParallelism $MaximumParallelism | Out-Null
     }
     catch { return }
     throw "Fixture '$Name' was unexpectedly accepted."
@@ -61,8 +66,64 @@ function Assert-Rejected([object]$Value, [string]$Name) {
 try {
     $canonical = New-CanonicalResult 10 123
     Assert-Accepted $canonical 'canonical-rotating'
-    Assert-Accepted (New-CanonicalResult 3 23063) `
-        'canonical-retained' 3 23063
+    $hashPath = Write-Result $canonical 'canonical-hash'
+    $hashed = Assert-SharpProofFuzzRunnerResult `
+        -Path $hashPath -ExpectedCases 10 -ExpectedSeed 123 `
+        -ExpectedMaximumParallelism 4
+    $expectedHash = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData(
+            [IO.File]::ReadAllBytes($hashPath))).ToLowerInvariant()
+    if ($hashed.ResultSha256 -cne $expectedHash) {
+        throw 'The fuzz runner result hash did not bind the validated bytes.'
+    }
+    $racePath = Write-Result $canonical 'canonical-race'
+    $raceBytes = [IO.File]::ReadAllBytes($racePath)
+    $replacement = New-CanonicalResult 10 456
+    $raced = Assert-SharpProofFuzzRunnerResult `
+        -Path $racePath -ExpectedCases 10 -ExpectedSeed 123 `
+        -ExpectedMaximumParallelism 4 `
+        -AfterValidation {
+            param($validatedPath)
+            $replacement | ConvertTo-Json -Depth 8 |
+                Set-Content -LiteralPath $validatedPath
+        }
+    $expectedRaceHash = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData(
+            $raceBytes)).ToLowerInvariant()
+    if ($raced.Seed -ne 123 -or
+        $raced.ResultSha256 -cne $expectedRaceHash) {
+        throw 'The fuzz runner result changed after its validated read.'
+    }
+    $encoding = [Text.UTF8Encoding]::new($false)
+    $boundedJson = $canonical | ConvertTo-Json -Depth 8 -Compress
+    $exactJson = $boundedJson +
+        (' ' * (1048576 - $encoding.GetByteCount($boundedJson)))
+    $boundedPath = Join-Path $temporaryRoot 'exact-byte-limit.json'
+    [IO.File]::WriteAllText($boundedPath, $exactJson, $encoding)
+    $bounded = Assert-SharpProofFuzzRunnerResult `
+        -Path $boundedPath -ExpectedCases 10 -ExpectedSeed 123 `
+        -ExpectedMaximumParallelism 4
+    if ($bounded.Cases -ne 10 -or $bounded.Seed -ne 123) {
+        throw 'The exact-limit fuzz runner result was not preserved.'
+    }
+    [IO.File]::AppendAllText($boundedPath, ' ', $encoding)
+    $oversizedRejected = $false
+    try {
+        [void](Assert-SharpProofFuzzRunnerResult `
+            -Path $boundedPath -ExpectedCases 10 -ExpectedSeed 123 `
+            -ExpectedMaximumParallelism 4)
+    }
+    catch { $oversizedRejected = $true }
+    if (-not $oversizedRejected) {
+        throw 'An oversized fuzz runner result was accepted.'
+    }
+    Assert-Accepted (New-CanonicalResult 5 23063) `
+        'canonical-retained' 5 23063
+    $small = New-CanonicalResult 1 7
+    foreach ($name in @($small.FrontendCoverage.Keys)) {
+        $small.FrontendCoverage[$name] = 0
+    }
+    Assert-Accepted $small 'canonical-small-budget' 1 7
 
     $fixture = Copy-Result $canonical; $fixture.Cases = '10'
     Assert-Rejected $fixture 'numeric-string'
@@ -76,6 +137,14 @@ try {
     Assert-Rejected $fixture 'extra-field'
     $fixture = Copy-Result $canonical; $fixture.SchemaVersion = 3
     Assert-Rejected $fixture 'wrong-schema'
+    $fixture = New-CanonicalResult 0 123
+    $fixture.MaximumParallelism = 0
+    foreach ($name in @($fixture.FrontendCoverage.Keys)) {
+        $fixture.FrontendCoverage[$name] = 0
+    }
+    Assert-Rejected $fixture 'zero-domain' 0 123 0
+    $fixture = Copy-Result $canonical; $fixture.MaximumParallelism = 5
+    Assert-Rejected $fixture 'parallelism-above-domain' 10 123 5
     $fixture = Copy-Result $canonical; $fixture.Passed = $false
     Assert-Rejected $fixture 'false-status'
     $fixture = Copy-Result $canonical; $fixture.CoverageSatisfied = $false
@@ -91,8 +160,16 @@ try {
     Assert-Rejected $fixture 'extra-coverage-field'
     $fixture = Copy-Result $canonical; $fixture.FrontendCoverage.ArrayIndexes = '1'
     Assert-Rejected $fixture 'coverage-numeric-string'
-    $fixture = Copy-Result $canonical; $fixture.FrontendCoverage.ArrayIndexes = 0
-    Assert-Rejected $fixture 'empty-coverage-category'
+    $expanded = New-CanonicalResult 1000 123
+    $expanded.FrontendCoverage.ArrayIndexes = 0
+    Assert-Rejected $expanded 'empty-expanded-coverage-category' 1000
+    $fixture = Copy-Result $canonical
+    $fixture.FrontendCoverage.DivideByZeroExceptions = 3
+    $fixture.FrontendCoverage.OverflowExceptions = 3
+    $fixture.FrontendCoverage.NullReferenceExceptions = 3
+    $fixture.FrontendCoverage.IndexOutOfRangeExceptions = 3
+    $fixture.FrontendCoverage.InvalidCastExceptions = 3
+    Assert-Rejected $fixture 'impossible-exception-total'
     $fixture = Copy-Result $canonical
     $fixture.Failures = [object[]]@([ordered]@{
             Case = 1; Seed = 123; Oracle = 'frontend'; Original = 'a'
@@ -107,4 +184,4 @@ finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
 }
 
-Write-Host 'Strict fuzz runner result fixtures passed.'
+Write-Host 'Strict fuzz runner result fixtures: 26'

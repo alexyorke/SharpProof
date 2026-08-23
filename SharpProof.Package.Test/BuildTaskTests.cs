@@ -3,6 +3,8 @@ using Microsoft.Build.Utilities;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using SharpProof.BuildTasks;
@@ -15,6 +17,503 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
+    [Test]
+    public void GeneratedSupervisorNoncePassesSupervisorGateValidation()
+    {
+        var nonce = RunVerifier.CreateSupervisorNonce();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(nonce, Has.Length.EqualTo(64));
+            Assert.That(nonce, Is.EqualTo(nonce.ToUpperInvariant()));
+            Assert.That(VerifierProcessSupervisor.IsValidNonce(nonce), Is.True);
+        }
+    }
+
+    [Test]
+    public void SupervisorCleanupReceiptsRequireAnExactNonceAndRecord()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        var output = "verifier output\nSharpProof.Armed/1 " + nonce +
+            "\nSharpProof.Cleanup/1 " + nonce + "\n";
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                RunVerifier.HasSupervisorProtocolRecord(
+                    output,
+                    "SharpProof.Armed/1",
+                    nonce),
+                Is.True);
+            Assert.That(
+                RunVerifier.HasSupervisorProtocolRecord(
+                    output,
+                    "SharpProof.Cleanup/1",
+                    "f" + nonce[1..]),
+                Is.False);
+            Assert.That(
+                RunVerifier.HasSupervisorProtocolRecord(
+                    output,
+                    "SharpProof.Cleanup/1 trailing",
+                    nonce),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void MissingCleanupReceiptInvokesContainmentFailureDecision()
+    {
+        var failure = string.Empty;
+        using var task = new RunVerifier
+        {
+            ContainmentAuthenticationFailureOverride = message =>
+                failure = message
+        };
+
+        var authenticated = task.RequireSupervisorCleanupReceipt(
+            cleanupAuthenticated: false,
+            authenticationRequired: true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(authenticated, Is.False);
+            Assert.That(failure, Does.Contain("cleanup receipt"));
+        }
+    }
+
+    [Test]
+    public async System.Threading.Tasks.Task
+        VerifierOutputDrainIsBoundedAndStillAuthenticatesCleanup()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        var input = "SharpProof.Armed/1 " + nonce + "\n" +
+            new string(
+                'x',
+                RunVerifier.MaximumCapturedOutputCharacters + 1) +
+            "\n\nSharpProof.Cleanup/1 " + nonce + "\n";
+        using var signal = new ManualResetEventSlim();
+
+        var result = await RunVerifier.ReadBoundedOutputAsync(
+            new StringReader(input),
+            nonce,
+            signal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Text.Length,
+                Is.EqualTo(
+                    RunVerifier.MaximumCapturedOutputCharacters));
+            Assert.That(result.LimitExceeded, Is.True);
+            Assert.That(signal.IsSet, Is.True);
+            Assert.That(result.SupervisorArmed, Is.True);
+            Assert.That(result.CleanupAuthenticated, Is.True);
+        }
+    }
+
+    [Test]
+    public async System.Threading.Tasks.Task
+        VerifierArmedStateIsPublishedIndependentlyOfOutputCompletion()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        using var signal = new ManualResetEventSlim();
+        var armed = new System.Threading.Tasks.TaskCompletionSource<bool>(
+            System.Threading.Tasks.TaskCreationOptions
+                .RunContinuationsAsynchronously);
+        using var reader = new GatedTextReader(
+            "SharpProof.Armed/1 " + nonce + "\n");
+
+        var read = RunVerifier.ReadBoundedOutputAsync(
+            reader,
+            nonce,
+            signal,
+            armed);
+        try
+        {
+            Assert.That(
+                await armed.Task.WaitAsync(TimeSpan.FromSeconds(1)),
+                Is.True);
+            Assert.That(read.IsCompleted, Is.False);
+        }
+        finally
+        {
+            reader.Complete();
+            await read;
+        }
+    }
+
+    [Test]
+    public async System.Threading.Tasks.Task
+        VerifierCleanupStateIsPublishedIndependentlyOfOutputCompletion()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        using var signal = new ManualResetEventSlim();
+        var cleanup = new System.Threading.Tasks.TaskCompletionSource<bool>(
+            System.Threading.Tasks.TaskCreationOptions
+                .RunContinuationsAsynchronously);
+        using var reader = new GatedTextReader(
+            "SharpProof.Armed/1 " + nonce + "\n" +
+            "SharpProof.Cleanup/1 " + nonce + "\n");
+
+        var read = RunVerifier.ReadBoundedOutputAsync(
+            reader,
+            nonce,
+            signal,
+            supervisorCleanupSignal: cleanup);
+        try
+        {
+            Assert.That(
+                await cleanup.Task.WaitAsync(TimeSpan.FromSeconds(1)),
+                Is.True);
+            Assert.That(read.IsCompleted, Is.False);
+        }
+        finally
+        {
+            reader.Complete();
+            await read;
+        }
+    }
+
+    [Test]
+    public void InterruptedAuthenticationWaitDefersIncompleteProtocolDrain()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                RunVerifier.ShouldDeferSupervisorAuthentication(
+                    authenticationRequired: true,
+                    interrupted: true,
+                    outputCompleted: false),
+                Is.True);
+            Assert.That(
+                RunVerifier.ShouldDeferSupervisorAuthentication(
+                    authenticationRequired: true,
+                    interrupted: false,
+                    outputCompleted: false),
+                Is.True);
+            Assert.That(
+                RunVerifier.ShouldDeferSupervisorAuthentication(
+                    authenticationRequired: true,
+                    interrupted: true,
+                    outputCompleted: true),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public void OutputDrainWaitRechecksInterruptionsBetweenBoundedSlices()
+    {
+        var interrupted = false;
+        var waits = 0;
+        var incomplete = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var completed = RunVerifier.WaitForOutputCompletion(
+            incomplete.Task,
+            timeoutMilliseconds: 1000,
+            () => interrupted,
+            milliseconds =>
+            {
+                Assert.That(
+                    milliseconds,
+                    Is.InRange(
+                        1,
+                        RunVerifier.OutputDrainPollingMilliseconds));
+                waits++;
+                interrupted = true;
+                return false;
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(completed, Is.False);
+            Assert.That(waits, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void OutputDrainWaitReturnsImmediatelyForCompletedOutput()
+    {
+        Assert.That(
+            RunVerifier.WaitForOutputCompletion(
+                System.Threading.Tasks.Task.CompletedTask,
+                timeoutMilliseconds: 1000,
+                static () => false,
+                _ => throw new AssertionException(
+                    "Completed output must not enter the polling wait.")),
+            Is.True);
+    }
+
+    [Test]
+    public void SupervisorReadinessWaitObservesArmedSignal()
+    {
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var waits = 0;
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            System.Threading.Tasks.Task.CompletedTask,
+            static () => false,
+            timeoutMilliseconds: 1000,
+            _ =>
+            {
+                waits++;
+                armed.TrySetResult(true);
+                return true;
+            });
+
+        Assert.That(result, Is.EqualTo(RunVerifier.SupervisorReadiness.Armed));
+        Assert.That(waits, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void SupervisorReadinessWaitObservesPreArmedExit()
+    {
+        var exited = false;
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            System.Threading.Tasks.Task.CompletedTask,
+            () => exited,
+            timeoutMilliseconds: 1000,
+            _ =>
+            {
+                exited = true;
+                return false;
+            });
+
+        Assert.That(
+            result,
+            Is.EqualTo(RunVerifier.SupervisorReadiness.ExitedBeforeArmed));
+    }
+
+    [Test]
+    public void SupervisorReadinessDoesNotInferPreArmedExitBeforeOutputDrain()
+    {
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var output = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            output.Task,
+            static () => true,
+            timeoutMilliseconds: 1,
+            _ => false);
+
+        Assert.That(
+            result,
+            Is.EqualTo(RunVerifier.SupervisorReadiness.NotReady));
+    }
+
+    [Test]
+    public void SupervisorReadinessRechecksArmedAfterExitObservation()
+    {
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            System.Threading.Tasks.Task.CompletedTask,
+            () =>
+            {
+                armed.TrySetResult(true);
+                return true;
+            },
+            timeoutMilliseconds: 1000);
+
+        Assert.That(result, Is.EqualTo(RunVerifier.SupervisorReadiness.Armed));
+    }
+
+    [Test]
+    public void SupervisorReadinessWaitFailsClosedAtBound()
+    {
+        var armed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var result = RunVerifier.WaitForSupervisorReadiness(
+            armed.Task,
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously).Task,
+            static () => false,
+            timeoutMilliseconds: 1,
+            _ => false);
+
+        Assert.That(
+            result,
+            Is.EqualTo(RunVerifier.SupervisorReadiness.NotReady));
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public async System.Threading.Tasks.Task
+        RetainedCleanupAnchorRejectsMissingEventualReceipt()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        var failure = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var process = Process.Start("/bin/true");
+        Assert.That(process, Is.Not.Null);
+
+        RunVerifier.RetainCleanupAnchorForTest(
+            process!,
+            System.Threading.Tasks.Task.FromResult(
+                "SharpProof.Armed/1 " + nonce + "\n"),
+            nonce,
+            message => failure.TrySetResult(message));
+
+        Assert.That(
+            await failure.Task.WaitAsync(TimeSpan.FromSeconds(2)),
+            Does.Contain("cleanup receipt"));
+        Assert.That(
+            SpinWait.SpinUntil(
+                () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                TimeSpan.FromSeconds(2)),
+            Is.True);
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void UnterminatedVerifierOutputDoesNotCorruptCleanupReceipt()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-receipt-framing-");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "System.Console.Out.Write(\"partial\");");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 2000,
+                TerminationGraceMilliseconds = 1
+            };
+
+            Assert.That(task.Execute(), Is.True);
+            Assert.That(task.ExitCode, Is.EqualTo(0));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void OversizedVerifierOutputTriggersPromptBoundedContainment()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-output-limit-");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "System.Console.Out.Write(new string('x', " +
+                (RunVerifier.MaximumCapturedOutputCharacters + 1)
+                    .ToString(CultureInfo.InvariantCulture) +
+                ")); System.Threading.Thread.Sleep(5000);");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 5000,
+                TerminationGraceMilliseconds = 1000
+            };
+            var stopwatch = Stopwatch.StartNew();
+
+            Assert.That(task.Execute(), Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(
+                    stopwatch.Elapsed,
+                    Is.LessThan(TimeSpan.FromSeconds(3)));
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void OversizedOutputWithIncompleteCleanupReturnsPromptly()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-output-limit-retained-");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "System.Console.Out.Write(new string('x', " +
+                (RunVerifier.MaximumCapturedOutputCharacters + 1)
+                    .ToString(CultureInfo.InvariantCulture) +
+                ")); System.Threading.Thread.Sleep(1500);");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 5000,
+                TerminationGraceMilliseconds = 1,
+                TryTerminateOverride = static (_, _, _) => false
+            };
+            var stopwatch = Stopwatch.StartNew();
+
+            Assert.That(task.Execute(), Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(-1));
+                Assert.That(
+                    stopwatch.Elapsed,
+                    Is.LessThan(TimeSpan.FromSeconds(1)));
+                Assert.That(
+                    RunVerifier.RetainedCleanupAnchorCount,
+                    Is.GreaterThan(0));
+            }
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                    TimeSpan.FromSeconds(3)),
+                Is.True);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [TestCase("missing")]
     [TestCase("malformed")]
     [TestCase("stale-request")]
@@ -77,7 +576,7 @@ public sealed class BuildTaskTests
     public void CanceledVerifierTaskDoesNotLaunchAProcess()
     {
         var engine = new RecordingBuildEngine();
-        var task = new RunVerifier
+        using var task = new RunVerifier
         {
             BuildEngine = engine,
             Executable = "dotnet",
@@ -100,7 +599,7 @@ public sealed class BuildTaskTests
     public void VerifierWarningsReachTheMsBuildWarningChannel()
     {
         var engine = new RecordingBuildEngine();
-        var task = new RunVerifier { BuildEngine = engine };
+        using var task = new RunVerifier { BuildEngine = engine };
 
         task.LogStandardError(
             "source.cs(12,3): warning SP0047: incomplete" + Environment.NewLine +
@@ -129,7 +628,7 @@ public sealed class BuildTaskTests
     public void VerifierDiagnosticGrammarPreservesMarkerLikePathsAndSeverity()
     {
         var engine = new RecordingBuildEngine();
-        var task = new RunVerifier { BuildEngine = engine };
+        using var task = new RunVerifier { BuildEngine = engine };
 
         task.LogStandardError(
             "/tmp/source: warning SP0047: detail.cs(4,5): warning SP0048: assumptions" +
@@ -166,7 +665,7 @@ public sealed class BuildTaskTests
     public void StructuredVerifierDiagnosticsPreserveArbitraryPathText()
     {
         var engine = new RecordingBuildEngine();
-        var task = new RunVerifier { BuildEngine = engine };
+        using var task = new RunVerifier { BuildEngine = engine };
         var path = "/tmp/line\nbreak: warning SP0047: (draft), \u03c0.cs";
         var warning = VerifierDiagnosticTransport.Serialize(
             new VerifierDiagnostic(
@@ -282,10 +781,11 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierTaskCapturesDotNetOutputAndErrors()
     {
         var outputEngine = new RecordingBuildEngine();
-        var outputTask = new RunVerifier
+        using var outputTask = new RunVerifier
         {
             BuildEngine = outputEngine,
             Executable = "dotnet",
@@ -293,7 +793,7 @@ public sealed class BuildTaskTests
             Arguments = [new TaskItem("--info")]
         };
         var errorEngine = new RecordingBuildEngine();
-        var errorTask = new RunVerifier
+        using var errorTask = new RunVerifier
         {
             BuildEngine = errorEngine,
             Executable = "dotnet",
@@ -313,6 +813,448 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void VerifierTaskBoundsTheWholeLauncherProcess()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-launcher-timeout-");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(directory.FullName);
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                // Let the instrumented supervisor and child finish managed
+                // startup before exercising the whole-process deadline.
+                ProjectWallTimeMilliseconds = 2000,
+                TerminationGraceMilliseconds = 50
+            };
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Assert.That(task.Execute(), Is.True);
+            stopwatch.Stop();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(
+                    stopwatch.Elapsed,
+                    Is.LessThan(TimeSpan.FromSeconds(4)));
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void VerifierTaskRejectsOverflowingTimeoutBeforeLaunch()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-launcher-overflow-");
+        try
+        {
+            var marker = Path.Combine(directory.FullName, "started.txt");
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "System.IO.File.WriteAllText(\"started.txt\", \"started\"); " +
+                "System.Threading.Thread.Sleep(3000);");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = int.MaxValue,
+                TerminationGraceMilliseconds = 1
+            };
+
+            Assert.That(task.Execute(), Is.True);
+            Thread.Sleep(250);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(-1));
+                Assert.That(File.Exists(marker), Is.False);
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void VerifierTaskUsesOneDeadlineAndStopsOutputHoldingDescendants()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-launcher-descendant-");
+        int? descendantId = null;
+        try
+        {
+            var pidPath = Path.Combine(directory.FullName, "descendant.pid");
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "using System.Diagnostics; using System.IO; using System.Threading; " +
+                "var start = new ProcessStartInfo(\"/bin/sleep\"); " +
+                "start.ArgumentList.Add(\"10\"); start.UseShellExecute = false; " +
+                "var child = Process.Start(start)!; " +
+                "File.WriteAllText(\"descendant.pid\", child.Id.ToString()); " +
+                "Thread.Sleep(800);");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                // Let the instrumented supervisor and child finish managed
+                // startup before asserting descendant cleanup behavior.
+                ProjectWallTimeMilliseconds = 2000,
+                TerminationGraceMilliseconds = 50
+            };
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Assert.That(task.Execute(), Is.True);
+            stopwatch.Stop();
+            Assert.That(File.Exists(pidPath), Is.True);
+            descendantId = int.Parse(
+                File.ReadAllText(pidPath),
+                CultureInfo.InvariantCulture);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(4)));
+                Assert.That(
+                    SpinWait.SpinUntil(
+                        () => !IsProcessRunning(descendantId.Value),
+                        TimeSpan.FromSeconds(1)),
+                    Is.True);
+            }
+        }
+        finally
+        {
+            if (descendantId.HasValue && IsProcessRunning(descendantId.Value))
+            {
+                Process.GetProcessById(descendantId.Value).Kill(entireProcessTree: true);
+            }
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void VerifierSupervisorStopsSessionEscapingDescendants()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-launcher-daemon-");
+        int? descendantId = null;
+        try
+        {
+            var pidPath = Path.Combine(directory.FullName, "daemon.pid");
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "using System.Diagnostics; using System.Threading; " +
+                "var start = new ProcessStartInfo(\"/usr/bin/setsid\"); " +
+                "start.ArgumentList.Add(\"/bin/sh\"); " +
+                "start.ArgumentList.Add(\"-c\"); " +
+                "start.ArgumentList.Add(\"exec >/dev/null 2>&1; echo $$ > daemon.pid; exec sleep 10\"); " +
+                "start.UseShellExecute = false; Process.Start(start); " +
+                "var wait = Stopwatch.StartNew(); " +
+                "while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1);");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 1000,
+                TerminationGraceMilliseconds = 1
+            };
+
+            Assert.That(task.Execute(), Is.True);
+            Assert.That(File.Exists(pidPath), Is.True);
+            descendantId = int.Parse(
+                File.ReadAllText(pidPath),
+                CultureInfo.InvariantCulture);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(
+                    SpinWait.SpinUntil(
+                        () => !IsProcessRunning(descendantId.Value),
+                        TimeSpan.FromSeconds(1)),
+                    Is.True);
+            }
+        }
+        finally
+        {
+            if (descendantId.HasValue && IsProcessRunning(descendantId.Value))
+            {
+                Process.GetProcessById(descendantId.Value)
+                    .Kill(entireProcessTree: true);
+            }
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void VerifierSupervisorReportsBoundedCleanupFailure()
+    {
+        using var descendant = Process.Start("/bin/sleep", "10");
+        Assert.That(descendant, Is.Not.Null);
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var cleanup = VerifierProcessSupervisor.StopDescendants(
+                Environment.ProcessId,
+                25,
+                static _ => -1);
+            stopwatch.Stop();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(cleanup.HadDescendants, Is.True);
+                Assert.That(cleanup.Complete, Is.False);
+                Assert.That(
+                    stopwatch.Elapsed,
+                    Is.LessThan(TimeSpan.FromSeconds(1)));
+            }
+        }
+        finally
+        {
+            if (descendant is { HasExited: false })
+            {
+                descendant.Kill(entireProcessTree: true);
+                descendant.WaitForExit();
+            }
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void RetainedCleanupAnchorRemainsOwnedUntilExit()
+    {
+        var process = Process.Start("/bin/sleep", "0.2");
+        Assert.That(process, Is.Not.Null);
+        RunVerifier.RetainCleanupAnchorForTest(process!);
+
+        Assert.That(RunVerifier.RetainedCleanupAnchorCount, Is.GreaterThan(0));
+        Assert.That(
+            SpinWait.SpinUntil(
+                () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                TimeSpan.FromSeconds(2)),
+            Is.True);
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void VerifierExecutionRetainsLiveIncompleteCleanupAnchor()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-retained-cleanup-");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "using System.Threading; Thread.Sleep(1500);");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 10,
+                TerminationGraceMilliseconds = 1,
+                TryTerminateOverride = static (_, _, _) => false
+            };
+
+            Assert.That(task.Execute(), Is.True);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(-1));
+                Assert.That(
+                    RunVerifier.RetainedCleanupAnchorCount,
+                    Is.GreaterThan(0));
+            }
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                    TimeSpan.FromSeconds(3)),
+                Is.True);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public async System.Threading.Tasks.Task CancellationInterruptsForegroundWait()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-cancel-wait-");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "using System.Threading; Thread.Sleep(1500);");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 300000,
+                TerminationGraceMilliseconds = 1,
+                TryTerminateOverride = static (_, _, _) => false
+            };
+            var execution = System.Threading.Tasks.Task.Run(task.Execute);
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => task.HasActiveProcess,
+                    TimeSpan.FromSeconds(2)),
+                Is.True);
+
+            task.Cancel();
+
+            Assert.That(
+                await execution.WaitAsync(TimeSpan.FromSeconds(2)),
+                Is.True);
+            Assert.That(task.ExitCode, Is.EqualTo(-1));
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                    TimeSpan.FromSeconds(3)),
+                Is.True);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void SupervisorContainsVerifierThatKillsItsImmediateParent()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-supervisor-anchor-");
+        int? descendantId = null;
+        try
+        {
+            var pidPath = Path.Combine(directory.FullName, "daemon.pid");
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "using System.Diagnostics; using System.Runtime.InteropServices; using System.Threading; " +
+                "var start = new ProcessStartInfo(\"/usr/bin/setsid\"); " +
+                "start.ArgumentList.Add(\"/bin/sh\"); start.ArgumentList.Add(\"-c\"); " +
+                "start.ArgumentList.Add(\"exec >/dev/null 2>&1; echo $$ > daemon.pid; exec sleep 10\"); " +
+                "start.UseShellExecute = false; Process.Start(start); " +
+                "var wait = Stopwatch.StartNew(); while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1); " +
+                "Native.Kill(Native.GetParent(), 9); Thread.Sleep(1000); " +
+                "internal static class Native { [DllImport(\"libc\", EntryPoint=\"getppid\")] internal static extern int GetParent(); [DllImport(\"libc\", EntryPoint=\"kill\")] internal static extern int Kill(int processId, int signal); }");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 2000,
+                TerminationGraceMilliseconds = 1
+            };
+
+            Assert.That(task.Execute(), Is.True);
+            Assert.That(File.Exists(pidPath), Is.True);
+            descendantId = int.Parse(
+                File.ReadAllText(pidPath),
+                CultureInfo.InvariantCulture);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(
+                    SpinWait.SpinUntil(
+                        () => !IsProcessRunning(descendantId.Value),
+                        TimeSpan.FromSeconds(1)),
+                    Is.True);
+            }
+        }
+        finally
+        {
+            if (descendantId.HasValue && IsProcessRunning(descendantId.Value))
+            {
+                Process.GetProcessById(descendantId.Value)
+                    .Kill(entireProcessTree: true);
+            }
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void VerifierTaskDoesNotReleaseCommandBeforePidFdAcquisition()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-launcher-gate-");
+        try
+        {
+            var marker = Path.Combine(directory.FullName, "started.txt");
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "using System.IO; File.WriteAllText(\"started.txt\", \"started\");");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                OpenPidFdOverride = static _ =>
+                    throw new InvalidOperationException("forced pidfd failure")
+            };
+
+            Assert.That(task.Execute(), Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(-1));
+                Assert.That(File.Exists(marker), Is.False);
+                Assert.That(task.HasActiveProcess, Is.False);
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void CanceledInvalidationDoesNotMutate()
     {
         var task = new InvalidatePublishedResult
@@ -327,13 +1269,15 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    [NonParallelizable]
     public async System.Threading.Tasks.Task ActiveVerifierTaskCancellationStopsTheProcess()
     {
         var directory = Directory.CreateTempSubdirectory("sharpproof-cancel-");
         try
         {
             var helper = CreateTimedProcessAssembly(directory.FullName);
-            var task = new RunVerifier
+            var containmentFailure = string.Empty;
+            using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
                 Executable = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
@@ -341,7 +1285,9 @@ public sealed class BuildTaskTests
                 Arguments =
                 [
                     new TaskItem(helper)
-                ]
+                ],
+                ContainmentAuthenticationFailureOverride = message =>
+                    containmentFailure = message
             };
 
             var execution = System.Threading.Tasks.Task.Run(task.Execute);
@@ -364,6 +1310,7 @@ public sealed class BuildTaskTests
                 Assert.That(canceledPromptly, Is.True);
                 Assert.That(await execution, Is.True);
                 Assert.That(task.ExitCode, Is.Not.Zero);
+                Assert.That(containmentFailure, Is.Empty);
             }
         }
         finally
@@ -372,11 +1319,12 @@ public sealed class BuildTaskTests
         }
     }
 
-    private static string CreateTimedProcessAssembly(string directory)
+    private static string CreateTimedProcessAssembly(
+        string directory,
+        string source = "using System.Threading; Thread.Sleep(3000);")
     {
         var assemblyPath = Path.Combine(directory, "TimedProcess.dll");
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            "using System.Threading; Thread.Sleep(3000);");
+        var syntaxTree = CSharpSyntaxTree.ParseText(source);
         var trustedPlatformAssemblies =
             (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
             throw new InvalidOperationException(
@@ -411,6 +1359,36 @@ public sealed class BuildTaskTests
             }
             """);
         return assemblyPath;
+    }
+
+    private static bool IsProcessRunning(int processId)
+    {
+        try
+        {
+            if (OperatingSystem.IsLinux())
+            {
+                var stat = File.ReadAllText(
+                    $"/proc/{processId.ToString(CultureInfo.InvariantCulture)}/stat");
+                var commandEnd = stat.LastIndexOf(')');
+                return commandEnd < 0 ||
+                    commandEnd + 2 >= stat.Length ||
+                    stat[commandEnd + 2] != 'Z';
+            }
+            using var process = Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
     }
 
     [Platform("Linux")]
@@ -915,6 +1893,36 @@ public sealed class BuildTaskTests
             System.Collections.IDictionary targetOutputs)
         {
             return false;
+        }
+    }
+
+    private sealed class GatedTextReader(string initialText) : TextReader
+    {
+        private readonly System.Threading.Tasks.TaskCompletionSource<bool>
+            completion = new(
+                System.Threading.Tasks.TaskCreationOptions
+                    .RunContinuationsAsynchronously);
+        private int position;
+
+        public void Complete()
+        {
+            completion.TrySetResult(true);
+        }
+
+        public override async System.Threading.Tasks.Task<int> ReadAsync(
+            char[] buffer,
+            int index,
+            int count)
+        {
+            if (position < initialText.Length)
+            {
+                var copied = Math.Min(count, initialText.Length - position);
+                initialText.CopyTo(position, buffer, index, copied);
+                position += copied;
+                return copied;
+            }
+            await completion.Task.ConfigureAwait(false);
+            return 0;
         }
     }
 }

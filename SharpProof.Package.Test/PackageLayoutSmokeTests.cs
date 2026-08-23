@@ -105,7 +105,9 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedToolEntries = [
         "tools/net9/Microsoft.Z3.dll",
+        "tools/net9/SharpProof.BuildTasks.deps.json",
         "tools/net9/SharpProof.BuildTasks.dll",
+        "tools/net9/SharpProof.BuildTasks.runtimeconfig.json",
         "tools/net9/SharpProof.CompilerArtifact.dll",
         "tools/net9/SharpProof.Dataflow.dll",
         "tools/net9/SharpProof.Host.dll",
@@ -761,6 +763,33 @@ public sealed class PackageLayoutSmokeTests
             ("_SharpProofVerifierHostSupported", "false"));
     }
 
+    [TestCase(
+        "SharpProofMode",
+        "contracts",
+        "SharpProofMode was removed before preview.1")]
+    [TestCase(
+        "SharpProofPortableAnalyzerPath",
+        "legacy.dll",
+        "SharpProofPortableAnalyzerPath was removed before preview.1")]
+    public async Task SourceConsumerRejectsRetiredConfiguration(
+        string property,
+        string value,
+        string expectedMessage)
+    {
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteSourceConsumerEvaluationProject((property, value));
+
+        var validation = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-target:_SharpProofValidateSourceTreeConfiguration",
+            "--nologo");
+
+        Assert.That(validation.ExitCode, Is.Not.Zero, validation.Output);
+        Assert.That(validation.Output, Does.Contain(expectedMessage));
+    }
+
     [TestCase("netstandard2.0")]
     [TestCase("net472")]
     public async Task PortablePackageBuildsFrameworkConsumerFromIsolatedFeed(
@@ -913,7 +942,7 @@ public sealed class PackageLayoutSmokeTests
                 manifest.RootElement
                     .GetProperty("schemaVersion")
                     .GetInt32(),
-                Is.EqualTo(14));
+                Is.EqualTo(15));
             var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()

@@ -1,3 +1,53 @@
+function Resolve-SharpProofPhysicalPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    $pathRoot = [IO.Path]::GetPathRoot($fullPath)
+    if ([string]::IsNullOrEmpty($pathRoot)) {
+        throw "Path has no filesystem root: $fullPath"
+    }
+    $relativePath = $fullPath.Substring($pathRoot.Length)
+    $components = @($relativePath.Split(
+            [char[]]@(
+                [IO.Path]::DirectorySeparatorChar,
+                [IO.Path]::AltDirectorySeparatorChar),
+            [StringSplitOptions]::RemoveEmptyEntries))
+    $current = $pathRoot
+    for ($index = 0; $index -lt $components.Count; $index++) {
+        $next = Join-Path $current $components[$index]
+        try {
+            $item = Get-Item -LiteralPath $next -Force -ErrorAction Stop
+        }
+        catch [Management.Automation.ItemNotFoundException] {
+            for ($remainder = $index;
+                $remainder -lt $components.Count;
+                $remainder++) {
+                $current = Join-Path $current $components[$remainder]
+            }
+            return [IO.Path]::GetFullPath($current)
+        }
+
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            $target = $item.ResolveLinkTarget($true)
+            if ($null -eq $target -or -not $target.Exists) {
+                throw "Path contains an unresolved link: $next"
+            }
+            $current = [IO.Path]::GetFullPath($target.FullName)
+        }
+        else {
+            $current = [IO.Path]::GetFullPath($item.FullName)
+        }
+        if ($index -lt $components.Count - 1 -and
+            -not [IO.Directory]::Exists($current)) {
+            throw "Path traverses a non-directory component: $current"
+        }
+    }
+    return [IO.Path]::GetFullPath($current)
+}
+
 function Resolve-SharpProofContainedPath {
     [CmdletBinding()]
     param(
@@ -7,11 +57,18 @@ function Resolve-SharpProofContainedPath {
     )
 
     $canonicalRoot = [IO.Path]::GetFullPath($Root)
+    $pathComparison = if (
+        [IO.Path]::DirectorySeparatorChar -eq [char]'\') {
+        [StringComparison]::OrdinalIgnoreCase
+    }
+    else {
+        [StringComparison]::Ordinal
+    }
     $rootPath = [IO.Path]::GetPathRoot($canonicalRoot)
     if (-not [string]::Equals(
             $canonicalRoot,
             $rootPath,
-            [StringComparison]::Ordinal)) {
+            $pathComparison)) {
         $canonicalRoot = $canonicalRoot.TrimEnd(
             [IO.Path]::DirectorySeparatorChar,
             [IO.Path]::AltDirectorySeparatorChar)
@@ -26,8 +83,41 @@ function Resolve-SharpProofContainedPath {
     $prefix = $canonicalRoot + [IO.Path]::DirectorySeparatorChar
     if (-not $canonicalPath.StartsWith(
             $prefix,
-            [StringComparison]::Ordinal)) {
+            $pathComparison)) {
         throw "$ParameterName must be a child of '$canonicalRoot': $canonicalPath"
     }
-    return $canonicalPath
+    if (-not [IO.Directory]::Exists($canonicalRoot)) {
+        throw "Containment root does not exist: $canonicalRoot"
+    }
+    # The disposable task workspace intentionally symlinks its "artifacts"
+    # directory back to the host-mounted repository root so that evidence
+    # written there survives the container. Physical containment for paths
+    # under that known, infrastructure-created redirect is checked against
+    # the symlink's own resolved target rather than the task root; every
+    # other path is still required to physically resolve inside the task
+    # root, which catches an unexpected symlink anywhere else in the tree.
+    $artifactsRoot = Join-Path $canonicalRoot 'artifacts'
+    $artifactsPrefix = $artifactsRoot + [IO.Path]::DirectorySeparatorChar
+    $rootForContainment = if (
+        [IO.Directory]::Exists($artifactsRoot) -and
+        ([string]::Equals($canonicalPath, $artifactsRoot, $pathComparison) -or
+            $canonicalPath.StartsWith($artifactsPrefix, $pathComparison))) {
+        $artifactsRoot
+    }
+    else {
+        $canonicalRoot
+    }
+    $physicalRoot = Resolve-SharpProofPhysicalPath -Path $rootForContainment
+    $physicalPath = Resolve-SharpProofPhysicalPath -Path $canonicalPath
+    $physicalPrefix = $physicalRoot + [IO.Path]::DirectorySeparatorChar
+    if (-not [string]::Equals(
+            $physicalPath,
+            $physicalRoot,
+            [StringComparison]::Ordinal) -and
+        -not $physicalPath.StartsWith(
+            $physicalPrefix,
+            [StringComparison]::Ordinal)) {
+        throw "$ParameterName must resolve to a child of '$physicalRoot': $physicalPath"
+    }
+    return $physicalPath
 }

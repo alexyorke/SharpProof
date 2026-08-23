@@ -1855,7 +1855,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0016", 5)));
+            Is.EqualTo(Enumerable.Repeat("SP0016", 3)));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -1866,10 +1866,10 @@ public sealed class AnalyzerModeAndEffectTests
                 Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
             Assert.That(
                 factory.Outcomes["ThrowingConstructor"],
-                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
             Assert.That(
                 factory.Outcomes["WrappedThrowingConstructor"],
-                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
             Assert.That(
                 factory.Outcomes["DynamicArrayLength"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));

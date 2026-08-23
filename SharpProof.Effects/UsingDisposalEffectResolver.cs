@@ -13,8 +13,6 @@ internal sealed class UsingDisposalEffectResolver
     private readonly IMethodSymbol _caller;
     private readonly EffectCallSiteResolver _calls;
     private readonly Compilation _compilation;
-    private readonly IMethodSymbol? _dispose;
-    private readonly INamedTypeSymbol? _disposable;
     private readonly ManagedFlowResult? _flow;
 
     internal UsingDisposalEffectResolver(
@@ -29,20 +27,15 @@ internal sealed class UsingDisposalEffectResolver
         _caller = ArgumentNullGuard.NotNull(caller, nameof(caller));
         _calls = ArgumentNullGuard.NotNull(calls, nameof(calls));
         _flow = flow;
-        _disposable = compilation.GetTypeByMetadataName(
-            FrameworkTypeMetadataNames.IDisposable);
-        _dispose = _disposable?.GetMembers("Dispose")
-            .OfType<IMethodSymbol>()
-            .SingleOrDefault(static method =>
-                !method.IsStatic &&
-                method.Arity == 0 &&
-                method.Parameters.IsEmpty &&
-                method.ReturnsVoid);
     }
 
     internal EffectSummary Scan(
         IOperation root,
-        Func<IOperation?, bool, EffectRegionSet> classifyRegion)
+        Func<IOperation?, bool, EffectRegionSet> classifyRegion,
+        Func<IOperation?, bool> canCompleteNormally,
+        Func<IMethodSymbol, bool> canMethodCompleteNormally,
+        Func<IMethodSymbol, bool> canMethodThrow,
+        Func<IOperation, IOperation, bool> canExitAbruptly)
     {
         var summary = EffectSummary.Empty;
         foreach (var operation in root.DescendantsAndSelf()
@@ -61,20 +54,158 @@ internal sealed class UsingDisposalEffectResolver
                 IUsingOperation { IsAsynchronous: true } or
                     IUsingDeclarationOperation { IsAsynchronous: true } =>
                     EffectSummaryOperations.Unsupported(),
-                IUsingOperation @using => ResolveResources(
-                    @using.Resources,
-                    @using,
-                    classifyRegion),
-                IUsingDeclarationOperation declaration => ResolveResources(
-                    declaration.DeclarationGroup,
-                    declaration,
-                    classifyRegion),
+                IUsingOperation @using =>
+                    ResolveResources(
+                        @using.Resources,
+                        @using,
+                        classifyRegion,
+                        canCompleteNormally,
+                        canMethodCompleteNormally,
+                        canMethodThrow,
+                        canCompleteNormally(@using.Body) ||
+                        canExitAbruptly(@using.Body, @using.Body)),
+                IUsingDeclarationOperation declaration =>
+                    ResolveResources(
+                        declaration.DeclarationGroup,
+                        declaration,
+                        classifyRegion,
+                        canCompleteNormally,
+                        canMethodCompleteNormally,
+                        canMethodThrow,
+                        CanReachDeclarationDisposal(
+                            declaration,
+                            canCompleteNormally,
+                            canMethodCompleteNormally,
+                            canExitAbruptly)),
                 _ => EffectSummary.Empty
             };
             summary = EffectSummaryDomain.Instance.Join(summary, disposal);
         }
 
         return summary;
+    }
+
+    private bool CanReachDeclarationDisposal(
+        IUsingDeclarationOperation declaration,
+        Func<IOperation?, bool> canCompleteNormally,
+        Func<IMethodSymbol, bool> canMethodCompleteNormally,
+        Func<IOperation, IOperation, bool> canExitAbruptly)
+    {
+        if (declaration.Parent is not IBlockOperation block)
+        {
+            return true;
+        }
+        var index = block.Operations.IndexOf(declaration);
+        if (index < 0)
+        {
+            return true;
+        }
+        var pending = new Queue<int>();
+        var visited = new HashSet<int>();
+        pending.Enqueue(index + 1);
+        while (pending.Count != 0)
+        {
+            var operationIndex = pending.Dequeue();
+            if (operationIndex >= block.Operations.Length)
+            {
+                return true;
+            }
+            if (!visited.Add(operationIndex))
+            {
+                continue;
+            }
+            var operation = block.Operations[operationIndex];
+            var internalBranches = GetInternalGotoTargets(
+                operation,
+                block,
+                index + 1);
+            if (internalBranches.LeavesActiveLifetime)
+            {
+                return true;
+            }
+            foreach (var target in internalBranches.Targets)
+            {
+                pending.Enqueue(target);
+            }
+            if (canExitAbruptly(operation, block))
+            {
+                return true;
+            }
+            if (operation is IUsingDeclarationOperation laterUsing &&
+                !CanDisposalsCompleteNormally(
+                    laterUsing,
+                    canMethodCompleteNormally))
+            {
+                continue;
+            }
+            if ((canCompleteNormally(operation) ||
+                    operation is ILabeledOperation labeled &&
+                    labeled.ChildOperations.All(canCompleteNormally)) &&
+                !internalBranches.HasUnconditionalGoto)
+            {
+                pending.Enqueue(operationIndex + 1);
+            }
+        }
+        return false;
+    }
+
+
+    private static InternalGotoTargets GetInternalGotoTargets(
+        IOperation operation,
+        IBlockOperation scope,
+        int firstActiveOperation)
+    {
+        var branches = operation.DescendantsAndSelf()
+            .OfType<IBranchOperation>()
+            .Where(branch =>
+                branch.Syntax is GotoStatementSyntax)
+            .ToArray();
+        var allTargets = branches
+            .SelectMany(static branch =>
+                branch.Target.DeclaringSyntaxReferences)
+            .Select(static reference => reference.GetSyntax())
+            .Where(target =>
+                target.SyntaxTree == scope.Syntax.SyntaxTree &&
+                scope.Syntax.Span.Contains(target.Span))
+            .Select(target => scope.Operations.IndexOf(
+                scope.Operations.FirstOrDefault(candidate =>
+                    candidate.Syntax.Span.Contains(target.Span) ||
+                    candidate.Syntax.Span.IntersectsWith(target.Span) ||
+                    target.Span.Contains(candidate.Syntax.Span)) ??
+                scope.Operations.First(candidate =>
+                    candidate.Syntax.Span.Start >= target.Span.Start)))
+            .Distinct()
+            .ToArray();
+        return new InternalGotoTargets(
+            allTargets.Where(target =>
+                target >= firstActiveOperation).ToArray(),
+            branches.Any(branch =>
+                IsUnconditionalAtOperationLevel(branch, operation)),
+            allTargets.Any(target => target < firstActiveOperation));
+    }
+
+    private static bool IsUnconditionalAtOperationLevel(
+        IBranchOperation branch,
+        IOperation operation)
+    {
+        if (ReferenceEquals(branch, operation))
+        {
+            return true;
+        }
+        for (var parent = branch.Parent;
+             parent != null;
+             parent = parent.Parent)
+        {
+            if (ReferenceEquals(parent, operation))
+            {
+                return true;
+            }
+            if (parent is not ILabeledOperation)
+            {
+                return false;
+            }
+        }
+        return false;
     }
 
     internal static bool IsSynthesizedSynchronousDispose(
@@ -100,38 +231,172 @@ internal sealed class UsingDisposalEffectResolver
     private EffectSummary ResolveResources(
         IOperation resources,
         IOperation origin,
-        Func<IOperation?, bool, EffectRegionSet> classifyRegion)
+        Func<IOperation?, bool, EffectRegionSet> classifyRegion,
+        Func<IOperation?, bool> canCompleteNormally,
+        Func<IMethodSymbol, bool> canMethodCompleteNormally,
+        Func<IMethodSymbol, bool> canMethodThrow,
+        bool scopeExitReachable)
     {
         if (resources is not IVariableDeclarationGroupOperation group)
         {
+            if (!canCompleteNormally(resources))
+            {
+                return EffectSummary.Empty;
+            }
+            if (!scopeExitReachable)
+            {
+                return EffectSummary.Empty;
+            }
             return ResolveResource(
                 resources.Type,
                 resources,
                 origin,
-                classifyRegion);
+                classifyRegion,
+                canMethodCompleteNormally,
+                canMethodThrow);
         }
 
-        var summary = EffectSummary.Empty;
+        var acquired = new List<(
+            ITypeSymbol Type,
+            IOperation Resource,
+            IOperation Origin)>();
+        var acquisitionFailed = false;
         foreach (var declarator in group.Declarations
                      .SelectMany(static declaration => declaration.Declarators))
         {
-            summary = EffectSummaryDomain.Instance.Join(
-                summary,
-                ResolveResource(
+            var resource = declarator.Initializer?.Value;
+            if (!canCompleteNormally(resource))
+            {
+                acquisitionFailed = true;
+                break;
+            }
+            if (resource != null)
+            {
+                acquired.Add((
                     declarator.Symbol.Type,
-                    declarator.Initializer?.Value,
-                    declarator,
-                    classifyRegion));
+                    resource,
+                    declarator));
+            }
         }
-
+        if (!scopeExitReachable && !acquisitionFailed)
+        {
+            return EffectSummary.Empty;
+        }
+        var summary = EffectSummary.Empty;
+        foreach (var item in acquired.AsEnumerable().Reverse())
+        {
+            var disposal = ResolveResource(
+                item.Type,
+                item.Resource,
+                item.Origin,
+                classifyRegion,
+                canMethodCompleteNormally,
+                canMethodThrow);
+            summary = EffectSummaryDomain.Instance.Join(summary, disposal);
+            if (!CanDisposalUnwind(
+                    item.Type,
+                    item.Resource,
+                    item.Origin,
+                    canMethodCompleteNormally,
+                    canMethodThrow))
+            {
+                break;
+            }
+        }
         return summary;
     }
+
+    private bool CanDisposalsCompleteNormally(
+        IUsingDeclarationOperation declaration,
+        Func<IMethodSymbol, bool> canMethodCompleteNormally)
+    {
+        return declaration.DeclarationGroup.Declarations
+            .SelectMany(static item => item.Declarators)
+            .Reverse()
+            .All(declarator => CanDisposalCompleteNormally(
+                declarator.Symbol.Type,
+                declarator.Initializer?.Value,
+                declarator,
+                canMethodCompleteNormally));
+    }
+
+    private bool CanDisposalCompleteNormally(
+        ITypeSymbol? resourceType,
+        IOperation? resource,
+        IOperation origin,
+        Func<IMethodSymbol, bool> canMethodCompleteNormally)
+    {
+        if (resourceType == null || resource == null ||
+            IsDefinitelyNull(resource, origin))
+        {
+            return true;
+        }
+        var dispose = ResolveDispose(
+            _compilation,
+            _caller,
+            GetConcreteResourceType(resourceType, resource));
+        return dispose == null || IsDispatchUncertain(dispose) ||
+            canMethodCompleteNormally(dispose);
+    }
+
+    private bool CanDisposalUnwind(
+        ITypeSymbol? resourceType,
+        IOperation resource,
+        IOperation origin,
+        Func<IMethodSymbol, bool> canMethodCompleteNormally,
+        Func<IMethodSymbol, bool> canMethodThrow)
+    {
+        if (IsDefinitelyNull(resource, origin))
+        {
+            return true;
+        }
+        var dispose = resourceType == null
+            ? null
+            : ResolveDispose(
+                _compilation,
+                _caller,
+                GetConcreteResourceType(resourceType, resource));
+        var complete = dispose != null && canMethodCompleteNormally(dispose);
+        var throws = dispose != null && canMethodThrow(dispose);
+        return dispose == null || IsDispatchUncertain(dispose) || complete || throws;
+    }
+
+    private bool IsDefinitelyNull(IOperation resource, IOperation origin)
+    {
+        return resource.ConstantValue is { HasValue: true, Value: null } ||
+            _flow?.TryEvaluate(origin, resource, out var value) == true &&
+            value.IsDefinitelyNull;
+    }
+
+    private static ITypeSymbol GetConcreteResourceType(
+        ITypeSymbol declaredType,
+        IOperation resource)
+    {
+        resource = DefiniteOperationFacts.UnwrapHarmlessValue(resource);
+        return declaredType is INamedTypeSymbol
+        {
+            TypeKind: TypeKind.Interface
+        } &&
+        resource.Type is INamedTypeSymbol
+        {
+            TypeKind: not TypeKind.Interface
+        } concrete
+            ? concrete
+            : declaredType;
+    }
+
+    private sealed record InternalGotoTargets(
+        IReadOnlyList<int> Targets,
+        bool HasUnconditionalGoto,
+        bool LeavesActiveLifetime);
 
     private EffectSummary ResolveResource(
         ITypeSymbol? resourceType,
         IOperation? resource,
         IOperation origin,
-        Func<IOperation?, bool, EffectRegionSet> classifyRegion)
+        Func<IOperation?, bool, EffectRegionSet> classifyRegion,
+        Func<IMethodSymbol, bool> canMethodCompleteNormally,
+        Func<IMethodSymbol, bool> canMethodThrow)
     {
         if (resourceType == null || resource == null)
         {
@@ -145,15 +410,28 @@ internal sealed class UsingDisposalEffectResolver
             return EffectSummary.Empty;
         }
 
-        var dispose = ResolveDispose(resourceType);
+        var dispose = ResolveDispose(
+            _compilation,
+            _caller,
+            GetConcreteResourceType(resourceType, resource));
         if (dispose == null)
         {
             return EffectSummaryOperations.Unsupported();
         }
+        if (!IsDispatchUncertain(dispose) &&
+            !canMethodCompleteNormally(dispose) &&
+            !canMethodThrow(dispose))
+        {
+            return EffectSummary.Empty;
+        }
 
+        var receiver = dispose.ContainingType?.IsValueType == true &&
+            !dispose.ContainingType.IsRefLikeType
+                ? EffectRegionSet.Empty
+                : classifyRegion(resource, true);
         return _calls.Resolve(
             dispose,
-            classifyRegion(resource, true),
+            receiver,
             ImmutableArray<EffectRegionSet>.Empty,
             ImmutableArray<IOperation?>.Empty,
             IsDispatchUncertain(dispose),
@@ -161,7 +439,10 @@ internal sealed class UsingDisposalEffectResolver
             resource);
     }
 
-    private IMethodSymbol? ResolveDispose(ITypeSymbol resourceType)
+    internal static IMethodSymbol? ResolveDispose(
+        Compilation compilation,
+        IMethodSymbol caller,
+        ITypeSymbol resourceType)
     {
         if (resourceType is INamedTypeSymbol
             {
@@ -178,18 +459,27 @@ internal sealed class UsingDisposalEffectResolver
             return null;
         }
 
-        if (_disposable != null && _dispose != null &&
+        var disposable = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.IDisposable);
+        var dispose = disposable?.GetMembers("Dispose")
+            .OfType<IMethodSymbol>()
+            .SingleOrDefault(static method =>
+                !method.IsStatic &&
+                method.Arity == 0 &&
+                method.Parameters.IsEmpty &&
+                method.ReturnsVoid);
+        if (disposable != null && dispose != null &&
             (SymbolEqualityComparer.Default.Equals(
                  named.OriginalDefinition,
-                 _disposable) ||
+                 disposable) ||
              named.AllInterfaces.Any(@interface =>
                  SymbolEqualityComparer.Default.Equals(
                      @interface.OriginalDefinition,
-                     _disposable))))
+                     disposable))))
         {
             return named.TypeKind == TypeKind.Interface
-                ? _dispose
-                : named.FindImplementationForInterfaceMember(_dispose) as
+                ? dispose
+                : named.FindImplementationForInterfaceMember(dispose) as
                     IMethodSymbol;
         }
 
@@ -202,13 +492,13 @@ internal sealed class UsingDisposalEffectResolver
                     method.Arity == 0 &&
                     method.Parameters.IsEmpty &&
                     method.ReturnsVoid &&
-                    _compilation.IsSymbolAccessibleWithin(
+                    compilation.IsSymbolAccessibleWithin(
                         method,
-                        _caller.ContainingType))
+                        caller.ContainingType))
             : null;
     }
 
-    private static bool IsDispatchUncertain(IMethodSymbol method)
+    internal static bool IsDispatchUncertain(IMethodSymbol method)
     {
         return !method.IsStatic &&
             (method.IsVirtual ||

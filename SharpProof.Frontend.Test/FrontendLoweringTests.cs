@@ -270,6 +270,13 @@ public sealed class FrontendLoweringTests
     {
         AssertClassification(
             """
+            public static bool Target<T>(T left, T right)
+                where T : class => left == right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            """
             public static bool Target(double left, double right) => left == right;
             """,
             FrontendSubsetDecision.ClosedAbstention,
@@ -331,6 +338,25 @@ public sealed class FrontendLoweringTests
                 Is.EqualTo(FrontendSubsetDecision.ClosedAbstention),
                 expression + " should abstain rather than claim an exact value.");
         }
+    }
+
+    [Test]
+    public void AbstractAndInterfaceReferenceEqualityLowersExactly()
+    {
+        AssertClassification(
+            """
+            public abstract class Base {}
+            public static bool Target(Base left, Base right) => left == right;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
+            public interface IItem {}
+            public static bool Target(IItem left, IItem right) => left == right;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
     }
 
     [Test]
@@ -950,7 +976,10 @@ public sealed class FrontendLoweringTests
     {
         using var compiled = CompiledMethod.Create(members);
         var result = compiled.Lower();
-        Assert.That(result.Classification.Decision, Is.EqualTo(decision));
+        Assert.That(
+            result.Classification.Decision,
+            Is.EqualTo(decision),
+            result.Classification.Abstention.ToString());
         Assert.That(result.Classification.Abstention, Is.EqualTo(abstention));
     }
 

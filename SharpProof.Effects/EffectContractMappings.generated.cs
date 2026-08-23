@@ -159,6 +159,7 @@ public enum EffectRegionKind
 internal readonly record struct EffectCallSite(
     IMethodSymbol Target,
     EffectRegionSet Receiver,
+    EffectRegionSet WriteReceiver,
     ImmutableArray<EffectRegionSet> Arguments,
     IOperation Origin
 );

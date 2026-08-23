@@ -118,6 +118,31 @@ public sealed class ContainerSourceCleanlinessTests
         }
     }
 
+    [Test]
+    public async Task GitBoundCommandAcceptsRepositoryWithDifferentOwner()
+    {
+        var repository = await CreateRepositoryAsync();
+        try
+        {
+            var result = await RunEntrypointAsync(
+                repository,
+                "package-consumers",
+                assumeDifferentOwner: true);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Zero, result.Error);
+                Assert.That(
+                    result.Output,
+                    Does.Contain("executed:package-consumers"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(repository, recursive: true);
+        }
+    }
+
     [TestCase("contract")]
     [TestCase("build")]
     public async Task FiniteCommandsRunFromAnArchiveWithoutGit(string command)
@@ -303,14 +328,21 @@ public sealed class ContainerSourceCleanlinessTests
 
     private static Task<ProcessResult> RunEntrypointAsync(
         string repository,
-        string command)
+        string command,
+        bool assumeDifferentOwner = false)
     {
+        var environment = new Dictionary<string, string>
+        {
+            ["SHARPPROOF_REPO_ROOT"] = repository
+        };
+        if (assumeDifferentOwner)
+        {
+            environment["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1";
+        }
+
         return RunAsync(
             repository,
-            new Dictionary<string, string>
-            {
-                ["SHARPPROOF_REPO_ROOT"] = repository
-            },
+            environment,
             "bash",
             Path.Combine(
                 RepositoryRoot(),

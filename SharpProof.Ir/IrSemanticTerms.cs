@@ -117,8 +117,16 @@ public static class IrTermAnalysis
     public static int GetDepth(IrTerm root)
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
-
         var memo = new Dictionary<IrId, int>();
+        return GetDepth(root, memo);
+    }
+
+    internal static int GetDepth(
+        IrTerm root,
+        Dictionary<IrId, int> memo)
+    {
+        ArgumentNullGuard.NotNull(root, nameof(root));
+        ArgumentNullGuard.NotNull(memo, nameof(memo));
         var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
         pending.Push((root, false));
         while (pending.Count != 0)

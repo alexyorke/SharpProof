@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using SharpProof.Ir;
 using SharpProof.Testing;
@@ -16,6 +15,11 @@ public sealed record FuzzFailure(
     public string Term => Minimized;
 }
 
+internal readonly record struct FuzzFailureKey(int Case, string Oracle);
+internal readonly record struct FuzzCaseClassification(
+    bool HasMismatch,
+    bool HasAbstention);
+
 public sealed record FrontendFuzzCoverage(
     int TextParameters,
     int StringLiterals,
@@ -31,6 +35,21 @@ public sealed record FrontendFuzzCoverage(
     int IndexOutOfRangeExceptions,
     int InvalidCastExceptions)
 {
+    public bool HasValidCounts =>
+        TextParameters >= 0 &&
+        StringLiterals >= 0 &&
+        NullStrings >= 0 &&
+        StringConcatenations >= 0 &&
+        StringLengths >= 0 &&
+        StringCasts >= 0 &&
+        ArrayLengths >= 0 &&
+        ArrayIndexes >= 0 &&
+        DivideByZeroExceptions >= 0 &&
+        OverflowExceptions >= 0 &&
+        NullReferenceExceptions >= 0 &&
+        IndexOutOfRangeExceptions >= 0 &&
+        InvalidCastExceptions >= 0;
+
     public bool HasExpandedCategories =>
         TextParameters > 0 &&
         StringLiterals > 0 &&
@@ -45,6 +64,16 @@ public sealed record FrontendFuzzCoverage(
         NullReferenceExceptions > 0 &&
         IndexOutOfRangeExceptions > 0 &&
         InvalidCastExceptions > 0;
+
+    public bool HasValidExceptionCounts(int cases)
+    {
+        return cases >= 0 &&
+            (long)DivideByZeroExceptions +
+            OverflowExceptions +
+            NullReferenceExceptions +
+            IndexOutOfRangeExceptions +
+            InvalidCastExceptions <= cases;
+    }
 }
 
 public sealed record FuzzSummary(
@@ -62,7 +91,17 @@ public sealed record FuzzSummary(
     ImmutableArray<FuzzFailure> Failures)
 {
     public bool Passed =>
-        Failures.IsDefaultOrEmpty &&
+        SchemaVersion == 4 &&
+        Cases > 0 &&
+        MaximumParallelism is >= 1 and <= 4 &&
+        !Failures.IsDefault &&
+        Failures.IsEmpty &&
+        FrontendCoverage != null &&
+        FrontendCoverage.HasValidCounts &&
+        FrontendCoverage.HasValidExceptionCounts(Cases) &&
+        CoverageSatisfied ==
+            (Cases < FuzzOptions.DefaultCases ||
+             FrontendCoverage.HasExpandedCategories) &&
         CoverageSatisfied &&
         Abstentions == 0 &&
         Agreements == Cases &&
@@ -75,6 +114,7 @@ public static class FuzzRunner
 {
     private const int FrontendCompilationBatchSize = 256;
     private const int PullRequestCoverageBudget = FuzzOptions.DefaultCases;
+    internal const int MaximumRetainedFailures = 64;
 
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,
@@ -84,8 +124,22 @@ public static class FuzzRunner
         {
             throw new ArgumentNullException(nameof(options));
         }
+        if (options.Cases <= 0 || options.Cases > FuzzOptions.MaximumCases)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.Cases,
+                "The fuzz case count must be between 1 and " +
+                FuzzOptions.MaximumCases + ".");
+        }
+        if (options.MaximumParallelism is < 1 or > 4)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.MaximumParallelism,
+                "Maximum parallelism must be between 1 and 4.");
+        }
 
-        var failures = new ConcurrentQueue<FuzzFailure>();
         var agreements = 0;
         var abstentions = 0;
         var frontendAgreements = 0;
@@ -102,6 +156,9 @@ public static class FuzzRunner
         }
         var frontendResults =
             new FrontendDifferentialResult[options.Cases];
+        var frontendStatuses = new FuzzOracleStatus[options.Cases];
+        var smtStatuses = new FuzzOracleStatus[options.Cases];
+        var partialStatuses = new FuzzOracleStatus[options.Cases];
         var frontendOracle = new FrontendDifferentialOracle();
         for (var offset = 0;
              offset < frontendCases.Length;
@@ -140,6 +197,7 @@ public static class FuzzRunner
                 var caseSeed = CreateCaseSeed(options.Seed, index);
                 var frontendCase = frontendCases[index];
                 var frontend = frontendResults[index];
+                frontendStatuses[index] = frontend.Status;
                 if (frontend.Status == FuzzOracleStatus.Agreement)
                 {
                     Interlocked.Increment(ref frontendAgreements);
@@ -156,6 +214,7 @@ public static class FuzzRunner
                         formula,
                         token)
                     .ConfigureAwait(false);
+                smtStatuses[index] = smt.Status;
                 if (smt.Status == FuzzOracleStatus.Agreement)
                 {
                     Interlocked.Increment(ref smtAgreements);
@@ -171,34 +230,68 @@ public static class FuzzRunner
                         partialCase,
                         token)
                     .ConfigureAwait(false);
+                partialStatuses[index] = partial.Status;
                 if (partial.Status == FuzzOracleStatus.Agreement)
                 {
                     Interlocked.Increment(ref partialSmtAgreements);
                 }
 
-                if (frontend.Status == FuzzOracleStatus.Mismatch)
+                var classification = ClassifyCase(
+                    frontend.Status,
+                    smt.Status,
+                    partial.Status);
+                if (!classification.HasMismatch &&
+                    !classification.HasAbstention)
                 {
-                    var minimized = CSharpStructuralShrinker.Minimize(
-                        frontendCase,
-                        candidate =>
-                            frontendOracle.Compare(candidate, token).Status ==
-                            FuzzOracleStatus.Mismatch,
-                        token);
-                    var minimizedResult = frontendOracle.Compare(
-                        minimized,
-                        token);
-                    failures.Enqueue(
-                        new FuzzFailure(
-                            index,
-                            caseSeed,
-                            "frontend",
-                            frontendCase.Source,
-                            minimized.Source,
-                            minimizedResult.Detail));
+                    Interlocked.Increment(ref agreements);
                 }
-                if (smt.Status == FuzzOracleStatus.Mismatch)
+                else if (!classification.HasMismatch)
                 {
-                    var minimized = await IrStructuralShrinker.MinimizeAsync(
+                    Interlocked.Increment(ref abstentions);
+                }
+            });
+
+        var failureKeys = SelectFailureKeys(
+            frontendStatuses,
+            smtStatuses,
+            partialStatuses);
+        var failures = new List<FuzzFailure>(failureKeys.Length);
+        foreach (var failureKey in failureKeys)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var index = failureKey.Case;
+            var caseSeed = CreateCaseSeed(options.Seed, index);
+            switch (failureKey.Oracle)
+            {
+                case "frontend":
+                    var frontendCase = frontendCases[index];
+                    var minimizedFrontend = CSharpStructuralShrinker.Minimize(
+                        frontendCase,
+                        candidate => frontendOracle.Compare(
+                            candidate,
+                            cancellationToken).Status ==
+                            FuzzOracleStatus.Mismatch,
+                        cancellationToken);
+                    var minimizedFrontendResult = frontendOracle.Compare(
+                        minimizedFrontend,
+                        cancellationToken);
+                    failures.Add(new FuzzFailure(
+                        index,
+                        caseSeed,
+                        failureKey.Oracle,
+                        frontendCase.Source,
+                        minimizedFrontend.Source,
+                        minimizedFrontendResult.Detail));
+                    break;
+                case "finite-domain-smt":
+                    var factory = new IrFactory();
+                    var formula = CreateTotalFiniteDomainFormula(
+                        factory,
+                        caseSeed,
+                        cancellationToken);
+                    var smtOracle = new FiniteDomainSmtDifferentialOracle();
+                    var minimizedFormula = await IrStructuralShrinker
+                        .MinimizeAsync(
                             factory,
                             formula,
                             async (candidate, cancellation) =>
@@ -208,53 +301,45 @@ public static class FuzzRunner
                                         cancellation)
                                     .ConfigureAwait(false)).Status ==
                                 FuzzOracleStatus.Mismatch,
-                            token)
+                            cancellationToken)
                         .ConfigureAwait(false);
-                    var minimizedResult = await smtOracle.CompareAsync(
+                    var minimizedSmtResult = await smtOracle.CompareAsync(
                             factory,
-                            minimized,
-                            token)
+                            minimizedFormula,
+                            cancellationToken)
                         .ConfigureAwait(false);
                     var printer = new IrPrinter(factory);
-                    failures.Enqueue(
-                        new FuzzFailure(
-                            index,
-                            caseSeed,
-                            "finite-domain-smt",
-                            printer.Print(formula),
-                            printer.Print(minimized),
-                            minimizedResult.Detail));
-                }
-                if (partial.Status != FuzzOracleStatus.Agreement)
-                {
-                    var printer = new IrPrinter(factory);
-                    failures.Enqueue(
-                        new FuzzFailure(
-                            index,
-                            caseSeed,
-                            "partial-term-smt",
-                            printer.Print(partialCase.Formula),
-                            printer.Print(partialCase.Formula),
-                            partial.Detail));
-                }
-
-                var hasMismatch =
-                    frontend.Status == FuzzOracleStatus.Mismatch ||
-                    smt.Status == FuzzOracleStatus.Mismatch ||
-                    partial.Status != FuzzOracleStatus.Agreement;
-                var hasAbstention =
-                    frontend.Status == FuzzOracleStatus.Abstained ||
-                    smt.Status == FuzzOracleStatus.Abstained ||
-                    partial.Status == FuzzOracleStatus.Abstained;
-                if (!hasMismatch && !hasAbstention)
-                {
-                    Interlocked.Increment(ref agreements);
-                }
-                else if (!hasMismatch)
-                {
-                    Interlocked.Increment(ref abstentions);
-                }
-            });
+                    failures.Add(new FuzzFailure(
+                        index,
+                        caseSeed,
+                        failureKey.Oracle,
+                        printer.Print(formula),
+                        printer.Print(minimizedFormula),
+                        minimizedSmtResult.Detail));
+                    break;
+                case "partial-term-smt":
+                    var partialFactory = new IrFactory();
+                    var partialCase = PartialTermSmtCaseGenerator.Create(
+                        partialFactory,
+                        unchecked(caseSeed ^ 0x243F6A88));
+                    var partialResult = await new
+                        PartialTermSmtDifferentialOracle().CompareAsync(
+                            partialFactory,
+                            partialCase,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    var partialPrinter = new IrPrinter(partialFactory);
+                    var printed = partialPrinter.Print(partialCase.Formula);
+                    failures.Add(new FuzzFailure(
+                        index,
+                        caseSeed,
+                        failureKey.Oracle,
+                        printed,
+                        printed,
+                        partialResult.Detail));
+                    break;
+            }
+        }
 
         return new FuzzSummary(
             SchemaVersion: 4,
@@ -268,9 +353,62 @@ public static class FuzzRunner
             partialSmtAgreements,
             frontendCoverage,
             coverageSatisfied,
-            [.. failures
-                .OrderBy(static failure => failure.Case)
-                .ThenBy(static failure => failure.Oracle, StringComparer.Ordinal)]);
+            [.. failures]);
+    }
+
+    internal static ImmutableArray<FuzzFailureKey> SelectFailureKeys(
+        IReadOnlyList<FuzzOracleStatus> frontend,
+        IReadOnlyList<FuzzOracleStatus> smt,
+        IReadOnlyList<FuzzOracleStatus> partial)
+    {
+        if (frontend.Count != smt.Count || smt.Count != partial.Count)
+        {
+            throw new ArgumentException(
+                "Fuzz oracle status collections must have equal lengths.");
+        }
+
+        var keys = ImmutableArray.CreateBuilder<FuzzFailureKey>(
+            MaximumRetainedFailures);
+        for (var index = 0; index < frontend.Count; index++)
+        {
+            Add(index, "finite-domain-smt",
+                smt[index] == FuzzOracleStatus.Mismatch);
+            Add(index, "frontend",
+                frontend[index] == FuzzOracleStatus.Mismatch);
+            Add(index, "partial-term-smt",
+                partial[index] == FuzzOracleStatus.Mismatch);
+            if (keys.Count >= MaximumRetainedFailures)
+            {
+                break;
+            }
+        }
+
+        keys.Capacity = keys.Count;
+        return keys.MoveToImmutable();
+
+        void Add(int index, string oracle, bool failed)
+        {
+            if (failed && keys.Count < MaximumRetainedFailures)
+            {
+                keys.Add(new FuzzFailureKey(index, oracle));
+            }
+        }
+    }
+
+    internal static FuzzCaseClassification ClassifyCase(
+        FuzzOracleStatus frontendStatus,
+        FuzzOracleStatus smtStatus,
+        FuzzOracleStatus partialStatus)
+    {
+        var hasMismatch =
+            frontendStatus == FuzzOracleStatus.Mismatch ||
+            smtStatus == FuzzOracleStatus.Mismatch ||
+            partialStatus == FuzzOracleStatus.Mismatch;
+        var hasAbstention =
+            frontendStatus == FuzzOracleStatus.Abstained ||
+            smtStatus == FuzzOracleStatus.Abstained ||
+            partialStatus == FuzzOracleStatus.Abstained;
+        return new FuzzCaseClassification(hasMismatch, hasAbstention);
     }
 
     private static FrontendFuzzCoverage CreateFrontendCoverage(

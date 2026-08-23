@@ -1008,11 +1008,25 @@ public sealed class FrontendDifferentialOracle
             var failure = Mismatch(
                 "Generated C# did not compile: " +
                 FormatErrors(emit.Diagnostics));
-            return [.. Enumerable.Repeat(failure, generatedCases.Count)];
+            if (generatedCases.Count == 1)
+            {
+                return [failure];
+            }
+
+            var midpoint = generatedCases.Count / 2;
+            var left = CompareBatch(
+                generatedCases.Take(midpoint).ToArray(),
+                cancellationToken);
+            var right = CompareBatch(
+                generatedCases.Skip(midpoint).ToArray(),
+                cancellationToken);
+            return [.. left, .. right];
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var model = compilation.GetSemanticModel(syntaxTree);
+        var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+            compilation,
+            syntaxTree);
         var methodSyntaxes = syntaxTree.GetRoot(cancellationToken)
             .DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
@@ -1153,28 +1167,67 @@ public sealed class FrontendDifferentialOracle
         var emit = compilation.Emit(image, cancellationToken: cancellationToken);
         if (!emit.Success)
         {
-            return RepeatSemanticFailure(
-                cases.Count,
+            return IsolateSemanticEdgeFailure(
+                cases,
                 "Generated semantic-edge C# did not compile: " +
-                FormatErrors(emit.Diagnostics));
+                FormatErrors(emit.Diagnostics),
+                cancellationToken);
         }
 
-        var model = compilation.GetSemanticModel(syntaxTree);
-        var methods = syntaxTree.GetRoot(cancellationToken)
+        var model = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+            compilation,
+            syntaxTree);
+        var compilationUnit = (CompilationUnitSyntax)syntaxTree.GetRoot(
+            cancellationToken);
+        var generatedTypes = compilationUnit
             .DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Where(static method => method.Identifier.ValueText.StartsWith(
-                SemanticEdgeMethodPrefix,
-                StringComparison.Ordinal))
-            .OrderBy(static method => ParseSemanticEdgeMethodIndex(
-                method.Identifier.ValueText))
+            .OfType<ClassDeclarationSyntax>()
+            .Where(static type => type.Identifier.ValueText ==
+                "SharpProofGeneratedFrontendEdges")
             .ToArray();
-        if (methods.Length != cases.Count)
+        if (generatedTypes.Length != 1)
         {
-            return RepeatSemanticFailure(
-                cases.Count,
-                "Roslyn exposed an unexpected semantic-edge method count.");
+            return IsolateSemanticEdgeFailure(
+                cases,
+                "Roslyn exposed an unexpected semantic-edge type shape.",
+                cancellationToken);
         }
+        var generatedType = generatedTypes[0];
+        var hasExpectedTopology =
+            compilationUnit.AttributeLists.Count == 0 &&
+            compilationUnit.Members.Count == 3 &&
+            compilationUnit.Members[0] is EnumDeclarationSyntax
+            { Identifier.ValueText: "SharpProofGeneratedEdgeEnum" } &&
+            compilationUnit.Members[1] is StructDeclarationSyntax
+            { Identifier.ValueText: "SharpProofGeneratedConvertible" } &&
+            compilationUnit.Members[2] is ClassDeclarationSyntax
+            { Identifier.ValueText: "SharpProofGeneratedFrontendEdges" };
+        if (!hasExpectedTopology)
+        {
+            return IsolateSemanticEdgeFailure(
+                cases,
+                "Roslyn exposed an unexpected semantic-edge file shape.",
+                cancellationToken);
+        }
+        var methods = generatedType.Members
+            .OfType<MethodDeclarationSyntax>()
+            .ToArray();
+        if (methods.Length != cases.Count ||
+            generatedType.Members.Count != cases.Count ||
+            Enumerable.Range(0, cases.Count).Any(index =>
+                methods.All(method =>
+                    method.Identifier.ValueText !=
+                    SemanticEdgeMethodName(index))))
+        {
+            return IsolateSemanticEdgeFailure(
+                cases,
+                "Roslyn exposed an unexpected semantic-edge method shape.",
+                cancellationToken);
+        }
+        methods = Enumerable.Range(0, cases.Count)
+            .Select(index => methods.Single(method =>
+                method.Identifier.ValueText == SemanticEdgeMethodName(index)))
+            .ToArray();
 
         image.Position = 0;
         var loadContext = new AssemblyLoadContext(
@@ -1205,6 +1258,27 @@ public sealed class FrontendDifferentialOracle
         {
             loadContext.Unload();
         }
+    }
+
+    private ImmutableArray<FrontendSemanticEdgeResult>
+        IsolateSemanticEdgeFailure(
+            IReadOnlyList<FrontendSemanticEdgeCase> cases,
+            string detail,
+            CancellationToken cancellationToken)
+    {
+        if (cases.Count == 1)
+        {
+            return RepeatSemanticFailure(1, detail);
+        }
+
+        var midpoint = cases.Count / 2;
+        var left = CompareSemanticEdges(
+            cases.Take(midpoint).ToArray(),
+            cancellationToken);
+        var right = CompareSemanticEdges(
+            cases.Skip(midpoint).ToArray(),
+            cancellationToken);
+        return [.. left, .. right];
     }
 
     private static Dictionary<IrVarId, IrValue> CreateEnvironment(
@@ -1349,6 +1423,8 @@ public sealed class FrontendDifferentialOracle
             IReadOnlyList<object?> arguments)
     {
         var environment = new Dictionary<IrVarId, IrValue>();
+        var sequenceValues = new Dictionary<object, Dictionary<IrTypeId, IrValue>>(
+            ReferenceEqualityComparer.Instance);
         foreach (var binding in lowering.Variables)
         {
             if (binding.Symbol is not IParameterSymbol parameter ||
@@ -1365,7 +1441,8 @@ public sealed class FrontendDifferentialOracle
                 CreateSemanticEdgeValue(
                     factory,
                     type,
-                    arguments[parameter.Ordinal]));
+                    arguments[parameter.Ordinal],
+                    sequenceValues));
         }
         return environment;
     }
@@ -1373,7 +1450,8 @@ public sealed class FrontendDifferentialOracle
     private static IrValue CreateSemanticEdgeValue(
         IrFactory factory,
         IrTypeId type,
-        object? value)
+        object? value,
+        Dictionary<object, Dictionary<IrTypeId, IrValue>> sequenceValues)
     {
         var kind = factory.GetTypeInfo(type).Kind;
         if (value == null)
@@ -1401,9 +1479,39 @@ public sealed class FrontendDifferentialOracle
                 factory.CreateStringValue(text),
             IrTypeKind.Reference =>
                 factory.CreateReferenceValue(type, value),
+            IrTypeKind.Sequence when value is Array array =>
+                CreateSequenceValue(array),
             _ => throw new InvalidOperationException(
                 "A semantic-edge value is outside the executable IR subset.")
         };
+
+        IrValue CreateSequenceValue(Array array)
+        {
+            if (sequenceValues.TryGetValue(array, out var typedValues) &&
+                typedValues.TryGetValue(type, out var existing))
+            {
+                return existing;
+            }
+
+            var elementType = factory.GetTypeInfo(type).ElementType ??
+                throw new InvalidOperationException(
+                    "A semantic-edge sequence has no element type.");
+            var created = factory.CreateSequenceValue(
+                type,
+                array.Cast<object?>().Select(element =>
+                    CreateSemanticEdgeValue(
+                        factory,
+                        elementType,
+                        element,
+                        sequenceValues)));
+            if (!sequenceValues.TryGetValue(array, out typedValues))
+            {
+                typedValues = [];
+                sequenceValues.Add(array, typedValues);
+            }
+            typedValues.Add(type, created);
+            return created;
+        }
     }
 
     private static IOperation? GetExpressionOperation(
@@ -1544,14 +1652,6 @@ public sealed class FrontendDifferentialOracle
             CultureInfo.InvariantCulture);
     }
 
-    private static int ParseSemanticEdgeMethodIndex(string name)
-    {
-        return int.Parse(
-            name.AsSpan(SemanticEdgeMethodPrefix.Length),
-            NumberStyles.None,
-            CultureInfo.InvariantCulture);
-    }
-
     private static string ReturnType(GeneratedExpressionType type)
     {
         return type switch
@@ -1601,27 +1701,58 @@ public sealed class FrontendDifferentialOracle
                 ".");
         }
 
-        var agrees = interpreted.Value!.Kind switch
-        {
-            IrValueKind.Boolean =>
-                actual.Value is bool value &&
-                value == interpreted.Value.Boolean,
-            IrValueKind.Integer =>
-                actual.Value is long value &&
-                value == interpreted.Value.Integer,
-            IrValueKind.String =>
-                actual.Value is string value &&
-                string.Equals(
-                    value,
-                    interpreted.Value.String,
-                    StringComparison.Ordinal),
-            IrValueKind.Null => actual.Value == null,
-            _ => false
-        };
+        var agrees = SemanticValueEquals(actual.Value, interpreted.Value!);
         return agrees
             ? Agreement()
             : Mismatch(
                 "Compiled C# and the lowered IR produced different values.");
+    }
+
+    private static bool SemanticValueEquals(object? actual, IrValue interpreted)
+    {
+        return interpreted.Kind switch
+        {
+            IrValueKind.Boolean =>
+                actual is bool value &&
+                value == interpreted.Boolean,
+            IrValueKind.Integer =>
+                IntegralValueEquals(
+                    actual,
+                    interpreted.Integer),
+            IrValueKind.String =>
+                actual is string value &&
+                string.Equals(
+                    value,
+                    interpreted.String,
+                    StringComparison.Ordinal),
+            IrValueKind.Reference =>
+                ReferenceEquals(actual, interpreted.Reference),
+            IrValueKind.Sequence =>
+                actual is Array array &&
+                array.Length == interpreted.Elements.Length &&
+                array.Cast<object?>().Zip(
+                    interpreted.Elements,
+                    SemanticValueEquals).All(static equal => equal),
+            IrValueKind.Null => actual == null,
+            _ => false
+        };
+    }
+
+    private static bool IntegralValueEquals(object? value, long expected)
+    {
+        return value switch
+        {
+            sbyte item => item == expected,
+            byte item => item == expected,
+            short item => item == expected,
+            ushort item => item == expected,
+            int item => item == expected,
+            uint item => item == expected,
+            long item => item == expected,
+            ulong item => item <= long.MaxValue && (long)item == expected,
+            char item => item == expected,
+            _ => false
+        };
     }
 
     private static string Describe(IrEvaluationResult result)

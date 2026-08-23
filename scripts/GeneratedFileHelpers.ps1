@@ -128,8 +128,11 @@ function Update-SharpProofGeneratedFile
             throw "$DisplayPath is missing. Run $GeneratorCommand."
         }
 
-        $existing = ConvertTo-SharpProofGeneratedText -Text (Get-Content -LiteralPath $Path -Raw)
-        if (-not [string]::Equals($existing, $normalizedContent, [System.StringComparison]::Ordinal))
+        $encoding = [System.Text.UTF8Encoding]::new($false)
+        $expectedBytes = $encoding.GetBytes($normalizedContent)
+        $actualBytes = [System.IO.File]::ReadAllBytes($Path)
+        if ([Convert]::ToBase64String($actualBytes) -cne
+            [Convert]::ToBase64String($expectedBytes))
         {
             throw "$DisplayPath is stale. Run $GeneratorCommand."
         }

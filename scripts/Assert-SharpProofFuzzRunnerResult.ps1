@@ -55,13 +55,45 @@ function Assert-SharpProofFuzzRunnerResult {
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][int]$ExpectedCases,
         [Parameter(Mandatory = $true)][int]$ExpectedSeed,
-        [Parameter(Mandatory = $true)][int]$ExpectedMaximumParallelism
+        [Parameter(Mandatory = $true)][int]$ExpectedMaximumParallelism,
+        [scriptblock]$AfterValidation
     )
 
     $document = $null
+    $bytes = $null
+    $json = $null
     try {
+        $stream = [IO.FileStream]::new(
+            $Path,
+            [IO.FileMode]::Open,
+            [IO.FileAccess]::Read,
+            [IO.FileShare]::Read)
+        try {
+            if ($stream.Length -eq 0 -or $stream.Length -gt 1048576) {
+                throw 'The fuzz runner result exceeds its byte limit.'
+            }
+            $bytes = [byte[]]::new([int]$stream.Length)
+            $offset = 0
+            while ($offset -lt $bytes.Length) {
+                $read = $stream.Read(
+                    $bytes,
+                    $offset,
+                    $bytes.Length - $offset)
+                if ($read -eq 0) {
+                    throw 'The fuzz runner result ended before its declared length.'
+                }
+                $offset += $read
+            }
+            if ($stream.ReadByte() -ne -1) {
+                throw 'The fuzz runner result changed during validation.'
+            }
+        }
+        finally {
+            $stream.Dispose()
+        }
+        $json = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
         $document = [Text.Json.JsonDocument]::Parse(
-            [IO.File]::ReadAllText($Path))
+            $json)
         $root = $document.RootElement
         Assert-ExactJsonObjectProperties -Object $root `
             -Description 'Fuzz runner result' `
@@ -85,6 +117,12 @@ function Assert-SharpProofFuzzRunnerResult {
         $passed = Get-ExactJsonBoolean $root 'Passed'
 
         if ($schema -ne 4) { throw "Unsupported fuzz schema '$schema'." }
+        if ($cases -lt 1) {
+            throw 'The fuzz runner case count must be positive.'
+        }
+        if ($maximumParallelism -lt 1 -or $maximumParallelism -gt 4) {
+            throw 'The fuzz runner maximum parallelism must be between 1 and 4.'
+        }
         if ($cases -ne $ExpectedCases -or $seed -ne $ExpectedSeed -or
             $maximumParallelism -ne $ExpectedMaximumParallelism) {
             throw 'The fuzz runner invocation identity does not match its result.'
@@ -110,9 +148,20 @@ function Assert-SharpProofFuzzRunnerResult {
         Assert-ExactJsonObjectProperties -Object $coverage `
             -Expected $coverageProperties -Description 'Frontend coverage'
         foreach ($name in $coverageProperties) {
-            if ((Get-ExactJsonInt32 $coverage $name) -le 0) {
-                throw "Frontend coverage '$name' must be positive."
+            $count = Get-ExactJsonInt32 $coverage $name
+            if ($count -lt 0 -or ($cases -ge 1000 -and $count -eq 0)) {
+                throw "Frontend coverage '$name' is invalid for the executed case count."
             }
+        }
+        $exceptionTotal = [long](Get-ExactJsonInt32 `
+                $coverage 'DivideByZeroExceptions') +
+            [long](Get-ExactJsonInt32 $coverage 'OverflowExceptions') +
+            [long](Get-ExactJsonInt32 $coverage 'NullReferenceExceptions') +
+            [long](Get-ExactJsonInt32 `
+                $coverage 'IndexOutOfRangeExceptions') +
+            [long](Get-ExactJsonInt32 $coverage 'InvalidCastExceptions')
+        if ($exceptionTotal -gt $cases) {
+            throw 'Frontend exception coverage exceeds the executed case count.'
         }
 
         $failures = $root.GetProperty('Failures')
@@ -147,6 +196,13 @@ function Assert-SharpProofFuzzRunnerResult {
         if ($null -ne $document) { $document.Dispose() }
     }
 
-    return Get-Content -LiteralPath $Path -Raw |
-        ConvertFrom-Json -ErrorAction Stop
+    if ($null -ne $AfterValidation) {
+        & $AfterValidation $Path
+    }
+
+    $result = $json | ConvertFrom-Json -ErrorAction Stop
+    $result | Add-Member -NotePropertyName ResultSha256 -NotePropertyValue (
+        [Convert]::ToHexString(
+            [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant())
+    return $result
 }

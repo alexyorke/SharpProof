@@ -12,7 +12,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         .Select(static (tree, ordinal) => (tree, ordinal))
         .ToDictionary(static item => item.tree, static item => item.ordinal);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractClauseInventory> _cache =
-        new(SymbolEqualityComparer.Default);
+        new(SymbolEqualityComparer.IncludeNullability);
 
     internal static ContractClauseInventoryBuilder ForCompilation(Compilation compilation)
     {
@@ -124,8 +124,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     {
         var enclosing = model.GetEnclosingSymbol(invocation.Syntax.SpanStart);
         if (enclosing is not IMethodSymbol method ||
-            !SymbolEqualityComparer.Default.Equals(
-                callable.OriginalDefinition, method.OriginalDefinition))
+            !HaveSameDefinition(callable, method))
         {
             return ContractClausePlacement.NestedCallable;
         }
@@ -246,12 +245,47 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IOperation? implementationBody)
     {
-        return implementationBody != null
-            ? [GetBody(implementationBody.Syntax) ?? implementationBody.Syntax]
-            : [.. callable.DeclaringSyntaxReferences
-                .Select(static reference => GetBody(reference.GetSyntax()))
-                .Where(static body => body != null)
-                .Select(static body => body!)];
+        if (implementationBody != null)
+        {
+            return [GetBody(implementationBody.Syntax) ?? implementationBody.Syntax];
+        }
+
+        var bodies = GetDeclaredBodies(callable);
+        if (!bodies.IsDefaultOrEmpty ||
+            GetPartialImplementation(callable) is not { } implementation)
+        {
+            return bodies;
+        }
+
+        return GetDeclaredBodies(implementation);
+    }
+
+    private static IMethodSymbol? GetPartialImplementation(
+        IMethodSymbol callable)
+    {
+        if (callable.OriginalDefinition.PartialImplementationPart is
+            { } methodImplementation)
+        {
+            return methodImplementation;
+        }
+        if (callable.OriginalDefinition.AssociatedSymbol is
+                IPropertySymbol property &&
+            property.PartialImplementationPart is { } propertyImplementation)
+        {
+            return callable.MethodKind == MethodKind.PropertyGet
+                ? propertyImplementation.GetMethod
+                : propertyImplementation.SetMethod;
+        }
+        return null;
+    }
+
+    private static ImmutableArray<SyntaxNode> GetDeclaredBodies(
+        IMethodSymbol callable)
+    {
+        return [.. callable.DeclaringSyntaxReferences
+            .Select(static reference => GetBody(reference.GetSyntax()))
+            .Where(static body => body != null)
+            .Select(static body => body!)];
     }
 
     internal static SyntaxNode? GetBody(SyntaxNode syntax)
@@ -292,6 +326,35 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     internal static IMethodSymbol NormalizeCallable(IMethodSymbol method)
     {
+        if (method.AssociatedSymbol is IPropertySymbol property &&
+            property.PartialImplementationPart is { } implementation)
+        {
+            return method.MethodKind == MethodKind.PropertyGet
+                ? implementation.GetMethod ?? method
+                : implementation.SetMethod ?? method;
+        }
         return method.PartialImplementationPart ?? method;
+    }
+
+    internal static bool HaveSameDefinition(
+        IMethodSymbol left,
+        IMethodSymbol right)
+    {
+        return SymbolEqualityComparer.Default.Equals(
+            GetPartialDefinition(left),
+            GetPartialDefinition(right));
+    }
+
+    private static IMethodSymbol GetPartialDefinition(IMethodSymbol method)
+    {
+        var definition = method.OriginalDefinition;
+        if (definition.AssociatedSymbol is IPropertySymbol property &&
+            property.PartialDefinitionPart is { } partialDefinition)
+        {
+            return definition.MethodKind == MethodKind.PropertyGet
+                ? partialDefinition.GetMethod ?? definition
+                : partialDefinition.SetMethod ?? definition;
+        }
+        return definition.PartialDefinitionPart ?? definition;
     }
 }

@@ -117,7 +117,7 @@ internal static class CompilerLoweredArtifact
             .Concat(body.SummaryCalls.Values.Select(static call => (
                 call.Instruction,
                 call.CallIdentity)))
-            .OrderBy(static call => call.Instruction.Value)
+            .OrderBy(call => encoded.InstructionIndices[call.Instruction])
             .ToArray();
         foreach (var call in allCalls)
         {
@@ -525,8 +525,8 @@ internal static class CompilerLoweredArtifact
                 CompilerVariableRole.PreState => item.Ordinal == -1 && item.CurrentStateVariable.HasValue &&
                     current.Contains(item.CurrentStateVariable.Value) &&
                     item.ModelLabel.StartsWith("pre:", StringComparison.Ordinal) &&
-                    int.TryParse(item.ModelLabel.Substring(4), NumberStyles.None, CultureInfo.InvariantCulture, out var ordinal) &&
-                    ordinal >= 0,
+                    int.TryParse(item.ModelLabel.Substring(4), NumberStyles.None,
+                        CultureInfo.InvariantCulture, out var ordinal) && ordinal >= 0,
                 _ => false
             };
             if (!shape || item.ModelLabel != label ||
@@ -637,8 +637,9 @@ internal static class CompilerLoweredArtifact
         var summaries = ImmutableDictionary.CreateBuilder<IrInstructionId, CompilerPreparedSummaryCall>();
         var calls = graph.Instructions.OfType<IrCallInstruction>().ToArray();
         var summaryVariables = new HashSet<IrVarId>();
-        var portableCalls = portable.Blocks.SelectMany(static block => block.Instructions).Where(
-            static instruction => instruction.Kind == IrInstructionKind.Call).ToArray();
+        var portableInstructions = portable.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
         if (row.Calls.Length != calls.Length ||
             row.SpecCalls.Length + row.SummaryCalls.Length != calls.Length)
         {
@@ -651,10 +652,22 @@ internal static class CompilerLoweredArtifact
         {
             var identity = row.Calls[index] ??
                 throw new InvalidDataException("A lowered call identity is invalid.");
-            var call = calls[index];
-            if (At(graph.Instructions, identity.Instruction, "instruction").Id != call.Id ||
+            var instruction = At(
+                graph.Instructions,
+                identity.Instruction,
+                "instruction");
+            var portableInstruction = At(
+                portableInstructions,
+                identity.Instruction,
+                "instruction");
+            if (instruction is not IrCallInstruction call ||
+                portableInstruction.Kind != IrInstructionKind.Call ||
                 string.IsNullOrWhiteSpace(identity.Identity) ||
-                At(portable.Members, portableCalls[index].B, "member").DocumentationCommentId != identity.Identity)
+                At(
+                    portable.Members,
+                    portableInstruction.B,
+                    "member").DocumentationCommentId != identity.Identity ||
+                identities.ContainsKey(call.Id))
             {
                 throw new InvalidDataException("A lowered call descriptor is invalid.");
             }

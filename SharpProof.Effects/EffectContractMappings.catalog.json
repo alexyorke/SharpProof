@@ -124,6 +124,7 @@
     {"name":"EffectCallSite","access":"internal","parameters":[
       {"type":"IMethodSymbol","name":"Target"},
       {"type":"EffectRegionSet","name":"Receiver"},
+      {"type":"EffectRegionSet","name":"WriteReceiver"},
       {"type":"ImmutableArray<EffectRegionSet>","name":"Arguments"},
       {"type":"IOperation","name":"Origin"}
     ]},

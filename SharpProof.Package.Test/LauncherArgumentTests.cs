@@ -7,6 +7,7 @@ using SharpProof.Host;
 using SharpProof.Worker;
 using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
+using Program = SharpProof.Worker.Launcher.Program;
 
 namespace SharpProof.Package.Test;
 
@@ -954,6 +955,40 @@ public sealed class LauncherArgumentTests
             Assert.That(
                 (Action)(() => LauncherArguments.ReadCompilerManifest(path)),
                 Throws.TypeOf<InvalidDataException>());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void CompilerManifestFifoIsRejectedBeforeBlockingOpen()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".fifo");
+        try
+        {
+            using var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "mkfifo",
+                    UseShellExecute = false,
+                    ArgumentList = { path }
+                })!;
+            process.WaitForExit();
+            Assert.That(process.ExitCode, Is.Zero);
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Assert.That(
+                (Action)(() => LauncherArguments.ReadCompilerManifest(path)),
+                Throws.TypeOf<InvalidDataException>());
+            stopwatch.Stop();
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromSeconds(1)));
         }
         finally
         {

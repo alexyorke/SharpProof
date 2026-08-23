@@ -146,6 +146,7 @@ public sealed class EffectAnalysisSession
     internal EffectSummary ResolveCall(
         IMethodSymbol caller, IMethodSymbol target,
         EffectRegionSet receiver,
+        EffectRegionSet writeReceiver,
         ImmutableArray<EffectRegionSet> arguments, bool dispatchUncertain,
         List<EffectCallSite> sourceCalls, IOperation origin,
         IOperation? instance,
@@ -158,6 +159,7 @@ public sealed class EffectAnalysisSession
             instance = null;
             arguments = arguments.Insert(0, receiver);
             receiver = EffectRegionSet.Empty;
+            writeReceiver = EffectRegionSet.Empty;
         }
         var normalized = NormalizeMethod(target);
         var preconditions = _callPreconditions.Assess(
@@ -186,7 +188,12 @@ public sealed class EffectAnalysisSession
 
         if (IsSourceMethod(normalized))
         {
-            sourceCalls.Add(new EffectCallSite(normalized, receiver, arguments, origin));
+            sourceCalls.Add(new EffectCallSite(
+                normalized,
+                receiver,
+                writeReceiver,
+                arguments,
+                origin));
             return EffectSummaryOperations.Join(
                 preconditionEvidence,
                 EffectSummaryOperations.DirectCall());
@@ -194,7 +201,11 @@ public sealed class EffectAnalysisSession
         return EffectSummaryOperations.Join(
             preconditionEvidence,
             EffectSummaryOperations.DirectCall(),
-            EffectSummaryOperations.Remap(_external.Resolve(normalized), receiver, arguments));
+            EffectSummaryOperations.Remap(
+                _external.Resolve(normalized),
+                receiver,
+                writeReceiver,
+                arguments));
     }
 
     internal EffectSummary ResolveEntryPreconditions(
@@ -248,16 +259,77 @@ public sealed class EffectAnalysisSession
         {
             return EffectSummary.Empty;
         }
+        if (OperationCompletionEvaluator
+                .CanAssumeStaticInitializationComplete(caller, field))
+        {
+            return EffectSummary.Empty;
+        }
 
         var isSourceType = SymbolEqualityComparer.Default.Equals(
             normalizedTarget.ContainingAssembly, _compilation.Assembly);
+        if (isSourceType &&
+            field.ContainingType.IsGenericType &&
+            !SymbolEqualityComparer.Default.Equals(
+                caller.ContainingType,
+                field.ContainingType) &&
+            normalizedTarget.StaticConstructors.Any(
+                static constructor => !constructor.IsImplicitlyDeclared))
+        {
+            return EffectSummaryOperations.Throw(
+                ResolveExceptionSet(
+                    FrameworkTypeMetadataNames.TypeInitializationException));
+        }
         var mayInitialize = !isSourceType ||
             EffectMethodNodeBuilder.HasPotentialStaticInitialization(
                 normalizedTarget,
                 ApiSpecs);
-        return mayInitialize
-            ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
-            : EffectSummary.Empty;
+        if (!mayInitialize ||
+            isSourceType && StaticInitializationCannotComplete(normalizedTarget))
+        {
+            return EffectSummary.Empty;
+        }
+        return EffectSummaryOperations.UnknownBoundary(
+            EffectUncertainty.UnmodeledCall);
+    }
+
+    private bool StaticInitializationCannotComplete(INamedTypeSymbol type)
+    {
+        var facts = new DefiniteOperationFacts(
+            _compilation,
+            CancellationToken.None);
+        foreach (var member in type.GetMembers())
+        {
+            var isStaticInitializable = member switch
+            {
+                IFieldSymbol field => field.IsStatic && !field.IsConst,
+                IPropertySymbol property => property.IsStatic,
+                IEventSymbol @event => @event.IsStatic,
+                _ => false
+            };
+            if (!isStaticInitializable)
+            {
+                continue;
+            }
+            foreach (var reference in member.DeclaringSyntaxReferences)
+            {
+                var expression = EffectProjections.GetInitializerExpression(
+                    reference.GetSyntax());
+                if (expression == null)
+                {
+                    continue;
+                }
+                var model = SharpProof.Frontend.Host.CompilationModelProvider
+                    .GetSemanticModel(_compilation, expression.SyntaxTree);
+                if (model.GetOperation(expression) is { } operation &&
+                    !facts.MayCompleteNormally(operation))
+                {
+                    return true;
+                }
+            }
+        }
+        return type.StaticConstructors.Any(
+            constructor => constructor.DeclaringSyntaxReferences.Length != 0 &&
+                !facts.MethodCanCompleteNormally(constructor));
     }
 
     private void EnsureAnalyzed(
@@ -331,7 +403,10 @@ public sealed class EffectAnalysisSession
             {
                 summary = EffectSummaryDomain.Instance.Join(summary,
                     EffectExceptionFlow.KeepEscaping(EffectSummaryOperations.Remap(
-                        Compute(call.Target), call.Receiver, call.Arguments),
+                        Compute(call.Target),
+                        call.Receiver,
+                        call.WriteReceiver,
+                        call.Arguments),
                         call.Origin, _compilation));
             }
 

@@ -288,6 +288,60 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void StaticConstructorDirectContractsBind()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public sealed class Target {
+                static Target() {
+                    Contract.Ensures(true);
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindMethodKind(
+            "Target",
+            MethodKind.StaticConstructor);
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
+        Assert.That(
+            result.Contracts.Clauses[0].Kind,
+            Is.EqualTo(BoundContractKind.Ensures));
+    }
+
+    [Test]
+    public void ExplicitInterfaceImplementationDirectContractsBind()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface ITarget {
+                int Read(int value);
+            }
+            public sealed class Target : ITarget {
+                int ITarget.Read(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindMethodKind(
+            "Target",
+            MethodKind.ExplicitInterfaceImplementation);
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
+        Assert.That(
+            result.Contracts.Clauses[0].Kind,
+            Is.EqualTo(BoundContractKind.Requires));
+    }
+
+    [Test]
     public void NestedCallableClausesDoNotPoisonContainingContracts()
     {
         const string source =
@@ -1548,6 +1602,18 @@ public sealed class ContractBinderTests
             var constructor = type.InstanceConstructors.Single(
                 static method => !method.IsImplicitlyDeclared);
             return _binder.Bind(constructor);
+        }
+
+        internal ContractBindingResult BindMethodKind(
+            string typeName,
+            MethodKind methodKind)
+        {
+            var type = Compilation.GetTypeByMetadataName(typeName) ??
+                       throw new InvalidOperationException(typeName);
+            var method = type.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Single(candidate => candidate.MethodKind == methodKind);
+            return _binder.Bind(method);
         }
 
         internal ContractBindingResult BindCallRequires(

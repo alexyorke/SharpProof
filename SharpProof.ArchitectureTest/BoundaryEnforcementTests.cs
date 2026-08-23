@@ -20,6 +20,7 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Dataflow",
         "SharpProof.Effects",
         "SharpProof.Frontend",
+        "SharpProof.Fuzz",
         "SharpProof.Gates",
         "SharpProof.Host",
         "SharpProof.Ir",
@@ -131,7 +132,7 @@ public sealed class BoundaryEnforcementTests
 
         var actual = BannedApiProjects
             .SelectMany(project => Directory.GetFiles(
-                Path.Combine(root, project),
+                Path.Combine(root, ProjectDirectory(project)),
                 "*.cs",
                 SearchOption.AllDirectories))
             .Where(static path =>
@@ -564,7 +565,7 @@ public sealed class BoundaryEnforcementTests
     private static IEnumerable<string> SourceFiles(string project)
     {
         return Directory.GetFiles(
-                Path.Combine(RepositoryRoot(), project),
+                Path.Combine(RepositoryRoot(), ProjectDirectory(project)),
                 "*.cs",
                 SearchOption.AllDirectories)
             .Where(static path =>
@@ -586,7 +587,17 @@ public sealed class BoundaryEnforcementTests
 
     private static string ProjectFile(string project)
     {
-        return Path.Combine(RepositoryRoot(), project, project + ".csproj");
+        return Path.Combine(
+            RepositoryRoot(),
+            ProjectDirectory(project),
+            project + ".csproj");
+    }
+
+    private static string ProjectDirectory(string project)
+    {
+        return project == "SharpProof.Fuzz"
+            ? Path.Combine("Tools", project)
+            : project;
     }
 
     private static string Relative(string path)

@@ -10,8 +10,8 @@
     <SharpProofCompilerCollectorPath>$([System.IO.Path]::GetFullPath('$(SharpProofCompilerCollectorPath)'))</SharpProofCompilerCollectorPath>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
-    <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').ToLowerInvariant())</_SharpProofProfileNormalized>
-    <_SharpProofFeaturesNormalized>$([System.String]::Copy('$(SharpProofFeatures)').ToLowerInvariant())</_SharpProofFeaturesNormalized>
+    <_SharpProofProfileNormalized>$([System.String]::Copy('$(SharpProofProfile)').Trim().ToLowerInvariant())</_SharpProofProfileNormalized>
+    <_SharpProofFeaturesNormalized>$([System.String]::Copy('$(SharpProofFeatures)').Trim().ToLowerInvariant())</_SharpProofFeaturesNormalized>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">true</SharpProofVerify>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
     <_SharpProofContractsRuntimeEnabled

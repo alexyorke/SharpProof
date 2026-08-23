@@ -34,15 +34,14 @@ $contract = Get-Content `
     -LiteralPath (Join-Path $repositoryRoot 'eng\acceptance\contract.json') `
     -Raw |
     ConvertFrom-Json
-$retained = Get-Content `
-    -LiteralPath (Join-Path $repositoryRoot 'eng\fuzz\retained-seeds.json') `
-    -Raw |
-    ConvertFrom-Json
-if ($retained.schemaVersion -ne 1 -or
-    [int]$retained.casesPerSeed -le 0 -or
-    @($retained.seeds).Count -eq 0) {
-    throw 'Invalid retained fuzz seed manifest.'
-}
+$nightlyCases = Assert-SharpProofFuzzCaseBudget `
+    -Value $contract.fuzz.nightlyCases `
+    -Name 'contract.fuzz.nightlyCases'
+$retainedManifestPath = Join-Path `
+    $repositoryRoot 'eng\fuzz\retained-seeds.json'
+$retained = Read-SharpProofRetainedFuzzSeedManifest `
+    -Path $retainedManifestPath
+$retainedSeeds = @($retained.Seeds)
 if (-not $PSBoundParameters.ContainsKey('RotatingSeed')) {
     $RotatingSeed = [int][DateTime]::UtcNow.ToString(
         'yyyyMMdd',
@@ -52,14 +51,26 @@ $effectiveRotatingCases = if ($RotatingCases -gt 0) {
     $RotatingCases
 }
 else {
-    [int]$contract.fuzz.nightlyCases
+    $nightlyCases
 }
 $effectiveRetainedCases = if ($RetainedCases -gt 0) {
     $RetainedCases
 }
 else {
-    [int]$retained.casesPerSeed
+    $retained.CasesPerSeed
 }
+$maximumCampaignCases = Assert-SharpProofFuzzCaseBudget `
+    -Value $contract.fuzz.maximumCampaignCases `
+    -Name 'contract.fuzz.maximumCampaignCases'
+$retainedRunSeeds = @($retainedSeeds | Where-Object {
+        [int]$_ -ne $RotatingSeed -or
+        $effectiveRotatingCases -lt $effectiveRetainedCases
+    })
+$requestedCampaignCases = Assert-SharpProofFuzzCampaignBudget `
+    -RotatingCases $effectiveRotatingCases `
+    -RetainedCases $effectiveRetainedCases `
+    -RetainedRunCount $retainedRunSeeds.Count `
+    -MaximumCases $maximumCampaignCases
 function Invoke-FuzzRun {
     param(
         [Parameter(Mandatory = $true)]
@@ -123,6 +134,7 @@ function Invoke-FuzzRun {
     $abstentions = 0
     $runnerSchemaVersion = $null
     $runnerPassed = $false
+    $resultSha256 = $null
     try {
         if ($process.ExitCode -ne 0) {
             throw "runner exited with code $($process.ExitCode)"
@@ -140,6 +152,7 @@ function Invoke-FuzzRun {
         $agreements = [int]$result.Agreements
         $abstentions = [int]$result.Abstentions
         $runnerPassed = [bool]$result.Passed
+        $resultSha256 = [string]$result.ResultSha256
     }
     catch {
         $validationError = $_.Exception.Message
@@ -156,9 +169,7 @@ function Invoke-FuzzRun {
         runnerPassed = $runnerPassed
         validationPassed = $null -eq $validationError
         validationError = $validationError
-        resultSha256 = if (Test-Path -LiteralPath $standardOutput -PathType Leaf) {
-            (Get-FileHash -LiteralPath $standardOutput -Algorithm SHA256).Hash.ToLowerInvariant()
-        } else { $null }
+        resultSha256 = $resultSha256
         standardOutput = [IO.Path]::GetRelativePath(
             $repositoryRoot,
             $standardOutput).Replace('\', '/')
@@ -173,10 +184,7 @@ $runs.Add((Invoke-FuzzRun `
     -Name "rotating-$RotatingSeed" `
     -Cases $effectiveRotatingCases `
     -Seed $RotatingSeed))
-foreach ($seed in @($retained.seeds)) {
-    if ([int]$seed -eq $RotatingSeed) {
-        continue
-    }
+foreach ($seed in $retainedRunSeeds) {
     $runs.Add((Invoke-FuzzRun `
         -Name "retained-$seed" `
         -Cases $effectiveRetainedCases `
@@ -191,12 +199,9 @@ $summary = [pscustomobject][ordered]@{
     rotatingSeed = $RotatingSeed
     rotatingCases = $effectiveRotatingCases
     retainedCasesPerSeed = $effectiveRetainedCases
-    retainedSeeds = @($retained.seeds | ForEach-Object { [int]$_ })
-    retainedSeedManifestSha256 = (Get-FileHash -LiteralPath (
-        Join-Path $repositoryRoot 'eng\fuzz\retained-seeds.json') `
-        -Algorithm SHA256).Hash.ToLowerInvariant()
-    requestedCases = [int](@($runs |
-        Measure-Object -Property requestedCases -Sum).Sum)
+    retainedSeeds = $retainedSeeds
+    retainedSeedManifestSha256 = $retained.Sha256
+    requestedCases = $requestedCampaignCases
     totalCases = [int](@($runs |
         Measure-Object -Property observedCases -Sum).Sum)
     runs = @($runs)

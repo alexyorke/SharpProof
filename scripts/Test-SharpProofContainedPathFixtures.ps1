@@ -32,9 +32,38 @@ try {
         -Path $exact -ParameterName absolute
     if ($absolute -cne $exact) { throw 'Absolute contained child was rejected.' }
     Require-Rejection $root root-equality
-    Require-Rejection (Join-Path $fixture 'repo/out.json') case-distinct-sibling
+    $caseVariant = Join-Path $fixture 'repo/out.json'
+    if ([IO.Path]::DirectorySeparatorChar -eq [char]'\') {
+        $caseResolved = Resolve-SharpProofContainedPath -Root $root `
+            -Path $caseVariant -ParameterName case-variant-child
+        if (-not [string]::Equals(
+                $caseResolved,
+                $caseVariant,
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Windows case-variant child did not retain filesystem identity.'
+        }
+    }
+    else {
+        Require-Rejection $caseVariant case-distinct-sibling
+    }
     Require-Rejection (Join-Path $fixture 'RepoSibling/out.json') prefix-sibling
     Require-Rejection '../outside.json' traversal-escape
+
+    $insideTarget = Join-Path $root 'artifacts/linked-target'
+    $outsideTarget = Join-Path $fixture 'Outside'
+    [IO.Directory]::CreateDirectory($insideTarget) | Out-Null
+    [IO.Directory]::CreateDirectory($outsideTarget) | Out-Null
+    $insideLink = Join-Path $root 'inside-link'
+    $outsideLink = Join-Path $root 'outside-link'
+    [IO.Directory]::CreateSymbolicLink($insideLink, $insideTarget) | Out-Null
+    [IO.Directory]::CreateSymbolicLink($outsideLink, $outsideTarget) | Out-Null
+    $linkedInside = Resolve-SharpProofContainedPath -Root $root `
+        -Path 'inside-link/report.json' -ParameterName inside-link
+    $expectedLinkedInside = Join-Path $insideTarget 'report.json'
+    if ($linkedInside -cne $expectedLinkedInside) {
+        throw 'Contained symbolic link did not resolve to its physical target.'
+    }
+    Require-Rejection 'outside-link/report.json' symbolic-link-escape
 
     $consumers = @(
         'eng/acceptance/Verify.ps1',

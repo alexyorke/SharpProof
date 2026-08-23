@@ -247,7 +247,7 @@ internal static class CSharpScalarSemantics
 
     private static bool SupportsBuiltInEquality(ITypeSymbol? type) =>
 
-        type is null or ({ IsReferenceType: true, TypeKind: not TypeKind.Delegate } and not INamedTypeSymbol { IsAbstract: true }) ||
+        type is null or { IsReferenceType: true, TypeKind: not TypeKind.Delegate, SpecialType: not (SpecialType.System_Delegate or SpecialType.System_MulticastDelegate) } ||
         type.SpecialType == SpecialType.System_Boolean ||
         IsSupportedInteger(type.SpecialType);
 }

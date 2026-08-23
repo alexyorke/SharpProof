@@ -55,30 +55,80 @@ internal static class StringConcatenationEffectResolver
         ManagedFlowResult? flow,
         Func<IOperation?, bool, EffectRegionSet> classifyRegion)
     {
+        var formatted = ResolveFormattedValueCall(
+            operand,
+            origin,
+            compilation,
+            flow);
+        if (!formatted.IsRequired)
+        {
+            return EffectSummary.Empty;
+        }
+        if (formatted.Target == null)
+        {
+            return EffectSummaryOperations.Unsupported();
+        }
+
+        return calls.Resolve(
+            formatted.Target,
+            classifyRegion(formatted.Operand, false),
+            ImmutableArray<EffectRegionSet>.Empty,
+            ImmutableArray<IOperation?>.Empty,
+            IsDispatchUncertain(
+                formatted.Target,
+                formatted.ReceiverType),
+            origin,
+            formatted.Operand);
+    }
+
+    internal static bool CanFormattedValueCompleteNormally(
+        IOperation operand,
+        IOperation origin,
+        Compilation compilation,
+        ManagedFlowResult? flow,
+        OperationCompletionEvaluator completionEvaluator)
+    {
+        var formatted = ResolveFormattedValueCall(
+            operand,
+            origin,
+            compilation,
+            flow);
+        return !formatted.IsRequired ||
+            formatted.Target == null ||
+            IsDispatchUncertain(
+                formatted.Target,
+                formatted.ReceiverType) ||
+            completionEvaluator.CanCompleteInvocation(
+                formatted.Target,
+                formatted.Operand,
+                origin);
+    }
+
+    private static FormattedValueCall ResolveFormattedValueCall(
+        IOperation operand,
+        IOperation origin,
+        Compilation compilation,
+        ManagedFlowResult? flow)
+    {
         operand = UnwrapImplicitConversion(operand);
         if (operand.Type?.SpecialType == SpecialType.System_String ||
             operand.ConstantValue is { HasValue: true, Value: null } ||
             flow?.TryEvaluate(origin, operand, out var value) == true &&
             value.IsDefinitelyNull)
         {
-            return EffectSummary.Empty;
+            return new(
+                operand,
+                Target: null,
+                ReceiverType: null,
+                IsRequired: false);
         }
 
         var receiverType = UnwrapNullable(operand.Type);
-        var target = ResolveToString(receiverType, compilation);
-        if (target == null)
-        {
-            return EffectSummaryOperations.Unsupported();
-        }
-
-        return calls.Resolve(
-            target,
-            classifyRegion(operand, false),
-            ImmutableArray<EffectRegionSet>.Empty,
-            ImmutableArray<IOperation?>.Empty,
-            IsDispatchUncertain(target, receiverType),
-            origin,
-            operand);
+        return new(
+            operand,
+            ResolveToString(receiverType, compilation),
+            receiverType,
+            IsRequired: true);
     }
 
     private static IOperation UnwrapImplicitConversion(IOperation operation)
@@ -165,4 +215,10 @@ internal static class StringConcatenationEffectResolver
              method.ContainingType?.TypeKind == TypeKind.Interface) &&
             !method.IsSealed;
     }
+
+    private readonly record struct FormattedValueCall(
+        IOperation Operand,
+        IMethodSymbol? Target,
+        ITypeSymbol? ReceiverType,
+        bool IsRequired);
 }

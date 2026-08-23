@@ -9,7 +9,8 @@ param(
         'actions-registry-unchecked','actions-registry-absent',
         'actions-symbol-preflight','actions-swapped',
         'actions-removed-projection','mocked-main-missing',
-        'mocked-main-exists','mocked-main-error','zero-symbol-preflight',
+        'mocked-main-exists','mocked-main-error','mocked-main-query-base',
+        'zero-symbol-preflight',
         'fixture-empty','fixture-foreign','fixture-main-case-collision',
         'fixture-symbol-case-collision','fixture-arbitrary-name',
         'fixture-wrong-id','fixture-wrong-version','fixture-nested-collision',
@@ -235,9 +236,13 @@ try {
             packageId = 'SharpProof'
             version = '1.0.0-preview.1'
         }
+        $baseAddress = if ($Mutation -eq 'mocked-main-query-base') {
+            'https://packages.example.test/v3-flatcontainer?q=1'
+        }
+        else { 'https://packages.example.test/v3-flatcontainer' }
         $result = Invoke-SharpProofMainPackagePreflight `
             -Package $package `
-            -BaseAddress 'https://packages.example.test/v3-flatcontainer' `
+            -BaseAddress $baseAddress `
             -Get {
                 param($uri, $outputPath)
                 $script:preflightCalls.Add([string]$uri)

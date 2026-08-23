@@ -1920,8 +1920,12 @@ public sealed class ClaimManifestBuilderTests
         {
             AssertUnsupportedDirectCandidate(evidence["SafeObject"]);
             AssertUnsupportedDirectCandidate(evidence["SafeArray"]);
-            AssertUnknownWithoutWitness(evidence["ThrowingConstructor"]);
-            AssertUnknownWithoutWitness(evidence["WrappedThrowingConstructor"]);
+            Assert.That(
+                evidence["ThrowingConstructor"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
+                evidence["WrappedThrowingConstructor"].Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             AssertUnknownWithoutWitness(evidence["DynamicArrayLength"]);
         }
         return;

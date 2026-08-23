@@ -19,6 +19,19 @@ internal static class AnalyzerGeneratedCodePolicy
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        return IsGenerated(
+            (ISymbol)method,
+            tree,
+            compilation,
+            cancellationToken);
+    }
+
+    internal static bool IsGenerated(
+        ISymbol symbol,
+        SyntaxTree tree,
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
         if (IsGenerated(tree, compilation, cancellationToken))
         {
             return true;
@@ -27,7 +40,7 @@ internal static class AnalyzerGeneratedCodePolicy
         var generated = compilation.Options.SyntaxTreeOptionsProvider?
             .IsGenerated(tree, cancellationToken) ?? GeneratedKind.Unknown;
         return generated != GeneratedKind.NotGenerated &&
-            HasGeneratedCodeAttribute(method, compilation);
+            HasGeneratedCodeAttribute(symbol, compilation);
     }
 
     internal static bool IsGenerated(
@@ -94,7 +107,7 @@ internal static class AnalyzerGeneratedCodePolicy
     }
 
     private static bool HasGeneratedCodeAttribute(
-        IMethodSymbol method,
+        ISymbol symbol,
         Compilation compilation)
     {
         var generatedCode = compilation.GetTypeByMetadataName(
@@ -104,21 +117,21 @@ internal static class AnalyzerGeneratedCodePolicy
             return false;
         }
 
-        var scopes = new List<ISymbol> { method };
-        if (method.AssociatedSymbol != null)
+        var scopes = new List<ISymbol> { symbol };
+        if (symbol is IMethodSymbol { AssociatedSymbol: { } associated })
         {
-            scopes.Add(method.AssociatedSymbol);
+            scopes.Add(associated);
         }
-        for (var type = method.ContainingType;
+        for (var type = symbol.ContainingType;
              type != null;
              type = type.ContainingType)
         {
             scopes.Add(type);
         }
 
-        foreach (var symbol in scopes)
+        foreach (var scope in scopes)
         {
-            if (symbol.GetAttributes().Any(attribute =>
+            if (scope.GetAttributes().Any(attribute =>
                     SymbolEqualityComparer.Default.Equals(
                         attribute.AttributeClass?.OriginalDefinition,
                         generatedCode.OriginalDefinition)))

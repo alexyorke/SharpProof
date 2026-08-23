@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Effects;
 
-internal sealed class OperationEffectScanner
+internal sealed partial class OperationEffectScanner
 {
     private readonly ManagedFlowResult? _abstractFlow;
     private readonly bool _allowDirectWitnesses;
@@ -52,14 +52,12 @@ internal sealed class OperationEffectScanner
         _conversionEffects = new ConversionEffectClassifier(session, abstractFlow);
         _conversionOwnership = new ConversionOwnershipClassifier(
             _method,
+            session.Compilation,
             _coalesceCaptures,
             _creationCaptures);
         _allowDirectWitnesses = allowDirectWitnesses;
         _directSyntax = GetDirectSyntax(root.Syntax);
         _exceptionType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
-        _handlerReachability = new ExceptionHandlerReachability(
-            session.Compilation,
-            abstractFlow);
         _monitorType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Monitor);
         _nullnessEvaluator = new OperationNullnessEvaluator(
             session,
@@ -68,9 +66,22 @@ internal sealed class OperationEffectScanner
             _monitorType);
         _completionEvaluator = new OperationCompletionEvaluator(
             session,
+            method,
             _nullnessEvaluator.IsProvenNull,
             _nullnessEvaluator.IsProvenNonNull,
             _nullnessEvaluator.IsImplicitLockEnterWithNullValue);
+        _handlerReachability = new ExceptionHandlerReachability(
+            session.Compilation,
+            _method,
+            abstractFlow,
+            _completionEvaluator.CanCompleteNormally,
+            _completionEvaluator.CanMethodCompleteNormally,
+            _completionEvaluator.CanCompleteCompoundValue,
+            _completionEvaluator.CanCompleteIncrementValue,
+            _completionEvaluator.CanCompleteWithClone,
+            _completionEvaluator.GetReachableImplicitListPatternMembers,
+            session.ApiSpecs,
+            HasNonThrowingMethodSpec);
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
         // remain useful in a try body, but absence of a fact cannot prove an
         // operation unreachable after a normally completing handler. The
@@ -85,11 +96,12 @@ internal sealed class OperationEffectScanner
                 _freshArrayTypes[creation.Syntax.SpanStart] = type;
             }
         }
-        _conversionOwnership.BuildLocalRegions(root);
+        _conversionOwnership.BuildLocalRegions(root, IsReachable);
     }
 
     internal ImmutableArray<EffectDirectWitness> DirectWitnesses =>
         _directWitnesses.ToImmutable();
+
 
     internal EffectSummary Scan(IOperation operation)
     {
@@ -133,19 +145,28 @@ internal sealed class OperationEffectScanner
                 {
                     RecordDirectLock(directLock);
                 }
-                else if (operation is IThrowOperation)
+                else if (operation is IThrowOperation thrown &&
+                         CanReachThrow(thrown))
                 {
                     RecordDirect(operation);
                 }
             }
             var lexical = operation switch
             {
-                ILockOperation @lock => EffectSummaryOperations.Join(
-                    PotentialNullLock(@lock.LockedValue, @lock),
-                    EffectSummaryOperations.Capability(EffectCapabilityKind.Synchronization)),
-                IThrowOperation thrown when IsSourceThrow(thrown) => EffectExceptionFlow.KeepEscaping(
-                    EffectSummaryOperations.Throw(
-                        ResolveThrownException(thrown)),
+                ILockOperation @lock
+                    when _completionEvaluator.CanCompleteNormally(
+                        @lock.LockedValue) => EffectSummaryOperations.Join(
+                            PotentialNullLock(@lock.LockedValue, @lock),
+                            EffectSummaryOperations.Capability(
+                                EffectCapabilityKind.Synchronization)),
+                IThrowOperation thrown when IsSourceThrow(thrown) &&
+                    CanReachThrow(thrown) => EffectExceptionFlow.KeepEscaping(
+                    IsUnmodeledExternalExceptionConstruction(thrown.Exception)
+                        ? EffectSummaryOperations.ExceptionConstructionThrow(
+                            EffectSummary.Empty,
+                            ResolveThrownException(thrown))
+                        : EffectSummaryOperations.Throw(
+                            ResolveThrownException(thrown)),
                     thrown, _session.Compilation),
                 _ => EffectSummary.Empty
             };
@@ -160,7 +181,13 @@ internal sealed class OperationEffectScanner
             _session.Compilation,
             _method,
             _callResolver,
-            _abstractFlow).Scan(root, _conversionOwnership.ClassifyRegion);
+            _abstractFlow).Scan(
+                root,
+                _conversionOwnership.ClassifyRegion,
+                _completionEvaluator.CanCompleteNormally,
+                _completionEvaluator.CanMethodCompleteNormally,
+                _handlerReachability.CanMethodThrow,
+                _handlerReachability.CanExitAbruptly);
     }
 
     private EffectSummary Scan(IOperation operation, EffectAccess access)
@@ -192,12 +219,23 @@ internal sealed class OperationEffectScanner
             RecordDirect(operation);
         }
 
-        var summary = operation switch
+        return EffectExceptionFlow.KeepEscaping(
+            ScanCoreOperation(operation, access),
+            operation,
+            _session.Compilation);
+    }
+
+    private EffectSummary ScanCoreOperation(
+        IOperation operation,
+        EffectAccess access)
+    {
+        return operation switch
         {
             IAnonymousFunctionOperation or ILocalFunctionOperation or ILiteralOperation or
                 ILocalReferenceOperation or IInstanceReferenceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation or ISizeOfOperation => EffectSummary.Empty,
             IFlowCaptureOperation capture => ScanFlowCapture(capture),
+            IFlowCaptureReferenceOperation => EffectSummary.Empty,
             IParameterReferenceOperation parameter =>
                 parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
                 PrimaryConstructorParameterOwnership.IsReceiverBacked(
@@ -211,46 +249,23 @@ internal sealed class OperationEffectScanner
             IArrayElementReferenceOperation element => ScanArrayElement(element, access),
             ICoalesceAssignmentOperation assignment =>
                 ScanCoalesceAssignment(assignment),
-            ISimpleAssignmentOperation assignment => EffectSummaryOperations.Join(
-                Scan(assignment.Value),
-                ScanWriteTarget(assignment.Target, assignment.Value)),
+            IDeconstructionAssignmentOperation deconstruction =>
+                ScanDeconstruction(deconstruction),
+            IEventAssignmentOperation eventAssignment =>
+                ScanEventAssignment(eventAssignment),
+            IAwaitOperation awaitOperation => ScanAwait(awaitOperation),
+            ISimpleAssignmentOperation assignment =>
+                ScanSimpleAssignment(assignment),
             ICompoundAssignmentOperation assignment => ScanCompoundAssignment(assignment),
-            IIncrementOrDecrementOperation increment => EffectSummaryOperations.Join(
-                Scan(increment.Target, EffectAccess.Read),
-                ScanWriteTarget(increment.Target, increment.Target, valueIsStoredDirectly: false),
-                _conversionEffects.CheckedOverflow(increment.IsChecked, increment),
-                ResolveOperatorEffects(increment.OperatorMethod, [increment.Target], increment)),
+            IIncrementOrDecrementOperation increment =>
+                ScanIncrementOrDecrement(increment),
+            IMethodReferenceOperation methodReference =>
+                ScanMethodReference(methodReference),
             IInvocationOperation invocation => ScanInvocation(invocation),
             IObjectCreationOperation creation => ScanObjectCreation(creation),
             IArrayCreationOperation array => ScanArrayCreation(array),
-            IOperation allocation when allocation is
-                IDelegateCreationOperation or IAnonymousObjectCreationOperation =>
-                EffectSummaryOperations.Join(
-                    ScanChildren(allocation),
-                    EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)),
-            IThrowOperation thrown when IsSourceThrow(thrown) => EffectSummaryOperations.Join(
-                ScanChildren(thrown),
-                EffectSummaryOperations.Throw(
-                    ResolveThrownException(thrown))),
-            IInterpolatedStringOperation interpolation =>
-                ScanInterpolatedString(interpolation),
-            IThrowOperation => EffectSummary.Empty,
-            IBinaryOperation binary => ScanBinary(binary),
-            IUnaryOperation unary => ScanUnary(unary),
-            IConversionOperation conversion => ScanConversion(conversion),
-            IConditionalAccessOperation conditional =>
-                ScanConditionalAccess(conditional),
-            ILockOperation @lock => ScanLock(@lock),
-            ILoopOperation loop => EffectSummaryOperations.Join(
-                ScanChildren(loop), EffectSummaryOperations.MayDiverge()),
-            IInvalidOperation or IDynamicInvocationOperation or
-                IDynamicIndexerAccessOperation or IFunctionPointerInvocationOperation =>
-                EffectSummaryOperations.Join(
-                    ScanChildren(operation),
-                    EffectSummaryOperations.Unsupported()),
-            _ => ScanDefault(operation)
+            _ => ScanCoreOperationTail(operation)
         };
-        return EffectExceptionFlow.KeepEscaping(summary, operation, _session.Compilation);
     }
 
     private EffectSummary ScanField(IFieldReferenceOperation field, EffectAccess access)
@@ -301,25 +316,13 @@ internal sealed class OperationEffectScanner
         if (PrimaryConstructorParameterOwnership
             .IsPositionalRecordProperty(property.Property))
         {
-            var region = _conversionOwnership.ClassifyRegion(
-                property.Instance,
-                aliasSource: true);
-            return EffectSummaryOperations.Join(
-                ScanInstance(property.Instance),
-                PotentialNullReceiver(property.Instance, property),
-                access == EffectAccess.Read
-                    ? EffectSummaryOperations.Read(region)
-                    : EffectSummaryOperations.Write(region));
+            return ScanIntrinsicProperty(property, access);
         }
 
         if (access == EffectAccess.Read &&
             IsIntrinsicArrayCardinalityProperty(property))
         {
-            return EffectSummaryOperations.Join(
-                ScanInstance(property.Instance),
-                PotentialNullReceiver(property.Instance, property),
-                EffectSummaryOperations.Read(
-                    _conversionOwnership.ClassifyRegion(property.Instance, aliasSource: true)));
+            return ScanIntrinsicProperty(property, access);
         }
 
         var accessor = access == EffectAccess.Read
@@ -361,6 +364,60 @@ internal sealed class OperationEffectScanner
             actualArguments,
             PropertyDispatchFacts.IsUncertain(property, accessor),
             property);
+    }
+
+    private EffectSummary ScanIntrinsicProperty(
+        IPropertyReferenceOperation property,
+        EffectAccess access)
+    {
+        var instance = property.Instance == null
+            ? EffectStep.Empty
+            : ScanStep(property.Instance);
+        if (!instance.CompletesNormally)
+        {
+            return instance.Summary;
+        }
+
+        var receiverCheck = property.Instance == null
+            ? EffectStep.Empty
+            : new EffectStep(
+                PotentialNullReceiver(property.Instance, property),
+                !_nullnessEvaluator.IsProvenNull(
+                    property.Instance,
+                    property));
+        var evaluation = instance.Then(receiverCheck);
+        if (!evaluation.CompletesNormally)
+        {
+            return evaluation.Summary;
+        }
+
+        var region = _conversionOwnership.ClassifyRegion(
+            property.Instance,
+            aliasSource: true);
+        return EffectSummaryDomain.Instance.Join(
+            evaluation.Summary,
+            access == EffectAccess.Read
+                ? EffectSummaryOperations.Read(region)
+                : EffectSummaryOperations.Write(region));
+    }
+
+    private EffectSummary ScanMethodReference(
+        IMethodReferenceOperation methodReference)
+    {
+        var instance = methodReference.Instance == null
+            ? EffectStep.Empty
+            : ScanStep(methodReference.Instance);
+        if (!instance.CompletesNormally ||
+            methodReference.Method.IsStatic ||
+            methodReference.Instance == null)
+        {
+            return instance.Summary;
+        }
+        return EffectSummaryOperations.Join(
+            instance.Summary,
+            PotentialNullReceiver(
+                methodReference.Instance,
+                methodReference));
     }
 
     private EffectSummary ScanArrayElement(
@@ -418,75 +475,11 @@ internal sealed class OperationEffectScanner
             exceptions);
     }
 
-    private EffectSummary ScanWriteTarget(
-        IOperation target,
-        IOperation value,
-        bool valueIsStoredDirectly = true)
-    {
-        target = _coalesceCaptures.Resolve(target);
-        return target switch
-        {
-            IFieldReferenceOperation field => ScanField(field, EffectAccess.Write),
-            IArrayElementReferenceOperation element =>
-                ScanArrayElement(
-                    element,
-                    EffectAccess.Write,
-                    valueIsStoredDirectly ? value : null),
-            IPropertyReferenceOperation property =>
-                ScanProperty(
-                    property,
-                    EffectAccess.Write,
-                    valueIsStoredDirectly ? value : null),
-            IParameterReferenceOperation parameter
-                when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out =>
-                EffectSummaryOperations.Write(
-                    _conversionOwnership.ClassifyParameter(parameter.Parameter)),
-            ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation => EffectSummary.Empty,
-            _ => EffectSummaryOperations.Join(
-                Scan(target),
-                EffectSummaryOperations.Unsupported())
-        };
-    }
-
     private EffectSummary ScanFlowCapture(IFlowCaptureOperation capture)
     {
         _coalesceCaptures.Record(capture);
         _creationCaptures.Record(capture);
         return Scan(capture.Value);
-    }
-
-    private EffectSummary ScanCompoundAssignment(ICompoundAssignmentOperation assignment)
-    {
-        var operatorCall = ResolveOperatorEffects(
-            assignment.OperatorMethod,
-            [assignment.Target, assignment.Value],
-            assignment);
-        var exceptions = IntegralDivisionExceptions(assignment.OperatorKind, assignment.Type,
-            assignment.Target, assignment.Value, assignment);
-        return EffectSummaryOperations.Join(
-            Scan(assignment.Target, EffectAccess.Read),
-            Scan(assignment.Value),
-            ScanWriteTarget(assignment.Target, assignment.Value, valueIsStoredDirectly: false),
-            operatorCall,
-            exceptions,
-            _conversionEffects.CheckedOverflow(assignment.IsChecked, assignment));
-    }
-
-    private EffectSummary ScanCoalesceAssignment(
-        ICoalesceAssignmentOperation assignment)
-    {
-        var targetRead = Scan(assignment.Target, EffectAccess.Read);
-        if (_abstractFlow?.ProvesNonNull(
-                assignment,
-                assignment.Target) == true)
-        {
-            return targetRead;
-        }
-
-        return EffectSummaryOperations.Join(
-            targetRead,
-            Scan(assignment.Value),
-            ScanWriteTarget(assignment.Target, assignment.Value));
     }
 
     private bool ArrayStoreIsDefinitelyCompatible(
@@ -548,6 +541,21 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanInvocation(IInvocationOperation invocation)
     {
+        if (invocation.TargetMethod.Name == "<Clone>$" &&
+            invocation.Syntax.ToString().IndexOf("with", StringComparison.Ordinal) >= 0 &&
+            OperationCompletionEvaluator.GetRecordCopyConstructor(
+                invocation.TargetMethod) is { } copyConstructor)
+        {
+            var cloneCallStep = ScanCallStep(
+                copyConstructor,
+                invocation.Instance,
+                [],
+                [],
+                [],
+                dispatchUncertain: false,
+                invocation);
+            return cloneCallStep.Summary;
+        }
         if (UsingDisposalEffectResolver
             .IsSynthesizedSynchronousDispose(invocation))
         {
@@ -639,9 +647,15 @@ internal sealed class OperationEffectScanner
             }
         }
 
+        var receiverRegion = receiver ??
+            _conversionOwnership.ClassifyRegion(instance);
+        var writeReceiver = UsesDefensiveReceiverCopy(method, instance)
+            ? EffectRegionSet.Empty
+            : receiverRegion;
         var call = _callResolver.Resolve(
             method,
-            receiver ?? _conversionOwnership.ClassifyRegion(instance),
+            receiverRegion,
+            writeReceiver,
             argumentRegions,
             actualArguments,
             dispatchUncertain,
@@ -653,9 +667,33 @@ internal sealed class OperationEffectScanner
             _completionEvaluator.CanCompleteInvocation(method, instance, origin)));
     }
 
-    private EffectSummary ScanInstance(IOperation? instance)
+    private bool UsesDefensiveReceiverCopy(
+        IMethodSymbol method,
+        IOperation? instance)
     {
-        return instance == null ? EffectSummary.Empty : Scan(instance);
+        if (instance == null || method.IsStatic || method.IsReadOnly ||
+            method.ContainingType?.IsRefLikeType == true ||
+            method.ContainingType?.IsValueType != true)
+        {
+            return false;
+        }
+        instance = DefiniteOperationFacts.UnwrapHarmlessValue(instance);
+        return instance switch
+        {
+            IInstanceReferenceOperation => _method.IsReadOnly,
+            IParameterReferenceOperation parameter =>
+                parameter.Parameter.RefKind is RefKind.In or
+                    RefKind.RefReadOnlyParameter,
+            ILocalReferenceOperation local =>
+                local.Local.RefKind is RefKind.RefReadOnly or
+                    RefKind.RefReadOnlyParameter,
+            IFieldReferenceOperation field => field.Field.IsReadOnly,
+            IPropertyReferenceOperation property =>
+                property.Property.ReturnsByRefReadonly,
+            IInvocationOperation invocation =>
+                invocation.TargetMethod.ReturnsByRefReadonly,
+            _ => false
+        };
     }
 
     private EffectSummary ScanArgumentValues(
@@ -667,6 +705,10 @@ internal sealed class OperationEffectScanner
 
     private EffectSummary ScanObjectCreation(IObjectCreationOperation creation)
     {
+        if (creation.IsImplicit)
+        {
+            return EffectSummary.Empty;
+        }
         var receiver = EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart));
         var arguments = ScanSequence(
             creation.Arguments.Select(static argument => argument.Value));
@@ -675,17 +717,19 @@ internal sealed class OperationEffectScanner
             : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
         if (!arguments.CompletesNormally)
         {
-            return EffectSummaryDomain.Instance.Join(
-                arguments.Summary,
-                allocation);
+            return arguments.Summary;
         }
 
-        var construction = _callResolver.ResolveConstruction(
-            creation,
-            receiver,
-            ClassifyArguments(
-                creation.Arguments,
-                creation.Constructor?.Parameters.Length ?? 0));
+        var construction = IsUnmodeledExternalExceptionConstruction(creation) &&
+            creation.Syntax.AncestorsAndSelf().Any(static syntax =>
+                syntax is ThrowExpressionSyntax or ThrowStatementSyntax)
+            ? EffectSummary.Empty
+            : _callResolver.ResolveConstruction(
+                creation,
+                receiver,
+                ClassifyArguments(
+                    creation.Arguments,
+                    creation.Constructor?.Parameters.Length ?? 0));
         var constructor = new EffectStep(
             EffectSummaryDomain.Instance.Join(allocation, construction),
             _completionEvaluator.CanCompleteConstruction(creation));
@@ -696,6 +740,78 @@ internal sealed class OperationEffectScanner
         }
 
         return result.Summary;
+    }
+
+    private EffectSummary ScanManagedAllocation(IOperation allocation)
+    {
+        var children = ScanSequence(allocation.ChildOperations);
+        return children.CompletesNormally
+            ? children.Then(new EffectStep(
+                EffectSummaryOperations.Allocate(
+                    EffectAllocationKind.Managed),
+                true)).Summary
+            : children.Summary;
+    }
+
+    private EffectSummary ScanThrow(IThrowOperation thrown)
+    {
+        if (thrown.Exception is { } exception &&
+            DefiniteOperationFacts.UnwrapHarmlessValue(exception)
+                is IObjectCreationOperation creation &&
+            IsExternalExceptionConstruction(creation) &&
+            !HasNonThrowingConstructorSpec(creation))
+        {
+            var arguments = ScanSequence(
+                creation.Arguments.Select(static argument => argument.Value));
+            if (!arguments.CompletesNormally)
+            {
+                return arguments.Summary;
+            }
+
+            var receiver = EffectRegionSet.Create(
+                EffectRegionId.Fresh(creation.Syntax.SpanStart));
+            var construction = _callResolver.ResolveConstruction(
+                creation,
+                receiver,
+                ClassifyArguments(
+                    creation.Arguments,
+                    creation.Constructor?.Parameters.Length ?? 0));
+            return EffectSummaryOperations.ExceptionConstructionThrow(
+                construction,
+                ResolveThrownException(thrown));
+        }
+        var expression = thrown.Exception == null
+            ? EffectStep.Empty
+            : ScanStep(thrown.Exception);
+        return expression.CompletesNormally
+            ? expression.Then(new EffectStep(
+                EffectSummaryOperations.Throw(
+                    ResolveThrownException(thrown)),
+                false)).Summary
+            : expression.Summary;
+    }
+
+    private bool IsUnmodeledExternalExceptionConstruction(IOperation? operation)
+    {
+        if (operation == null)
+        {
+            return false;
+        }
+        operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
+        return operation is IObjectCreationOperation creation &&
+            IsExternalExceptionConstruction(creation) &&
+            !HasNonThrowingConstructorSpec(creation);
+    }
+
+    private bool IsExternalExceptionConstruction(
+        IObjectCreationOperation creation)
+    {
+        return
+            creation.Type is INamedTypeSymbol type &&
+            _exceptionType is { } exceptionType &&
+            EffectTypeFacts.IsDerivedFrom(type, exceptionType) &&
+            creation.Constructor is
+            { DeclaringSyntaxReferences.Length: 0 };
     }
 
     private EffectSummary ScanArrayCreation(IArrayCreationOperation array)
@@ -749,138 +865,77 @@ internal sealed class OperationEffectScanner
             whenNotNullStep.Summary);
     }
 
-    private EffectSummary ScanLock(ILockOperation @lock)
+    private EffectSummary ScanSwitchExpression(
+        ISwitchExpressionOperation switchExpression)
     {
-        var receiver = ScanStep(@lock.LockedValue);
-        if (!receiver.CompletesNormally)
+        var value = ScanStep(switchExpression.Value);
+        if (!value.CompletesNormally)
         {
-            return receiver.Summary;
+            return value.Summary;
         }
 
-        var entry = new EffectStep(
-            EffectSummaryOperations.Join(
-                PotentialNullLock(@lock.LockedValue, @lock),
-                EffectSummaryOperations.Capability(
-                    EffectCapabilityKind.Synchronization)),
-            !_nullnessEvaluator.IsProvenNull(@lock.LockedValue, @lock));
-        var result = receiver.Then(entry);
-        if (@lock.Body != null && result.CompletesNormally)
+        var arms = EffectSummary.Empty;
+        foreach (var arm in SwitchExpressionFacts.GetReachableArms(
+                     switchExpression,
+                     _completionEvaluator.CanCompleteNormally,
+                     _nullnessEvaluator.IsProvenNonNull(
+                         switchExpression.Value,
+                         switchExpression)))
         {
-            result = result.Then(ScanStep(@lock.Body));
+            arms = EffectSummaryDomain.Instance.Join(arms, Scan(arm));
         }
-        return result.Summary;
+
+        var unmatched = SwitchExpressionFacts.HasReachableUnmatchedPath(
+            switchExpression,
+            _completionEvaluator.CanCompleteNormally,
+            _nullnessEvaluator.IsProvenNonNull(
+                switchExpression.Value,
+                switchExpression))
+                ? Throw(FrameworkTypeMetadataNames.SwitchExpressionException)
+                : EffectSummary.Empty;
+        return EffectSummaryOperations.Join(value.Summary, arms, unmatched);
     }
 
-    private EffectSummary ScanBinary(IBinaryOperation binary)
+    private EffectSummary ScanListPattern(IListPatternOperation pattern)
     {
-        return EffectSummaryOperations.Join(
-            Scan(binary.LeftOperand),
-            Scan(binary.RightOperand),
-            StringConcatenationEffectResolver.Resolve(
-                binary,
-                _session.Compilation,
-                _callResolver,
-                _abstractFlow,
-                _conversionOwnership.ClassifyRegion),
-            IntegralDivisionExceptions(binary.OperatorKind, binary.Type,
-                binary.LeftOperand, binary.RightOperand, binary),
-            _conversionEffects.CheckedOverflow(binary.IsChecked, binary),
-            ResolveOperatorEffects(
-                binary.OperatorMethod,
-                [binary.LeftOperand, binary.RightOperand],
-                binary));
-    }
-
-    private EffectSummary ScanInterpolatedString(
-        IInterpolatedStringOperation interpolation)
-    {
-        if (interpolation.ConstantValue.HasValue)
+        var summary = ScanMany(pattern.Patterns);
+        var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
+        var receiver = _conversionOwnership.ClassifyRegion(
+            instance,
+            aliasSource: true);
+        foreach (var method in _completionEvaluator
+                     .GetReachableImplicitListPatternMembers(pattern))
         {
-            return EffectSummary.Empty;
-        }
-
-        var summary = EffectSummaryOperations.Allocate(
-            EffectAllocationKind.Managed);
-        foreach (var part in interpolation.Parts)
-        {
-            if (part is not IInterpolationOperation value)
+            if (method.DeclaringSyntaxReferences.Length == 0)
             {
                 continue;
             }
-            if (value.Alignment != null || value.FormatString != null)
-            {
-                summary = EffectSummaryOperations.Join(
-                    summary,
-                    ScanChildren(value),
-                    EffectSummaryOperations.Unsupported());
-                continue;
-            }
-
-            summary = EffectSummaryOperations.Join(
-                summary,
-                Scan(value.Expression),
-                StringConcatenationEffectResolver.ResolveFormattedValue(
-                    value.Expression,
-                    value,
-                    _session.Compilation,
-                    _callResolver,
-                    _abstractFlow,
-                    _conversionOwnership.ClassifyRegion));
+            var argumentRegions = Enumerable.Repeat(
+                    EffectRegionSet.Empty,
+                    method.Parameters.Length)
+                .ToImmutableArray();
+            var actualArguments = Enumerable.Repeat<IOperation?>(
+                    null,
+                    method.Parameters.Length)
+                .ToImmutableArray();
+            var call = _callResolver.Resolve(
+                method,
+                receiver,
+                receiver,
+                argumentRegions,
+                actualArguments,
+                method.IsVirtual || method.IsAbstract,
+                pattern,
+                instance,
+                ImmutableArray<IArgumentOperation>.Empty);
+            summary = EffectSummaryDomain.Instance.Join(summary, call);
         }
         return summary;
     }
 
-    private EffectSummary ScanUnary(IUnaryOperation unary)
+    private EffectSummary ScanDefaultPattern(IOperation pattern)
     {
-        return EffectSummaryOperations.Join(
-            Scan(unary.Operand),
-            _conversionEffects.CheckedOverflow(unary.IsChecked, unary),
-            ResolveOperatorEffects(unary.OperatorMethod, [unary.Operand], unary));
-    }
-
-    private EffectSummary ScanConversion(IConversionOperation operation)
-    {
-        if (!string.Equals(operation.Syntax.Language, LanguageNames.CSharp, StringComparison.Ordinal))
-        {
-            return EffectSummaryOperations.Join(
-                Scan(operation.Operand),
-                EffectSummaryOperations.Unsupported());
-        }
-
-        var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(operation);
-        return EffectSummaryOperations.Join(
-            Scan(operation.Operand),
-            _conversionEffects.Classify(operation, conversion),
-            ResolveOperatorEffects(operation.OperatorMethod, [operation.Operand], operation));
-    }
-
-    private EffectSummary ResolveOperatorEffects(
-        IMethodSymbol? method,
-        ImmutableArray<IOperation?> operands,
-        IOperation origin)
-    {
-        return _callResolver.ResolveOperator(
-            method,
-            EffectRegionSet.Empty,
-            [.. operands.Select(operand => _conversionOwnership.ClassifyRegion(operand))],
-            operands,
-            origin);
-    }
-
-    private EffectSummary Throw(params string[] exceptionMetadataNames)
-    {
-        return EffectSummaryOperations.Throw(_session.ResolveExceptionSet(exceptionMetadataNames));
-    }
-
-    private EffectSummary ScanDefault(IOperation operation)
-    {
-        var classification = OperationSubsetClassifier.Classify(
-            OperationSupportStage.EffectDiscovery,
-            operation.Kind);
-        var children = ScanChildren(operation);
-        return classification.IsExact
-            ? children
-            : EffectSummaryOperations.Join(children, EffectSummaryOperations.Unsupported());
+        return ScanChildren(pattern);
     }
 
     private EffectSummary ScanChildren(IOperation operation)
@@ -905,6 +960,11 @@ internal sealed class OperationEffectScanner
             }
         }
         return result;
+    }
+
+    internal bool CanCompleteNormally(IOperation operation)
+    {
+        return _completionEvaluator.CanCompleteNormally(operation);
     }
 
     private EffectStep ScanStep(IOperation operation)
@@ -1123,7 +1183,12 @@ internal sealed class OperationEffectScanner
     private bool HasNonThrowingConstructorSpec(IObjectCreationOperation creation)
     {
         return creation.Constructor != null &&
-               _session.ApiSpecs.TryGet(creation.Constructor, out var spec) &&
+            HasNonThrowingMethodSpec(creation.Constructor);
+    }
+
+    private bool HasNonThrowingMethodSpec(IMethodSymbol method)
+    {
+        return _session.ApiSpecs.TryGet(method, out var spec) &&
                spec.Template.Facets.Throws.Behavior ==
                SpecThrowBehavior.DoesNotThrow &&
                spec.Template.Facets.Termination?.Behavior ==
@@ -1213,6 +1278,12 @@ internal sealed class OperationEffectScanner
     private static bool IsSourceThrow(IThrowOperation operation)
     {
         return operation.Syntax is ThrowStatementSyntax or ThrowExpressionSyntax;
+    }
+
+    private bool CanReachThrow(IThrowOperation thrown)
+    {
+        return thrown.Exception == null ||
+            _completionEvaluator.CanCompleteNormally(thrown.Exception);
     }
 
     private ImmutableArray<EffectRegionSet> ClassifyArguments(

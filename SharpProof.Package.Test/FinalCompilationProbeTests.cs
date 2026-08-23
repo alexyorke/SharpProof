@@ -717,6 +717,7 @@ public sealed class FinalCompilationProbeTests
 
         internal Task<ProcessResult> VerifyPackedArtifactAsync()
         {
+            var invocationId = Guid.NewGuid().ToString("N");
             var runDirectory = Path.Combine(_root, "verify-run");
             var publishDirectory = Path.Combine(_root, "published");
             Directory.CreateDirectory(runDirectory);
@@ -738,11 +739,7 @@ public sealed class FinalCompilationProbeTests
                 "-p:SharpProofVerify=true",
                 "-p:_SharpProofCompilerManifestPath=" +
                     invocationManifestPath,
-                "-p:_SharpProofInvocationDirectory=" + runDirectory,
-                "-p:_SharpProofInvocationRequestFile=" +
-                    Path.Combine(runDirectory, "request.json"),
-                "-p:_SharpProofInvocationResultFile=" +
-                    Path.Combine(runDirectory, "result.json"),
+                "-p:_SharpProofInvocationId=" + invocationId,
                 "-p:SharpProofVerifyRequestFile=" +
                     Path.Combine(publishDirectory, "request.json"),
                 "-p:SharpProofVerifyResultFile=" +

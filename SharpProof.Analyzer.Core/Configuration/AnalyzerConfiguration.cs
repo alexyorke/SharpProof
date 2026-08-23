@@ -73,6 +73,14 @@ internal sealed class AnalyzerConfiguration
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
         foreach (var option in AnalyzerConfigurationOptionRegistry.All)
         {
+            if (TryGetConflictingAliases(options, option, out var conflict))
+            {
+                builder.Add(new(
+                    option.Key,
+                    conflict,
+                    "configuration aliases disagree; use one effective value"));
+                continue;
+            }
             if (!TryGet(options, option, out var value) ||
                 AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value))
             {
@@ -98,6 +106,31 @@ internal sealed class AnalyzerConfiguration
         return builder.ToImmutable();
     }
 
+    private static bool TryGetConflictingAliases(
+        AnalyzerConfigOptions options,
+        AnalyzerConfigurationOption option,
+        out string conflict)
+    {
+        var values = new List<string>();
+        foreach (var key in new[] {
+                     option.Key,
+                     "build_property." + option.Key,
+                     "build_property." + option.BuildPropertyName
+                 })
+        {
+            if (options.TryGetValue(key, out var value) &&
+                !string.IsNullOrWhiteSpace(value))
+            {
+                values.Add(value.Trim());
+            }
+        }
+
+        var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        conflict = string.Join(" / ", distinct);
+        return distinct.Length > 1;
+    }
+
     internal static InvalidAnalyzerConfigurationValue ProviderFailure(
         Exception exception)
     {
@@ -114,6 +147,14 @@ internal sealed class AnalyzerConfiguration
         var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
         foreach (var option in AnalyzerConfigurationOptionRegistry.All)
         {
+            if (TryGetConflictingAliases(options, option, out var conflict))
+            {
+                builder.Add(new InvalidAnalyzerConfigurationValue(
+                    option.Key,
+                    conflict,
+                    "configuration aliases disagree; use one effective value"));
+                continue;
+            }
             if (!TryGet(options, option, out var value))
             {
                 continue;

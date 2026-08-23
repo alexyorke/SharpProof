@@ -14,6 +14,23 @@ public sealed class PublicationPlanIdentityTests
     [TestCase("stale-checksums", false)]
     [TestCase("missing-identity", false)]
     [TestCase("duplicate-identity", false)]
+    [TestCase("version-syntax", true)]
+    [TestCase("commit-syntax", true)]
+    [TestCase("string-schema", false)]
+    [TestCase("decimal-bytes", false)]
+    [TestCase("array-version", false)]
+    [TestCase("array-commit", false)]
+    [TestCase("array-artifact-text", false)]
+    [TestCase("version-authority-hash-tamper", false)]
+    [TestCase("destination-tamper", false)]
+    [TestCase("package-action-tamper", false)]
+    [TestCase("fixture-canonical", true)]
+    [TestCase("fixture-authority-tamper", false)]
+    [TestCase("fixture-nonexistent-archive", true)]
+    [TestCase("registry-canonical", true)]
+    [TestCase("registry-url-tamper", false)]
+    [TestCase("targetless-publish-tamper", false)]
+    [TestCase("json-roundtrip", true)]
     public async Task ReplayRehashesEveryImmutablePlanInput(
         string mutation,
         bool expectedValid)

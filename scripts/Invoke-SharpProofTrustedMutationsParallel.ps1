@@ -21,6 +21,8 @@ Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 $contract = Get-Content -LiteralPath (Join-Path `
     $repositoryRoot 'eng/acceptance/contract.json') -Raw |
     ConvertFrom-Json
@@ -339,8 +341,11 @@ foreach ($shard in $shards) {
     }
 }
 $orderedResults = @($orderedResults | Sort-Object catalogOrdinal)
+$actualCatalogSha256 = Get-SharpProofMutationCatalogSha256 `
+    -Mutations $orderedResults
 if ($orderedResults.Count -ne $catalogCount -or
-    @($orderedResults.name | Sort-Object -Unique).Count -ne $catalogCount) {
+    @($orderedResults.name | Sort-Object -Unique).Count -ne $catalogCount -or
+    $actualCatalogSha256 -ne $catalogSha256) {
     throw 'Parallel mutation shards do not cover the exact mutation catalog.'
 }
 foreach ($result in $orderedResults) {

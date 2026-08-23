@@ -43,6 +43,7 @@ public sealed class ArchitectureTests
         "SharpProof.Specs",
         "SharpProof.Dataflow",
         "SharpProof.Frontend",
+        "SharpProof.Fuzz",
         "SharpProof.Host",
         "SharpProof.Contracts",
         "SharpProof.Effects",
@@ -191,6 +192,14 @@ public sealed class ArchitectureTests
                 "SharpProof.Attributes",
                 "SharpProof.Ir"
             ],
+            ["SharpProof.Fuzz"] = [
+                "SharpProof.Frontend",
+                "SharpProof.Host",
+                "SharpProof.Ir",
+                "SharpProof.Smt",
+                "SharpProof.Testing",
+                "SharpProof.Verify"
+            ],
             ["SharpProof.Contracts"] = [
                 "SharpProof.Frontend",
                 "SharpProof.Ir"
@@ -307,7 +316,7 @@ public sealed class ArchitectureTests
     }
 
     [Test]
-    public void OnlyTheSmtLayerReferencesZ3InTheProductionGraph()
+    public void OnlyTheSmtLayerAndFuzzHarnessReferenceZ3InTheProductionGraph()
     {
         foreach (var project in ProductionProjects)
         {
@@ -319,7 +328,7 @@ public sealed class ArchitectureTests
                 .ToArray();
             Assert.That(
                 packages.Contains("Microsoft.Z3", StringComparer.Ordinal),
-                Is.EqualTo(project == "SharpProof.Smt"),
+                Is.EqualTo(project is "SharpProof.Smt" or "SharpProof.Fuzz"),
                 project);
         }
     }
@@ -466,8 +475,9 @@ public sealed class ArchitectureTests
         Assert.That(
             FindRelativeCallers(productionFiles, "new Assumption("),
             Is.EqualTo([
-            "SharpProof.Worker/CallableEvidenceBuilder.cs",
-                "SharpProof.Worker/PostconditionObligationBuilder.cs"
+                "SharpProof.Worker/CallableEvidenceBuilder.cs",
+                "SharpProof.Worker/PostconditionObligationBuilder.cs",
+                "Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs"
             ]));
         Assert.That(
             FindRelativeCallers(productionFiles, "new EffectSummary("),
@@ -489,6 +499,7 @@ public sealed class ArchitectureTests
             "SharpProof.Dataflow/SequenceCardinalityDomain.cs",
             "SharpProof.Effects/EffectAnalysisSession.cs",
             "SharpProof.Effects/ExternalEffectResolver.cs",
+            "SharpProof.Effects/OperationEffectScanner.Assignments.cs",
             "SharpProof.Effects/OperationEffectScanner.cs",
             "SharpProof.Frontend/RoslynOperationLowerer.cs",
             "SharpProof.Frontend/RoslynProgramLowerer.cs",
@@ -2215,7 +2226,14 @@ public sealed class ArchitectureTests
 
     private static string ProjectFile(string project)
     {
-        return Path.Combine(RepositoryRoot(), project, project + ".csproj");
+        return Path.Combine(ProjectDirectory(project), project + ".csproj");
+    }
+
+    private static string ProjectDirectory(string project)
+    {
+        return project == "SharpProof.Fuzz"
+            ? Path.Combine(RepositoryRoot(), "Tools", project)
+            : Path.Combine(RepositoryRoot(), project);
     }
 
     private static string ReadProductionSources(string project)
@@ -2229,7 +2247,7 @@ public sealed class ArchitectureTests
     private static IEnumerable<string> ProductionSourceFiles(string project)
     {
         return Directory.GetFiles(
-                Path.Combine(RepositoryRoot(), project),
+                ProjectDirectory(project),
                 "*.cs",
                 SearchOption.AllDirectories)
             .Where(static path =>
@@ -2277,10 +2295,15 @@ public sealed class ArchitectureTests
             .GetProperty("fuzz")
             .GetProperty("nightlyCases")
             .GetInt32();
+        var maximumCampaignCases = contract.RootElement
+            .GetProperty("fuzz")
+            .GetProperty("maximumCampaignCases")
+            .GetInt32();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(nightlyCases, Is.Positive);
+            Assert.That(maximumCampaignCases, Is.GreaterThan(nightlyCases));
             Assert.That(workflow, Does.Contain("tooling fuzz-nightly"));
             Assert.That(
                 Directory.EnumerateFiles(
@@ -2302,15 +2325,19 @@ public sealed class ArchitectureTests
                     .And.Contain("requires clean exact-commit source"));
             Assert.That(campaign,
                 Does.Contain("contract.fuzz.nightlyCases")
+                    .And.Contain("contract.fuzz.maximumCampaignCases")
+                    .And.Contain("Assert-SharpProofFuzzCampaignBudget")
                     .And.Contain("ContainsKey('RotatingSeed')")
-                    .And.Contain("retained.seeds")
+                    .And.Contain("Read-SharpProofRetainedFuzzSeedManifest")
+                    .And.Contain("$retained.Seeds")
                     .And.Contain("Invoke-FuzzRun")
                     .And.Contain("yyyyMMdd")
                     .And.Contain("schemaVersion = 3")
                     .And.Contain("commit = $sourceCommit")
                     .And.Contain("rotatingCases = $effectiveRotatingCases")
                     .And.Contain("retainedCasesPerSeed = $effectiveRetainedCases")
-                    .And.Contain("retainedSeeds = @($retained.seeds")
+                    .And.Contain("retainedSeeds = $retainedSeeds")
+                    .And.Contain("retainedSeedManifestSha256 = $retained.Sha256")
                     .And.Contain("resultSha256")
                     .And.Contain("status = if"));
             Assert.That(acceptance,

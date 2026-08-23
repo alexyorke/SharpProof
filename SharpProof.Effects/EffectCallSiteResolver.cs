@@ -24,10 +24,34 @@ internal sealed class EffectCallSiteResolver(
         IOperation? instance,
         IEnumerable<IArgumentOperation>? callArguments = null)
     {
+        return Resolve(
+            target,
+            receiver,
+            receiver,
+            arguments,
+            actualArguments,
+            dispatchUncertain,
+            origin,
+            instance,
+            callArguments);
+    }
+
+    internal EffectSummary Resolve(
+        IMethodSymbol target,
+        EffectRegionSet receiver,
+        EffectRegionSet writeReceiver,
+        ImmutableArray<EffectRegionSet> arguments,
+        ImmutableArray<IOperation?> actualArguments,
+        bool dispatchUncertain,
+        IOperation origin,
+        IOperation? instance,
+        IEnumerable<IArgumentOperation>? callArguments = null)
+    {
         var summary = _session.ResolveCall(
             _caller,
             target,
             receiver,
+            writeReceiver,
             arguments,
             dispatchUncertain,
             _sourceCalls,
@@ -54,6 +78,7 @@ internal sealed class EffectCallSiteResolver(
             : Resolve(
                 target,
                 receiver,
+                receiver,
                 arguments,
                 actualArguments,
                 dispatchUncertain: false,
@@ -71,7 +96,6 @@ internal sealed class EffectCallSiteResolver(
         {
             return EffectSummaryOperations.Unsupported();
         }
-
         var implicitLayers = EffectSummary.Empty;
         var implicitDepth = 0;
         while (EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer(
@@ -107,8 +131,12 @@ internal sealed class EffectCallSiteResolver(
 
         return EffectSummaryOperations.Join(
             implicitLayers,
+            HasExplicitSourceTypeInitialization(constructor)
+                ? EffectSummaryOperations.TypeInitializationBoundary()
+                : EffectSummary.Empty,
             Resolve(
                 constructor,
+                receiver,
                 receiver,
                 arguments,
                 AlignActualArguments(
@@ -118,6 +146,18 @@ internal sealed class EffectCallSiteResolver(
                 creation,
                 instance: null,
                 creation.Arguments));
+    }
+
+    private bool HasExplicitSourceTypeInitialization(IMethodSymbol constructor)
+    {
+        return SymbolEqualityComparer.Default.Equals(
+                constructor.ContainingAssembly,
+                _session.Compilation.Assembly) &&
+            EffectMethodNodeBuilder.HasPotentialStaticInitialization(
+                constructor.ContainingType,
+                _session.ApiSpecs) &&
+            constructor.ContainingType.StaticConstructors.Any(
+                static candidate => !candidate.IsImplicitlyDeclared);
     }
 
     internal static ImmutableArray<IOperation?> AlignActualArguments(

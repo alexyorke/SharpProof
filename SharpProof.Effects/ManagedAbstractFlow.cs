@@ -30,11 +30,13 @@ internal sealed class ManagedAbstractFlow
 
     private static readonly ConditionalWeakTable<Compilation, ManagedAbstractFlow> Sessions = new();
     private readonly ResolvedApiSpecTable _apiSpecs;
+    private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _contractApi;
     private readonly INamedTypeSymbol? _inRangeAttribute;
     private readonly INamedTypeSymbol? _notNullAttribute;
     private readonly INamedTypeSymbol? _positiveAttribute;
     private readonly TrustedBoundaryPolicy _trustedBoundaries;
+    private readonly DefiniteOperationFacts _completionFacts;
 
     private ManagedAbstractFlow(Compilation compilation)
         : this(compilation, new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation))
@@ -46,6 +48,7 @@ internal sealed class ManagedAbstractFlow
         ResolvedApiSpecTable apiSpecs)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        _compilation = compilation;
         _apiSpecs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
         var contractApi = ContractApiIdentityResolver.ForCompilation(compilation);
         _contractApi = contractApi.Contract;
@@ -54,6 +57,9 @@ internal sealed class ManagedAbstractFlow
         _inRangeAttribute = contractApi.ResolveAttribute(ContractApiMetadata.InRange);
         _trustedBoundaries =
             TrustedBoundaryPolicy.ForCompilation(compilation);
+        _completionFacts = new DefiniteOperationFacts(
+            compilation,
+            CancellationToken.None);
     }
 
     internal static ManagedAbstractFlow ForCompilation(Compilation compilation)
@@ -1067,6 +1073,31 @@ internal sealed class ManagedAbstractFlow
             return ManagedFlowState.LessThanOrEqual(left, right);
         }
     }
+    internal bool IsBlockedAfterNoncompletingStatement(
+        IOperation operation)
+    {
+        var statement = operation.Syntax.AncestorsAndSelf()
+            .OfType<StatementSyntax>()
+            .FirstOrDefault();
+        if (statement?.Parent is not BlockSyntax block)
+        {
+            return false;
+        }
+
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_compilation, block.SyntaxTree);
+        foreach (var prior in block.Statements
+                     .TakeWhile(candidate => candidate != statement))
+        {
+            var priorOperation = model.GetOperation(prior);
+            if (priorOperation != null &&
+                !_completionFacts.MayCompleteNormally(priorOperation))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 internal enum ManagedFlowStatus
@@ -1158,8 +1189,9 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool IsReachable(IOperation operation)
     {
-        return operation.DescendantsAndSelf().Any(candidate =>
-            TryGetState(candidate, out var state) && !state.IsBottom);
+        return !flow.IsBlockedAfterNoncompletingStatement(operation) &&
+            operation.DescendantsAndSelf().Any(candidate =>
+                TryGetState(candidate, out var state) && !state.IsBottom);
     }
 
     internal static IOperation? GetUnavoidableDirectOperation(
@@ -1798,6 +1830,22 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 IDiscardOperation or IInstanceReferenceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation => true,
             IInvocationOperation invocation => CompletesNormally(invocation),
+            IObjectCreationOperation creation =>
+                creation.Arguments.All(argument =>
+                    CompletesNormally(argument.Value)) &&
+                (creation.Constructor == null ||
+                 creation.Constructor.DeclaringSyntaxReferences.Length != 1 ||
+                 CompletesNormally(creation.Constructor)),
+            IMethodReferenceOperation methodReference =>
+                ChildrenCompleteNormally(methodReference) &&
+                (methodReference.Method.IsStatic ||
+                 methodReference.Instance != null &&
+                 IsDefinitelyNonNull(methodReference.Instance)),
+            IFieldReferenceOperation fieldReference =>
+                ChildrenCompleteNormally(fieldReference) &&
+                (fieldReference.Field.IsStatic ||
+                 fieldReference.Instance != null &&
+                 IsDefinitelyNonNull(fieldReference.Instance)),
             ISimpleAssignmentOperation assignment =>
                 assignment.Target is ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation &&
                 CompletesNormally(assignment.Value),
@@ -1872,10 +1920,13 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         var normalized = method.OriginalDefinition;
-        if (normalized.DeclaringSyntaxReferences.Length != 1 ||
-            !_activeMethods.Add(normalized))
+        if (normalized.DeclaringSyntaxReferences.Length != 1)
         {
             return true;
+        }
+        if (!_activeMethods.Add(normalized))
+        {
+            return false;
         }
 
         try
@@ -1907,7 +1958,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     /// ordinary assignments, writes, external calls, and unsupported shapes
     /// are all treated as potentially completing.
     /// </summary>
-    private bool MayCompleteNormally(IOperation? operation)
+    internal bool MayCompleteNormally(IOperation? operation)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return operation switch
@@ -1931,8 +1982,38 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 (MayCompleteNormally(conditionalAccess.WhenNotNull) ||
                  !DefiniteOperationFacts.IsDefinitelyNonNull(
                      conditionalAccess.Operation)),
+            ISwitchExpressionOperation switchExpression =>
+                MayCompleteSwitchExpression(switchExpression),
+            ISwitchExpressionArmOperation arm =>
+                MayCompleteNormally(arm.Pattern) &&
+                (arm.Guard == null || MayCompleteNormally(arm.Guard)) &&
+                MayCompleteNormally(arm.Value),
+            IIsPatternOperation isPattern =>
+                MayCompleteNormally(isPattern.Value) &&
+                MayCompleteNormally(isPattern.Pattern),
+            IPropertySubpatternOperation propertySubpattern =>
+                MayCompleteNormally(propertySubpattern.Member) &&
+                MayCompleteNormally(propertySubpattern.Pattern),
+            IListPatternOperation listPattern =>
+                MayCompleteListPattern(listPattern),
+            IRecursivePatternOperation recursivePattern =>
+                MayCompleteRecursivePattern(recursivePattern),
+            IPatternOperation pattern =>
+                ChildrenMayCompleteNormally(pattern),
+            ICoalesceOperation coalesce =>
+                MayCompleteNormally(coalesce.Value) &&
+                (!IsDefinitelyNull(coalesce.Value) ||
+                 MayCompleteNormally(coalesce.WhenNull)),
             IInvocationOperation invocation =>
                 InvocationMayCompleteNormally(invocation),
+            IAnonymousObjectCreationOperation or
+                IDelegateCreationOperation =>
+                ChildrenMayCompleteNormally(operation),
+            IMethodReferenceOperation methodReference =>
+                ChildrenMayCompleteNormally(methodReference) &&
+                (methodReference.Method.IsStatic ||
+                 methodReference.Instance == null ||
+                 !IsDefinitelyNull(methodReference.Instance)),
             IObjectCreationOperation creation =>
                 CreationMayCompleteNormally(creation),
             IArrayCreationOperation array =>
@@ -1946,10 +2027,17 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
                 ISimpleAssignmentOperation or IArrayElementReferenceOperation or
-                IFieldReferenceOperation or IPropertyReferenceOperation or
+                IFieldReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
                 ChildrenMayCompleteNormally(operation),
+            IPropertyReferenceOperation property =>
+                ChildrenMayCompleteNormally(property) &&
+                (property.Property.IsStatic ||
+                 property.Instance == null ||
+                 !IsDefinitelyNull(property.Instance)) &&
+                (property.Property.GetMethod == null ||
+                 MethodCanCompleteNormally(property.Property.GetMethod)),
             IObjectOrCollectionInitializerOperation initializer =>
                 SequenceMayCompleteNormally(initializer.ChildOperations),
             IExpressionStatementOperation or
@@ -1958,10 +2046,192 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 IVariableDeclaratorOperation or
                 IVariableInitializerOperation =>
                 ChildrenMayCompleteNormally(operation),
-            ITryOperation or ILoopOperation or ISwitchOperation or
-                ISwitchExpressionOperation => true,
+            ILabeledOperation labeled =>
+                ChildrenMayCompleteNormally(labeled),
+            ILoopOperation loop when
+                LoopConditionIsAlwaysTrue(loop) &&
+                loop.Body != null &&
+                !LoopHasReachableBreak(loop.Body) => false,
+            ITryOperation @try =>
+                (@try.Finally == null || MayCompleteNormally(@try.Finally)) &&
+                @try.Catches.All(catchClause =>
+                    MayCompleteNormally(catchClause.Handler)),
+            ILoopOperation or ISwitchOperation => true,
             _ => true
         };
+    }
+
+    private bool MayCompleteSwitchExpression(
+        ISwitchExpressionOperation switchExpression)
+    {
+        if (!MayCompleteNormally(switchExpression.Value))
+        {
+            return false;
+        }
+
+        if (SwitchExpressionFacts.HasReachableUnmatchedPath(
+                switchExpression,
+                MayCompleteNormally,
+                IsDefinitelyNonNull(switchExpression.Value)))
+        {
+            return false;
+        }
+
+        return SwitchExpressionFacts.GetReachableArms(
+                switchExpression,
+                MayCompleteNormally,
+                IsDefinitelyNonNull(switchExpression.Value))
+            .Any(MayCompleteNormally);
+    }
+
+    private bool MayCompleteRecursivePattern(
+        IRecursivePatternOperation pattern)
+    {
+        if (pattern.DeconstructSymbol is IMethodSymbol deconstruct &&
+            !MethodCanCompleteNormally(deconstruct))
+        {
+            return false;
+        }
+        return pattern.DeconstructionSubpatterns.All(MayCompleteNormally) &&
+            pattern.PropertySubpatterns.All(MayCompleteNormally);
+    }
+
+    private bool MayCompleteListPattern(IListPatternOperation pattern)
+    {
+        var value = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (pattern.InputType?.IsValueType != true &&
+            value?.Syntax.ToString().IndexOf(
+                "null",
+                StringComparison.Ordinal) >= 0)
+        {
+            return true;
+        }
+
+        var lengthMethod =
+            SwitchExpressionFacts.GetCallableListPatternMember(
+                pattern.LengthSymbol);
+        if (lengthMethod != null &&
+            !MethodCanCompleteNormally(lengthMethod))
+        {
+            return false;
+        }
+
+        if (TryGetListPatternLength(pattern, out var length))
+        {
+            var requiredLength = pattern.Patterns.Count(
+                static item => item is not ISlicePatternOperation);
+            var hasSlice = pattern.Patterns.Any(
+                static item => item is ISlicePatternOperation);
+            if (hasSlice ? length < requiredLength : length != requiredLength)
+            {
+                return true;
+            }
+        }
+
+        foreach (var item in pattern.Patterns)
+        {
+            var method = item is ISlicePatternOperation slice
+                ? slice.Pattern == null
+                    ? null
+                    : SwitchExpressionFacts.GetCallableListPatternMember(
+                        slice.SliceSymbol)
+                : SwitchExpressionFacts.GetCallableListPatternMember(
+                    pattern.IndexerSymbol);
+            if (method != null && !MethodCanCompleteNormally(method))
+            {
+                return false;
+            }
+            var nested = item is ISlicePatternOperation nestedSlice
+                ? nestedSlice.Pattern
+                : item;
+            if (nested != null && !MayCompleteNormally(nested))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private bool TryGetListPatternLength(
+        IListPatternOperation pattern,
+        out long length)
+    {
+        var value = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (value is IArrayCreationOperation
+            { DimensionSizes.Length: 1 } array &&
+            array.DimensionSizes[0].ConstantValue is
+            { HasValue: true, Value: int arrayLength })
+        {
+            length = arrayLength;
+            return true;
+        }
+
+        if (pattern.LengthSymbol is IPropertySymbol
+            { GetMethod: { } getter } &&
+            getter.DeclaringSyntaxReferences.Length == 1)
+        {
+            var syntax = getter.DeclaringSyntaxReferences[0].GetSyntax();
+            ExpressionSyntax? expression = syntax switch
+            {
+                PropertyDeclarationSyntax property
+                    when property.ExpressionBody != null =>
+                    property.ExpressionBody.Expression,
+                AccessorDeclarationSyntax accessor
+                    when accessor.ExpressionBody != null =>
+                    accessor.ExpressionBody.Expression,
+                _ => null
+            };
+            if (expression is { } constantExpression)
+            {
+                var constant = SharpProof.Frontend.Host.CompilationModelProvider
+                    .GetSemanticModel(
+                        compilation,
+                        constantExpression.SyntaxTree)
+                    .GetConstantValue(constantExpression);
+                if (constant is { HasValue: true, Value: int constantLength })
+                {
+                    length = constantLength;
+                    return length >= 0;
+                }
+            }
+        }
+        length = 0;
+        return false;
+    }
+
+    private static bool LoopConditionIsAlwaysTrue(ILoopOperation loop)
+    {
+        return loop switch
+        {
+            IWhileLoopOperation
+            {
+                ConditionIsTop: true,
+                ConditionIsUntil: false,
+                Condition.ConstantValue: { HasValue: true, Value: true }
+            } => true,
+            IForLoopOperation { Condition: null } => true,
+            _ => false
+        };
+    }
+
+    private static bool LoopHasReachableBreak(IOperation body)
+    {
+        foreach (var child in body.ChildOperations)
+        {
+            if (child is IBranchOperation { BranchKind: BranchKind.Break })
+            {
+                return true;
+            }
+            if (child is ILoopOperation or ISwitchOperation)
+            {
+                continue;
+            }
+            if (LoopHasReachableBreak(child))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private bool InvocationMayCompleteNormally(IInvocationOperation invocation)
@@ -1969,6 +2239,13 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         if (!MayCompleteNormally(invocation.Instance) ||
             invocation.Arguments.Any(argument =>
                 !MayCompleteNormally(argument.Value)))
+        {
+            return false;
+        }
+
+        if (!invocation.TargetMethod.IsStatic &&
+            invocation.Instance != null &&
+            IsDefinitelyNull(invocation.Instance))
         {
             return false;
         }
@@ -2111,6 +2388,30 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         return operation is IInstanceReferenceOperation or IConditionalAccessInstanceOperation or
             IObjectCreationOperation or IArrayCreationOperation or ITypeOfOperation ||
             operation.ConstantValue is { HasValue: true, Value: not null };
+    }
+
+    internal static bool IsDefinitelyNull(IOperation operation)
+    {
+        while (operation is IParenthesizedOperation or IConversionOperation)
+        {
+            if (operation is IParenthesizedOperation parenthesized)
+            {
+                operation = parenthesized.Operand;
+            }
+            else if (operation is IConversionOperation
+            {
+                OperatorMethod: null,
+                IsTryCast: false
+            } conversion)
+            {
+                operation = conversion.Operand;
+            }
+            else
+            {
+                break;
+            }
+        }
+        return operation.ConstantValue is { HasValue: true, Value: null };
     }
 
     private static bool HarmlessConversion(IConversionOperation conversion)

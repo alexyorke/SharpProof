@@ -42,6 +42,7 @@
       "SharpProof.Contracts.Test\\SharpProof.Contracts.Test.csproj": 2,
       "SharpProof.ContractForGenerator.Test\\SharpProof.ContractForGenerator.Test.csproj": 2,
       "SharpProof.Frontend.Test\\SharpProof.Frontend.Test.csproj": 2,
+      "SharpProof.Fuzz.Test\\SharpProof.Fuzz.Test.csproj": 2,
       "SharpProof.Gates.Test\\SharpProof.Gates.Test.csproj": 2,
       "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj": 2,
       "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj": 2,
@@ -57,13 +58,13 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 234,
-    "expectedCatalogSha256": "83298b80c8dd16de224ba72b94b2d0e3ea84d1103868b4e9cbc1db2c9ffecd53"
+    "expectedCatalogCount": 261,
+    "expectedCatalogSha256": "66c1d833f29a5f6f6997ba443f0d3f077b6d1094f16b7ba28deeeee32fa5fa81"
   },
   "worker": {
     "protocolVersion": 11,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 14,
+    "compilerArtifactSchemaVersion": 15,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -209,7 +210,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-    "inventorySha256": "6285bf4670402f8922d33f6d42a8a70f11bda0616ce2930e719d7bd7c41ae422",
+      "inventorySha256": "bfe6906b52cc86d83a1e9279889fa48e75a69a4b4d40358cc433d7917a0dd9a7",
     "components": [
       {
         "name": "discovery",
@@ -498,7 +499,11 @@
           "SharpProof.Effects/EffectContractMappings.cs",
           "SharpProof.Effects/CreationFlowCaptures.cs",
           "SharpProof.Effects/ConversionOwnershipClassifier.cs",
+          "SharpProof.Effects/OperationEffectScanner.Assignments.cs",
           "SharpProof.Effects/OperationEffectScanner.cs",
+          "SharpProof.Effects/OperationCompletionEvaluator.cs",
+          "SharpProof.Effects/ExceptionHandlerReachability.cs",
+          "SharpProof.Effects/SwitchExpressionFacts.cs",
           "SharpProof.Effects/PropertyDispatchFacts.cs",
           "SharpProof.Effects/EffectExceptionFlow.cs",
           "SharpProof.Effects/ManagedAbstractFlow.cs",
@@ -612,8 +617,10 @@
         "paths": [
           "SharpProof.BuildTasks/SharpProof.BuildTasks.csproj",
           "SharpProof.BuildTasks/InvalidatePublishedResult.cs",
+          "SharpProof.BuildTasks/Program.cs",
           "SharpProof.BuildTasks/ResetPublishedVerification.cs",
           "SharpProof.BuildTasks/RunVerifier.cs",
+          "SharpProof.BuildTasks/VerifierProcessSupervisor.cs",
           "SharpProof.Host/SharpProof.Host.csproj",
           "SharpProof.Host/ContainerContract.cs",
           "SharpProof.Host/ContainerNativeLibrary.cs",
@@ -721,6 +728,15 @@
       {
         "name": "fuzzEvidenceAuthority",
         "paths": [
+          "Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs",
+          "Tools/SharpProof.Fuzz/FrontendFuzzing.cs",
+          "Tools/SharpProof.Fuzz/FuzzDifferential.cs",
+          "Tools/SharpProof.Fuzz/FuzzOptions.cs",
+          "Tools/SharpProof.Fuzz/FuzzRunner.cs",
+          "Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs",
+          "Tools/SharpProof.Fuzz/Program.cs",
+          "Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj",
+          "Tools/SharpProof.Fuzz/packages.lock.json",
           "scripts/Assert-SharpProofFuzzRunnerResult.ps1",
           "scripts/SharpProof.FuzzEvidenceLifecycle.ps1",
           "scripts/Test-SharpProofFuzzEvidenceLifecycle.ps1",
@@ -840,6 +856,7 @@
   "fuzz": {
     "pullRequestCases": 1000,
     "nightlyCases": 10000,
+    "maximumCampaignCases": 1000000,
     "maximumParallelism": 4
   },
   "performance": {

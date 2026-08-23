@@ -14,9 +14,9 @@ public sealed class ContractBinder(
     private readonly ContractClauseInventoryBuilder _clauseInventory =
         clauseInventory ?? ContractClauseInventoryBuilder.ForCompilation(compilation);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _bindings =
-        new(SymbolEqualityComparer.Default);
+        new(SymbolEqualityComparer.IncludeNullability);
     private readonly ConcurrentDictionary<IMethodSymbol, ContractBindingResult> _requiresBindings =
-        new(SymbolEqualityComparer.Default);
+        new(SymbolEqualityComparer.IncludeNullability);
     private readonly EffectiveContractSourceResolver _contractSources =
         clauseInventory == null
             ? EffectiveContractSourceResolver.ForCompilation(compilation)
@@ -74,10 +74,12 @@ public sealed class ContractBinder(
         if (target.MethodKind is not (
                 MethodKind.Ordinary or
                 MethodKind.Constructor or
+                MethodKind.StaticConstructor or
                 MethodKind.PropertyGet or
                 MethodKind.PropertySet or
                 MethodKind.EventAdd or
-                MethodKind.EventRemove))
+                MethodKind.EventRemove or
+                MethodKind.ExplicitInterfaceImplementation))
         {
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedTarget);
         }

@@ -1,3 +1,14 @@
+function Test-SharpProofReleaseVersionSyntax {
+    param([Parameter(Mandatory = $true)][string]$Version)
+
+    return $Version -cmatch (
+        '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.' +
+        '(0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|' +
+        '(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))' +
+        '(?:\.(?:(?:0|[1-9][0-9]*)|' +
+        '(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?\z')
+}
+
 function Get-SharpProofReleaseVersion {
     param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
 
@@ -18,8 +29,7 @@ function Get-SharpProofReleaseVersion {
         $template.IndexOf('$(SharpProofVersionPrefix)',
             [StringComparison]::Ordinal) -lt 0 -or
         $version.Contains('$(', [StringComparison]::Ordinal) -or
-        $version -notmatch
-            '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+        -not (Test-SharpProofReleaseVersionSyntax -Version $version)) {
         throw 'SharpProof.Release.props has an invalid package version.'
     }
     return $version

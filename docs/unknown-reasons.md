@@ -262,7 +262,7 @@ The exact typed outcome and effect-certainty authority follows.
 A may-effect summary is suitable for proving the absence of a disallowed
 effect, but the presence of a may-effect is not itself a concrete trace.
 Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 14 can seal
+`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 15 can seal
 one unconditional definite managed object/array allocation event for
 independent worker replay. The worker validates its order, source-tree
 identity/span, selected-constraint and semantic-operation hashes, and sealed

@@ -8,17 +8,42 @@ namespace SharpProof.Fuzz.Test;
 [TestFixture]
 public sealed class FrontendSemanticEdgeCaseTests
 {
+    private static readonly long[] SequenceValue = [1L, 2L];
+    private static readonly ulong[] UnsupportedSequenceValue = [1UL];
+    private static readonly Array MultidimensionalSequenceValue =
+        Array.CreateInstance(typeof(long), 2, 3);
+
     [Test]
     public void FixedSemanticEdgesMatchRuntimeOrAbstainExactly()
     {
         var cases = new[] {
+            Exact("sbyte", "", "-3"),
+            Exact("byte", "", "3"),
+            Exact("short", "", "-3"),
+            Exact("ushort", "", "3"),
+            Exact("int", "", "-3"),
+            Exact("uint", "", "3"),
+            Exact("char", "", "'A'"),
             Exact("long", "short value", "(long)value", short.MinValue),
             Exact("long", "int value", "(long)value", int.MaxValue),
             Exact("long", "uint value", "(long)value", uint.MaxValue),
             Exact("long", "", "checked((int)3L)"),
+            Exact("object?", "object? value", "value", new object()),
+            Exact("long[]", "long[] value", "value", SequenceValue),
+            Closed(
+                "ulong",
+                "ulong[] value",
+                "value[0]",
+                FrontendAbstention.UnsupportedType,
+                UnsupportedSequenceValue),
             Exact("string?", "object? value", "(string)value", (object?)null),
             Exact("string?", "object? value", "(string)value", "proof"),
             Exact("string?", "object? value", "(string)value", new object()),
+            Exact(
+                "long",
+                "long[,] value",
+                "value.LongLength",
+                MultidimensionalSequenceValue),
             Closed(
                 "long",
                 "long value",
@@ -91,7 +116,7 @@ public sealed class FrontendSemanticEdgeCaseTests
                 results.Select((result, index) =>
                     index + ": " + result.Detail)));
         Assert.That(
-            results[6].ExceptionKind,
+            results[16].ExceptionKind,
             Is.EqualTo(IrExceptionKind.InvalidCast));
         for (var index = 0; index < cases.Length; index++)
         {
@@ -101,6 +126,103 @@ public sealed class FrontendSemanticEdgeCaseTests
             Assert.That(
                 results[index].ActualAbstention,
                 Is.EqualTo(cases[index].ExpectedAbstention));
+        }
+    }
+
+    [Test]
+    public void CompileInvalidSemanticEdgeDoesNotPoisonValidPeer()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact("long", "", "long.MaxValue + 1L")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
+    public void CompileSuccessfulSemanticEdgeInjectionDoesNotPoisonValidPeer()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact(
+                "long",
+                "",
+                "0L; public static long EdgeTarget999() => 0L")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
+    public void NonnumericSemanticEdgeInjectionDoesNotEscapeBatchIsolation()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact(
+                "long",
+                "",
+                "0L; public static long EdgeTargetOops() => 0L")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
+    public void StaticInitializerInjectionDoesNotPoisonValidPeer()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact(
+                "long",
+                "",
+                "0L; static readonly long Poison = Throw(); " +
+                "static long Throw() => throw new System.Exception()")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
+        }
+    }
+
+    [Test]
+    public void TopLevelInitializerInjectionDoesNotPoisonValidPeer()
+    {
+        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            Exact("long", "", "0L"),
+            Exact(
+                "long",
+                "",
+                "0L; } public static class Injected { " +
+                "[System.Runtime.CompilerServices.ModuleInitializer] " +
+                "public static void Initialize() => " +
+                "throw new System.Exception(); } public static class Tail { " +
+                "public static long Value => 0L")
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
         }
     }
 

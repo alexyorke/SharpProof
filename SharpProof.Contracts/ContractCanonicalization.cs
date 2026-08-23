@@ -35,6 +35,24 @@ internal sealed class ContractCanonicalization(
                 source.OriginalDefinition.Parameters[index].Type,
                 source.Parameters[index].Type);
         }
+        var partialCounterpart =
+            source.OriginalDefinition.PartialImplementationPart ??
+            source.OriginalDefinition.PartialDefinitionPart;
+        if (partialCounterpart != null)
+        {
+            AddParameters(
+                partialCounterpart.TypeParameters,
+                source.TypeArguments);
+            AddSignatureType(
+                partialCounterpart.ReturnType,
+                source.ReturnType);
+            for (var index = 0; index < source.Parameters.Length; index++)
+            {
+                AddSignatureType(
+                    partialCounterpart.Parameters[index].Type,
+                    source.Parameters[index].Type);
+            }
+        }
 
         return Specialize;
 
@@ -295,9 +313,9 @@ internal sealed class ContractCanonicalization(
             IrVarId? canonicalVariable = null;
             if (binding.Symbol is IParameterSymbol parameter &&
                 parameter.ContainingSymbol is IMethodSymbol owner &&
-                SymbolEqualityComparer.Default.Equals(
-                    owner.OriginalDefinition,
-                    source.OriginalDefinition))
+                ContractClauseInventoryBuilder.HaveSameDefinition(
+                    owner,
+                    source))
             {
                 var ordinal = parameter.Ordinal -
                     (usesCompanion && canonical.Receiver.HasValue ? 1 : 0);

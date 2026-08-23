@@ -38,11 +38,18 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var owners = ImmutableHashSet.CreateBuilder<
             IMethodSymbol>(
             SymbolEqualityComparer.Default);
+        var operationFacts = new DefiniteOperationFacts(
+            semanticModel.Compilation,
+            cancellationToken);
         foreach (var operation in
                  ExecutableDescendantsAndSelf(operationRoot))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var calls = GetCalls(operation);
+            var calls = GetCalls(
+                operation,
+                operationFacts,
+                semanticModel.Compilation,
+                cancellationToken);
             if (calls.IsDefaultOrEmpty)
             {
                 continue;
@@ -99,6 +106,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
             cancellationToken);
         var flowResult = flowAnalysis.Result;
         var callSites = new List<RequiresCallSiteCandidate>();
+        var reachableOperationSites = new HashSet<(
+            SyntaxTree Tree, int Start, int Length)>();
         var initializer = (operationRoot as IConstructorBodyOperation)?.Initializer;
         if (TryGetImplicitParameterlessBaseConstructor(out var baseConstructor))
         {
@@ -137,7 +146,15 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var operation in roots.SelectMany(
                          ExecutableDescendantsAndSelf))
             {
-                var calls = GetCalls(operation);
+                reachableOperationSites.Add((
+                    operation.Syntax.SyntaxTree,
+                    operation.Syntax.SpanStart,
+                    operation.Syntax.Span.Length));
+                var calls = GetCalls(
+                    operation,
+                    operationFacts,
+                    semanticModel.Compilation,
+                    cancellationToken);
                 if (calls.IsDefaultOrEmpty ||
                     !SymbolEqualityComparer.Default.Equals(
                         semanticModel.GetEnclosingSymbol(
@@ -152,13 +169,22 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     flowResult?.TryGetState(operation, out _) == true;
                 if (flowAnalysis.IsComplete &&
                     !hasFlowState &&
-                    !IsInsideExceptionHandler(operation))
+                    !IsInsideExceptionHandler(operation) &&
+                    operation is not IListPatternOperation)
                 {
                     continue;
                 }
 
                 foreach (var call in calls)
                 {
+                    if (call.TargetMethod.MethodKind == MethodKind.PropertySet &&
+                        operation is IPropertyReferenceOperation property &&
+                        property.Parent is ICoalesceAssignmentOperation coalesce &&
+                        ReferenceEquals(coalesce.Target, property) &&
+                        !CanCoalesceGetterComplete(property, operationFacts))
+                    {
+                        continue;
+                    }
                     var candidate = new RequiresCallSiteCandidate(
                         operation,
                         call.TargetMethod,
@@ -166,14 +192,15 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         call.Arguments,
                         call.ExplicitArguments,
                         call.CanReplay &&
-                        (hasFlowState || !flowAnalysis.IsComplete) &&
-                        (IsAccessorCall(call.TargetMethod)
+                        (IsAccessorCall(call.TargetMethod) ||
+                            operation is IListPatternOperation
                             ? HasReplayableAccessorEvaluation(
                                 call,
                                 operationFacts)
-                            : HasReplayablePrefix(
-                                operation,
-                                operationFacts)),
+                            : (hasFlowState || !flowAnalysis.IsComplete) &&
+                                HasReplayablePrefix(
+                                    operation,
+                                    operationFacts)),
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status);
                     var existingIndex = callSites.FindIndex(existing =>
@@ -194,6 +221,50 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         callSites[existingIndex] = candidate;
                     }
                 }
+            }
+        }
+
+        foreach (var property in ExecutableDescendantsAndSelf(operationRoot!)
+                     .OfType<IPropertyReferenceOperation>()
+                     .Where(static property =>
+                         property.Parent is ICoalesceAssignmentOperation coalesce &&
+                         ReferenceEquals(coalesce.Target, property))
+                     .Where(property => reachableOperationSites.Contains((
+                         property.Syntax.SyntaxTree,
+                         property.Syntax.SpanStart,
+                         property.Syntax.Span.Length)))
+                     .Where(property =>
+                         SymbolEqualityComparer.Default.Equals(
+                             semanticModel.GetEnclosingSymbol(
+                                 property.Syntax.SpanStart,
+                             cancellationToken),
+                             caller))
+                     .Where(property =>
+                         CanCoalesceGetterComplete(property, operationFacts)))
+        {
+            foreach (var call in GetPropertyCalls(property).Where(static call =>
+                         call.TargetMethod.MethodKind == MethodKind.PropertySet))
+            {
+                if (callSites.Any(existing =>
+                        existing.Operation.Syntax.SyntaxTree ==
+                            property.Syntax.SyntaxTree &&
+                        existing.Operation.Syntax.Span == property.Syntax.Span &&
+                        SymbolEqualityComparer.Default.Equals(
+                            existing.TargetMethod,
+                            call.TargetMethod)))
+                {
+                    continue;
+                }
+
+                callSites.Add(new RequiresCallSiteCandidate(
+                    property,
+                    call.TargetMethod,
+                    call.Instance,
+                    call.Arguments,
+                    call.ExplicitArguments,
+                    CanReplay: false,
+                    Flow: null,
+                    ManagedFlowStatus.BudgetExceeded));
             }
         }
 
@@ -418,6 +489,20 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationFacts.CompletesNormally);
     }
 
+    private static bool CanCoalesceGetterComplete(
+        IPropertyReferenceOperation property,
+        DefiniteOperationFacts operationFacts)
+    {
+        return (property.Instance == null ||
+                operationFacts.MayCompleteNormally(property.Instance)) &&
+            property.Arguments.All(argument =>
+                operationFacts.MayCompleteNormally(argument.Value)) &&
+            property.Parent is ICoalesceAssignmentOperation coalesce &&
+            operationFacts.MayCompleteNormally(coalesce.Value) &&
+            property.Property.GetMethod is { } getter &&
+            operationFacts.MethodCanCompleteNormally(getter);
+    }
+
     private bool IsDirectReplayableStatement(
         StatementSyntax statement,
         IOperation callSite,
@@ -472,7 +557,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
     }
 
     private static ImmutableArray<RequiresCallTarget> GetCalls(
-        IOperation operation)
+        IOperation operation,
+        DefiniteOperationFacts? operationFacts = null,
+        Compilation? compilation = null,
+        CancellationToken cancellationToken = default)
     {
         return operation switch
         {
@@ -495,8 +583,930 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 GetPropertyCalls(property),
             IEventReferenceOperation eventReference =>
                 GetEventCalls(eventReference),
+            IListPatternOperation listPattern => GetListPatternCalls(
+                listPattern,
+                operationFacts,
+                compilation,
+                cancellationToken),
             _ => []
         };
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetListPatternCalls(
+        IListPatternOperation pattern,
+        DefiniteOperationFacts? operationFacts,
+        Compilation? compilation,
+        CancellationToken cancellationToken)
+    {
+        var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (instance != null &&
+            DefiniteOperationFacts.IsDefinitelyNull(instance))
+        {
+            return [];
+        }
+
+        var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>();
+        var length = SwitchExpressionFacts.GetCallableListPatternMember(
+            pattern.LengthSymbol);
+        if (length != null)
+        {
+            calls.Add(CreateImplicitListPatternCall(length, instance));
+            if (operationFacts != null &&
+                !operationFacts.MethodCanCompleteNormally(length))
+            {
+                return calls.ToImmutable();
+            }
+        }
+
+        var requiredLength = pattern.Patterns.Count(
+            static item => item is not ISlicePatternOperation);
+        var hasSlice = pattern.Patterns.Any(
+            static item => item is ISlicePatternOperation);
+        if (compilation != null &&
+            TryGetKnownListLength(
+                pattern,
+                instance,
+                compilation,
+                cancellationToken,
+                out var knownLength) &&
+            (hasSlice
+                ? knownLength < requiredLength
+                : knownLength != requiredLength))
+        {
+            return calls.ToImmutable();
+        }
+
+        foreach (var item in pattern.Patterns)
+        {
+            var member = item is ISlicePatternOperation slice
+                ? slice.Pattern == null
+                    ? null
+                    : SwitchExpressionFacts.GetCallableListPatternMember(
+                        slice.SliceSymbol)
+                : SwitchExpressionFacts.GetCallableListPatternMember(
+                    pattern.IndexerSymbol);
+            if (member == null)
+            {
+                continue;
+            }
+            calls.Add(CreateImplicitListPatternCall(member, instance));
+            if (operationFacts != null &&
+                !operationFacts.MethodCanCompleteNormally(member))
+            {
+                break;
+            }
+        }
+        return calls.ToImmutable();
+    }
+
+    private static RequiresCallTarget CreateImplicitListPatternCall(
+        IMethodSymbol method,
+        IOperation? instance)
+    {
+        return new RequiresCallTarget(
+            method,
+            instance,
+            [],
+            ImmutableDictionary<int, IOperation>.Empty,
+            true);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1508:Avoid dead conditional code",
+        Justification = "The analyzer misreads the multi-branch nullable " +
+            "assignment above the null check as unreachable.")]
+    private static bool TryGetKnownListLength(
+        IListPatternOperation pattern,
+        IOperation? instance,
+        Compilation compilation,
+        CancellationToken cancellationToken,
+        out long length)
+    {
+        instance = instance == null
+            ? null
+            : DefiniteOperationFacts.UnwrapHarmlessValue(instance);
+        if (instance is IArrayCreationOperation
+            { DimensionSizes.Length: 1 } arrayCreation &&
+            arrayCreation.DimensionSizes[0].ConstantValue is
+            { HasValue: true, Value: int arrayLength })
+        {
+            length = arrayLength;
+            return true;
+        }
+        if (pattern.LengthSymbol is not IPropertySymbol
+            { GetMethod: { } getter } ||
+            getter.IsVirtual && !getter.IsSealed ||
+            getter.DeclaringSyntaxReferences.Length != 1)
+        {
+            length = 0;
+            return false;
+        }
+
+        var declaration = getter.DeclaringSyntaxReferences[0]
+            .GetSyntax(cancellationToken);
+        var expression = declaration switch
+        {
+            PropertyDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            AccessorDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            ArrowExpressionClauseSyntax
+            { Expression: { } body } => body,
+            AccessorDeclarationSyntax
+            { Body.Statements.Count: 1 } accessor
+                when accessor.Body!.Statements[0] is ReturnStatementSyntax
+                { Expression: { } body } => body,
+            _ => null
+        };
+        if (expression == null)
+        {
+            length = 0;
+            return false;
+        }
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, expression.SyntaxTree);
+        var constant = model.GetConstantValue(expression, cancellationToken);
+        if (!constant.HasValue || constant.Value == null)
+        {
+            length = 0;
+            return false;
+        }
+        try
+        {
+            length = Convert.ToInt64(
+                constant.Value,
+                System.Globalization.CultureInfo.InvariantCulture);
+            return length >= 0;
+        }
+        catch (Exception exception) when (exception is
+            FormatException or InvalidCastException or OverflowException)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
+    internal static ImmutableArray<RequiresCallSiteCandidate>
+        CreateUnflowedCandidates(IOperation operation)
+    {
+        return [.. GetCalls(operation).Select(call =>
+            new RequiresCallSiteCandidate(
+                operation,
+                call.TargetMethod,
+                call.Instance,
+                call.Arguments,
+                call.ExplicitArguments,
+                call.CanReplay,
+                Flow: null,
+                ManagedFlowStatus.BudgetExceeded))];
+    }
+
+    internal static IEnumerable<IOperation>
+        ExecutableUnflowedDescendantsAndSelf(IOperation operation)
+    {
+        return ExecutableUnflowedDescendantsAndSelfCore(
+            operation,
+            operationFacts: null);
+    }
+
+    internal static IEnumerable<IOperation>
+        ExecutableUnflowedDescendantsAndSelf(
+            IOperation operation,
+            DefiniteOperationFacts operationFacts)
+    {
+        return ExecutableUnflowedDescendantsAndSelfCore(
+            operation,
+            operationFacts);
+    }
+
+    private static IEnumerable<IOperation>
+        ExecutableUnflowedDescendantsAndSelfCore(
+            IOperation operation,
+            DefiniteOperationFacts? operationFacts)
+    {
+        if (operation is IAnonymousFunctionOperation or ILocalFunctionOperation)
+        {
+            yield break;
+        }
+
+        if (operationFacts != null && operation is IInvocationOperation invocation)
+        {
+            if (invocation.Instance is { } instance)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             instance,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                if (!operationFacts.MayCompleteNormally(instance))
+                {
+                    yield break;
+                }
+            }
+            foreach (var argument in invocation.Arguments)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             argument.Value,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                if (!operationFacts.MayCompleteNormally(argument.Value))
+                {
+                    yield break;
+                }
+            }
+            yield return invocation;
+            yield break;
+        }
+
+        if (operationFacts != null &&
+            operation is IObjectCreationOperation creation)
+        {
+            foreach (var argument in creation.Arguments)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             argument.Value,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                if (!operationFacts.MayCompleteNormally(argument.Value))
+                {
+                    yield break;
+                }
+            }
+            yield return creation;
+            if (creation.Constructor is { } constructor &&
+                !operationFacts.MethodCanCompleteNormally(constructor))
+            {
+                yield break;
+            }
+            if (creation.Initializer != null)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             creation.Initializer,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+            }
+            yield break;
+        }
+
+        if (operationFacts != null &&
+            operation is IObjectOrCollectionInitializerOperation initializer)
+        {
+            yield return initializer;
+            foreach (var item in initializer.Initializers)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             item,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                if (!operationFacts.MayCompleteNormally(item))
+                {
+                    yield break;
+                }
+            }
+            yield break;
+        }
+
+        if (operationFacts != null &&
+            operation is ISimpleAssignmentOperation
+            {
+                Target: IPropertyReferenceOperation property
+            } assignment)
+        {
+            yield return assignment;
+            if (property.Instance is { } propertyInstance)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             propertyInstance,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                if (!operationFacts.MayCompleteNormally(propertyInstance))
+                {
+                    yield break;
+                }
+            }
+            foreach (var argument in property.Arguments)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             argument.Value,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                if (!operationFacts.MayCompleteNormally(argument.Value))
+                {
+                    yield break;
+                }
+            }
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         assignment.Value,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (operationFacts.MayCompleteNormally(assignment.Value))
+            {
+                yield return property;
+            }
+            yield break;
+        }
+
+        if (operationFacts != null &&
+            operation is IPropertyReferenceOperation propertyReference)
+        {
+            if (propertyReference.Instance is { } propertyInstance)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             propertyInstance,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                if (!operationFacts.MayCompleteNormally(propertyInstance))
+                {
+                    yield break;
+                }
+            }
+            foreach (var argument in propertyReference.Arguments)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             argument.Value,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                if (!operationFacts.MayCompleteNormally(argument.Value))
+                {
+                    yield break;
+                }
+            }
+            yield return propertyReference;
+            yield break;
+        }
+
+        if (operationFacts != null &&
+            operation is IConditionalOperation factConditional)
+        {
+            yield return factConditional;
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         factConditional.Condition,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (!operationFacts.MayCompleteNormally(
+                    factConditional.Condition))
+            {
+                yield break;
+            }
+            if (factConditional.Condition.ConstantValue is
+                { HasValue: true, Value: bool factCondition })
+            {
+                var branch = factCondition
+                    ? factConditional.WhenTrue
+                    : factConditional.WhenFalse;
+                if (branch != null)
+                {
+                    foreach (var descendant in
+                             ExecutableUnflowedDescendantsAndSelfCore(
+                                 branch,
+                                 operationFacts))
+                    {
+                        yield return descendant;
+                    }
+                }
+                yield break;
+            }
+            foreach (var branch in new[]
+                     {
+                         factConditional.WhenTrue,
+                         factConditional.WhenFalse
+                     })
+            {
+                if (branch == null)
+                {
+                    continue;
+                }
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             branch,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+            }
+            yield break;
+        }
+
+        if (operationFacts != null && operation is IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.ConditionalAnd or
+                    BinaryOperatorKind.ConditionalOr
+            } factBinary)
+        {
+            yield return factBinary;
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         factBinary.LeftOperand,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (!operationFacts.MayCompleteNormally(factBinary.LeftOperand))
+            {
+                yield break;
+            }
+            var skipRight = factBinary.LeftOperand.ConstantValue is
+            { HasValue: true, Value: bool leftValue } &&
+                leftValue == (factBinary.OperatorKind ==
+                    BinaryOperatorKind.ConditionalOr);
+            if (!skipRight)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             factBinary.RightOperand,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+            }
+            yield break;
+        }
+
+        if (operationFacts != null && operation is ICoalesceOperation factCoalesce)
+        {
+            yield return factCoalesce;
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         factCoalesce.Value,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (!operationFacts.MayCompleteNormally(factCoalesce.Value))
+            {
+                yield break;
+            }
+            if (!factCoalesce.Value.ConstantValue.HasValue ||
+                factCoalesce.Value.ConstantValue.Value == null)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             factCoalesce.WhenNull,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+            }
+            yield break;
+        }
+
+        if (operationFacts != null &&
+            operation is IConditionalAccessOperation factAccess)
+        {
+            yield return factAccess;
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         factAccess.Operation,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (!operationFacts.MayCompleteNormally(factAccess.Operation) ||
+                factAccess.Operation.ConstantValue is
+                { HasValue: true, Value: null })
+            {
+                yield break;
+            }
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         factAccess.WhenNotNull,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            yield break;
+        }
+
+        yield return operation;
+
+        if (operation is IConditionalOperation conditional &&
+            conditional.Condition.ConstantValue is
+            { HasValue: true, Value: bool condition })
+        {
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         conditional.Condition,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            var branch = condition
+                ? conditional.WhenTrue
+                : conditional.WhenFalse;
+            if (branch != null)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             branch,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+            }
+            yield break;
+        }
+
+        if (operation is IBinaryOperation binary &&
+            (binary.OperatorKind is
+                BinaryOperatorKind.ConditionalAnd or
+                BinaryOperatorKind.ConditionalOr) &&
+            binary.LeftOperand.ConstantValue is
+            { HasValue: true, Value: bool left })
+        {
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         binary.LeftOperand,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (left != (binary.OperatorKind ==
+                    BinaryOperatorKind.ConditionalOr))
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             binary.RightOperand,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+            }
+            yield break;
+        }
+
+        if (operation is ICoalesceOperation coalesce &&
+            coalesce.Value.ConstantValue.HasValue)
+        {
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         coalesce.Value,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (coalesce.Value.ConstantValue.Value == null)
+            {
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             coalesce.WhenNull,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+            }
+            yield break;
+        }
+
+        if (operation is IConditionalAccessOperation access &&
+            access.Operation.ConstantValue is
+            { HasValue: true, Value: null })
+        {
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         access.Operation,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            yield break;
+        }
+
+        if (operation is ISwitchExpressionOperation switchExpression &&
+            switchExpression.Value.ConstantValue.HasValue)
+        {
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         switchExpression.Value,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (operationFacts != null &&
+                !operationFacts.MayCompleteNormally(switchExpression.Value))
+            {
+                yield break;
+            }
+            var input = switchExpression.Value.ConstantValue.Value;
+            var switchCompilation = switchExpression.SemanticModel?.Compilation;
+            foreach (var arm in switchExpression.Arms)
+            {
+                var match = switchCompilation == null
+                    ? ConstantPatternMatch.Unknown
+                    : GetConstantPatternMatch(
+                        switchCompilation,
+                        arm.Pattern,
+                        input,
+                        switchExpression.Value.Type);
+                if (match == ConstantPatternMatch.No)
+                {
+                    continue;
+                }
+                if (arm.Guard != null)
+                {
+                    foreach (var descendant in
+                             ExecutableUnflowedDescendantsAndSelfCore(
+                                 arm.Guard,
+                                 operationFacts))
+                    {
+                        yield return descendant;
+                    }
+                    if (operationFacts != null &&
+                        !operationFacts.MayCompleteNormally(arm.Guard))
+                    {
+                        if (match == ConstantPatternMatch.Yes)
+                        {
+                            yield break;
+                        }
+                        continue;
+                    }
+                    if (arm.Guard.ConstantValue is
+                        { HasValue: true, Value: false })
+                    {
+                        continue;
+                    }
+                }
+                foreach (var descendant in
+                         ExecutableUnflowedDescendantsAndSelfCore(
+                             arm.Value,
+                             operationFacts))
+                {
+                    yield return descendant;
+                }
+                var guardIsTrue = arm.Guard == null ||
+                    arm.Guard.ConstantValue is { HasValue: true, Value: true };
+                if (match == ConstantPatternMatch.Yes && guardIsTrue)
+                {
+                    break;
+                }
+            }
+            yield break;
+        }
+
+        foreach (var child in operation.ChildOperations)
+        {
+            foreach (var descendant in
+                     ExecutableUnflowedDescendantsAndSelfCore(
+                         child,
+                         operationFacts))
+            {
+                yield return descendant;
+            }
+            if (operationFacts != null &&
+                !operationFacts.MayCompleteNormally(child))
+            {
+                yield break;
+            }
+        }
+    }
+
+    private static ConstantPatternMatch GetConstantPatternMatch(
+        Compilation compilation,
+        IPatternOperation pattern,
+        object? input,
+        ITypeSymbol? inputType)
+    {
+        return pattern switch
+        {
+            IDiscardPatternOperation => ConstantPatternMatch.Yes,
+            ITypePatternOperation typePattern =>
+                MatchTypePattern(
+                    compilation,
+                    typePattern.MatchedType,
+                    input,
+                    inputType,
+                    matchesNull: false),
+            IDeclarationPatternOperation
+            { MatchedType: { } declarationMatchedType } declarationPattern =>
+                MatchTypePattern(
+                    compilation,
+                    declarationMatchedType,
+                    input,
+                    inputType,
+                    declarationPattern.MatchesNull),
+            IDeclarationPatternOperation => ConstantPatternMatch.Unknown,
+            IConstantPatternOperation
+            {
+                Value.ConstantValue: { HasValue: true } constant
+            } => Equals(constant.Value, input)
+                ? ConstantPatternMatch.Yes
+                : ConstantPatternMatch.No,
+            IRelationalPatternOperation relational =>
+                MatchRelationalPattern(relational, input),
+            INegatedPatternOperation negated =>
+                Negate(GetConstantPatternMatch(
+                    compilation,
+                    negated.Pattern,
+                    input,
+                    inputType)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.And =>
+                And(
+                    GetConstantPatternMatch(
+                        compilation,
+                        binary.LeftPattern,
+                        input,
+                        inputType),
+                    GetConstantPatternMatch(
+                        compilation,
+                        binary.RightPattern,
+                        input,
+                        inputType)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.Or =>
+                Or(
+                    GetConstantPatternMatch(
+                        compilation,
+                        binary.LeftPattern,
+                        input,
+                        inputType),
+                    GetConstantPatternMatch(
+                        compilation,
+                        binary.RightPattern,
+                        input,
+                        inputType)),
+            _ => ConstantPatternMatch.Unknown
+        };
+    }
+
+    private static ConstantPatternMatch MatchTypePattern(
+        Compilation compilation,
+        ITypeSymbol matchedType,
+        object? input,
+        ITypeSymbol? inputType,
+        bool matchesNull)
+    {
+        if (input == null)
+        {
+            return matchesNull
+                ? ConstantPatternMatch.Yes
+                : ConstantPatternMatch.No;
+        }
+        var actualType = inputType?.TypeKind == TypeKind.Enum
+            ? inputType
+            : input switch
+            {
+                bool => compilation.GetSpecialType(
+                    SpecialType.System_Boolean),
+                byte => compilation.GetSpecialType(
+                    SpecialType.System_Byte),
+                sbyte => compilation.GetSpecialType(
+                    SpecialType.System_SByte),
+                short => compilation.GetSpecialType(
+                    SpecialType.System_Int16),
+                ushort => compilation.GetSpecialType(
+                    SpecialType.System_UInt16),
+                int => compilation.GetSpecialType(
+                    SpecialType.System_Int32),
+                uint => compilation.GetSpecialType(
+                    SpecialType.System_UInt32),
+                long => compilation.GetSpecialType(
+                    SpecialType.System_Int64),
+                ulong => compilation.GetSpecialType(
+                    SpecialType.System_UInt64),
+                char => compilation.GetSpecialType(
+                    SpecialType.System_Char),
+                float => compilation.GetSpecialType(
+                    SpecialType.System_Single),
+                double => compilation.GetSpecialType(
+                    SpecialType.System_Double),
+                decimal => compilation.GetSpecialType(
+                    SpecialType.System_Decimal),
+                string => compilation.GetSpecialType(
+                    SpecialType.System_String),
+                _ => null
+            };
+        if (actualType == null || actualType.TypeKind == TypeKind.Error)
+        {
+            return ConstantPatternMatch.Unknown;
+        }
+        return compilation
+            .ClassifyCommonConversion(actualType, matchedType)
+            .IsImplicit
+            ? ConstantPatternMatch.Yes
+            : ConstantPatternMatch.No;
+    }
+
+    private static ConstantPatternMatch MatchRelationalPattern(
+        IRelationalPatternOperation pattern,
+        object? input)
+    {
+        var constantValue = pattern.Value.ConstantValue;
+        if (input is not IComparable comparable ||
+            !constantValue.HasValue ||
+            constantValue.Value == null)
+        {
+            return ConstantPatternMatch.No;
+        }
+        var constant = constantValue.Value;
+        if (input is double inputDouble && double.IsNaN(inputDouble) ||
+            constant is double constantDouble && double.IsNaN(constantDouble) ||
+            input is float inputFloat && float.IsNaN(inputFloat) ||
+            constant is float constantFloat && float.IsNaN(constantFloat))
+        {
+            return ConstantPatternMatch.No;
+        }
+
+        int comparison;
+        try
+        {
+            comparison = comparable.CompareTo(constant);
+        }
+        catch (ArgumentException)
+        {
+            return ConstantPatternMatch.Unknown;
+        }
+
+        var matches = pattern.OperatorKind switch
+        {
+            BinaryOperatorKind.LessThan => comparison < 0,
+            BinaryOperatorKind.LessThanOrEqual => comparison <= 0,
+            BinaryOperatorKind.GreaterThan => comparison > 0,
+            BinaryOperatorKind.GreaterThanOrEqual => comparison >= 0,
+            _ => false
+        };
+        return matches
+            ? ConstantPatternMatch.Yes
+            : ConstantPatternMatch.No;
+    }
+
+    private static ConstantPatternMatch Negate(ConstantPatternMatch value)
+    {
+        return value switch
+        {
+            ConstantPatternMatch.Yes => ConstantPatternMatch.No,
+            ConstantPatternMatch.No => ConstantPatternMatch.Yes,
+            _ => ConstantPatternMatch.Unknown
+        };
+    }
+
+    private static ConstantPatternMatch And(
+        ConstantPatternMatch left,
+        ConstantPatternMatch right)
+    {
+        if (left == ConstantPatternMatch.No ||
+            right == ConstantPatternMatch.No)
+        {
+            return ConstantPatternMatch.No;
+        }
+        return left == ConstantPatternMatch.Yes &&
+               right == ConstantPatternMatch.Yes
+            ? ConstantPatternMatch.Yes
+            : ConstantPatternMatch.Unknown;
+    }
+
+    private static ConstantPatternMatch Or(
+        ConstantPatternMatch left,
+        ConstantPatternMatch right)
+    {
+        if (left == ConstantPatternMatch.Yes ||
+            right == ConstantPatternMatch.Yes)
+        {
+            return ConstantPatternMatch.Yes;
+        }
+        return left == ConstantPatternMatch.No &&
+               right == ConstantPatternMatch.No
+            ? ConstantPatternMatch.No
+            : ConstantPatternMatch.Unknown;
+    }
+
+    private enum ConstantPatternMatch
+    {
+        No,
+        Yes,
+        Unknown
     }
 
     private static ImmutableArray<RequiresCallTarget> GetPropertyCalls(
@@ -510,6 +1520,24 @@ internal sealed partial class RequiresCallSiteDiscovery(
             return setter == null
                 ? []
                 : [CreateSetterCall(property, setter, assignment.Value, true)];
+        }
+        if (property.Parent is ICoalesceAssignmentOperation coalesce &&
+            ReferenceEquals(coalesce.Target, property))
+        {
+            var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>(2);
+            if (getter != null)
+            {
+                calls.Add(CreateGetterCall(property, getter));
+            }
+            if (setter != null)
+            {
+                calls.Add(CreateSetterCall(
+                    property,
+                    setter,
+                    coalesce.Value,
+                    canReplay: false));
+            }
+            return calls.ToImmutable();
         }
         if (property.Parent is ICompoundAssignmentOperation compound &&
             ReferenceEquals(compound.Target, property) ||

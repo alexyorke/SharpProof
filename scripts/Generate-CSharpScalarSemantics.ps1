@@ -675,6 +675,7 @@ Assert-Properties `
     -Allowed @(
         'allowReferenceTypes',
         'excludedReferenceTypeKinds',
+        'excludedSpecialTypes',
         'excludeAbstractReferenceTypes',
         'specialTypes') `
     -Context 'builtInEquality'
@@ -692,6 +693,18 @@ $excludedReferenceTypeKinds = @(
 if (@($excludedReferenceTypeKinds | Select-Object -Unique).Count -ne
     $excludedReferenceTypeKinds.Count) {
     throw 'builtInEquality.excludedReferenceTypeKinds contains duplicates.'
+}
+$excludedEqualitySpecialTypes = @(
+    $catalog.builtInEquality.excludedSpecialTypes |
+        ForEach-Object {
+            Assert-EnumName `
+                -Value $_ `
+                -Allowed @('System_Delegate', 'System_MulticastDelegate') `
+                -Context 'builtInEquality.excludedSpecialTypes'
+        })
+if (@($excludedEqualitySpecialTypes | Select-Object -Unique).Count -ne
+    $excludedEqualitySpecialTypes.Count) {
+    throw 'builtInEquality.excludedSpecialTypes contains duplicates.'
 }
 $excludeAbstractReferenceTypes = Assert-Boolean `
     -Value $catalog.builtInEquality.excludeAbstractReferenceTypes `
@@ -994,6 +1007,13 @@ if ($allowReferenceEquality) {
     }
     $referencePattern =
         "{ IsReferenceType: true, TypeKind: not $excludedKindPattern }"
+    if ($excludedEqualitySpecialTypes.Count -gt 0) {
+        $excludedSpecialTypePattern = @(
+            $excludedEqualitySpecialTypes |
+                ForEach-Object { "SpecialType.$_" }) -join ' or '
+        $referencePattern = $referencePattern.TrimEnd(' }') +
+            ", SpecialType: not ($excludedSpecialTypePattern) }"
+    }
     if ($excludeAbstractReferenceTypes) {
         $referencePattern = "($referencePattern and not INamedTypeSymbol { IsAbstract: true })"
     }
