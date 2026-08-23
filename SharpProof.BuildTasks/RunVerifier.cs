@@ -211,16 +211,17 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             var canceled = _cancellationSignal.IsSet;
             if (timedOut)
             {
+                var processWasAlive = !process.HasExited;
                 var contained = TryTerminate(
                     process,
                     processGroupId,
                     RemainingMilliseconds(
                         processStopwatch,
                         processTimeout));
+                retainCleanupAnchor |= processWasAlive;
                 if (!contained)
                 {
                     containmentFailed = true;
-                    retainCleanupAnchor = !process.HasExited;
                 }
                 canceled = _cancellationSignal.IsSet;
                 if (!canceled && !_outputLimitSignal.IsSet)
@@ -244,14 +245,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             if (!outputCompleted)
             {
                 timedOut = true;
+                var processWasAlive = !process.HasExited;
                 var contained = TryTerminate(
                     process,
                     processGroupId,
                     RemainingMilliseconds(
                         processStopwatch,
                         processTimeout));
+                retainCleanupAnchor |= processWasAlive;
                 containmentFailed |= !contained;
-                retainCleanupAnchor |= !contained && !process.HasExited;
             }
             var outputResult = standardOutput.IsCompletedSuccessfully
                 ? standardOutput.Result
@@ -922,10 +924,11 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             if (terminateSent && !process.HasExited)
             {
                 // The supervisor remains the subreaper while it retries its
-                // individually bounded cleanup batches. Killing it here
+                // individually bounded cleanup batches. The caller retains
+                // the live supervisor as a cleanup anchor; killing it here
                 // would reparent session-escaping descendants beyond the
                 // containment boundary.
-                return false;
+                return true;
             }
             var cleanup = VerifierProcessSupervisor.StopDescendants(
                 processGroupId,
