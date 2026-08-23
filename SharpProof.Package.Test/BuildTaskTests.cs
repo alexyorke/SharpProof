@@ -829,7 +829,9 @@ public sealed class BuildTaskTests
                     "DOTNET_HOST_PATH") ?? "dotnet",
                 WorkingDirectory = directory.FullName,
                 Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 50,
+                // Let the instrumented supervisor and child finish managed
+                // startup before exercising the whole-process deadline.
+                ProjectWallTimeMilliseconds = 2000,
                 TerminationGraceMilliseconds = 50
             };
 
@@ -842,7 +844,7 @@ public sealed class BuildTaskTests
                 Assert.That(task.ExitCode, Is.EqualTo(124));
                 Assert.That(
                     stopwatch.Elapsed,
-                    Is.LessThan(TimeSpan.FromSeconds(2)));
+                    Is.LessThan(TimeSpan.FromSeconds(4)));
             }
         }
         finally
@@ -917,9 +919,9 @@ public sealed class BuildTaskTests
                     "DOTNET_HOST_PATH") ?? "dotnet",
                 WorkingDirectory = directory.FullName,
                 Arguments = [new TaskItem(helper)],
-                // Leave enough launch budget for instrumented supervisor
+                // Let the instrumented supervisor and child finish managed
                 // startup before asserting descendant cleanup behavior.
-                ProjectWallTimeMilliseconds = 500,
+                ProjectWallTimeMilliseconds = 2000,
                 TerminationGraceMilliseconds = 50
             };
 
@@ -934,7 +936,7 @@ public sealed class BuildTaskTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(task.ExitCode, Is.EqualTo(124));
-                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(1.6)));
+                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(4)));
                 Assert.That(
                     SpinWait.SpinUntil(
                         () => !IsProcessRunning(descendantId.Value),
