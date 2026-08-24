@@ -111,6 +111,16 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             var elapsed = Stopwatch.GetElapsedTime(_startedTimestamp);
             if (elapsed >= terminationStart)
             {
+                // The non-blocking check at the top of the loop and the
+                // deadline calculation are not atomic. Recheck before
+                // classifying the completion so a child that exits at the
+                // boundary is reported as exited rather than timed out.
+                if (process.WaitForExit(0))
+                {
+                    return new LinuxWorkerCompletion(
+                        LinuxWorkerCompletionKind.Exited,
+                        process.ExitCode);
+                }
                 Terminate(process, _startedTimestamp, finalLimit);
                 return new LinuxWorkerCompletion(
                     LinuxWorkerCompletionKind.TimedOut,

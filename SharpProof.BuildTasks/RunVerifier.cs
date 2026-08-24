@@ -185,13 +185,13 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     LauncherProcessReserveMilliseconds);
             }
             // The verifier launcher uses the project timeout plus termination
-            // grace as its own final deadline. Keep the full process deadline
-            // for that invocation so the reserve remains available for
-            // containment and output drain. Direct task callers do not have
-            // that inner deadline and retain the task's original timeout.
-            var verifierTimeout = workerLauncherBudget
-                ? processTimeout
-                : processTimeout - LauncherProcessReserveMilliseconds;
+            // grace as its own deadline. Keep the additional process reserve
+            // available for containment and output drain even when startup
+            // has already consumed part of the total task budget.
+            var cleanupReserve = workerLauncherBudget
+                ? WorkerLauncherProcessReserveMilliseconds
+                : LauncherProcessReserveMilliseconds;
+            var verifierTimeout = processTimeout - cleanupReserve;
             var resolvedExecutable = ResolveDotNetHost(Executable);
             supervisorNonce = CreateSupervisorNonce();
             process = new Process
@@ -267,9 +267,10 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 isOutputLimitReached,
                 Math.Min(
                     verifierTimeout,
-                    RemainingMilliseconds(
+                    ForegroundRemainingMilliseconds(
                         processStopwatch,
-                        processTimeout)));
+                        processTimeout,
+                        cleanupReserve)));
             if (!processExited)
             {
                 var processWasAlive = !process.HasExited;
@@ -895,6 +896,45 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             projectWallTimeMilliseconds +
             terminationGraceMilliseconds +
             LauncherProcessReserveMilliseconds);
+    }
+
+    internal static int ComputeForegroundTimeout(
+        int processTimeoutMilliseconds,
+        int cleanupReserveMilliseconds,
+        int elapsedMilliseconds)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            processTimeoutMilliseconds,
+            1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            cleanupReserveMilliseconds,
+            1);
+        ArgumentOutOfRangeException.ThrowIfNegative(elapsedMilliseconds);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(
+            cleanupReserveMilliseconds,
+            processTimeoutMilliseconds);
+
+        var remaining = processTimeoutMilliseconds - elapsedMilliseconds;
+        var foregroundBudget = processTimeoutMilliseconds -
+            cleanupReserveMilliseconds;
+        return remaining <= cleanupReserveMilliseconds
+            ? 0
+            : Math.Min(foregroundBudget, remaining -
+                cleanupReserveMilliseconds);
+    }
+
+    private static int ForegroundRemainingMilliseconds(
+        Stopwatch stopwatch,
+        int processTimeoutMilliseconds,
+        int cleanupReserveMilliseconds)
+    {
+        var elapsed = stopwatch.ElapsedMilliseconds >= int.MaxValue
+            ? int.MaxValue
+            : (int)stopwatch.ElapsedMilliseconds;
+        return ComputeForegroundTimeout(
+            processTimeoutMilliseconds,
+            cleanupReserveMilliseconds,
+            elapsed);
     }
 
     private static int RemainingMilliseconds(

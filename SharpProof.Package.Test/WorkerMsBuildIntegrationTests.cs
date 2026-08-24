@@ -3014,6 +3014,13 @@ public sealed class WorkerMsBuildIntegrationTests
                 targetXml,
                 Does.Not.Contain("SharpProofNativeZ3Path"));
             Assert.That(
+                targetXml,
+                Does.Contain(
+                    "Combine(\"$(MSBuildProjectDirectory)\", " +
+                    "\"$(SharpProofVerifySarifFile)\")"),
+                "Configured relative SARIF paths must be anchored to the " +
+                "project directory, not the MSBuild process directory.");
+            Assert.That(
                 verifyCore.Descendants("WriteLinesToFile"),
                 Is.Empty);
             Assert.That(

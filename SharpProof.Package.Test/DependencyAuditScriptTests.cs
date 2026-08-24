@@ -320,6 +320,29 @@ public sealed class DependencyAuditScriptTests
     }
 
     [Test]
+    public void OpenCodePluginDependencyIsDeclaredAndLocked()
+    {
+        var root = FindRepositoryRoot();
+        using var package = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, ".opencode", "package.json")));
+        using var lockFile = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root, ".opencode", "package-lock.json")));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                package.RootElement.GetProperty("dependencies")
+                    .GetProperty("oh-my-goal").GetString(),
+                Is.Not.Null.And.Not.Empty);
+            Assert.That(
+                lockFile.RootElement.GetProperty("packages")
+                    .GetProperty("node_modules/oh-my-goal")
+                    .GetProperty("version").GetString(),
+                Is.EqualTo("1.0.0"));
+        }
+    }
+
+    [Test]
     public async Task OutputCannotEscapeOrOverwriteAuditInputs()
     {
         using var workspace = DependencyAuditWorkspace.Create();

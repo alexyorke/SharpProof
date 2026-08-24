@@ -17,6 +17,23 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
+    [TestCase(10_000, 1_000, 0, 9_000)]
+    [TestCase(10_000, 1_000, 2_500, 6_500)]
+    [TestCase(10_000, 1_000, 9_500, 0)]
+    public void ForegroundVerifierBudgetPreservesCleanupReserve(
+        int processTimeoutMilliseconds,
+        int cleanupReserveMilliseconds,
+        int elapsedMilliseconds,
+        int expected)
+    {
+        Assert.That(
+            RunVerifier.ComputeForegroundTimeout(
+                processTimeoutMilliseconds,
+                cleanupReserveMilliseconds,
+                elapsedMilliseconds),
+            Is.EqualTo(expected));
+    }
+
     [Test]
     public void GeneratedSupervisorNoncePassesSupervisorGateValidation()
     {
