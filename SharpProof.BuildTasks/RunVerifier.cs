@@ -54,6 +54,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     internal Func<int, int>? OpenPidFdOverride { get; set; }
     internal Func<Process?, int, int, bool>? TryTerminateOverride { get; set; }
     internal Action<string>? ContainmentAuthenticationFailureOverride { get; set; }
+    internal Action? ArmedExecutionOverride { get; set; }
 
     internal static int RetainedCleanupAnchorCount =>
         RetainedCleanupAnchors.Count;
@@ -343,12 +344,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         }
         catch (Exception exception)
         {
+            TrySetTerminalCause(VerifierTerminalCause.Faulted);
             var contained = TryTerminate(
                 process,
                 processGroupId,
                 LauncherProcessReserveMilliseconds);
-            retainCleanupAnchor = !contained &&
-                process is { HasExited: false };
+            retainCleanupAnchor |= ShouldRetainCleanupAfterFailure(
+                processGroupId > 0,
+                supervisorArmedSignal.Task.IsCompletedSuccessfully,
+                contained);
             ExitCode = -1;
             Log.LogMessage(
                 MessageImportance.High,
@@ -522,6 +526,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     {
         _ = interrupted;
         return authenticationRequired && !outputCompleted;
+    }
+
+    internal static bool ShouldRetainCleanupAfterFailure(
+        bool processStarted,
+        bool supervisorArmed,
+        bool containmentSucceeded)
+    {
+        return processStarted &&
+            (supervisorArmed || !containmentSucceeded);
     }
 
     internal static bool SupervisorExitCompletesTermination(
@@ -856,6 +869,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         var stopwatch = Stopwatch.StartNew();
         while (!_cancellationSignal.IsSet && !_outputLimitSignal.IsSet)
         {
+            if (_supervisorArmedSignal?.Task.IsCompletedSuccessfully == true &&
+                ArmedExecutionOverride is { } armedExecutionOverride)
+            {
+                ArmedExecutionOverride = null;
+                armedExecutionOverride();
+            }
             var remaining = RemainingMilliseconds(
                 stopwatch,
                 timeoutMilliseconds);
@@ -1278,7 +1297,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         Completed,
         Canceled,
         OutputLimit,
-        Timeout
+        Timeout,
+        Faulted
     }
 
     private static string ResolveDotNetFromPath()

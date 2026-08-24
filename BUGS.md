@@ -2073,11 +2073,41 @@ about the same root cause are combined below.
   covers armed 125 and non-125 exits, pre-arm 125 and non-125 exits, and the
   not-ready state.
 
+### 73. Fault handling can abandon an armed cleanup supervisor
+
+- Severity: High (P1)
+- Status: Fixed on this branch after the final post-rebase convergence audit.
+- Affected code: `SharpProof.BuildTasks/RunVerifier.cs`, `Execute` exception
+  handling and retained cleanup ownership.
+- Normal trigger: verifier execution or output handling throws after the
+  supervisor has armed. `TryTerminate` delivers the termination request but
+  returns while the live supervisor is still cleaning descendants.
+- Expected: the task retains the armed supervisor, pidfd, output readers, and
+  nonce until exit, then authenticates the cleanup receipt. A later
+  cancellation cannot erase an execution fault that won the terminal race.
+- Actual impact before the fix: the catch path treated a successful
+  termination request as completed cleanup, cleared the retention flag, and
+  disposed the process and pidfd immediately. Missing cleanup authentication
+  could therefore go unobserved, and a later cancellation could suppress the
+  retained failure callback.
+- Evidence confidence: High from the explicit live-supervisor success branch
+  in `TryTerminate` and the catch path's inverse-boolean retention decision.
+- Fix: latch execution faults as a terminal cause and retain every started,
+  armed supervisor after a failure, as well as every boundary whose containment
+  attempt did not succeed. Preserve any retention decision already made before
+  the exception.
+- Regression tests: `FailureRetainsArmedOrIncompleteCleanupBoundary` covers the
+  catch-path state table, while
+  `PostArmFaultRetainsAuthenticationAfterLaterCancellation` drives the full
+  fault, concurrent cancellation, retained resource transfer, process exit,
+  and missing-receipt callback path.
+
 ## Post-rebase triage ledger
 
-- Accepted two new High/P1 roots in the only production file changed by the
-  squashed merge relative to the audited verifier-supervisor tip (bugs 71 and
-  72), and fixed both with focused regressions.
+- Accepted three new High/P1 roots in the only production file changed by the
+  squashed merge relative to the audited verifier-supervisor tip (bugs 71-73),
+  and fixed all three with focused regressions. The final split convergence
+  audit reported no other supported-path finding besides bug 73.
 - The linked-worktree Docker investigation also rejected a proposed network
   bootstrap workaround because it would regress offline archive commands and
   configured non-`master` origins. That experiment was removed and is not part

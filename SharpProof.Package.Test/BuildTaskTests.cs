@@ -412,6 +412,25 @@ public sealed class BuildTaskTests
         }
     }
 
+    [TestCase(false, true, false, false)]
+    [TestCase(true, false, true, false)]
+    [TestCase(true, false, false, true)]
+    [TestCase(true, true, true, true)]
+    [TestCase(true, true, false, true)]
+    public void FailureRetainsArmedOrIncompleteCleanupBoundary(
+        bool processStarted,
+        bool supervisorArmed,
+        bool containmentSucceeded,
+        bool expected)
+    {
+        Assert.That(
+            RunVerifier.ShouldRetainCleanupAfterFailure(
+                processStarted,
+                supervisorArmed,
+                containmentSucceeded),
+            Is.EqualTo(expected));
+    }
+
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
@@ -1281,6 +1300,104 @@ public sealed class BuildTaskTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(
+                    await containmentFailure.Task.WaitAsync(
+                        TimeSpan.FromSeconds(2)),
+                    Does.Contain("cleanup receipt"));
+            }
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                    TimeSpan.FromSeconds(2)),
+                Is.True);
+        }
+        finally
+        {
+            resumeTermination.Set();
+            if (supervisorId > 0 && IsProcessRunning(supervisorId))
+            {
+                using var supervisor = Process.GetProcessById(supervisorId);
+                supervisor.Kill(entireProcessTree: true);
+                await supervisor.WaitForExitAsync();
+            }
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public async System.Threading.Tasks.Task
+        PostArmFaultRetainsAuthenticationAfterLaterCancellation()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-fault-cleanup-order-");
+        using var faultTerminationObserved = new ManualResetEventSlim();
+        using var resumeTermination = new ManualResetEventSlim();
+        var supervisorId = 0;
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "using System.Threading; Thread.Sleep(10000);");
+            var terminationCalls = 0;
+            var containmentFailure =
+                new TaskCompletionSource<string>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 300000,
+                TerminationGraceMilliseconds = 1,
+                ArmedExecutionOverride = static () =>
+                    throw new InvalidOperationException(
+                        "forced post-arm execution fault"),
+                TryTerminateOverride = (process, _, _) =>
+                {
+                    if (Interlocked.Increment(ref terminationCalls) == 1)
+                    {
+                        supervisorId = process?.Id ?? 0;
+                        faultTerminationObserved.Set();
+                        Assert.That(
+                            resumeTermination.Wait(TimeSpan.FromSeconds(2)),
+                            Is.True);
+                    }
+                    return true;
+                },
+                ContainmentAuthenticationFailureOverride = message =>
+                    containmentFailure.TrySetResult(message)
+            };
+
+            var execution = System.Threading.Tasks.Task.Run(task.Execute);
+            Assert.That(
+                faultTerminationObserved.Wait(TimeSpan.FromSeconds(2)),
+                Is.True,
+                "The post-arm execution fault was not observed.");
+            Assert.That(supervisorId, Is.GreaterThan(0));
+            await System.Threading.Tasks.Task.Run(task.Cancel)
+                .WaitAsync(TimeSpan.FromSeconds(2));
+            resumeTermination.Set();
+
+            Assert.That(
+                await execution.WaitAsync(TimeSpan.FromSeconds(2)),
+                Is.True);
+            Assert.That(
+                RunVerifier.RetainedCleanupAnchorCount,
+                Is.GreaterThan(0));
+            using (var supervisor = Process.GetProcessById(supervisorId))
+            {
+                supervisor.Kill(entireProcessTree: true);
+                await supervisor.WaitForExitAsync()
+                    .WaitAsync(TimeSpan.FromSeconds(2));
+                Assert.That(supervisor.HasExited, Is.True);
+            }
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(-1));
                 Assert.That(
                     await containmentFailure.Task.WaitAsync(
                         TimeSpan.FromSeconds(2)),
