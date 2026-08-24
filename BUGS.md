@@ -2,18 +2,22 @@
 
 ## Scope and method
 
-This report covers ordinary correctness and reliability behavior in verifier
-process supervision and the directly connected build-task, launcher,
-publication, protocol, cache, and Linux-worker paths. It excludes analyzers,
-corpus tooling, documentation-only defects, test infrastructure, scripts,
-non-routine process behavior, and hardening work.
+This report covers ordinary correctness and reliability behavior across the
+complete repository. Earlier rounds concentrated on verifier process
+supervision and its connected build-task, launcher, publication, protocol,
+cache, and Linux-worker paths. The final exhaustive round inspected every
+tracked file at commit `8a5141d7d8772d1e9659099531086d156ea11e92` except this
+report: 833 files and 248,733 physical lines. Its scope included production
+code, tests, analyzers, build and release infrastructure, scripts, container
+configuration, samples, specifications, and contract documentation.
 
-The final pass was static only: source, tests, targets, and documented contracts
-were inspected, but no build, test, or executable reproduction was run after the
-scope changed to documentation-only work. Where an audit report supplied a prior
-isolated reproduction, that is called out explicitly. Otherwise, confidence is
-based on reachable control flow and the documented contract. Duplicate reports
-about the same root cause are combined below.
+Ten read-only audit shards inspected non-overlapping file manifests line by
+line. The main audit independently traced every candidate through reachable
+control flow, checked its documented contract, searched for duplicate root
+causes, and classified unsupported or disproved leads separately. Findings are
+static proofs unless an isolated or canonical-container reproduction is
+explicitly recorded. Cybersecurity, hacking, adversarial hardening, and other
+non-routine threat work remained out of scope.
 
 ## Confirmed bugs
 
@@ -2104,6 +2108,350 @@ about the same root cause are combined below.
   fault, concurrent cancellation, retained resource transfer, process exit,
   and missing-receipt callback path.
 
+### 74. Primary-constructor overload collisions suppress analyzer diagnostics and manifest entries
+
+- Severity: High
+- Affected code:
+  `SharpProof.Analyzer.Core/PrimaryConstructorCallableInventory.cs`,
+  `AnalyzerFeaturePipeline.AnalyzePrimaryConstructor`, and the compiler
+  collector's shared primary-constructor inventory.
+- Normal trigger: a primary constructor and an ordinary constructor have the
+  same parameter count and parameter names but different parameter types, for
+  example `Derived(int marker)` plus `Derived(string marker)`.
+- Expected: semantic symbol identity selects the primary constructor. Its base
+  initializer is analyzed and emitted to the compiler manifest, including any
+  ordinary diagnostic such as `SP0027` for a provably invalid argument.
+- Actual: the inventory matches only parameter count and names. Both
+  constructors match, so the helper returns failure; analyzer processing and
+  manifest collection silently skip the primary constructor.
+- Evidence confidence: High from the two-candidate branch in
+  `PrimaryConstructorCallableInventory` and both reachable callers.
+- Recommended fix: identify the declared primary-constructor symbol directly,
+  or include semantic parameter types and ref kinds in the match.
+- Regression test: use equal-name, equal-arity overloads with different types;
+  assert the base-initializer diagnostic and the primary-constructor manifest
+  entry.
+
+### 75. Conditional local assignment is ignored when deciding lock nullness
+
+- Severity: High
+- Affected code: `SharpProof.Effects/OperationNullnessEvaluator.cs` and
+  the lock handling in `OperationEffectScanner.Expressions.cs`.
+- Normal trigger: initialize a local to null, conditionally assign a non-null
+  object, then lock that local and perform a visible write in the lock body.
+- Expected: the summary represents both feasible traces: the non-null trace
+  executes the body write, while the null trace can throw
+  `ArgumentNullException`.
+- Actual: `IsSourceDefinitelyNull` returns true immediately for a value
+  whose origin is an `ILockOperation`. It does not scan the intervening
+  conditional assignment, so the scanner treats the source as definitely null
+  and omits the feasible body effects.
+- Evidence confidence: High from the special-case return and the scanner branch
+  that skips the body.
+- Recommended fix: remove the origin shortcut and use provenance-aware abstract
+  flow that preserves maybe-null state through assignments.
+- Regression test: summarize a conditional assignment followed by a lock and
+  assert both the body write and possible null exception.
+
+### 76. Diverging Dispose methods lose effects performed before divergence
+
+- Severity: High
+- Affected code:
+  `SharpProof.Effects/UsingDisposalEffectResolver.cs` and synthesized
+  disposal handling in `OperationEffectScanner.cs`.
+- Normal trigger: a resource's `Dispose` mutates visible state and then
+  diverges, for example by entering an infinite loop.
+- Expected: the mutation remains in the effect summary even though disposal
+  cannot complete normally or throw.
+- Actual: when the disposer is classified as unable to complete normally and
+  unable to throw, the resolver returns `EffectSummary.Empty` without
+  resolving the method body. The scanner deliberately omits the synthesized
+  disposal operation, so no other path recovers the prefix effects.
+- Evidence confidence: High from the early return and the scanner's explicit
+  synthesized-disposal exclusion.
+- Recommended fix: resolve disposer effects regardless of completion mode and
+  use the completion classification only to control subsequent flow.
+- Regression test: use a disposer that writes static state before divergence
+  and assert that the write is retained.
+
+### 77. Requires reachability misses nested positional-pattern captures
+
+- Severity: Medium
+- Affected code:
+  `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs`,
+  particularly whole-input designation and pattern-destination propagation.
+- Normal trigger: destructure a tuple or nested value with a positional pattern,
+  capture a delegate from a subpattern, and invoke that captured delegate on a
+  reachable path.
+- Expected: the captured value keeps the correct tuple, property, or list
+  provenance, allowing the analyzer to report a downstream violated
+  requirement.
+- Actual: whole-input designation handles direct, parenthesized, and binary
+  patterns but does not propagate destinations through nested
+  `RecursivePatternSyntax` subpatterns. The is-pattern operation is treated
+  as a nonexecuting observation, so the invocation loses its reachable source
+  and a diagnostic such as `SP0027` is omitted.
+- Evidence confidence: High from the missing recursive-pattern branch and the
+  invocation provenance lookup.
+- Recommended fix: propagate a precise subvalue path for positional, property,
+  and list captures rather than assigning every capture the whole-input path.
+- Regression test: cover nested positional, property, and list captures that
+  lead to a requirement violation.
+
+### 78. Semantic-string detection misses switch-expression guards
+
+- Severity: Medium
+- Affected code:
+  `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`,
+  `IsInsideCondition`, and semantic reason/provenance string checks.
+- Normal trigger: compare a semantic reason or provenance string inside a
+  switch-expression `when` guard.
+- Expected: `SPMETA004` reports that semantic reason/provenance text is
+  controlling behavior.
+- Actual: condition detection recognizes if, while, do, for, and conditional
+  expressions, but not switch guards. The comparison therefore escapes the
+  diagnostic.
+- Evidence confidence: High from the closed syntax-kind checks and the missing
+  `WhenClauseSyntax` case.
+- Recommended fix: recognize switch guards while preventing duplicate reports
+  with the existing constant-pattern path.
+- Regression test: put a semantic reason-string comparison in a switch guard
+  and assert exactly one `SPMETA004`.
+
+### 79. Conditional-return helpers evade cache-soundness diagnostics
+
+- Severity: Medium
+- Affected code: `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs`,
+  especially returned-value name extraction for `SPMETA010`.
+- Normal trigger: a helper returns a conditional expression selecting
+  `Answer.Unknown` or `Answer.Proven`, and its result is written to
+  a proof cache.
+- Expected: the rule discovers the possible unknown result and reports
+  `SPMETA010`.
+- Actual: returned-value extraction handles member access, identifiers, and
+  object creation, but not conditional or switch expressions. The fallback sees
+  only the helper method name, so the unknown branch is missed.
+- Evidence confidence: High from the finite returned-expression cases and the
+  cache-write data flow.
+- Recommended fix: recursively inspect every return branch of conditional and
+  switch expressions.
+- Regression test: cover helpers with unknown values in either conditional
+  branch and in switch arms.
+
+### 80. Canonical assumption sorting can reorder clause identities
+
+- Severity: Medium
+- Affected code:
+  `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs`,
+  `SharpProof.Worker.Protocol/ProtocolJson.cs`, and
+  `CompilerCallableLowerer.cs`.
+- Normal trigger: a callable has two same-kind requirements or assumptions whose
+  stable hashed IDs sort in the opposite order from their source clauses.
+- Expected: each lowered clause remains paired with the ID derived from that
+  clause, so used-assumption and unsat-core provenance identifies the right
+  source fact.
+- Actual: manifest sealing sorts assumptions by kind and ID. Lowering filters
+  that sorted list by kind and attaches IDs positionally to source-ordered
+  clauses. Validation compares only sorted ID/kind sets, so a swap passes while
+  predicate hashes and reported assumption labels refer to the wrong clause.
+- Evidence confidence: High from the canonicalization, positional join, and
+  set-only validation sequence. The logical result may remain sound, but
+  provenance identity is incorrect.
+- Recommended fix: carry each source clause's ID through lowering using a
+  semantic fingerprint or explicit clause-to-ID mapping.
+- Regression test: choose two source clauses with inverse lexical ID order and
+  assert that every lowered predicate retains its own manifest ID.
+
+### 81. Launcher and worker disagree on UTF-8-BOM compiler manifests
+
+- Severity: Medium
+- Affected code: manifest decoding in
+  `SharpProof.Worker.Launcher/Program.cs`,
+  `SharpProof.Worker/WorkerInputSnapshot.cs`, and
+  `SharpProof.Worker.Protocol/ProtocolJson.cs`.
+- Normal trigger: supply an otherwise canonical compiler manifest prefixed by
+  one UTF-8 byte-order mark.
+- Expected: launcher and worker apply the same strict decoding policy, while
+  the content digest continues to cover the original raw bytes.
+- Actual: the launcher performs strict UTF-8 decoding without removing the BOM,
+  leaving a leading U+FEFF that fails canonical JSON equality. The worker input
+  and protocol readers explicitly strip one BOM, so the launcher rejects input
+  that the worker-side readers accept.
+- Evidence confidence: High from the directly inconsistent decode paths.
+- Recommended fix: share a strict decoder that strips exactly one UTF-8 BOM
+  after preserving the raw-byte digest.
+- Regression test: prefix a valid manifest with a BOM, assert launcher request
+  creation succeeds, and assert the recorded digest includes the BOM bytes.
+
+### 82. Corpus-import cancellation can leave a Git child running
+
+- Severity: Medium
+- Affected code:
+  `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs`, Git process
+  execution and cancellation.
+- Normal trigger: cancel during a slow or hung Git
+  `rev-parse`, `status`, or `config` operation.
+- Expected: cancellation terminates and awaits the complete Git process tree
+  before propagating `OperationCanceledException`.
+- Actual: output reads and `WaitForExitAsync` receive the token, but the
+  method has no cancellation cleanup. Disposing the `Process` wrapper
+  releases the handle and does not terminate the child, which can survive the
+  canceled import.
+- Evidence confidence: High from the uncaught cancellation path and standard
+  `Process.Dispose` behavior.
+- Recommended fix: catch cancellation, kill the entire process tree, perform a
+  bounded exit wait, then rethrow.
+- Regression test: use a fake blocking Git executable, cancel the operation,
+  and assert its child process exits.
+
+### 83. Differential oracle falsely mismatches reference and sequence results
+
+- Severity: Medium
+- Affected code: `SharpProof.Testing/IrCSharpDifferentialOracle.cs`,
+  result conversion and `CompareValue`.
+- Normal trigger: compare a root expression whose result is a non-null reference
+  or sequence.
+- Expected: values converted into the supported runtime object and array forms
+  compare according to the oracle's reference-identity and sequence semantics.
+- Actual: conversion accepts IR reference and sequence values, but comparison
+  handles only boolean, integer, string, and null kinds. All other supported
+  converted values fall through to false, producing a mismatch even when the
+  executions agree.
+- Evidence confidence: High from the conversion cases followed by the closed
+  comparison switch.
+- Recommended fix: compare reference identity consistently with conversion and
+  recursively compare sequence elements while preserving null and alias
+  relationships.
+- Regression test: compare an agreed non-null reference root and an agreed
+  integer-sequence root.
+
+### 84. External exception construction drops evaluated argument effects
+
+- Severity: Medium
+- Affected code: `SharpProof.Effects/OperationEffectScanner.cs`,
+  `ScanThrow`, and
+  `SharpProof.Effects/EffectSummaryOperations.cs`.
+- Normal trigger: throw an externally defined exception whose constructor
+  argument performs a read, assignment, allocation, or other visible effect.
+- Expected: argument effects are sequenced before the exception-construction
+  summary because C# evaluates those arguments before throwing.
+- Actual: the scanner evaluates the arguments and preserves only their
+  noncompletion result. On the completing path it returns the external
+  exception-construction summary, whose helper starts with empty reads, writes,
+  and allocations, discarding the already evaluated argument summary.
+- Evidence confidence: High from the computed-but-unsequenced argument summary.
+- Recommended fix: sequence the argument summary with the exception-construction
+  summary before returning.
+- Regression test: throw an external exception with a side-effecting direct
+  argument and assert that effect remains in the summary.
+
+### 85. API-spec catalog generation can leave mixed generated outputs
+
+- Severity: Medium
+- Affected code: `scripts/Generate-ApiSpecCatalog.ps1` and
+  `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1`.
+- Normal trigger: distinct witness IDs normalize to the same generated factory
+  name, such as `bcl.foo-bar` and `bcl.foo_bar`.
+- Expected: all cross-output validation succeeds before any generated source,
+  documentation, or runtime witness file is replaced; on failure all prior
+  outputs remain unchanged.
+- Actual: the parent generator validates exact witness IDs and writes source and
+  documentation before invoking the runtime generator. The runtime generator
+  then discovers the normalized-name collision and fails, leaving newly written
+  outputs beside a stale runtime witness file.
+- Evidence confidence: High from the write-before-child-validation order and
+  the child's additional normalization check.
+- Recommended fix: share every validation step before writes, or stage all
+  outputs and replace them only after the complete pipeline succeeds.
+- Regression test: run against colliding IDs in a temporary tree and assert all
+  three output paths are byte-for-byte unchanged after failure.
+
+### 86. Package-test timeout does not cover worker-test discovery
+
+- Severity: Medium
+- Affected code: `scripts/Invoke-SharpProofPackageTests.ps1`, worker
+  test discovery and deadline initialization.
+- Normal trigger: `dotnet test --list-tests` hangs while discovering
+  worker tests.
+- Expected: the configured package-test timeout bounds discovery as well as test
+  execution and terminates the process tree on expiry.
+- Actual: discovery invokes raw `dotnet test --list-tests` before the
+  script initializes its deadline and without the timeout-aware process wrapper.
+  A hung discovery can therefore block indefinitely.
+- Evidence confidence: High from the command order and direct invocation.
+- Recommended fix: start the deadline before discovery and run discovery through
+  the same timeout and process-tree cleanup boundary.
+- Regression test: substitute a fake `dotnet` that blocks during
+  `--list-tests` and assert a one-second timeout stops it.
+
+### 87. Architecture documentation contradicts the compiler artifact schema version
+
+- Severity: Low
+- Affected code: `docs/architecture.md`, the compiler artifact schema
+  discussion.
+- Normal trigger: use the architecture document to determine the current
+  compiler artifact schema.
+- Expected: the section consistently identifies compiler artifact schema 15 and
+  distinguishes it from worker protocol schema 11.
+- Actual: the paragraph introduces compiler artifact schema 15 but later says
+  "Schema 11 retains" while still discussing that artifact. The acceptance
+  contract and the other repository documentation identify 11 as the worker
+  protocol version and 15 as the compiler artifact version.
+- Evidence confidence: High from the contradiction within one paragraph and
+  the version constants in the repository contracts.
+- Recommended fix: change that artifact reference to schema 15 or generate the
+  version reference from the canonical contract.
+- Regression test: add a documentation consistency check for published schema
+  version references.
+
+## Exhaustive repository audit coverage
+
+The final round used ten non-overlapping, read-only manifests. Every manifest
+was reported complete, no file appeared in two shards, and the combined ledger
+matched every tracked file except `BUGS.md`.
+
+| Shard | Files | Physical lines |
+| --- | ---: | ---: |
+| Scripts A | 45 | 17,727 |
+| Scripts and infrastructure | 190 | 30,114 |
+| Analyzers and meta-analyzers | 80 | 27,649 |
+| Compiler pipeline | 55 | 22,196 |
+| Effects | 56 | 26,579 |
+| Worker tests | 28 | 25,610 |
+| Worker and package paths | 67 | 26,555 |
+| IR, frontend, and gates | 127 | 31,325 |
+| Runtime and tooling | 90 | 21,842 |
+| Contracts and specifications | 95 | 19,136 |
+| **Total** | **833** | **248,733** |
+
+Verification used four gates before accepting a finding:
+
+1. Trace a normal, reachable trigger from public or in-repository entry points.
+2. Compare the behavior with source comments, tests, specifications, and
+   repository contracts.
+3. Follow the complete relevant control and data flow, including downstream
+   validators and cleanup.
+4. Search this report for an existing root cause, then independently classify
+   severity and confidence.
+
+This round accepted 14 independent findings: three High, ten Medium, and one
+Low. It changed no production code, test code, configuration, or public API.
+
+## Rejected and unconfirmed exhaustive-audit leads
+
+- The proposed performance-probe cancellation race was retracted after tracing
+  the synchronous portion of the async chain. `VerifyAsync` reaches the
+  backend and sets the probe's entry signal before its first incomplete await,
+  so the outer wait cannot abandon the call in the reported state.
+- The proposed Linux backslash-path defect was disproved in the canonical
+  container. PowerShell normalized `Join-Path` with `..\..` to
+  `/workspace/SharpProof`, and `Get-Content` successfully read
+  `/workspace/SharpProof/eng\acceptance\contract.json` (39,366 bytes).
+- The unused mandatory `RunAttempt` field in
+  `GitHubEvidenceArtifact` remains unconfirmed. No reachable
+  in-repository caller of the helper was found, so the audit could not establish
+  a supported trigger or user-visible failure.
+
 ## Post-rebase triage ledger
 
 - Accepted three new High/P1 roots in the only production file changed by the
@@ -2434,6 +2782,22 @@ used for the final broad run.
 - `scripts/Format-CSharp.ps1 -Verify`: passed after a locked restore in the same
   container environment.
 
+The exhaustive repository round used the identical tracked code and
+configuration tree. Excluding `BUGS.md`, audit commit
+`8a5141d7d8772d1e9659099531086d156ea11e92` was byte-for-byte identical
+to the validated tree at `0a32288de3f615b2786fd3928fcf609e86b449e8`.
+Fresh canonical-container evidence for that tree was recorded under Compose
+project `sharpproof-validation-0a32288de`:
+
+- `docker compose run --rm tooling build`: zero warnings and zero errors.
+- `docker compose run --rm tooling test`: every project passed. Package
+  reported 265 passed with one expected unsupported-host skip; Worker 597,
+  Architecture 479, Analyzer 389, Effects 194, Gates 27, and Fuzz 33 all
+  passed, with no failures.
+
+No tracked code or configuration changed during this documentation-only round,
+so the plan did not require another Docker run after editing this report.
+
 Earlier entries marked as previously reproduced still refer to their original
 isolated evidence. Bugs without a fixed status remain audit findings rather than
-claims that all 73 entries were remediated in this pass.
+claims that all 87 entries were remediated in this pass.
