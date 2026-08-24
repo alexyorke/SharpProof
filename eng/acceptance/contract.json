@@ -216,7 +216,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-      "inventorySha256": "bfe6906b52cc86d83a1e9279889fa48e75a69a4b4d40358cc433d7917a0dd9a7",
+      "inventorySha256": "5fcd4593bac0b4c8622a3547d4c7696a79ff3761b00959615e86e05e6160a4ff",
     "components": [
       {
         "name": "discovery",
@@ -687,6 +687,11 @@
         "paths": [
           ".github/actions/build-tooling/action.yml",
           ".github/workflows/nightly.yml",
+          "Directory.Build.props",
+          "Directory.Packages.props",
+          "NuGet.Config",
+          "SharpProof.PackageMetadata.props",
+          "SharpProof.Release.props",
           "SharpProof.Gates/Program.cs",
           "SharpProof.Gates/SharpProof.Gates.csproj",
           "SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1",
@@ -695,6 +700,7 @@
           "eng/release/first-party-assemblies.json",
           "eng/release/package-dependency-contract.json",
           "eng/release/third-party-components.json",
+          "global.json",
           "scripts/Assert-SharpProofStandaloneGateResult.ps1",
           "scripts/Get-SharpProofDevCheckPlan.ps1",
           "scripts/Get-SharpProofPilotPackageAuthority.ps1",
