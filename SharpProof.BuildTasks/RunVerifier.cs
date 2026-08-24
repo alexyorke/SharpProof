@@ -187,11 +187,16 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             // The verifier launcher uses the project timeout plus termination
             // grace as its own deadline. Keep the additional process reserve
             // available for containment and output drain even when startup
-            // has already consumed part of the total task budget.
+            // has already consumed part of the total task budget. The worker
+            // launcher has its own authenticated final deadline, so its outer
+            // reserve remains after that inner deadline rather than shortening
+            // the launcher's result-publication window.
             var cleanupReserve = workerLauncherBudget
                 ? WorkerLauncherProcessReserveMilliseconds
                 : LauncherProcessReserveMilliseconds;
-            var verifierTimeout = processTimeout - cleanupReserve;
+            var verifierTimeout = workerLauncherBudget
+                ? processTimeout
+                : processTimeout - cleanupReserve;
             var resolvedExecutable = ResolveDotNetHost(Executable);
             supervisorNonce = CreateSupervisorNonce();
             process = new Process
@@ -262,15 +267,18 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     ProcessGateStartMessage + " " + supervisorNonce);
                 process.StandardInput.Close();
             }
+            var foregroundTimeout = workerLauncherBudget
+                ? RemainingMilliseconds(processStopwatch, processTimeout)
+                : ForegroundRemainingMilliseconds(
+                    processStopwatch,
+                    processTimeout,
+                    cleanupReserve);
             var processExited = WaitForExitOrCancellation(
                 process,
                 isOutputLimitReached,
                 Math.Min(
                     verifierTimeout,
-                    ForegroundRemainingMilliseconds(
-                        processStopwatch,
-                        processTimeout,
-                        cleanupReserve)));
+                    foregroundTimeout));
             if (!processExited)
             {
                 var processWasAlive = !process.HasExited;
