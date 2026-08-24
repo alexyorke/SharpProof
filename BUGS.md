@@ -1150,6 +1150,8 @@ about the same root cause are combined below.
 ### 45. Sequential task disposal can break retained cleanup authentication
 
 - Severity: High (P1)
+- Status: Fixed on this branch after the exact-commit container validation
+  reproduced the failure under package-shard load.
 - Affected code: `SharpProof.BuildTasks/RunVerifier.cs`, `Dispose`, `Execute`,
   `ReadBoundedOutputAsync`, `RetainCleanupAnchor`, and
   `ObserveCleanupAnchorAsync` (approximately lines 87-92, 178-186, 221-340,
@@ -1162,7 +1164,7 @@ about the same root cause are combined below.
 - Expected: retained cleanup owns every resource its output readers require until
   authentication completes, and ordinary sequential `Dispose` after `Execute`
   cannot invalidate that transferred lifetime.
-- Actual impact: both retained readers captured the task-owned
+- Actual impact before the fix: both retained readers captured the task-owned
   `_outputLimitSignal`, but `Dispose` immediately disposes that event. Every
   subsequent over-limit read calls `Set()` and faults with
   `ObjectDisposedException`, potentially before parsing the valid cleanup line.
@@ -1171,16 +1173,16 @@ about the same root cause are combined below.
   is `Environment.FailFast`. This is neither the rejected concurrent-`Dispose`
   scenario nor bug 13's cancellation-source callback race.
 - Evidence confidence: High from the explicit resource capture, ownership
-  transfer, event disposal, fault-to-null authentication path, and production
-  callback; static only.
-- Suggested fix: transfer ownership of every reader dependency to the cleanup
-  anchor, or replace the disposable event captured by asynchronous readers with
-  an independently owned atomic/cancellation signal. Dispose the signal only
-  after both readers have completed, including retained-cleanup completion.
-- Regression test: gate stdout after it exceeds the capture limit, let `Execute`
-  retain cleanup and return, dispose the task sequentially, then release more
-  output followed by a valid cleanup receipt; assert the reader does not fault,
-  no authentication-failure callback runs, and the anchor is released.
+  transfer, event disposal, fault-to-null authentication path, and a local
+  reproduction whose package-test host reached the production `FailFast`
+  callback while 14 shards were under load.
+- Fix: replace the task-owned disposable event with a per-`Execute` atomic flag
+  captured by the readers. Sequential task disposal can no longer invalidate
+  retained reader state, and separate invocations cannot share that state.
+- Regression test: `SequentialDisposePreservesRetainedOutputReader` forces an
+  output-limit retention, disposes the completed task while the supervisor is
+  still live, then accepts its later valid cleanup receipt and observes anchor
+  release without an authentication failure.
 
 ### 46. Custom PDB outputs are absent from compiler/publication collision checks
 
@@ -2108,6 +2110,9 @@ about the same root cause are combined below.
   squashed merge relative to the audited verifier-supervisor tip (bugs 71-73),
   and fixed all three with focused regressions. The final split convergence
   audit reported no other supported-path finding besides bug 73.
+- Exact-commit package-shard validation then reproduced the previously reported
+  sequential-disposal race (bug 45). It was fixed with a deterministic retained
+  reader lifetime regression before validation resumed.
 - The linked-worktree Docker investigation also rejected a proposed network
   bootstrap workaround because it would regress offline archive commands and
   configured non-`master` origins. That experiment was removed and is not part

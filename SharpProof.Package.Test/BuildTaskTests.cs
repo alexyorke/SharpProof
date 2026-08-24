@@ -100,7 +100,7 @@ public sealed class BuildTaskTests
         var result = await RunVerifier.ReadBoundedOutputAsync(
             new StringReader(input),
             nonce,
-            signal);
+            signal.Set);
 
         using (Assert.EnterMultipleScope())
         {
@@ -132,7 +132,7 @@ public sealed class BuildTaskTests
         var read = RunVerifier.ReadBoundedOutputAsync(
             reader,
             nonce,
-            signal,
+            signal.Set,
             armed);
         try
         {
@@ -166,7 +166,7 @@ public sealed class BuildTaskTests
         var read = RunVerifier.ReadBoundedOutputAsync(
             reader,
             nonce,
-            signal,
+            signal.Set,
             supervisorCleanupSignal: cleanup);
         try
         {
@@ -582,6 +582,61 @@ public sealed class BuildTaskTests
                     () => RunVerifier.RetainedCleanupAnchorCount == 0,
                     TimeSpan.FromSeconds(3)),
                 Is.True);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void SequentialDisposePreservesRetainedOutputReader()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-output-limit-dispose-");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "System.Console.Out.Write(new string('x', " +
+                (RunVerifier.MaximumCapturedOutputCharacters + 1)
+                    .ToString(CultureInfo.InvariantCulture) +
+                ")); System.Threading.Thread.Sleep(1500);");
+            var containmentFailure =
+                new TaskCompletionSource<string>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+            using (var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 5000,
+                TerminationGraceMilliseconds = 1,
+                TryTerminateOverride = static (_, _, _) => true,
+                ContainmentAuthenticationFailureOverride = message =>
+                    containmentFailure.TrySetResult(message)
+            })
+            {
+                Assert.That(task.Execute(), Is.True);
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(task.ExitCode, Is.EqualTo(124));
+                    Assert.That(
+                        RunVerifier.RetainedCleanupAnchorCount,
+                        Is.GreaterThan(0));
+                }
+            }
+
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                    TimeSpan.FromSeconds(3)),
+                Is.True);
+            Assert.That(containmentFailure.Task.IsCompleted, Is.False);
         }
         finally
         {

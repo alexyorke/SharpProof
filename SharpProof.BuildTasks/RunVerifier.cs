@@ -40,7 +40,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     private static long _nextCleanupAnchor;
     private readonly object _synchronization = new();
     private readonly ManualResetEventSlim _cancellationSignal = new();
-    private readonly ManualResetEventSlim _outputLimitSignal = new();
     private Process? _process;
     private int _processGroupId;
     private int _processGroupPidFd = -1;
@@ -96,7 +95,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     public void Dispose()
     {
         _cancellationSignal.Dispose();
-        _outputLimitSignal.Dispose();
         _process?.Dispose();
     }
 
@@ -118,6 +116,11 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             new System.Threading.Tasks.TaskCompletionSource<bool>(
                 System.Threading.Tasks.TaskCreationOptions
                     .RunContinuationsAsynchronously);
+        var outputLimitReached = 0;
+        Action signalOutputLimit = () =>
+            Volatile.Write(ref outputLimitReached, 1);
+        Func<bool> isOutputLimitReached = () =>
+            Volatile.Read(ref outputLimitReached) != 0;
         var supervisorNonce = string.Empty;
         var retainCleanupAnchor = false;
         HasStructuredError = false;
@@ -128,7 +131,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             if (!_canceled)
             {
                 _cancellationSignal.Reset();
-                _outputLimitSignal.Reset();
                 Volatile.Write(
                     ref _terminalCause,
                     (int)VerifierTerminalCause.None);
@@ -210,7 +212,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 standardOutput = ReadBoundedOutputAsync(
                     process.StandardOutput,
                     supervisorNonce,
-                    _outputLimitSignal,
+                    signalOutputLimit,
                     supervisorArmedSignal,
                     supervisorCleanupSignal,
                     () => TrySetTerminalCause(
@@ -218,7 +220,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 standardError = ReadBoundedOutputAsync(
                     process.StandardError,
                     supervisorNonce: null,
-                    _outputLimitSignal,
+                    signalOutputLimit,
                     outputLimitReached: () => TrySetTerminalCause(
                         VerifierTerminalCause.OutputLimit));
                 _supervisorOutputCompletion = standardOutput;
@@ -228,6 +230,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             }
             var processExited = WaitForExitOrCancellation(
                 process,
+                isOutputLimitReached,
                 Math.Min(
                     verifierTimeout,
                     RemainingMilliseconds(
@@ -248,7 +251,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     containmentFailed = true;
                 }
                 if (!_cancellationSignal.IsSet &&
-                    !_outputLimitSignal.IsSet)
+                    !isOutputLimitReached())
                 {
                     _ = process.WaitForExit(RemainingMilliseconds(
                         processStopwatch,
@@ -263,11 +266,11 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     processStopwatch,
                     processTimeout),
                 () => _cancellationSignal.IsSet ||
-                    _outputLimitSignal.IsSet,
+                    isOutputLimitReached(),
                 timeoutReached: () => TrySetTerminalCause(
                     VerifierTerminalCause.Timeout));
             var interrupted = _cancellationSignal.IsSet ||
-                _outputLimitSignal.IsSet;
+                isOutputLimitReached();
             if (!outputCompleted)
             {
                 var processWasAlive = !process.HasExited;
@@ -306,7 +309,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 LogStandardError(error);
             }
-            if (_outputLimitSignal.IsSet ||
+            if (isOutputLimitReached() ||
                 outputResult?.LimitExceeded == true ||
                 errorResult?.LimitExceeded == true)
             {
@@ -550,13 +553,14 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         ReadBoundedOutputAsync(
             TextReader reader,
             string? supervisorNonce,
-            ManualResetEventSlim outputLimitSignal,
+            Action signalOutputLimit,
             System.Threading.Tasks.TaskCompletionSource<bool>?
                 supervisorArmedSignal = null,
             System.Threading.Tasks.TaskCompletionSource<bool>?
                 supervisorCleanupSignal = null,
             Action? outputLimitReached = null)
     {
+        ArgumentNullException.ThrowIfNull(signalOutputLimit);
         var captured = new StringBuilder();
         var protocolLine = new StringBuilder();
         var protocolLineTooLong = false;
@@ -584,7 +588,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 limitExceeded = true;
                 outputLimitReached?.Invoke();
-                outputLimitSignal.Set();
+                signalOutputLimit();
             }
             if (supervisorNonce == null)
             {
@@ -864,10 +868,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private bool WaitForExitOrCancellation(
         Process process,
+        Func<bool> isOutputLimitReached,
         int timeoutMilliseconds)
     {
+        ArgumentNullException.ThrowIfNull(isOutputLimitReached);
         var stopwatch = Stopwatch.StartNew();
-        while (!_cancellationSignal.IsSet && !_outputLimitSignal.IsSet)
+        while (!_cancellationSignal.IsSet && !isOutputLimitReached())
         {
             if (_supervisorArmedSignal?.Task.IsCompletedSuccessfully == true &&
                 ArmedExecutionOverride is { } armedExecutionOverride)
