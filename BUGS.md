@@ -2376,9 +2376,26 @@ about the same root cause are combined below.
   continues independently of captured logging text, and no downstream scalar or
   serialization contract requiring a complete pair was identified.
 
-## Validation caveat
+## Validation
 
-No current build or test validation is claimed. The requested final activity was
-static inspection and documentation only. Items marked as previously reproduced
-refer solely to isolated evidence supplied before or alongside this audit and
-should receive focused regression tests as part of implementation.
+Post-rebase remediation was validated locally on 2026-08-23 in the canonical
+Linux amd64 container from a disposable conventional clone of commit
+`95bb57e21` so every Git-backed release fixture had authentic repository
+history. The linked audit worktree itself stores `.git` as a pointer to metadata
+outside the Docker bind mount, so it was not used for the final broad run.
+
+- `docker compose run --rm tooling build`: passed with zero warnings and zero
+  errors.
+- Focused `BuildTaskTests`: 53 passed, zero failed.
+- `docker compose run --rm tooling check`: passed its Debug build, five semantic
+  task groups, 14 package shards, and performance smoke; the maximum observed
+  package-build ratio was 1.0354 against the 2.0 limit.
+- `docker compose run --rm tooling test`: passed every project. The longest
+  relevant totals were Worker 597, Architecture 479, Analyzer 389, Package 258
+  with one unsupported-host skip, Gates 27, and Fuzz 33; no test failed.
+- `scripts/Format-CSharp.ps1 -Verify`: passed after a locked restore in the same
+  container environment.
+
+Earlier entries marked as previously reproduced still refer to their original
+isolated evidence. Bugs without a fixed status remain audit findings rather than
+claims that all 72 entries were remediated in this pass.
