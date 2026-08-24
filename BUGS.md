@@ -430,37 +430,34 @@ non-routine threat work remained out of scope.
 - Regression test: hold a publication lock, start reset, invoke `Cancel`, and
   assert prompt task completion and reacquisition of every partially held lock.
 
-### 18. Equivalent path spellings split publication identity
+### 18. Case-folding absent paths can split publication identity
 
 - Severity: Medium (P2)
 - Affected code: `SharpProof.Host/LinuxPathIdentity.cs`, `Canonicalize`,
   `CanonicalPublicationPaths`, `ValidatePublicationTopology`,
   `AreSameExistingFile`, and `PublicationMetadataPath` (approximately lines
   50-108, 299-307, and 365-434).
-- Normal trigger: one supported invocation configures a publication file as
-  `/path/result.json` and another supplies `/path/result.json/`; or two
-  cooperative invocations name the same absent destination with different case
-  on a local case-folding filesystem.
+- Normal trigger: two cooperative invocations name the same absent destination
+  with different case on a supported local case-folding filesystem.
 - Expected: canonical file-path identity either normalizes equivalent spellings
   to one lock/marker identity or rejects a spelling whose equivalence cannot be
   represented safely.
-- Actual impact: segment checks can address the same filesystem object while the
-  returned full path preserves the trailing separator. For an absent final
-  component, `AreSameExistingFile` has no identity to compare and every topology,
-  sort, and metadata comparison remains ordinal, so case-fold aliases are also
-  missed. Hashes, parent directories, marker paths, and locks are derived from
-  the distinct strings; cooperative operations can fail or proceed concurrently
-  against one eventual file identity.
-- Evidence confidence: High from string-preserving canonicalization, absent-file
-  identity fallback, ordinal topology, metadata hashing, and the support contract
-  for local paths without a case-sensitivity restriction; static only.
-- Suggested fix: reject trailing separators for publication members, and derive
-  absent final-component identity from the kernel-visible parent filesystem's
-  name semantics (or reject case-folding filesystems if that cannot be done
-  reliably) before topology, hash, and metadata derivation.
-- Regression test: acquire/reset equivalent paths with and without a trailing
-  slash, then repeat with differently cased absent names on a local case-folding
-  fixture; assert neither case can produce distinct locks/markers or concurrent
+- Actual impact: `Path.GetFullPath` preserves case, while an absent final
+  component gives `AreSameExistingFile` no inode identity to compare.
+  Topology, sorting, and metadata hashing all remain ordinal, so the aliases
+  derive distinct locks and ownership markers even though the filesystem maps
+  them to one eventual entry.
+- Evidence confidence: High from the absent-file identity fallback, ordinal
+  comparisons, metadata hashing, and the support contract's lack of a
+  case-sensitivity restriction. A canonical-container probe separately
+  disproved the former trailing-separator variant: opening an existing regular
+  file through a trailing slash failed rather than aliasing that file.
+- Suggested fix: derive absent final-component identity from the
+  kernel-visible parent filesystem's name semantics, or reject case-folding
+  filesystems if that cannot be done reliably, before topology, hash, and
+  metadata derivation.
+- Regression test: use differently cased absent names on a local case-folding
+  fixture and assert they cannot produce distinct locks/markers or concurrent
   publication to one destination.
 
 ### 19. Marker flush failure can be mistaken for a benign bind collision
@@ -548,96 +545,69 @@ non-routine threat work remained out of scope.
 - Regression test: cover fractional, exponent-overflow, and out-of-range numeric
   values for all three fields and assert false with no exception.
 
-### 23. Relative configured paths use inconsistent base directories
+### 23. Relative publication paths use inconsistent base directories
 
 - Severity: Medium (P2)
 - Affected code:
   `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,
   `_SharpProofInitializeVerify` and `SharpProofResetPublishedVerification`
   (approximately lines 46-55 and 239-247);
-  `SharpProof.Worker.Launcher/Program.cs`, `CreateRequest` and
-  `ValidateDistinctPaths` (approximately lines 855-926); and
-  `SharpProof.Worker.Protocol/WorkerCachePath.cs`, `Resolve`.
+  `SharpProof.BuildTasks/InvalidatePublishedResult.cs`; and
+  `ValidatePublishedVerificationResult.cs`.
 - Normal trigger: MSBuild runs from a solution or other working directory while
-  custom request, result, compiler-manifest, SARIF, or cache properties are
-  relative.
+  custom request, result, compiler-manifest, or SARIF properties are relative.
 - Expected: every phase resolves configured relative paths once against
-  `MSBuildProjectDirectory`, including multi-target projection, clean,
-  prevalidation, and actual cache access.
+  `MSBuildProjectDirectory`, including invalidation, multi-target
+  projection, launcher publication, final validation, and clean.
 - Actual impact: SARIF `Path.GetFullPath` property functions use the MSBuild
-  process working directory. Cache alias prevalidation canonicalizes the raw
-  value against launcher CWD, then actual cache use resolves it against the
-  compiler project directory. Custom request/result/manifest values are
-  project-relative for invalidation and the child launcher, but `Clean` passes
-  the same raw strings to `ResetPublishedVerification`, which resolves them
-  against the MSBuild process CWD. Build and clean can therefore address
-  different publications, and cache prevalidation can reason about a different
-  directory from the one later opened.
+  process working directory. Invalidation explicitly combines raw publication
+  values with the project directory, and the launcher runs with that project as
+  its working directory, but final validation canonicalizes the same raw values
+  against the MSBuild process working directory. `Clean` likewise passes raw
+  strings to `ResetPublishedVerification`. One build can therefore
+  invalidate and publish one set, validate a different set, and later clean the
+  wrong set.
 - Evidence confidence: High from the paired resolution sites; static only.
 - Suggested fix: project-anchor and canonicalize every configured publication
-  and cache path once in the targets, pass only absolute effective paths to all
-  tasks/children, and remove prevalidation of unresolved raw cache text.
+  path once in the targets and pass only absolute effective paths to all
+  tasks and child processes.
 - Regression test: invoke the same project from its directory and a solution
-  directory with all relative custom path settings; assert identical projected,
-  invalidated, launched, validated, accessed, and cleaned absolute paths.
+  directory with all relative custom publication settings; assert identical
+  projected, invalidated, launched, validated, and cleaned absolute paths.
 
-### 24. Unsupported hosts skip existing-publication invalidation
-
-- Severity: Medium (P2)
-- Affected code:
-  `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,
-  `_SharpProofInitializeVerify`, `SharpProofResetPublishedVerification`, and
-  `SharpProofRejectUnsupportedWorkerHost` (approximately lines 43-118 and
-  234-260), plus `SharpProof.BuildTasks/InvalidatePublishedResult.cs` and
-  `ResetPublishedVerification.cs`.
-- Normal trigger: a checkout was verified in the canonical Linux host, then an
-  enabled verifier `Build` or `Clean` is invoked from a portable/unsupported
-  MSBuild host while the prior default or custom publication still exists.
-- Expected: an enabled build removes the prior stable result before reporting
-  that verification cannot run on this host, and `Clean` removes known build
-  publications without attempting verification.
-- Actual impact: the invalidation task inside `_SharpProofInitializeVerify` and
-  the reset target both require `_SharpProofVerifierHostSupported == true`.
-  Unsupported `Build` instead reaches the later post-compile rejection with the
-  old successful result still committed; unsupported `Clean` skips reset
-  entirely, so custom publications outside ordinary intermediate-directory
-  cleanup can remain stale across a successful clean.
-- Evidence confidence: High from the two support-gated mutation sites and the
-  later unsupported-host rejection target; static only.
-- Suggested fix: separate portable, ownership-aware publication invalidation
-  and cleanup from verifier execution support. Delete the stable result first
-  on every enabled unsupported-host build, reset the full owned set on clean,
-  and preserve the Linux lease protocol on hosts where it is available.
-- Regression test: create a complete owned publication on the supported host,
-  then force the unsupported-host target path. Assert an enabled `Build` fails
-  with the host diagnostic but removes the result commit, while `Clean` removes
-  every configured member without starting verification.
-
-### 25. Failure-result recovery mutations can replace the original classification
+### 25. Failure-response recovery can escape launcher and worker classification
 
 - Severity: Medium (P2)
-- Affected code: `SharpProof.Worker.Launcher/Program.cs`, `RunMain`,
-  `WriteLauncherFailureAsync`, and `DeleteIfExists` (approximately lines 89-153
-  and 747-770).
-- Normal trigger: the launcher classifies an ordinary worker/launcher failure and
-  its recovery response write fails, or a worker timeout 124 is followed by an
-  ordinary failure deleting a prior private result.
-- Expected: recovery either publishes the classified failure response or returns
-  a deterministic infrastructure/publication result while retaining the
-  original failure as context.
-- Actual impact: the writes at the catch recovery path, missing-result path, and
-  malformed-result replacement path are outside any write-failure boundary.
-  The post-timeout `DeleteIfExists` call is outside that boundary as well and
-  occurs before timeout-response synthesis. Any of these mutation exceptions
-  escapes `RunMain`, replacing the original classification and potentially
-  leaving no protocol result.
-- Evidence confidence: High from catch boundaries; static only.
-- Suggested fix: centralize timeout cleanup and best-effort failure publication
-  behind one bounded mutation classifier and return its deterministic exit code
-  without recursively attempting the same failing destination.
-- Regression test: inject write failure at each recovery call site and deletion
-  failure after exit 124; assert deterministic exit behavior and preserved
-  diagnostic classification with no unhandled exception.
+- Affected code: `SharpProof.Worker.Launcher/Program.cs`,
+  `RunMain`, `WriteLauncherFailureAsync`, and `DeleteIfExists`
+  (approximately lines 89-153 and 747-770), plus
+  `SharpProof.Worker/Program.cs`, local `Respond` and the
+  malformed-request, cancellation, and infrastructure catches
+  (approximately lines 45-107).
+- Normal trigger: either executable has already classified an ordinary failure
+  but writing its protocol response fails, or launcher timeout handling cannot
+  delete a prior private result.
+- Expected: recovery either publishes the classified failure response or
+  returns one deterministic infrastructure/publication exit while retaining
+  the original classification as context.
+- Actual impact: launcher recovery writes and the post-timeout
+  `DeleteIfExists` call sit outside a mutation-failure boundary. The worker
+  directly awaits `Respond` from its catch bodies; an exception thrown from a
+  catch body is not handled by sibling catches on the original try. A
+  successful-path worker response failure can enter the infrastructure catch,
+  but its second write then escapes in the same way. Both processes can
+  therefore replace the original classification with an unhandled exception
+  and leave no protocol result.
+- Evidence confidence: High from C# catch semantics and the explicit mutation
+  boundaries; static only.
+- Suggested fix: give response publication in each executable one
+  non-recursive mutation boundary, centralize launcher timeout cleanup there,
+  and return a deterministic exit without trying to report a write failure
+  through the same failing destination.
+- Regression test: inject failure at every launcher recovery write and timeout
+  deletion, then at worker success, malformed-request, cancellation, and
+  infrastructure response writes; assert no exception escapes and the original
+  classification remains observable.
 
 ### 26. Assumption notifications can suppress the SARIF run-failure notification
 
@@ -912,33 +882,6 @@ non-routine threat work remained out of scope.
 - Regression test: let the outer intermediary start, remove or deauthorize the
   executable before the inner start barrier, and assert authenticated cleanup plus
   final exit 125 with no unhandled-exception exit.
-
-### 37. Worker failure-response writes can escape their own catch paths
-
-- Severity: Medium (P2)
-- Affected code: `SharpProof.Worker/Program.cs`, local `Respond`, malformed-request,
-  cancellation, and infrastructure catches (approximately lines 45-107), plus
-  `WriteResponseAtomicAsync` near lines 184-187.
-- Normal trigger: the result directory is removed, becomes unwritable, or has an
-  ordinary I/O failure while a catch body is publishing its protocol failure
-  response.
-- Expected: inability to publish a worker response produces a deterministic
-  nonzero worker result so the launcher can execute its missing-result recovery.
-- Actual impact: each catch body directly awaits `Respond`. An exception thrown
-  from one catch body is not considered by sibling catches on the original
-  `try`, so response serialization/write failure escapes `Main` and leaves an
-  unhandled worker with no result. A successful-path response write can first
-  enter the infrastructure catch, but its second write escapes the same way.
-  This is the worker boundary counterpart to launcher bug 25, not the same call
-  site.
-- Evidence confidence: High from C# catch semantics and the unbounded awaited
-  write; static only.
-- Suggested fix: give response publication one non-recursive boundary that maps
-  ordinary serialization/filesystem failures to a deterministic nonzero exit and
-  never tries to report a write failure through the same failing destination.
-- Regression test: inject write failure from the success, malformed-request,
-  cancellation, and infrastructure response paths; assert no exception escapes
-  and each returns the documented recovery exit with no partial committed result.
 
 ### 38. Apostrophes in valid paths break MSBuild target expressions
 
@@ -1320,6 +1263,9 @@ non-routine threat work remained out of scope.
 ### 50. Late output overflow can preserve verifier exit zero
 
 - Severity: Medium (P2)
+- Status: Fixed on this branch by the first-terminal-cause latch. Output readers
+  now record `OutputLimit` before completing, and the later
+  `Completed` transition cannot replace it.
 - Affected code: `SharpProof.BuildTasks/RunVerifier.cs`, `Execute`,
   `WaitForExitOrCancellation`, `WaitForOutputCompletion`, and
   `ReadBoundedOutputAsync` (approximately lines 178-291, 351-390, 462-500, and
@@ -1330,49 +1276,55 @@ non-routine threat work remained out of scope.
   loop tests the overflow signal.
 - Expected: an output-limit breach has one stable nonzero classification
   regardless of whether process exit or pipe draining wins the scheduling race.
-- Actual impact: the foreground wait returns success because the process exited,
-  so `timedOut` remains false. The drain wait also returns success as soon as the
-  reader task is complete, before consulting the now-set interrupt signal. The
-  task logs the overflow error but finally copies the child's zero exit code.
-  The exported exit property and any already-published result therefore appear
+- Actual impact before the fix: the foreground wait returned success because the
+  process exited, so `timedOut` remained false. The drain wait also returned
+  success as soon as the reader task completed, before consulting the now-set
+  interrupt signal. The task logged the overflow error but finally copied the
+  child's zero exit code. The exported exit property and any already-published
+  result therefore appeared
   successful even though the same task reported a bounded-output failure.
-- Evidence confidence: High from the two completion-before-signal branches and
-  final exit selection; static only.
-- Suggested fix: latch output overflow as an independent final failure state and
-  include it in exit classification after both readers are observed. Preserve
-  cleanup-receipt authentication, but never allow a latched overflow to fall
-  through to child exit zero.
+- Evidence confidence: High from the former completion-before-signal branches
+  and the current atomic terminal-cause transitions.
+- Fix: latch output overflow as an independent terminal cause from inside each
+  output reader and include it in final exit classification after both readers
+  are observed. Cleanup-receipt authentication remains independent.
 - Regression test: gate the output reader so a zero-exited process is observed
   first, then release more than the capture limit and a valid cleanup receipt;
   assert cleanup authenticates while the exported exit remains nonzero and is
   identical to the overflow-before-exit ordering.
 
-### 51. Cancellation after invalidation lock acquisition can preserve stale success
+### 51. Invalidation and reset can leave a stale result across interrupted mutation
 
 - Severity: Medium (P2)
 - Affected code:
   `SharpProof.BuildTasks/InvalidatePublishedResult.cs`, private `Execute`, the
-  publication lease and output deletion loop (approximately lines 226-244).
-- Normal trigger: MSBuild cancellation arrives after the task acquires the
-  publication-set lease but before the first loop iteration deletes `ResultPath`.
-- Expected: acquisition remains cancelable, but once exclusive ownership is
-  obtained the minimal fail-closed invalidation commit removes the old result
-  marker before cancellation can return control.
-- Actual impact: the first statement in the deletion loop rechecks cancellation.
-  It throws before deleting the result, the catch returns `false`, and the prior
-  successful public result remains visible after the new build has entered its
-  invalidation transaction. This is distinct from cancellation while waiting for
-  a lock, where no publication ownership has yet been obtained.
-- Evidence confidence: High from lease acquisition, output ordering (`ResultPath`
-  first), cancellation check, and filtered catch; static only.
-- Suggested fix: keep lock acquisition cancelable, then complete an uncancelable
-  minimal commit-marker deletion under the acquired lease. Honor cancellation
-  only after the result is absent, before optional cleanup such as SARIF, while
-  retaining observable handling for deletion failures.
-- Regression test: place a barrier immediately after lease acquisition, cancel
-  the active task, and release the barrier; assert execution reports cancellation
-  but the prior result is absent. Retain the existing cancel-before-acquisition
-  case, which must not mutate anything.
+  publication lease and output deletion loop (approximately lines 226-244), plus
+  `SharpProof.Host/LinuxPathIdentity.cs`, `ResetPublicationSet` and
+  `CanonicalPublicationPaths` (approximately lines 174-225 and 365-371).
+- Normal trigger: cancellation reaches invalidation after it acquires the
+  publication lease but before its first result deletion, or reset deletes a
+  lexically earlier companion and then encounters cancellation or an ordinary
+  delete/type failure before reaching the result path.
+- Expected: lock acquisition remains cancelable, but after exclusive ownership
+  the stable result commit marker is the first mutation and is removed without
+  an intervening cancellation point. No companion may disappear while success
+  remains visible.
+- Actual impact: invalidation rechecks cancellation before deleting
+  `ResultPath` and can return with the complete prior success untouched. Reset
+  instead drives deletion from the ordinal lock-order array; default manifest
+  and request names sort before `result.json`, and every iteration can cancel
+  or fail. It can therefore remove companions while leaving the result and all
+  ownership markers visible.
+- Evidence confidence: High from both lease/deletion sequences, default
+  filenames, and the documented result-first commit invariant.
+- Suggested fix: keep acquisition cancelable, identify the result role
+  explicitly, and make result deletion the first uncancelable mutation after
+  lease and marker validation. Only companion cleanup should observe later
+  cancellation; lock ordering must remain separate from mutation ordering.
+- Regression test: cancel invalidation immediately after lease acquisition, then
+  inject cancellation and delete/type failures at every reset member boundary.
+  In every case the result is removed first or the complete prior set remains
+  unchanged; cancel-before-acquisition must still mutate nothing.
 
 ### 52. Publication-lock retry can succeed after its timeout
 
@@ -1561,41 +1513,6 @@ non-routine threat work remained out of scope.
   maximum below their total, then issue a different-key miss whose result is not
   cacheable; assert oldest owned entries are evicted and total active bytes obey
   the new limit.
-
-### 58. Reset can remove companions before the result commit marker
-
-- Severity: Medium (P2)
-- Affected code: `SharpProof.Host/LinuxPathIdentity.cs`,
-  `ResetPublicationSet` and `CanonicalPublicationPaths` (approximately lines
-  174-225 and 365-371), plus
-  `SharpProof.BuildTasks/ResetPublishedVerification.cs`, `Execute` and `Present`
-  (approximately lines 19-38).
-- Normal trigger: `Clean` resets a complete owned publication and cancellation or
-  an ordinary delete failure occurs after a lexically earlier manifest, request,
-  or SARIF member is removed but before the result path is reached. The default
-  manifest/request names both sort before `result.json`.
-- Expected: the stable result is removed first, as required by the publication
-  commit contract, so an interrupted reset can never leave success visible for a
-  set whose companions are already missing.
-- Actual impact: `CanonicalPublicationPaths` sorts by ordinal path for locking and
-  that same role-free array drives deletion. Each iteration checks cancellation
-  and can throw from type checking or `File.Delete`. A prefix of companions can
-  therefore disappear while the result commit marker and all ownership markers
-  remain, exposing a visibly committed but incomplete generation after failed
-  cleanup. This is distinct from bug 6's partial ownership-marker transaction,
-  bug 14's rejected validation, bug 44's publication rollback, and bug 51's
-  pre-first-delete invalidation window.
-- Evidence confidence: High from ordinal canonicalization, deletion ordering,
-  failure boundaries, default filenames, and the documented result-first reset
-  invariant; static only.
-- Suggested fix: separate deadlock-safe lock ordering from mutation ordering and
-  make the reset API identify the result commit member explicitly. After lease
-  and marker validation, remove the result first without a cancellation point;
-  only then make companion cleanup cancelable. If result deletion fails, no
-  companion should have been touched.
-- Regression test: use default and deliberately reordered member names, inject
-  cancellation and delete/type failures at every member boundary, and assert the
-  result is either removed first or the complete prior set remains unchanged.
 
 ### 59. The worker outer deadline starts after its startup gate
 
@@ -4547,3 +4464,464 @@ A total of **104 distinct defects** were identified, traced through reachable co
 Every line of code across all 10 subsystems was rigorously audited by 10 dedicated parallel audit shards. All 104 identified bugs represent verified static proofs and correctness issues with clear reproduction mechanics and concrete remediations recorded.
 
 <!-- END CONSOLIDATED SOURCE: BUGS_5.md -->
+
+### Late supplemental reports incorporated during consolidation
+
+These reports appeared after the original four-source consolidation. Their
+source filenames overlap three earlier report names, so the checksums below
+distinguish the exact inputs preserved here. As with the earlier appendices,
+these are source leads rather than independently confirmed bugs unless a
+finding also appears in the canonical numbered inventory above.
+
+| Late source file | SHA-256 before consolidation |
+| --- | --- |
+| `BUGS_3.md` | `609332C1DC7B9EE20D187FCC9706C7D46AA224570AD2E95DA2EE4E280DADE1C5` |
+| `BUGS_4.md` | `841E2F0AACEE9FE78D833D4D06A3059770AF409A295F1C01F8038D8ADD52F74F` |
+| `BUGS_5.md` | `66440A8CD3D939A5E01DAD03ACD0C296F72703448D170D44BD8732CFB4C1DA79` |
+| `BUGS_6.md` | `5186BF509728AD1DAF8E57B9926F845AA05EF7A1E903627AA0E6B2C56F0C9045` |
+
+#### Late import from `BUGS_3.md`
+
+<!-- BEGIN LATE CONSOLIDATED SOURCE: BUGS_3.md -->
+
+#### Comprehensive Bug Report - PurelySharp
+
+Generated by 10 parallel analysis agents covering all code sections.
+
+---
+
+##### 1. CompilerArtifact Directory Bugs (Agent 1)
+
+###### Unimplemented Throwing Errors
+Multiple `throw new InvalidDataException` statements indicate missing implementation logic or incomplete validation paths:
+- **CompilerManifestArtifact.cs**: 310 throws related to diagnostic checks
+- **CompilerEffectClaimArtifactCodec.cs**: 38 try-catch blocks handling various exception types
+- **CompilerResponseEvidenceAuthority.cs**: Multiple throw statements
+- **PortableIrGraphCodec.cs**: Multiple throw statements for unhandled IR graph scenarios
+
+###### Specific Issues
+- **CompilerEffectClaimArtifactCodec.cs**:
+  - Validation logic for replay events appears incomplete (check Line 38-44)
+  - Missing implementation for `ComputeReplayOperationSha256` in certain cases
+- **CompilerSourceLocationAuthority.cs**:
+  - Several IsBound method calls with incomplete implementation
+- **CompilerCaptureAuthority.cs**:
+  - Multiple `throw new ArgumentException` without context
+
+###### Documentation Placeholders
+Multiple instances of "TODO" or "not implemented" comments in:
+- PortableIrModel.generated.cs
+- CompilerCompilationModel.generated.cs
+- CompilerCaptureAuthority.cs
+
+---
+
+##### 2. Fuzzing Directory Bugs (Agent 2)
+
+###### Inconsistent Failure Minimization
+In **FuzzRunner.cs**, partial-term-smt failures do not attempt to minimize the failing case before reporting, while frontend and finite-domain-smt failures do:
+- Frontend failures: Uses `CSharpStructuralShrinker.Minimize` (lines 268-284)
+- Finite-domain-smt failures: Uses `IrStructuralShrinker.MinimizeAsync` (lines 286-318)
+- Partial-term-smt failures: No minimization, prints original formula for both Original and Minimized fields (lines 320-340)
+
+###### Potential Inefficiency with Z3 Resolver Installation
+Both **PartialTermSmtFuzzing.cs** (line 134) and **FiniteDomainSmtFuzzing.cs** (line 179) call:
+```csharp
+ContainerNativeLibrary.InstallZ3ResolverRequired(
+    typeof(Microsoft.Z3.Context).Assembly);
+```
+This is called in hot paths during fuzzing and may be inefficient if it performs initialization that should only happen once.
+
+###### Overly Strict Pass Criteria
+In **FuzzRunner.cs**, `FuzzSummary.Passed` property (lines 93-110):
+- Requires `Abstentions == 0` (line 106) - too strict for fuzzing where abstentions may be expected
+- Requires `Agreements == Cases` (line 107) - all cases must be agreements across all oracles
+- Redundant condition in lines 102-105
+
+###### Potential Stack Overflow Risk
+In **FiniteDomainSmtFuzzing.cs**:
+- `IsDefinedForAllAssignments` (lines 30-106) uses recursion over all variable assignments
+- `IsSatisfiableByEnumeration` (lines 219-282) similar recursive pattern
+- Could cause stack overflow for formulas with many variables
+
+---
+
+##### 3. Worker Directory Bugs (Agent 3)
+
+###### Worker Lifecycle Issues
+- **SharpProofWorker.Create** method has potential issues with backend initialization
+- `WorkerBudgets` created semi-statically without proper configuration review, leading to potential resource exhaustion
+
+###### Resource State Management
+- **WorkerInputSnapshot.LoadAsync** can throw `IOException` when dealing with compiler artifacts
+- **WorkerCache** implementation doesn't show proper locking for concurrent access
+- Could lead to race conditions between cache misses and subsequent writes
+
+###### Race Conditions
+- **WorkerInputSnapshot** loading mechanism lacks proper shadowing of concurrent reads/writes
+- `CompilerManifestArtifactFile.ReadAllBytes(manifestPath)` could be problematic if multiple worker threads access the same manifest simultaneously
+
+###### Incorrect State Management
+- In **SharpProofWorker.VerifyAsync**, the `solver` field is used without proper guarding
+- Lack of null checking around critical worker initialization points might cause silent failures
+
+---
+
+##### 4. SMT Directory Bugs (Agent 7)
+
+###### Z3ExpressionOwner Resource Management
+- **Z3ExpressionOwner.cs** contains sealed/disposable pattern suggesting potential resource management risks
+- Assertion ownership appears tightly coupled with Z3 query results
+- If not properly disposed, could lead to resource leaks in long-running verification processes
+
+---
+
+##### 5. Comprehensive Scan Bugs (Agent 10)
+
+###### Null Pointer Exceptions (100+ matches)
+Found in multiple core components:
+- **FuzzRunner.cs** (34, 64, 73, 984, 1135, 1467, 1676)
+- **CompilerEffectAuthority.cs** (85, 476, 555, 628)
+- **Effects analysis code** (242, 124, 177, 190, 449, 456, 982)
+- Missing null checks in critical paths like:
+  - File path handling in CompilerArtifact (portable IR arrays)
+  - Variable initialization in EffectAnalysisSession
+  - Parameter validation in IRInterpreter
+
+###### Unhandled Exceptions
+- Critical gaps in exception handling:
+  - No try/catch blocks around file operations
+  - Missing error handling in network/client components
+  - Uncaught exceptions in performance probes
+- Example missing handling: **FrontendFuzzing.cs** (line 984+)
+
+###### Resource Leaks
+- Potential issues with IDisposable management:
+  - Missing Dispose calls in VerifierPublicationTransactionTests
+  - Unmanaged resources in LinuxPathIdentity.cs (while(true) loops)
+  - Logging adapter resources not properly released
+
+###### Infinite Loops
+Found 13 instances of `while(true)` patterns:
+- In effect analysis (ManagedAbstractFlow.cs line 878)
+- In compiler probing (CompilerProbeAnalyzer.cs line 54)
+- In worker invocation loops (SharpProofWorker.cs line 238)
+- Some appear intentional for fuzzing but may need bounds
+
+###### Logging & Error Handling
+- Good: Extensive use of ILogger (250+ matches)
+- Improvement areas:
+  - Missing error logging in key validation steps
+  - Insufficient logging of critical state changes
+  - Error messages sometimes too vague
+
+---
+
+##### Summary of Critical Issues
+
+1. **Inconsistent failure minimization** in FuzzRunner.cs - partial-term failures lack minimization
+2. **Z3 resolver installation** called repeatedly in hot paths
+3. **Overly strict fuzzing pass criteria** requiring zero abstentions
+4. **Multiple unimplemented throwing errors** in CompilerArtifact files
+5. **TODO placeholders** in generated files indicating incomplete work
+6. **100+ null pointer exception** locations across codebase
+7. **13 while(true) loops** without clear termination conditions
+8. **Missing exception handling** in file operations and network components
+9. **Resource leak risks** in IDisposable management
+10. **Race conditions** in WorkerCache and WorkerInputSnapshot
+
+---
+
+*Report generated by 10 parallel analysis agents covering all code sections.*
+
+<!-- END LATE CONSOLIDATED SOURCE: BUGS_3.md -->
+
+#### Late import from `BUGS_4.md`
+
+<!-- BEGIN LATE CONSOLIDATED SOURCE: BUGS_4.md -->
+
+#### Comprehensive Bug Report - SharpProof Codebase
+
+##### Overview
+This report documents all bugs discovered across the SharpProof codebase through exhaustive analysis of all source files, configuration, and test infrastructure.
+
+##### Critical Bugs
+
+###### 1. CompilerEffectClaimArtifactCodec.HasValidReplayEvent (SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs:177-178)
+- **Severity**: High
+- **Location**: `SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs` lines 177-178
+- **Issue**: The method `HasValidReplayEvent` requires `value.ScalarOperands` and `value.ExactExceptionTypeHierarchy` to be non-empty (`is not { Length: 0 }`). However, the generated `WorkerEffectViolationWitness` class initializes these fields as empty arrays (`= []`). This creates a contradiction where the validation logic expects non-empty collections but the generated code provides empty ones.
+- **Impact**: Replay events with `ManagedObjectAllocation` kind (and potentially others) will be incorrectly rejected as invalid, breaking the replay mechanism for verified workers.
+- **Evidence**: See lines 177-178 in the code where the check is performed.
+
+###### 2. CompilerEffectClaimArtifactCodec.HasValidOutcome (SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs:100-116)
+- **Severity**: Medium
+- **Location**: `SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs` lines 100-116
+- **Issue**: The switch expression in `HasValidOutcome` has a default case that returns `false`. This means valid outcome tuples that don't match any of the explicit cases (e.g., `Unknown` with specific reason/certainty combinations) will be incorrectly rejected.
+- **Impact**: Certain valid effect outcomes may be rejected during verification, leading to false negatives in the verification pipeline.
+- **Evidence**: Lines 100-116 show the switch expression with a default case returning `false`.
+
+###### 3. CompilerManifestArtifactJson.HasValidFeatureScope (SharpProof.CompilerManifestArtifact.cs:419-426)
+- **Severity**: Medium
+- **Location**: `SharpProof.CompilerManifestArtifact.cs` lines 419-426
+- **Issue**: The feature scope validation may not properly handle all combinations of feature selections (Effects, Contracts, or both). The current implementation could miss valid combinations or incorrectly reject valid ones.
+- **Impact**: Manifest validation failures that should be allowed.
+- **Evidence**: Lines 419-426 describe the validation logic for feature scope.
+
+###### 4. CompilerManifestArtifactJson.MaxJsonBytes (SharpProof.CompilerManifestArtifact.cs:6)
+- **Severity**: High
+- **Location**: `SharpProof.CompilerManifestArtifact.cs` line 6
+- **Issue**: The `MaximumJsonBytes` is set to 16 MB (`16 * 1024 * 1024`), which is far too small for SMT proof objects that can grow significantly during verification.
+- **Impact**: Large SMT proofs will be rejected during manifest validation, causing build failures.
+- **Evidence**: Line 6 shows `MaximumJsonBytes = 16 * 1024 * 1024`.
+
+###### 5. SharpProof.Smt/IrSmtBackend.cs.DivideTowardZero (SharpProof.Smt/IrSmtBackend.cs:515-528)
+- **Severity**: Critical
+- **Location**: `SharpProof.Smt/IrSmtBackend.cs` lines 515-528
+- **Issue**: The `DivideTowardZero` method does not properly handle division by zero. When `right` is zero, the operation can produce undefined results or crash.
+- **Impact**: Division by zero in SMT constraints can cause verification failures or crashes.
+- **Evidence**: Lines 515-528 show the division logic without proper zero-checking.
+
+###### 6. SharpProof.Worker.Launcher/Program.cs - Cancellation Handling (SharpProof.Worker/Launcher/Program.cs:204-279, 308-377)
+- **Severity**: High
+- **Location**: `SharpProof.Worker/Launcher/Program.cs`
+- **Issue**: The cancellation handling in the launcher does not properly distinguish between supervisor-level cancellations and worker-level cancellations. This can lead to premature cleanup of worker processes or incorrect exit code classification.
+- **Impact**: Workers may be terminated unexpectedly, leading to incomplete verification or incorrect exit codes (e.g., 124 instead of 143 for cancellation).
+- **Evidence**: Lines 204-279 and 308-377 describe the cancellation handling logic.
+
+###### 7. SharpProof.BuildTasks/VerifierProcessSupervisor.cs - Descendant Scanning (SharpProof.BuildTasks/VerifierProcessSupervisor.cs:204-279, 308-377)
+- **Severity**: High
+- **Location**: `SharpProof.BuildTasks/VerifierProcessSupervisor.cs`
+- **Issue**: The descendant scanning logic can terminate prematurely when observing an incomplete process tree. The scan may return `Complete: true` before all descendants have been properly observed, leading to stale or inaccurate verification results.
+- **Impact**: Incomplete verification snapshots, potentially missing side effects or race conditions.
+- **Evidence**: Lines 204-279 and 308-377 describe the scanning and cleanup logic.
+
+###### 8. SharpProof.Worker.Protocol/ProtocolJson.cs - Relative Publication Paths (SharpProof.Worker.Protocol/ProtocolJson.cs:135-183)
+- **Severity**: Medium
+- **Location**: `SharpProof.Worker.Protocol/ProtocolJson.cs`
+- **Issue**: Publication paths are treated as relative without proper anchor to the project root. This can cause inconsistencies when the build is executed from different working directories or with different relative paths.
+- **Impact**: Publication failures or inconsistent behavior across different build contexts.
+- **Evidence**: Lines 135-183 describe the path handling logic.
+
+###### 9. SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs - HasValidOutcome (SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:143-144)
+- **Severity**: Medium
+- **Location**: `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs` lines 143-144
+- **Issue**: For `Refuted` outcomes with `replay` set to `null`, the method returns `true` (considered valid). However, for `Refuted` outcomes with non-null `replay` events, the method checks `replay.Events.Length` and may incorrectly reject valid replay events.
+- **Impact**: Replay events attached to refuted outcomes may be incorrectly rejected.
+- **Evidence**: Lines 143-144 show the logic.
+
+###### 10. SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs - HasValidReplay (SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:267-268)
+- **Severity**: Medium
+- **Location**: `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs` lines 267-268
+- **Issue**: Similar to #9, the replay event validation may reject valid replay events when the event type is not recognized or when the event list is empty.
+- **Impact**: Replay events for certain effect types may be dropped.
+- **Evidence**: Lines 267-268 show the validation logic.
+
+##### Medium Priority Bugs
+
+###### 11. SharpProof.Smt/IrSmtBackend.cs - Encoding Issues (SharpProof.Smt/IrSmtBackend.cs:407-639)
+- **Severity**: Medium
+- **Location**: `SharpProof.Smt/IrSmtBackend.cs`
+- **Issue**: The `Encode` method has complex encoding logic that may not handle all sequence types and binary encodings correctly, potentially leading to malformed serialized data.
+- **Impact**: Corrupted SMT proof data, causing verification failures.
+- **Evidence**: Lines 407-639 describe the encoding/decoding logic.
+
+###### 12. SharpProof.Worker.Launcher/Program.cs - Multiple Concurrency Issues (SharpProof.Worker/Launcher/Program.cs:481-568)
+- **Severity**: High
+- **Location**: `SharpProof.Worker/Launcher/Program.cs`
+- **Issue**: Limited parallelism (max 4 parallelism) restricts utilization of multi-core processors during fuzzing campaigns. Additionally, the cancellation handling and cleanup logic has race conditions that can lead to orphaned processes or incomplete teardown.
+- **Impact**: Reduced fuzzing throughput, potential resource leaks.
+- **Evidence**: Lines 481-568 describe the parallelism and cancellation logic.
+
+###### 13. SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs - Public Result Validation (SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs:19-69)
+- **Severity**: Medium
+- **Location**: `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs`
+- **Issue**: The validation of published verification results may not properly handle all edge cases, particularly when the result is not fully complete or contains partial data.
+- **Impact**: Acceptance of invalid or incomplete verification results.
+- **Evidence**: Lines 19-69 describe the validation logic.
+
+###### 14. SharpProof.CompilerManifestArtifact.cs - Feature Scope Parity (SharpProof.CompilerManifestArtifact.cs:419-426)
+- **Severity**: Medium
+- **Location**: `SharpProof.CompilerManifestArtifact.cs`
+- **Issue**: The `HasValidFeatureScope` method may not correctly enforce parity between feature selection and allowed features, potentially allowing invalid feature combinations.
+- **Impact**: Incorrect feature scope validation leading to invalid manifest processing.
+- **Evidence**: Lines 419-426 describe the validation logic.
+
+###### 15. SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs - ScalarOperands Requirement (SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs:177-178)
+- **Severity**: High
+- **Location**: Already covered in #1
+- **Additional Context**: The `ScalarOperands` field is required for certain effect types (like `ManagedObjectAllocation`) but is initialized as empty in the generated code, creating a direct conflict between validation expectations and implementation reality.
+
+##### Low Priority Bugs
+
+###### 16. SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs - Empty Replay Events (SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:143-144)
+- **Severity**: Low
+- **Location**: Already covered in #9
+- **Note**: Related to #9 but worth noting separately.
+
+###### 17. SharpProof.CompilerManifestArtifact.cs - JSON Schema Validation (SharpProof.CompilerManifestArtifact.cs:377-395)
+- **Severity**: Low
+- **Location**: `SharpProof.CompilerManifestArtifact.cs` lines 377-395
+- **Issue**: The `ValidateManifest` method may have overly strict or inconsistent validation rules that could reject valid manifests.
+- **Impact**: Build failures due to manifest validation issues.
+- **Evidence**: Lines 377-395 describe the validation logic.
+
+##### Summary
+
+Total bugs identified: 10 critical/high priority, 5 medium priority, 2 low priority.
+
+**Most Critical:**
+1. `CompilerEffectClaimArtifactCodec.HasValidReplayEvent` - Breaks replay mechanism
+2. `SharpProof.Smt/IrSmtBackend.cs.DivideTowardZero` - Division by zero vulnerability
+3. `CompilerManifestArtifactJson.MaxJsonBytes` - Too small limit
+4. `SharpProof.Smt/IrSmtBackend.cs` - Encoding issues
+5. `SharpProof.Worker.Launcher/Program.cs` - Cancellation and cleanup issues
+
+**Recommendations:**
+- Fix the `HasValidReplayEvent` method to properly handle empty `ScalarOperands` and `ExactExceptionTypeHierarchy`
+- Increase `MaximumJsonBytes` to a more reasonable limit (e.g., 256 MB)
+- Add null checks for division by zero in `DivideTowardZero`
+- Improve cancellation handling in the launcher to properly distinguish between supervisor and worker cancellations
+- Address encoding issues in the SMT backend
+- Reduce parallelism limit to allow better resource utilization
+- Strengthen feature scope validation
+
+---
+*Report generated by parallel bug-hunting agents*
+*Date: 2026-08-23*
+*Scope: Entire SharpProof codebase (C:\w\PurelySharp-bug-hunt)*
+
+<!-- END LATE CONSOLIDATED SOURCE: BUGS_4.md -->
+
+#### Late import from `BUGS_5.md`
+
+<!-- BEGIN LATE CONSOLIDATED SOURCE: BUGS_5.md -->
+
+#### SharpProof Fuzzing and Code Audit - Round 5
+##### Bugs Identified in Fuzzing and Related Components
+
+###### New Bugs Not in BUGS.md
+
+###### A.1. Inconsistent Scenario Index in PartialTermSmtDifferentialOracle
+
+- **Location**: `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs`, `CompareAsync` method (lines 152-162, 191-202)
+- **Severity**: Medium
+- **Description**: When the IR interpreter fails to classify a scenario (line 152-162), the abstained result returns `index` as the scenario count. However, when the backend fails to produce a proof (lines 191-202), it returns `index + 1` as the scenario count. This inconsistency means the scenario numbering is non-deterministic depending on which failure path is hit, leading to incorrect failure key selection and potentially missing failures in the fuzzing report.
+- **Evidence**: Static code analysis of the two return paths within the same loop.
+- **Suggested fix**: Use consistent `index` value in both abstained return paths, or document the offset intentionally and ensure callers handle both cases.
+
+###### A.2. ArgumentOutOfRangeException Risk in FuzzCoverage Count Method
+
+- **Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, `CreateFrontendCoverage` method, `Count` inner function (lines 472-507)
+- **Severity**: Medium
+- **Description**: The `Count` switch statement on `GeneratedExpressionKind` has a `default` case that falls through without handling all enum values. If Microsoft.AddSharpProof introduces new expression kinds, the switch will silently skip them (due to C# switch fall-through behavior when no `goto case` or `return`), causing undercounting in exception statistics. This could make `FrontendCoverage.HasValidExceptionCounts` return false positives, causing valid fuzz runs to be incorrectly rejected.
+- **Evidence**: C# switch semantics; the switch lacks `default: throw ...` or explicit handling for all `GeneratedExpressionKind` values.
+- **Suggested fix**: Add a `default` case that throws `ArgumentOutOfRangeException` or use `switch_expression` with exhaustive pattern matching.
+
+###### A.3. Potential Index Out of Range in Failure Key Selection
+
+- **Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, `SelectFailureKeys` method (lines 359-396)
+- **Severity**: Low
+- **Description**: The `SelectFailureKeys` method limits retained failures to `MaximumRetainedFailures` (64) but iterates through ALL cases (up to millions). If more than 64 failures exist across the three oracles, only the first 64 encountered (in order: finite-domain-smt, frontend, partial-term-smt per index) are kept, and the rest are silently dropped. This means severe mismatches later in the case list are ignored, potentially giving a false sense of fuzz correctness.
+- **Evidence**: The `break` statement at line 382 exits the loop entirely when 64 keys are reached, even if remaining cases have failures.
+- **Suggested fix**: Continue scanning all cases but only retain up to 64, or increase `MaximumRetainedFailures` with a configurable limit.
+
+###### A.4. Seed Overflow in Case Seed Generation
+
+- **Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, `CreateCaseSeed` method (lines 552-555)
+- **Severity**: Low
+- **Description**: The method `unchecked(seed + index * 397)` can overflow `int` if `seed` is near `int.MaxValue` and `index` is large. While the `unchecked` block prevents runtime exceptions, the resulting seed values may not be truly unique, reducing the effective randomness of case generation across large fuzz runs. Given `MaximumCases` is 1,000,000, the maximum `index` is 999,999, and `seed * 397` can overflow for seeds > ~2.1 million.
+- **Evidence**: Integer arithmetic overflow analysis; `seed + index * 397` with `seed = 0x5A17 = 23171`, `index = 999999` gives `23171 + 396999699 = 397022870`, which fits in int, but larger seeds could overflow.
+- **Suggested fix**: Use `checked` arithmetic or switch to `long` for seed computation, then cast back.
+
+###### A.5. Redundant CoverageSatisfied Logic in FuzzSummary
+
+- **Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, `FuzzSummary.Passed` property (lines 93-111)
+- **Severity**: Low
+- **Description**: The `Passed` property computes `CoverageSatisfied == (Cases < FuzzOptions.DefaultCases || FrontendCoverage.HasExpandedCategories)`, but `CoverageSatisfied` is already set to the exact same expression on line 102-104. This redundant comparison serves no purpose other than obfuscation and could mask a bug if someone later modifies one expression but not the other.
+- **Evidence**: Direct code inspection showing identical expressions on both sides of `==`.
+- **Suggested fix**: Simplify to just `CoverageSatisfied` since it's already set to the correct value, or remove the redundant check entirely.
+
+###### Cross-Referenced Bugs from BUGS.md (Existing)
+
+The following bugs from the main audit (BUGS.md) are relevant to the fuzzing/code paths examined:
+
+- **Bug 11**: Slow setup consuming verifier cleanup reserve - affects execution timing that fuzz runs exercise
+- **Bug 22**: Diagnostic `TryDeserialize` can throw `FormatException` - fuzzing may generate malformed JSON inputs that trigger this
+- **Bug 25**: Failure-response recovery can escape launcher and worker classification - relevant to fuzzer protocol response handling
+- **Bug 35**: Outer caller cancellation can rewrite project timeout - affects how fuzz cancellations are classified
+- **Bug 39**: Accepted short grace values cannot provide the cleanup reserve - impacts worker termination timing in fuzz runs
+- **Bug 42**: Cache-hit validation can return Complete after deadline is canceled - affects cached fuzz results
+- **Bug 48**: Request validation and hashing occur outside the project wall timer - relevant to fuzz setup timing
+- **Bug 54**: Manifest/result association is quadratic at supported cardinalities - large fuzz projects could hit performance limits
+- **Bug 55**: Post-load interruption of an empty manifest produces an invalid response - affects empty fuzz project scenarios
+- **Bug 59**: The worker outer deadline starts after its startup gate - impacts fuzz worker lifecycle
+
+###### Summary
+
+Total bugs identified: 5 new + 23 from BUGS.md directly relevant to fuzzing paths = 28 unique issues requiring attention. The fuzzing code in `Tools/SharpProof.Fuzz/` has moderate bug density with the index inconsistency (A.1) and coverage counting issue (A.2) being the most significant risks to fuzz reliability.
+
+<!-- END LATE CONSOLIDATED SOURCE: BUGS_5.md -->
+
+#### Late import from `BUGS_6.md`
+
+<!-- BEGIN LATE CONSOLIDATED SOURCE: BUGS_6.md -->
+
+#### SharpProof Codebase Audit Findings
+
+##### Identified Issues
+
+###### 1. Evidence Authority Validation Hides Real Bugs
+**File:** `SharpProof.Worker.Protocol.ProtocolJson.cs`
+**Line:** 319-330
+**Issue:** The `ValidateEvidenceAuthority` method uses a broad `catch (Exception)` that catches any exception and reports it as `"response.evidence_authority"`. This masks underlying bugs in the evidence authority processing logic.
+**Fix:** Replace the broad catch with specific exception handling or remove the catch entirely to allow proper error propagation.
+
+###### 2. Proof Core and Model Sorting Without Null Checks
+**File:** `SharpProof.Worker.Protocol.ProtocolJson.cs`
+**Lines:** 237-250 (ProofCore), 240-243 (Model)
+**Issue:** The `Canonicalize` method sorts `result.ProofCore` and `result.Model` without checking for null values. If either is null, this will throw a `NullReferenceException`.
+**Fix:** Add null checks before sorting:
+```csharp
+private static void Canonicalize(WorkerClaimResult result)
+{
+    result.ProofCore = SortOrdinal(result.ProofCore, ...);
+    result.Model = SortOrdinal(result.Model ?? new List<WorkerModelValue>() , ...);
+    // ...
+}
+```
+
+###### 3. FindCandidates Method May Throw Null Reference
+**File:** `SharpProof.Analyzer.Core.ContractForValidation.ContractForValidationEngine.cs`
+**Lines:** 92-103
+**Issue:** The `FindCandidates` method iterates over type declarations and attempts to get symbols. If a type declaration has no attributes (length != 1), accessing `symbols` could be problematic. More critically, if `model.GetDeclaredSymbol()` returns null for a type declaration, the subsequent checks may fail.
+**Fix:** Add null checks for `model.GetDeclaredSymbol()` and handle cases where symbols are not found.
+
+###### 4. ContractForValidation Engine Missing Null Guards
+**File:** `SharpProof.Analyzer.Core.ContractForValidation.ContractForValidationEngine.cs`
+**Lines:** 17-19, 99-103
+**Issue:** The `Validate` method checks if `ContractFor` is null but doesn't handle the case where `ContractSelectionInventory.ForCompilation(compilation).ContractFor` returns null. Additionally, the `FindCandidates` method assumes every type declaration has at least one attribute.
+**Fix:** Add proper null checks throughout the validation pipeline.
+
+###### 5. IR Soundness Issues in RoslynProgramLowerer
+**File:** `SharpProof.Verifier.IrProgramLowerer.cs`
+**Issue:** The `IsDirectInvocation` check is overly restrictive - it requires invocations to be static and parameter counts to match exactly. This can cause legitimate polymorphic calls to be aborted prematurely.
+**Fix:** Relax the constraint to allow virtual methods and dynamic dispatch.
+
+###### 6. IR Generation Null Safety
+**File:** `SharpProof.CompilerArtifact.CompilerArtifact.CompilerManifestArtifactProducer.cs`
+**Issue:** The manifest producer may encounter null artifacts during compilation artifact creation, leading to crashes.
+**Fix:** Add defensive null checks in the manifest production pipeline.
+
+###### 7. Dataflow Graph Null Values
+**File:** `SharpProof.Dataflow.DataflowGraph.cs`
+**Issue:** The `Transfer` function may receive null values in transfer functions, leading to unexpected behavior.
+**Fix:** Add null checks in transfer function implementations.
+
+##### Summary
+
+These findings represent critical gaps in the SharpProof codebase that could lead to runtime failures, incorrect validation results, and poor debugging experience. The most urgent issues are in the ProtocolJson validation layer (issues #1 and #2) and the IR lowerer (issue #5), as they affect core functionality of request/response validation and code transformation respectively.
+
+All issues have been appended to `BUGS_6.md`.
+
+<!-- END LATE CONSOLIDATED SOURCE: BUGS_6.md -->
