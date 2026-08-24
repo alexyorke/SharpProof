@@ -444,6 +444,21 @@ same code tree at `be14e47da5eb61891460edae1e4c76ae42c0b2bf`:
   Git/release-metadata fixtures failed for that stated reason. The conventional-
   clone rerun superseded it.
 
+The final remediation commits `3e2105481f0794abd6964b814261f6704d9b7aa1`
+and `5cdd9b617a70ed774cfab7002ebc7886ddbee77c` were then pushed to the audit
+branch and validated from a conventional clone whose origin points at the
+canonical repository. Using the warmed canonical Compose cache on 2026-08-24:
+
+- `docker compose run --rm tooling build -Configuration Debug`: succeeded with
+  zero warnings and zero errors.
+- `docker compose run --rm tooling test`: every project passed. Package had
+  271 passed and one expected unsupported-host skip; Worker 600, Architecture
+  479, Analyzer 391, Effects 194, Gates 27, Fuzz 33, and all other projects
+  passed with no failures.
+- The focused timeout regression passed independently, and the targeted
+  cleanup-reserve, OpenCode manifest, and project-relative SARIF contract tests
+  passed before the final full run.
+
 Earlier entries marked as previously reproduced still refer to their original
 isolated evidence. The historical numeric gaps 24, 37, and 58 remain in the
 triage ledgers so old references stay stable; all confirmed findings in the
