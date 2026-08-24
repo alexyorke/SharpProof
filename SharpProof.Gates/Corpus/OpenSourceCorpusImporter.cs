@@ -396,9 +396,32 @@ internal static class OpenSourceCorpusImporter
 
         using var process = Process.Start(startInfo) ??
             throw new InvalidOperationException("Could not start Git.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        var outputTask = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        var errorTask = process.StandardError.ReadToEndAsync(CancellationToken.None);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch (InvalidOperationException) { }
+            catch (NotSupportedException) { }
+            try
+            {
+                await process.WaitForExitAsync(CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch (InvalidOperationException) { }
+            await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);
+            throw;
+        }
         var output = (await outputTask.ConfigureAwait(false)).Trim();
         var error = (await errorTask.ConfigureAwait(false)).Trim();
         if (process.ExitCode != 0)

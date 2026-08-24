@@ -106,6 +106,9 @@ internal static class SpecResultDomainProjection
                     Visit(conditional.WhenTrue), Visit(conditional.WhenFalse)),
                 IrCastTerm cast => factory.Cast(cast.Type, Visit(cast.Operand)),
                 IrLengthTerm length => VisitLength(length),
+                IrSequenceAccessTerm access => factory.SequenceAccess(
+                    Visit(access.Sequence), Visit(access.Index)),
+                IrOpaqueTerm opaque => RewriteOpaque(opaque),
                 _ => term
             };
             memo.Add(term.Id, result);
@@ -144,6 +147,14 @@ internal static class SpecResultDomainProjection
             return length.Value is IrVariableTerm variable && projections.TryGetValue(variable.Variable, out var projection) &&
             projection.LengthVariable is { } proxy
                 ? factory.Variable(proxy) : factory.Length(Visit(length.Value));
+        }
+        IrTerm RewriteOpaque(IrOpaqueTerm opaque)
+        {
+            var receiver = opaque.Receiver == null ? null : Visit(opaque.Receiver);
+            var arguments = opaque.Arguments.Select(Visit).ToArray();
+            return opaque.Purity == IrOpaquePurity.Pure
+                ? factory.PureOpaque(opaque.Member, receiver, arguments)
+                : factory.ImpureOpaque(opaque.Operation, opaque.Member, receiver, arguments);
         }
     }
     private static IrVarId CreateProxy(

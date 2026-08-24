@@ -3,8 +3,11 @@ using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
-public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task
+public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task, ICancelableTask
 {
+    private readonly object _synchronization = new();
+    private Action? _cancelExecution;
+    private bool _canceled;
     [Required]
     public string RequestPath { get; set; } = string.Empty;
 
@@ -16,21 +19,68 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task
 
     public string? SarifPath { get; set; }
 
+    public string? ProjectDirectory { get; set; }
+
     public override bool Execute()
     {
+        using var cancellation = new TaskExecutionCancellation();
+        Action cancel = cancellation.Cancel;
+        lock (_synchronization)
+        {
+            if (_canceled)
+            {
+                return false;
+            }
+            _cancelExecution = cancel;
+        }
         try
         {
+            var projectDirectory = string.IsNullOrWhiteSpace(ProjectDirectory)
+                ? Directory.GetCurrentDirectory()
+                : Path.GetFullPath(ProjectDirectory);
+            var paths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
+                .Select(path => Path.GetFullPath(Path.IsPathRooted(path)
+                    ? path
+                    : Path.Combine(projectDirectory, path)));
             LinuxPathIdentity.ResetPublicationSet(
-                Present(RequestPath, ResultPath, ManifestPath, SarifPath),
-                TimeSpan.FromSeconds(30));
+                paths,
+                TimeSpan.FromSeconds(30),
+                cancellation.Token);
             return true;
         }
+        catch (OperationCanceledException) when (
+            cancellation.Token.IsCancellationRequested)
+        {
+            return false;
+        }
         catch (Exception exception) when (exception is
-            ArgumentException or IOException or UnauthorizedAccessException)
+            ArgumentException or IOException or UnauthorizedAccessException or
+            InvalidOperationException)
         {
             Log.LogErrorFromException(exception, showStackTrace: false);
             return false;
         }
+        finally
+        {
+            lock (_synchronization)
+            {
+                if (ReferenceEquals(_cancelExecution, cancel))
+                {
+                    _cancelExecution = null;
+                }
+            }
+        }
+    }
+
+    public void Cancel()
+    {
+        Action? cancel;
+        lock (_synchronization)
+        {
+            _canceled = true;
+            cancel = _cancelExecution;
+        }
+        cancel?.Invoke();
     }
 
     private static IEnumerable<string> Present(params string?[] paths)

@@ -463,27 +463,6 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        IMethodSymbol? constructor = null;
-        foreach (var candidate in constructors)
-        {
-            if (SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
-                    candidate,
-                    session,
-                    context.ReportDiagnostic,
-                    context.CancellationToken))
-            {
-                session.RecordSemanticOutcome(
-                    candidate,
-                    AnalyzerSemanticOutcome.Suppressed);
-                continue;
-            }
-            constructor = candidate;
-            break;
-        }
-        if (constructor == null)
-        {
-            return;
-        }
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
         var operationFacts = new DefiniteOperationFacts(
             context.Compilation,
@@ -497,19 +476,47 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        foreach (var operation in RequiresCallSiteDiscovery
-                     .ExecutableUnflowedDescendantsAndSelf(
-                         root,
-                         operationFacts))
+        var reportedDiagnostics = new HashSet<string>(StringComparer.Ordinal);
+        void ReportInitializerDiagnostic(Diagnostic diagnostic)
         {
-            outcome = AnalyzerSemanticOutcomes.Combine(
-                outcome,
-                RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
-                    constructor, initializer, operation,
-                    context.SemanticModel, session,
-                    context.ReportDiagnostic, context.CancellationToken));
+            var key = diagnostic.Id + "|" +
+                diagnostic.Location.SourceSpan.Start + "|" +
+                diagnostic.Location.SourceSpan.Length + "|" +
+                diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture);
+            if (reportedDiagnostics.Add(key))
+            {
+                context.ReportDiagnostic(diagnostic);
+            }
         }
-        session.RecordSemanticOutcome(constructor, outcome);
+        foreach (var candidate in constructors)
+        {
+            if (SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
+                    candidate,
+                    session,
+                    context.ReportDiagnostic,
+                    context.CancellationToken))
+            {
+                session.RecordSemanticOutcome(
+                    candidate,
+                    AnalyzerSemanticOutcome.Suppressed);
+                continue;
+            }
+
+            outcome = AnalyzerSemanticOutcome.NotApplicable;
+            foreach (var operation in RequiresCallSiteDiscovery
+                         .ExecutableUnflowedDescendantsAndSelf(
+                             root,
+                             operationFacts))
+            {
+                outcome = AnalyzerSemanticOutcomes.Combine(
+                    outcome,
+                    RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
+                        candidate, initializer, operation,
+                        context.SemanticModel, session,
+                        ReportInitializerDiagnostic, context.CancellationToken));
+            }
+            session.RecordSemanticOutcome(candidate, outcome);
+        }
     }
 
     private static bool CanReachMemberInitializer(

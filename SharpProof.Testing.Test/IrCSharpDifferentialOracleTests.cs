@@ -127,4 +127,33 @@ public sealed class IrCSharpDifferentialOracleTests
                 Is.EqualTo(IrExceptionKind.NullReference));
         }
     }
+
+    [Test]
+    public void RenderableReferenceAndSequenceValuesCompareStructurally()
+    {
+        var factory = new IrFactory();
+        var reference = factory.CreateVariable("reference", factory.ObjectType);
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var sequence = factory.CreateVariable("sequence", sequenceType);
+        var oracle = new IrCSharpDifferentialOracle(factory);
+
+        var referenceResult = oracle.Compare(
+            factory.Variable(reference),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [reference] = factory.CreateReferenceValue(
+                    factory.ObjectType, new object())
+            });
+        var sequenceResult = oracle.Compare(
+            factory.Variable(sequence),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [sequence] = factory.CreateSequenceValue(
+                    sequenceType,
+                    [factory.CreateIntegerValue(1), factory.CreateIntegerValue(2)])
+            });
+
+        Assert.That(referenceResult.Status, Is.EqualTo(DifferentialStatus.Agreement));
+        Assert.That(sequenceResult.Status, Is.EqualTo(DifferentialStatus.Agreement));
+    }
 }

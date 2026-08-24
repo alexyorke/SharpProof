@@ -16,6 +16,12 @@ function Get-SharpProofReleaseAuthorityClosure {
         [void]$tracked.Add($trackedPath.Replace('\', '/'))
     }
     $roots = @(
+        'global.json',
+        'NuGet.Config',
+        'Directory.Packages.props',
+        'Directory.Build.props',
+        'SharpProof.Release.props',
+        'SharpProof.PackageMetadata.props',
         '.github/workflows/package-consumers.yml',
         'eng/container/entrypoint.sh',
         'scripts/Get-SharpProofReleaseAuthorityClosure.ps1',

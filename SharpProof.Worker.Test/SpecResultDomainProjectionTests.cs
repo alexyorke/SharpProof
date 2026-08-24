@@ -134,6 +134,56 @@ public sealed class SpecResultDomainProjectionTests
     }
 
     [Test]
+    public void RewriteVisitsSequenceAccessAndOpaqueChildren()
+    {
+        var factory = new IrFactory();
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var result = factory.CreateVariable("result", sequenceType);
+        var index = factory.Integer(0);
+        var template = CreateTemplate(
+            IrTypeKind.Sequence,
+            SpecNullness.NonNull,
+            SpecCardinality.Empty);
+        Assert.That(
+            SpecResultDomainProjection.TryCreate(
+                factory, template, result, out var projection, out _),
+            Is.True);
+        var proxy = factory.Variable(projection.NonNullVariable!.Value);
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Use",
+            factory.BooleanType,
+            isStatic: true,
+            factory.IntegerType);
+        var opaque = factory.PureOpaque(
+            member,
+            null,
+            factory.Length(factory.Variable(result)));
+        var root = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            factory.Binary(
+                IrBinaryOperator.NotEqual,
+                factory.SequenceAccess(factory.Variable(result), index),
+                factory.Integer(0)),
+            opaque);
+
+        var rewritten = SpecResultDomainProjection.Rewrite(
+            factory,
+            root,
+            ImmutableDictionary<IrVarId, SpecResultProjection>.Empty.Add(result, projection));
+
+        Assert.That(rewritten, Is.TypeOf<IrBinaryTerm>());
+        var rewrittenBinary = (IrBinaryTerm)rewritten;
+        var rewrittenOpaque = (IrOpaqueTerm)rewrittenBinary.Right;
+        Assert.That(rewrittenOpaque.Arguments, Has.Length.EqualTo(1));
+        Assert.That(
+            rewrittenOpaque.Arguments[0],
+            Is.EqualTo(factory.Variable(projection.LengthVariable!.Value)));
+        Assert.That(proxy, Is.Not.Null);
+    }
+
+    [Test]
     public void CardinalityWithoutNonNullOrSequenceTypeFailsClosed()
     {
         var factory = new IrFactory();

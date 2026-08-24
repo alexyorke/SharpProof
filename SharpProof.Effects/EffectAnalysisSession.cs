@@ -67,6 +67,24 @@ public sealed class EffectAnalysisSession
     public Compilation Compilation => _compilation;
     internal ResolvedApiSpecTable ApiSpecs => _external.ApiSpecs;
 
+    // Disposal resolution needs the callee's local prefix when a disposer is
+    // known not to complete or throw. The full fixed-point summary carries an
+    // unknown boundary for that case, which would erase the effects that occur
+    // before divergence.
+    internal EffectSummary ResolveLocalSummary(IMethodSymbol method)
+    {
+        ArgumentNullGuard.NotNull(method, nameof(method));
+        lock (_gate)
+        {
+            if (!_nodes.TryGetValue(method, out var node))
+            {
+                node = _nodeBuilder.Build(method, CancellationToken.None);
+                _nodes.Add(method, node);
+            }
+            return node.LocalSummary;
+        }
+    }
+
     internal EffectContractResolution ResolveExternalContract(IMethodSymbol method)
     {
         return _external.ResolveContract(method);

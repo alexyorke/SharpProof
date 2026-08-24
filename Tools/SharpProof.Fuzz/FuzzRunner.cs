@@ -290,7 +290,7 @@ public static class FuzzRunner
                         caseSeed,
                         cancellationToken);
                     var smtOracle = new FiniteDomainSmtDifferentialOracle();
-                    var minimizedFormula = await IrStructuralShrinker
+                    var minimizedFiniteFormula = await IrStructuralShrinker
                         .MinimizeAsync(
                             factory,
                             formula,
@@ -305,7 +305,7 @@ public static class FuzzRunner
                         .ConfigureAwait(false);
                     var minimizedSmtResult = await smtOracle.CompareAsync(
                             factory,
-                            minimizedFormula,
+                            minimizedFiniteFormula,
                             cancellationToken)
                         .ConfigureAwait(false);
                     var printer = new IrPrinter(factory);
@@ -314,7 +314,7 @@ public static class FuzzRunner
                         caseSeed,
                         failureKey.Oracle,
                         printer.Print(formula),
-                        printer.Print(minimizedFormula),
+                        printer.Print(minimizedFiniteFormula),
                         minimizedSmtResult.Detail));
                     break;
                 case "partial-term-smt":
@@ -322,21 +322,33 @@ public static class FuzzRunner
                     var partialCase = PartialTermSmtCaseGenerator.Create(
                         partialFactory,
                         unchecked(caseSeed ^ 0x243F6A88));
-                    var partialResult = await new
-                        PartialTermSmtDifferentialOracle().CompareAsync(
+                    var partialPrinter = new IrPrinter(partialFactory);
+                    var partialOracle = new PartialTermSmtDifferentialOracle();
+                    var minimizedPartialFormula = await IrStructuralShrinker
+                        .MinimizeAsync(
                             partialFactory,
-                            partialCase,
+                            partialCase.Formula,
+                            async (candidate, cancellation) =>
+                                (await partialOracle.CompareAsync(
+                                        partialFactory,
+                                        partialCase with { Formula = candidate },
+                                        cancellation)
+                                    .ConfigureAwait(false)).Status ==
+                                FuzzOracleStatus.Mismatch,
                             cancellationToken)
                         .ConfigureAwait(false);
-                    var partialPrinter = new IrPrinter(partialFactory);
-                    var printed = partialPrinter.Print(partialCase.Formula);
+                    var minimizedPartialResult = await partialOracle.CompareAsync(
+                            partialFactory,
+                            partialCase with { Formula = minimizedPartialFormula },
+                            cancellationToken)
+                        .ConfigureAwait(false);
                     failures.Add(new FuzzFailure(
                         index,
                         caseSeed,
                         failureKey.Oracle,
-                        printed,
-                        printed,
-                        partialResult.Detail));
+                        partialPrinter.Print(partialCase.Formula),
+                        partialPrinter.Print(minimizedPartialFormula),
+                        minimizedPartialResult.Detail));
                     break;
             }
         }

@@ -34,7 +34,8 @@ internal sealed partial record WorkerInputSnapshot
                 throw new InvalidDataException();
             }
 
-            manifest = CompilerManifestArtifactJson.Deserialize(DecodeUtf8(manifestBytes));
+            manifest = CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactFile.DecodeUtf8(manifestBytes));
         }
         catch (Exception exception) when (exception is
             JsonException or InvalidDataException or DecoderFallbackException)
@@ -45,11 +46,6 @@ internal sealed partial record WorkerInputSnapshot
             cacheIdentity.ToolVersion, cacheIdentity.WorkerBinarySha256, cacheIdentity.ApiSpecIdentity,
             cacheIdentity.ApiSpecVersion, cacheIdentity.ApiSpecContentSha256);
         return Task.FromResult(new WorkerInputSnapshot(manifest, inputHash));
-    }
-    private static string DecodeUtf8(byte[] bytes)
-    {
-        var offset = bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }) ? 3 : 0;
-        return new UTF8Encoding(false, true).GetString(bytes, offset, bytes.Length - offset);
     }
 }
 

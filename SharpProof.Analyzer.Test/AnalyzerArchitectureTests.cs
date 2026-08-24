@@ -214,9 +214,6 @@ public sealed class AnalyzerArchitectureTests
             "New Rules");
         var descriptors = new SharpProofAnalyzer()
             .SupportedDiagnostics
-            .Where(static descriptor => !descriptor.Id.StartsWith(
-                "SPCF",
-                StringComparison.Ordinal))
             .ToDictionary(
                 static descriptor => descriptor.Id,
                 StringComparer.Ordinal);
@@ -230,7 +227,7 @@ public sealed class AnalyzerArchitectureTests
             Assert.That(
                 unshipped.Keys,
                 Is.EquivalentTo(descriptors.Keys));
-            Assert.That(unshipped, Has.Count.EqualTo(13));
+            Assert.That(unshipped, Has.Count.EqualTo(21));
         }
         foreach (var descriptor in descriptors.Values)
         {
@@ -276,10 +273,7 @@ public sealed class AnalyzerArchitectureTests
                 .Split('|')
                 .Select(static column => column.Trim())
                 .ToArray();
-            if (columns.Length < 4 ||
-                columns[0].Length != 6 ||
-                !columns[0].StartsWith("SP", StringComparison.Ordinal) ||
-                !int.TryParse(columns[0].AsSpan(2), out _))
+            if (columns.Length < 4 || !IsDiagnosticId(columns[0]))
             {
                 continue;
             }
@@ -294,6 +288,18 @@ public sealed class AnalyzerArchitectureTests
                 "Duplicate release row " + rule.Id + " in " + path + ".");
         }
         return result;
+    }
+
+    private static bool IsDiagnosticId(string id)
+    {
+        if (id.StartsWith("SPCF", StringComparison.Ordinal))
+        {
+            return id.Length == 8 && int.TryParse(id.AsSpan(4), out _);
+        }
+
+        return id.Length == 6 &&
+            id.StartsWith("SP", StringComparison.Ordinal) &&
+            int.TryParse(id.AsSpan(2), out _);
     }
 
     private static string ReleaseSeverity(

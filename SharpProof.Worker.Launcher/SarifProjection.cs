@@ -23,11 +23,13 @@ internal static class SarifProjection
         var callables = manifest.Callables.ToDictionary(
             static callable => callable.CallableId, StringComparer.Ordinal);
         var results = claimResults
-            .Select(result => ClaimResult(request, result, claims[result.ClaimId]))
+            .Select(result => ClaimResult(
+                request, result, claims[result.ClaimId]))
             .ToList();
         results.AddRange(callableResults
             .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete)
-            .Select(result => IncompleteResult(request, result, callables[result.CallableId])));
+            .Select(result => IncompleteResult(
+                request, result, callables[result.CallableId])));
         var notifications = errors.Select(
             static error => Notification(error.Code, error.Message)).ToList();
         var assumptions = summary.Assumptions;
@@ -41,8 +43,7 @@ internal static class SarifProjection
                 LauncherPresentation.Level(request.AssumptionPolicy, "note")));
         }
 
-        if (runStatus != WorkerRunStatus.Complete &&
-            notifications.Count == 0)
+        if (runStatus != WorkerRunStatus.Complete)
         {
             notifications.Add(Notification(
                 "worker." + runStatus,
@@ -64,6 +65,15 @@ internal static class SarifProjection
             automationDetails = new
             {
                 id = manifest.Hash
+            },
+            originalUriBaseIds = new Dictionary<string, object>
+            {
+                ["PROJECTROOT"] = new
+                {
+                    uri = new Uri(
+                        Path.GetFullPath(Environment.CurrentDirectory) +
+                        Path.DirectorySeparatorChar).AbsoluteUri
+                }
             },
             invocations = new[] { new {
                 executionSuccessful = runStatus == WorkerRunStatus.Complete && errors.Length == 0,
@@ -134,7 +144,8 @@ internal static class SarifProjection
 
     private static object Result(
         string ruleId, string kind, string level, string message,
-        WorkerSourceLocation location, string semanticId, object properties)
+        WorkerSourceLocation location, string semanticId,
+        object properties)
     {
         return new
         {
@@ -146,7 +157,11 @@ internal static class SarifProjection
                 text = message
             },
             locations = new[] { new { physicalLocation = new {
-                artifactLocation = new { uri = LocationUri(location.Path) },
+                artifactLocation = new
+                {
+                    uri = LocationUri(location.Path),
+                    uriBaseId = "PROJECTROOT"
+                },
                 region = new {
                     startLine = location.Line, startColumn = location.Column
                 }
@@ -178,7 +193,18 @@ internal static class SarifProjection
 
     private static string LocationUri(string path)
     {
-        return Uri.TryCreate(path, UriKind.Absolute, out var uri)
-            ? uri.AbsoluteUri : path.Replace('\\', '/');
+        if (Uri.TryCreate(path, UriKind.Absolute, out var uri))
+        {
+            return uri.AbsoluteUri;
+        }
+
+        // Compiler locations are intentionally project-relative (and may be
+        // mapped virtual paths). Preserve that identity in SARIF while
+        // escaping each physical path segment for URI consumers.
+        return string.Join(
+            "/",
+            path.Replace('\\', '/')
+                .Split('/')
+                .Select(Uri.EscapeDataString));
     }
 }

@@ -8,6 +8,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         maximumBytes, nameof(maximumBytes));
     internal static Action<string, string>? PathValidationOverride;
     internal static Action? TransactionRollbackOverride;
+    internal bool LastReadUnavailable { get; private set; }
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
         string inputHash,
@@ -16,6 +17,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         WorkerBudgets budgets,
         CancellationToken cancellationToken)
     {
+        LastReadUnavailable = false;
         var path = GetPath(inputHash);
         var staged = new List<StagedEntry>();
         var committed = false;
@@ -23,8 +25,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         try
         {
             cacheLock = AcquireLock(_directory);
+            RecoverTransactionDebris(cancellationToken);
             ValidatePath(path);
             var file = new FileInfo(path);
+            if (!file.Exists)
+            {
+                committed = true;
+                return null;
+            }
             if (file.Length > Math.Min(
                     _maximumBytes,
                     WorkerProtocolJson.MaximumJsonBytes))
@@ -32,6 +40,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 cancellationToken.ThrowIfCancellationRequested();
                 ValidatePath(path);
                 file.Delete();
+                DiscardStaged(staged);
+                committed = true;
+                return null;
+            }
+            if (!TryStageCapacity(path, staged, cancellationToken))
+            {
+                RestoreStaged(staged);
                 return null;
             }
             var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
@@ -47,6 +62,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 !string.Equals(envelopeInputHash, inputHash, StringComparison.Ordinal) ||
                 !string.Equals(payloadHash, HashText(envelopePayload), StringComparison.Ordinal))
             {
+                DiscardStaged(staged);
+                committed = true;
                 return null;
             }
             cancellationToken.ThrowIfCancellationRequested();
@@ -61,6 +78,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 callables.Any(static result => result == null) ||
                 claims.Any(static result => result == null))
             {
+                DiscardStaged(staged);
+                committed = true;
                 return null;
             }
 
@@ -74,24 +93,28 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                     targets,
                     cancellationToken))
             {
+                DiscardStaged(staged);
+                committed = true;
                 return null;
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryStageCapacity(path, staged, cancellationToken))
-            {
-                return null;
-            }
             ValidatePath(path);
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
             committed = true;
             DiscardStaged(staged);
             return response;
         }
-        catch (Exception exception) when (exception is
-            ArgumentException or JsonException or IOException or InvalidDataException or
-                UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
+            LastReadUnavailable = true;
+            return null;
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or JsonException or InvalidDataException)
+        {
+            DiscardStaged(staged);
+            committed = true;
             return null;
         }
         finally
@@ -133,6 +156,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         try
         {
             cacheLock = AcquireLock(_directory);
+            RecoverTransactionDebris(cancellationToken);
             var payload = JsonSerializer.Serialize(new CachePayload(
                 manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
             var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
@@ -236,21 +260,70 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
     }
 
+    private void RecoverTransactionDebris(CancellationToken cancellationToken)
+    {
+        foreach (var debrisPath in new DirectoryInfo(_directory)
+                     .EnumerateFiles()
+                     .Where(static file =>
+                         file.Name.EndsWith(".rollback", StringComparison.Ordinal) ||
+                         file.Name.EndsWith(".eviction", StringComparison.Ordinal)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var suffix = debrisPath.Name.EndsWith(
+                ".rollback", StringComparison.Ordinal)
+                ? ".rollback"
+                : ".eviction";
+            var separator = debrisPath.Name.LastIndexOf(
+                '.', debrisPath.Name.Length - suffix.Length - 1);
+            if (separator <= 0 ||
+                !IsOwnedCacheEntry(debrisPath.Name[..separator]))
+            {
+                continue;
+            }
+
+            var originalPath = Path.Combine(
+                _directory,
+                debrisPath.Name[..separator]);
+            ValidatePath(debrisPath.FullName);
+            ValidatePath(originalPath);
+            if (File.Exists(originalPath))
+            {
+                File.Delete(debrisPath.FullName);
+            }
+            else
+            {
+                File.Move(debrisPath.FullName, originalPath);
+            }
+        }
+    }
+
     private bool TryStageCapacity(
         string protectedPath,
         List<StagedEntry> staged,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var files = new DirectoryInfo(_directory)
-            .EnumerateFiles("*.sharp-proof-cache.json", SearchOption.TopDirectoryOnly)
-            .Where(static file => IsOwnedCacheEntry(file.Name))
-            .OrderBy(static file => file.LastWriteTimeUtc)
-            .ThenBy(static file => file.Name, StringComparer.Ordinal)
-            .ToArray();
+        var files = new List<FileInfo>();
+        foreach (var file in new DirectoryInfo(_directory)
+                     .EnumerateFiles("*.sharp-proof-cache.json", SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsOwnedCacheEntry(file.Name))
+            {
+                files.Add(file);
+            }
+        }
+        files.Sort(static (left, right) =>
+        {
+            var result = left.LastWriteTimeUtc.CompareTo(right.LastWriteTimeUtc);
+            return result != 0
+                ? result
+                : StringComparer.Ordinal.Compare(left.Name, right.Name);
+        });
         long total = 0;
         foreach (var file in files)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ValidatePath(file.FullName);
             checked
             {

@@ -49,6 +49,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         _supervisorOutputCompletion;
     private int _terminalCause;
     private bool _canceled;
+    private bool _disposed;
+    private bool _executionActive;
 
     internal Func<int, int>? OpenPidFdOverride { get; set; }
     internal Func<Process?, int, int, bool>? TryTerminateOverride { get; set; }
@@ -94,8 +96,34 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     public void Dispose()
     {
-        _cancellationSignal.Dispose();
-        _process?.Dispose();
+        Process? process = null;
+        ManualResetEventSlim? cancellationSignal = null;
+        lock (_synchronization)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _canceled = true;
+            TrySetTerminalCause(VerifierTerminalCause.Canceled);
+            // Keep the signal alive for any Execute/Cancel caller that already
+            // captured it.  Dispose is intentionally deferred until this task's
+            // active execution has released the process.
+            _cancellationSignal.Set();
+            if (!_executionActive)
+            {
+                process = _process;
+                _process = null;
+                _processGroupId = 0;
+                _processGroupPidFd = -1;
+                cancellationSignal = _cancellationSignal;
+            }
+        }
+
+        process?.Dispose();
+        cancellationSignal?.Dispose();
     }
 
     [SuppressMessage(
@@ -126,8 +154,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         HasStructuredError = false;
         ExitCode = 0;
         var containmentFailed = false;
+        var processStopwatch = Stopwatch.StartNew();
         lock (_synchronization)
         {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            _executionActive = true;
             if (!_canceled)
             {
                 _cancellationSignal.Reset();
@@ -157,7 +192,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             var verifierTimeout = workerLauncherBudget
                 ? processTimeout
                 : processTimeout - LauncherProcessReserveMilliseconds;
-            var processStopwatch = Stopwatch.StartNew();
             var resolvedExecutable = ResolveDotNetHost(Executable);
             supervisorNonce = CreateSupervisorNonce();
             process = new Process
@@ -365,6 +399,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         finally
         {
             var processGroupPidFd = -1;
+            ManualResetEventSlim? cancellationSignal = null;
             lock (_synchronization)
             {
                 if (ReferenceEquals(_process, process))
@@ -375,6 +410,11 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     _processGroupPidFd = -1;
                     _supervisorArmedSignal = null;
                     _supervisorOutputCompletion = null;
+                }
+                _executionActive = false;
+                if (_disposed)
+                {
+                    cancellationSignal = _cancellationSignal;
                 }
             }
             if (processGroupPidFd >= 0)
@@ -403,6 +443,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 }
             }
             process?.Dispose();
+            cancellationSignal?.Dispose();
         }
         return true;
     }
@@ -1240,9 +1281,27 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         }
 
         var disclosedHost = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
-        var trusted = !string.IsNullOrWhiteSpace(disclosedHost)
+        var currentProcess = Environment.ProcessPath;
+        var currentMuxer = !string.IsNullOrWhiteSpace(currentProcess) &&
+            Path.IsPathRooted(currentProcess) &&
+            string.Equals(
+                Path.GetFileName(currentProcess),
+                "dotnet",
+                StringComparison.Ordinal)
+            ? ValidateDotNetInstallation(currentProcess)
+            : null;
+        var disclosedMuxer = !string.IsNullOrWhiteSpace(disclosedHost)
             ? ValidateDotNetInstallation(disclosedHost)
-            : ValidateDotNetInstallation(ResolveDotNetFromPath());
+            : null;
+        if (currentMuxer != null &&
+            disclosedMuxer != null &&
+            !LinuxPathIdentity.AreSameExistingFile(currentMuxer, disclosedMuxer))
+        {
+            throw new InvalidOperationException(
+                "DOTNET_HOST_PATH must match the current dotnet muxer.");
+        }
+        var trusted = currentMuxer ?? disclosedMuxer ??
+            ValidateDotNetInstallation(ResolveDotNetFromPath());
         if (string.Equals(
                 executable,
                 "dotnet",
@@ -1274,6 +1333,10 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         int processGroupId;
         lock (_synchronization)
         {
+            if (_disposed)
+            {
+                return;
+            }
             _canceled = true;
             TrySetTerminalCause(VerifierTerminalCause.Canceled);
             _cancellationSignal.Set();
@@ -1314,7 +1377,10 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                      [Path.PathSeparator],
                      StringSplitOptions.RemoveEmptyEntries))
         {
-            var directory = value.Trim().Trim('"');
+            // PATH is already a parsed environment value. Treat each field as
+            // an opaque directory name; trimming would silently redirect legal
+            // installations whose names end in whitespace or quotes.
+            var directory = value;
             if (string.IsNullOrWhiteSpace(directory) ||
                 directory == "." ||
                 !Path.IsPathRooted(directory))

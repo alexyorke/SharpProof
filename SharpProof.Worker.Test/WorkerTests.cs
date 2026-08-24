@@ -261,7 +261,7 @@ public sealed class WorkerTests
         var first = await worker.VerifyAsync(request);
         var response = await worker.VerifyAsync(request);
         var result = response.ClaimResults.Single();
-        var usedPreconditions = result.Assumptions.Where(
+        var usedPreconditions = result.Assumptions!.Where(
             static assumption =>
                 assumption.Kind ==
                 WorkerAssumptionKind.Precondition);
@@ -319,7 +319,7 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
         var result = response.ClaimResults.Single();
-        var preconditions = result.Assumptions.Where(
+        var preconditions = result.Assumptions!.Where(
             static assumption =>
                 assumption.Kind ==
                 WorkerAssumptionKind.Precondition).ToArray();
@@ -850,9 +850,9 @@ public sealed class WorkerTests
             Assert.That(result.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
-            Assert.That(result.Assumptions.Select(static item => item.Kind),
+            Assert.That(result.Assumptions!.Select(static item => item.Kind),
                 Does.Contain(WorkerAssumptionKind.TrustedBoundary));
-            Assert.That(result.Assumptions.Single(static item =>
+            Assert.That(result.Assumptions!.Single(static item =>
                     item.Kind == WorkerAssumptionKind.TrustedBoundary).Used,
                 Is.True);
             Assert.That(response.CallableResults.Single().Coverage,
@@ -2033,7 +2033,7 @@ public sealed class WorkerTests
         Assert.That(
             backend.Query.Assumptions[0].Justification,
             Is.TypeOf<UserAssumedJustification>());
-        var userAssumptions = record.Assumptions
+        var userAssumptions = record.Assumptions!
             .Where(static evidence =>
                 evidence.Kind == WorkerAssumptionKind.UserAssume).ToArray();
         using (Assert.EnterMultipleScope())
@@ -6328,7 +6328,7 @@ public sealed class WorkerTests
             Does.Contain("response.proof_core_authority"));
 
         result.ProofCore = originalCore;
-        var usedAssumption = result.Assumptions.Single(
+        var usedAssumption = result.Assumptions!.Single(
             assumption => assumption.Kind == WorkerAssumptionKind.UserAssume &&
                 assumption.Id == assumptionId);
         usedAssumption.Used = !usedAssumption.Used;

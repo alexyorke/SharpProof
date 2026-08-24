@@ -50,6 +50,24 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void MemberInterningIncludesTheMemberName()
+    {
+        var factory = new IrFactory();
+        var identity = factory.CreateIdentity();
+        var type = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Widget");
+
+        var first = factory.GetOrCreateMember(
+            identity, type, "First", factory.IntegerType, isStatic: true);
+        var second = factory.GetOrCreateMember(
+            identity, type, "Second", factory.IntegerType, isStatic: true);
+
+        Assert.That(second, Is.Not.EqualTo(first));
+        Assert.That(factory.GetString(factory.GetMemberInfo(first).Name), Is.EqualTo("First"));
+        Assert.That(factory.GetString(factory.GetMemberInfo(second).Name), Is.EqualTo("Second"));
+    }
+
+    [Test]
     public void StructuralTermsAreReferenceIdenticalAndConstantsFoldCentrally()
     {
         var factory = new IrFactory();

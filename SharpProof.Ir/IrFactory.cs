@@ -179,6 +179,7 @@ public sealed class IrFactory
             var parameters = parameterTypes.ToImmutableArray();
             var key = new StructuralKey(
                 default, declaringType.Value, identity.Value, returnType.Value, isStatic ? 1 : 0,
+                number: nameId.Value,
                 children: [.. parameters.Select(static value => value.Value)]);
             if (_memberIds.TryGetValue(key, out var existing))
             {

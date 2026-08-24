@@ -4,13 +4,15 @@ public static class WorkerExecutionEnvelope
 {
     public const long MaximumProducerElapsedMilliseconds = 922337203685477L;
     public const int CleanupReserveMilliseconds = 100;
+    public const int MinimumTerminationGraceMilliseconds =
+        CleanupReserveMilliseconds + 1;
 
     public static long MaximumElapsedMilliseconds(
         WorkerVerifyRequest request,
         int terminationGraceMilliseconds)
     {
         _ = request ?? throw new ArgumentNullException(nameof(request));
-        if (terminationGraceMilliseconds < 1 ||
+        if (terminationGraceMilliseconds < MinimumTerminationGraceMilliseconds ||
             terminationGraceMilliseconds > WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds)
         {
             throw new ArgumentOutOfRangeException(nameof(terminationGraceMilliseconds));

@@ -224,7 +224,8 @@
       "sharpproof.buildtasks": {
         "type": "Project",
         "dependencies": {
-          "SharpProof.Host": "[1.0.0-preview.1, )"
+          "SharpProof.Host": "[1.0.0-preview.1, )",
+          "SharpProof.Worker.Protocol": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.compilerartifact": {

@@ -59,8 +59,12 @@ internal sealed class CompilerCallableLowerer
         }
 
         var contracts = binding.Contracts!;
-        var preconditions = target.Entry.Assumptions.Where(static evidence => evidence.Kind == WorkerAssumptionKind.Precondition).ToArray();
-        var userAssumptions = target.Entry.Assumptions.Where(static evidence => evidence.Kind == WorkerAssumptionKind.UserAssume).ToArray();
+        IEnumerable<WorkerAssumptionEvidence> sourceAssumptions =
+            target.SourceOrderedAssumptions.IsDefaultOrEmpty
+                ? target.Entry.Assumptions
+                : target.SourceOrderedAssumptions;
+        var preconditions = sourceAssumptions.Where(static evidence => evidence.Kind == WorkerAssumptionKind.Precondition).ToArray();
+        var userAssumptions = sourceAssumptions.Where(static evidence => evidence.Kind == WorkerAssumptionKind.UserAssume).ToArray();
         if (contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Requires) != preconditions.Length ||
             contracts.Clauses.Count(static clause => clause.Kind == BoundContractKind.Assume) != userAssumptions.Length)
         {

@@ -77,10 +77,7 @@ internal static class AtomicFile
         }
         finally
         {
-            if (File.Exists(temporary))
-            {
-                File.Delete(temporary);
-            }
+            TryDeleteStaged(temporary);
         }
     }
     internal static Task WriteUtf8Async(
@@ -106,10 +103,7 @@ internal static class AtomicFile
         }
         finally
         {
-            if (File.Exists(temporary))
-            {
-                File.Delete(temporary);
-            }
+            TryDeleteStaged(temporary);
         }
     }
     private static (string Destination, string Temporary) Prepare(string path)
@@ -118,7 +112,9 @@ internal static class AtomicFile
         var directory = Path.GetDirectoryName(destination) ??
             throw new InvalidOperationException("The output path has no directory.");
         Directory.CreateDirectory(directory);
-        return (destination, destination + "." + Guid.NewGuid().ToString("N") + ".tmp");
+        return (destination, Path.Combine(
+            directory,
+            ".sharpproof-" + Guid.NewGuid().ToString("N") + ".tmp"));
     }
     private static void Publish(string temporary, string destination)
     {

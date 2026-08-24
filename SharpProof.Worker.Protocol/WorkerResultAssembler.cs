@@ -45,7 +45,8 @@ internal static class WorkerResultAssembler
         string inputHash, string requestHash, WorkerClaimManifest manifest, WorkerBudgets budgets,
         WorkerRunStatus status, WorkerRunFailureReason failureReason, WorkerCallableCoverageReason callableReason,
         WorkerClaimReason claimReason, IEnumerable<WorkerProtocolError>? errors = null,
-        WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0)
+        WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0,
+        WorkerCacheStatus cacheStatus = WorkerCacheStatus.Disabled)
     {
         return Create(inputHash, manifest, status, failureReason,
             manifest.Callables.Select(callable => new WorkerCallableResult
@@ -69,7 +70,7 @@ internal static class WorkerResultAssembler
                 Assumptions = manifest.Callables.FirstOrDefault(callable =>
                     callable.CallableId == claim.CallableId)?.Assumptions ?? []
             }),
-            budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
+            budgets, cacheStatus, elapsedMilliseconds, errors, requestHash, versions);
     }
 
     internal static WorkerAssumptionSummary SummarizeAssumptions(WorkerCallableResult[] callables, WorkerClaimResult[] claims,
@@ -173,12 +174,17 @@ internal static class WorkerResultAssembler
         IEnumerable<WorkerClaimResult> claims,
         WorkerRunStatus runStatus,
         WorkerRunFailureReason failureReason,
-        bool hasErrors)
+        bool hasErrors,
+        IReadOnlyDictionary<string, WorkerClaimResult[]>? claimsByCallable = null)
     {
         var ownedIds = manifest.Callables.FirstOrDefault(entry =>
             entry.CallableId == callable.CallableId)?.ClaimIds ?? [];
-        var owned = claims.Where(claim =>
-            ownedIds.Contains(claim.ClaimId, StringComparer.Ordinal)).ToArray();
+        var owned = claimsByCallable != null
+            ? claimsByCallable.TryGetValue(callable.CallableId, out var indexed)
+                ? indexed
+                : []
+            : claims.Where(claim =>
+                ownedIds.Contains(claim.ClaimId, StringComparer.Ordinal)).ToArray();
         WorkerCallableCoverageReason expected;
         if (runStatus == WorkerRunStatus.Failed && hasErrors)
         {
@@ -186,8 +192,16 @@ internal static class WorkerResultAssembler
                 ? WorkerCallableCoverageReason.MissingClaimResult
                 : WorkerCallableCoverageReason.InfrastructureFailure;
         }
-        else if (owned.Length == 0 ||
-            owned.All(static claim => claim.Outcome != WorkerClaimOutcome.Unknown))
+        else if (owned.Length == 0)
+        {
+            expected = runStatus switch
+            {
+                WorkerRunStatus.Canceled => WorkerCallableCoverageReason.Canceled,
+                WorkerRunStatus.TimedOut => WorkerCallableCoverageReason.ProjectTimeout,
+                _ => WorkerCallableCoverageReason.None
+            };
+        }
+        else if (owned.All(static claim => claim.Outcome != WorkerClaimOutcome.Unknown))
         {
             expected = WorkerCallableCoverageReason.None;
         }

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -67,24 +68,32 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 "Generated C# did not compile: " + errors);
         }
 
-        image.Position = 0;
-        var assembly = Assembly.Load(image.ToArray());
-        var method = assembly.GetType("SharpProofGeneratedOracle")!.GetMethod(
-            "Evaluate",
-            BindingFlags.Public | BindingFlags.Static)!;
+        var loadContext = new OracleLoadContext();
         try
         {
-            var runtimeValues = new Dictionary<IrValue, object?>(
-                ReferenceEqualityComparer.Instance);
-            var actual = method.Invoke(
-                null,
-                [.. orderedVariables.Select(
-                    binding => ToRuntimeValue(variables[binding], runtimeValues))]);
-            return CompareValue(interpreted, actual);
+            using var assemblyImage = new MemoryStream(image.ToArray());
+            var assembly = loadContext.LoadFromStream(assemblyImage);
+            var method = assembly.GetType("SharpProofGeneratedOracle")!.GetMethod(
+                "Evaluate",
+                BindingFlags.Public | BindingFlags.Static)!;
+            try
+            {
+                var runtimeValues = new Dictionary<IrValue, object?>(
+                    ReferenceEqualityComparer.Instance);
+                var actual = method.Invoke(
+                    null,
+                    [.. orderedVariables.Select(
+                        binding => ToRuntimeValue(variables[binding], runtimeValues))]);
+                return CompareValue(interpreted, actual);
+            }
+            catch (TargetInvocationException exception) when (exception.InnerException != null)
+            {
+                return CompareException(interpreted, exception.InnerException);
+            }
         }
-        catch (TargetInvocationException exception) when (exception.InnerException != null)
+        finally
         {
-            return CompareException(interpreted, exception.InnerException);
+            loadContext.Unload();
         }
     }
 
@@ -432,12 +441,37 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
             IrValueKind.String => actual is string value &&
                                   string.Equals(value, interpreted.Value.String, StringComparison.Ordinal),
             IrValueKind.Null => actual == null,
+            IrValueKind.Reference => ReferenceEquals(actual, interpreted.Value.Reference),
+            IrValueKind.Sequence => actual is Array array &&
+                                    array.Length == interpreted.Value.Elements.Length &&
+                                    interpreted.Value.Elements
+                                        .Select((element, index) => (element, index))
+                                        .All(pair => CompareRuntimeValue(pair.element, array.GetValue(pair.index))),
             _ => false
         };
         return new DifferentialResult(
             agrees ? DifferentialStatus.Agreement : DifferentialStatus.Mismatch,
             interpreted,
             agrees ? "" : "Compiled C# and the IR interpreter produced different values.");
+    }
+
+    private static bool CompareRuntimeValue(IrValue expected, object? actual)
+    {
+        return expected.Kind switch
+        {
+            IrValueKind.Boolean => actual is bool value && value == expected.Boolean,
+            IrValueKind.Integer => actual is long value && value == expected.Integer,
+            IrValueKind.String => actual is string value &&
+                                  string.Equals(value, expected.String, StringComparison.Ordinal),
+            IrValueKind.Null => actual == null,
+            IrValueKind.Reference => ReferenceEquals(actual, expected.Reference),
+            IrValueKind.Sequence => actual is Array array &&
+                                    array.Length == expected.Elements.Length &&
+                                    expected.Elements
+                                        .Select((element, index) => (element, index))
+                                        .All(pair => CompareRuntimeValue(pair.element, array.GetValue(pair.index))),
+            _ => false
+        };
     }
 
     private static DifferentialResult CompareException(
@@ -475,5 +509,18 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
             .Select(static path => MetadataReference.CreateFromFile(path))];
+    }
+
+    private sealed class OracleLoadContext : AssemblyLoadContext
+    {
+        internal OracleLoadContext()
+            : base("SharpProof.DifferentialOracle", isCollectible: true)
+        {
+        }
+
+        protected override Assembly? Load(AssemblyName assemblyName)
+        {
+            return null;
+        }
     }
 }

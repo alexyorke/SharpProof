@@ -178,6 +178,7 @@ internal sealed partial class OperationEffectScanner
     internal EffectSummary ScanUsingDisposalEffects(IOperation root)
     {
         return new UsingDisposalEffectResolver(
+            _session,
             _session.Compilation,
             _method,
             _callResolver,
@@ -776,9 +777,11 @@ internal sealed partial class OperationEffectScanner
                 ClassifyArguments(
                     creation.Arguments,
                     creation.Constructor?.Parameters.Length ?? 0));
-            return EffectSummaryOperations.ExceptionConstructionThrow(
-                construction,
-                ResolveThrownException(thrown));
+            return EffectSummaryDomain.Instance.Join(
+                arguments.Summary,
+                EffectSummaryOperations.ExceptionConstructionThrow(
+                    construction,
+                    ResolveThrownException(thrown)));
         }
         var expression = thrown.Exception == null
             ? EffectStep.Empty

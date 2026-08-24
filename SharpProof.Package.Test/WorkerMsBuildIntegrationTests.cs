@@ -1031,6 +1031,10 @@ public sealed class WorkerMsBuildIntegrationTests
             ("SharpProofVerifySarifFile", sarifPath));
         Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
         var stableResult = await File.ReadAllBytesAsync(project.ResultPath);
+        Assert.That(
+            File.Exists(LinuxPathIdentity.PublicationMarkerPath(project.ResultPath)),
+            Is.True,
+            "The baseline result must retain its ownership marker.");
 
         await AssertInvalidatedAsync(
             ("_SharpProofCompilerManifestPath",
@@ -3187,7 +3191,7 @@ public sealed class WorkerMsBuildIntegrationTests
             verify: true,
             ("SharpProofVerifyMethodWallTimeMilliseconds", "1"),
             ("SharpProofVerifyProjectWallTimeMilliseconds", "1"),
-            ("SharpProofVerifyTerminationGraceMilliseconds", "1"));
+            ("SharpProofVerifyTerminationGraceMilliseconds", "101"));
         Assert.That(timedOutBuild.ExitCode, Is.Not.Zero);
         Assert.That(
             timedOutBuild.Output.Contains(

@@ -261,6 +261,24 @@ function ConvertTo-PascalIdentifier {
         $Value.Substring(1)
 }
 
+function ConvertTo-RuntimeWitnessFactoryName {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$WitnessIdentifier
+    )
+
+    $segments = @(
+        $WitnessIdentifier -split '[^A-Za-z0-9]+' |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($segments.Count -eq 0) {
+        throw "Witness identifier '$WitnessIdentifier' has no name segments."
+    }
+    $suffix = $segments | ForEach-Object {
+        $_.Substring(0, 1).ToUpperInvariant() + $_.Substring(1)
+    }
+    return 'Create' + ($suffix -join '') + 'Witness'
+}
+
 function Format-EnumValue {
     param(
         [AllowNull()]
@@ -659,6 +677,12 @@ $witnesses = @($declarations | ForEach-Object {
 })
 if (@($witnesses | Sort-Object -Unique).Count -ne $witnesses.Count) {
     throw 'API-spec witness identifiers must be unique.'
+}
+$factoryNames = @($witnesses | ForEach-Object {
+    ConvertTo-RuntimeWitnessFactoryName $_
+})
+if (@($factoryNames | Sort-Object -Unique).Count -ne $factoryNames.Count) {
+    throw 'API-spec witness identifiers produce colliding factory names.'
 }
 
 $source = [Collections.Generic.List[string]]::new()

@@ -80,7 +80,8 @@ internal static class VerifierDiagnosticTransport
         }
         catch (Exception exception) when (
             exception is ArgumentException or InvalidOperationException or
-                JsonException or KeyNotFoundException or OverflowException)
+                JsonException or KeyNotFoundException or OverflowException or
+                FormatException)
         {
             return false;
         }

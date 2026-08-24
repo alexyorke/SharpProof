@@ -48,7 +48,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
 
     public override bool Execute()
     {
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = new TaskExecutionCancellation();
         Action cancel = cancellation.Cancel;
         lock (_synchronization)
         {
@@ -60,7 +60,17 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
         }
         try
         {
-            return Execute(cancellation.Token);
+            try
+            {
+                return Execute(cancellation.Token);
+            }
+            catch (Exception exception) when (exception is
+                ArgumentException or IOException or UnauthorizedAccessException or
+                InvalidOperationException)
+            {
+                Log.LogErrorFromException(exception, showStackTrace: false);
+                return false;
+            }
         }
         finally
         {
@@ -225,17 +235,11 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
 
         try
         {
-            using (LinuxPathIdentity.AcquirePublicationSet(
-                       publicationPaths,
-                       TimeSpan.FromSeconds(30),
-                       cancellationToken))
-            {
-                foreach (var path in outputPaths)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    LinuxPathIdentity.DeleteIfUnprotected(path, protectedPaths);
-                }
-            }
+            LinuxPathIdentity.InvalidatePublicationMembers(
+                publicationPaths,
+                outputPaths,
+                TimeSpan.FromSeconds(30),
+                cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

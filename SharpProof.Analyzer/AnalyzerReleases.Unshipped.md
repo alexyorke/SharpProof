@@ -15,3 +15,11 @@ SP0046 | ExceptionFlow | Info | Reports exception contracts that could not be ve
 SP0047 | Verification | Info | Reports selected methods outside the supported analyzer subset.
 SP0049 | Infrastructure | Error | Reports failure to emit the selected final compiler manifest.
 SP0050 | Infrastructure | Error | Reports a referenced contract API assembly that could not be read to verify its payload.
+SPCF0001 | SharpProof.ContractFor.Usage | Error | Reports an invalid ContractFor target.
+SPCF0002 | SharpProof.ContractFor.Usage | Error | Reports duplicate ContractFor companions.
+SPCF0003 | SharpProof.ContractFor.Usage | Error | Reports an invalid ContractFor companion type.
+SPCF0004 | SharpProof.ContractFor.Usage | Error | Reports a missing ContractFor member.
+SPCF0005 | SharpProof.ContractFor.Usage | Error | Reports a ContractFor member signature mismatch.
+SPCF0006 | SharpProof.ContractFor.Usage | Error | Reports an ambiguous ContractFor member.
+SPCF0007 | SharpProof.ContractFor.Usage | Error | Reports a ContractFor member without a required body.
+SPCF0008 | SharpProof.ContractFor.Usage | Error | Reports invalid ContractFor clause placement.

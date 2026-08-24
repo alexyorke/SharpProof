@@ -235,7 +235,7 @@ pack schema version 1. Every selected
 effect-attribute occurrence also has one compiler-sealed `Proven`, candidate
 `Refuted`, or typed `Unknown` evidence record. Repeated attributes retain
 distinct claim IDs while sharing their effective combined
-constraint/evidence. Schema 11 retains the ordered,
+constraint/evidence. Schema 15 retains the ordered,
 compiler-neutral replay event for an unconditional definite managed object or
 array allocation. It seals the selected-constraint hash, semantic-operation
 hash, exact compiler tree/span identity, type/member identity, mapped location,

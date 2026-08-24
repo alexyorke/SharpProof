@@ -630,7 +630,10 @@ public sealed class ProtocolModelSchemaTests
     {
         if (type.IsArray)
         {
-            return SchemaType(type.GetElementType()!, nullability?.ElementType) + "[]";
+            var arrayType = SchemaType(type.GetElementType()!, nullability?.ElementType) + "[]";
+            return nullability?.ReadState == NullabilityState.Nullable
+                ? arrayType + "?"
+                : arrayType;
         }
 
         var name = type == typeof(string)

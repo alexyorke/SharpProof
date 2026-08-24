@@ -13,6 +13,7 @@ namespace SharpProof.Worker.Launcher;
 
 internal static class Program
 {
+    private const int MaximumClaimLogCharacters = 64 * 1024;
     private const int TerminationCleanupReserveMilliseconds = 100;
 
     internal static async Task<int> Main(string[] args)
@@ -48,9 +49,13 @@ internal static class Program
         try
         {
             arguments.ValidatePreflight();
-            arguments.ValidateDistinctPaths(runtimeSnapshot);
+            // Reject path aliases before opening the worker dependency closure.
+            // A colliding output can otherwise make closure staging fail first
+            // with an unrelated missing-component error.
+            arguments.ValidateDistinctPaths(null);
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
+            arguments.ValidateDistinctPaths(runtimeSnapshot);
             request = arguments.CreateRequest(
                 runtimeSnapshot, out artifact, out artifactBytes);
             expectedInputHash = ComputeExpectedInputHash(
@@ -68,9 +73,6 @@ internal static class Program
                 WriteErrors(validation.Errors, string.Empty);
                 return 2;
             }
-            await AtomicFile.WriteUtf8Async(arguments.RequestPath,
-                WorkerProtocolJson.SerializeRequest(request)).ConfigureAwait(false);
-            DeleteIfExists(arguments.ResultPath);
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or
@@ -84,6 +86,25 @@ internal static class Program
                 "SharpProof launcher input is invalid: " +
                 exception.GetType().Name + ": " + exception.Message);
             return 2;
+        }
+
+        try
+        {
+            await AtomicFile.WriteUtf8Async(arguments.RequestPath,
+                WorkerProtocolJson.SerializeRequest(request)).ConfigureAwait(false);
+            DeleteIfExists(arguments.ResultPath);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+                ArgumentException or InvalidDataException or InvalidOperationException or
+                System.ComponentModel.Win32Exception)
+        {
+            runtimeSnapshot.Dispose();
+            runtimeSnapshot = null;
+            Console.Error.WriteLine(
+                "SharpProof launcher could not stage its private request: " +
+                exception.Message);
+            return 3;
         }
 
         int exitCode;
@@ -119,21 +140,42 @@ internal static class Program
             var failure = ClassifyLauncherFailure(exception);
             exitCode = failure.ExitCode;
             Console.Error.WriteLine(failure.ConsoleMessage);
-            await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
-                expectedVersions, failure.Status, failure.Reason,
-                failure.Code, failure.Message).ConfigureAwait(false);
+            if (!await TryWriteLauncherFailureAsync(
+                    arguments.ResultPath, request, artifact, expectedInputHash,
+                    expectedVersions, failure.Status, failure.Reason,
+                    failure.Code, failure.Message).ConfigureAwait(false))
+            {
+                return 3;
+            }
         }
         if (exitCode == 124)
         {
-            DeleteIfExists(arguments.ResultPath);
+            try
+            {
+                DeleteIfExists(arguments.ResultPath);
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException or
+                    ArgumentException or InvalidOperationException or
+                    System.ComponentModel.Win32Exception)
+            {
+                Console.Error.WriteLine(
+                    "SharpProof launcher could not clear the timed-out result: " +
+                    exception.Message);
+                return 3;
+            }
         }
         if (!File.Exists(arguments.ResultPath))
         {
             LauncherFailure launcherFailure =
                 LauncherPresentation.NoResultFailure(exitCode);
-            await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
-                expectedVersions, launcherFailure.Status, launcherFailure.Reason,
-                launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false);
+            if (!await TryWriteLauncherFailureAsync(
+                    arguments.ResultPath, request, artifact, expectedInputHash,
+                    expectedVersions, launcherFailure.Status, launcherFailure.Reason,
+                    launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false))
+            {
+                return 3;
+            }
         }
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
             artifact.Manifest, expectedVersions,
@@ -142,10 +184,14 @@ internal static class Program
             responseAuthority);
         if (!validResponse)
         {
-            await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
-                expectedVersions, WorkerRunStatus.Failed,
-                WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
-                "The worker result was unavailable or malformed.").ConfigureAwait(false);
+            if (!await TryWriteLauncherFailureAsync(
+                    arguments.ResultPath, request, artifact, expectedInputHash,
+                    expectedVersions, WorkerRunStatus.Failed,
+                    WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
+                    "The worker result was unavailable or malformed.").ConfigureAwait(false))
+            {
+                return 3;
+            }
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
                 artifact.Manifest, expectedVersions,
                 out validResponse, out validatedResponse,
@@ -165,7 +211,8 @@ internal static class Program
                     System.ComponentModel.Win32Exception)
             {
                 Console.Error.WriteLine(
-                    "SharpProof worker result could not be published.");
+                    "SharpProof worker result could not be published: " +
+                    exception.Message);
                 return 3;
             }
         }
@@ -275,6 +322,9 @@ internal static class Program
     internal static int ComputeHardLimit(
         int projectMilliseconds, int terminationGraceMilliseconds)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            terminationGraceMilliseconds,
+            WorkerExecutionEnvelope.MinimumTerminationGraceMilliseconds);
         return checked(projectMilliseconds + Math.Max(1,
             terminationGraceMilliseconds - TerminationCleanupReserveMilliseconds));
     }
@@ -282,6 +332,9 @@ internal static class Program
     internal static int ComputeFinalLimit(
         int projectMilliseconds, int terminationGraceMilliseconds)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            terminationGraceMilliseconds,
+            WorkerExecutionEnvelope.MinimumTerminationGraceMilliseconds);
         return checked(projectMilliseconds + terminationGraceMilliseconds);
     }
 
@@ -393,12 +446,30 @@ internal static class Program
 
         var manifestClaims = response.Manifest.Claims.ToDictionary(static claim => claim.ClaimId, StringComparer.Ordinal);
         var refuted = response.ClaimResults.Any(static result => result.Outcome == WorkerClaimOutcome.Refuted);
+        var claimLogCharacters = 0;
+        var omittedClaimLogs = 0;
         foreach (var result in response.ClaimResults)
         {
             var claim = manifestClaims[result.ClaimId];
             var reason = result.Reason == WorkerClaimReason.None ? string.Empty : " (" + result.Reason + ")";
-            Console.WriteLine("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
-                LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason);
+            var line = "SharpProof " + result.Outcome + " " + claim.CallableId + " " +
+                LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason;
+            if (claimLogCharacters + line.Length + Environment.NewLine.Length <=
+                MaximumClaimLogCharacters)
+            {
+                Console.WriteLine(line);
+                claimLogCharacters += line.Length + Environment.NewLine.Length;
+            }
+            else
+            {
+                omittedClaimLogs++;
+            }
+        }
+        if (omittedClaimLogs != 0)
+        {
+            Console.WriteLine(
+                "SharpProof omitted " + omittedClaimLogs.ToString(CultureInfo.InvariantCulture) +
+                " claim log lines to keep launcher output bounded.");
         }
         var incomplete = response.CallableResults
             .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete).ToArray();
@@ -427,6 +498,11 @@ internal static class Program
         {
             Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
+            if (response.FailureReason ==
+                WorkerRunFailureReason.ContainmentFailure)
+            {
+                return 125;
+            }
             return LauncherPresentation.ExitCode(response.RunStatus);
         }
         if (response.Errors.Length != 0)
@@ -552,7 +628,20 @@ internal static class Program
         {
             if (commitStarted)
             {
-                TryRollbackPublication(members, previous);
+                try
+                {
+                    TryRollbackPublication(members, previous);
+                }
+                catch (Exception rollbackException) when (
+                    rollbackException is not OutOfMemoryException and
+                    not StackOverflowException and
+                    not OperationCanceledException)
+                {
+                    throw new AggregateException(
+                        "SharpProof publication rollback failed.",
+                        exception,
+                        rollbackException);
+                }
             }
             throw;
         }
@@ -575,18 +664,13 @@ internal static class Program
         var complete = true;
         foreach (var member in members)
         {
-            if (File.Exists(member.Path))
+            if (LinuxPathIdentity.TryReadRegularFile(
+                    member.Path,
+                    out var bytes))
             {
-                content.Add(member.Path, File.ReadAllBytes(member.Path));
+                content.Add(member.Path, bytes);
                 continue;
             }
-
-            if (Directory.Exists(member.Path))
-            {
-                throw new IOException(
-                    "SharpProof publication members must be regular files.");
-            }
-
             complete = false;
         }
 
@@ -619,23 +703,37 @@ internal static class Program
         IReadOnlyList<PublicationMember> members,
         PreviousPublication previous)
     {
-        try
+        if (previous.IsComplete)
         {
-            if (previous.IsComplete)
+            try
             {
                 RestorePreviousPublication(members, previous);
             }
-            else
+            catch (Exception restoreException) when (
+                restoreException is not OutOfMemoryException and
+                not StackOverflowException and
+                not OperationCanceledException)
             {
-                InvalidatePublication(members);
+                try
+                {
+                    InvalidatePublication(members);
+                }
+                catch (Exception invalidateException) when (
+                    invalidateException is not OutOfMemoryException and
+                    not StackOverflowException and
+                    not OperationCanceledException)
+                {
+                    throw new AggregateException(
+                        "SharpProof could not restore or invalidate its publication.",
+                        restoreException,
+                        invalidateException);
+                }
+                throw;
             }
         }
-        catch (Exception exception) when (
-            exception is not OutOfMemoryException and
-            not StackOverflowException and
-            not OperationCanceledException)
+        else
         {
-            TryInvalidatePublication(members);
+            InvalidatePublication(members);
         }
     }
 
@@ -668,21 +766,6 @@ internal static class Program
         }
     }
 
-    private static void TryInvalidatePublication(
-        IReadOnlyList<PublicationMember> members)
-    {
-        try
-        {
-            InvalidatePublication(members);
-        }
-        catch (Exception exception) when (
-            exception is not OutOfMemoryException and
-            not StackOverflowException and
-            not OperationCanceledException)
-        {
-        }
-    }
-
     private static void InvalidatePublication(
         IReadOnlyList<PublicationMember> members)
     {
@@ -691,17 +774,14 @@ internal static class Program
         {
             try
             {
-                if (Directory.Exists(member.Path))
+                if (LinuxPathIdentity.DeleteIfUnprotected(
+                        member.Path,
+                        []))
                 {
-                    throw new IOException(
-                        "SharpProof publication members must be regular files.");
-                }
-                if (File.Exists(member.Path))
-                {
-                    File.Delete(member.Path);
                     LinuxPathIdentity.SyncDirectory(
                         Path.GetDirectoryName(member.Path)!);
                 }
+                File.Delete(LinuxPathIdentity.PublicationMarkerPath(member.Path));
             }
             catch (Exception exception) when (
                 exception is IOException or UnauthorizedAccessException or
@@ -760,6 +840,43 @@ internal static class Program
             [new WorkerProtocolError { Code = code, Message = message }],
             expectedVersions);
         return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeResponse(response));
+    }
+
+    private static async Task<bool> TryWriteLauncherFailureAsync(
+        string path,
+        WorkerVerifyRequest request,
+        CompilerManifestArtifact artifact,
+        string expectedInputHash,
+        WorkerVersionSummary expectedVersions,
+        WorkerRunStatus status,
+        WorkerRunFailureReason reason,
+        string code,
+        string message)
+    {
+        try
+        {
+            await WriteLauncherFailureAsync(
+                path,
+                request,
+                artifact,
+                expectedInputHash,
+                expectedVersions,
+                status,
+                reason,
+                code,
+                message).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+                ArgumentException or InvalidDataException or InvalidOperationException or
+                System.ComponentModel.Win32Exception)
+        {
+            Console.Error.WriteLine(
+                "SharpProof launcher could not write its failure response: " +
+                exception.Message);
+            return false;
+        }
     }
 
     private static void DeleteIfExists(string? path)
@@ -944,7 +1061,9 @@ internal sealed partial class LauncherArguments
         ContainerContract.ValidateRequired();
         var graceMilliseconds = TerminationGraceMilliseconds;
         ArgumentOutOfRangeException.ThrowIfLessThan(
-            graceMilliseconds, 1, "termination-grace-ms");
+            graceMilliseconds,
+            WorkerExecutionEnvelope.MinimumTerminationGraceMilliseconds,
+            "termination-grace-ms");
         ArgumentOutOfRangeException.ThrowIfGreaterThan(
             graceMilliseconds,
             WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds,
@@ -956,7 +1075,8 @@ internal sealed partial class LauncherArguments
     {
         var path = FullPath("compiler-manifest");
         bytes = ReadCompilerManifest(path);
-        artifact = CompilerManifestArtifactJson.Deserialize(new UTF8Encoding(false, true).GetString(bytes));
+        artifact = CompilerManifestArtifactJson.Deserialize(
+            CompilerManifestArtifactFile.DecodeUtf8(bytes));
         return new WorkerFileReference { Path = path, Sha256 = WorkerProtocolJson.ComputeSha256(bytes) };
     }
 

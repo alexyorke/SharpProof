@@ -788,6 +788,8 @@ public sealed class LauncherArgumentTests
     }
 
     [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(100)]
     [TestCase(300_001)]
     public void TerminationGraceIsBoundedBeforeWorkerStarts(int graceMilliseconds)
     {
@@ -1079,8 +1081,7 @@ public sealed class LauncherArgumentTests
     }
 
     [TestCase(1_000, 1_000, 1_900)]
-    [TestCase(1_000, 100, 1_001)]
-    [TestCase(1_000, 1, 1_001)]
+    [TestCase(1_000, 101, 1_001)]
     public void CombinedTimeoutReservesCleanupTime(
         int projectMilliseconds, int graceMilliseconds, int expected)
     {
@@ -1092,8 +1093,7 @@ public sealed class LauncherArgumentTests
             Is.EqualTo(projectMilliseconds + graceMilliseconds));
     }
 
-    [TestCase(1)]
-    [TestCase(100)]
+    [TestCase(101)]
     [TestCase(1000)]
     public void BoundResultUsesTheConfiguredTerminationGrace(
         int terminationGraceMilliseconds)

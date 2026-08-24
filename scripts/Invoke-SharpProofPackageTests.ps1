@@ -218,15 +218,20 @@ try {
 
     $workerClass =
         'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
-    $workerList = & dotnet test $testProject `
+    $workerListPath = Join-Path $root 'worker-test-list.txt'
+    & $dotnetWrapper `
+        -TimeoutSeconds $TimeoutSeconds `
+        -OutputPath $workerListPath `
+        test $testProject `
         -c $Configuration `
         --no-build `
         --no-restore `
         --list-tests `
-        --filter "FullyQualifiedName~$workerClass" 2>&1 | Out-String
+        --filter "FullyQualifiedName~$workerClass"
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not discover Worker MSBuild integration tests.'
     }
+    $workerList = Get-Content -LiteralPath $workerListPath -Raw
     $workerMethods = @(
         [regex]::Matches(
             $workerList,

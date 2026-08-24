@@ -1023,7 +1023,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                  operation != null;
                  operation = operation.Parent)
             {
-                if (operation is ISimpleAssignmentOperation)
+                if (operation is ISimpleAssignmentOperation or
+                    IDeconstructionAssignmentOperation)
                 {
                     return true;
                 }
@@ -1238,9 +1239,42 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 case VarPatternSyntax varPattern:
                     yield return varPattern.Designation;
                     yield break;
-                case RecursivePatternSyntax
-                { Designation: { } designation }:
-                    yield return designation;
+                case RecursivePatternSyntax recursive:
+                    if (recursive.Designation is { } designation)
+                    {
+                        yield return designation;
+                    }
+                    if (recursive.PositionalPatternClause is { } positional)
+                    {
+                        foreach (var nested in positional.Subpatterns.SelectMany(
+                                     static subpattern =>
+                                         WholeInputDesignations(subpattern.Pattern)))
+                        {
+                            yield return nested;
+                        }
+                    }
+                    if (recursive.PropertyPatternClause is { } properties)
+                    {
+                        foreach (var nested in properties.Subpatterns.SelectMany(
+                                     static subpattern =>
+                                         WholeInputDesignations(subpattern.Pattern)))
+                        {
+                            yield return nested;
+                        }
+                    }
+                    break;
+                case ListPatternSyntax list:
+                    foreach (var nested in list.Patterns.SelectMany(
+                                 WholeInputDesignations))
+                    {
+                        yield return nested;
+                    }
+                    break;
+                case SlicePatternSyntax slice when slice.Pattern is { } nestedPattern:
+                    foreach (var nested in WholeInputDesignations(nestedPattern))
+                    {
+                        yield return nested;
+                    }
                     yield break;
                 case ParenthesizedPatternSyntax parenthesized:
                     foreach (var nested in WholeInputDesignations(

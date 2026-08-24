@@ -58,9 +58,9 @@ internal static class EffectSummaryOperations
         EffectThrowSet exceptions)
     {
         return new EffectSummary(
-            EffectRegionSet.Empty,
-            EffectRegionSet.Empty,
-            EffectAllocationKind.None,
+            construction.Reads,
+            construction.Writes,
+            construction.Allocation,
             construction.Capabilities,
             exceptions,
             EffectTermination.Unknown,

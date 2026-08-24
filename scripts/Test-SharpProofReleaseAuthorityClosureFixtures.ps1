@@ -39,6 +39,15 @@ jobs:
     uses: ./.github/actions/build-tooling
 '@
     Write-FixtureFile '.github/actions/build-tooling/action.yml' "name: build`n"
+    foreach ($leaf in @(
+            'global.json',
+            'NuGet.Config',
+            'Directory.Packages.props',
+            'Directory.Build.props',
+            'SharpProof.Release.props',
+            'SharpProof.PackageMetadata.props')) {
+        Write-FixtureFile $leaf "<!-- $leaf -->`n"
+    }
     Write-FixtureFile 'eng/container/entrypoint.sh' "pwsh scripts/Invoke-SharpProofContainer.ps1`n"
     Write-FixtureFile 'scripts/Invoke-SharpProofContainer.ps1' @'
 & 'scripts/New-SharpProofReleaseEvidence.ps1'
@@ -70,6 +79,12 @@ $manifest = 'SharpProof.Verifier/SharpProof.Verifier.nuspec'
 
     $canonical = @(Get-FixtureClosure)
     $requiredLeaves = @(
+        'global.json',
+        'NuGet.Config',
+        'Directory.Packages.props',
+        'Directory.Build.props',
+        'SharpProof.Release.props',
+        'SharpProof.PackageMetadata.props',
         '.github/workflows/package-consumers.yml',
         'scripts/New-SharpProofReleaseEvidence.ps1',
         'scripts/Test-SharpProofReleaseArtifacts.ps1',

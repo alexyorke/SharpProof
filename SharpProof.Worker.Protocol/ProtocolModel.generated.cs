@@ -347,7 +347,9 @@ public sealed class WorkerClaimResult
     public WorkerVacuityKind Vacuity { get; set; }
     public string[] ProofCore { get; set; } = [];
     public WorkerModelValue[] Model { get; set; } = [];
-    public WorkerAssumptionEvidence[] Assumptions { get; set; } = [];
+    // Null means the claim inherits its callable's manifest declarations. This
+    // compact wire form keeps a large failure response inside the JSON limit.
+    public WorkerAssumptionEvidence[]? Assumptions { get; set; }
 }
 
 public sealed class WorkerEffectViolationWitness
@@ -545,7 +547,7 @@ internal static class WorkerProtocolMetadata
                 new("vacuity", "WorkerVacuityKind"),
                 new("proofCore", "string[]"),
                 new("model", "WorkerModelValue[]"),
-                new("assumptions", "WorkerAssumptionEvidence[]"),
+                new("assumptions", "WorkerAssumptionEvidence[]?"),
             ]),
             ["WorkerEffectViolationWitness"] = new([
                 new("kind", "string"),
@@ -777,7 +779,13 @@ internal static class WorkerProtocolMetadata
             or (WorkerClaimOutcome.Proven, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.VacuousEntry, WorkerVacuityKind.ContradictoryPreconditions, true, _, _)
             or (WorkerClaimOutcome.Refuted, WorkerClaimReason.None, WorkerEffectEvidenceCertainty.DefiniteViolation, WorkerVacuityKind.None, false, _, _)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectSummaryIncomplete, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, false, _, _)
             or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.CompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.EffectContractNotEstablished, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.ResourceLimit, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary, WorkerVacuityKind.None, false, _, _)
+            or (WorkerClaimOutcome.Unknown, WorkerClaimReason.UnsupportedBody, WorkerEffectEvidenceCertainty.TrustedCompleteBoundary, WorkerVacuityKind.None, false, _, _)
             or (WorkerClaimOutcome.Unknown, _, WorkerEffectEvidenceCertainty.Unavailable, WorkerVacuityKind.None, false, _, _);
     internal static bool MatchesVacuity(WorkerClaimKind kind, WorkerClaimOutcome outcome, WorkerVacuityKind vacuity) =>
         (kind, outcome, vacuity) is
@@ -865,7 +873,8 @@ internal static class WorkerProtocolMetadata
         new("response.claim_reason", static value => WorkerProtocolMetadata.MatchesClaimOutcome(value.Outcome, value.Reason)),
         new("response.proof_core", static value => WorkerProtocolJson.AreDistinctNonblank(value.ProofCore)),
         new("response.model", static value => WorkerProtocolJson.AreValidModel(value.Model)),
-        new("response.assumptions", static value => WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
+        new("response.assumptions", static value => value.Assumptions == null ||
+            WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
         new("response.vacuity_evidence", static value =>
             (!(value.Vacuity != WorkerVacuityKind.None)
             || (value.ProofCore is { Length: > 0 }))),

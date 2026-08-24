@@ -133,7 +133,10 @@ internal sealed partial class ClaimManifestBuilder(
             Assumptions = assumptions.ToArray()
         };
         return new ManifestCallableTarget(target, seed.Declaration, seed.Model,
-            entry, postconditions, effects, supported);
+            entry, postconditions, effects, supported)
+        {
+            SourceOrderedAssumptions = assumptions
+        };
     }
 
     private LanguageSubsetDecision ClassifySelectedSubset(

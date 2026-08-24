@@ -866,10 +866,21 @@ public sealed class BuildTaskTests
             Environment.SetEnvironmentVariable(
                 "PATH",
                 "relative" + Path.PathSeparator + ".");
-            Assert.That(
-                Assert.Throws<InvalidOperationException>(
-                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
-                Does.Contain("resolve a trusted dotnet muxer"));
+            if (!string.Equals(
+                    Path.GetFileName(Environment.ProcessPath),
+                    "dotnet",
+                    StringComparison.Ordinal))
+            {
+                Assert.That(
+                    Assert.Throws<InvalidOperationException>(
+                        (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")))!.Message,
+                    Does.Contain("resolve a trusted dotnet muxer"));
+            }
+            else
+            {
+                Assert.DoesNotThrow(
+                    (Action)(() => RunVerifier.ResolveDotNetHost("dotnet")));
+            }
 
             var wrongName = Path.Combine(directory.FullName, "not-dotnet");
             File.WriteAllText(wrongName, string.Empty);
@@ -1174,6 +1185,35 @@ public sealed class BuildTaskTests
             {
                 descendant.Kill(entireProcessTree: true);
                 descendant.WaitForExit();
+            }
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void SupervisorCleanupDoesNotReapTheManagedDirectChild()
+    {
+        using var direct = Process.Start("/bin/sleep", "1");
+        Assert.That(direct, Is.Not.Null);
+        try
+        {
+            var cleanup = VerifierProcessSupervisor.StopDescendants(
+                Environment.ProcessId,
+                50,
+                protectedProcessId: direct!.Id);
+
+            Assert.That(cleanup.HadDescendants, Is.False);
+            Assert.That(cleanup.Complete, Is.True);
+            Assert.That(direct.WaitForExit(1000), Is.True);
+            Assert.That(direct.ExitCode, Is.Zero);
+        }
+        finally
+        {
+            if (direct is { HasExited: false })
+            {
+                direct.Kill();
+                direct.WaitForExit();
             }
         }
     }
@@ -2078,6 +2118,53 @@ public sealed class BuildTaskTests
                     TimeSpan.FromSeconds(5))),
                 Throws.TypeOf<IOException>());
             Assert.That(set.All(File.Exists), Is.True);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void PublicationResetFinishesCleaningAnInterruptedMarkerSequence()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-interrupted-");
+        try
+        {
+            var set = new[]
+            {
+                Path.Combine(directory.FullName, "request.json"),
+                Path.Combine(directory.FullName, "result.json"),
+                Path.Combine(directory.FullName, "manifest.json")
+            };
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       set,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in set)
+            {
+                File.WriteAllText(path, Path.GetFileName(path));
+            }
+
+            File.Delete(set[1]);
+            File.Delete(LinuxPathIdentity.PublicationMarkerPath(set[1]));
+
+            Assert.That(
+                (Action)(() => LinuxPathIdentity.ResetPublicationSet(
+                    set,
+                    TimeSpan.FromSeconds(5))),
+                Throws.Nothing);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(set.All(path => !File.Exists(path)), Is.True);
+                Assert.That(
+                    set.All(path => !File.Exists(
+                        LinuxPathIdentity.PublicationMarkerPath(path))),
+                    Is.True);
+            }
         }
         finally
         {

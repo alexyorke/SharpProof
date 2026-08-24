@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
 
@@ -109,7 +110,18 @@ internal static partial class VerifierProcessSupervisor
             {
                 process.StartInfo.ArgumentList.Add(argument);
             }
-            if (!process.Start())
+            bool started;
+            try
+            {
+                started = process.Start();
+            }
+            catch (Exception exception) when (
+                exception is Win32Exception or InvalidOperationException or IOException)
+            {
+                WriteCleanupReceipt(nonce);
+                return 125;
+            }
+            if (!started)
             {
                 WriteCleanupReceipt(nonce);
                 return 125;
@@ -127,7 +139,8 @@ internal static partial class VerifierProcessSupervisor
             var cleanup = StopDescendants(
                 Environment.ProcessId,
                 CleanupMilliseconds,
-                descriptorReserves: descriptorReserves);
+                descriptorReserves: descriptorReserves,
+                protectedProcessId: process.Id);
             var hadDescendants = cleanup.HadDescendants;
             var retryDelayMilliseconds = 10;
             while (!cleanup.Complete)
@@ -138,7 +151,8 @@ internal static partial class VerifierProcessSupervisor
                     5000);
                 cleanup = StopDescendants(
                     Environment.ProcessId,
-                    RetryCleanupMilliseconds);
+                    RetryCleanupMilliseconds,
+                    protectedProcessId: process.Id);
                 hadDescendants |= cleanup.HadDescendants;
             }
             if (!process.HasExited && !process.WaitForExit(1000))
@@ -190,9 +204,17 @@ internal static partial class VerifierProcessSupervisor
         {
             process.StartInfo.ArgumentList.Add(argument);
         }
-        return process.Start()
-            ? WaitForWorkerExit(process)
-            : 125;
+        try
+        {
+            return process.Start()
+                ? WaitForWorkerExit(process)
+                : 125;
+        }
+        catch (Exception exception) when (
+            exception is Win32Exception or InvalidOperationException or IOException)
+        {
+            return 125;
+        }
     }
 
     private static int WaitForWorkerExit(Process process)
@@ -206,23 +228,43 @@ internal static partial class VerifierProcessSupervisor
         int maximumMilliseconds,
         Func<int, int>? openPidFd = null,
         Func<int, int, int>? sendSignal = null,
-        IReadOnlyList<int>? descriptorReserves = null)
+        IReadOnlyList<int>? descriptorReserves = null,
+        int? protectedProcessId = null)
     {
         CloseDescriptors(descriptorReserves ?? []);
         var foundAny = false;
         var deadline = Stopwatch.StartNew();
+        var consecutiveEmptyScans = 0;
         while (deadline.ElapsedMilliseconds < maximumMilliseconds)
         {
-            var discovered = DescendantProcessIds(supervisorId);
+            var discovered = DescendantProcessIds(
+                supervisorId,
+                protectedProcessId,
+                () => deadline.ElapsedMilliseconds >= maximumMilliseconds);
+            if (deadline.ElapsedMilliseconds >= maximumMilliseconds)
+            {
+                break;
+            }
             if (discovered.Count == 0)
             {
-                return new DescendantStopResult(
-                    foundAny,
-                    Complete: true);
+                consecutiveEmptyScans++;
+                if (consecutiveEmptyScans >= 2)
+                {
+                    return new DescendantStopResult(
+                        foundAny,
+                        Complete: true);
+                }
+                Thread.Sleep(1);
+                continue;
             }
+            consecutiveEmptyScans = 0;
             foundAny = true;
             foreach (var processId in discovered)
             {
+                if (deadline.ElapsedMilliseconds >= maximumMilliseconds)
+                {
+                    break;
+                }
                 var descriptor = openPidFd?.Invoke(processId) ??
                     OpenPidFd(processId);
                 if (descriptor < 0)
@@ -238,7 +280,8 @@ internal static partial class VerifierProcessSupervisor
                     if (!IsDescendant(
                             processId,
                             supervisorId,
-                            ReadProcessParents()))
+                            ReadProcessParents(
+                                () => deadline.ElapsedMilliseconds >= maximumMilliseconds)))
                     {
                         continue;
                     }
@@ -269,13 +312,25 @@ internal static partial class VerifierProcessSupervisor
             }
             if (supervisorId == Environment.ProcessId)
             {
-                ReapExitedChildren();
+                if (deadline.ElapsedMilliseconds >= maximumMilliseconds)
+                {
+                    break;
+                }
+                ReapExitedChildren(protectedProcessId);
             }
-            Thread.Yield();
+            if (deadline.ElapsedMilliseconds < maximumMilliseconds)
+            {
+                Thread.Yield();
+            }
         }
+        var finalComplete = deadline.ElapsedMilliseconds < maximumMilliseconds &&
+            DescendantProcessIds(
+                supervisorId,
+                protectedProcessId,
+                () => deadline.ElapsedMilliseconds >= maximumMilliseconds).Count == 0;
         return new DescendantStopResult(
             foundAny,
-            Complete: DescendantProcessIds(supervisorId).Count == 0);
+            Complete: finalComplete);
     }
 
     internal readonly record struct DescendantStopResult(
@@ -305,11 +360,15 @@ internal static partial class VerifierProcessSupervisor
         }
     }
 
-    private static HashSet<int> DescendantProcessIds(int supervisorId)
+    private static HashSet<int> DescendantProcessIds(
+        int supervisorId,
+        int? protectedProcessId = null,
+        Func<bool>? deadlineExpired = null)
     {
-        var parents = ReadProcessParents();
+        var parents = ReadProcessParents(deadlineExpired);
         return parents.Keys
             .Where(processId =>
+                processId != protectedProcessId &&
                 IsDescendant(processId, supervisorId, parents))
             .ToHashSet();
     }
@@ -333,11 +392,16 @@ internal static partial class VerifierProcessSupervisor
         return false;
     }
 
-    private static Dictionary<int, int> ReadProcessParents()
+    private static Dictionary<int, int> ReadProcessParents(
+        Func<bool>? deadlineExpired = null)
     {
         var result = new Dictionary<int, int>();
         foreach (var directory in Directory.EnumerateDirectories("/proc"))
         {
+            if (deadlineExpired?.Invoke() == true)
+            {
+                break;
+            }
             if (!int.TryParse(
                     Path.GetFileName(directory),
                     NumberStyles.None,
@@ -394,8 +458,18 @@ internal static partial class VerifierProcessSupervisor
             0);
     }
 
-    private static void ReapExitedChildren()
+    private static void ReapExitedChildren(int? protectedProcessId = null)
     {
+        if (protectedProcessId is { } protectedId)
+        {
+            foreach (var processId in DescendantProcessIds(
+                         Environment.ProcessId,
+                         protectedId))
+            {
+                _ = NativeMethods.WaitForProcess(processId, out _, 1);
+            }
+            return;
+        }
         while (NativeMethods.WaitForProcess(
                    -1,
                    out _,

@@ -526,18 +526,6 @@ internal static class CancellationBoundaryAnalyzer
                 cancellationVariable,
                 context.CancellationToken) is not ILocalSymbol canceled ||
             Unwrap(context.SemanticModel.GetOperation(
-                cancellationExpression,
-                context.CancellationToken)) is not
-                IPropertyReferenceOperation cancellationRequested ||
-            cancellationRequested.Property.Name != "IsCancellationRequested" ||
-            !IsSameType(
-                cancellationRequested.Property.ContainingType,
-                symbols[
-                    SharpProofSoundnessAnalyzer.KnownType.CancellationToken]) ||
-            !ReferencesParameter(
-                cancellationRequested.Instance,
-                method.Parameters[1]) ||
-            Unwrap(context.SemanticModel.GetOperation(
                 resultExpression,
                 context.CancellationToken)) is not
                 IInvocationOperation create ||
@@ -546,6 +534,32 @@ internal static class CancellationBoundaryAnalyzer
                 create.TargetMethod.ContainingType,
                 symbols[
                     SharpProofSoundnessAnalyzer.KnownType.WorkerResultAssembler]))
+        {
+            return false;
+        }
+
+        var cancellationOperation = Unwrap(context.SemanticModel.GetOperation(
+            cancellationExpression,
+            context.CancellationToken));
+        var directCancellation = cancellationOperation is
+            IPropertyReferenceOperation cancellationRequested &&
+            cancellationRequested.Property.Name == "IsCancellationRequested" &&
+            IsSameType(
+                cancellationRequested.Property.ContainingType,
+                symbols[SharpProofSoundnessAnalyzer.KnownType.CancellationToken]) &&
+            ReferencesParameter(cancellationRequested.Instance, method.Parameters[1]);
+        var latchedCancellation = cancellationOperation is IInvocationOperation helper &&
+            helper.TargetMethod is
+            {
+                Name: "CallerCancellationWon",
+                MethodKind: MethodKind.LocalFunction,
+                Parameters.Length: 0,
+                ReturnType.SpecialType: SpecialType.System_Boolean
+            } &&
+            SymbolEqualityComparer.Default.Equals(
+                helper.TargetMethod.ContainingSymbol,
+                method);
+        if (!directCancellation && !latchedCancellation)
         {
             return false;
         }

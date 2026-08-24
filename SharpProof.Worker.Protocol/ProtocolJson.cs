@@ -43,9 +43,16 @@ public static partial class WorkerProtocolJson
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var reader = OpenJsonReader(path);
-        var text = await reader.ReadToEndAsync().ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        return text.TrimStart('\uFEFF');
+        var builder = new StringBuilder();
+        var buffer = new char[81920];
+        int read;
+        while ((read = await reader.ReadAsync(buffer, 0, buffer.Length)
+                   .ConfigureAwait(false)) != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            builder.Append(buffer, 0, read);
+        }
+        return builder.ToString().TrimStart('\uFEFF');
     }
 
     public static WorkerVerifyRequest? DeserializeRequest(string json)
@@ -90,7 +97,26 @@ public static partial class WorkerProtocolJson
     public static string SerializeResponse(WorkerVerifyResponse response)
     {
         Canonicalize(response ?? throw new ArgumentNullException(nameof(response)));
-        return JsonSerializer.Serialize(response, s_options);
+        var json = JsonSerializer.Serialize(response, s_options);
+        if (Encoding.UTF8.GetByteCount(json) <= MaximumJsonBytes)
+        {
+            return json;
+        }
+
+        // Claim rows normally repeat their callable's declarations so each row
+        // is independently auditable.  A large manifest can make that product
+        // exceed the reader limit even though the manifest itself is valid. Use
+        // an explicit null inheritance marker for the compact wire form before
+        // refusing to publish an otherwise unrepresentable response.
+        CompactClaimAssumptions(response);
+        json = JsonSerializer.Serialize(response, s_options);
+        if (Encoding.UTF8.GetByteCount(json) > MaximumJsonBytes)
+        {
+            throw new InvalidDataException(
+                $"The serialized worker response exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
+        return json;
     }
 
     public static WorkerProtocolValidationResult Validate(WorkerVerifyRequest? request)
@@ -241,7 +267,10 @@ public static partial class WorkerProtocolJson
             .OrderBy(static value => value?.Variable, s_ordinal)
             .ThenBy(static value => value?.Kind, s_ordinal)
             .ThenBy(static value => value?.Value, s_ordinal)];
-        result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
+        if (result.Assumptions != null)
+        {
+            result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
+        }
         if (result.EffectWitness != null)
         {
             result.EffectWitness.ExactExceptionTypeHierarchy = SortOrdinal(
@@ -441,13 +470,25 @@ public static partial class WorkerProtocolJson
             callables.Where(static value => !string.IsNullOrWhiteSpace(value.CallableId))
                 .Select(static value => value.CallableId),
             s_ordinal);
+        var claimsByCallable = claims
+            .Where(static value => value != null)
+            .GroupBy(static value => value.CallableId, s_ordinal)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.ToArray(),
+                s_ordinal);
         foreach (var callable in callables)
         {
             errors.Check(HasValidLocation(callable.Location), prefix + ".callable_location")
                 .Rules(callable, WorkerProtocolMetadata.ManifestCallableRules, prefix + ".")
                 .Check(HasProducerAssumptionKinds(callable.Assumptions),
                     prefix + ".assumption_kind");
-            ValidateClaimMembership(callable, claims, prefix, errors);
+            claimsByCallable.TryGetValue(callable.CallableId, out var ownedClaims);
+            ValidateClaimMembership(
+                callable,
+                ownedClaims ?? [],
+                prefix,
+                errors);
         }
         ValidateManifestAssumptionIdentity(callables, prefix, errors);
         foreach (var claim in claims)
@@ -464,7 +505,7 @@ public static partial class WorkerProtocolJson
     private static void ValidateClaimMembership(
         WorkerCallableManifestEntry callable, WorkerClaimManifestEntry[] claims, string prefix, Validator errors)
     {
-        var expected = claims.Where(value => value.CallableId == callable.CallableId)
+        var expected = claims
             .OrderBy(static value => value.Ordinal)
             .ThenBy(static value => value.ClaimId, s_ordinal).ToArray();
         errors.Check(expected.Select(static value => value.Ordinal)
@@ -481,11 +522,14 @@ public static partial class WorkerProtocolJson
                 .Select(static value => value.CallableId) ?? [],
             static value => value.CallableId, "response.callable_results",
             "response.callable_id", "response.callable_set", errors);
+        var declaredById = (manifest?.Callables ?? [])
+            .Where(static item => item != null && !string.IsNullOrWhiteSpace(item.CallableId))
+            .GroupBy(static item => item.CallableId, s_ordinal)
+            .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
         foreach (var value in valid)
         {
             errors.Rules(value, WorkerProtocolMetadata.CallableResultRules);
-            var declared = manifest?.Callables?.FirstOrDefault(
-                item => item != null && item.CallableId == value.CallableId);
+            declaredById.TryGetValue(value.CallableId, out var declared);
             errors.Check(declared != null &&
                 SameAssumptionDeclarations(value.Assumptions, declared.Assumptions),
                 "response.callable_assumption_set");
@@ -499,18 +543,29 @@ public static partial class WorkerProtocolJson
                 .Select(static value => value.ClaimId) ?? [],
             static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
+        var claimsById = (manifest?.Claims ?? [])
+            .Where(static item => item != null && !string.IsNullOrWhiteSpace(item.ClaimId))
+            .GroupBy(static item => item.ClaimId, s_ordinal)
+            .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
+        var callablesById = (manifest?.Callables ?? [])
+            .Where(static item => item != null && !string.IsNullOrWhiteSpace(item.CallableId))
+            .GroupBy(static item => item.CallableId, s_ordinal)
+            .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
         foreach (var value in valid)
         {
-            ValidateClaimResult(value, manifest, errors);
+            ValidateClaimResult(value, claimsById, callablesById, errors);
         }
 
         return valid;
     }
-    private static void ValidateClaimResult(WorkerClaimResult value, WorkerClaimManifest? manifest, Validator errors)
+    private static void ValidateClaimResult(
+        WorkerClaimResult value,
+        Dictionary<string, WorkerClaimManifestEntry> claimsById,
+        Dictionary<string, WorkerCallableManifestEntry> callablesById,
+        Validator errors)
     {
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
-        var claim = manifest?.Claims?.FirstOrDefault(
-            item => item != null && item.ClaimId == value.ClaimId);
+        claimsById.TryGetValue(value.ClaimId, out var claim);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
         errors.Check(claim != null &&
                 WorkerProtocolMetadata.MatchesClaimKindOutcome(
@@ -545,10 +600,35 @@ public static partial class WorkerProtocolJson
         errors.Check(WorkerProtocolMetadata.MatchesVacuity(
             claim?.Kind ?? WorkerClaimKind.Unspecified, value.Outcome, value.Vacuity),
             "response.vacuity");
-        var owner = manifest?.Callables?.FirstOrDefault(
-            item => item != null && item.CallableId == claim?.CallableId);
-        errors.Check(owner != null && SameAssumptionDeclarations(value.Assumptions, owner.Assumptions),
+        callablesById.TryGetValue(claim?.CallableId ?? string.Empty, out var owner);
+        errors.Check(owner != null &&
+                (value.Assumptions == null ||
+                    SameAssumptionDeclarations(value.Assumptions, owner.Assumptions)),
             "response.claim_assumption_set");
+    }
+
+    private static void CompactClaimAssumptions(WorkerVerifyResponse response)
+    {
+        var callables = (response.Manifest?.Callables ?? [])
+            .Where(static callable => callable != null)
+            .ToDictionary(static callable => callable.CallableId, s_ordinal);
+        var claims = response.Manifest?.Claims ?? [];
+        foreach (var result in response.ClaimResults ?? [])
+        {
+            if (result?.Assumptions is not { Length: > 0 })
+            {
+                continue;
+            }
+
+            var manifestClaim = claims.FirstOrDefault(claim =>
+                claim != null && claim.ClaimId == result.ClaimId);
+            if (manifestClaim != null &&
+                callables.TryGetValue(manifestClaim.CallableId, out var callable) &&
+                callable.Assumptions is { Length: > 0 })
+            {
+                result.Assumptions = null;
+            }
+        }
     }
     internal static bool HasValidEffectCertainty(WorkerClaimOutcome outcome, WorkerClaimReason reason,
         WorkerEffectEvidenceCertainty certainty)
@@ -605,6 +685,15 @@ public static partial class WorkerProtocolJson
             "response.run_projection");
         if (response.Manifest != null && projected)
         {
+            var manifestClaimsById = response.Manifest.Claims
+                .Where(static claim => claim != null)
+                .ToDictionary(static claim => claim.ClaimId, s_ordinal);
+            var claimsByCallable = claims
+                .GroupBy(claim => manifestClaimsById.TryGetValue(
+                    claim.ClaimId, out var manifestClaim)
+                    ? manifestClaim.CallableId
+                    : string.Empty, s_ordinal)
+                .ToDictionary(static group => group.Key, static group => group.ToArray(), s_ordinal);
             foreach (var callable in callables)
             {
                 errors.Check(WorkerResultAssembler.MatchesCallableProjection(
@@ -613,7 +702,8 @@ public static partial class WorkerProtocolJson
                         claims,
                         expectedStatus,
                         expectedFailure,
-                        protocolErrors.Length != 0),
+                        protocolErrors.Length != 0,
+                        claimsByCallable),
                     "response.callable_projection");
             }
         }

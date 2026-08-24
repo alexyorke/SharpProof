@@ -64,12 +64,17 @@ internal static class CacheSoundnessRules
     private static bool IsNonCacheableSemanticAnswer(
         IOperation operation, IOperation root, HashSet<ILocalSymbol> resolving)
     {
-        operation = operation switch
+        while (operation is IConversionOperation conversion &&
+               conversion.OperatorMethod == null ||
+               operation is IParenthesizedOperation)
         {
-            IConversionOperation conversion when conversion.OperatorMethod == null => conversion.Operand,
-            IParenthesizedOperation parenthesized => parenthesized.Operand,
-            _ => operation
-        };
+            operation = operation switch
+            {
+                IConversionOperation { OperatorMethod: null } value => value.Operand,
+                IParenthesizedOperation parenthesized => parenthesized.Operand,
+                _ => operation
+            };
+        }
         return operation switch
         {
             IFieldReferenceOperation field
@@ -193,18 +198,35 @@ internal static class CacheSoundnessRules
                              .Any(static ancestor => ancestor is
                                  AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)))
             {
-                var name = expression switch
-                {
-                    MemberAccessExpressionSyntax member => member.Name.Identifier.ValueText,
-                    IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
-                    ObjectCreationExpressionSyntax creation => creation.Type.ToString(),
-                    _ => null
-                };
-                if (name != null)
+                foreach (var name in GetExpressionNames(expression))
                 {
                     yield return name;
                 }
             }
+        }
+    }
+
+    private static IEnumerable<string> GetExpressionNames(ExpressionSyntax expression)
+    {
+        foreach (var member in expression.DescendantNodesAndSelf()
+                     .OfType<MemberAccessExpressionSyntax>())
+        {
+            yield return member.Name.Identifier.ValueText;
+        }
+
+        foreach (var identifier in expression.DescendantNodesAndSelf()
+                     .OfType<IdentifierNameSyntax>()
+                     .Where(static identifier =>
+                         identifier.Parent is not MemberAccessExpressionSyntax member ||
+                         !ReferenceEquals(member.Name, identifier)))
+        {
+            yield return identifier.Identifier.ValueText;
+        }
+
+        foreach (var creation in expression.DescendantNodesAndSelf()
+                     .OfType<ObjectCreationExpressionSyntax>())
+        {
+            yield return creation.Type.ToString();
         }
     }
 

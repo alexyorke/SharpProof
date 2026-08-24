@@ -331,7 +331,10 @@ internal sealed class CompilerSpecificationPackProvider
                 value.ToString("x2", CultureInfo.InvariantCulture)));
         return approved.Any(candidate =>
             candidate.Name == identity.Name &&
-            candidate.PublicKeyToken == token);
+            string.Equals(
+                candidate.PublicKeyToken,
+                token,
+                StringComparison.OrdinalIgnoreCase));
     }
 
     private static IMethodSymbol Normalize(IMethodSymbol method)

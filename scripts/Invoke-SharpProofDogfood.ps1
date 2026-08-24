@@ -55,7 +55,8 @@ try
             /p:SharpProofDogfood=true `
             /p:GeneratePackageOnBuild=false `
             /p:TreatWarningsAsErrors=false `
-            /p:SharpProofProfile=off
+            /p:SharpProofProfile=advisory `
+            /p:SharpProofFeatures=all
         if ($LASTEXITCODE -ne 0)
         {
             exit $LASTEXITCODE

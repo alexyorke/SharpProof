@@ -96,6 +96,17 @@ public sealed class AtomicFileTests
         }
     }
 
+    [Test]
+    public void WriteUtf8SupportsAValidNearLimitDestinationName()
+    {
+        var path = Path.Combine(_root, new string('x', 240));
+
+        AtomicFile.WriteUtf8(path, "content");
+
+        Assert.That(File.ReadAllText(path), Is.EqualTo("content"));
+        Assert.That(TemporaryFiles(path), Is.Empty);
+    }
+
     private static string[] TemporaryFiles(string path)
     {
         return Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*.tmp");

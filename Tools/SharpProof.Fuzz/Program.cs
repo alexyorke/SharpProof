@@ -20,12 +20,13 @@ catch (FuzzUsageException exception)
     return string.IsNullOrEmpty(exception.Message) ? 0 : 2;
 }
 
-using var cancellation = new CancellationTokenSource();
-Console.CancelKeyPress += (_, eventArgs) =>
+using var cancellation = new CancellationGate();
+ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
 {
     eventArgs.Cancel = true;
     cancellation.Cancel();
 };
+Console.CancelKeyPress += cancelHandler;
 
 try
 {
@@ -40,6 +41,10 @@ catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
     Console.Error.WriteLine("SharpProof fuzz run cancelled.");
     return 130;
 }
+finally
+{
+    Console.CancelKeyPress -= cancelHandler;
+}
 
 file static class FuzzJson
 {
@@ -51,4 +56,59 @@ file static class FuzzJson
         {
             WriteIndented = true
         };
+}
+
+file sealed class CancellationGate : IDisposable
+{
+    private readonly object _synchronization = new();
+    private readonly CancellationTokenSource _source = new();
+    private bool _disposing;
+    private int _callbacks;
+
+    internal CancellationToken Token => _source.Token;
+
+    internal bool IsCancellationRequested => _source.IsCancellationRequested;
+
+    internal void Cancel()
+    {
+        lock (_synchronization)
+        {
+            if (_disposing)
+            {
+                return;
+            }
+
+            _callbacks++;
+        }
+
+        try
+        {
+            _source.Cancel();
+        }
+        finally
+        {
+            lock (_synchronization)
+            {
+                _callbacks--;
+                if (_callbacks == 0)
+                {
+                    Monitor.PulseAll(_synchronization);
+                }
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        lock (_synchronization)
+        {
+            _disposing = true;
+            while (_callbacks != 0)
+            {
+                Monitor.Wait(_synchronization);
+            }
+        }
+
+        _source.Dispose();
+    }
 }

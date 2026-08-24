@@ -41,18 +41,52 @@ public sealed class SharpProofWorker : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var started = Stopwatch.GetTimestamp();
+        ArgumentNullException.ThrowIfNull(request);
         var validation = WorkerProtocolJson.Validate(request);
         if (!validation.IsValid)
         {
             return Failure(string.Empty, WorkerRunFailureReason.InvalidRequest, new WorkerBudgets(), started, validation.Errors);
         }
 
-        ArgumentNullException.ThrowIfNull(request);
+        const int CallerCancellation = 1;
+        const int ProjectDeadline = 2;
+        var interruptionCause = 0;
+        var interruptionCacheStatus = WorkerCacheStatus.Disabled;
+        using var projectDeadline = new CancellationTokenSource();
+        using var projectBoundary = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            projectDeadline.Token);
+        using var callerCauseRegistration = cancellationToken.Register(
+            () => Interlocked.CompareExchange(
+                ref interruptionCause,
+                CallerCancellation,
+                0));
+        using var deadlineCauseRegistration = projectDeadline.Token.Register(
+            () => Interlocked.CompareExchange(
+                ref interruptionCause,
+                ProjectDeadline,
+                0));
+        var remainingMilliseconds = request.Budgets.ProjectWallTimeMilliseconds -
+            Elapsed(started);
+        if (remainingMilliseconds <= 0)
+        {
+            await projectDeadline.CancelAsync().ConfigureAwait(false);
+        }
+        else
+        {
+            projectDeadline.CancelAfter((int)Math.Min(
+                remainingMilliseconds,
+                int.MaxValue));
+        }
         var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
-        using var projectBoundary = cancellationToken.IsCancellationRequested
-            ? new CancellationTokenSource()
-            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        projectBoundary.CancelAfter(request.Budgets.ProjectWallTimeMilliseconds);
+        bool CallerCancellationWon()
+        {
+            var cause = Volatile.Read(ref interruptionCause);
+            return cause == CallerCancellation ||
+                cause == 0 && cancellationToken.IsCancellationRequested &&
+                !projectDeadline.IsCancellationRequested;
+        }
+
         WorkerVerifyResponse Failed(WorkerRunFailureReason reason, string code, string message, string inputHash = "")
         {
             return Failure(inputHash, reason, request.Budgets, started, Error(code, message), requestHash);
@@ -60,7 +94,7 @@ public sealed class SharpProofWorker : IDisposable
 
         WorkerVerifyResponse Interrupted(WorkerInputSnapshot? input = null)
         {
-            var canceled = cancellationToken.IsCancellationRequested;
+            var canceled = CallerCancellationWon();
             return WorkerResultAssembler.CreateIncomplete(
                 input?.InputHash ?? WorkerResultAssembler.EmptyInputHash, requestHash,
                 input?.CompilerManifest.Manifest ?? WorkerResultAssembler.EmptyManifest(), request.Budgets,
@@ -74,7 +108,8 @@ public sealed class SharpProofWorker : IDisposable
                             ? "The worker was canceled before loading the compiler manifest."
                             : "The project timed out before loading the compiler manifest.")
                     : null,
-                versions: Versions(), elapsedMilliseconds: Elapsed(started));
+                versions: Versions(), elapsedMilliseconds: Elapsed(started),
+                cacheStatus: interruptionCacheStatus);
         }
         WorkerInputSnapshot snapshot;
         VerificationLane[] solverLanes = [];
@@ -109,7 +144,7 @@ public sealed class SharpProofWorker : IDisposable
                 request.Budgets, started, reason, errors, requestHash, claimReason);
         }
 
-        if (cancellationToken.IsCancellationRequested)
+        if (CallerCancellationWon())
         {
             return Interrupted(snapshot);
         }
@@ -177,6 +212,7 @@ public sealed class SharpProofWorker : IDisposable
 
             var cache = CreateCacheIfEnabled(request,
                 snapshot.CompilerManifest.Compilation.ProjectDirectory, out var cacheStatus);
+            interruptionCacheStatus = cacheStatus;
             if (cache != null)
             {
                 var cached = await cache.TryReadAsync(
@@ -185,9 +221,14 @@ public sealed class SharpProofWorker : IDisposable
                     targets,
                     request.Budgets,
                     projectBoundary.Token).ConfigureAwait(false);
+                if (cache.LastReadUnavailable)
+                {
+                    interruptionCacheStatus = WorkerCacheStatus.Unavailable;
+                }
                 projectBoundary.Token.ThrowIfCancellationRequested();
                 if (cached != null)
                 {
+                    interruptionCacheStatus = WorkerCacheStatus.Hit;
                     var cachedResponse = Assemble(
                         WorkerRunStatus.Complete,
                         WorkerRunFailureReason.None,
@@ -198,14 +239,16 @@ public sealed class SharpProofWorker : IDisposable
                             cachedResponse,
                             snapshot.InputHash,
                             manifest,
-                            responseAuthority).IsValid)
+                        responseAuthority).IsValid)
                     {
+                        projectBoundary.Token.ThrowIfCancellationRequested();
                         return cachedResponse;
                     }
                 }
             }
             if (!TryCreateLanes(request.Budgets, targets.Length, out solverLanes, out var backendError))
             {
+                projectBoundary.Token.ThrowIfCancellationRequested();
                 return FailedAfterManifest(WorkerRunFailureReason.BackendUnavailable,
                     Error("backend.unavailable", "The native SMT backend is unavailable: " + backendError),
                     WorkerClaimReason.BackendUnavailable);
@@ -281,7 +324,7 @@ public sealed class SharpProofWorker : IDisposable
                 }
             }
             await Task.WhenAll(solverLanes.Select(RunLane)).ConfigureAwait(false);
-            if (cancellationToken.IsCancellationRequested)
+            if (CallerCancellationWon())
             {
                 return Canceled(cacheStatus);
             }
@@ -330,9 +373,28 @@ public sealed class SharpProofWorker : IDisposable
             {
                 var written = await cache.TryWriteAsync(
                     response, snapshot.InputHash, manifest, projectBoundary.Token).ConfigureAwait(false);
-                projectBoundary.Token.ThrowIfCancellationRequested();
+                if (written)
+                {
+                    interruptionCacheStatus = WorkerCacheStatus.Written;
+                    // A successful cache commit is the terminal winner for
+                    // this invocation. Do not let a cancellation racing the
+                    // commit turn the same run into a contradictory response.
+                    return WorkerResultAssembler.Create(
+                        snapshot.InputHash,
+                        manifest,
+                        run.Status,
+                        run.Failure,
+                        callableResults,
+                        claimResults,
+                        request.Budgets,
+                        WorkerCacheStatus.Written,
+                        Elapsed(started),
+                        requestHash: requestHash,
+                        versions: Versions());
+                }
+                interruptionCacheStatus = WorkerCacheStatus.Unavailable;
                 response = Assemble(run.Status, run.Failure, callableResults, claimResults,
-                    written ? WorkerCacheStatus.Written : WorkerCacheStatus.Unavailable);
+                    WorkerCacheStatus.Unavailable);
             }
             projectBoundary.Token.ThrowIfCancellationRequested();
             return response;
@@ -342,7 +404,18 @@ public sealed class SharpProofWorker : IDisposable
         {
             foreach (var lane in solverLanes)
             {
-                lane.DisposeOwnedBackend();
+                try
+                {
+                    lane.DisposeOwnedBackend();
+                }
+                catch (Exception exception) when (
+                    exception is not OutOfMemoryException and
+                    not StackOverflowException and
+                    not OperationCanceledException)
+                {
+                    // Cleanup must not replace an already assembled verifier
+                    // response. Every lane is still attempted below.
+                }
             }
         }
     }
@@ -457,7 +530,16 @@ public sealed class SharpProofWorker : IDisposable
         {
             foreach (var lane in created)
             {
-                lane.DisposeOwnedBackend();
+                try
+                {
+                    lane.DisposeOwnedBackend();
+                }
+                catch (Exception cleanupException) when (
+                    cleanupException is not OutOfMemoryException and
+                    not StackOverflowException and
+                    not OperationCanceledException)
+                {
+                }
             }
 
             error = exception.GetBaseException().Message;
@@ -534,8 +616,14 @@ public sealed class SharpProofWorker : IDisposable
         }
         internal void DisposeOwnedBackend()
         {
-            _ownedBackend?.Dispose();
-            _ownedBackend = null;
+            try
+            {
+                _ownedBackend?.Dispose();
+            }
+            finally
+            {
+                _ownedBackend = null;
+            }
         }
     }
 

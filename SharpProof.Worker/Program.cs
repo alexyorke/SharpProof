@@ -42,12 +42,58 @@ internal static class Program
             return 125;
         }
 
+        WorkerVerifyRequest? request = null;
         async Task<int> Respond(WorkerVerifyResponse response)
         {
-            await WriteResponseAtomicAsync(resultPath, response).ConfigureAwait(false);
-            return 0;
+            try
+            {
+                await WriteResponseAtomicAsync(resultPath, response).ConfigureAwait(false);
+                return 0;
+            }
+            catch (InvalidDataException exception)
+            {
+                // A manifest can be valid while the fully expanded response is
+                // not representable inside the bounded JSON envelope. Publish
+                // a compact, manifest-independent infrastructure failure rather
+                // than committing an unreadable oversized response.
+                Console.Error.WriteLine(
+                    "The SharpProof worker response exceeded its size limit: " +
+                    exception.Message);
+                try
+                {
+                    await WriteResponseAtomicAsync(
+                        resultPath,
+                        Failure(
+                            WorkerRunFailureReason.InfrastructureFailure,
+                            [new WorkerProtocolError {
+                                Code = "worker.response_too_large",
+                                Message = "The worker response exceeded the JSON size limit."
+                            }],
+                            request?.Budgets ?? new WorkerBudgets()))
+                        .ConfigureAwait(false);
+                }
+                catch (Exception fallbackException) when (fallbackException is
+                    IOException or UnauthorizedAccessException or ArgumentException or
+                    InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    Console.Error.WriteLine(
+                        "The SharpProof worker could not publish its bounded failure response: " +
+                        fallbackException.Message);
+                }
+
+                return 3;
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException or
+                    ArgumentException or InvalidOperationException or
+                    System.ComponentModel.Win32Exception)
+            {
+                Console.Error.WriteLine(
+                    "The SharpProof worker could not publish its response: " +
+                    exception.Message);
+                return 3;
+            }
         }
-        WorkerVerifyRequest? request;
         try
         {
             request = WorkerProtocolJson.DeserializeRequest(
@@ -62,7 +108,7 @@ internal static class Program
                     Code = "request.malformed", Message = "The request file is unavailable or malformed."
                 }], new WorkerBudgets())).ConfigureAwait(false);
         }
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = new CancellationGate();
         ConsoleCancelEventHandler handler = (_, eventArgs) =>
         {
             eventArgs.Cancel = true;
@@ -113,6 +159,59 @@ internal static class Program
         return WorkerResultAssembler.Create(
             WorkerResultAssembler.EmptyInputHash, WorkerResultAssembler.EmptyManifest(),
             WorkerRunStatus.Failed, reason, [], [], budgets, WorkerCacheStatus.Disabled, 0, errors);
+    }
+
+    private sealed class CancellationGate : IDisposable
+    {
+        private readonly object _synchronization = new();
+        private readonly CancellationTokenSource _source = new();
+        private bool _disposing;
+        private int _callbacks;
+
+        internal CancellationToken Token => _source.Token;
+
+        internal void Cancel()
+        {
+            lock (_synchronization)
+            {
+                if (_disposing)
+                {
+                    return;
+                }
+
+                _callbacks++;
+            }
+
+            try
+            {
+                _source.Cancel();
+            }
+            finally
+            {
+                lock (_synchronization)
+                {
+                    _callbacks--;
+                    if (_callbacks == 0)
+                    {
+                        Monitor.PulseAll(_synchronization);
+                    }
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (_synchronization)
+            {
+                _disposing = true;
+                while (_callbacks != 0)
+                {
+                    Monitor.Wait(_synchronization);
+                }
+            }
+
+            _source.Dispose();
+        }
     }
 
     private static bool TryParseArguments(

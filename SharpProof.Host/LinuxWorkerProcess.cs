@@ -31,11 +31,15 @@ public sealed partial class LinuxWorkerProcess : IDisposable
     private const int SignalKill = 9;
     private const int SignalTerminate = 15;
     private const int PollMilliseconds = 25;
+    private const string SetsidPath = "/usr/bin/setsid";
+    private readonly object _synchronization = new();
+    private readonly long _startedTimestamp;
     private Process? _process;
 
-    private LinuxWorkerProcess(Process process)
+    private LinuxWorkerProcess(Process process, long startedTimestamp)
     {
         _process = process;
+        _startedTimestamp = startedTimestamp;
     }
 
     public static LinuxWorkerProcess Start(
@@ -50,12 +54,13 @@ public sealed partial class LinuxWorkerProcess : IDisposable
 
         var startInfo = new ProcessStartInfo
         {
-            FileName = executable,
+            FileName = SetsidPath,
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
             RedirectStandardInput = true,
             CreateNoWindow = true
         };
+        startInfo.ArgumentList.Add(executable);
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
@@ -68,9 +73,12 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         var ownershipTransferred = false;
         try
         {
+            var startedTimestamp = Stopwatch.GetTimestamp();
             process.StandardInput.WriteLine(StartMessage);
             process.StandardInput.Close();
-            var worker = new LinuxWorkerProcess(process);
+            var worker = new LinuxWorkerProcess(
+                process,
+                startedTimestamp);
             ownershipTransferred = true;
             return worker;
         }
@@ -97,18 +105,22 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             terminationStart);
         var process = _process ?? throw new ObjectDisposedException(
             nameof(LinuxWorkerProcess));
-        var stopwatch = Stopwatch.StartNew();
         while (!process.WaitForExit(0))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (stopwatch.Elapsed >= terminationStart)
+            var elapsed = Stopwatch.GetElapsedTime(_startedTimestamp);
+            if (elapsed >= terminationStart)
             {
-                Terminate(process, stopwatch, finalLimit);
+                Terminate(process, _startedTimestamp, finalLimit);
                 return new LinuxWorkerCompletion(
                     LinuxWorkerCompletionKind.TimedOut,
                     124);
             }
-            if (cancellationToken.WaitHandle.WaitOne(PollMilliseconds))
+            var remaining = terminationStart - elapsed;
+            var waitMilliseconds = (int)Math.Min(
+                Math.Max(1, remaining.TotalMilliseconds),
+                PollMilliseconds);
+            if (cancellationToken.WaitHandle.WaitOne(waitMilliseconds))
             {
                 throw new OperationCanceledException(cancellationToken);
             }
@@ -143,26 +155,33 @@ public sealed partial class LinuxWorkerProcess : IDisposable
 
     public void Dispose()
     {
-        var process = Interlocked.Exchange(ref _process, null);
-        if (process == null)
+        lock (_synchronization)
         {
-            return;
+            var process = _process;
+            if (process == null)
+            {
+                return;
+            }
+            if (!process.HasExited)
+            {
+                Terminate(
+                    process,
+                    Stopwatch.GetTimestamp(),
+                    TimeSpan.FromSeconds(1));
+            }
+            process.Dispose();
+            _process = null;
         }
-        if (!process.HasExited)
-        {
-            var stopwatch = Stopwatch.StartNew();
-            Terminate(process, stopwatch, TimeSpan.FromSeconds(1));
-        }
-        process.Dispose();
     }
 
     private static void Terminate(
         Process process,
-        Stopwatch stopwatch,
+        long startedTimestamp,
         TimeSpan finalLimit)
     {
         if (process.HasExited)
         {
+            KillProcessGroup(process.Id);
             return;
         }
         if (NativeMethods.Kill(process.Id, SignalTerminate) != 0 &&
@@ -171,7 +190,8 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             throw NativeFailure(
                 "SharpProof could not terminate the worker process.");
         }
-        var remainingForTerminate = finalLimit - stopwatch.Elapsed;
+        var remainingForTerminate = finalLimit -
+            Stopwatch.GetElapsedTime(startedTimestamp);
         var terminateWait = checked((int)Math.Min(
             Math.Max(0, remainingForTerminate.TotalMilliseconds / 2),
             int.MaxValue));
@@ -187,7 +207,8 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             catch (InvalidOperationException) when (process.WaitForExit(0))
             {
             }
-            var remaining = finalLimit - stopwatch.Elapsed;
+            var remaining = finalLimit -
+                Stopwatch.GetElapsedTime(startedTimestamp);
             var killWait = checked((int)Math.Min(
                 Math.Max(0, remaining.TotalMilliseconds),
                 int.MaxValue));
@@ -196,6 +217,17 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                 throw new InvalidOperationException(
                     "The SharpProof worker did not terminate within its grace period.");
             }
+        }
+        KillProcessGroup(process.Id);
+    }
+
+    private static void KillProcessGroup(int processId)
+    {
+        if (NativeMethods.Kill(-processId, SignalKill) != 0 &&
+            Marshal.GetLastPInvokeError() != 3)
+        {
+            throw NativeFailure(
+                "SharpProof could not terminate the worker process group.");
         }
     }
 
@@ -208,6 +240,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                 process.Kill(entireProcessTree: true);
                 process.WaitForExit(1000);
             }
+            KillProcessGroup(process.Id);
         }
         catch (InvalidOperationException)
         {

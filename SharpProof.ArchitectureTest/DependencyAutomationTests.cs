@@ -149,6 +149,12 @@ public sealed class DependencyAutomationTests
                 Does.Not.Contain(
                     "semantic Unknown rates as metrics; none is a " +
                     "release gate."));
+            Assert.That(
+                architecture,
+                Does.Contain("compiler artifact schema 15"));
+            Assert.That(
+                architecture,
+                Does.Not.Contain("Schema 11 retains"));
         }
     }
 

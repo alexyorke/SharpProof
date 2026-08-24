@@ -2433,6 +2433,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             BaseMethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
             AccessorDeclarationSyntax accessor => (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
             LocalFunctionStatementSyntax local => (SyntaxNode?)local.Body ?? local.ExpressionBody?.Expression,
+            PropertyDeclarationSyntax property => property.ExpressionBody?.Expression,
+            IndexerDeclarationSyntax indexer => indexer.ExpressionBody?.Expression,
             _ => null
         };
     }

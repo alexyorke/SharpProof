@@ -53,6 +53,59 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void OversizedAssumptionExpansionUsesAValidatedCompactClaimForm()
+    {
+        const int assumptionCount = 400;
+        const int claimCount = 100;
+        var assumptions = Enumerable.Range(0, assumptionCount)
+            .Select(index => new WorkerAssumptionEvidence
+            {
+                Id = "assumption-" + index.ToString(CultureInfo.InvariantCulture) +
+                    new string('x', 500),
+                Kind = WorkerAssumptionKind.UserAssume
+            })
+            .ToArray();
+        var manifest = CreateManifest();
+        manifest.Callables[0].Assumptions = assumptions;
+        manifest.Callables[0].ClaimIds = Enumerable.Range(0, claimCount)
+            .Select(index => "claim." + index.ToString(CultureInfo.InvariantCulture))
+            .ToArray();
+        manifest.Claims = Enumerable.Range(0, claimCount)
+            .Select(index => new WorkerClaimManifestEntry
+            {
+                ClaimId = "claim." + index.ToString(CultureInfo.InvariantCulture),
+                CallableId = manifest.Callables[0].CallableId,
+                Ordinal = index,
+                Kind = WorkerClaimKind.Postcondition,
+                Evidence = WorkerClaimEvidence.DirectClause,
+                Location = manifest.Callables[0].Location
+            })
+            .ToArray();
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        var unboundedJson = JsonSerializer.Serialize(
+            response,
+            WorkerProtocolJson.Options);
+        Assert.That(
+            Encoding.UTF8.GetByteCount(unboundedJson),
+            Is.GreaterThan(WorkerProtocolJson.MaximumJsonBytes));
+
+        var compactJson = WorkerProtocolJson.SerializeResponse(response);
+        Assert.That(
+            Encoding.UTF8.GetByteCount(compactJson),
+            Is.LessThanOrEqualTo(WorkerProtocolJson.MaximumJsonBytes));
+        var roundTrip = WorkerProtocolJson.DeserializeResponse(compactJson)!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(roundTrip.ClaimResults, Has.Length.EqualTo(claimCount));
+            Assert.That(roundTrip.ClaimResults.All(
+                static claim => claim.Assumptions == null), Is.True);
+            Assert.That(WorkerProtocolJson.Validate(roundTrip).IsValid, Is.True);
+        }
+    }
+
+    [Test]
     public void VersionNineRequestCarriesOnlyArtifactAndRuntimeControls()
     {
         var request = CreateRequest();
@@ -580,7 +633,7 @@ public sealed class ProtocolJsonTests
             Does.Contain("response.effect_evidence"));
 
         foreach (var assumption in response.ClaimResults
-                     .SelectMany(static result => result.Assumptions)
+                     .SelectMany(static result => result.Assumptions ?? [])
                      .Where(static value =>
                          value.Kind == WorkerAssumptionKind.TrustedBoundary))
         {
@@ -1332,7 +1385,7 @@ public sealed class ProtocolJsonTests
     public void AssumptionSummaryUnionsDeclarationsAndUsageById()
     {
         var response = CreateResponse(CreateManifest());
-        var used = response.ClaimResults[0].Assumptions.Single(
+        var used = response.ClaimResults[0].Assumptions!.Single(
             static assumption =>
                 assumption.Kind == WorkerAssumptionKind.UserAssume);
         used.Used = true;
@@ -1351,7 +1404,7 @@ public sealed class ProtocolJsonTests
     {
         var response = CreateResponse(CreateManifest());
         response.ClaimResults[0].Assumptions =
-            [.. response.ClaimResults[0].Assumptions.Skip(1)];
+            [.. response.ClaimResults[0].Assumptions!.Skip(1)];
         response.Summary = CreateSummary(response);
 
         Assert.That(
@@ -1593,8 +1646,7 @@ public sealed class ProtocolJsonTests
             Does.Contain("response.elapsed_unrepresentable"));
     }
 
-    [TestCase(1, 300001L)]
-    [TestCase(100, 300001L)]
+    [TestCase(101, 300001L)]
     [TestCase(1000, 300900L)]
     public void RequestBoundElapsedTimeUsesTheActualLauncherGrace(
         int terminationGraceMilliseconds,
@@ -1636,6 +1688,19 @@ public sealed class ProtocolJsonTests
             Is.EqualTo((long)int.MaxValue +
                 WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds -
                 WorkerExecutionEnvelope.CleanupReserveMilliseconds));
+    }
+
+    [TestCase(1)]
+    [TestCase(100)]
+    public void RequestElapsedEnvelopeRejectsGraceWithoutCleanupReserve(
+        int terminationGraceMilliseconds)
+    {
+        var request = CreateRequest();
+
+        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+            WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+                request,
+                terminationGraceMilliseconds)));
     }
 
     [Test]

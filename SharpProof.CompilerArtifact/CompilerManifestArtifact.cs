@@ -840,6 +840,24 @@ internal static class CompilerManifestArtifactFile
 {
     internal const int MaximumBytes = WorkerProtocolJson.MaximumJsonBytes;
 
+    internal static string DecodeUtf8(byte[] bytes)
+    {
+        if (bytes == null)
+        {
+            throw new ArgumentNullException(nameof(bytes));
+        }
+        var offset = bytes.Length >= 3 &&
+            bytes[0] == 0xEF &&
+            bytes[1] == 0xBB &&
+            bytes[2] == 0xBF
+            ? 3
+            : 0;
+        return new UTF8Encoding(false, true).GetString(
+            bytes,
+            offset,
+            bytes.Length - offset);
+    }
+
     internal static byte[] ReadAllBytes(
         string path,
         int maximumBytes = MaximumBytes)

@@ -163,7 +163,10 @@ public sealed class ArchitectureTests
                 "SharpProof.Specs"
             ],
             ["SharpProof.Attributes"] = [],
-            ["SharpProof.BuildTasks"] = ["SharpProof.Host"],
+            ["SharpProof.BuildTasks"] = [
+                "SharpProof.Host",
+                "SharpProof.Worker.Protocol"
+            ],
             ["SharpProof.Host"] = [],
             ["SharpProof.Ir"] = [],
             ["SharpProof.Meta.Analyzers"] = [],

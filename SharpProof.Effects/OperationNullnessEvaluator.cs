@@ -68,11 +68,6 @@ internal sealed class OperationNullnessEvaluator
             return false;
         }
 
-        if (origin is ILockOperation)
-        {
-            return true;
-        }
-
         foreach (var operation in _root.DescendantsAndSelf()
                      .Where(candidate =>
                          candidate.Syntax.SyntaxTree == origin.Syntax.SyntaxTree &&

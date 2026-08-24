@@ -14,13 +14,16 @@ internal sealed class UsingDisposalEffectResolver
     private readonly EffectCallSiteResolver _calls;
     private readonly Compilation _compilation;
     private readonly ManagedFlowResult? _flow;
+    private readonly EffectAnalysisSession _session;
 
     internal UsingDisposalEffectResolver(
+        EffectAnalysisSession session,
         Compilation compilation,
         IMethodSymbol caller,
         EffectCallSiteResolver calls,
         ManagedFlowResult? flow)
     {
+        _session = ArgumentNullGuard.NotNull(session, nameof(session));
         _compilation = ArgumentNullGuard.NotNull(
             compilation,
             nameof(compilation));
@@ -418,17 +421,21 @@ internal sealed class UsingDisposalEffectResolver
         {
             return EffectSummaryOperations.Unsupported();
         }
-        if (!IsDispatchUncertain(dispose) &&
-            !canMethodCompleteNormally(dispose) &&
-            !canMethodThrow(dispose))
-        {
-            return EffectSummary.Empty;
-        }
-
         var receiver = dispose.ContainingType?.IsValueType == true &&
             !dispose.ContainingType.IsRefLikeType
                 ? EffectRegionSet.Empty
                 : classifyRegion(resource, true);
+        var completes = canMethodCompleteNormally(dispose);
+        var throws = canMethodThrow(dispose);
+        if (!completes && !throws && !IsDispatchUncertain(dispose))
+        {
+            return EffectSummaryOperations.Remap(
+                _session.ResolveLocalSummary(dispose),
+                receiver,
+                receiver,
+                ImmutableArray<EffectRegionSet>.Empty);
+        }
+
         return _calls.Resolve(
             dispose,
             receiver,

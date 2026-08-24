@@ -28,13 +28,19 @@ internal static class PrimaryConstructorCallableInventory
                             parameter.Identifier.ValueText),
                         StringComparer.Ordinal))
             .ToArray();
-        if (matches.Length != 1)
+        var primary = matches.FirstOrDefault(static candidate =>
+            candidate.IsImplicitlyDeclared);
+        if (primary == null && matches.Length == 1)
+        {
+            primary = matches[0];
+        }
+        if (primary == null)
         {
             return false;
         }
 
         constructor = ContractClauseInventoryBuilder.NormalizeCallable(
-            matches[0]);
+            primary);
         return true;
     }
 
