@@ -45,6 +45,9 @@ about the same root cause are combined below.
 ### 2. Active cancellation is reported as timeout 124
 
 - Severity: Medium
+- Status: Fixed on this branch after the post-rebase verification pass. The
+  build task now latches the first terminal cause and reports cancellation-first
+  completion as 143 without allowing later timeout/output events to replace it.
 - Affected code: `SharpProof.BuildTasks/RunVerifier.cs`, `Execute` and
   `WaitForExitOrCancellation` (approximately lines 192-291 and 748-768).
 - Normal trigger: MSBuild calls `Cancel` after the verifier process is active and
@@ -2019,6 +2022,66 @@ about the same root cause are combined below.
   and remote-over-local type permutations and assert that classification follows
   the later visible ancestor, not the uniquely longer hidden child. Retain the
   equal-path and carriage-return cases for bugs 34 and 69.
+
+### 71. Later cancellation can erase an earlier cleanup failure
+
+- Severity: High (P1)
+- Status: Fixed on this branch after the post-rebase verification pass.
+- Affected code: `SharpProof.BuildTasks/RunVerifier.cs`, `Execute`, `Cancel`,
+  and bounded-output interruption handling.
+- Normal trigger: a wall timeout or output-limit interruption wins first and
+  retains the live supervisor for authenticated cleanup, then MSBuild calls
+  `Cancel` before the retained anchor is installed. The supervisor subsequently
+  exits without a valid cleanup receipt.
+- Expected: the first terminal cause remains authoritative. Later cancellation
+  can shorten foreground waiting, but it cannot change a timeout into
+  cancellation or suppress the timeout's required cleanup-failure report.
+- Actual impact before the fix: `Execute` sampled the live cancellation bit
+  twice. The later sample forced deferred authentication and passed a null
+  retained-anchor failure callback, so the task could return timeout 124 while
+  silently discarding missing cleanup authentication.
+- Evidence confidence: High from the reachable ordering and a deterministic
+  regression that pauses termination after timeout, calls `Cancel`, removes the
+  supervisor without a receipt, and observes the retained failure decision.
+- Fix: atomically latch cancellation, output-limit, timeout, or completed output
+  as the first terminal cause. Derive exit classification and retained cleanup
+  policy from that latch rather than the mutable cancellation bit.
+- Regression test: `LaterCancellationDoesNotEraseEarlierTimeoutCleanupFailure`
+  asserts exit 124 plus the cleanup-receipt failure; the active-cancellation
+  control now asserts cancellation exit 143 and no containment failure.
+
+### 72. Armed supervisor exit 125 is mistaken for failed termination
+
+- Severity: High (P1)
+- Status: Fixed on this branch after the post-rebase verification pass.
+- Affected code: `SharpProof.BuildTasks/RunVerifier.cs`, `TryTerminate`.
+- Normal trigger: termination overlaps an armed supervisor that exits with
+  infrastructure code 125 after publishing its authenticated cleanup receipt.
+- Expected: observed process exit completes termination. Cleanup authentication
+  is evaluated separately from the supervisor's functional exit code.
+- Actual impact before the fix: the post-arm `WaitForExit` branch returned false
+  solely for exit 125, immediately setting containment failure even when the
+  cleanup receipt was valid. Pre-arm 125 and post-arm cleanup are different
+  lifecycle states and cannot share that inference.
+- Evidence confidence: High from the explicit state-machine branches and the
+  shared cleanup-receipt authority used after termination.
+- Fix: accept every observed post-arm supervisor exit as completed termination;
+  retain the special pre-arm rule that only infrastructure exit 125 is an
+  expected bootstrap failure. The normal receipt path remains responsible for
+  accepting or rejecting cleanup.
+- Regression test: `SupervisorExitAndCleanupAuthenticationRemainSeparate`
+  covers armed 125 and non-125 exits, pre-arm 125 and non-125 exits, and the
+  not-ready state.
+
+## Post-rebase triage ledger
+
+- Accepted two new High/P1 roots in the only production file changed by the
+  squashed merge relative to the audited verifier-supervisor tip (bugs 71 and
+  72), and fixed both with focused regressions.
+- The linked-worktree Docker investigation also rejected a proposed network
+  bootstrap workaround because it would regress offline archive commands and
+  configured non-`master` origins. That experiment was removed and is not part
+  of the branch diff.
 
 ## Round 17 triage ledger
 

@@ -252,6 +252,29 @@ public sealed class BuildTaskTests
             Is.True);
     }
 
+    [TestCase(0)]
+    [TestCase(1)]
+    public void OutputDrainDeadlinePublishesTimeoutBeforeReturning(
+        int timeoutMilliseconds)
+    {
+        var timeoutPublished = false;
+        var incomplete = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var completed = RunVerifier.WaitForOutputCompletion(
+            incomplete.Task,
+            timeoutMilliseconds,
+            static () => false,
+            static _ => false,
+            () => timeoutPublished = true);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(completed, Is.False);
+            Assert.That(timeoutPublished, Is.True);
+        }
+    }
+
     [Test]
     public void SupervisorReadinessWaitObservesArmedSignal()
     {
@@ -354,6 +377,39 @@ public sealed class BuildTaskTests
         Assert.That(
             result,
             Is.EqualTo(RunVerifier.SupervisorReadiness.NotReady));
+    }
+
+    [Test]
+    public void SupervisorExitAndCleanupAuthenticationRemainSeparate()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                RunVerifier.SupervisorExitCompletesTermination(
+                    RunVerifier.SupervisorReadiness.Armed,
+                    125),
+                Is.True);
+            Assert.That(
+                RunVerifier.SupervisorExitCompletesTermination(
+                    RunVerifier.SupervisorReadiness.Armed,
+                    1),
+                Is.True);
+            Assert.That(
+                RunVerifier.SupervisorExitCompletesTermination(
+                    RunVerifier.SupervisorReadiness.ExitedBeforeArmed,
+                    125),
+                Is.True);
+            Assert.That(
+                RunVerifier.SupervisorExitCompletesTermination(
+                    RunVerifier.SupervisorReadiness.ExitedBeforeArmed,
+                    1),
+                Is.False);
+            Assert.That(
+                RunVerifier.SupervisorExitCompletesTermination(
+                    RunVerifier.SupervisorReadiness.NotReady,
+                    125),
+                Is.False);
+        }
     }
 
     [Test]
@@ -1160,6 +1216,98 @@ public sealed class BuildTaskTests
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
+    public async System.Threading.Tasks.Task
+        LaterCancellationDoesNotEraseEarlierTimeoutCleanupFailure()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-timeout-cancel-order-");
+        using var timeoutObserved = new ManualResetEventSlim();
+        using var resumeTermination = new ManualResetEventSlim();
+        var supervisorId = 0;
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "using System.Threading; Thread.Sleep(10000);");
+            var terminationCalls = 0;
+            var containmentFailure =
+                new TaskCompletionSource<string>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 10,
+                TerminationGraceMilliseconds = 1,
+                TryTerminateOverride = (process, _, _) =>
+                {
+                    if (Interlocked.Increment(ref terminationCalls) == 1)
+                    {
+                        supervisorId = process?.Id ?? 0;
+                        timeoutObserved.Set();
+                        Assert.That(
+                            resumeTermination.Wait(TimeSpan.FromSeconds(2)),
+                            Is.True);
+                    }
+                    return true;
+                },
+                ContainmentAuthenticationFailureOverride = message =>
+                    containmentFailure.TrySetResult(message)
+            };
+
+            var execution = System.Threading.Tasks.Task.Run(task.Execute);
+            Assert.That(
+                timeoutObserved.Wait(TimeSpan.FromSeconds(2)),
+                Is.True,
+                "The wall timeout was not observed.");
+            Assert.That(supervisorId, Is.GreaterThan(0));
+            await System.Threading.Tasks.Task.Run(task.Cancel)
+                .WaitAsync(TimeSpan.FromSeconds(2));
+            resumeTermination.Set();
+
+            Assert.That(
+                await execution.WaitAsync(TimeSpan.FromSeconds(2)),
+                Is.True);
+            using (var supervisor = Process.GetProcessById(supervisorId))
+            {
+                supervisor.Kill(entireProcessTree: true);
+                await supervisor.WaitForExitAsync()
+                    .WaitAsync(TimeSpan.FromSeconds(2));
+                Assert.That(supervisor.HasExited, Is.True);
+            }
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(
+                    await containmentFailure.Task.WaitAsync(
+                        TimeSpan.FromSeconds(2)),
+                    Does.Contain("cleanup receipt"));
+            }
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                    TimeSpan.FromSeconds(2)),
+                Is.True);
+        }
+        finally
+        {
+            resumeTermination.Set();
+            if (supervisorId > 0 && IsProcessRunning(supervisorId))
+            {
+                using var supervisor = Process.GetProcessById(supervisorId);
+                supervisor.Kill(entireProcessTree: true);
+                await supervisor.WaitForExitAsync();
+            }
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
     public void SupervisorContainsVerifierThatKillsItsImmediateParent()
     {
         var directory = Directory.CreateTempSubdirectory(
@@ -1309,7 +1457,7 @@ public sealed class BuildTaskTests
             {
                 Assert.That(canceledPromptly, Is.True);
                 Assert.That(await execution, Is.True);
-                Assert.That(task.ExitCode, Is.Not.Zero);
+                Assert.That(task.ExitCode, Is.EqualTo(143));
                 Assert.That(containmentFailure, Is.Empty);
             }
         }

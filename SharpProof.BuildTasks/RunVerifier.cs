@@ -48,6 +48,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         _supervisorArmedSignal;
     private System.Threading.Tasks.Task<BoundedProcessOutput>?
         _supervisorOutputCompletion;
+    private int _terminalCause;
     private bool _canceled;
 
     internal Func<int, int>? OpenPidFdOverride { get; set; }
@@ -121,11 +122,17 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         HasStructuredError = false;
         ExitCode = 0;
         var containmentFailed = false;
-        if (!_canceled)
+        lock (_synchronization)
         {
-            _cancellationSignal.Reset();
+            if (!_canceled)
+            {
+                _cancellationSignal.Reset();
+                _outputLimitSignal.Reset();
+                Volatile.Write(
+                    ref _terminalCause,
+                    (int)VerifierTerminalCause.None);
+            }
         }
-        _outputLimitSignal.Reset();
         try
         {
             ContainerContract.ValidateRequired();
@@ -204,25 +211,28 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     supervisorNonce,
                     _outputLimitSignal,
                     supervisorArmedSignal,
-                    supervisorCleanupSignal);
+                    supervisorCleanupSignal,
+                    () => TrySetTerminalCause(
+                        VerifierTerminalCause.OutputLimit));
                 standardError = ReadBoundedOutputAsync(
                     process.StandardError,
                     supervisorNonce: null,
-                    _outputLimitSignal);
+                    _outputLimitSignal,
+                    outputLimitReached: () => TrySetTerminalCause(
+                        VerifierTerminalCause.OutputLimit));
                 _supervisorOutputCompletion = standardOutput;
                 process.StandardInput.WriteLine(
                     ProcessGateStartMessage + " " + supervisorNonce);
                 process.StandardInput.Close();
             }
-            var timedOut = !WaitForExitOrCancellation(
+            var processExited = WaitForExitOrCancellation(
                 process,
                 Math.Min(
                     verifierTimeout,
                     RemainingMilliseconds(
                         processStopwatch,
                         processTimeout)));
-            var canceled = _cancellationSignal.IsSet;
-            if (timedOut)
+            if (!processExited)
             {
                 var processWasAlive = !process.HasExited;
                 var contained = TryTerminate(
@@ -236,8 +246,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 {
                     containmentFailed = true;
                 }
-                canceled = _cancellationSignal.IsSet;
-                if (!canceled && !_outputLimitSignal.IsSet)
+                if (!_cancellationSignal.IsSet &&
+                    !_outputLimitSignal.IsSet)
                 {
                     _ = process.WaitForExit(RemainingMilliseconds(
                         processStopwatch,
@@ -252,12 +262,13 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     processStopwatch,
                     processTimeout),
                 () => _cancellationSignal.IsSet ||
-                    _outputLimitSignal.IsSet);
+                    _outputLimitSignal.IsSet,
+                timeoutReached: () => TrySetTerminalCause(
+                    VerifierTerminalCause.Timeout));
             var interrupted = _cancellationSignal.IsSet ||
                 _outputLimitSignal.IsSet;
             if (!outputCompleted)
             {
-                timedOut = true;
                 var processWasAlive = !process.HasExited;
                 var contained = TryTerminate(
                     process,
@@ -268,6 +279,16 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 retainCleanupAnchor |= processWasAlive;
                 containmentFailed |= !contained;
             }
+            else
+            {
+                TrySetTerminalCause(VerifierTerminalCause.Completed);
+            }
+            var terminalCause = (VerifierTerminalCause)Volatile.Read(
+                ref _terminalCause);
+            var canceled = terminalCause == VerifierTerminalCause.Canceled;
+            var timedOut = terminalCause is
+                VerifierTerminalCause.Timeout or
+                VerifierTerminalCause.OutputLimit;
             var outputResult = standardOutput.IsCompletedSuccessfully
                 ? standardOutput.Result
                 : null;
@@ -314,9 +335,11 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             }
             ExitCode = containmentFailed
                 ? -1
-                : timedOut
-                    ? 124
-                    : process.ExitCode;
+                : canceled
+                    ? 143
+                    : timedOut
+                        ? 124
+                        : process.ExitCode;
         }
         catch (Exception exception)
         {
@@ -352,7 +375,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 if (retainCleanupAnchor && process != null)
                 {
                     Action<string>? authenticationFailure =
-                        _canceled
+                        (VerifierTerminalCause)Volatile.Read(
+                            ref _terminalCause) ==
+                            VerifierTerminalCause.Canceled
                             ? null
                             : HandleContainmentAuthenticationFailure;
                     RetainCleanupAnchor(
@@ -385,13 +410,19 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         System.Threading.Tasks.Task outputCompletion,
         int timeoutMilliseconds,
         Func<bool> isInterrupted,
-        Func<int, bool>? waitOverride = null)
+        Func<int, bool>? waitOverride = null,
+        Action? timeoutReached = null)
     {
         ArgumentNullException.ThrowIfNull(outputCompletion);
         ArgumentNullException.ThrowIfNull(isInterrupted);
         if (timeoutMilliseconds <= 0)
         {
-            return outputCompletion.IsCompleted;
+            var completedAtDeadline = outputCompletion.IsCompleted;
+            if (!completedAtDeadline)
+            {
+                timeoutReached?.Invoke();
+            }
+            return completedAtDeadline;
         }
 
         var stopwatch = Stopwatch.StartNew();
@@ -411,7 +442,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 timeoutMilliseconds);
             if (remaining <= 0)
             {
-                return outputCompletion.IsCompleted;
+                var completedAtDeadline = outputCompletion.IsCompleted;
+                if (!completedAtDeadline)
+                {
+                    timeoutReached?.Invoke();
+                }
+                return completedAtDeadline;
             }
 
             var slice = Math.Min(
@@ -488,6 +524,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         return authenticationRequired && !outputCompleted;
     }
 
+    internal static bool SupervisorExitCompletesTermination(
+        SupervisorReadiness readiness,
+        int exitCode)
+    {
+        return readiness == SupervisorReadiness.Armed ||
+            readiness == SupervisorReadiness.ExitedBeforeArmed &&
+            exitCode == 125;
+    }
+
     internal static async System.Threading.Tasks.Task<BoundedProcessOutput>
         ReadBoundedOutputAsync(
             TextReader reader,
@@ -496,7 +541,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             System.Threading.Tasks.TaskCompletionSource<bool>?
                 supervisorArmedSignal = null,
             System.Threading.Tasks.TaskCompletionSource<bool>?
-                supervisorCleanupSignal = null)
+                supervisorCleanupSignal = null,
+            Action? outputLimitReached = null)
     {
         var captured = new StringBuilder();
         var protocolLine = new StringBuilder();
@@ -524,6 +570,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             if (count > remaining)
             {
                 limitExceeded = true;
+                outputLimitReached?.Invoke();
                 outputLimitSignal.Set();
             }
             if (supervisorNonce == null)
@@ -814,7 +861,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 timeoutMilliseconds);
             if (remaining == 0)
             {
-                return process.HasExited;
+                if (process.HasExited)
+                {
+                    return true;
+                }
+                TrySetTerminalCause(VerifierTerminalCause.Timeout);
+                return false;
             }
             if (process.WaitForExit(Math.Min(remaining, 25)))
             {
@@ -822,6 +874,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             }
         }
         return process.HasExited;
+    }
+
+    private bool TrySetTerminalCause(VerifierTerminalCause cause)
+    {
+        return Interlocked.CompareExchange(
+            ref _terminalCause,
+            (int)cause,
+            (int)VerifierTerminalCause.None) ==
+            (int)VerifierTerminalCause.None;
     }
 
     private static string ResolveProcessGroupLauncherRequired()
@@ -911,7 +972,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     LauncherProcessReserveMilliseconds));
             if (readiness == SupervisorReadiness.ExitedBeforeArmed)
             {
-                return process.ExitCode == 125;
+                return SupervisorExitCompletesTermination(
+                    readiness,
+                    process.ExitCode);
             }
             if (readiness != SupervisorReadiness.Armed)
             {
@@ -932,7 +995,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             if (terminateSent && boundedWait > 0 &&
                 process.WaitForExit(boundedWait))
             {
-                return process.ExitCode != 125;
+                return SupervisorExitCompletesTermination(
+                    readiness,
+                    process.ExitCode);
             }
             if (terminateSent && !process.HasExited)
             {
@@ -1185,6 +1250,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         lock (_synchronization)
         {
             _canceled = true;
+            TrySetTerminalCause(VerifierTerminalCause.Canceled);
             _cancellationSignal.Set();
             process = _process;
             processGroupId = _processGroupId;
@@ -1204,6 +1270,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         Armed,
         ExitedBeforeArmed,
         NotReady
+    }
+
+    private enum VerifierTerminalCause
+    {
+        None,
+        Completed,
+        Canceled,
+        OutputLimit,
+        Timeout
     }
 
     private static string ResolveDotNetFromPath()
