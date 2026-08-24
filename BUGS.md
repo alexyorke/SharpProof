@@ -2801,3 +2801,1749 @@ so the plan did not require another Docker run after editing this report.
 Earlier entries marked as previously reproduced still refer to their original
 isolated evidence. Bugs without a fixed status remain audit findings rather than
 claims that all 87 entries were remediated in this pass.
+
+## Consolidated supplemental source reports
+
+The four source reports below were generated after the independently triaged
+audit above. They overlap substantially with one another and with the confirmed
+list, and their raw candidates have not passed the four acceptance gates used
+for bugs 1-87. They are preserved for provenance and future triage; a candidate
+in these source reports is not a confirmed bug unless it also appears in the
+canonical confirmed-bugs section above. No cybersecurity investigation is being
+performed as part of this consolidation; any out-of-scope language below is
+retained only as source material.
+
+The source bodies are complete. Only Markdown heading levels and whitespace were
+normalized to fit the single-document hierarchy.
+
+| Former source file | SHA-256 before consolidation |
+| --- | --- |
+| `BUGS_2.md` | `3E3C0B8DC557C40D8A51282A8FF5774923684F096123B1171748C4D01395F403` |
+| `BUGS_3.md` | `150CB7A13A9A3DBE7CDBFD38FE1B6FC5BDC6DA8FA87D124287E717A0DADE7C0D` |
+| `BUGS_4.md` | `408F190E0D5CF3C345568EBBDE8E42104ED7F30FEA5D7688C13919B7E11A9CAF` |
+| `BUGS_5.md` | `A6A1C2654663F34B82D38F662E0767A53D4A90EC4F9E16121ACD0E6DFEB2EBF3` |
+
+### Imported from `BUGS_2.md`
+
+<!-- BEGIN CONSOLIDATED SOURCE: BUGS_2.md -->
+
+#### SharpProof — Second-Round Comprehensive Bug Hunt (BUGS_2.md)
+
+**Date:** 2026-08-23 (commit `8a5141d7d8772d1e9659099531086d156ea11e92` + worktree)
+
+**Authority:** Agent 10 — sole writer to `BUGS_2.md` per task. All other agents wrote only to temp findings under `C:\Users\yorke\AppData\Local\Temp\opencode\agent{1..9}_findings.md`.
+
+**Scope:** Exhaustive, all tracked files except this report — 833 files, 248,733 physical lines (per `BUGS.md` ledger). Includes production code, tests, analyzers, gates, build/release infra, scripts, container config, samples, specifications, contracts, docs.
+
+**Method:** 10 parallel read-only audit shards with non-overlapping file manifests, each globbed and read line-by-line, traced through reachable control/data flow, checked against documented contracts/specs/tests, classified for cancellation/disposal/overflow/quadratic/null/logic, and de-duplicated against `BUGS.md:1-87`.
+**Shards:**
+
+| # | Partition | Files | Agent temp file |
+|---|-----------|------:|---------------|
+| 1 | `SharpProof.Host/**/*` | 6 | `agent1_findings.md` |
+| 2 | `SharpProof.BuildTasks/**/*` | 8 | `agent2_findings.md` |
+| 3 | `SharpProof.Worker*` (Worker, Launcher, Protocol) | 44 | `agent3_findings.md` |
+| 4 | `SharpProof.Ir/Smt/Dataflow/Effects/**/*` | 74 | `agent4_findings.md` |
+| 5 | `SharpProof.Analyzer/Core/Gates/Frontend/**/*` | ~130 | `agent5_findings.md` |
+| 6 | `SharpProof.Attributes/Contracts/CompilerArtifact/Collector/Specs/Summaries/ContractForGenerator/Meta.Analyzers/**/*` | 80 | `agent6_findings.md` |
+| 7 | `SharpProof.Verifier/Package/docs/eng/Tools/scripts/compose.yaml/Directory.*` | 216 | `agent7_findings.md` |
+| 8 | All `*Test*`, `Testing`, `Verify/Fuzz` | 496+ | `agent8_findings.md` |
+| 9 | Root `*.*`, `.github`, `.opencode`, `samples`, `CompilerProbe.TestAsset`, remaining `eng` | ~90 | `agent9_findings.md` |
+| 10 | Cross-cut scan of `CompilerCollector/CompilerProbe/ContractForGenerator` + aggregation | — | this file |
+
+**Deduplication:** Every new finding below was checked against `BUGS.md` 87 roots. Close neighbors explicitly excluded (see each agent’s dedup notes). Inter-agent duplication is near-zero because partitions were disjoint; where titles overlap (e.g., MSBuild escaping) they refer to distinct file:line/metas (`Host` vs `Verifier` vs `Worker`). After dedup this report documents **~116 new high/medium/low roots** plus 3 additional Agent-10 findings. None duplicate `BUGS.md` 1–87.
+
+**Verification:** Findings are static proofs; suggested reproduction hooks use existing deterministic fixtures (`fsync` shim, `pidfd_open` override, `/proc` fixtures, FIFO/symlink, `ArmedExecutionOverride`, `GC` pressure, `CancellationToken` barriers). No production code was changed in this audit.
+
+---
+
+##### 1. Summary of pre-existing bugs in `BUGS.md` (bugs 1–87, header claims 73 but documents 87)
+
+`BUGS.md` audits the same 833-file/248k-line repo at `8a5141d`. Ten shards + triage ledgers (Rounds 13–17) accepted 87 distinct High/Medium/Low roots. Briefly grouped:
+
+**A. Verifier supervision & process lifecycle (High):** 1 supervisor reaps direct child via `waitpid(-1)`, 3 post-`Armed` child-start exception omits cleanup receipt, 15 cooperative worker exit skips descendant kill, 20 worker `Dispose` loses ownership on `Terminate` throw, 36 inner `RunWorker` start exception bypasses 125, 45 sequential disposal breaks retained cleanup reader, 71 later cancellation erases earlier cleanup failure, 72 armed 125 mistaken for failed termination, 73 fault abandons armed supervisor.
+
+**B. Build-task / publication / lease (High/Medium):** 2 active cancellation → 124, 4 validation without lease, 5 equal-path concurrent builds not bound to invocation, 6 reset marker race/retry, 9 lock release stops at first `flock` failure, 12 invalidation failures escape as `MSB4018`, 13 cancellation-callback races source disposal, 14 rejected evidence remains committed, 17 reset ignores cancellation, 24 unsupported hosts skip invalidation, 33 non-regular nodes admitted, 34/69/70 mount parsing (equal-length hidden, CR split, hidden descendant), 49 pre-editor-config failure preserves success, 51 cancellation after lease preserves stale success, 52 late lock success after timeout, 53 outer Clean probes unprojected SARIF, 58 reset removes companions before result, 64 topology validation preserves prior commit.
+
+**C. BuildTasks/MSBuild & path handling (Medium):** 8 stale `DOTNET_HOST_PATH`, 11 slow setup consumes cleanup reserve, 18 path spelling splits identity, 19 marker flush failure → bind collision, 23 inconsistent relative bases, 38 apostrophe breaks target expressions, 40 PATH parsing corrupts directory, 43 semicolon → list split, 46 custom PDB omitted from collision check, 68 terminal whitespace trimmed by item `Include`.
+
+**D. Worker/Launcher/Cache/Protocol (Medium):** 7 descendant scan authenticates early / overruns deadline, 10 `finally` masks primary error, 21 fixed 25 ms polling, 25/37/44 failure writes escape, 26 assumptions suppress run-failure SARIF, 27 SARIF relative URI no base, 28 cache ignores cancellation under lock, 29 enum overflow → `OverflowException`, 30 effect-certainty vs validation, 31 backend `Dispose` leak, 32 transaction debris, 35 caller cancellation rewrites timeout, 39 short grace cannot provide reserve, 41 private staging I/O → exit 2, 42 cache-hit validation ignores deadline, 47 typed 125 → 3, 48 request validation outside wall timer, 50 late overflow preserves zero, 54 quadratic manifest association, 55 empty manifest interrupted → invalid, 56 response exceeds 16 MiB, 57 cache miss bypasses capacity, 59 outer deadline starts after gate, 60 unbounded per-claim logging overflows output, 61 claimless callable interruption fails projection, 62 cache commit vs interruption both win, 63 nested waits no absolute deadline, 65 backend failure overrides interruption, 66 read failure → `Miss`, 67 incomplete discards cache state.
+
+**E. Effects/IR/Analyzer (High/Medium):** 74 primary-ctor overload collisions, 75 conditional lock nullness, 76 diverging `Dispose` loses effects, 77 nested positional pattern, 78 switch guard semantic-string, 79 conditional return cache soundness, 80 sorted assumption swaps predicate, 81 BOM disagreement, 82 Git child on cancel, 83 oracle sequence/reference mismatch, 84 external exception drops arg effects, 85 ApiSpec catalog mixed outputs, 86 package-test timeout excludes discovery, 87 architecture docs schema contradiction.
+
+**Rejected leads** (performance probe race, backslash-path, `RunAttempt` field) and **post-rebase ledgers** (71–73, 45) are documented in triage sections. All 87 are High/Medium except 87 Low; audit claims coverage of every tracked file and four-gate acceptance (reachable trigger, contract comparison, full flow, duplicate search).
+
+---
+
+##### 2. NEW bugs aggregated from 9 shards + Agent-10 scan
+
+> Notation `File:Line` is absolute repo path + approximate line from inspected snapshot (8a5141d). `Severity` follows repo rubric (High = soundness/correctness/containment leak, Medium = reliability/diagnostic/correctness boundary, Low = defense-in-depth/perf). `Confidence` High/Med per shard. `Fix` is narrow and non-broadening. Where two agents numbered overlapping (e.g., both claim “bug 88”) IDs are kept with shard prefix.
+
+###### 2.1 SharpProof.Host (Agent 1 — 10 new)
+
+###### HOST-N01 — [High] Canonicalize lexical `..` bypasses symlink check
+- **File:Line:** `SharpProof.Host/LinuxPathIdentity.cs:50-108` (`Canonicalize`, `Path.GetFullPath` then `LStat` loop)
+- **Description:** Lexically resolves `.`/`..` via `Path.GetFullPath` before symlink walk. `Canonicalize("/tmp/link/../etc/passwd")` where `/tmp/link -> /etc` becomes `/tmp/etc/passwd` and symlink never examined. Violates “must not traverse symlinks”. Subsequent `RequireLocalPath`/`PublicationLockNameForCanonicalPath` derive wrong identity/filesystem.
+- **Fix:** Walk raw input segments before `..` elimination; `LStat` each prefix, pop only after confirming not symlink, or use `openat`+`O_NOFOLLOW`/`fstat`.
+
+###### HOST-N02 — [Medium] `IsStrictPathAncestor` fails for root `/`
+- **File:Line:** `SharpProof.Host/LinuxPathIdentity.cs:399-409`
+- **Description:** `descendant[ancestor.Length]=='/'` fails for `ancestor=="/"` (`descendant[1]=='f'`). `ValidatePublicationTopology(["/","/tmp/a.json"])` incorrectly accepted; could derive markers under `/.sharpproof-publication`.
+- **Fix:** Special-case `"/"` or normalize `prefix = ancestor=="/" ? "/" : ancestor+'/'`.
+
+###### HOST-N03 — [Medium] `ResetPublicationSet` silently succeeds on empty input
+- **File:Line:** `SharpProof.Host/LinuxPathIdentity.cs:174-201` vs `228-247` (`Acquire` throws)
+- **Description:** Empty/whitespace-only input filtered then vacuously `return`. `Acquire` throws `ArgumentException`. `Reset` hides configuration drift, leaves prior generation.
+- **Fix:** Mirror `Acquire` guard: `if(requestedPaths.Length==0) throw`.
+
+###### HOST-N04 — [Medium] `ContainerContract.ReadBoundedJson` TOCTOU length check
+- **File:Line:** `SharpProof.Host/ContainerContract.cs:173-191`
+- **Description:** `FileInfo.Length` stat then new `FileStream` parse with no `fd` linkage; file can be swapped/grown between. 16 KiB contract bypassed or valid file rejected.
+- **Fix:** Open first, `fstat`/`stream.Length` on fd or bounded stream-copy capped at 16 KiB+1 before `JsonDocument.Parse`.
+
+###### HOST-N05 — [High] `LinuxWorkerProcess` PID reuse → SIGTERM hits unrelated process
+- **File:Line:** `SharpProof.Host/LinuxWorkerProcess.cs:159-170` `Terminate`, `202-215` `TerminateNow`
+- **Description:** Signals by `process.Id` after `HasExited` check. If worker exits and PID recycled, `kill` hits unrelated process. `ESRCH` ignored but success on recycled PID indistinguishable. No `pidfd`.
+- **Fix:** `pidfd_open` + `pidfd_send_signal` or re-validate `/proc/[pid]/starttime`.
+
+###### HOST-N06 — [Low] `EnsurePublicationMetadataDirectory` mode mask misses setuid/setgid/sticky
+- **File:Line:** `SharpProof.Host/LinuxPathIdentity.cs:683-688` `(Mode & 0x3F)!=0`
+- **Description:** Only checks `0077` (bits 0-5). `0700|01000`/`02000`/`04000` passes though publication dir must be exactly `0700`.
+- **Fix:** `if((Mode & 0xFFF)!=0x1C0)` (or `07777 != 0700`) .
+
+###### HOST-N07 — [Medium] `WorkerCachePath.Resolve` performs no symlink/mount/regular validation
+- **File:Line:** `SharpProof.Worker.Protocol/WorkerCachePath.cs:5-14` plus `SharpProof.Worker.Launcher/Program.cs:870-872`, `SharpProof.Worker/SharpProofWorker.cs:365`
+- **Description:** Lexical `GetFullPath` only, never `RequireLocalPath`. Cache can be placed on remote FS via symlink/FIFO/escaped `..`, bypassing local-only preview contract.
+- **Fix:** Call `RequireLocalPath`/`Canonicalize` on final combined path.
+
+###### HOST-N08 — [Medium] `WaitForExit` timeout precedence + `WaitHandle` disposed race
+- **File:Line:** `SharpProof.Host/LinuxWorkerProcess.cs:87-118`, `144-157`
+- **Description:** `elapsed>=terminationStart` checked before `WaitHandle.WaitOne`; cancellation simultaneously → timeout wins (124 vs `OperationCanceled`). Concurrent `CancellationTokenSource.Dispose` → `ObjectDisposedException` from `WaitOne`.
+- **Fix:** Check cancellation before/after elapsed, use `WaitAny` with remaining time, catch `ObjectDisposedException`.
+
+###### HOST-N09 — [Medium] `ContainerContract.ResolveZ3LibraryRequired` TOCTOU / non-regular file
+- **File:Line:** `SharpProof.Host/ContainerContract.cs:121-156`
+- **Description:** `RequireLocalPath` then `FileInfo` stat then `FileStream` hash. Between, target can be FIFO/socket/device or different file. `FileInfo.Length` on FIFO blocks; hash blocks.
+- **Fix:** `open(O_NOFOLLOW)+fstat` / `OpenRegularMetadata` on fd, hash via fd.
+
+###### HOST-N10 — [Medium] `PublicationLock.Dispose` abandons handle when `Release` throws (inner leak)
+- **File:Line:** `SharpProof.Host/LinuxPathIdentity.cs:867-874` (`Dispose` without `finally`), `692-702` `ReleaseLocks`
+- **Description:** `if(_acquired) Release(); _handle.Dispose();` — if `Release()` throws, dispose never reached. `PublicationLease.Dispose` `Exchange(null)` then `ReleaseLocks` throws at `i` → remaining handles undisposed forever (distinct from BUGS.md#9 outer loop).
+- **Fix:** `try{Release}finally{Dispose}` + loop best-effort with first-exception collection.
+
+---
+
+###### 2.2 SharpProof.BuildTasks (Agent 2 — 12 new)
+
+###### BT-N01 — [High] `RunVerifier.Dispose` races `Cancel`/`Execute` on `_cancellationSignal`/`_process`
+- **File:Line:** `SharpProof.BuildTasks/RunVerifier.cs:95-99` vs `130-138`, `1273-1281`
+- **Description:** `Dispose` disposes `ManualResetEventSlim` and `_process` without lock while `Execute` `Reset()`/`IsSet` and `Cancel` `Set()` run concurrently. MSBuild may have `Cancel` in-flight when `Execute` returns and `Dispose` runs → `ObjectDisposedException`.
+- **Fix:** Synchronize `Dispose` under `_synchronization`, drain in-flight callback or make per-`Execute` signal, guard with `try/catch(ObjectDisposed)`.
+
+###### BT-N02 — [Medium] Task reuse latches `_canceled` forever
+- **File:Line:** `SharpProof.BuildTasks/RunVerifier.cs:130-138`, `InvalidatePublishedResult.cs:53-58`
+- **Description:** `_canceled=true` never cleared; second `Execute` on same instance (batching) always returns `-1`/`false` without attempting work.
+- **Fix:** Clear `_canceled` at start of `Execute`.
+
+###### BT-N03 — [Medium] `Present` drops whitespace-only `Required` paths silently
+- **File:Line:** `SharpProof.BuildTasks/InvalidatePublishedResult.cs:258-261`, `ResetPublishedVerification.cs:36-39`
+- **Description:** `[Required]` properties expanding to `"   "` filtered, producing incomplete publication set. Invalidation acquires lease for subset, reset early-returns.
+- **Fix:** Validate required members for `IsNullOrWhiteSpace` → `LogError` before filtering.
+
+###### BT-N04 — [Medium] `ResetPublishedVerification` exception filter omits `InvalidOperationException`
+- **File:Line:** `SharpProof.BuildTasks/ResetPublishedVerification.cs:27-33`
+- **Description:** `ResetPublicationSet` throws `InvalidOperationException` (alias, FIFO); filter catches only `ArgumentException/IOException/UnauthorizedAccessException` → `MSB4018`.
+- **Fix:** Add `InvalidOperationException`/`PlatformNotSupportedException`.
+
+###### BT-N05 — [Medium] `ValidatePublishedVerificationResult` ignores cancellation (no `ICancelableTask`)
+- **File:Line:** `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs:8-82`
+- **Description:** No token, no lease; file reads/hashing not cancellation-aware; blocks during 30 s lease wait or 16 MiB hash.
+- **Fix:** Implement `ICancelableTask`, pass token to `AcquirePublicationSet` / async reads.
+
+###### BT-N06 — [High] Supervisor returns 125 without authenticated `Cleanup` receipt when direct child hangs
+- **File:Line:** `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:144-149`
+- **Description:** After descendant cleanup, waits 1000 ms for direct child; if still alive returns 125 without `ReapOwnedDescendants`/`WriteCleanupReceipt`. Parent expects receipt when armed → containment failure / `FailFast` via retained anchor.
+- **Fix:** Always write receipt when armed, even on 125 timeout.
+
+###### BT-N07 — [Medium] Supervisor gate `ReadLine` blocks indefinitely
+- **File:Line:** `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:83-91`
+- **Description:** `Console.In.ReadLine()` with no timeout; parent crash before gate write → supervisor hangs forever, leaked subreaper, retained anchor never reaped.
+- **Fix:** `ReadLineAsync` + `Task.WhenAny` + 1000 ms delay or token.
+
+###### BT-N08 — [Medium] Supervisor descendant-retry loop is unbounded
+- **File:Line:** `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:133-143` `while(!cleanup.Complete)`
+- **Description:** No overall deadline/cancellation; unkillable descendant → infinite hang, no receipt.
+- **Fix:** Cap total retry (e.g., 5000 ms) and break with `Complete==false` + receipt.
+
+###### BT-N09 — [Medium] `RunVerifier.WaitForExitOrCancellation` deadline `HasExited` race
+- **File:Line:** `SharpProof.BuildTasks/RunVerifier.cs:889-894`
+- **Description:** When `remaining==0` checks `HasExited` once then latches `Timeout`; process exits between check and return → misclassified as 124.
+- **Fix:** Resample `HasExited` after deadline.
+
+###### BT-N10 — [Medium] `RetainCleanupAnchor` leaks if supervisor never exits
+- **File:Line:** `SharpProof.BuildTasks/RunVerifier.cs:750-782` `ObserveCleanupAnchorAsync` `WaitForExitAsync()` no timeout
+- **Description:** Hanging supervisor → anchor stays in static `RetainedCleanupAnchors` forever, pidfd leak.
+- **Fix:** Timeout/cancellation on `WaitForExitAsync`, dispose in `finally`.
+
+###### BT-N11 — [Medium] Fault path uses fixed 1000 ms instead of remaining `processTimeout`
+- **File:Line:** `SharpProof.BuildTasks/RunVerifier.cs:348-364` `TryTerminate(...,LauncherProcessReserveMilliseconds)`
+- **Description:** Catch block for setup failure ignores remaining budget; violates overall deadline or starves authenticated cleanup.
+- **Fix:** Use `RemainingMilliseconds(processStopwatch, processTimeout)`.
+
+###### BT-N12 — [Medium] Supervisor/setsid launchers accept non-regular nodes
+- **File:Line:** `SharpProof.BuildTasks/RunVerifier.cs:913-944`
+- **Description:** `File.Exists` returns true for FIFOs/sockets; no `FileTypeRegular` check. FIFO at `/usr/bin/setsid` or supervisor assembly → `Process.Start` blocks or throws `Win32Exception`.
+- **Fix:** `LStat` + require `FileTypeRegular` after `Canonicalize`.
+
+---
+
+###### 2.3 SharpProof.Worker Stack (Agent 3 — 11 new, 2 retracted)
+
+###### WK-N88 — [Medium] Worker manifest load ignores project wall timer
+- **File:Line:** `SharpProof.Worker/SharpProofWorker.cs:52-55,86-88`, `WorkerInputSnapshot.cs:7-53` `LoadAsync(...,CancellationToken.None)`
+- **Description:** Validates `projectBoundary` then loads `compiler_manifest.json` uncancellable. Cold FS can make `Elapsed > ProjectWall` yet return `Complete`.
+- **Fix:** Pass `projectBoundary.Token` into `LoadAsync`, make token-aware.
+
+###### WK-N89 — [Medium] `VerificationCache.IsCacheable` throws on duplicate IDs
+- **File:Line:** `SharpProof.Worker/VerificationCache.cs:450-459,498-501` `ToDictionary`
+- **Description:** `IsCacheable` predicate throws `ArgumentException` on duplicate `CallableId`/`ClaimId`; write path turns non-cacheable semantic result into `InfrastructureFailure`.
+- **Fix:** Return `false` on duplicate, never throw.
+
+###### WK-N90 — [Medium] `VerificationCache.AcquireLock` `FileShare.None` not cross-process exclusive on Linux
+- **File:Line:** `SharpProof.Worker/VerificationCache.cs:212-237`
+- **Description:** `FileShare.None` on Unix does not map to `flock`; two concurrent worker processes both open lock successfully, interleave `File.Move` → lost entry/corruption.
+- **Fix:** Use `flock`/`fcntl` on lock fd (as `LinuxPathIdentity` does).
+
+###### WK-N91 — [Medium] Launcher first-stage catch misses `NotSupportedException` → crash
+- **File:Line:** `SharpProof.Worker.Launcher/Program.cs:74-86`
+- **Description:** Filter omits `NotSupportedException` from `WorkerCachePath.Resolve` / `Path.GetFullPath` (`"bad:dir"`). Escapes `RunMain`, no `result.json`, unhandled.
+- **Fix:** Add `NotSupportedException`/`PlatformNotSupportedException` or catch `Exception` and classify.
+
+###### WK-N92 — [Medium] `TryCreateLanes` starves cancellation
+- **File:Line:** `SharpProof.Worker/SharpProofWorker.cs:437-465`
+- **Description:** Synchronous loop over `backendFactory()` with no token check; timeout during lane creation still creates all lanes, overshooting `finalLimit`.
+- **Fix:** Pass `projectBoundary.Token`, `ThrowIfCancellationRequested` per iteration.
+
+###### WK-N93 — [Medium] `TryWriteAsync` orphan `.rollback` on `WriteUtf8Async` throw after `Move`
+- **File:Line:** `SharpProof.Worker/VerificationCache.cs:147-160`
+- **Description:** `Move(path, previousPath)` then `WriteUtf8Async` throws after creating partial `path`; `finally` skips `TryDeletePublishedFile` (`published==false`) and `RestorePrevious` won't restore because `path` exists → partial remains + orphan.
+- **Fix:** Always delete `path` if exists when `!committed`; unconditional restore when `previousPath` exists.
+
+###### WK-N94 — [Medium] `ProtocolJson.OpenJsonReader` TOCTOU + unbounded `ReadToEnd`
+- **File:Line:** `SharpProof.Worker.Protocol/ProtocolJson.cs:71-88`
+- **Description:** Checks `stream.Length > MaximumJsonBytes` then `ReadToEnd` without recheck; concurrent growth or pipe → huge allocation / `OutOfMemoryException` not caught.
+- **Fix:** Bounded read with byte cap, throw `InvalidDataException` if exceed.
+
+###### WK-N95 — [Low-Med] `ManifestWriter` ambiguous hash — retracted (length-prefix ensures unambiguous)
+- **File:Line:** `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:207-261`
+- **Description:** Length-prefix `len:value;` is unambiguous even if value contains `:`/`;`. Low confidence, kept for completeness.
+- **Disposition:** Retracted / Low.
+
+###### WK-N96 — [Medium] `WaitForStartAsync` ignores `Console.In` redirection, token not observed
+- **File:Line:** `SharpProof.Worker/Program.cs:153-170` `ReadLineAsync(token)` on `SyncTextReader`
+- **Description:** `Console.In.ReadLineAsync(token)` does not observe token for sync reader; 30 s `CancelAfter` does not interrupt → worker hangs beyond `finalLimit`.
+- **Fix:** `Task.WhenAny(read, Task.Delay(timeout))` without relying on reader’s token.
+
+###### WK-N97 — [Medium] `LauncherProjections.Level` throws on `Unspecified` — low reachability
+- **File:Line:** `SharpProof.Worker.Launcher/LauncherProjections.generated.cs:64-76`
+- **Description:** `ValidateAndReport` with `verifyPolicy==Unspecified` would throw, but validation returns early. Low confidence, likely unreachable.
+- **Disposition:** Observation, Low.
+
+###### WK-N98 — [Medium] `EffectCounterexampleReplayer` Unsupported → wrong reason
+- **File:Line:** `SharpProof.Worker/CallableCounterexampleReplayer.cs:46-54`, `EffectCounterexampleReplayer.cs:37-50`
+- **Description:** Effect path returns `null` (interpretation failure) rather than `CounterexampleNotReplayable` when unsupported spec call is effect-relevant, misclassifying vs `Callable` path.
+- **Fix:** Align unsupported branch to always return `NotReplayable` when `call` in spec/summary.
+
+###### WK-N99 — [Low] `TryStageCapacity` `checked` overflow escapes as `OverflowException`
+- **File:Line:** `SharpProof.Worker/VerificationCache.cs:251-259`
+- **Description:** `Total` overflow → `OverflowException` not caught in `TryReadAsync` → `InfrastructureFailure` instead of `Miss`.
+- **Fix:** Add `OverflowException` to `TryReadAsync` catch or return `false` on overflow.
+
+###### WK-N100 — [Medium] `CapturePreviousPublication` unbounded `ReadAllBytes`
+- **File:Line:** `SharpProof.Worker.Launcher/Program.cs:571-594`
+- **Description:** `File.ReadAllBytes` per member (up to 64 MiB) under lease; `OutOfMemoryException` escapes narrow `IOException` catch → generic infrastructure with possible partial publication.
+- **Fix:** Bounded `FileInfo.Length` precheck + stream copy with cap, widen catch.
+
+---
+
+###### 2.4 Ir / Smt / Dataflow / Effects (Agent 4 — 13 new)
+
+###### IR-N01 — [Medium] `AtomicFile.WriteUtf8` uses `Create` not `CreateNew`
+- **File:Line:** `SharpProof.Ir/AtomicFile.cs:70-85` vs `92-113`, `26-41`
+- **Description:** `File.WriteAllText` truncates stale `*.tmp` (crash debris, symlink race) instead of failing. `WriteBytesAsync` correctly uses `CreateNew`.
+- **Fix:** `FileStream(CreateNew)` + `StreamWriter`+`Flush(true)`.
+
+###### IR-N02 — [Medium] `AtomicFile.Publish` `Exists→Replace/Move` TOCTOU
+- **File:Line:** `SharpProof.Ir/AtomicFile.cs:43-52,123-132`
+- **Description:** `File.Exists` then `Replace`/`Move` race: concurrent delete/create → throw and leaked `*.tmp` debris.
+- **Fix:** Try `Move` first, catch and retry with alternative, or `File.Move(overwrite:true)` single atomic rename.
+
+###### IR-N03 — [Medium] `AtomicFile.WriteBytesAsync` omits `Flush(true)` durability
+- **File:Line:** `SharpProof.Ir/AtomicFile.cs:92-113` vs `26-41`
+- **Description:** `WriteAsync` disposes without `fsync`; `WriteStagedBytes` does `Flush(true)`. Crash can publish torn bytes.
+- **Fix:** `FlushAsync` + `Flush(true)` before publish.
+
+###### IR-N04 — [Medium] `CanonicalHashWriter.Add(Stream)` overflow / non-seekable
+- **File:Line:** `SharpProof.Ir/CanonicalHashWriter.cs:43-64`
+- **Description:** `checked((int)(Length-Position))` throws `OverflowException` >2 GiB, `NotSupportedException` for non-seekable streams, escapes as unclassified.
+- **Fix:** Reject non-seekable with `ArgumentException`, use `long` length, chunk 81920, emit 8-byte header or overflow-check.
+
+###### SMT-N05 — [High] Remainder `long.MinValue % -1` misclassified as undefined
+- **File:Line:** `SharpProof.Smt/IrSmtBackend.cs:618-631` `DivisionDefined`, `514-528` `EncodeDivision`
+- **Description:** `notOverflow = !(left==Min && right==-1)` applied to both `Divide` and `Remainder`. `Min % -1` is defined (`0`) per C# and `IrInterpreter`, but encoding makes it undefined → `UNSAT` may be spuriously reported as proven.
+- **Fix:** Split into `DivideDefined` vs `RemainderDefined` (right!=0 only).
+
+###### SMT-N06 — [Medium] Smt backend permanently poisons after cancellation
+- **File:Line:** `SharpProof.Smt/IrSmtBackend.cs:85-89` `Interrupt` `Volatile.Write(_interrupted,true)`, `47-50` `CheckAsync` gate
+- **Description:** `_interrupted` set on `Interrupt` never cleared; next `CheckAsync` always returns `Unknown(Unavailable)` even though context reusable.
+- **Fix:** Per-check token or reset after `Check` / recreate `Context` per lane.
+
+###### SMT-N07 — [Medium] Smt backend holds global gate during `solver.Check()`
+- **File:Line:** `SharpProof.Smt/IrSmtBackend.cs:32-83` `lock(_gate)` around `CheckCore`, `91-103` `Dispose`
+- **Description:** Long `solver.Check()` (rlimit 3M) blocks other `CheckAsync` and `Dispose` on same lane, defeating lane parallelism.
+- **Fix:** Narrow lock to state, use per-check `Solver`, or release gate before `Check()`.
+
+###### SMT-N08 — [Medium] `Z3ExpressionOwner.Dispose` leaks if one `Expr.Dispose` throws
+- **File:Line:** `SharpProof.Smt/Z3ExpressionOwner.cs:27-46`
+- **Description:** Loop aborts on first `Dispose` throw, `finally` clears list losing ownership of remaining native handles.
+- **Fix:** Best-effort loop with first-exception collection.
+
+###### DF-N09 — [Medium] `FindCyclicBlocks` quadratic `O(V*(V+E))`
+- **File:Line:** `SharpProof.Dataflow/DataflowGraph.cs:164-193`
+- **Description:** Fresh DFS from every block; ~512 blocks → ~130k visits, burns wall timer vs Tarjan `O(V+E)`.
+- **Fix:** Single Tarjan SCC pass.
+
+###### DF-N10 — [Medium] Interval `Add` overflow → `Top` unsound
+- **File:Line:** `SharpProof.Dataflow/IntervalDomain.cs:175-204`
+- **Description:** Singleton overflow `checked(... )` catch → `Top` (any value) instead of `Bottom` (unreachable normal path with `OverflowException`), masks effect analysis.
+- **Fix:** Overflow → `Bottom` on normal domain.
+
+###### EF-N11 — [Medium] ThreadStatic depth double-counts
+- **File:Line:** `SharpProof.Effects/ManagedAbstractFlow.cs:27-30,204-221,517-533`
+- **Description:** Single `_walkDepth` shared by `Transfer` and `EvaluateCore`; depth 130 hits `MaximumWalkDepth=256` after 65 combined increments → premature `Unknown`/`Incomplete`.
+- **Fix:** Split into `_transferDepth`/`_evalDepth`.
+
+###### EF-N12 — [Medium] Control-flow traversals ignore `CancellationToken`
+- **File:Line:** `SharpProof.Effects/EffectMethodNodeBuilder.cs:320-475`, `ExceptionHandlerReachability.cs:84-196`
+- **Description:** `AnalyzeControlFlowGraph` / `GetPotentialExceptions` loops never observe token despite `Build` receiving it; 4000-op method can burn 100 ms after timeout.
+- **Fix:** Poll `ThrowIfCancellationRequested` per block/operation, thread token through all helpers.
+
+###### SMT-N13 — [Low-Med] Cancellation registration leak via gate
+- **File:Line:** `SharpProof.Smt/IrSmtBackend.cs:52-55`
+- **Description:** `CancellationToken.Register` inside `lock(_gate)` keeps callback alive for gate wait duration, sets `_interrupted` spuriously for queued checks.
+- **Fix:** Register just before `CheckCore`, dispose after `Check()`.
+
+---
+
+###### 2.5 Analyzer / Analyzer.Core / Gates / Frontend (Agent 5 — 15 new)
+
+###### AN-N88 — [High] List-pattern captures lose provenance
+- **File:Line:** `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1199-1265`
+- **Description:** `WholeInputDesignations` handles `Declaration/Var/Recursive/Parenthesized/Binary` but not `ListPatternSyntax`. `if(xs is [var a,var b] && b.Requires(...))` → zero destinations, invocation discarded as non-executing.
+- **Fix:** Add `ListPatternSyntax` case, propagate sub-value paths.
+
+###### AN-N89 — [High] Initializer attributed only to first constructor
+- **File:Line:** `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:435-512`
+- **Description:** Picks first unsuppressed ctor; field initializer `int x=M()` analyzed once. Misses violation visible only via second ctor, or suppresses differently.
+- **Fix:** Iterate all unsuppressed ctors, combine outcomes.
+
+###### AN-N90 — [Medium] Short-circuit `&&`/`||` constant folding discards RHS lowering
+- **File:Line:** `SharpProof.Frontend/RoslynOperationLowerer.cs:685-710`
+- **Description:** `if(left is false) return left` before lowering right; opaque calls on RHS never lowered, witnesses incomplete.
+- **Fix:** Lower both sides, preserve `Abstention`.
+
+###### AN-N91 — [Medium] Null-dereference in `DefineConstants` scanning
+- **File:Line:** `SharpProof.Analyzer.Core/ContractRuntimePolicy.cs:9-24`, `SharpProof.Frontend/CSharpPreprocessorSymbols.cs:10-35`
+- **Description:** `tree.Options is CSharpParseOptions` not checked; mixed VB trees → `Empty` silently. `GetText` `InvalidOperationException` not caught where `MayContainAdvisoryActivationSyntax` called.
+- **Fix:** Guard parse options, wrap `GetText` in try/catch.
+
+###### AN-N92 — [Medium] Corpus snapshot duplicate not rejected at write time
+- **File:Line:** `SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs:29-75`, `CorpusGate.cs:465-509`
+- **Description:** `Parse` enforces uniqueness via `TryAdd`, but `Render` does not validate duplicate `CaseId`s; `corpus-update` can write duplicate file that then bricks gate.
+- **Fix:** `Render` validates `Distinct().Count == Length`, atomic write via temp+move.
+
+###### AN-N93 — [Medium] `VerifyCacheReplayAsync` reuses same `Compilation` → masks nondeterminism
+- **File:Line:** `SharpProof.Gates/Corpus/CorpusGate.cs:397-437`
+- **Description:** Calls `Observe` twice with same `Compilation` instance; `CompilationWithAnalyzers` caches diagnostics, so ordering bug not detected.
+- **Fix:** Clone or `CreateCompilation` twice.
+
+###### AN-N94 — [Medium] Corpus importer symlink / `bin` bypass
+- **File:Line:** `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:248-312`
+- **Description:** `EnumerateFiles` follows symlinks, `Path.GetRelativePath` then `Contains("\bin\")` checks Windows separator only; Linux symlink `Algorithms/link -> /etc` outside root imported, `bin/obj` included.
+- **Fix:** `EnumerationOptions {AttributesToSkip=ReparsePoint}`, `EnsureContained(GetFullPath)`, check both separators.
+
+###### AN-N95 — [Low] `CorpusGate` compilation leak on exception
+- **File:Line:** `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs:18-94`
+- **Description:** On `InvalidDataException` trees/Compilation not disposed, `trees` builder retained.
+- **Fix:** Scope trees in try/finally, let GC collect.
+
+###### AN-N96 — [Medium] `CompilerIdentityBridge.InternSymbol` error-symbol explosion
+- **File:Line:** `SharpProof.Frontend/CompilerIdentityBridge.cs:5-15`
+- **Description:** Error types intern per-instance via display, exploding `IrFactory` dictionaries for many erroneous files.
+- **Fix:** Canonical singleton identity for `TypeKind.Error`.
+
+###### AN-N97 — [Medium] `AnalyzerGateHost` `Preview` vs product `CSharp12` mismatch
+- **File:Line:** `SharpProof.Gates/AnalyzerGateHost.cs:25-26`, `SharpProof.Frontend/CompilationModelProvider.cs:8-25`
+- **Description:** Gate always `LanguageVersion.Preview` while probe/workspace uses `CSharp12`; preview syntax accepted in gate but abstained in product.
+- **Fix:** Single constant `LanguageVersion.CSharp12`.
+
+###### AN-N98 — [Low] `CorpusSnapshotFormat` 2 GB allocation before length check
+- **File:Line:** `SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs:29-57`
+- **Description:** `ReadAllBytes` → `GetString` no bound before allocation; large snapshot → `OutOfMemoryException` not classified.
+- **Fix:** Precheck `bytes.Length` vs 10 MB, stream line-by-line.
+
+###### AN-N99 — [Low] Metadata attribute deduplication by null `SyntaxReference`
+- **File:Line:** `SharpProof.Analyzer.Core/AnalyzerSession.cs:42-50`
+- **Description:** `TryMarkAttributeValidated(AttributeData)` returns `true` when `reference==null` (metadata), dedup fails, concurrent `SP0052` duplicates.
+- **Fix:** Key on symbol identity when reference null.
+
+###### AN-N100 — [Low] `CryptographicException` misclassified as unreadable file
+- **File:Line:** `SharpProof.Frontend/ContractApiIdentityResolver.cs:221-244`
+- **Description:** FIPS `SHA256.Create()` throws `CryptographicException` reported as file unreadable with same `SP0050` template.
+- **Fix:** Separate catch with distinct message.
+
+###### AN-N101 — [Medium] `PerformanceGate` XML injection via `repositoryRoot`
+- **File:Line:** `SharpProof.Gates/Performance/PerformanceGate.cs:489-543`
+- **Description:** String interpolation + `SecurityElement.Escape` only for `&<>\"'`, not for `]]>`/`<!--` or `"` in attribute; path `"/tmp/a&b]]>"` breaks XML.
+- **Fix:** Build `XDocument` programmatically.
+
+###### AN-N102 — [Medium] `AssessEntry` returns `Proven` for incomplete `Requires`
+- **File:Line:** `SharpProof.Analyzer.Core/EffectCallPreconditionPolicy.cs:234-269`
+- **Description:** Returns `Proven` for any method with `Requires` clause without checking `binding.IsSuccess` / `Incomplete`, e.g., `Requires(x>0 && UnknownCall(x))`.
+- **Fix:** Require `contract.Kind==Valid` and all clauses `IsValid`.
+
+---
+
+###### 2.6 Attributes / Contracts / CompilerArtifact / Collector / Specs / Summaries / Meta.Analyzers (Agent 6 — 15 new)
+
+###### A6-01 — [Medium] Null element in `AllowedExceptionsAttribute` crashes manifest encoding
+- **File:Line:** `SharpProof.Attributes/AllowedExceptionsAttribute.cs:5`, `EffectContractAttribute.cs:13`, `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:373`
+- **Description:** `params Type[]` never validates elements; `Encode(null)` → `NullReferenceException` escaping `FinalCompilationCollector.Collect` as unclassified.
+- **Fix:** Validate `Any(t=>t==null)` and check `Exception` base type in `ContractSelectionInventory`.
+
+###### A6-02 — [Medium] Trust/Suppress whitespace bypass via metadata
+- **File:Line:** `SharpProof.Attributes/SharpProofTrustedAttribute.cs:9-14`, `SharpProof.Contracts/ContractSelectionInventory.cs:163-177`
+- **Description:** Constructor guard `IsNullOrWhiteSpace` not executed for `AttributeData` from referenced DLL; `"   "` emitted via IL honored as legitimate `TrustedBoundary` / `Suppression`.
+- **Fix:** Central `IsValidTrustedReason(AttributeData)` requiring non-whitespace string.
+
+###### A6-03 — [Medium] `ClosedContract` `NotNull` validator `IsReferenceType` vs IR kind mismatch
+- **File:Line:** `SharpProof.Contracts/ClosedContractAttributeValidator.cs:50-51`, `ContractBinder.cs:298-313`
+- **Description:** `IsReferenceType` vs `factory.GetTypeInfo().Kind is Reference/String/Sequence` diverge for unconstrained generics `T` vs `T:class`.
+- **Fix:** Unify via single `IsReferenceCapable` authority.
+
+###### A6-04 — [Medium] Tuple type contracts return `UnsupportedExpression` via `null` specialization
+- **File:Line:** `SharpProof.Contracts/ContractCanonicalization.cs:164-166`
+- **Description:** `named.IsTupleType => return null` silently propagates to `UnsupportedExpression` without tuple-specific diagnostic.
+- **Fix:** Implement tuple specialization or explicit early `UnsupportedExpression` with message.
+
+###### A6-05 — [Medium] `ResolveSiblingModule` & `HasSafeModuleFileName` incomplete separator validation
+- **File:Line:** `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:350-379`
+- **Description:** Checks `'/'` and `'\0'` only, not `'\\'` nor invalid chars; Linux `"a\\b.dll"` passes, Windows `"sub\evil.dll"` relies on final `GetDirectoryName` defense.
+- **Fix:** `IndexOfAny('/', '\\')` + `Path.GetInvalidFileNameChars()` + reject `"."`, `".."`, `IsPathRooted`.
+
+###### A6-06 — [High] `CompilerManifestArtifactProducer.BuildSummaryEvidence` omits `EvidenceSha256` binding
+- **File:Line:** `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:117-127`, `CompilerLoweredArtifact.cs:1084-1110`
+- **Description:** For `CompilerSummaryOrigin.Source` validates file SHA and range but never `EvidenceSha256 == SHA256(FullSpan)`; stale evidence from moved declaration passes.
+- **Fix:** Compute `expected = EvidenceSha256(declaration)` and require equality.
+
+###### A6-07 — [Medium] `IrRelationalSummaryBuilder` ignores `CancellationToken` & undercounts via `VisitedTerms`
+- **File:Line:** `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:43-95`, `CompilerRelationalSummaryProvider.cs:265-281`
+- **Description:** `Build` has no token, never observes cancellation; `Charge` dedups by `HashSet<IrId>` undercounts shared DAG vs `MaximumSymbolicOperations`.
+- **Fix:** Add token param, poll per block, count total visits vs unique.
+
+###### A6-08 — [Low-Med] `CompilerEffectReplayLowerer.TryResolveSource` double `CaptureTree` quadratic & path normalization
+- **File:Line:** `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:189-275`
+- **Description:** Loops over ~500 syntax trees, calls `CaptureTree` (2×SHA256) per candidate including duplicate for operation’s own tree → O(n·m) hashing; path comparison ordinal without `NormalizePath`.
+- **Fix:** Cache `CaptureTree` results, normalize paths.
+
+###### A6-09 — [Medium] `ApiSpecTermValidator` over-rejects `SpecLength(Parameter)`
+- **File:Line:** `SharpProof.Specs/ApiSpecTermValidator.cs:38-45,74-88`
+- **Description:** Requires `value.IsNonNull` but only `this` is considered non-null; `array.Length` on sequence parameter always non-total.
+- **Fix:** Extend `ApiSpecFacets` with per-parameter nullness or treat trusted specs as assuming parameter non-null.
+
+###### A6-10 — [Low] `ApiSpecContentDigest` token case mismatch
+- **File:Line:** `SharpProof.Specs/ApiSpecContentDigest.cs:21-27`
+- **Description:** Digest `ToUpperInvariant` but `ValidateDeclaration` ordinal distinct and `MatchesAssembly` lowercase `x2` → same digest for case variants, but runtime match fails.
+- **Fix:** Normalize to lower everywhere, `OrdinalIgnoreCase` or canonical.
+
+###### A6-11 — [Low] `TargetsOverlap` not enforced eagerly
+- **File:Line:** `SharpProof.Contracts/ContractForSymbolMatcher.cs:68-77`
+- **Description:** Open `List<>` + closed `List<int>` overlap detected only at `ResolveCompanion` per method, not at `DiscoverCompanions` discovery → duplicate with no call site silenced.
+- **Fix:** Pairwise `TargetsOverlap` check at discovery, emit diagnostic.
+
+###### A6-12 — [Low-Med] `IsCacheType` substring heuristic
+- **File:Line:** `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:50-53`
+- **Description:** `type.Name.IndexOf("Cache")>=0` flags `CacheableAttribute` and misses `Memoizer`.
+- **Fix:** Explicit allowlist or interface `IVerificationCache`.
+
+###### A6-13 — [Low] `WorkerLauncherProgram` not audited for swallowed cancellation
+- **File:Line:** `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:25`, `CancellationBoundaryAnalyzer`
+- **Description:** `KnownType.WorkerLauncherProgram` registered but `IsAuditedWorkerMain` checks only `WorkerProgram`.
+- **Fix:** Add `IsAuditedLauncherMain` or document exclusion.
+
+###### A6-14 — [Low] `WriteLocalRole` quadratic & `for`/`catch` locals handling
+- **File:Line:** `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs:252-282`
+- **Description:** `TakeWhile` per parent `ChildNodes()` is `O(depth·children)`; `foreach`/`catch` locals path via `HasSameSite` fragile.
+- **Fix:** `GetChildIndex` or cache, handle `ForEach`/`CatchDeclaration`.
+
+###### A6-15 — [Low] `ContractForAttribute` `Class` only vs matcher `Class|Interface` & empty generator
+- **File:Line:** `SharpProof.Attributes/ContractForAttribute.cs:3`, `SharpProof.ContractForGenerator/ContractForValidatorGenerator.cs:5-14`
+- **Description:** `AttributeTargets.Class` prevents `[ContractFor(typeof(IMyInterface))]` (compiler `CS0592` vs `SPCxxx`); generator empty preserves package load role but emits nothing.
+- **Fix:** Expand to `Class|Struct|Interface` or align matcher, document generator role.
+
+---
+
+###### 2.7 Verifier / Package / docs / eng / Tools (Agent 7 — 8 new)
+
+###### VP-N01 — [High] MSBuild wildcard/metachar expansion corrupts compiler-output inventory
+- **File:Line:** `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:79-98,135,153`
+- **Description:** `Include="$(TargetPath)"` etc. without `Escape`; `*` `?` `*` `%` `$` `@` `(` `)` reinterpreted. `/src/my%20proj/Worker.dll` → `%(20…)` metadata ref; `*` expands as glob. Distinct from bug 38 (apostrophe) and 43 (`;`).
+- **Fix:** `$([MSBuild]::Escape(...))` before `Directories`/`Include`.
+
+###### VP-N02 — [Medium] Nuspec `src` uses Windows `\` breaks Linux pack
+- **File:Line:** `SharpProof.Verifier/SharpProof.Verifier.nuspec:23-27`, `SharpProof.Package/SharpProof.nuspec:23-66`
+- **Description:** `src="buildTransitive\SharpProof.Verifier.props"` on Linux `\` is literal filename char, not separator. Container `dotnet pack` may not find file or packages literal-named file. One entry already uses `/`.
+- **Fix:** Normalize all `src` to forward slashes.
+
+###### VP-N03 — [Medium] Tools directory vs verify directory inconsistent base
+- **File:Line:** `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:7-10`, `SharpProof.Verifier.targets:3,45`
+- **Description:** `_SharpProofToolsDirectory = GetFullPath('$(SharpProofToolsDirectory)')` resolves against CWD (solution dir) when relative; `_SharpProofVerifyDirectory` combines with `MSBuildProjectDirectory`. Build vs Clean can address different closures.
+- **Fix:** `GetFullPath(Combine(MSBuildProjectDirectory, SharpProofToolsDirectory))` for all tool paths.
+
+###### VP-N04 — [Medium] Fuzz `CancelKeyPress` races CTS disposal
+- **File:Line:** `Tools/SharpProof.Fuzz/Program.cs:22-28`, `FuzzRunner.cs:143-148`
+- **Description:** `using var cancellation` + `Console.CancelKeyPress += (...,e=>{e.Cancel=true;cancellation.Cancel();})` without unregister/drain → late Ctrl+C after `RunAsync` disposes → `ObjectDisposedException` on console thread.
+- **Fix:** Capture handler delegate, unregister in `finally`, guard `Cancel` with `IsCancellationRequested`/`try/catch`.
+
+###### VP-N05 — [Medium] `Prepare-NativePayload.ps1` no timeout/retry/atomic
+- **File:Line:** `eng/container/Prepare-NativePayload.ps1:41,42-49`
+- **Description:** `Invoke-WebRequest -OutFile $archivePath` no `-TimeoutSec`, no retry, writes directly to final path; partial reused via `Test-Path` guard, concurrent builds corrupt `extractRoot`.
+- **Fix:** `-TimeoutSec 60`, retry loop 3×, download to `*.tmp.<guid>` then verify SHA and atomic `Move-Item`, unique `extractRoot`.
+
+###### VP-N06 — [Low] `compose.yaml` `COMPOSE_PROJECT_NAME` not validated
+- **File:Line:** `compose.yaml:2,29-31`
+- **Description:** `image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}` — project name/image tag regex `^[a-z0-9][a-z0-9_.-]*$` not enforced; `C:\w\...` or `My Feature/Branch` → cryptic Docker error.
+- **Fix:** `entrypoint.sh` validation with clear message.
+
+###### VP-N07 — [Medium] `SharpProof.Verifier.props` bare `dotnet` fallback bypasses host-identity gate
+- **File:Line:** `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:27-28`, `SharpProof.Verifier.targets:202-205`
+- **Description:** `_SharpProofDotNetHost` fallback = `dotnet` not absolute; `ResolveDotNetHost` cannot compare via `AreSameExistingFile`, probes PATH at execution time vs `Environment.ProcessPath` muxer, allowing stale installation.
+- **Fix:** Resolve bare `dotnet` to absolute at MSBuild evaluation or require equality with `Environment.ProcessPath` when muxer.
+
+###### VP-N08 — [Medium] `Invoke-SharpProofPackageTests.ps1` hard-link isolation leaves `*.deps.json` shared
+- **File:Line:** `scripts/Invoke-SharpProofPackageTests.ps1:348-355`, `SharpProof.ContainerExecution.psm1:72-98`
+- **Description:** `cp --archive --link` then breaks links only for `*.dll/*.pdb`; `*.deps.json/*.runtimeconfig.json` stay hard-linked → coverage `DataCollector` race can corrupt shared inode.
+- **Fix:** Break links for `*.deps.json`/`*.runtimeconfig.json`/`*.json` or `cp --archive` without `--link` when coverage enabled.
+
+---
+
+###### 2.8 Tests / Testing / Verify / Fuzz (Agent 8 — 19 new)
+
+###### TE-N01 — [High] `IrCSharpDifferentialOracle` leaks collectible assemblies
+- **File:Line:** `SharpProof.Testing/IrCSharpDifferentialOracle.cs:71`
+- **Description:** `Assembly.Load(image.ToArray())` per `Compare`; never collectible, loops 200× in tests → OOM / loader exhaustion, masks real mismatch.
+- **Fix:** Collectible `AssemblyLoadContext` + `Unload()` or avoid loading.
+
+###### TE-N02 — [Medium] `CompareValue` false mismatch for `Sequence`/`Reference`
+- **File:Line:** `SharpProof.Testing/IrCSharpDifferentialOracle.cs:416-441`
+- **Description:** Only `Boolean/Integer/String/Null` handled, default `_=>false` makes agreeing `Sequence`/`Reference` always `Mismatch`.
+- **Fix:** Handle `Sequence` element-wise, `Reference` identity, or `Abstained`.
+
+###### TE-N03 — [Medium] `WellSortedIrGenerator` only 8 integer literals
+- **File:Line:** `SharpProof.Testing/WellSortedIrGenerator.cs:32-40,229-232`
+- **Description:** `InterestingIntegers = [Min, -3,-1,0,1,2,3,Max]` only source; no uniform `NextInt64`, never exercises `checked((int)long)` narrowing vs Z3.
+- **Fix:** Mix `InterestingIntegers` + `Random.NextInt64()` 50%.
+
+###### TE-N04 — [High] `AnalyzerTestHost` incomplete fallback references hides false-negative
+- **File:Line:** `SharpProof.Testing/AnalyzerTestHost.cs:70-82`
+- **Description:** When `TRUSTED_PLATFORM_ASSEMBLIES` empty returns only `object`+`Console` refs; compilation diagnostics suppressed, test `Is.Empty` passes incorrectly.
+- **Fix:** Require TPA or throw.
+
+###### TE-N05 — [Medium] `GetRepositoryRoot` `TestContext.TestDirectory` brittle
+- **File:Line:** `SharpProof.Testing/AnalyzerTestHost.cs:57-63`
+- **Description:** Ascent from `TestContext.CurrentContext.TestDirectory` may be null/outside NUnit, shadow-copy, throws `Could not find repository root`.
+- **Fix:** Unify to `RepositoryLayout.FindRoot()`.
+
+###### TE-N06 — [Medium] `TryCreateProgram` double-invokes `TryAppendExpression` losing reason
+- **File:Line:** `SharpProof.Testing/IrCSharpDifferentialOracle.cs:97-122`
+- **Description:** First dummy `StringBuilder` pass then second pass with same `variables`; stale `orderedVariables` / overwritten `reason` misclassifies `Abstained` bucket.
+- **Fix:** Single traversal capturing all.
+
+###### TE-N07 — [Medium] `FuzzRunnerTests` brittle exact counts
+- **File:Line:** `SharpProof.Fuzz.Test/FuzzRunnerTests.cs:64-85,88-107`
+- **Description:** `Agreements==24`, `DivideByZero>0` snapshot on seed 12345; generator change or Windows vs Linux breaks, hides real soundness bug.
+- **Fix:** Assert invariants (`Agreements+Abstentions==Cases`) not exact.
+
+###### TE-N08 — [High] Static `RetainedCleanupAnchorCount` shared → flaky
+- **File:Line:** `SharpProof.Package.Test/BuildTaskTests.cs:458-466,580-582`
+- **Description:** Static global, `[NonParallelizable]` only per fixture, no `SetUp` reset; leaked anchor from prior test makes next `==0` fail or `>0` spuriously pass.
+- **Fix:** Reset per test, `TearDown` asserts 0, assembly-level `NonParallelizable` or `Interlocked`.
+
+###### TE-N09 — [Medium] `SpinWait`/`Sleep`/`Barrier` timing windows flaky
+- **File:Line:** `SharpProof.Package.Test/BuildTaskTests.cs:459,511,581...`, `IrSmtBackendTests.cs:568-573`
+- **Description:** Fixed 250 ms / 1–3 s windows fail under `CPU_LIMIT=16` throttling or parallel `tooling test`.
+- **Fix:** Monotonic deadline + generous tolerance (10 s) or event-driven `WaitAsync`.
+
+###### TE-N10 — [Medium] Smt tests reflect private members brittle
+- **File:Line:** `SharpProof.Smt.Test/IrSmtBackendTests.cs:414-430`
+- **Description:** Reflects `ClassifyUnknown` private, `_gate` field; rename or Z3 bump breaks suite, hides prod bug where `timeout ` trailing space not classified.
+- **Fix:** Expose `internal` + `InternalsVisibleTo`, test via public `CheckAsync`.
+
+###### TE-N11 — [Medium] Hard-pins Z3 4.12.2.0 blocks upgrades
+- **File:Line:** `SharpProof.Smt.Test/IrSmtBackendTests.cs:478-480`
+- **Description:** `Version==4.12.2.0` exact equality fails on 4.13 patch.
+- **Fix:** `>=4.12.2` with probe.
+
+###### TE-N12 — [High] `LinuxPublicationSetTests` vacuously pass on Windows
+- **File:Line:** `SharpProof.Worker.Test/LinuxPublicationSetTests.cs:251-293,665-677`
+- **Description:** `if(!IsLinux()) return;` inside test vs `[Platform("Linux")]`; on `C:\w\...` win32 host reports `Passed` with 0 assertions, false confidence.
+- **Fix:** `Assert.Ignore` or `[Platform("Linux")]`.
+
+###### TE-N13 — [Medium] FD leak counter races with parallel opens
+- **File:Line:** `SharpProof.Worker.Test/LinuxPublicationSetTests.cs:291-310`
+- **Description:** Single `before`/`after` snapshot over 32 attempts hides per-iteration leak via net-zero; enumeration not atomic with `LinkTarget.StartsWith(prefix)` null handling.
+- **Fix:** Snapshot per attempt, `GC.Collect()` before.
+
+###### TE-N14 — [Medium] `WorkerTests.TestProject` leaks temp dirs on failure
+- **File:Line:** `SharpProof.Worker.Test/WorkerTests.cs:6553-6570,6664-6683`
+- **Description:** `Directory.CreateDirectory` before `try`; `CreateCompilation` throw → no `Delete`.
+- **Fix:** `try/catch { Delete; throw; }`.
+
+###### TE-N15 — [Medium] `WorkerMsBuildIntegrationTests` fixed 1100 ms timestamp delay flaky
+- **File:Line:** `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:2609,2639,2675`
+- **Description:** Hard `Delay(1100)` for `GetLastWriteTimeUtc` 1 s resolution wastes 3.5 s and still flakes under VM pause.
+- **Fix:** Poll until `>previous` or timeout 5 s.
+
+###### TE-N16 — [Medium] `VerifierTaskDoesNotReleaseCommandBeforePidFdAcquisition` only tests `InvalidOperationException`
+- **File:Line:** `SharpProof.Package.Test/BuildTaskTests.cs:1538-1575`
+- **Description:** Only `InvalidOperationException` path; `IOException`/`UnauthorizedAccessException` from `/proc` exhaustion → untested `MSB4018` and leak.
+- **Fix:** Parameterized theory over exception types.
+
+###### TE-N17 — [Medium] `IrKernelTests` memoizes only within one environment hides cross-env reuse
+- **File:Line:** `SharpProof.Ir.Test/IrKernelTests.cs:153-185`
+- **Description:** Single `IrInterpreter` instance for two envs tests intra-instance but not static leak across instances.
+- **Fix:** Two interpreters, assert isolation.
+
+###### TE-N18 — [Low-Med] Frontend tests bypass analyzer config precedence
+- **File:Line:** `SharpProof.Testing/AnalyzerTestHost.cs:114-126`
+- **Description:** `TestAnalyzerConfigOptionsProvider` ignores global vs tree precedence; bug where `sharpproof_profile=advisory` vs `SP0045=none` not reproduced.
+- **Fix:** Merge with production precedence.
+
+###### TE-N19 — [Low] `Smoke.Net472` no analyzer verification
+- **File:Line:** `SharpProof.Smoke.Net472/SmokeMath.cs:1-14`
+- **Description:** No test asserts `SP0002` under `net472`; `System.Collections.Immutable 8.0.0` net472 break slips.
+- **Fix:** Add `SmokeMath_AddIsPure` via `AnalyzerTestHost` with `net472` refs.
+
+---
+
+###### 2.9 Root configs / samples / .github / meta (Agent 9 — 13 new)
+
+###### RC-N01 — [High] Release authority closure omits central version files → stealth mutation
+- **File:Line:** `eng/acceptance/contract.json:82-176` `releaseAuthorityClosure.paths`, `global.json:1-6`, `NuGet.Config:1-21`, `Directory.Packages.props:1-32`, `Directory.Build.props:1-86`
+- **Description:** Closure lists ~105 files (nuspecs, props, scripts) but omits `global.json` (SDK 9.0.316 `rollForward:disable`), `NuGet.Config` (sole source + `*` mapping), `Directory.Packages.props` (all `PackageVersion`), `Directory.Build.props` (LangVersion, audit, `TreatWarningsAsErrors`), `SharpProof.Release.props` (1.0.0-preview.1), `SharpProof.PackageMetadata.props`. SDK bump or `System.Text.Json` change invisible to release gate.
+- **Fix:** Add all to `paths`, regenerate `inventorySha256`, negative test per file.
+
+###### RC-N02 — [Medium] Dockerfile hard-codes framework pack versions drift from `toolchain.json`
+- **File:Line:** `eng/container/Dockerfile:3,27-37` vs `eng/container/toolchain.json:11-15`
+- **Description:** `toolchain.json` (`minimumSdkFrameworkVersion 8.0.16`, `testRuntimeVersion 8.0.29`, digest) is authority; `Dockerfile` has literals `8.0.410`, `8.0.16` (5×), `8.0.29` with no `ARG` plumbing; bump breaks `COPY` or ships stale packs.
+- **Fix:** `ARG MINIMUM_SDK_FRAMEWORK_VERSION`, replace literals, test `Dockerfile` contains catalog versions.
+
+###### RC-N03 — [Medium] Canonical-container gate blocks `DesignTimeBuild`
+- **File:Line:** `Directory.Build.targets:4-7`
+- **Description:** `_RequireSharpProofCanonicalContainer BeforeTargets=Restore` fires even for `DesignTimeBuild=true` (IDE IntelliSense) outside container, though `docs/architecture.md` claims portable `netstandard2.0` cross-platform.
+- **Fix:** `Condition="...'$(DesignTimeBuild)'!='true' And '$(BuildingProject)'!='false'"`.
+
+###### RC-N04 — [Medium] `.opencode` plugin re-exports non-existent npm package
+- **File:Line:** `.opencode/plugins/oh-my-goal.js:1`, `.opencode/package.json:1-5`, `opencode.json:1-4`
+- **Description:** `export {default} from "oh-my-goal"` but `package.json` depends only on `@opencode-ai/plugin 1.18.19`, no `oh-my-goal` in `node_modules` → `ERR_MODULE_NOT_FOUND`, opencode fails to start.
+- **Fix:** `npm install oh-my-goal` or change to `@opencode-ai/plugin`.
+
+###### RC-N05 — [Low] Samples docs “executable” vs `Library`
+- **File:Line:** `samples/README.md:3-15`, `samples/*/*.csproj:3-5`
+- **Description:** README says “executable” but every sample is `<OutputType>Library</OutputType>`; `Effects` etc. policy mismatch with runner-forced `advisory`.
+- **Fix:** Fix README or change to `Exe`.
+
+###### RC-N06 — [Medium] `BannedSymbols.txt` incomplete
+- **File:Line:** `BannedSymbols.txt:1-47`, `SharpProof.Frontend/ContractApiIdentityResolver.cs`
+- **Description:** Bans `GetSymbolsWithName`, `GetSemanticModel` etc. but not `GetTypeByMetadataName`, `GetAssemblyOrModuleSymbol`, `GetSymbolInfo`, `GetTypeInfo`, `LookupSymbols` → whole-compilation search still allowed.
+- **Fix:** Add `GetTypeByMetadataName`, `IAssemblySymbol.GetTypeByMetadataName`, `GetSymbolInfo` etc., negative test.
+
+###### RC-N07 — [Low] Sample central-package-management implicit
+- **File:Line:** `samples/Directory.Build.props:1-11`, `Directory.Packages.props:4-7`
+- **Description:** Samples rely on *not* setting `ManagePackageVersionsCentrally` (unset) vs pilots explicitly `false`; future SDK default change would break isolated feed.
+- **Fix:** Explicit `<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>`.
+
+###### RC-N08 — [Low] GitHub workflows `nightly/weekly/stale-issues` lack `concurrency`
+- **File:Line:** `.github/workflows/nightly.yml:1-48`, `weekly.yml:1-41`, `stale-issues.yml:1-31` vs `ci.yml:12-14`
+- **Description:** `ci/coverage/package-consumers` have `concurrency: group: ...`, three workflows have none → concurrent schedule + dispatch can duplicate GHA cache / double-close issues.
+- **Fix:** Add `concurrency: {group: ..., cancel-in-progress: false}`.
+
+###### RC-N09 — [Low] `NuGet.Config` `packageSourceMapping *` no-op
+- **File:Line:** `NuGet.Config:8-20`
+- **Description:** `*` → `nuget.org` allows any typo-squat, no restriction; `auditSources` duplicates `packageSources` with drift risk.
+- **Fix:** Comment or split `SharpProof*` mapping, test `auditSources` keys == `packageSources`.
+
+###### RC-N10 — [Low] `.editorconfig` `max_line_length=140` non-standard ignored
+- **File:Line:** `.editorconfig:13`
+- **Description:** Unknown key, not Roslyn/EditorConfig; no enforcement via `EnforceCodeStyleInBuild` or `dotnet format`.
+- **Fix:** Remove or enforce via `Test-ProductionCSharpComplexity.ps1`.
+
+###### RC-N11 — [Low] `PackageMetadata.props` `RepositoryCommit` only `GITHUB_SHA`
+- **File:Line:** `SharpProof.PackageMetadata.props:14`
+- **Description:** Fallback `$(GITHUB_SHA)` alone vs release qualification validates `GITHUB_SHA`+`GITHUB_REF_NAME` pair → tag-move drift.
+- **Fix:** Derive from `(SHA, REF_NAME)` pair via `Get-SharpProofReleaseVersion`.
+
+###### RC-N12 — [Low] `global.json` `rollForward:disable` blocks minimum SDK lane
+- **File:Line:** `global.json:3-5` vs `README.md:36-40` (minimum 9.0.300) vs `Dockerfile:4,28-31`
+- **Description:** Pins `9.0.316` `disable` fails even though container has `9.0.300` for portable lane; portable test cannot select 9.0.300.
+- **Fix:** `latestPatch` or override with isolated `global.json`.
+
+###### RC-N13 — [Low] `samples/Diagnostics` `global_level=100` shadows root warnings
+- **File:Line:** `samples/Diagnostics/.globalconfig:1-5`, `.globalconfig:1-15`
+- **Description:** `is_global=true, global_level=100` overrides root CA1811/IDE0051; future root rule with same key would be shadowed without comment.
+- **Fix:** Use `is_global=false` or comment level.
+
+---
+
+###### 2.10 Agent 10 — Own cross-cut scan of CompilerCollector / CompilerProbe / ContractForGenerator
+
+Scanned via `Glob` + `Read` of `SharpProof.CompilerCollector/**/*` (18 files), `SharpProof.CompilerProbe.TestAsset/**/*` (4 files), `SharpProof.ContractForGenerator/**/*` (2 files), plus spot checks of `SharpProof.Host/ContainerContract.cs` and `CompilerProbeSnapshot` vs collector authority.
+
+###### OWN-01 — [Medium] `CompilerProbeAnalyzer.WriteAtomically` same `Exists→Replace/Move` TOCTOU as `AtomicFile` (file:line distinct)
+- **File:Line:** `SharpProof.CompilerProbe.TestAsset/CompilerProbeAnalyzer.cs:96-103` (`if(File.Exists(dest)) File.Replace else File.Move`)
+- **Description:** Probe test asset (used in `CompilerProbeIntegration` gate to detect compiler drift) uses identical non-atomic publish as `AtomicFile` (Agent-4 IR-N02) but was not in IR shard partition. Concurrent `CompilerProbe` runs (e.g., parallel `tooling test` shards each writing probe output to same isolated path via shared temp) can have `File.Exists` observe pre-existing file, then `File.Replace` throw `FileNotFoundException` if another deletes, or `File.Move` throw `IOException` if another creates between check and move. Leaked `*.tmp` debris not counted. Distinct from A4-02 (production `AtomicFile`) — different file, different gate, but same root cause. Surfaced during own scan because agent partitions excluded `CompilerProbe.TestAsset`.
+- **Confidence:** High. Control flow literal; `Glob` proves file outside agent 4/6 partitions.
+- **Fix:** Single atomic `File.Move(temporaryPath, destination, overwrite:true)` (.NET 7+) or try `Move` first then catch and retry with `Replace` once. Use `TryDeleteStaged` pattern already in repo.
+
+###### OWN-02 — [Medium] `CompilerProbeSnapshot.GetDeclaredSymbols` uses banned `ToDisplayString` + non-normalized enumeration
+- **File:Line:** `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:255-275` (`model.GetDeclaredSymbol(...).ToDisplayString(CSharpErrorMessageFormat)`)
+- **Description:** `BannedSymbols.txt` (RC-N06) bans `ISymbol.ToDisplayString(SymbolDisplayFormat)` for production (outside host boundary) and `CompilerCompilationCapture` normalizes via `SymbolEqualityComparer` / `CaptureVersion`. `CompilerProbeSnapshot` enumerates `DescendantNodesAndSelf()` where `BaseType/Delegate/BaseMethod/Property/Event` and hashes via `ToDisplayString`, which is locale/option-sensitive and includes `global::` prefixes oppositely to collector’s `SemanticClaimIdentity`. Two compilations with same normalized identity but different display (e.g., `List<int>` vs `System.Collections.Generic.List<System.Int32>`) produce different probe hashes for same collector snapshot, causing spurious gate failure or masking real drift. Also `Compilation.GetSemanticModel(tree)` is itself banned for production but used here without cancellation on `model` creation.
+- **Confidence:** Medium-High. Explicit `ToDisplayString` vs collector’s `GetOrCreateReferenceType` fingerprint; banned-list gap corroborates.
+- **Fix:** Replace `ToDisplayString` with collector’s canonical fingerprint (`SemanticClaimIdentity` or `CompilationFingerprint`) or at least `SymbolDisplayFormat.FullyQualifiedName` normalized, and sort via `Ordinal`. Add `cancellationToken.ThrowIfCancellationRequested()` inside `GetDeclaredSymbols` loop.
+
+###### OWN-03 — [Low-Medium] `CompilerProbeSnapshot.CreateReferenceRows` & `CreateAdditionalFileRows` perform unbounded synchronous I/O without cancellation
+- **File:Line:** `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:333-341` (`File.Exists(path) ? ProbeHash.File(path) : ""`), `404-437` (`file.GetText(...)?.ToString()`), `CompilerCompilationCapture.cs:235-239` (`new FileStream(..., FileShare.Read)` + `PEReader`) already cancellation-aware in Capture but not in Probe.
+- **Description:** Probe snapshot hashing of `reference.FilePath` and `AdditionalText` reads entire file into memory via `ProbeHash.File(path)` (synchronous `File.ReadAllBytes` style) and `file.GetText(...).ToString()` without observing `context.CancellationToken` per file except at row creation start. For large additional files (up to 16 MiB manifest + 201 syntax trees) cancellation during `dotnet build` (`Cancel` from MSBuild) is ignored; also `File.Exists` + `Hash` TOCTOU (file replaced between check and hash) can hash wrong generation. Collector’s `CaptureReference` correctly uses `budget.Consume(stream.Length)` + `Hash(stream, token)` with `ThrowIfCancellationRequested` per 81920-byte chunk.
+- **Confidence:** High. `ProbeHash.File` and `NormalizePath(file.Path)` calls explicit; token not passed to `CreateReferenceRows` (no param) vs `CreateSyntaxTreeRows` has token.
+- **Fix:** Thread `context.CancellationToken` into `CreateReferenceRows`/`CreateAdditionalFileRows`, check per-file before `File.Exists`, use `FileStream` + `Hash(stream, token)` pattern as in `CompilerCompilationCapture.Hash`, and bounded size check before `Text` duplicate.
+
+> The above 3 are net-new vs agents 1–9. `CompilerCompilationCapture.ResolveSiblingModule` backslash finding (Agent 6 A6-05) and `ContractForGenerator` emptiness (A6-15) were confirmed during scan (no additional fix needed). No other high-confidence new roots were found in these three projects within this quick scan; full token-budget/quadratic review of `CompilerEffectReplayLowerer` was already covered by A6-08.
+
+---
+
+##### 3. Deduplication & confidence ledger
+
+- **Against BUGS.md 1–87:** All findings above excluded exact duplicates via string/line root search. Agents’ dedup notes (e.g., HOST-N01 vs Bug 18 trailing-slash, HOST-N10 vs Bug 9 inner leak, BT-N09 vs BUGS.md#21 worker polling, VP-N01 vs 38/43 escape classes, TE-N12 vs build-host vs test-host platform skip) were retained.
+- **Inter-agent dedup:** Partitions were disjoint by file manifest (`git ls-files` ledger). Where titles collide (e.g., `AtomicFile` exists→replace in both `Ir` shard and `CompilerProbe` own scan) they are distinct defects at different file:lines with different gates, so kept separate with note.
+- **Retracted:** WK-N95, WK-N97 marked Low/retracted due to length-prefix unambiguity and reachability proof; kept for completeness.
+- **Confidence rubric:** High = unambiguous source + documented contract violation verifiable without timing; Medium = explicit ordering but requires stress/fixture to reproduce; Low = defense-in-depth/perf/quadratic.
+
+---
+
+##### 4. Coverage statement for this second-round hunt
+
+| Shard | Agent | Files read (approx) | Lines (approx) | New High | New Med | New Low |
+|-------|:-----:|-------------------:|---------------:|---------:|--------:|--------:|
+| Host | 1 | 6 | 2,500 | 2 | 6 | 1 +1 obs |
+| BuildTasks | 2 | 8 | 3,200 | 2 | 10 | 0 |
+| Worker | 3 | 44 | 9,500 | 0 | 9 | 1 |
+| Ir/Smt/Dataflow/Effects | 4 | 74 | 22,000 | 1 | 11 | 1 |
+| Analyzer/Gates/Frontend | 5 | ~130 | 28,000 | 2 | 9 | 5 |
+| Attributes/Contracts/Collector | 6 | 80 | 19,000 | 1 | 8 | 6 |
+| Verifier/Package/docs/eng | 7 | 216 | 18,000 | 1 | 6 | 1 |
+| Tests/Testing | 8 | 496 | 35,000 | 4 | 12 | 3 |
+| Root/samples/.github/meta | 9 | ~90 | 12,000 | 1 | 3 | 9 |
+| Own cross-cut | 10 | 24 | 3,000 | 0 | 2 | 1 |
+| **Total new** |  | **~1,168** | **~152k** | **14** | **76** | **29** |
+
+*Line/file counts are shard self-reports; combined they exceed the 833-file repo because tests and docs overlap across shards’ glob patterns but deduped file manifests ensured no double-count for write authority.*
+
+All findings preserve `BUGS.md` four-gate acceptance (reachable trigger, contract comparison, full flow, duplicate search) and `AGENTS.md` container ownership (Linux amd64 canonical).
+
+---
+
+##### 5. How to reproduce / fix prioritization
+
+1. **High first:** HOST-N01 (symlink bypass), HOST-N05 (PID reuse), BT-N01 (Dispose race), BT-N06 (missing receipt), IR-N05/Smt remainder soundness, A6-06 evidence SHA, RC-N01 release closure — all enable soundness/containment or supply-chain bypass.
+2. **Medium next:** Start with token-propagation gaps (WK-N88/92, EF-N12, DF-N09, TE-N04) and `flock` gaps (WK-N90) that burn wall budget or corrupt cache.
+3. **MSBuild path class:** VP-N01/`*?%` wildcard (High) + VP-N07 bare `dotnet` host + VP-N03 relative base must be fixed together (single project-anchored `Combine(MSBuildProjectDirectory, ...)` authority, then `Escape`).
+4. **Infra/docs:** RC-N02 Dockerfile literals, VP-N02 nuspec slashes, VP-N05 download timeout, RC-N04 plugin load — fix before next release train.
+5. **Tests:** TE-N08/N12 flaky global/static → gate false-negatives; fix before trusting CI signal.
+
+Each fix is intentionally narrow (single file, `catch` filter, `flock`, `pidfd`, `Hash` bound, `XDocument`) to avoid broadening exception scopes beyond documented ordinary filesystem/encoding errors (preserve `BUGS.md#12` task-boundary discipline).
+
+---
+
+*End of BUGS_2.md — aggregated by Agent 10 from `agent{1..9}_findings.md` + own scan. File is sole write authority; `BUGS.md` left untouched. All agents inspected disjoint manifests line-by-line at `8a5141d`.*
+
+<!-- END CONSOLIDATED SOURCE: BUGS_2.md -->
+
+### Imported from `BUGS_3.md`
+
+<!-- BEGIN CONSOLIDATED SOURCE: BUGS_3.md -->
+
+#### SharpProof Comprehensive Codebase Defect Audit (BUGS_3.md)
+
+##### Scope and Methodology
+
+This document contains the exhaustive, multi-subsystem static analysis and correctness audit across the entire SharpProof codebase. Ten parallel audit passes were executed across all repository subsystems:
+1. **BuildTasks & Verifier MSBuild Targets** (`SharpProof.BuildTasks`, `SharpProof.Verifier`)
+2. **Host, Packaging, Platform Interop, Architecture** (`SharpProof.Host`, `SharpProof.Package`, `SharpProof.Package.Test`, `SharpProof.ArchitectureTest`)
+3. **Worker Core, Launcher, Protocol & Lifecycle** (`SharpProof.Worker`, `SharpProof.Worker.Launcher`, `SharpProof.Worker.Protocol`, `SharpProof.Worker.Test`)
+4. **SMT Solvers, SMT Theory Encoding & Differential Fuzzing** (`SharpProof.Smt`, `SharpProof.Smt.Test`, `Tools/SharpProof.Fuzz`, `SharpProof.Fuzz.Test`)
+5. **IR Data Structures, Atomic Files & Abstract Interpretation Dataflow** (`SharpProof.Ir`, `SharpProof.Ir.Test`, `SharpProof.Dataflow`, `SharpProof.Dataflow.Test`)
+6. **Frontend Lowering, AST/CFG Traversal & Compiler Collector** (`SharpProof.Frontend`, `SharpProof.Frontend.Test`, `SharpProof.CompilerCollector`, `SharpProof.CompilerProbe.TestAsset`)
+7. **Diagnostic Analyzers, Analyzer Core & Meta Analyzers** (`SharpProof.Analyzer`, `SharpProof.Analyzer.Core`, `SharpProof.Analyzer.Test`, `SharpProof.Meta.Analyzers`, `SharpProof.Meta.Analyzers.Test`)
+8. **Effects System, Contracts API, Attributes & Source Generators** (`SharpProof.Effects`, `SharpProof.Effects.Test`, `SharpProof.Contracts`, `SharpProof.Contracts.Test`, `SharpProof.Attributes`, `SharpProof.Attributes.Test`, `SharpProof.ContractForGenerator`, `SharpProof.ContractForGenerator.Test`)
+9. **Specifications, Relational Summaries & Verification Engine** (`SharpProof.Specs`, `SharpProof.Specs.Test`, `SharpProof.Summaries`, `SharpProof.Summaries.Test`, `SharpProof.Verify`, `SharpProof.Verify.Test`)
+10. **Gates, Testing Infrastructure, Release Contracts, Pilots & Samples** (`SharpProof.Gates`, `SharpProof.Gates.Test`, `SharpProof.Testing`, `SharpProof.Testing.Test`, `eng/`, `samples/`)
+
+---
+
+##### Master Table of Identified Bugs
+
+| Bug ID | Title | Severity | Area / Primary File |
+|---|---|---|---|
+| **BT-01** | Subreaper Broad `waitpid(-1)` Reaps Managed Direct Child Process During Cleanup | **High** | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs` |
+| **BT-02** | Uncaught `Process.Start` Exception After `Armed` Omits Cleanup Receipt | **High** | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs` |
+| **BT-03** | `/proc` Descendant Scan Early Termination, Non-Atomic Walking, and Transient Stat Failures | **Medium** | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs` |
+| **BT-04** | Uncaught Inner Child `Process.Start` Exception Bypasses Exit Code 125 | **Medium** | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs` |
+| **BT-05** | Pre-Launch Setup Elapsed Time Starves Termination and Output Drain Cleanup Reserve | **Medium** | `SharpProof.BuildTasks/RunVerifier.cs` |
+| **BT-06** | PATH Directory Parsing Strips Valid Whitespace and Double Quotes from Directory Names | **Medium** | `SharpProof.BuildTasks/RunVerifier.cs` |
+| **BT-07** | Output Capture Overflow Racing Child Process Exit 0 Preserves Exit Code 0 | **Medium** | `SharpProof.BuildTasks/RunVerifier.cs` |
+| **BT-08** | Nested Output Drain and Supervisor Readiness Waits Reset Stopwatches Instead of Sharing Deadline | **Medium** | `SharpProof.BuildTasks/RunVerifier.cs` |
+| **BT-09** | Stale `DOTNET_HOST_PATH` Overrides Direct Dotnet Muxer (`Environment.ProcessPath`) | **High** | `SharpProof.BuildTasks/RunVerifier.cs` |
+| **BT-10** | Concurrent Cancellation Callback Races `CancellationTokenSource` Disposal | **Medium** | `SharpProof.BuildTasks/InvalidatePublishedResult.cs` |
+| **BT-11** | Expected Filesystem and Validation Exceptions Escape `ITask.Execute` as Unhandled MSB4018 | **Medium** | `SharpProof.BuildTasks/InvalidatePublishedResult.cs` |
+| **BT-12** | Cancellation Point Immediately After Lock Acquisition Preserves Stale Published Results | **Medium** | `SharpProof.BuildTasks/InvalidatePublishedResult.cs` |
+| **BT-13** | Non-Result Topology Check Early Return Preserves Stale Result Marker | **Medium** | `SharpProof.BuildTasks/InvalidatePublishedResult.cs` |
+| **BT-14** | Result Validation Reads Multi-File Publication Set Without Holding Publication Lease | **High** | `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs` |
+| **BT-15** | Incomplete Protocol Validation Accepts Synthetic/Incomplete Worker Results | **Medium** | `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs` |
+| **BT-16** | Corrupted or Rejected Verification Results Remain Publicly Committed on Disk | **Medium** | `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs` |
+| **BT-17** | `ResetPublishedVerification` Ignores Cancellation While Waiting Up to 30 Seconds for Locks | **Medium** | `SharpProof.BuildTasks/ResetPublishedVerification.cs` |
+| **BT-18** | Semicolons in Paths Cause MSBuild List Splitting and Dangerous Recursive Deletions in `RemoveDir` | **High** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` |
+| **BT-19** | Apostrophes in Paths Break Single-Quoted MSBuild Property Functions and Conditions | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` |
+| **BT-20** | Relative Configured Paths Resolved Against MSBuild Process Working Directory Instead of Project | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` |
+| **BT-21** | Outer Cross-Target Clean Synthesizes and Probes Unprojected Base SARIF File | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` |
+| **BT-22** | Custom Compiler Debug Symbols (`PdbFile`, `_DebugSymbolsIntermediatePath`) Omitted from Collision | **High** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` |
+| **BT-23** | Pre-EditorConfig Target Failures Bypass Invalidation, Leaving Stale Success Results | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` |
+| **BT-24** | Unsupported Host Builds and Cleans Skip Publication Invalidation and Reset | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` |
+| **BT-25** | MSBuild Argument Item Construction Strips Terminal Whitespace from Valid Paths | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` |
+| **HST-01** | `FindFileSystemType` Overmount / Stacked Mount Shadowing Defect | **High** | `SharpProof.Host/LinuxPathIdentity.cs` |
+| **HST-02** | `ReleaseLocks` Partial Release and SafeFileHandle Leak on Exception | **High** | `SharpProof.Host/LinuxPathIdentity.cs` |
+| **HST-03** | `PublicationLock.Acquire` Fails Spuriously on Interrupted Syscall (`EINTR`) | **Medium** | `SharpProof.Host/LinuxPathIdentity.cs` |
+| **HST-04** | `InstallZ3ResolverRequired` Native Library Handle Leak on `OperationCanceledException` | **Medium** | `SharpProof.Host/ContainerNativeLibrary.cs` |
+| **HST-05** | `LinuxWorkerProcess.Dispose` Leaks Process Handle and Propagates Exception | **Medium** | `SharpProof.Host/LinuxWorkerProcess.cs` |
+| **HST-06** | False Positive / Tautological Test in `AnalyzerPackagePayloadExcludesWorkerAndSolverAssets` | **High** | `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs` |
+| **HST-07** | `IsProcessRunning` Unhandled `IOException` / `UnauthorizedAccessException` in `/proc` Check | **Medium** | `SharpProof.Package.Test/BuildTaskTests.cs` |
+| **HST-08** | Global `Console.Out` / `Console.Error` Redirection Race Conditions in Parallel Test Execution | **Medium** | `SharpProof.Package.Test/LauncherArgumentTests.cs` |
+| **HST-09** | Inconsistent Schema Version in Test Name vs Implementation in `FuzzRunnerEvidenceTests` | **Low** | `SharpProof.ArchitectureTest/FuzzRunnerEvidenceTests.cs` |
+| **WRK-01** | Numeric Enum Strings Bypass Protocol Canonicalization | **High** | `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs` |
+| **WRK-02** | UTF-8 BOM Decoding Asymmetry Between Launcher and Worker | **Medium** | `SharpProof.Worker.Launcher/Program.cs` |
+| **WRK-03** | SARIF Run-Failure Notification Suppressed by Assumption Notifications | **Medium** | `SharpProof.Worker.Launcher/SarifProjection.cs` |
+| **WRK-04** | SARIF Location URIs Lack Proper Escaping and Base Anchor | **Medium** | `SharpProof.Worker.Launcher/SarifProjection.cs` |
+| **WRK-05** | Worker Failure-Response Publication Escapes Catch Blocks | **High** | `SharpProof.Worker/Program.cs` |
+| **WRK-06** | Launcher Failure Recovery Mutations Escape Without Catch Boundaries | **High** | `SharpProof.Worker.Launcher/Program.cs` |
+| **WRK-07** | Exception on Backend Dispose Leaks Subsequent Lanes and Replaces Verification Result | **High** | `SharpProof.Worker/SharpProofWorker.cs` |
+| **WRK-08** | Cancellation Signals Race `CancellationTokenSource` Disposal | **Medium** | `SharpProof.Worker/Program.cs` |
+| **WRK-09** | Subsequent Caller Cancellation Rewrites Prior Project Timeout | **High** | `SharpProof.Worker/SharpProofWorker.cs` |
+| **WRK-10** | Post-Load Interruption of Empty Manifest Produces Invariant-Violating Response | **High** | `SharpProof.Worker/SharpProofWorker.cs` |
+| **WRK-11** | Claimless Callable Interruption Violates Callable Projection Validation | **High** | `SharpProof.Worker/SharpProofWorker.cs` |
+| **WRK-12** | Cache Write Commit Races Final Cancellation Checks | **High** | `SharpProof.Worker/VerificationCache.cs` |
+| **WRK-13** | Backend Factory Failure Overrides Preceding Cancellation/Timeout | **Medium** | `SharpProof.Worker/SharpProofWorker.cs` |
+| **WRK-14** | Cache Read Failures Reported as `Miss` Instead of `Unavailable` | **Medium** | `SharpProof.Worker/VerificationCache.cs` |
+| **WRK-15** | Interrupted Responses Unconditionally Revert Cache Status to `Disabled` | **Medium** | `SharpProof.Worker/SharpProofWorker.cs` |
+| **WRK-16** | Cache Capacity Staging Bypassed on Lookup Misses | **Medium** | `SharpProof.Worker/VerificationCache.cs` |
+| **WRK-17** | Cache Maintenance Ignores Cancellation While Holding Exclusive Lock | **Medium** | `SharpProof.Worker/VerificationCache.cs` |
+| **WRK-18** | Orphaned Cache Transaction Debris is Not Recovered or Accounted in Capacity | **Medium** | `SharpProof.Worker/VerificationCache.cs` |
+| **WRK-19** | Cache-Hit Validation Can Return `Complete` After Project Timeout/Cancellation | **High** | `SharpProof.Worker/SharpProofWorker.cs` |
+| **WRK-20** | Request Hashing and Validation Run Unbounded Outside Project Wall Budget | **Medium** | `SharpProof.Worker/SharpProofWorker.cs` |
+| **WRK-21** | Short Termination Grace Config Prevents Required Cleanup Reserve | **High** | `SharpProof.Worker.Protocol/WorkerExecutionEnvelope.cs` |
+| **WRK-22** | Private Request Staging I/O Errors Classified as Invalid CLI Input | **Medium** | `SharpProof.Worker.Launcher/Program.cs` |
+| **WRK-23** | Typed Containment Failure (Exit 125) Re-projected to Generic Exit 3 | **High** | `SharpProof.Worker.Launcher/Program.cs` |
+| **WRK-24** | Worker Process Outer Deadline Measured After Startup Gate Rather Than Gate Release | **Medium** | `SharpProof.Worker.Launcher/Program.cs` |
+| **WRK-25** | Effect Evidence Tuple Validation Disagrees with Certainty Admission Table | **High** | `SharpProof.Worker.Protocol/ProtocolModel.schema.json` |
+| **WRK-26** | Manifest-to-Response Assumption Array Duplication Causes Quadratic Payload Blowup | **High** | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs` |
+| **WRK-27** | Quadratic Manifest and Result Traversal in Protocol Canonicalization | **Medium** | `SharpProof.Worker.Protocol/ProtocolJson.cs` |
+| **WRK-28** | Canonical Assumption Sorting Reorders Clause Provenance Identities | **Medium** | `SharpProof.Worker.Protocol/ProtocolJson.cs` |
+| **SMT-01** | Asynchronous `Interrupt()` Race with `Dispose()` on Native Z3 Context | **High** | `SharpProof.Smt/IrSmtBackend.cs` |
+| **SMT-02** | 32-Bit Rollover Assumption in Resource Accounting Adds Phantom $4.29\times 10^9$ Resources | **High** | `SharpProof.Smt/IrSmtBackend.cs` |
+| **SMT-03** | Model Extraction Failure for SMT-LIB Formatted Negative Integers | **Medium** | `SharpProof.Smt/IrSmtBackend.cs` |
+| **SMT-04** | Fuzz Generator ArrayIndex Parameter Mismatch in Nested Expressions | **Medium** | `Tools/SharpProof.Fuzz/FrontendFuzzing.cs` |
+| **SMT-05** | String Literal AST Construction Permitted Without String Theory Sort Handling | **Low** | `SharpProof.Smt/IrSmtBackend.cs` |
+| **SMT-06** | Code Duplication in AST Variable Collection Across Fuzz Modules | **Low** | `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs` |
+| **IR-01** | Unhandled Cleanup Exception Masks Primary Errors in `WriteUtf8`/`WriteBytesAsync` | **High** | `SharpProof.Ir/AtomicFile.cs` |
+| **IR-02** | Path and Filename Length Overflow on Long Target Paths in `AtomicFile.Prepare` | **High** | `SharpProof.Ir/AtomicFile.cs` |
+| **IR-03** | TOCTOU Race Condition in `Publish` and `PublishStaged` | **Medium** | `SharpProof.Ir/AtomicFile.cs` |
+| **IR-04** | `default(IntSequenceKey)` / `default(StructuralKey)` Crash on `Equals`/`GetHashCode` | **Medium** | `SharpProof.Ir/IrFactory.cs` |
+| **IR-05** | `IrFactory.EnsureTermCore` Throws `NullReferenceException` on Null Term | **Medium** | `SharpProof.Ir/IrFactory.cs` |
+| **IR-06** | Member Name Omitted in `GetOrCreateMember` Structural Key Indexing | **Medium** | `SharpProof.Ir/IrFactory.cs` |
+| **IR-07** | Missing Null Check in `CanonicalHashWriter.Add(params object?[])` | **Low** | `SharpProof.Ir/CanonicalHashWriter.cs` |
+| **IR-08** | Missing Parameter Null Guards for `condition` and `consequence` in `IrSemanticTerms.Guard` | **Low** | `SharpProof.Ir/IrSemanticTerms.cs` |
+| **FE-01** | Top-Level Statement Main Method Declaration Lookup in `ClaimManifestBuilder` | **Medium** | `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs` |
+| **FE-02** | Potential Division by Zero in `CompilerImplementationIlSummaryLowerer.Arithmetic` | **Medium** | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs` |
+| **FE-03** | `ContractApiIdentityResolver` Cache Retention Across Multiple Roslyn Compilations | **Low** | `SharpProof.Frontend/ContractApiIdentityResolver.cs` |
+| **FE-04** | Diagnostic File Path Fallback in `CompilerManifestArtifactProducer.CreateDiagnostic` | **Low** | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs` |
+| **FE-05** | Inconsistent Exception Handling in `ProbeHash.File` vs `CompilerCompilationCapture.Hash` | **Low** | `SharpProof.CompilerProbe.TestAsset/ProbeHash.cs` |
+| **FE-06** | Unbound Ref/Out Parameter in `CompilerCallableLowerer.TryCreateParameterBindings` | **Low** | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs` |
+| **AZ-01** | Incorrect Metadata Type Name for `ContractForDiagnosticDescriptors` in Meta-Analyzer | **High** | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs` |
+| **AZ-02** | Incomplete Unwrapping of Nested Casts/Parentheses in Semantic Cache Soundness Rule | **Medium** | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs` |
+| **AZ-03** | Inconsistent Flow Status for Implicit Base Constructor & Primary Constructor Candidates | **Low** | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs` |
+| **AZ-04** | Unused `KnownType.WorkerLauncherProgram` in Meta-Analyzer Symbol Registration | **Low** | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs` |
+| **EF-01** | Conditional Local Assignment Ignored When Deciding Lock Nullness | **High** | `SharpProof.Effects/OperationNullnessEvaluator.cs` |
+| **EF-02** | Diverging `Dispose` Methods Discard Effects Executed Prior to Divergence | **High** | `SharpProof.Effects/UsingDisposalEffectResolver.cs` |
+| **EF-03** | External Exception Construction Drops Evaluated Constructor Argument Effects | **Medium** | `SharpProof.Effects/OperationEffectScanner.cs` |
+| **SPC-01** | Unsound Propagation of Method Termination in Relational Summary Composition | **High** | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs` |
+| **SPC-02** | Rejection of Sequence Null Equality Instantiation Against Concrete Substitutions | **Medium** | `SharpProof.Specs/ApiSpecInstantiation.cs` |
+| **SPC-03** | Missing Frame/Modifies Invalidation for Heap and Side-Effecting Calls in Summary Builder | **High** | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs` |
+| **SPC-04** | Inability to Prove Totality for `SpecLengthDeclaration` on Non-Receiver Parameters | **Medium** | `SharpProof.Specs/ApiSpecTermValidator.cs` |
+| **SPC-05** | Factory Name Normalization Collision in Runtime Witness Generation | **Medium** | `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1` |
+| **SPC-06** | Inconsistent `static readonly` Storage for `FrameworkTypeMetadataNames.Monitor` | **Low** | `SharpProof.Specs/FrameworkTypeMetadataNames.cs` |
+| **GT-01** | `IrCSharpDifferentialOracle.CompareValue` Drops `Sequence` and `Reference` Kinds | **High** | `SharpProof.Testing/IrCSharpDifferentialOracle.cs` |
+| **GT-02** | Uncollected Dynamic Assemblies in `IrCSharpDifferentialOracle` Lead to ALC Memory Leaks | **Medium** | `SharpProof.Testing/IrCSharpDifferentialOracle.cs` |
+| **GT-03** | `samples/Diagnostics.globalconfig` Ignored by Roslyn (Missing `GlobalAnalyzerConfigFiles`) | **High** | `samples/Diagnostics.globalconfig` |
+| **GT-04** | Case-Sensitive Path Prefix Check in `WorkerProbeWorkspace.Dispose` Breaks on Windows | **Medium** | `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs` |
+| **GT-05** | Orphaned Broken Files in `SharpProof.Testing` with Missing Assembly References | **Low** | `SharpProof.Testing/SharpProof.Testing.csproj` |
+| **GT-06** | `OpenSourceCorpusRunner` Target Key Mapping Failure Under Generic/Partial Nodes | **Low** | `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs` |
+
+---
+
+##### Detailed Section Breakdown
+
+---
+
+###### Section 1: BuildTasks & MSBuild Targets
+
+###### BT-01: Subreaper Broad `waitpid(-1)` Reaps Managed Direct Child Process During Cleanup
+- **Severity:** High
+- **Affected Code:** `SharpProof.BuildTasks/VerifierProcessSupervisor.cs`, lines 118–149, 204–279, 397–405.
+- **Normal Trigger:** Cancellation or timeout triggers descendant cleanup while the managed direct child process has exited but has not yet been observed by `Process.WaitForExit` / `Process.ExitCode`.
+- **Root Cause & Impact:** The supervisor runs as a Linux subreaper (`PR_SET_CHILD_SUBREAPER`). `ReapExitedChildren()` calls `waitpid(-1, out _, 1)`, which consumes the exit status of the managed direct child. Subsequent calls on `Process` throw `InvalidOperationException` / `ECHILD`, causing the supervisor to crash before writing the `SharpProof.Cleanup/1` receipt. The parent task treats this as a containment boundary crash (`FailFast`).
+- **Suggested Fix:** Pass the direct child PID to `StopDescendants` and exclude it from `waitpid(-1)` until after the managed `Process` object has reaped it.
+
+###### BT-02: Uncaught `Process.Start` Exception After `Armed` Omits Cleanup Receipt
+- **Severity:** High
+- **Affected Code:** `SharpProof.BuildTasks/VerifierProcessSupervisor.cs`, lines 83–116.
+- **Normal Trigger:** The supervisor writes `SharpProof.Armed/1`, then `Process.Start` throws `Win32Exception` (e.g. dotnet muxer removed or execution permission denied).
+- **Root Cause & Impact:** Start exceptions are unhandled in `Run`. The process crashes without emitting `SharpProof.Cleanup/1`. The parent task treats the missing receipt as a containment failure.
+- **Suggested Fix:** Wrap `process.Start()` in a `try/catch`, emit the cleanup receipt, and return exit code 125.
+
+###### BT-05: Pre-Launch Setup Elapsed Time Starves Termination and Output Drain Cleanup Reserve
+- **Severity:** Medium
+- **Affected Code:** `SharpProof.BuildTasks/RunVerifier.cs`, lines 160–267, 859–867.
+- **Normal Trigger:** Heavy machine load causes pre-launch setup to consume $>1000\text{ ms}$.
+- **Root Cause & Impact:** The stopwatch starts before setup and bounds the entire `processTimeout`. When foreground execution times out, zero milliseconds remain for `TryTerminate` and output draining, forcing `containmentFailed = true` and returning `-1` instead of `124`.
+- **Suggested Fix:** Protect the cleanup reserve by starting the foreground timer post-setup or capping the foreground wait at `processTimeout - LauncherProcessReserveMilliseconds`.
+
+###### BT-09: Stale `DOTNET_HOST_PATH` Overrides Direct Dotnet Muxer (`Environment.ProcessPath`)
+- **Severity:** High
+- **Affected Code:** `SharpProof.BuildTasks/RunVerifier.cs`, lines 1234–1269.
+- **Normal Trigger:** MSBuild is executed in an environment with a stale `DOTNET_HOST_PATH` while running under a different `Environment.ProcessPath`.
+- **Root Cause & Impact:** `DOTNET_HOST_PATH` is trusted unconditionally, launching the verifier under an unexpected runtime version.
+- **Suggested Fix:** Require `Environment.ProcessPath` to be authoritative when it points to a valid `dotnet` muxer.
+
+###### BT-18: Semicolons in Paths Cause MSBuild List Splitting and Recursive Deletions in `RemoveDir`
+- **Severity:** High
+- **Affected Code:** `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`, lines 80–97, 135, 153.
+- **Normal Trigger:** Project directory contains a semicolon `;` (e.g., `/workspace/proj;v1/`).
+- **Root Cause & Impact:** MSBuild `RemoveDir` parses semicolons as list delimiters, splitting `/workspace/proj;v1/obj/SharpProof/runs/<id>` and deleting `/workspace/proj` recursively.
+- **Suggested Fix:** Escape paths with `$([MSBuild]::Escape(...))` in `RemoveDir` and `MakeDir`.
+
+---
+
+###### Section 2: Host, Packaging, Platform Interop & Architecture
+
+###### HST-01: `FindFileSystemType` Overmount / Stacked Mount Shadowing Defect
+- **Severity:** High
+- **Affected Code:** `SharpProof.Host/LinuxPathIdentity.cs`, lines 755–762.
+- **Normal Trigger:** A directory is overmounted with an equal-length mountpoint (e.g., `/` overmounted with `tmpfs`/`overlayfs` or network share).
+- **Root Cause & Impact:** `mount.Length <= bestMount.Length` rejects later entries in `/proc/self/mountinfo` that have the same length. Linux VFS semantics dictate that later entries shadow earlier ones. The helper returns stale filesystem types, bypassing unsupported remote filesystem checks.
+- **Suggested Fix:** Change `<=` to `<` so later equal-length mount records overwrite earlier ones.
+
+###### HST-02: `ReleaseLocks` Partial Release and SafeFileHandle Leak on Exception
+- **Severity:** High
+- **Affected Code:** `SharpProof.Host/LinuxPathIdentity.cs`, lines 692–702, 867–874, 886–894.
+- **Normal Trigger:** An exception occurs during `flock(LOCK_UN)` or handle disposal when releasing a multi-file publication set.
+- **Root Cause & Impact:** An exception in the loop immediately aborts, skipping unlock and dispose for all remaining descriptors, leaking OS file handles and leaving locks held.
+- **Suggested Fix:** Wrap unlock and dispose in a resilient `try/catch` collecting exceptions and ensuring all handles are closed.
+
+###### HST-06: False Positive / Tautological Test in `AnalyzerPackagePayloadExcludesWorkerAndSolverAssets`
+- **Severity:** High
+- **Affected Code:** `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs`, lines 480–518.
+- **Normal Trigger:** CI runs `AnalyzerPackagePayloadExcludesWorkerAndSolverAssets`.
+- **Root Cause & Impact:** The test queries `TfmSpecificPackageFile` in `SharpProof.Package.csproj`, but the package uses an external `SharpProof.nuspec` with zero `TfmSpecificPackageFile` nodes. The test asserts against an empty string and always passes trivially.
+- **Suggested Fix:** Parse the `<files>` element of `SharpProof.Package/SharpProof.nuspec`.
+
+---
+
+###### Section 3: Worker Core, Launcher & Protocol
+
+###### WRK-01: Numeric Enum Strings Bypass Protocol Canonicalization
+- **Severity:** High
+- **Affected Code:** `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs`, lines 151–178; `SharpProof.Worker/Program.cs`, lines 50–64.
+- **Normal Trigger:** Input JSON contains numeric strings for enum values (e.g. `"999"` or large integer strings).
+- **Root Cause & Impact:** `Enum.Parse` throws `OverflowException` which is uncaught, crashing the worker. In-range integers pass string equality checks, injecting unmapped numeric enums into the domain model.
+- **Suggested Fix:** Disallow strings starting with digits/signs and enforce `Enum.IsDefined`.
+
+###### WRK-05: Worker Failure-Response Publication Escapes Catch Blocks
+- **Severity:** High
+- **Affected Code:** `SharpProof.Worker/Program.cs`, lines 45–49, 56–64, 86–107.
+- **Normal Trigger:** Worker encounters an error and attempts `Respond(...)`, but `resultPath` is unwritable or disk is full.
+- **Root Cause & Impact:** Awaiting `Respond` inside `catch` blocks leaves write `IOException`s unhandled, crashing the process without output.
+- **Suggested Fix:** Wrap response file writing in an internal exception barrier.
+
+###### WRK-07: Exception on Backend Dispose Leaks Subsequent Lanes and Replaces Result
+- **Severity:** High
+- **Affected Code:** `SharpProof.Worker/SharpProofWorker.cs`, lines 341–347, 457–464.
+- **Normal Trigger:** `DisposeOwnedBackend()` on lane 0 throws during `finally` cleanup.
+- **Root Cause & Impact:** The unhandled exception aborts the loop, leaking native SMT solver processes on lanes 1..N and overwriting the verified response.
+- **Suggested Fix:** Catch disposal exceptions per lane in `finally`.
+
+###### WRK-09: Subsequent Caller Cancellation Rewrites Prior Project Timeout
+- **Severity:** High
+- **Affected Code:** `SharpProof.Worker/SharpProofWorker.cs`, lines 61–78, 340.
+- **Normal Trigger:** Project wall timer expires, and parent caller cancels its token during exception handling.
+- **Root Cause & Impact:** `Interrupted()` checks `cancellationToken.IsCancellationRequested` and selects `Canceled` (exit 4) instead of preserving `TimedOut` (exit 124).
+- **Suggested Fix:** Latch the first triggering cancellation source immutably.
+
+###### WRK-19: Cache-Hit Validation Can Return `Complete` After Project Timeout/Cancellation
+- **Severity:** High
+- **Affected Code:** `SharpProof.Worker/SharpProofWorker.cs`, lines 188–205.
+- **Normal Trigger:** Project wall timeout expires while validating a retrieved cache entry.
+- **Root Cause & Impact:** Synchronous validation succeeds and returns `cachedResponse` with status `Complete` without checking if `projectBoundary` was canceled.
+- **Suggested Fix:** Check `projectBoundary.Token.ThrowIfCancellationRequested()` before returning validated cached response.
+
+---
+
+###### Section 4: SMT Solvers & Fuzzing
+
+###### SMT-01: Asynchronous `Interrupt()` Race with `Dispose()` on Native Z3 Context
+- **Severity:** High
+- **Affected Code:** `SharpProof.Smt/IrSmtBackend.cs`, lines 85–89, 91–103.
+- **Normal Trigger:** Cancellation token callback triggers `Interrupt()` while another thread is disposing the backend.
+- **Root Cause & Impact:** `Interrupt()` does not acquire `_gate` or check `_disposed`. It calls `_context.Interrupt()` on a freed native pointer, causing access violations or unhandled `Z3Exception`.
+- **Suggested Fix:** Acquire `_gate` and guard with `!_disposed`.
+
+###### SMT-02: 32-Bit Rollover Assumption in Resource Accounting Adds Phantom $4.29\times 10^9$ Resources
+- **Severity:** High
+- **Affected Code:** `SharpProof.Smt/IrSmtBackend.cs`, lines 181–200.
+- **Normal Trigger:** Consecutive queries on a backend encounter a lower `"rlimit count"` due to solver reset or tactic changes.
+- **Root Cause & Impact:** `observed < _lastObservedResourceCount` assumes a 32-bit integer rollover and adds `(1L << 32)`, corrupting resource accounting and exhausting resource limits.
+- **Suggested Fix:** Only add the raw `observed` delta on resets without adding $2^{32}$.
+
+---
+
+###### Section 5: IR & Abstract Interpretation Dataflow
+
+###### IR-01: Unhandled Cleanup Exception Masks Primary Errors in `WriteUtf8`/`WriteBytesAsync`
+- **Severity:** High
+- **Affected Code:** `SharpProof.Ir/AtomicFile.cs`, lines 78–84, 107–113.
+- **Normal Trigger:** Primary write throws `OperationCanceledException` and `File.Delete(temporary)` in `finally` throws `IOException`.
+- **Root Cause & Impact:** Raw `File.Delete` in `finally` replaces the primary exception with an `IOException`.
+- **Suggested Fix:** Use `TryDeleteStaged(temporary)` in `finally`.
+
+###### IR-02: Path and Filename Length Overflow on Long Target Paths in `AtomicFile.Prepare`
+- **Severity:** High
+- **Affected Code:** `SharpProof.Ir/AtomicFile.cs`, lines 115–122.
+- **Normal Trigger:** Target filename length is $>220$ characters.
+- **Root Cause & Impact:** Appending `.<guid>.tmp` exceeds `NAME_MAX` (255 bytes).
+- **Suggested Fix:** Use a fixed-length `.sharpproof-<guid>.tmp` filename in the target directory.
+
+---
+
+###### Section 6: Frontend & Compiler Collector
+
+###### FE-01: Top-Level Statement Main Method Declaration Lookup in `ClaimManifestBuilder`
+- **Severity:** Medium
+- **Affected Code:** `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs`, lines 475–478.
+- **Normal Trigger:** Top-level statements contain method contracts.
+- **Root Cause & Impact:** Roslyn associates `CompilationUnitSyntax` with synthesized `$Main`. Explicit cast `(BaseMethodDeclarationSyntax)Declaration!` throws `InvalidCastException`.
+- **Suggested Fix:** Safely match `Declaration as BaseMethodDeclarationSyntax`.
+
+###### FE-02: Potential Division by Zero in `CompilerImplementationIlSummaryLowerer.Arithmetic`
+- **Severity:** Medium
+- **Affected Code:** `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs`, lines 1097–1115.
+- **Normal Trigger:** IL method contains division/remainder with divisor 0.
+- **Root Cause & Impact:** Summary builder assumes range without adding `divisor != 0` guard, producing unconstrained SMT values.
+- **Suggested Fix:** Explicitly emit `Assume(divisor != 0)` for `Div` and `Rem` opcodes.
+
+---
+
+###### Section 7: Analyzers & Meta Analyzers
+
+###### AZ-01: Incorrect Metadata Type Name for `ContractForDiagnosticDescriptors` in Meta-Analyzer
+- **Severity:** High
+- **Affected Code:** `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, lines 18, 481, 501.
+- **Normal Trigger:** Meta-analyzer audits descriptor catalog types.
+- **Root Cause & Impact:** `KnownTypeNames[9]` specifies `SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors` instead of `SharpProof.ContractForValidation.ContractForDiagnosticDescriptors`. Descriptor resolution returns `null`, causing false positive `SPMETA005` warnings.
+- **Suggested Fix:** Update metadata name to `SharpProof.ContractForValidation.ContractForDiagnosticDescriptors`.
+
+###### AZ-02: Incomplete Unwrapping of Nested Casts/Parentheses in Semantic Cache Soundness Rule
+- **Severity:** Medium
+- **Affected Code:** `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs`, lines 67–72.
+- **Normal Trigger:** Non-cacheable value wrapped in multiple casts or parenthesized expressions.
+- **Root Cause & Impact:** Single-level switch fails to unwrap multiple layers, missing `SPMETA010` violations.
+- **Suggested Fix:** Use a `while (true)` unwrapping loop.
+
+---
+
+###### Section 8: Effects, Contracts & Source Generators
+
+###### EF-01: Conditional Local Assignment Ignored When Deciding Lock Nullness
+- **Severity:** High
+- **Affected Code:** `SharpProof.Effects/OperationNullnessEvaluator.cs`, lines 71–74; `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, lines 135–155.
+- **Normal Trigger:** Local variable initialized to `null` is reassigned in a branch before `lock (lockObj)`.
+- **Root Cause & Impact:** `IsSourceDefinitelyNull` short-circuits to `true` when `origin is ILockOperation`, ignoring subsequent assignments. `ScanLock` assumes the lock always throws `ArgumentNullException` and discards the lock body effects entirely.
+- **Suggested Fix:** Remove the early return so preceding assignments are scanned.
+
+###### EF-02: Diverging `Dispose` Methods Discard Effects Executed Prior to Divergence
+- **Severity:** High
+- **Affected Code:** `SharpProof.Effects/UsingDisposalEffectResolver.cs`, lines 421–426.
+- **Normal Trigger:** `Dispose()` method performs side effects then diverges (`while(true){}`).
+- **Root Cause & Impact:** `ResolveResource` returns `EffectSummary.Empty` when `!canMethodCompleteNormally && !canMethodThrow`, losing all effects performed prior to the loop.
+- **Suggested Fix:** Resolve dispose body effects and apply divergence to control flow rather than returning `Empty`.
+
+---
+
+###### Section 9: Specs, Relational Summaries & Verification
+
+###### SPC-01: Unsound Propagation of Method Termination in Summary Composition
+- **Severity:** High
+- **Affected Code:** `SharpProof.Summaries/IrRelationalSummaryBuilder.cs`, lines 287, 402–478.
+- **Normal Trigger:** Summary is built for method `A` calling helper `B` where `B` has `Termination == Unknown`.
+- **Root Cause & Impact:** `Execute()` hardcodes `IrSummaryTermination.TerminatesOrThrows`, ignoring `B`'s potential divergence and unsoundly proving caller termination.
+- **Suggested Fix:** Propagate `IrSummaryTermination.Unknown` when calling dependencies with unknown termination.
+
+###### SPC-03: Missing Frame/Modifies Invalidation for Heap and Side-Effecting Calls in Summary Builder
+- **Severity:** High
+- **Affected Code:** `SharpProof.Summaries/IrRelationalSummaryBuilder.cs`, lines 348–373, 402–478.
+- **Normal Trigger:** Method calls a callee with heap side-effects and subsequent code reads the modified references.
+- **Root Cause & Impact:** Builder substitutes pure values without invalidating receiver/argument state, producing relational summaries that ignore state mutations.
+- **Suggested Fix:** Reject side-effecting calls or introduce existential frame variables for mutated references.
+
+---
+
+###### Section 10: Gates, Testing Infrastructure, Samples & Release Scripts
+
+###### GT-01: `IrCSharpDifferentialOracle.CompareValue` Drops `Sequence` and `Reference` Kinds
+- **Severity:** High
+- **Affected Code:** `SharpProof.Testing/IrCSharpDifferentialOracle.cs`, lines 428–437.
+- **Normal Trigger:** Running differential oracle on terms evaluating to `Sequence` or `Reference` values.
+- **Root Cause & Impact:** `CompareValue` switch lacks cases for `Sequence` and `Reference`, returning `DifferentialStatus.Mismatch` for identical results.
+- **Suggested Fix:** Add recursive array element and reference comparison in `CompareValue`.
+
+###### GT-03: `samples/Diagnostics.globalconfig` Ignored by Roslyn (Missing `GlobalAnalyzerConfigFiles`)
+- **Severity:** High
+- **Affected Code:** `samples/Diagnostics.globalconfig`, `samples/Diagnostics/Diagnostics.csproj`.
+- **Normal Trigger:** Building `samples/Diagnostics` to test warning escalation for `SP0045`/`SP0047`.
+- **Root Cause & Impact:** Roslyn requires globalconfigs to be named `.globalconfig` or included via `<GlobalAnalyzerConfigFiles>`. `Diagnostics.globalconfig` is ignored, leaving diagnostics at `Info` severity.
+- **Suggested Fix:** Add `<GlobalAnalyzerConfigFiles Include="../Diagnostics.globalconfig" />` to `Diagnostics.csproj`.
+
+---
+
+##### Conclusion & Action Plan
+
+This comprehensive audit of all files across all 10 areas has identified **82 distinct defects** spanning process isolation, SMT encoding soundness, abstract interpretation lattice edge cases, effect tracking, MSBuild argument safety, and protocol serialization. All defects are fully documented above with root cause analyses and actionable code remedies.
+
+<!-- END CONSOLIDATED SOURCE: BUGS_3.md -->
+
+### Imported from `BUGS_4.md`
+
+<!-- BEGIN CONSOLIDATED SOURCE: BUGS_4.md -->
+
+#### SharpProof Bug Hunt - Comprehensive Bug Report (BUGS_4.md)
+
+##### Executive Summary
+This report consolidates findings from 10 parallel agents analyzing the entire SharpProof codebase across all projects. Total bugs found: **87+** across 27 projects.
+
+---
+
+##### Bugs by Project
+
+###### 1. SharpProof.BuildTasks (Agent 1)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| VerifierProcessSupervisor.cs | 374 | Pointless self-assignment `_processGroupPidFd = _processGroupPidFd` | Low |
+| VerifierProcessSupervisor.cs | 61-62, 158 | Potential double-close of file descriptors on early return | Medium |
+| RunVerifier.cs | 95-99 | Dispose may leak process if `_cancellationSignal.Dispose()` throws | Medium |
+| ValidatePublishedVerificationResult.cs | 55 | `Path.GetFullPath(string.Empty)` throws on null manifest path | High |
+| ValidatePublishedVerificationResult.cs | 59 | NullReferenceException on null `manifestHashProperty.GetString()` | High |
+| ValidatePublishedVerificationResult.cs | 64 | NullReferenceException on null `requestHashProperty.GetString()` | High |
+| RunVerifier.cs | 798-807 | Returns false without waiting for process exit on delay timeout | Medium |
+
+###### 2. SharpProof.Analyzer / Analyzer.Core / Attributes (Agent 2)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| SharpProofControlAttributePolicy.cs | 39, 188 | Missing null checks on `ApplicationSyntaxReference?.GetSyntax()` | Medium |
+| SharpProofAnalyzerEngine.cs | 79 | Thread safety: modifies state without synchronization in `InitializeCompilation` | High |
+| ManagedContractFacts.cs | N/A | No IDisposable implementation, resource disposal gaps | Medium |
+| RequiresCallSiteAnalyzer.cs | 376 | Unwrapped `ArgumentException` without error handling | Medium |
+| LanguageSubsetGate.cs | 127-131 | Missing operation kind handling in `OperationKindDecisions` map | Medium |
+| All Attribute files | Various | Potential null reference in attribute application syntax access | Medium |
+
+###### 3. SharpProof.ContractForGenerator / Contracts / Dataflow (Agent 3)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| ContractForSymbolMatcher.cs | 261 | Null reference in `CollectVariables` method | Critical |
+| ContractIntrinsicValidator.cs | 36 | Null return from `GetContext` not handled | High |
+| ContractBinder.cs | 35 | `ValidationIntrinsics` may return null | High |
+| ContractBinder.cs | 16 | ConcurrentDictionary modification without synchronization | High |
+| ContractForSymbolMatcher.cs | 149 | Concurrent dictionary access in companion resolution | High |
+| DataflowGraph.cs | 88 | Concurrent modification during edge creation | High |
+| ContractForSymbolMatcher.cs | 130 | File handles not closed properly | Medium |
+| DataflowAnalysis.cs | 148 | Domain objects not disposed after analysis | Medium |
+| NullnessDomain.cs | 79 | Missing null check in validation | Medium |
+| SequenceCardinalityDomain.cs | 50 | No exception handling for negative lengths | Medium |
+
+###### 4. SharpProof.Host / Worker (Agent 4)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| VerifierDiagnosticTransport.cs | 40 | 16MB limit silently exits with code 124, inconsistent handling | High |
+| ContainerNativeLibrary.cs | 31 | `SetDllImportResolver` with null exposes ambient paths | Medium |
+| VerifierDiagnosticTransport.cs | 26-31 | JSON parsing not thread-safe | High |
+| LinuxPathIdentity.cs | 9-11 | Magic numbers for file permissions instead of constants | Low |
+| LinuxWorkerProcess.cs | 145-157 | Missing `WaitForExit` after `Fsync` in termination | Medium |
+| LinuxWorkerProcess.cs | 84-85 | `StandardInput` resources unclosed on start failure | Medium |
+| Program.cs | 79 | Broad exception handling misses `IOException` in serialization | High |
+| ProtocolJson.cs | 263 | Budget keys not trimmed (whitespace sensitivity) | Medium |
+| ProtocolJson.cs | 215-216 | Missing schema validation for `json.$schema` | High |
+| Program.cs (Launcher) | 61 | Grace period not validated against OS limits | Medium |
+| LinuxPathIdentity.cs | 75-76 | Race condition in `File.Exists` before marker write | High |
+| LinuxWorkerProcess.cs | 170-173 | Race between `Fsync` and `Terminate` | Medium |
+| Program.cs | 72-78 | Signal handlers don't cancel stream tasks | High |
+| LinuxWorkerProcess.cs | 170-173 | `WaitForExit` without timeout backoff | Medium |
+| ContainerNativeLibrary.cs | 18 | Dynamic Z3 loading lacks checksum validation | Medium |
+| Cache.cs | 112-113 | Cache eviction not thread-safe (non-atomic capacity) | High |
+
+###### 5. SharpProof.Verify / Ir (Agent 5)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| AtomicFile.cs | 57-68 | `TryDeleteStaged` only catches IOException/UnauthorizedAccessException | Medium |
+| ProofKernel.cs | 59-71 | Counterexample replay assumes valid assumptions without full validation | Medium |
+| IrTraversal.cs | 6-20 | `GetChildren` doesn't validate IR term structure (binary ops need operands) | High |
+| ProofKernel.cs | 26-28 | Backend Unknown mapped to abstention, may hide real errors | Medium |
+| AtomicFile.cs | 11-12 | Directory creation doesn't handle permissions gracefully | Low |
+
+###### 6. SharpProof.Frontend / Effects (Agent 6)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| UsingDisposalEffectResolver.cs | 45-47 | Missing null check in `Dispose()`, violates IDisposable pattern | High |
+
+###### 7. SharpProof.Summaries / Smt (Agent 7)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| IrRelationalSummaryBuilder.cs | 350 | NullReferenceException when `calls` dictionary has null values | Medium |
+| IrRelationalSummaryBuilder.cs | 398-399 | `_reason` overwritten to `UnsupportedBody` unconditionally | Medium |
+| IrRelationalSummaryBuilder.cs | 647-651 | Variables skipped if not in all incoming states | Medium |
+| IrRelationalSummaryBuilder.cs | 862-872 | `Spend()` not thread-safe on `_remainingOperations` | Medium |
+| IrSmtBackend.cs | 110-156 | **CRITICAL**: Use-after-free of Z3 expressions in `CreateSatisfiable` | Critical |
+| Z3ExpressionOwner.cs | N/A | Potential double-disposal if same expression added twice | Medium |
+
+###### 8. SharpProof.Gates / Package (Agent 8)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| PerformanceGate.cs | 130-145 | Race condition in publication locking validation | High |
+| PerformanceGate.cs | 18-21 | Uncaught exception in `ProcessStart` wrapper | Medium |
+| RepositoryLayout.cs | 45-49 | Incorrect file ownership validation logic | High |
+| RepositoryLayout.cs | 60-65 | Timestamp comparison bug causing false negatives | Medium |
+| WorkerPerformanceProbe.cs | 72-77 | Timer resolution too granular | Low |
+| WorkerPerformanceProbe.cs | 88-93 | Memory counter not reset between sessions | Medium |
+| PackageBuildEstimator.cs | 160-165 | Overestimated license compliance checks | Low |
+| PackageBuildEstimator.cs | 185-190 | Missing SOM validation verification | Medium |
+| Package build | N/A | No .cs files - potential path normalization issues | Low |
+
+###### 9. SharpProof.Specs / Worker.Protocol (Agent 9)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| ApiSpecTermValidator.cs | 69-94 | NullReferenceException if `whenTrue`/`whenFalse` null | Medium |
+| ApiSpecTermValidator.cs | 186-195 | Incomplete postcondition evidence validation | Medium |
+| SpecIdentifiers.cs | N/A | `SpecId`/`SpecVarId` don't override `Equals`/`GetHashCode` properly | High |
+| ApiSpecInstantiation.cs | 164-169 | NullReferenceException on null `variable.RequestInfo` | High |
+| ApiSpecInstantiation.cs | N/A | `MatchesType` doesn't verify sequence element types | Medium |
+| DefaultApiSpecCatalog.generated.cs | N/A | `ImmutableArray.Builder` without capacity hints | Low |
+| ProtocolJson.cs | 73-82 | 81KB buffer contradicts 16MB max JSON size | High |
+| ProtocolJsonSupport.cs | 865-871 | `ToString("x2")` hash collision risk for bytes > 255 | Medium |
+| ProtocolJsonSupport.cs | 314-315 | JSON round-trip validation produces false mismatches | Medium |
+| ApiSpecTable.cs | 166-169 | `AddOptionalVariable` uses -1 ordinal (invalid range) | High |
+| ApiSpecTable.cs | 192-213 | Assembly validation missing version check | Medium |
+
+###### 10. SharpProof.ArchitectureTest / CompilerProbe.TestAsset (Agent 10)
+| File | Line(s) | Bug | Severity |
+|------|---------|-----|----------|
+| CompilerProbeAnalyzer.cs | 38-40 | Null reference on `AnalyzerConfigOptionsProvider.GlobalOptions` | Medium |
+| CompilerProbeGenerator.cs | 53-55 | No input size validation (buffer overflow risk) | High |
+| CompilerProbeGenerator.cs | 79-85 | `StartsWith("refute:")` false positive in contract generation | High |
+| CompilerSpecificationPackProviderTests.cs | N/A | **MISSING TEST FILE** - breaks coverage | Critical |
+| SbomReleaseIdentityTests.cs | 53-59 | `File.ReadAllTextAsync` not synchronized for concurrent runs | Medium |
+| CompilerProbeAnalyzer.cs | 58-60 | Catches exceptions but doesn't propagate critical disk failures | Medium |
+| CompilerProbeGenerator.cs | 74 | Path traversal risk with `../` sequences | High |
+| CompilerProbeAnalyzer.cs | 47-52 | Race condition in concurrent file writes | Medium |
+| VerifierPublicationTransactionTests.cs | 63-75 | `HasTransactionAuthority` relies on string patterns | Medium |
+
+---
+
+##### Previously Known Bugs (from BUGS.md - for reference)
+The original BUGS.md documents 34 confirmed bugs. Key highlights:
+1. Supervisor cleanup reaps managed direct child (High)
+2. Active cancellation reported as timeout 124 (Medium)
+3. Armed supervisor omits cleanup on start exception (High)
+4. Publication validation reads without lease (High)
+5. Concurrent equal-path builds not bound to publication (High)
+6. Reset marker handling not serialized/retry-safe (Medium)
+7. Descendant scans authenticate too early (Medium)
+8. Stale `DOTNET_HOST_PATH` overrides muxer (High)
+9. Lock release stops after first unlock failure (Medium)
+10. Atomic file cleanup masks original failure (Medium)
+...and 24 more
+
+---
+
+##### Severity Summary
+| Severity | Count |
+|----------|-------|
+| Critical | 3 |
+| High | 28 |
+| Medium | 42 |
+| Low | 14 |
+
+---
+
+##### Top Priority Fixes (Critical/High)
+
+1. **IrSmtBackend.cs** - Use-after-free of Z3 expressions (Agent 7)
+2. **ValidatePublishedVerificationResult.cs** - Multiple null reference bugs (Agent 1)
+3. **CompilerSpecificationPackProviderTests.cs** - Missing test file (Agent 10)
+4. **ContractForSymbolMatcher.cs** - Null reference in CollectVariables (Agent 3)
+5. **ProtocolJson.cs** - Buffer size contradiction (Agent 9)
+6. **LinuxPathIdentity.cs** - Race condition in marker creation (Agent 4)
+7. **Program.cs (Worker)** - Signal handlers don't cancel streams (Agent 4)
+8. **SharpProofAnalyzerEngine.cs** - Thread safety in InitializeCompilation (Agent 2)
+9. **ConcurrentDictionary issues** in ContractBinder, ContractForSymbolMatcher (Agent 3)
+10. **Cache.cs** - Non-thread-safe eviction (Agent 4)
+
+---
+
+##### Recommendations
+1. **Immediate**: Fix Critical/High severity bugs in production code paths
+2. **Short-term**: Add missing null checks, thread synchronization, resource disposal patterns
+3. **Ongoing**: Implement comprehensive test coverage for missing test files
+4. **Architecture**: Review all `ConcurrentDictionary` usage for proper synchronization
+5. **Security**: Address path traversal and assembly validation gaps
+
+<!-- END CONSOLIDATED SOURCE: BUGS_4.md -->
+
+### Imported from `BUGS_5.md`
+
+<!-- BEGIN CONSOLIDATED SOURCE: BUGS_5.md -->
+
+#### SharpProof Comprehensive Codebase Defect & Correctness Audit (BUGS_5.md)
+
+##### Scope and Methodology
+
+This document contains the exhaustive, multi-subsystem static analysis, reliability, and correctness audit across the entire SharpProof codebase. Ten parallel audit passes were executed simultaneously across all repository subsystems:
+
+1. **BuildTasks & Verifier MSBuild Targets** (`SharpProof.BuildTasks`, `SharpProof.Verifier`, root props & targets)
+2. **Host, Platform Interop, Packaging & Architecture** (`SharpProof.Host`, `SharpProof.Package`, `SharpProof.Package.Test`, `SharpProof.ArchitectureTest`, `SharpProof.Smoke.Net472`)
+3. **Worker Core & Worker Launcher** (`SharpProof.Worker`, `SharpProof.Worker.Launcher`)
+4. **Worker Protocol & Worker Tests** (`SharpProof.Worker.Protocol`, `SharpProof.Worker.Test`)
+5. **SMT Solvers, SMT Theory Encoding & Differential Fuzzing** (`SharpProof.Smt`, `SharpProof.Smt.Test`, `Tools/SharpProof.Fuzz`, `SharpProof.Fuzz.Test`)
+6. **IR Data Structures, Atomic Files & Abstract Interpretation Dataflow** (`SharpProof.Ir`, `SharpProof.Ir.Test`, `SharpProof.Dataflow`, `SharpProof.Dataflow.Test`)
+7. **Compiler Collector, Compiler Artifacts & Frontend Lowering** (`SharpProof.CompilerCollector`, `SharpProof.CompilerArtifact`, `SharpProof.CompilerProbe.TestAsset`, `SharpProof.Frontend`, `SharpProof.Frontend.Test`)
+8. **Diagnostic Analyzers, Analyzer Core & Meta Analyzers** (`SharpProof.Analyzer`, `SharpProof.Analyzer.Core`, `SharpProof.Analyzer.Test`, `SharpProof.Meta.Analyzers`, `SharpProof.Meta.Analyzers.Test`)
+9. **Contracts API, Effects System, Attributes & Source Generators** (`SharpProof.Contracts`, `SharpProof.Contracts.Test`, `SharpProof.Effects`, `SharpProof.Effects.Test`, `SharpProof.Attributes`, `SharpProof.Attributes.Test`, `SharpProof.ContractForGenerator`, `SharpProof.ContractForGenerator.Test`)
+10. **Verification Engine, Specifications, Summaries, Gates, Scripts & Infrastructure** (`SharpProof.Verify`, `SharpProof.Verify.Test`, `SharpProof.Specs`, `SharpProof.Specs.Test`, `SharpProof.Summaries`, `SharpProof.Summaries.Test`, `SharpProof.Gates`, `SharpProof.Gates.Test`, `SharpProof.Testing`, `SharpProof.Testing.Test`, `scripts/`, `eng/`, `samples/`, `docs/`)
+
+A total of **104 distinct defects** were identified, traced through reachable control flow, validated against documented architectural contracts, and classified with line-level accuracy and concrete remediation guidance.
+
+---
+
+##### Master Table of Identified Bugs
+
+| Bug ID | Title | Severity | Primary Subsystem / File |
+|---|---|---|---|
+| **BT-01** | Subreaper Broad `waitpid(-1)` Reaps Managed Direct Child Process During Cleanup | **High** | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:118–149` |
+| **BT-02** | Uncaught `Process.Start` Exception in Supervisor Omits Cleanup Receipt After Arming | **High** | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:83–116` |
+| **BT-03** | `/proc` Descendant Scan Transient Exceptions and Non-Atomic Process Tree Walking | **Medium** | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:336–377` |
+| **BT-04** | Uncaught `Process.Start` Exception in `RunWorker` Bypasses Exit Code 125 | **Medium** | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:178–196` |
+| **BT-05** | Pre-Launch Setup Elapsed Time Starves Termination and Output Drain Cleanup Reserve | **Medium** | `SharpProof.BuildTasks/RunVerifier.cs:160–285` |
+| **BT-06** | PATH Parsing in `ResolveDotNetFromPath` Inappropriately Trims Valid Spaces and Quotes on Linux | **Medium** | `SharpProof.BuildTasks/RunVerifier.cs:1310–1332` |
+| **BT-07** | Output Limit Exceeded Races Clean Process Exit, Masking Verification Failure with Exit Code 0 | **Medium** | `SharpProof.BuildTasks/RunVerifier.cs:288–346` |
+| **BT-08** | Lock Contention in `RunVerifier.Cancel()` Blocks Cancellation Signal Behind `TryTerminate` | **Medium** | `SharpProof.BuildTasks/RunVerifier.cs:973–1054` |
+| **BT-09** | Stale `DOTNET_HOST_PATH` Overrides Authoritative `Environment.ProcessPath` in `ResolveDotNetHost` | **High** | `SharpProof.BuildTasks/RunVerifier.cs:1234–1269` |
+| **BT-10** | Legacy Location Parser Rejects Standard Roslyn Diagnostic Format `file(line)` | **Low** | `SharpProof.BuildTasks/RunVerifier.cs:1189–1232` |
+| **BT-11** | `InvalidatePublishedResult.Cancel()` Races `CancellationTokenSource` Disposal, Throwing `ObjectDisposedException` | **Medium** | `SharpProof.BuildTasks/InvalidatePublishedResult.cs:50–75` |
+| **BT-12** | Unhandled Filesystem and Container Contract Exceptions Escape `InvalidatePublishedResult.Execute` as `MSB4018` | **Medium** | `SharpProof.BuildTasks/InvalidatePublishedResult.cs:77–245` |
+| **BT-13** | Validation Failure in `InvalidatePublishedResult` Leaves Stale Result Files Intact | **Medium** | `SharpProof.BuildTasks/InvalidatePublishedResult.cs:196–224` |
+| **BT-14** | `ValidatePublishedVerificationResult` Reads Multi-File Publication Set Without Holding Publication Lease | **High** | `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs:20–70` |
+| **BT-15** | Corrupted Verification Results Remain Committed on Disk on Validation Failure | **Medium** | `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs:71–81` |
+| **BT-16** | `ResetPublishedVerification` Ignores Cancellation and Cannot Be Interrupted | **Medium** | `SharpProof.BuildTasks/ResetPublishedVerification.cs:6–40` |
+| **BT-17** | `ResetPublishedVerification` Escapes `InvalidOperationException` Unhandled | **Medium** | `SharpProof.BuildTasks/ResetPublishedVerification.cs:21–34` |
+| **BT-18** | Unescaped Semicolons in Paths Cause MSBuild List Splitting and Catastrophic Directory Deletion in `RemoveDir` | **High** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:135` |
+| **BT-19** | Single Quotes / Apostrophes in Path Names Break MSBuild Property Functions | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:45–85` |
+| **BT-20** | Relative Paths in `SharpProofVerifySarifFile` Evaluated Against MSBuild Working Directory in Multi-Targeting Builds | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:50–51` |
+| **BT-21** | Outer Multi-Targeting Clean Generates Invalid SARIF Path with Missing TFM Segment | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:234–254` |
+| **BT-22** | Custom Compiler Debug Symbols (`PdbFile`, `_DebugSymbolsIntermediatePath`) Omitted from Collision Set | **High** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:79–98` |
+| **BT-23** | Build Failures Prior to `GenerateMSBuildEditorConfigFile` Leave Stale Successful Verification Results | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:41–44` |
+| **BT-24** | Non-Supported Host Builds and Cleans Skip Publication Invalidation and Reset | **Medium** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:100, 236` |
+| **BT-25** | Inconsistent Process/Host Architecture Error Diagnostics in `SharpProof.Verifier.props` | **Low** | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:4–6` |
+| **HST-01** | `FindFileSystemType` Overmount / Stacked Mount Shadowing Defect | **High** | `SharpProof.Host/LinuxPathIdentity.cs:756–762` |
+| **HST-02** | `ReleaseLocks` and `PublicationLock.Dispose` Handle Leaks on Exception | **High** | `SharpProof.Host/LinuxPathIdentity.cs:692–702, 867–874` |
+| **HST-03** | `PublicationLock.Acquire` Fails Spuriously on Interrupted Syscall (`EINTR`) | **Medium** | `SharpProof.Host/LinuxPathIdentity.cs:828–834` |
+| **HST-04** | `InstallZ3ResolverRequired` Native Library Handle Leak on `OperationCanceledException` | **Medium** | `SharpProof.Host/ContainerNativeLibrary.cs:28–46` |
+| **HST-05** | `LinuxWorkerProcess.Dispose` Leaks Process Handle and Propagates Exception | **Medium** | `SharpProof.Host/LinuxWorkerProcess.cs:144–157` |
+| **HST-06** | False Positive / Tautological Architecture Test in `AnalyzerPackagePayloadExcludesWorkerAndSolverAssets` | **High** | `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:480–518` |
+| **HST-07** | `IsProcessRunning` Unhandled `IOException` / `UnauthorizedAccessException` in `/proc` Check | **Medium** | `SharpProof.Package.Test/BuildTaskTests.cs:1684–1712` |
+| **HST-08** | Global `Console.Out` / `Console.Error` Redirection Race Conditions in Parallel Test Execution | **Medium** | `SharpProof.Package.Test/LauncherArgumentTests.cs:1000–1386` |
+| **HST-09** | Inconsistent Schema Version in Test Name vs Implementation in `FuzzRunnerEvidenceTests` | **Low** | `SharpProof.ArchitectureTest/FuzzRunnerEvidenceTests.cs:10–48` |
+| **WRK-01** | Synthetic/Simulated Resource Budget `IsExceeded` Unconditionally Returns `false` | **High** | `SharpProof.Worker/MethodResourceBudget.cs:31` |
+| **WRK-02** | Cache Lookup Throws First-Chance `FileNotFoundException` on Every Cache Miss | **Medium** | `SharpProof.Worker/VerificationCache.cs:27–36` |
+| **WRK-03** | Cache Write Commit Races Cancellation Leaving Pruned Cache State | **High** | `SharpProof.Worker/VerificationCache.cs:156–168` |
+| **WRK-04** | Backend Disposal Failure in `finally` Leaks Remaining Verification Lanes and Replaces Result | **High** | `SharpProof.Worker/SharpProofWorker.cs:341–347` |
+| **WRK-05** | Subsequent Caller Token Cancellation Rewrites Prior Project Timeout to `Canceled` | **High** | `SharpProof.Worker/SharpProofWorker.cs:61–78` |
+| **WRK-06** | Cache-Hit Return Bypasses Post-Validation Timeout/Cancellation Check | **High** | `SharpProof.Worker/SharpProofWorker.cs:188–205` |
+| **WRK-07** | Unbounded Request Validation and Hashing Outside Project Wall Timer | **Medium** | `SharpProof.Worker/SharpProofWorker.cs:43–55` |
+| **WRK-08** | Worker Response Publication in `catch` Blocks Escapes Without Exception Barrier | **High** | `SharpProof.Worker/Program.cs:45–107` |
+| **WRK-09** | POSIX Signal and Console Cancel Handlers Race `CancellationTokenSource` Disposal | **Medium** | `SharpProof.Worker/Program.cs:65–78` |
+| **WRK-10** | Typed Containment Failure (Exit Code 125) Re-Projected to Generic Exit Code 3 | **High** | `SharpProof.Worker.Launcher/Program.cs:132–153, 426–431` |
+| **WRK-11** | Launcher Recovery File Writes Escape Without Exception Boundaries | **High** | `SharpProof.Worker.Launcher/Program.cs:122–148` |
+| **WRK-12** | Private Request Staging I/O Errors Classified as CLI Usage Errors (Exit Code 2) | **Medium** | `SharpProof.Worker.Launcher/Program.cs:71–87` |
+| **WRK-13** | UTF-8 BOM Decoding Asymmetry Between Launcher and Worker | **Medium** | `SharpProof.Worker.Launcher/Program.cs:959` |
+| **WRK-14** | Hard Limit Timing Measured from `Process.Start` Instead of Startup Handshake Release | **Medium** | `SharpProof.Worker.Launcher/Program.cs:218–237` |
+| **WRK-15** | SARIF Run-Failure Notification Suppressed by User Assumption Notifications | **Medium** | `SharpProof.Worker.Launcher/SarifProjection.cs:34–51` |
+| **WRK-16** | SARIF Location URIs Lack Proper Escaping for Non-Absolute Paths | **Medium** | `SharpProof.Worker.Launcher/SarifProjection.cs:179–183` |
+| **WRK-17** | `SpecResultDomainProjection.Rewrite` Omits `IrSequenceAccessTerm` and `IrOpaqueTerm` Children | **Medium** | `SharpProof.Worker/SpecResultDomainProjection.cs:101–113` |
+| **WRK-18** | `NullReferenceException` in `EffectCounterexampleReplayer.WitnessesEqual` on Missing Location | **Low** | `SharpProof.Worker/EffectCounterexampleReplayer.cs:188–197` |
+| **PROT-01** | Numeric Enum Strings Bypass Protocol Canonicalization in `EnsureCanonicalEnum` | **High** | `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:151–178` |
+| **PROT-02** | Short Termination Grace Config Prevents Required Cleanup Reserve in `MaximumElapsedMilliseconds` | **High** | `SharpProof.Worker.Protocol/WorkerExecutionEnvelope.cs:8–26` |
+| **PROT-03** | Effect Evidence Tuple Validation Disagrees with Certainty Admission Table | **High** | `SharpProof.Worker.Protocol/ProtocolModel.schema.json:154–198` |
+| **PROT-04** | Manifest-to-Response Assumption Array Duplication Causes Quadratic Payload Blowup | **High** | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:44–90` |
+| **PROT-05** | Quadratic Manifest and Result Traversal in Protocol Canonicalization and Run Validation | **Medium** | `SharpProof.Worker.Protocol/ProtocolJson.cs:217–220, 596–620` |
+| **PROT-06** | Canonical Manifest Payload Serialization Diverges from Manifest Claim ID Ordering | **Medium** | `SharpProof.Worker.Protocol/ProtocolManifestPayload.cs:23–25` |
+| **PROT-07** | Incomplete Unit Test Masking Schema Discrepancy in `ResourceLimitIncompleteEffectTupleIsAProtocolState` | **Medium** | `SharpProof.Worker.Test/ProtocolJsonTests.cs:436–465` |
+| **PROT-08** | Test Assertion Cementing Defective Execution Envelope Math in `RequestBoundElapsedTimeUsesTheActualLauncherGrace` | **Low** | `SharpProof.Worker.Test/ProtocolJsonTests.cs:1596–1623` |
+| **SMT-01** | Asynchronous `Interrupt()` Race with `Dispose()` on Native Z3 Context | **High** | `SharpProof.Smt/IrSmtBackend.cs:85–103` |
+| **SMT-02** | 32-Bit Rollover Assumption in Resource Accounting Adds Phantom $4.29\times 10^9$ Resources | **High** | `SharpProof.Smt/IrSmtBackend.cs:176–200` |
+| **SMT-03** | Model Extraction Failure for SMT-LIB Formatted Negative Integers | **Medium** | `SharpProof.Smt/IrSmtBackend.cs:264–289` |
+| **SMT-04** | String Literal AST Construction Permitted Without String Theory / Variable Support | **Low** | `SharpProof.Smt/IrSmtBackend.cs:316–324, 554–566` |
+| **SMT-05** | AST Variable Collection Code Duplication Across Fuzzing Modules | **Low** | `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:345–400` |
+| **SMT-06** | Permanent Interruption Latch Prevents Subsequent Query Execution on Reused Backend | **Medium** | `SharpProof.Smt/IrSmtBackend.cs:13, 47, 85–89` |
+| **SMT-07** | `NullReferenceException` Missing from `CheckAsync` Infrastructure Exception Filter | **Low** | `SharpProof.Smt/IrSmtBackend.cs:67–75` |
+| **IR-01** | Unhandled Cleanup `File.Delete` in `finally` Masks Primary Exceptions in `WriteUtf8` & `WriteBytesAsync` | **High** | `SharpProof.Ir/AtomicFile.cs:78–113` |
+| **IR-02** | Staging Filename Length Overflow (`NAME_MAX` Violation) on Long Destination Paths in `AtomicFile.Prepare` | **High** | `SharpProof.Ir/AtomicFile.cs:115–122` |
+| **IR-03** | Member Name Omitted from Structural Key Indexing in `IrFactory.GetOrCreateMember` | **High** | `SharpProof.Ir/IrFactory.cs:180–189` |
+| **IR-04** | TOCTOU Race Condition in `AtomicFile.Publish` and `AtomicFile.PublishStaged` | **Medium** | `SharpProof.Ir/AtomicFile.cs:43–53, 123–133` |
+| **IR-05** | Uninitialized `default(IntSequenceKey)` and `default(StructuralKey)` Throw Exception on `Equals`/`GetHashCode` | **Medium** | `SharpProof.Ir/IrFactory.cs:757–819` |
+| **IR-06** | Half-Bounded Interval Addition Drops Finite Bounds and Over-Approximates to `Top` in `IntervalDomain.TryAddBounds` | **Medium** | `SharpProof.Dataflow/IntervalDomain.cs:269–280` |
+| **IR-07** | `EnsureTermCore` Dereferences Null Term Parameter Without Argument Null Guard | **Low** | `SharpProof.Ir/IrFactory.cs:537–542` |
+| **IR-08** | Missing Parameter Null Guards for `condition` and `consequence` in `IrSemanticTerms.Guard` | **Low** | `SharpProof.Ir/IrSemanticTerms.cs:44–54` |
+| **IR-09** | Missing Null Guard on Parameter Array in `CanonicalHashWriter.Add(params object?[])` | **Low** | `SharpProof.Ir/CanonicalHashWriter.cs:117–137` |
+| **IR-10** | Non-Antisymmetric `Compare` Result on Incomparable Lattice Elements in `ClosedAbstractDomain<T>` | **Low** | `SharpProof.Dataflow/ClosedAbstractDomain.cs:33–48` |
+| **FE-01** | Manifest Target Declaration Cast Throws `InvalidCastException` on C# Top-Level Statements | **High** | `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:647–652` |
+| **FE-02** | IL Summary Lowerer Div/Rem Omission of Zero-Divisor Assumption | **High** | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:1097–1115` |
+| **FE-03** | IL Summary Lowerer Re-initializes Local Variables on Backward Jump to Offset 0 | **Medium** | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:496–506` |
+| **FE-04** | Inconsistent Path Geometry Resolution Under `#line` Directives | **Medium** | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:206–221` |
+| **FE-05** | Cross-Platform Sibling Module Resolution File Path Separator Mismatch | **Medium** | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:350–379` |
+| **FE-06** | Reference Downcast vs Upcast String Equality Asymmetry | **Medium** | `SharpProof.Frontend/RoslynOperationLowerer.cs:667–675, 826–835` |
+| **FE-07** | Unhandled Lock Concurrency in ProbeHash PE Inspection | **Low** | `SharpProof.CompilerProbe.TestAsset/ProbeHash.cs:14–19` |
+| **AZ-01** | Concrete Replay `Proven` Outcome Discarded on Incomplete Flow Status | **High** | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:286–294` |
+| **AZ-02** | Deconstruction Assignment Target Misidentified as Value Consumption | **High** | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:606–632` |
+| **AZ-03** | Incorrect Metadata Type Name for `ContractForDiagnosticDescriptors` in Meta-Analyzer | **High** | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:18, 481, 501` |
+| **AZ-04** | Primary Constructor Resolution Collision with Explicit Constructor Overloads | **Medium** | `SharpProof.Analyzer.Core/PrimaryConstructorCallableInventory.cs:21–38` |
+| **AZ-05** | Missing `SPCF0001`–`SPCF0008` in `AnalyzerReleases.Unshipped.md` | **Medium** | `SharpProof.Analyzer/AnalyzerReleases.Unshipped.md:1–18` |
+| **AZ-06** | Incomplete Multi-Level Unwrapping in Semantic Cache Soundness Rule | **Medium** | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:67–72` |
+| **AZ-07** | Switch Expression Constant Pattern Matching Fails Due to Null `IOperation.SemanticModel` | **Medium** | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1223–1233` |
+| **AZ-08** | Generated Code Header Detection Misses Standard `// <auto-generated>` | **Low** | `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs:10–14` |
+| **AZ-09** | Deprecated Option Check Misses `build_property.sharpproof_mode` Alias | **Low** | `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs:183–192` |
+| **EFF-01** | `IsSourceDefinitelyNull` Premature Lock Check & `ScanLock` Unsound Body Effect Dropping | **High** | `SharpProof.Effects/OperationNullnessEvaluator.cs:71–74`, `OperationEffectScanner.Expressions.cs:135–155` |
+| **EFF-02** | `UsingDisposalEffectResolver.ResolveResource` Discards Effects of Non-Completing `Dispose()` | **Medium** | `SharpProof.Effects/UsingDisposalEffectResolver.cs:421–426` |
+| **EFF-03** | `ScanThrow` and `ExceptionConstructionThrow` Drop Exception Constructor Argument Effects | **Medium** | `SharpProof.Effects/OperationEffectScanner.cs:764–782`, `EffectSummaryOperations.cs:56–70` |
+| **EFF-04** | `DefiniteOperationFacts.GetBody` Missing Support for Expression-Bodied Properties and Indexers | **Low** | `SharpProof.Effects/ManagedAbstractFlow.cs:2429–2438` |
+| **GT-01** | `IrCSharpDifferentialOracle.CompareValue` Drops `Sequence` and `Reference` Kinds | **High** | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:428–436` |
+| **SPC-01** | Unsound Termination Propagation in Relational Summary Composition | **High** | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:287, 402–478` |
+| **SPC-02** | Missing Receiver & Argument State Invalidation for Heap-Mutating Callee Calls | **High** | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:100–140, 402–478` |
+| **SCR-01** | `Invoke-SharpProofDogfood.ps1` Neutralized by `/p:SharpProofProfile=off` | **Medium** | `scripts/Invoke-SharpProofDogfood.ps1:58` |
+| **SPEC-01** | Non-Constant Arithmetic in API Spec Declarations Rejected as Non-Total | **Medium** | `SharpProof.Specs/ApiSpecTermValidator.cs:153–170` |
+| **DOC-01** | `FrameworkTypeMetadataNames.Monitor` Inconsistent Field Modifier | **Low** | `SharpProof.Specs/FrameworkTypeMetadataNames.cs:29` |
+| **SCR-02** | `New-SharpProofReleaseEvidence.ps1` `Write-AtomicText` Fails on Rootless Relative Paths | **Low** | `scripts/New-SharpProofReleaseEvidence.ps1:93–119` |
+
+---
+
+##### Detailed Defect Reports by Subsystem
+
+###### Section 1: BuildTasks & MSBuild Targets
+
+###### BT-01: Subreaper Broad `waitpid(-1)` Reaps Managed Direct Child Process During Cleanup
+- **Severity:** High
+- **Affected File:** `SharpProof.BuildTasks/VerifierProcessSupervisor.cs`, lines 118–149, 204–279, 397–405.
+- **Trigger Scenario:** Cancellation or timeout triggers descendant cleanup (`StopDescendants`) while the managed direct child process has exited or is exiting.
+- **Expected Behavior:** The managed `Process` instance representing the direct child process must observe and reap its own PID to retrieve its exit code before broad child reaping occurs.
+- **Actual Buggy Behavior:** The supervisor operates as a Linux subreaper (`PR_SET_CHILD_SUBREAPER`). During cleanup, `ReapExitedChildren()` calls `waitpid(-1, out _, 1)` in a tight loop. This raw syscall reaps *all* exited child processes, including the direct managed child. Consequently, .NET's internal `Process` tracking fails (subsequent `process.WaitForExit` / `process.ExitCode` throws `InvalidOperationException` or returns `ECHILD`). The supervisor crashes before writing the required `SharpProof.Cleanup/1 <nonce>` receipt. The parent task (`RunVerifier`) treats this missing receipt as an unauthenticated containment failure and invokes `Environment.FailFast`.
+- **Suggested Fix:** Pass the direct child PID to `StopDescendants` and exclude it from `waitpid(-1)` until the managed `Process` object has safely harvested its exit code.
+
+###### BT-02: Uncaught `Process.Start` Exception in Supervisor Omits Cleanup Receipt After Arming
+- **Severity:** High
+- **Affected File:** `SharpProof.BuildTasks/VerifierProcessSupervisor.cs`, lines 83–116.
+- **Trigger Scenario:** The supervisor receives the startup nonce from stdin and writes `SharpProof.Armed/1 <nonce>` to stdout (line 93). Then `process.Start()` is invoked to launch the inner child process. If `process.Start()` throws an exception (such as `Win32Exception` due to file permission issues or missing binary, or `OutOfMemoryException`), there is no `catch` block in `Run()`.
+- **Expected Behavior:** If the child process fails to start after arming, the supervisor must catch the exception, emit `SharpProof.Cleanup/1 <nonce>` to stdout, and exit with code 125.
+- **Actual Buggy Behavior:** The unhandled exception terminates the supervisor abruptly. Because `SharpProof.Armed/1` was already sent, the parent task (`RunVerifier`) expects an authenticated cleanup receipt. When the supervisor dies without emitting `SharpProof.Cleanup/1`, `RequireSupervisorCleanupReceipt` fails and triggers `Environment.FailFast`.
+- **Suggested Fix:** Wrap `process.Start()` in a `try/catch (Exception)` block, emit `WriteCleanupReceipt(nonce)`, and return exit code 125.
+
+###### BT-05: Pre-Launch Setup Elapsed Time Starves Termination and Output Drain Cleanup Reserve
+- **Severity:** Medium
+- **Affected File:** `SharpProof.BuildTasks/RunVerifier.cs`, lines 160–285, 843–867.
+- **Trigger Scenario:** Pre-launch setup (host validation, PATH scanning, nonce generation, assembly verification, process spawning) takes several hundred milliseconds to $>1000$ ms on a heavily loaded host.
+- **Expected Behavior:** The 1000 ms reserve (`LauncherProcessReserveMilliseconds`) must be dedicated solely to process termination, descendant cleanup, and output draining.
+- **Actual Buggy Behavior:** `processStopwatch` starts at line 160 before pre-launch setup. The foreground wait in `WaitForExitOrCancellation` is given `verifierTimeout = processTimeout - LauncherProcessReserveMilliseconds`. If setup takes $>1000$ ms, the remaining timeout when `WaitForExitOrCancellation` times out is 0 ms! `TryTerminate` and `WaitForSupervisorReadiness` receive a timeout of 0 ms, immediately failing with `SupervisorReadiness.NotReady` and calling `HandleContainmentAuthenticationFailure` (`Environment.FailFast`).
+- **Suggested Fix:** Start `processStopwatch` only after `process.Start()` succeeds and pipes are connected.
+
+###### BT-09: Stale `DOTNET_HOST_PATH` Overrides Authoritative `Environment.ProcessPath` in `ResolveDotNetHost`
+- **Severity:** High
+- **Affected File:** `SharpProof.BuildTasks/RunVerifier.cs`, lines 1234–1269.
+- **Trigger Scenario:** MSBuild runs in an environment where `DOTNET_HOST_PATH` was set by an outer tool to a different or stale SDK path, while the current MSBuild process is executing under `Environment.ProcessPath`.
+- **Expected Behavior:** The dotnet host should prioritize `Environment.ProcessPath` when valid, ensuring the verifier runs on the identical runtime as MSBuild.
+- **Actual Buggy Behavior:** `ResolveDotNetHost` checks `Environment.GetEnvironmentVariable("DOTNET_HOST_PATH")` first. If set, it uses that path without checking `Environment.ProcessPath`. This can result in invoking a mismatched dotnet version or failing if `DOTNET_HOST_PATH` points to an invalid SDK.
+- **Suggested Fix:** Check `Environment.ProcessPath` first if valid, or validate that `DOTNET_HOST_PATH` matches `Environment.ProcessPath`.
+
+###### BT-18: Unescaped Semicolons in Paths Cause MSBuild List Splitting and Catastrophic Directory Deletion in `RemoveDir`
+- **Severity:** High
+- **Affected File:** `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`, line 135.
+- **Trigger Scenario:** The project or intermediate output directory contains a semicolon `;` (e.g. `/workspace/proj;v1/`).
+- **Expected Behavior:** MSBuild tasks `RemoveDir` and `MakeDir` should operate strictly on the exact directory path.
+- **Actual Buggy Behavior:** In line 135: `<RemoveDir Directories="$(_SharpProofCleanupInvocationDirectoryFullPath)" />`. In MSBuild, `Directories` is an `ITaskItem[]` parameter. MSBuild splits strings containing unescaped semicolons into multiple items. For `/workspace/proj;v1/obj/SharpProof/runs/<id>`, `RemoveDir` splits this into `/workspace/proj` and `v1/obj/SharpProof/runs/<id>`, and recursively deletes `/workspace/proj` — destroying the user's project directory!
+- **Suggested Fix:** Escape the path with `$([MSBuild]::Escape('$(_SharpProofCleanupInvocationDirectoryFullPath)'))`.
+
+---
+
+###### Section 2: Host, Platform Interop, Packaging & Architecture
+
+###### HST-01: `FindFileSystemType` Overmount / Stacked Mount Shadowing Defect
+- **Severity:** High
+- **Affected File:** `SharpProof.Host/LinuxPathIdentity.cs`, lines 756–762.
+- **Trigger Scenario:** When a filesystem path resides on a directory mount point that has been stacked or overmounted (e.g., in container environments where `/workspace` or a submount is mounted with ext4 and then overmounted with another filesystem like NFS or tmpfs).
+- **Expected Behavior:** In Linux `/proc/self/mountinfo`, lines are ordered chronologically. When multiple mounts share the exact same mountpoint, the later entry represents the active, visible mount. `FindFileSystemType` should identify the active top-level mount.
+- **Actual Buggy Behavior:** Line 756 tests `if (!IsPathWithin(canonicalPath, mount) || bestMount != null && mount.Length <= bestMount.Length) continue;`. Because the condition checks `<=`, when a subsequent mount entry has the *same* mount point length, it skips the entry, retaining the earlier shadowed mount entry and bypassing unsupported remote filesystem checks.
+- **Suggested Fix:** Change `mount.Length <= bestMount.Length` to `mount.Length < bestMount.Length`.
+
+###### HST-02: `ReleaseLocks` and `PublicationLock.Dispose` Handle Leaks on Exception
+- **Severity:** High
+- **Affected File:** `SharpProof.Host/LinuxPathIdentity.cs`, lines 692–702, 867–874.
+- **Trigger Scenario:** An unhandled exception occurs during `flock(..., LOCK_UN)` inside `Release()`, or during batch cleanup when releasing acquired locks in `ReleaseLocks`.
+- **Expected Behavior:** All publication locks must attempt release, and all underlying `SafeFileHandle` instances must be disposed cleanly without leaking file descriptors or aborting prematurely.
+- **Actual Buggy Behavior:** In `ReleaseLocks`, if `locks[index].Release()` throws an exception, the loop aborts and remaining locks are never released nor disposed. In `PublicationLock.Dispose()`, if `Release()` throws, `_handle.Dispose()` is skipped, leaking the OS file handle.
+- **Suggested Fix:** Wrap unlock and dispose in resilient try/finally blocks.
+
+###### HST-06: False Positive / Tautological Architecture Test in `AnalyzerPackagePayloadExcludesWorkerAndSolverAssets`
+- **Severity:** High
+- **Affected File:** `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs`, lines 480–518.
+- **Trigger Scenario:** Running architecture boundary enforcement tests against `SharpProof.Package`.
+- **Expected Behavior:** The test should inspect the actual packaged analyzer payload defined in `SharpProof.nuspec` (which defines `<files><file src="..." target="..." /></files>`) to ensure no worker or solver assets (`Microsoft.Z3`, `libz3`, `SharpProof.Smt`, `SharpProof.Verify`, `SharpProof.Worker`) are packaged into analyzer directories.
+- **Actual Buggy Behavior:** The test inspects `SharpProof.Package.csproj` for `<TfmSpecificPackageFile>` elements. Because `SharpProof.Package.csproj` delegates packaging to `SharpProof.nuspec` and does NOT declare any `TfmSpecificPackageFile` elements, `analyzerPayload` is always `""`. The test unconditionally passes without validating any package contents.
+- **Suggested Fix:** Inspect `SharpProof.Package/SharpProof.nuspec` XML structure directly.
+
+---
+
+###### Section 3: Worker Core & Worker Launcher
+
+###### WRK-01: Synthetic/Simulated Resource Budget `IsExceeded` Unconditionally Returns `false`
+- **Severity:** High
+- **Affected File:** `SharpProof.Worker/MethodResourceBudget.cs`, line 31.
+- **Trigger Scenario:** Verification is executed using a simulated/mock backend or when `readConsumedResourceCount` is `null`.
+- **Expected Behavior:** `IsExceeded` should return `true` when total consumed/reserved resources exceed `_methodRlimit` regardless of whether `_readConsumedResourceCount` is provided.
+- **Actual Buggy Behavior:** `IsExceeded` explicitly requires `_readConsumedResourceCount != null && GetConsumedResourceCount() > _methodRlimit`. When `_readConsumedResourceCount == null`, `IsExceeded` always returns `false`, disabling resource limits.
+- **Suggested Fix:** Change to `internal bool IsExceeded => GetConsumedResourceCount() > _methodRlimit;`.
+
+###### WRK-04: Backend Disposal Failure in `finally` Leaks Remaining Verification Lanes and Replaces Result
+- **Severity:** High
+- **Affected File:** `SharpProof.Worker/SharpProofWorker.cs`, lines 341–347, 457–465.
+- **Trigger Scenario:** During `VerifyAsync.finally` cleanup, `lane.DisposeOwnedBackend()` on lane 0 throws an exception (e.g. native solver termination failure).
+- **Expected Behavior:** All solver lanes must be disposed safely, exceptions during disposal must be caught, and a successfully verified verification result must not be overwritten.
+- **Actual Buggy Behavior:** An exception on `solverLanes[0]` immediately aborts the loop, leaving native solver processes and memory from lanes 1..N leaked. Furthermore, the unhandled disposal exception escapes `VerifyAsync`, discarding the computed verification response.
+- **Suggested Fix:** Wrap each lane disposal in a resilient try/catch block.
+
+###### WRK-05: Subsequent Caller Token Cancellation Rewrites Prior Project Timeout to `Canceled`
+- **Severity:** High
+- **Affected File:** `SharpProof.Worker/SharpProofWorker.cs`, lines 61–78, 340.
+- **Trigger Scenario:** The worker project wall timer expires (`projectBoundary` cancels), raising `OperationCanceledException`. While the worker unwinds to line 340, the caller's cancellation token is canceled by a supervisor or cancellation propagation handler.
+- **Expected Behavior:** The verification outcome should remain `WorkerRunStatus.TimedOut` (exit code 124) because the project budget timeout triggered first.
+- **Actual Buggy Behavior:** `Interrupted` checks `cancellationToken.IsCancellationRequested` first. When caller cancellation is signaled after the project timeout occurred, it converts a deterministic `TimedOut` result (exit 124) into a `Canceled` result (exit 4).
+- **Suggested Fix:** Track which cancellation source triggered first and preserve `TimedOut`.
+
+###### WRK-10: Typed Containment Failure (Exit Code 125) Re-Projected to Generic Exit Code 3
+- **Severity:** High
+- **Affected File:** `SharpProof.Worker.Launcher/Program.cs`, `SharpProof.Worker.Launcher/LauncherProjections.generated.cs`, lines 132–153, 426–431.
+- **Trigger Scenario:** The worker process fails containment setup and exits with code 125, or `ClassifyLauncherFailure` classifies an environmental startup exception as `ContainmentFailure` (exit 125).
+- **Expected Behavior:** The launcher should preserve exit code 125 so outer build tasks and supervisors recognize a containment failure.
+- **Actual Buggy Behavior:** `NoResultFailure(125)` constructs a `LauncherFailure(125, Failed, ContainmentFailure, ...)`. `ValidateAndReport` calls `LauncherPresentation.ExitCode(response.RunStatus)`, which maps `Failed` to `3`. `RunMain` then returns `3` instead of the original classified exit code `125`.
+- **Suggested Fix:** Make exit code projection depend on `(RunStatus, FailureReason)`, returning `125` for `FailureReason == WorkerRunFailureReason.ContainmentFailure`.
+
+---
+
+###### Section 4: Worker Protocol & Worker Tests
+
+###### PROT-01: Numeric Enum Strings Bypass Protocol Canonicalization in `EnsureCanonicalEnum`
+- **Severity:** High
+- **Affected File:** `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs`, lines 151–178.
+- **Trigger Scenario:** A JSON payload contains a string property for an enum field whose value is an undeclared integer formatted as a string (e.g. `"99999"`).
+- **Expected Behavior:** JSON schema shape validation should reject non-canonical and undeclared numeric enum string values, throwing `JsonException`.
+- **Actual Buggy Behavior:** In .NET, `Enum.Parse` succeeds on numeric strings even if undefined, and `parsed.ToString()` reproduces `"99999"`. `string.Equals(parsed.ToString(), text)` compares `"99999"` to `"99999"`, evaluates to `true`, and does not throw! The invalid numeric enum string bypasses shape verification entirely.
+- **Suggested Fix:** Ensure string is not numeric/signed and verify `Enum.IsDefined(enumType, parsed)`.
+
+###### PROT-03: Effect Evidence Tuple Validation Disagrees with Certainty Admission Table
+- **Severity:** High
+- **Affected File:** `SharpProof.Worker.Protocol/ProtocolModel.schema.json`, lines 154–198; `SharpProof.Worker.Protocol/ProtocolModel.generated.cs`, lines 756–781.
+- **Trigger Condition:** An effect claim verification finishes with `Unknown` outcome due to `ResourceLimit` or `UnsupportedBody` with certainty `IncompleteMayEffectSummary` or `TrustedCompleteBoundary`.
+- **Expected Behavior:** The response should pass protocol validation because these combinations are explicitly permitted by the `EffectCertainty` table in `ProtocolModel.schema.json`.
+- **Actual Buggy Behavior:** In `EffectEvidenceTuple`, rows for `ResourceLimit` and `UnsupportedBody` are omitted from the tuple table. Claims with these reasons fail `MatchesEffectEvidenceTuple` and are rejected with `response.effect_evidence`.
+- **Suggested Fix:** Add missing tuple rows to `EffectEvidenceTuple` in `ProtocolModel.schema.json` and regenerate.
+
+---
+
+###### Section 5: SMT Backend, Fuzzing & Differential Testing
+
+###### SMT-01: Asynchronous `Interrupt()` Race with `Dispose()` on Native Z3 Context
+- **Severity:** High
+- **Affected File:** `SharpProof.Smt/IrSmtBackend.cs`, lines 85–103.
+- **Trigger Condition:** A cancellation token triggers its callback while another thread is disposing the `IrSmtBackend` instance.
+- **Expected Behavior:** `Interrupt()` must safely synchronize with `Dispose()` and never invoke methods on a disposed native Z3 context pointer.
+- **Actual Buggy Behavior:** `Interrupt()` executes on the thread pool via `cancellationToken.Register` without acquiring `_gate` or checking `_disposed`. When `Dispose()` runs concurrently, `_context.Dispose()` frees the native context pointer, causing access violations or native memory corruption on `_context.Interrupt()`.
+- **Suggested Fix:** Synchronize `Interrupt()` with `_gate` and guard with `!_disposed`.
+
+###### SMT-02: 32-Bit Rollover Assumption in Resource Accounting Adds Phantom $4.29\times 10^9$ Resources
+- **Severity:** High
+- **Affected File:** `SharpProof.Smt/IrSmtBackend.cs`, lines 176–200.
+- **Trigger Condition:** Consecutive verification queries on a shared backend encounter a lower `rlimit count` on a new solver instance.
+- **Expected Behavior:** `ConsumedResourceCount` should accurately track the sum of resource units consumed by queries.
+- **Actual Buggy Behavior:** `CheckCore` allocates a fresh `Solver` per query. When a subsequent query consumes fewer rlimit units than the previous query's solver (`observed < _lastObservedResourceCount`), `(1L << 32) - _lastObservedResourceCount + observed` incorrectly assumes a 32-bit integer rollover and adds $(2^{32} - \Delta) \approx 4.29\times 10^9$ phantom resource units to `_consumedResourceCount`, falsely exhausting resource budgets.
+- **Suggested Fix:** Accumulate per-solver `observed` count directly without rollover math.
+
+---
+
+###### Section 6: IR Data Structures, Atomic Files & Dataflow Analysis
+
+###### IR-01: Unhandled Cleanup `File.Delete` in `finally` Masks Primary Exceptions in `WriteUtf8` & `WriteBytesAsync`
+- **Severity:** High
+- **Affected File:** `SharpProof.Ir/AtomicFile.cs`, lines 78–113.
+- **Trigger Condition:** A primary write operation fails (e.g. disk full `IOException`). During `finally` block execution, `File.Delete(temporary)` is executed and throws an `IOException` or `UnauthorizedAccessException` due to file locks or scanner interference.
+- **Expected Behavior:** The primary failure or cancellation exception is preserved; temporary file staging cleanup is best-effort.
+- **Actual Buggy Behavior:** The raw `File.Delete(temporary)` in the `finally` block throws an unhandled exception, which replaces/masks the primary exception.
+- **Suggested Fix:** Use `TryDeleteStaged(temporary)` in `finally` blocks.
+
+###### IR-03: Member Name Omitted from Structural Key Indexing in `IrFactory.GetOrCreateMember`
+- **Severity:** High
+- **Affected File:** `SharpProof.Ir/IrFactory.cs`, lines 180–189.
+- **Trigger Condition:** Two members on the same declaring type share the same `identity`, `returnType`, `isStatic`, and `parameterTypes`, but have different member names (e.g., `GetCount()` vs `GetSize()`).
+- **Expected Behavior:** Distinct member names must yield distinct `IrMemberId` instances.
+- **Actual Buggy Behavior:** `nameId` is interned, but `nameId` is completely omitted from `StructuralKey`. `_memberIds.TryGetValue` collides, returning the first-registered member for all subsequent distinct member names matching the signature.
+- **Suggested Fix:** Include `nameId.Value` in `StructuralKey`.
+
+---
+
+###### Section 7: Compiler Collector, Compiler Artifacts & Frontend Lowering
+
+###### FE-01: Manifest Target Declaration Cast Throws `InvalidCastException` on C# Top-Level Statements
+- **Severity:** High
+- **Affected File:** `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs`, lines 647–652.
+- **Trigger Condition:** Projects using C# 9+ top-level statements where Roslyn associates `<Program>$.<Main>$` with `CompilationUnitSyntax`.
+- **Expected Behavior:** Top-level entry points and synthetic method targets should bind declaring syntax without throwing runtime cast exceptions.
+- **Actual Buggy Behavior:** `(BaseMethodDeclarationSyntax)Declaration!` throws `InvalidCastException` when `Declaration` is `CompilationUnitSyntax`.
+- **Suggested Fix:** Use `Declaration as BaseMethodDeclarationSyntax;`.
+
+###### FE-02: IL Summary Lowerer Div/Rem Omission of Zero-Divisor Assumption
+- **Severity:** High
+- **Affected File:** `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs`, lines 1097–1115.
+- **Trigger Condition:** Referenced PE assemblies with IL methods performing integer division (`div`, `div.un`) or remainder (`rem`, `rem.un`).
+- **Expected Behavior:** Explicit non-zero divisor constraints (`Assume(right != 0)`) must be emitted.
+- **Actual Buggy Behavior:** Only range constraints are emitted. In SMT semantics, unconstrained division allows the solver to find spurious counterexamples with `right == 0`.
+- **Suggested Fix:** Prepend `builder.Assume(builder.Binary(IrBinaryOperator.NotEqual, right, builder.Integer(0)));`.
+
+---
+
+###### Section 8: Diagnostic Analyzers, Analyzer Core & Meta Analyzers
+
+###### AZ-01: Concrete Replay `Proven` Outcome Discarded on Incomplete Flow Status
+- **Severity:** High
+- **Affected File:** `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, lines 286–294.
+- **Trigger Condition:** Calling a method with a `[Requires]` precondition where arguments are compile-time constants evaluating to `true`, but the call site is an unflowed candidate (e.g. primary constructor base call or member initializer).
+- **Expected Behavior:** If `AnalyzeConcreteCall` proves that all arguments are compile-time constant/pure and the condition evaluates to `true`, it should return `AnalyzerSemanticOutcome.Proven`.
+- **Actual Buggy Behavior:** `if (candidate.FlowStatus != ManagedFlowStatus.Complete)` converts `Proven` outcomes to `AnalyzerSemanticOutcome.Unknown`, raising erroneous `SP0047` diagnostics.
+- **Suggested Fix:** Check `if (concrete.HasValue) return concrete.Value;` before inspecting `candidate.FlowStatus`.
+
+###### AZ-02: Deconstruction Assignment Target Misidentified as Value Consumption
+- **Severity:** High
+- **Affected File:** `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs`, lines 606–632.
+- **Trigger Condition:** A local variable holding an anonymous function / delegate is reassigned on the LHS of a deconstruction assignment `(local, other) = (newFunc, 123);`.
+- **Expected Behavior:** `CanReachConsumption` should recognize that `local` is being assigned/killed on the LHS.
+- **Actual Buggy Behavior:** `HasEnclosingSimpleAssignment` traverses `reference.Parent` looking exclusively for `ISimpleAssignmentOperation`. In Roslyn, tuple deconstruction produces `IDeconstructionAssignmentOperation`. The kill check is skipped and `CanReachConsumption` erroneously returns `true`.
+- **Suggested Fix:** Update check to match `IAssignmentOperation` (including `IDeconstructionAssignmentOperation`).
+
+###### AZ-03: Incorrect Metadata Type Name for `ContractForDiagnosticDescriptors` in Meta-Analyzer
+- **Severity:** High
+- **Affected File:** `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, lines 18, 481, 501.
+- **Trigger Condition:** `SharpProofSoundnessAnalyzer` executes `AnalyzeObjectCreation` on descriptor declarations in `ContractForDiagnosticDescriptors.generated.cs`.
+- **Expected Behavior:** Descriptors in `ContractForDiagnosticDescriptors` should be allowlisted from `SPMETA005`.
+- **Actual Buggy Behavior:** `KnownTypeNames[9]` is set to `"SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors"` instead of `"SharpProof.ContractForValidation.ContractForDiagnosticDescriptors"`, raising false positive `SPMETA005` errors.
+- **Suggested Fix:** Update `KnownTypeNames[9]` to `"SharpProof.ContractForValidation.ContractForDiagnosticDescriptors"`.
+
+---
+
+###### Section 9: Contracts, Effects, Attributes & Source Generators
+
+###### EFF-01: `IsSourceDefinitelyNull` Premature Lock Check & `ScanLock` Unsound Body Effect Dropping
+- **Severity:** High
+- **Affected File:** `SharpProof.Effects/OperationNullnessEvaluator.cs`, lines 71–74; `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, lines 135–155.
+- **Trigger Condition:** A method containing a `lock (x)` statement where the locked expression was associated with a lock construct, but whose body performs side effects.
+- **Expected Behavior:** The analyzer must scan `@lock.Body` and accumulate all may-effects.
+- **Actual Buggy Behavior:** `IsSourceDefinitelyNull` unconditionally returns `true` if `origin is ILockOperation`. In `ScanLock`, `entry.CompletesNormally` becomes `false`, causing the scanner to completely skip scanning `@lock.Body`. All effects inside the lock body are silently dropped, producing an unsound pure summary for impure code.
+- **Suggested Fix:** Evaluate actual flow nullness of `@lock.LockedValue` and always scan `@lock.Body`.
+
+###### EFF-03: `ScanThrow` and `ExceptionConstructionThrow` Drop Exception Constructor Argument Effects
+- **Severity:** Medium
+- **Affected File:** `SharpProof.Effects/OperationEffectScanner.cs`, lines 764–782; `SharpProof.Effects/EffectSummaryOperations.cs`, lines 56–70.
+- **Trigger Condition:** An explicit throw statement constructing an exception with evaluated arguments: `throw new CustomException(ComputeMessage(), Helper.GetState());`.
+- **Expected Behavior:** Evaluating exception constructor arguments can perform heap allocations, reads, and writes, which must be retained in the summary.
+- **Actual Buggy Behavior:** `ScanThrow` checks `arguments.CompletesNormally` but never joins `arguments.Summary` into the returned summary. Furthermore, `ExceptionConstructionThrow` hardcodes `Reads = Empty` and `Writes = Empty`.
+- **Suggested Fix:** Join `arguments.Summary` in `ScanThrow` and preserve reads/writes in `ExceptionConstructionThrow`.
+
+---
+
+###### Section 10: Verification Engine, Specifications, Summaries, Gates & Infrastructure
+
+###### GT-01: `IrCSharpDifferentialOracle.CompareValue` Drops `Sequence` and `Reference` Kinds
+- **Severity:** High
+- **Affected File:** `SharpProof.Testing/IrCSharpDifferentialOracle.cs`, lines 428–436.
+- **Trigger Condition:** Executing differential testing on expressions evaluating to a sequence (array) or reference value.
+- **Expected Behavior:** `CompareValue` should compare the runtime C# `Array` (or reference object) produced by compiled C# against the IR interpreter's evaluated `IrValue`.
+- **Actual Buggy Behavior:** `CompareValue`'s switch expression only contains cases for `Boolean`, `Integer`, `String`, and `Null`. It defaults to `_ => false` for any `Sequence` or `Reference` kind, returning `DifferentialStatus.Mismatch` even when both runtimes produced identical arrays.
+- **Suggested Fix:** Add pattern matches for `IrValueKind.Sequence` (recursively comparing elements) and `IrValueKind.Reference`.
+
+###### SPC-01: Unsound Termination Propagation in Relational Summary Composition
+- **Severity:** High
+- **Affected File:** `SharpProof.Summaries/IrRelationalSummaryBuilder.cs`, lines 287, 402–478.
+- **Trigger Condition:** Building a relational summary for method `A` that invokes callee dependency `B` where `B` has `Termination == IrSummaryTermination.Unknown`.
+- **Expected Behavior:** Composed summary must reflect `Termination = IrSummaryTermination.Unknown`.
+- **Actual Buggy Behavior:** `ApplyCall` ignores `dependency.Termination`, and `Execute()` hardcodes `IrSummaryTermination.TerminatesOrThrows`, leading to unsound termination assumptions.
+- **Suggested Fix:** Track callee termination and propagate `_termination` to the summary constructor.
+
+###### SPC-02: Missing Receiver & Argument State Invalidation for Heap-Mutating Callee Calls
+- **Severity:** High
+- **Affected File:** `SharpProof.Summaries/IrRelationalSummaryBuilder.cs`, lines 100–140, 402–478.
+- **Trigger Condition:** Method summary is constructed for a method with non-static receiver or reference parameters, and code following a callee call reads the receiver or reference argument.
+- **Expected Behavior:** Per `SEMANTICS.md`, relational summaries must restrict methods to static scalar methods or invalidate reference environments across mutating calls.
+- **Actual Buggy Behavior:** `ValidateSignature` permits instance receivers and reference parameters, but `ApplyCall` leaves receiver and reference arguments unchanged in `environment`. Subsequent instructions read stale pre-call state.
+- **Suggested Fix:** Enforce in `ValidateSignature` that `member.IsStatic` is true and all parameter/return types are scalar (`BooleanType` or `IntegerType`).
+
+###### SCR-01: `Invoke-SharpProofDogfood.ps1` Neutralized by `/p:SharpProofProfile=off`
+- **Severity:** Medium
+- **Affected File:** `scripts/Invoke-SharpProofDogfood.ps1`, line 58.
+- **Trigger Condition:** Running `Invoke-SharpProofDogfood.ps1` to dogfood `SharpProof.Analyzer` on the repository's projects.
+- **Expected Behavior:** Dogfooding builds projects with the SharpProof analyzer active.
+- **Actual Buggy Behavior:** Line 58 explicitly passes `/p:SharpProofProfile=off`. When `SharpProofProfile=off`, `SharpProofAnalyzerEngine.cs` immediately returns without analyzing any syntax or symbols, executing as an inert build.
+- **Suggested Fix:** Change `/p:SharpProofProfile=off` to `/p:SharpProofProfile=advisory`.
+
+---
+
+##### Conclusion & Verification Status
+
+Every line of code across all 10 subsystems was rigorously audited by 10 dedicated parallel audit shards. All 104 identified bugs represent verified static proofs and correctness issues with clear reproduction mechanics and concrete remediations recorded.
+
+<!-- END CONSOLIDATED SOURCE: BUGS_5.md -->
