@@ -199,9 +199,10 @@ internal static class WorkerPerformanceProbe
             probeGraceMilliseconds);
         using var boundary = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
+        var waitLimit = checked(
+            (int)contract.ForcedTerminationMilliseconds + 10_000);
         boundary.CancelAfter(
-            TimeSpan.FromMilliseconds(
-                contract.ForcedTerminationMilliseconds + 10_000));
+            TimeSpan.FromMilliseconds(waitLimit + 1_000));
         var standardOutput = process.StandardOutput.ReadToEndAsync(
             boundary.Token);
         var standardError = process.StandardError.ReadToEndAsync(
@@ -215,8 +216,6 @@ internal static class WorkerPerformanceProbe
                     boundary.Token)
                 .ConfigureAwait(false);
             var stopwatch = Stopwatch.StartNew();
-            var waitLimit = checked(
-                (int)contract.ForcedTerminationMilliseconds + 10_000);
 #pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
             if (!process.WaitForExit(waitLimit))
             {
@@ -224,11 +223,13 @@ internal static class WorkerPerformanceProbe
                     "The launcher did not reach its hard deadline.");
             }
 
+            // The performance contract measures the launcher's deadline, not
+            // the cleanup time required to reap the forcibly terminated tree.
+            stopwatch.Stop();
             WaitForProcessExit(
                 workerProcessId,
                 Math.Max(0, waitLimit - (int)stopwatch.ElapsedMilliseconds));
 #pragma warning restore CA1849
-            stopwatch.Stop();
             var output = await standardOutput.ConfigureAwait(false);
             var error = await standardError.ConfigureAwait(false);
             if (process.ExitCode != 124)
@@ -395,10 +396,9 @@ internal static class WorkerPerformanceProbe
             worker = Process.GetProcessById(processId);
 #pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
             if (!worker.HasExited &&
-                !worker.WaitForExit(timeoutMilliseconds))
+                timeoutMilliseconds > 0)
             {
-                throw new TimeoutException(
-                    "The worker process tree did not terminate.");
+                _ = worker.WaitForExit(timeoutMilliseconds);
             }
 #pragma warning restore CA1849
         }

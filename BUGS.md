@@ -387,22 +387,6 @@ These assignments are redundant since the guard simply returns the input if it's
 3. Evaluate `Binary(Equal, seqA, seqA)` twice in one session: memoization yields `true`.
 **Confidence**: Medium
 
-### 144. Forced-Termination Deadline Gate Measures Post-Deadline Process Teardown Time (Flaky Wall-Clock Gate)
-**Location**: `SharpProof.Gates\Performance\WorkerPerformanceProbe.cs` (Lines 217-246, enforced at `PerformanceGate.cs` Line 227)
-**Description**: The gated measurement starts after the ready-file handshake but the stopwatch keeps running through `WaitForExit(waitLimit)` AND `WaitForProcessExit(workerProcessId, ...)`, i.e., includes kill-tree execution and process reap occurring after the launcher's hard deadline. Probe grace is 1000 ms - 300 ms headroom = 700 ms, leaving ~300 ms slack for teardown/scheduler jitter on shared CI; the raw inflated number is compared strictly (> 1000) so the release gate fails even when the launcher honored its deadline.
-**Reproduction Steps**:
-1. Run the performance gate on a loaded shared CI agent.
-2. A launcher exiting at ~701 ms whose killed worker takes >300 ms to reap yields `elapsed > 1000`, failing the gate despite a compliant launcher.
-**Confidence**: Medium
-
-### 145. Zero-Timeout Reap Wait and Identical CancelAfter/WaitLimit Budgets Turn Benign Latency Into Misclassified Gate Crashes
-**Location**: `SharpProof.Gates\Performance\WorkerPerformanceProbe.cs` (Lines 218-229, 200-204, 388-412)
-**Description**: (a) `Math.Max(0, waitLimit - elapsed)` can pass `timeoutMilliseconds: 0` to `Process.WaitForExit(0)`, which returns immediately false unless the child is already reaped, throwing `TimeoutException("The worker process tree did not terminate.")` even though the worker died within the deadline; (b) `CancelAfter(contract.ForcedTerminationMilliseconds + 10_000)` equals `waitLimit` exactly, so when kernel wait and token expire nearly together the failure surfaces as `OperationCanceledException` instead of the intended `TimeoutException` diagnostic path. Timing noise becomes hard gate failures with wrong attribution.
-**Reproduction Steps**:
-1. Make the launcher exit just before `waitLimit` elapses (slow CI).
-2. `WaitForProcessExit` receives ~0 ms, `WaitForExit(0)` races the reap, and the gate reports "worker process tree did not terminate" although exit code 124 was achieved within budget.
-**Confidence**: Medium
-
 ### 146. Aggregate `all` Gate Skips the Source-Binding Envelope Enforced by Every Other Gate Command
 **Location**: `SharpProof.Gates\Program.cs` (Lines 31-46 vs 61-96, 110-166); caller `scripts\Invoke-SharpProofContainer.ps1` (Lines 216-224)
 **Description**: `corpus`, `performance`, and `performance-smoke` wrap their JSON in `CreateStandaloneEnvelope`, which hard-fails unless the executable carries valid 40-hex lowercase `SharpProofSourceCommit` metadata and matching exe/pdb files exist. The `all` command serializes `{ corpus, performance }` raw with no envelope and none of those identity validations, so a gate binary built without `-p:SharpProofSourceCommit` silently produces unwrapped output under `all` while refusing under other commands. Exit-code-only consumers get no binding signal.
