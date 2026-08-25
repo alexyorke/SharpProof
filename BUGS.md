@@ -427,14 +427,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Session summary: Reads(h), no writes, Complete.
 **Confidence**: Medium
 
-### 160. SP0024 Usage Diagnostics Leak Out of Generated Code Because Two Pipeline Paths Report Before (or Without) the Generated-Code Gate
-**Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 87-102, 162, 223-234); `SharpProofAnalyzerEngine.cs` (Lines 114-143); `SharpProofControlAttributePolicy.cs` (Lines 147-194)
-**Description**: Every other entry point gates on IsGenerated before reporting. Two paths violate this: (1) AnalyzeOperationBlock runs GetSelection (which calls ValidateAndShouldSuppress, reporting SP0024 for malformed [SharpProofSuppress]/[SharpProofTrusted]) before the generated-code early return; (2) ValidateMethodAttributes and the NamedType/assembly ValidateDeclaredScope callbacks have no generated-code gate before contract-argument validation and rejected-API reporting. The same diagnostic category gets opposite treatment depending on which callback owns the symbol, contradicting the quietness policy pinned by tests.
-**Reproduction Steps**:
-1. Add generated tree Gen.g.cs containing `[SharpProofSuppress("")] internal static class G { internal static void M() { } }`.
-2. Run analysis: an Error-severity SP0024 is reported from Gen.g.cs even though M is unselected and all other diagnostics for that tree are suppressed; moving the attribute onto a local function in another .g.cs silences it, proving inconsistent gating.
-**Confidence**: High
-
 ### 161. Nested-Callable Declaration Validation Unregistered in Advisory Operation-Only Activation, So Malformed Suppress/Trusted Attributes on Lambdas Escape
 **Location**: `SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs` (Lines 114-123 registration gate; 225-232 advisory activation returning RequiresSymbolAnalysis:false)
 **Description**: ValidateNestedCallableDeclaration is the only validator for [SharpProofSuppress]/[SharpProofTrusted] on local functions/lambdas and registers only when RequiresSymbolAnalysis is true. In advisory mode triggered by Contract-API-shaped invocations, symbol actions are not registered, yet method/type/assembly-level instances of the same malformed attributes are still validated via the operation-block path. Enforcement of one rule silently depends on which advisory tier fired.

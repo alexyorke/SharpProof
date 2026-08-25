@@ -27,6 +27,7 @@ internal static class SharpProofControlAttributePolicy
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!session.Attributes.IsRejectedControlAttribute(attribute) ||
+                IsGeneratedAttribute(attribute, session, cancellationToken) ||
                 !session.TryMarkRejectedControlAttributeReported(attribute))
             {
                 continue;
@@ -164,6 +165,11 @@ internal static class SharpProofControlAttributePolicy
                 suppress |= suppressing.Value;
                 continue;
             }
+            if (symbol is not IMethodSymbol &&
+                IsGeneratedAttribute(attribute, session, cancellationToken))
+            {
+                continue;
+            }
             ReportInvalidReason(
                 symbol, attribute, suppressing.Value, reason, session,
                 reportDiagnostic, cancellationToken);
@@ -217,5 +223,18 @@ internal static class SharpProofControlAttributePolicy
                 inventory.Trusted)
                 ? false
                 : null;
+    }
+
+    private static bool IsGeneratedAttribute(
+        AttributeData attribute,
+        AnalyzerSession session,
+        CancellationToken cancellationToken)
+    {
+        var tree = attribute.ApplicationSyntaxReference?.SyntaxTree;
+        return tree != null &&
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                tree,
+                session.Compilation,
+                cancellationToken);
     }
 }

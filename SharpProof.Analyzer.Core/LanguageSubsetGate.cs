@@ -166,7 +166,7 @@ internal static class LanguageSubsetGate
             IInvocationOperation invocation =>
                 SupportsCall(invocation.TargetMethod, hasResolvedGenericApiSpec),
             IObjectCreationOperation creation =>
-                !creation.IsImplicit &&
+                (!creation.IsImplicit || creation.Parent is IAttributeOperation) &&
                 creation.Constructor != null &&
                 SupportsCall(creation.Constructor, hasResolvedGenericApiSpec),
             IPropertyReferenceOperation property =>

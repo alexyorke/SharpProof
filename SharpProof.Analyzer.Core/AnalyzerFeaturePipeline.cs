@@ -84,6 +84,18 @@ internal static partial class AnalyzerFeaturePipeline
             return;
         }
 
+        var declaration = method.DeclaringSyntaxReferences[0]
+            .GetSyntax(context.CancellationToken);
+        var generated = AnalyzerGeneratedCodePolicy.IsGenerated(
+            method,
+            declaration.SyntaxTree,
+            context.Compilation,
+            context.CancellationToken);
+        if (generated && !GetFeatureSelection(method, session).Any)
+        {
+            return;
+        }
+
         EffectContractDiagnostics.ValidateArguments(method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(method, session, context.ReportDiagnostic);
         var rejectedContractApi =
@@ -105,8 +117,6 @@ internal static partial class AnalyzerFeaturePipeline
         if (IsConcreteSemicolonAccessor(method, context.CancellationToken) &&
             selection.Any)
         {
-            var declaration = method.DeclaringSyntaxReferences[0]
-                .GetSyntax(context.CancellationToken);
             if (AnalyzerGeneratedCodePolicy.IsGenerated(
                     method,
                     declaration.SyntaxTree,
@@ -220,6 +230,16 @@ internal static partial class AnalyzerFeaturePipeline
                 ContractSelectionFeatures.None ||
             session.GetContractClauses(method)
                 .HasRejectedContractApiUsage;
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                declaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken) &&
+            !GetFeatureSelection(method, session).Any &&
+            !rejectedContractApi)
+        {
+            return;
+        }
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
         if (!selection.Any &&
@@ -756,6 +776,23 @@ internal static partial class AnalyzerFeaturePipeline
         var suppressed = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
             method, session, reportDiagnostic, cancellationToken);
         return new(features, suppressed);
+    }
+
+    private static MethodSelection GetFeatureSelection(
+        IMethodSymbol method,
+        AnalyzerSession session)
+    {
+        var features = session.Attributes.Select(
+            method,
+            session.Configuration.ContractsEnabled &&
+            session.ResolveContractSource(method).HasSelectedContractIntent) &
+            ((session.Configuration.ContractsEnabled
+                  ? ContractSelectionFeatures.Contracts
+                  : ContractSelectionFeatures.None) |
+             (session.Configuration.EffectsEnabled
+                  ? ContractSelectionFeatures.Effects
+                  : ContractSelectionFeatures.None));
+        return new(features, false);
     }
 
     private static SyntaxNode? FindDeclaration(
