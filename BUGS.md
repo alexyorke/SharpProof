@@ -6,19 +6,6 @@ This file documents security, code quality, and correctness issues identified in
 
 ## Issues
 
-### 1. Redundant Parameter Assignment via ArgumentNullGuard
-
-**Location**: `SharpProof.Analyzer.cs` (Line 27)
-
-**Description**: The `ArgumentNullGuard.NotNull(context, nameof(context))` call is made but the result is immediately reassigned to the same variable (`context`). This is a code smell that reduces readability and adds unnecessary indirection.
-
-**Reproduction Steps**:
-1. Create a `SharpProofAnalyzer` instance
-2. Observe that the context variable is reassigned through the null check
-3. The guard effectively validates the input but the reassignment is redundant
-
-**Confidence**: High
-
 ### 2. Redundant Parameter Assignment via ArgumentNullGuard
 
 **Location**: `SharpProofAnalyzerEngine.cs` (Line 16)
@@ -417,15 +404,6 @@ These assignments are redundant since the guard simply returns the input if it's
 1. Invoke `AtomicFile.WriteUtf8` to persist verification cache entries.
 2. Simulate process/system termination immediately following the method call.
 3. Destination file may exist with zero bytes or partial data due to missing fsync.
-**Confidence**: High
-
-### 135. Dependency Provenance De-Duplication Key Injection Ambiguity
-**Location**: `SharpProof.Summaries\IrRelationalSummaryBuilder.cs` (Lines 480-488)
-**Description**: `AddDependencyProvenance` formats dictionary lookup keys by concatenating fields with a raw pipe delimiter: `(int)Origin + EvidenceCallIdentity + "|" + EvidenceIdentity + "|" + EvidenceSha256`. Because `EvidenceCallIdentity` and `EvidenceIdentity` can contain arbitrary unescaped text, distinct identity pairs such as `("a|b", "c")` and `("a", "b|c")` produce identical keys, causing the later entry to overwrite the earlier entry and resulting in lost provenance audit records.
-**Reproduction Steps**:
-1. Register dependency provenance with call identity `"a|b"` and evidence identity `"c"`.
-2. Register dependency provenance with call identity `"a"` and evidence identity `"b|c"` with matching hash and origin.
-3. Inspect `DependencyProvenance` in the resulting summary and observe only one provenance record retained.
 **Confidence**: High
 
 ### 136. Unbounded Recursion in ManagedAbstractFlow.IsAcyclic on Unbudgeted CFGs

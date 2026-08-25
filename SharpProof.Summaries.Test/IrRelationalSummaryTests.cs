@@ -731,6 +731,102 @@ public sealed class IrRelationalSummaryTests
     }
 
     [Test]
+    public void DependencyProvenanceKeepsDelimiterContainingIdentitiesDistinct()
+    {
+        var factory = new IrFactory();
+        var declaringType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Functions");
+        var callerParameter = factory.CreateVariable(
+            "caller:parameter", factory.IntegerType);
+        var callerBodyParameter = factory.CreateVariable(
+            "caller:body-parameter", factory.IntegerType);
+        var callerResult = factory.CreateVariable(
+            "caller:result", factory.IntegerType);
+        var callerMember = factory.GetOrCreateMember(
+            factory.CreateIdentity(), declaringType, "Caller",
+            factory.IntegerType, isStatic: true, factory.IntegerType);
+
+        var firstParameter = factory.CreateVariable(
+            "first:parameter", factory.IntegerType);
+        var firstResult = factory.CreateVariable(
+            "first:result", factory.IntegerType);
+        var firstMember = factory.GetOrCreateMember(
+            factory.CreateIdentity(), declaringType, "First",
+            factory.IntegerType, isStatic: true, factory.IntegerType);
+        var secondParameter = factory.CreateVariable(
+            "second:parameter", factory.IntegerType);
+        var secondResult = factory.CreateVariable(
+            "second:result", factory.IntegerType);
+        var secondMember = factory.GetOrCreateMember(
+            factory.CreateIdentity(), declaringType, "Second",
+            factory.IntegerType, isStatic: true, factory.IntegerType);
+
+        var firstSummary = BuildIdentity(
+            factory,
+            new IrSummarySignature(
+                firstMember, null, [firstParameter], firstResult,
+                new IrSummaryProvenance(
+                    IrSummaryOrigin.SpecificationPack,
+                    new string('a', 64),
+                    evidenceIdentity: "c",
+                    evidenceCallIdentity: "a|b")),
+            firstParameter);
+        var secondSummary = BuildIdentity(
+            factory,
+            new IrSummarySignature(
+                secondMember, null, [secondParameter], secondResult,
+                new IrSummaryProvenance(
+                    IrSummaryOrigin.SpecificationPack,
+                    new string('a', 64),
+                    evidenceIdentity: "b|c",
+                    evidenceCallIdentity: "a")),
+            secondParameter);
+
+        var callerBuilder = new IrProgramBuilder(factory);
+        var entry = callerBuilder.CreateBlock("caller:entry");
+        var firstCallResult = factory.CreateVariable(
+            "caller:first-call", factory.IntegerType);
+        var secondCallResult = factory.CreateVariable(
+            "caller:second-call", factory.IntegerType);
+        var firstCall = callerBuilder.Call(
+            entry,
+            factory.CreateOperation("caller:first-call-op"),
+            firstCallResult,
+            firstMember,
+            receiver: null,
+            factory.Variable(callerBodyParameter));
+        var secondCall = callerBuilder.Call(
+            entry,
+            factory.CreateOperation("caller:second-call-op"),
+            secondCallResult,
+            secondMember,
+            receiver: null,
+            factory.Variable(callerBodyParameter));
+        callerBuilder.Return(
+            entry,
+            factory.CreateOperation("caller:return"),
+            factory.Variable(secondCallResult));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            callerBuilder.Build(),
+            new IrSummarySignature(
+                callerMember, null, [callerParameter], callerResult,
+                Provenance('d')),
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [callerBodyParameter] = factory.Variable(callerParameter)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [firstCall.Id] = firstSummary,
+                [secondCall.Id] = secondSummary
+            });
+
+        Assert.That(built.IsSuccess, Is.True);
+        Assert.That(built.Summary!.DependencyProvenance, Has.Length.EqualTo(2));
+    }
+
+    [Test]
     public void CyclicControlFlowAbstainsWithTypedReason()
     {
         var fixture = new SummaryFixture("Loop");
@@ -775,6 +871,26 @@ public sealed class IrRelationalSummaryTests
             });
         Assert.That(evaluation.Status, Is.EqualTo(IrEvaluationStatus.Value));
         return evaluation.Value!.Boolean;
+    }
+
+    private static IrRelationalSummary BuildIdentity(
+        IrFactory factory,
+        IrSummarySignature signature,
+        IrVarId bodyParameter)
+    {
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("identity:entry");
+        builder.Return(
+            entry,
+            factory.CreateOperation("identity:return"),
+            factory.Variable(bodyParameter));
+        return IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = factory.Variable(signature.Parameters[0])
+            }).Summary!;
     }
 
     private static IrRelationalSummary BuildIdentitySummary(

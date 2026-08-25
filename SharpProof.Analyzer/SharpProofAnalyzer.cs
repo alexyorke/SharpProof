@@ -24,7 +24,10 @@ public sealed class SharpProofAnalyzer : DiagnosticAnalyzer
 
     public override void Initialize(AnalysisContext context)
     {
-        context = ArgumentNullGuard.NotNull(context, nameof(context));
+        if (context is null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(
             GeneratedCodeAnalysisFlags.Analyze |

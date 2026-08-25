@@ -47,6 +47,13 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public void AnalyzerInitializeRejectsNullContext()
+    {
+        Assert.Throws<ArgumentNullException>(
+            (Action)(() => new SharpProofAnalyzer().Initialize(null!)));
+    }
+
+    [Test]
     public async Task DefaultAdvisoryAllKeepsUnannotatedCodeQuiet()
     {
         var factory = new ThrowingSessionFactory();
