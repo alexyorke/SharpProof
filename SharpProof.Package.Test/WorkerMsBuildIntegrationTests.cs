@@ -909,6 +909,52 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task MultiTargetConfiguredPublicationTripleIsFrameworkScoped()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            ("TargetFrameworks", "net8.0;net9.0"),
+            ("SharpProofVerifyRequestFile", "published/request.json"),
+            ("SharpProofVerifyResultFile", "published/result.json"),
+            ("SharpProofCompilerManifestFile", "published/compiler-manifest.json"));
+
+        var build = await project.BuildAsync(verify: true);
+
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        foreach (var framework in new[] { "net8.0", "net9.0" })
+        {
+            var requestPath = Path.Combine(
+                project.Root, "published", framework, "request.json");
+            var resultPath = Path.Combine(
+                project.Root, "published", framework, "result.json");
+            var manifestPath = Path.Combine(
+                project.Root, "published", framework, "compiler-manifest.json");
+            var request = WorkerProtocolJson.DeserializeRequest(
+                await File.ReadAllTextAsync(requestPath))!;
+            var response = WorkerProtocolJson.DeserializeResponse(
+                await File.ReadAllTextAsync(resultPath))!;
+            var artifact = await AssertPublicationBindingAsync(request, response);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(File.Exists(manifestPath), Is.True, build.Output);
+                Assert.That(artifact.TargetFramework, Is.EqualTo(framework));
+                Assert.That(
+                    request.CompilerManifest.Path,
+                    Is.EqualTo(Path.GetFullPath(manifestPath)));
+            }
+        }
+
+        Assert.That(
+            File.Exists(Path.Combine(project.Root, "published", "request.json")),
+            Is.False);
+        Assert.That(
+            File.Exists(Path.Combine(project.Root, "published", "result.json")),
+            Is.False);
+    }
+
+    [Test]
     public async Task MultiTargetConfiguredSarifIsFrameworkScoped()
     {
         RequireContainerWorker();

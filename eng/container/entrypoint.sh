@@ -120,6 +120,16 @@ case "${command_name}" in
       if [[ -n "${source_origin}" ]]; then
         git -C "${task_root}" remote set-url origin "${source_origin}"
       fi
+      # A mounted CI checkout commonly has a detached HEAD and keeps the
+      # release base only as a remote-tracking ref. A local shared clone does
+      # not copy those refs, so preserve the source ref namespace explicitly
+      # without fetching from the network.
+      while IFS=' ' read -r ref object; do
+        if [[ -n "${ref}" && -n "${object}" ]]; then
+          git -C "${task_root}" update-ref "${ref}" "${object}"
+        fi
+      done < <(git -C "${repo_root}" for-each-ref \
+        --format='%(refname) %(objectname)' refs/remotes/)
       git -C "${task_root}" checkout --quiet --detach \
         "$(git -C "${repo_root}" rev-parse HEAD)"
       # Docker Desktop bind mounts do not preserve meaningful Git executable

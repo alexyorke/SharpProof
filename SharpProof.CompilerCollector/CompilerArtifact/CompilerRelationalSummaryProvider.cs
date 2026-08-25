@@ -18,6 +18,7 @@ internal sealed record CompilerSummaryEvidenceAuthority(
 
 internal sealed class CompilerRelationalSummaryProvider
 {
+    private const int MaximumSummaryDependencyDepth = 256;
     private readonly CSharpCompilation _compilation;
     private readonly IrFactory _factory;
     private readonly ResolvedApiSpecTable _apiSpecs;
@@ -96,7 +97,9 @@ internal sealed class CompilerRelationalSummaryProvider
             return summary.Signature.Member == member;
         }
 
-        if (_failed.Contains(method) || !_active.Add(method))
+        if (_failed.Contains(method) ||
+            _active.Count >= MaximumSummaryDependencyDepth ||
+            !_active.Add(method))
         {
             summary = null;
             return false;

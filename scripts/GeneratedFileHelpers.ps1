@@ -140,8 +140,32 @@ function Update-SharpProofGeneratedFile
         return
     }
 
-    [System.IO.File]::WriteAllText(
-        $Path,
-        $normalizedContent,
-        [System.Text.UTF8Encoding]::new($false))
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $directory = [System.IO.Path]::GetDirectoryName($fullPath)
+    if ([string]::IsNullOrWhiteSpace($directory))
+    {
+        throw "$DisplayPath has no containing directory."
+    }
+
+    $temporaryPath = [System.IO.Path]::Combine(
+        $directory,
+        '.sharpproof-generated-' + [Guid]::NewGuid().ToString('N') + '.tmp')
+    try
+    {
+        [System.IO.File]::WriteAllText(
+            $temporaryPath,
+            $normalizedContent,
+            [System.Text.UTF8Encoding]::new($false))
+        # The temporary file is in the destination directory, so the rename
+        # is atomic on the supported filesystems and never exposes a partial
+        # generated source to a concurrent build or verification gate.
+        [System.IO.File]::Move($temporaryPath, $fullPath, $true)
+    }
+    finally
+    {
+        if ([System.IO.File]::Exists($temporaryPath))
+        {
+            [System.IO.File]::Delete($temporaryPath)
+        }
+    }
 }

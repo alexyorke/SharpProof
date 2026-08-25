@@ -563,7 +563,14 @@ public static class FuzzRunner
 
     private static int CreateCaseSeed(int seed, int index)
     {
-        return unchecked(seed + index * 397);
+        var value = unchecked(
+            (uint)seed + 0x9E3779B9u * (uint)(index + 1));
+        value ^= value >> 16;
+        value *= 0x85EBCA6Bu;
+        value ^= value >> 13;
+        value *= 0xC2B2AE35u;
+        value ^= value >> 16;
+        return unchecked((int)value);
     }
 
     private static int PositiveModulo(int value, int divisor)
