@@ -112,7 +112,8 @@ internal sealed class EffectModuleInitialization
 
     private bool IsValidSourceDefinition(INamedTypeSymbol attribute)
     {
-        var systemAttribute = _compilation.GetTypeByMetadataName("System.Attribute");
+        var systemAttribute = _compilation.GetTypeByMetadataName(
+            typeof(Attribute).FullName!);
         var attributeBase = attribute.BaseType;
         if (attributeBase == null ||
             !SymbolEqualityComparer.Default.Equals(
@@ -127,7 +128,7 @@ internal sealed class EffectModuleInitialization
         }
 
         var attributeUsage = _compilation.GetTypeByMetadataName(
-            "System.AttributeUsageAttribute");
+            typeof(AttributeUsageAttribute).FullName!);
         var usage = attribute.GetAttributes().FirstOrDefault(candidate =>
             SymbolEqualityComparer.Default.Equals(
                 candidate.AttributeClass?.OriginalDefinition,
