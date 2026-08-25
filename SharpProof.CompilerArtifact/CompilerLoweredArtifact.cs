@@ -1173,7 +1173,7 @@ internal static class CompilerLoweredArtifact
             return false;
         }
 
-        string? previous = null;
+        CompilerSummaryEvidenceArtifact? previous = null;
         foreach (var item in evidence)
         {
             if (item == null ||
@@ -1187,21 +1187,46 @@ internal static class CompilerLoweredArtifact
                 return false;
             }
 
-            var key = ((int)item.Origin).ToString(
-                    CultureInfo.InvariantCulture) + "|" +
-                item.CallIdentity + "|" +
-                item.EvidenceIdentity + "|" + item.EvidenceSha256;
             if (previous != null &&
-                StringComparer.Ordinal.Compare(previous, key) >= 0)
+                CompareDependencyEvidence(previous, item) >= 0)
             {
                 return false;
             }
 
-            previous = key;
+            previous = item;
         }
 
         return true;
     }
+
+    internal static int CompareDependencyEvidence(
+        CompilerSummaryEvidenceArtifact left,
+        CompilerSummaryEvidenceArtifact right)
+    {
+        var comparison = ((int)left.Origin).CompareTo((int)right.Origin);
+        if (comparison != 0)
+        {
+            return comparison;
+        }
+
+        comparison = StringComparer.Ordinal.Compare(
+            left.CallIdentity,
+            right.CallIdentity);
+        if (comparison != 0)
+        {
+            return comparison;
+        }
+
+        comparison = StringComparer.Ordinal.Compare(
+            left.EvidenceIdentity,
+            right.EvidenceIdentity);
+        return comparison != 0
+            ? comparison
+            : StringComparer.Ordinal.Compare(
+                left.EvidenceSha256,
+                right.EvidenceSha256);
+    }
+
     private static WorkerClaimEvidence ManifestEvidence(CompilerContractEvidence value)
     {
         var index = (int)value;

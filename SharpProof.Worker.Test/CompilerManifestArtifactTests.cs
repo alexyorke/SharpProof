@@ -19,6 +19,29 @@ public sealed class CompilerManifestArtifactTests
         "sharp-proof-source-must-not-be-embedded";
 
     [Test]
+    public void DependencyEvidenceOrderingComparesFieldsIndependently()
+    {
+        var left = new CompilerSummaryEvidenceArtifact
+        {
+            Origin = CompilerSummaryOrigin.Source,
+            CallIdentity = "a",
+            EvidenceIdentity = "|b",
+            EvidenceSha256 = new string('a', 64)
+        };
+        var right = new CompilerSummaryEvidenceArtifact
+        {
+            Origin = CompilerSummaryOrigin.Source,
+            CallIdentity = "a|",
+            EvidenceIdentity = "b",
+            EvidenceSha256 = new string('a', 64)
+        };
+
+        Assert.That(
+            CompilerLoweredArtifact.CompareDependencyEvidence(left, right),
+            Is.LessThan(0));
+    }
+
+    [Test]
     public void ArtifactRecordsCompilerAndSyntaxEvidenceWithoutSourceText()
     {
         var parse = new CSharpParseOptions(LanguageVersion.CSharp12)
