@@ -425,19 +425,50 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 "Compiled C# returned normally while the IR did not.");
         }
 
-        var agrees = interpreted.Value!.Kind switch
-        {
-            IrValueKind.Boolean => actual is bool value && value == interpreted.Value.Boolean,
-            IrValueKind.Integer => actual is long value && value == interpreted.Value.Integer,
-            IrValueKind.String => actual is string value &&
-                                  string.Equals(value, interpreted.Value.String, StringComparison.Ordinal),
-            IrValueKind.Null => actual == null,
-            _ => false
-        };
+        var agrees = ValuesAgree(interpreted.Value!, actual);
         return new DifferentialResult(
             agrees ? DifferentialStatus.Agreement : DifferentialStatus.Mismatch,
             interpreted,
             agrees ? "" : "Compiled C# and the IR interpreter produced different values.");
+    }
+
+    private static bool ValuesAgree(IrValue interpreted, object? actual)
+    {
+        return interpreted.Kind switch
+        {
+            IrValueKind.Boolean =>
+                actual is bool value && value == interpreted.Boolean,
+            IrValueKind.Integer =>
+                actual is long value && value == interpreted.Integer,
+            IrValueKind.String => actual is string value &&
+                                  string.Equals(
+                                      value,
+                                      interpreted.String,
+                                      StringComparison.Ordinal),
+            IrValueKind.Null => actual == null,
+            IrValueKind.Reference =>
+                ReferenceEquals(actual, interpreted.Reference),
+            IrValueKind.Sequence => SequenceAgrees(interpreted, actual),
+            _ => false
+        };
+    }
+
+    private static bool SequenceAgrees(IrValue interpreted, object? actual)
+    {
+        if (actual is not Array array ||
+            array.Rank != 1 ||
+            array.Length != interpreted.Elements.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < array.Length; index++)
+        {
+            if (!ValuesAgree(interpreted.Elements[index], array.GetValue(index)))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static DifferentialResult CompareException(

@@ -127,4 +127,63 @@ public sealed class IrCSharpDifferentialOracleTests
                 Is.EqualTo(IrExceptionKind.NullReference));
         }
     }
+
+    [Test]
+    public void SequenceResultsCompareRecursively()
+    {
+        var factory = new IrFactory();
+        var integers = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var nested = factory.GetOrCreateSequenceType(integers);
+        var strings = factory.GetOrCreateSequenceType(factory.StringType);
+        var integerValues = factory.CreateVariable("integers", integers);
+        var nestedValues = factory.CreateVariable("nested", nested);
+        var stringValues = factory.CreateVariable("strings", strings);
+        var oracle = new IrCSharpDifferentialOracle(factory);
+
+        var empty = oracle.Compare(
+            factory.Variable(integerValues),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [integerValues] = factory.CreateSequenceValue(integers, [])
+            });
+        var scalarElements = oracle.Compare(
+            factory.Variable(integerValues),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [integerValues] = factory.CreateSequenceValue(
+                    integers,
+                    [factory.CreateIntegerValue(17)])
+            });
+        var nestedElements = oracle.Compare(
+            factory.Variable(nestedValues),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [nestedValues] = factory.CreateSequenceValue(
+                    nested,
+                    [
+                        factory.CreateSequenceValue(
+                            integers,
+                            [factory.CreateIntegerValue(1)]),
+                        factory.CreateSequenceValue(integers, [])
+                    ])
+            });
+        var nullElement = oracle.Compare(
+            factory.Variable(stringValues),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [stringValues] = factory.CreateSequenceValue(
+                    strings,
+                    [factory.CreateNullValue(factory.StringType)])
+            });
+
+        Assert.That(
+            new[]
+            {
+                empty.Status,
+                scalarElements.Status,
+                nestedElements.Status,
+                nullElement.Status
+            },
+            Is.All.EqualTo(DifferentialStatus.Agreement));
+    }
 }

@@ -89,6 +89,25 @@ public sealed class DocumentationSupportContractTests
         Assert.That(workflow, Does.Contain("tooling release-qualification"));
     }
 
+    [Test]
+    public async Task UnreleasedChangelogUsesTheCanonicalVerifierPlatform()
+    {
+        var changelog = await File.ReadAllTextAsync(Path.Combine(
+            FindRepositoryRoot(),
+            "CHANGELOG.md"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                changelog,
+                Does.Contain("canonical Linux amd64 container"));
+            Assert.That(changelog, Does.Not.Contain("Windows x64 verifier"));
+            Assert.That(
+                changelog,
+                Does.Not.Contain("Windows x64 worker containment"));
+        }
+    }
+
     private static void AssertCommandGatePrecedes(
         string text,
         string command,

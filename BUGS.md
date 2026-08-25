@@ -17,7 +17,9 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 24 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 0 unresolved root-cause rows. Twenty-one fixed
+historical rows remain below. Stable IDs are not renumbered; merged historical
+IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -2500,48 +2502,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 ## P3 active bugs
 
 Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
-
-### SP-AUDIT-254 - Sequence-valued differential checks always report mismatch (P3)
-
-- [x] `IrCSharpDifferentialOracle` renders sequence result types as C# arrays and
-  converts sequence inputs to runtime arrays, but `CompareValue` handles only
-  Boolean, Integer, String, and Null. Every `IrValueKind.Sequence` falls through
-  to false.
-- Impact: correct sequence-valued IR/C# executions are reported as differential
-  mismatches, preventing the oracle from validating a supported executable
-  shape and creating false fuzz/test failures.
-- Reproduction: a detached canonical-container test compared a sequence variable
-  containing one integer against the generated C# array. It expected Agreement
-  and received Mismatch.
-- Required closure: recursively compare array length, elements, nulls, and nested
-  sequences. Add empty, scalar-element, nested, null-element, and unequal
-  controls; extend randomized roots beyond scalar results.
-
-### SP-AUDIT-255 - The Unreleased changelog advertises a removed Windows verifier (P3)
-
-- [x] `CHANGELOG.md` claims Windows x64 worker containment and a Windows x64
-  verifier. The current package, `ContainerContract`, Dockerfile, README, and
-  support boundary require the canonical Linux amd64 container and reject native
-  Windows verification.
-- Impact: the release-facing feature list gives users a materially incorrect
-  platform/install expectation even though runtime enforcement fails closed.
-- Required closure: replace the obsolete bullets with the Linux amd64
-  container-only package contract and include changelog platform statements in
-  the generated documentation/support-contract validation.
-
-### SP-AUDIT-256 - The checked-in OpenCode plugin has no declared dependency (P3)
-
-- [x] `opencode.json` loads `.opencode/plugins/oh-my-goal.js`, whose only line is
-  a bare import from `oh-my-goal`. The repository ignores `.opencode/package.json`
-  and lock files; the locally generated ignored manifest declares only
-  `@opencode-ai/plugin`, and `oh-my-goal` is absent.
-- Impact: a fresh checkout cannot resolve the configured plugin, so the checked-
-  in OpenCode setup fails before the goal helper loads. This affects developer
-  tooling only, not verifier execution.
-- Required closure: track a deterministic OpenCode dependency manifest/lock that
-  includes `oh-my-goal`, or remove the checked-in local-plugin import and use a
-  configuration form whose package installation is itself declared. Add a fresh-
-  checkout plugin-resolution smoke check.
 
 ## Current comprehensive audit evidence
 

@@ -12,9 +12,10 @@ contain documented breaking changes.
 - Exact manifest/result accountability and deterministic worker summaries.
 - Independent SMT-term and whole-body counterexample replay.
 - Advisory and strict profiles with explicit incomplete-analysis diagnostics.
-- Windows x64 worker containment, cache validation, and resource budgets.
+- The canonical Linux amd64 container provides worker containment,
+  cache validation, and resource budgets.
 - Three exact-version packages for the contract API, portable analyzer and
-  generator, and Windows x64 verifier.
+  generator, and container-only Linux amd64 verifier.
 - Portable-PDB symbol packages with SourceLink bound to the packaged commit.
 - Deterministic SHA-256 release manifests, SPDX 2.3 package/component SBOM
   generation, restored-dependency version checks, and separately permissioned
