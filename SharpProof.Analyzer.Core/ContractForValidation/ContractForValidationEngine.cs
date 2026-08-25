@@ -133,6 +133,7 @@ internal static class ContractForValidationEngine
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (discovered.Any(candidate =>
+                    candidate.Failure == ContractBindingFailure.None &&
                     !SymbolEqualityComparer.Default.Equals(
                         candidate.Type, source.Companion) &&
                     ContractForSymbolMatcher.TargetsOverlap(

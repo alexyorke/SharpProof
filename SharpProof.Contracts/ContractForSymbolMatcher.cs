@@ -4,11 +4,13 @@ internal static class ContractForSymbolMatcher
 {
     internal sealed class CompanionDescriptor(
         INamedTypeSymbol type,
-        (INamedTypeSymbol Target, bool IsOpen) contractTarget)
+        (INamedTypeSymbol Target, bool IsOpen) contractTarget,
+        ContractBindingFailure failure = ContractBindingFailure.None)
     {
         internal INamedTypeSymbol Type { get; } = type;
         internal (INamedTypeSymbol Target, bool IsOpen) ContractTarget { get; } = contractTarget;
         internal INamedTypeSymbol Target => ContractTarget.Target;
+        internal ContractBindingFailure Failure { get; } = failure;
     }
 
     internal sealed class CompanionResolution(
@@ -127,6 +129,18 @@ internal static class ContractForSymbolMatcher
             {
                 result.Add(new CompanionDescriptor(type, target));
             }
+            else if (attributes.Length == 1)
+            {
+                // Preserve a malformed ContractFor declaration as a failed
+                // companion instead of dropping its intent and allowing the
+                // target to bind as if no companion had been declared. The
+                // target tuple is a sentinel only; failed descriptors are
+                // never considered for matching or manifest expansion.
+                result.Add(new CompanionDescriptor(
+                    type,
+                    (type, false),
+                    ContractBindingFailure.InvalidClosedAttribute));
+            }
         }
         return result.ToImmutable();
     }
@@ -138,6 +152,16 @@ internal static class ContractForSymbolMatcher
         if (target.MethodKind != MethodKind.Ordinary)
         {
             return CompanionResolution.None;
+        }
+
+        var invalid = companions.Where(static companion =>
+                companion.Failure != ContractBindingFailure.None)
+            .ToImmutableArray();
+        if (!invalid.IsDefaultOrEmpty)
+        {
+            return CompanionResolution.Fail(invalid.Length == 1
+                ? invalid[0].Failure
+                : ContractBindingFailure.AmbiguousCompanion);
         }
 
         var matching = companions.Where(companion =>

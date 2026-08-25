@@ -428,14 +428,6 @@ These assignments are redundant since the guard simply returns the input if it's
 1. Graph with entry 0→1 and an isolated cycle 2↔3; Analyze returns normally with InputStates[2]/[3] == Bottom and no signal two blocks were never analyzed.
 **Confidence**: High (behavior), Medium (design-gap classification)
 
-### 167. ContractFor Companion Silently Vanishes When Its Single Attribute Payload Is Malformed or Unsupported
-**Location**: `SharpProof.Contracts\ContractForSymbolMatcher.cs` (Lines 41-58 TryGetTarget, 120-131 DiscoverCompanions)
-**Description**: Every other companion defect fails closed with a typed ContractBindingFailure (MissingCompanion, AmbiguousCompanion, CompanionSignatureMismatch). But if the sole ContractForAttribute fails TryGetTarget (e.g., `[ContractFor(typeof(SomeStruct))]` - struct targets rejected - or a non-Type constructor argument), DiscoverCompanions drops the whole class, ResolveCompanion returns None (not failure), and ContractBinder.BindCore returns SUCCESS with an empty clause set. Distinct-contract intent silently erased.
-**Reproduction Steps**:
-1. Define a struct S with method M; add signature-matching companion M in a static class annotated `[ContractFor(typeof(S))]` (compiles cleanly).
-2. Bind the target method: IsSuccess == true with empty clauses, no failure value, versus MissingCompanion/CompanionSignatureMismatch for comparable malformations.
-**Confidence**: Medium
-
 ### 168. Valid Parenthesized Prologue Clause Rejected as Misplaced (Hard Binding Failure)
 **Location**: `SharpProof.Contracts\ContractClauseInventoryBuilder.cs` (Lines 160-165 TryGetDirectPlacement, 142-146 Classify)
 **Description**: Roslyn operations unwrap parentheses, so for `(((Contract.Requires(x > 0))));` the invocation's syntax parent is ParenthesizedExpressionSyntax, not ExpressionStatementSyntax. TryGetDirectPlacement returns false and the ancestor scan finds no conditional node, yielding Misplaced → InvalidClausePlacement for legal C# input; removing one pair of parentheses fixes it.

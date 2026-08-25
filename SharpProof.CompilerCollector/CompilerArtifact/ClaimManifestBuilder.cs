@@ -493,6 +493,10 @@ internal sealed partial class ClaimManifestBuilder(
         }
         foreach (var companion in _contractSources.Companions)
         {
+            if (companion.Failure != ContractBindingFailure.None)
+            {
+                continue;
+            }
             foreach (var method in ContractForSymbolMatcher.GetOrdinaryMethods(companion.Target))
             {
                 cancellationToken.ThrowIfCancellationRequested();
