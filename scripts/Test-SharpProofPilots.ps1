@@ -269,6 +269,12 @@ foreach ($pilot in $catalog.pilots) {
     $diagnosticText = Get-Content -LiteralPath $buildLog -Raw
     $negativeProbePassed = $null
     if ([string]$pilot.category -eq 'contract-heavy') {
+        $negativeArtifactDirectory = Join-Path $runRoot "negative/$($pilot.id)"
+        [IO.Directory]::CreateDirectory($negativeArtifactDirectory) | Out-Null
+        $negativeRequestPath = Join-Path $negativeArtifactDirectory 'request.json'
+        $negativeResultPath = Join-Path $negativeArtifactDirectory 'result.json'
+        $negativeManifestPath = Join-Path $negativeArtifactDirectory 'compiler-manifest.json'
+        $negativeSarifPath = Join-Path $negativeArtifactDirectory 'result.sarif'
         $negativeLog = Join-Path $logDirectory "$($pilot.id)-negative.log"
         $negative = Invoke-PilotDotNet `
             -WorkingDirectory $projectDirectory `
@@ -276,7 +282,10 @@ foreach ($pilot in $catalog.pilots) {
             -Arguments (@(
             'build', $project, '-c', 'Release', '--no-restore', '--nologo',
             '-p:SharpProofVerify=false',
-            "-p:SharpProofVerifySarifFile=$sarifPath",
+            "-p:SharpProofVerifyRequestFile=$negativeRequestPath",
+            "-p:SharpProofVerifyResultFile=$negativeResultPath",
+            "-p:SharpProofCompilerManifestFile=$negativeManifestPath",
+            "-p:SharpProofVerifySarifFile=$negativeSarifPath",
             '-p:DefineConstants=SHARPPROOF_NEGATIVE_PROBE') + $common)
         $negativeText = Get-Content -LiteralPath $negativeLog -Raw
         $negativeProbePassed = $negative.exitCode -ne 0 -and
