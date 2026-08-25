@@ -626,7 +626,8 @@ internal static class Program
             members.Add(new PublicationMember(
                 arguments.PublishSarifPath,
                 Encoding.UTF8.GetBytes(
-                    SarifProjection.Serialize(request, response))));
+                    SarifProjection.Serialize(
+                        request, response, artifact.Compilation.ProjectDirectory))));
         }
         members.Add(new PublicationMember(
             arguments.PublishResultPath!,

@@ -28,6 +28,15 @@ internal static class CallableVerificationPolicy
                 target,
                 new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit),
                 methodBoundary.Token).ConfigureAwait(false);
+            // The method wall-time budget applies to proof verification. Result
+            // assembly is a separate, bounded phase and must not inherit an
+            // already-expired timer that can turn a completed proof into a
+            // spurious timeout while rows are being projected.
+            await methodBoundary.CancelAsync().ConfigureAwait(false);
+            using var postProcessingBoundary =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    projectBoundary.Token, callerCancellation);
+            var postProcessingToken = postProcessingBoundary.Token;
             var ordinal = target.Entry.ClaimIds
                 .Select(static (claimId, index) => (claimId, index))
                 .ToDictionary(static item => item.claimId, static item => item.index, StringComparer.Ordinal);
@@ -37,7 +46,7 @@ internal static class CallableVerificationPolicy
                         target,
                         evidence,
                         proof.EntryFeasibility,
-                        methodBoundary.Token)))
+                        postProcessingToken)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
             var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)

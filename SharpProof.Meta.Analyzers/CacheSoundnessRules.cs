@@ -104,9 +104,12 @@ internal static class CacheSoundnessRules
         }
         try
         {
+            var enclosingLoop = FindEnclosingLoop(reference, root);
             var writes = root.DescendantsAndSelf()
-                .Where(candidate => candidate.Syntax.SpanStart < reference.Syntax.SpanStart &&
-                                    !IsInsideNestedCallable(candidate, root))
+                .Where(candidate =>
+                    !IsInsideNestedCallable(candidate, root) &&
+                    (candidate.Syntax.SpanStart < reference.Syntax.SpanStart ||
+                     enclosingLoop != null && IsWithin(candidate, enclosingLoop)))
                 .Select(candidate => candidate switch
                 {
                     IVariableDeclaratorOperation declarator
@@ -150,6 +153,35 @@ internal static class CacheSoundnessRules
             }
         }
         return false;
+    }
+
+    private static ILoopOperation? FindEnclosingLoop(
+        IOperation operation, IOperation root)
+    {
+        for (var current = operation.Parent;
+             current != null && !ReferenceEquals(current, root);
+             current = current.Parent)
+        {
+            if (current is ILoopOperation loop)
+            {
+                return loop;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsWithin(IOperation operation, IOperation container)
+    {
+        for (var current = operation.Parent; current != null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, container))
+            {
+                return true;
+            }
+        }
+
+        return ReferenceEquals(operation, container);
     }
 
     private static bool IsInsideNestedCallable(IOperation operation, IOperation root)

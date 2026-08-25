@@ -8,8 +8,16 @@ internal static class SarifProjection
     internal static string Serialize(
         WorkerVerifyRequest request, WorkerVerifyResponse response)
     {
+        return Serialize(request, response, Environment.CurrentDirectory);
+    }
+
+    internal static string Serialize(
+        WorkerVerifyRequest request, WorkerVerifyResponse response,
+        string projectDirectory)
+    {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(response);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
         WorkerProtocolJson.Canonicalize(response);
         var manifest = response.Manifest;
         var summary = response.Summary;
@@ -74,7 +82,7 @@ internal static class SarifProjection
                 ["PROJECTROOT"] = new
                 {
                     uri = new Uri(
-                        Path.GetFullPath(Environment.CurrentDirectory) +
+                        Path.GetFullPath(projectDirectory) +
                         Path.DirectorySeparatorChar).AbsoluteUri
                 }
             },

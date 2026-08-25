@@ -328,6 +328,32 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.EqualTo(8));
     }
 
+    [Test]
+    public async Task SemanticCacheWritesRejectLoopCarriedNonCacheableAnswers()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void Set(string key, Answer answer) { }
+            }
+            sealed class C {
+                void M(ProofCache cache, bool condition) {
+                    var answer = Answer.Proven;
+                    while (condition) {
+                        cache.Set("answer", answer);
+                        answer = Answer.Unknown;
+                    }
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA010"));
+    }
+
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
     public async Task ReportsCSharpExpressionTextConstruction(string source)
     {

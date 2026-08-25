@@ -1699,6 +1699,43 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void SarifProjectionUsesTheVerifiedProjectDirectoryAsTheRoot()
+    {
+        var manifest = CreateSarifManifest();
+        var response = new WorkerVerifyResponse
+        {
+            InputHash = new('a', 64),
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
+            {
+                Versions = new WorkerVersionSummary { WorkerVersion = "test" }
+            }
+        };
+        var request = new WorkerVerifyRequest();
+        var directory = Path.Combine(
+            Path.GetTempPath(), "sharpproof-sarif-root-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            using var document = JsonDocument.Parse(
+                SarifProjection.Serialize(request, response, directory));
+            var uri = document.RootElement
+                .GetProperty("runs")[0]
+                .GetProperty("originalUriBaseIds")
+                .GetProperty("PROJECTROOT")
+                .GetProperty("uri")
+                .GetString();
+            Assert.That(uri, Is.EqualTo(new Uri(directory + Path.DirectorySeparatorChar).AbsoluteUri));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public void SarifProjectionPreservesVacuityAndEffectCertainty()
     {
         var manifest = CreateSarifManifest();

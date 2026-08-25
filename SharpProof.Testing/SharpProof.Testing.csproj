@@ -12,7 +12,6 @@
     <ProjectReference Include="..\SharpProof.Ir\SharpProof.Ir.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="AnalyzerTestHost.cs" />
     <Compile Remove="ReadmeExampleAttribute.cs" />
   </ItemGroup>
 </Project>
