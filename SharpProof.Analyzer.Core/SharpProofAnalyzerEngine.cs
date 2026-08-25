@@ -420,7 +420,8 @@ internal sealed partial class SharpProofAnalyzerEngine
         foreach (var handle in reader.CustomAttributes)
         {
             var attribute = reader.GetCustomAttribute(handle);
-            if (attribute.Parent.Kind == HandleKind.Parameter &&
+            if ((attribute.Parent.Kind is HandleKind.Parameter or
+                    HandleKind.MethodDefinition) &&
                 IsClosedContractAttribute(reader, attribute))
             {
                 return true;

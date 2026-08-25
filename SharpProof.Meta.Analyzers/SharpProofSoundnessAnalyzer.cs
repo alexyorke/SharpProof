@@ -13,6 +13,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static readonly ImmutableArray<string> KnownTypeNames = [
         "Microsoft.CodeAnalysis.Compilation", "Microsoft.CodeAnalysis.SemanticModel",
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.ISymbol",
+        "Microsoft.CodeAnalysis.CSharp.SymbolDisplay",
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
         "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
         "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors",
@@ -125,7 +126,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         var receiverType = invocation.Instance?.Type ?? method.ContainingType;
-        return IsSameType(receiverType, symbols[KnownType.Symbol]) ||
+        return IsSameType(method.ContainingType, symbols[KnownType.SymbolDisplay]) ||
+               IsSameType(receiverType, symbols[KnownType.Symbol]) ||
                receiverType?.AllInterfaces.Any(value => IsSameType(value, symbols[KnownType.Symbol])) == true;
     }
 
@@ -477,7 +479,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     internal enum KnownType
     {
-        Compilation, SemanticModel, SyntaxFactory, Symbol, DiagnosticDescriptor,
+        Compilation, SemanticModel, SyntaxFactory, Symbol, SymbolDisplay, DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
         AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, String,
         Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,

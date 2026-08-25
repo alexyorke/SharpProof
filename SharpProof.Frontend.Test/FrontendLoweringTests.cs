@@ -152,6 +152,23 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void ReferenceAndSequenceResultsUseTheInterpreterValue()
+    {
+        var reference = new object();
+        using var referenceMethod = CompiledMethod.Create(
+            "public static object Target(object value) => value;");
+        Assert.That(
+            referenceMethod.CompareWithInterpreter(reference),
+            Is.SameAs(reference));
+
+        using var sequenceMethod = CompiledMethod.Create(
+            "public static long[] Target(long[] value) => value;");
+        var interpreted = sequenceMethod.CompareWithInterpreter(ElementValues);
+        Assert.That(interpreted, Is.TypeOf<long[]>());
+        Assert.That((long[])interpreted!, Is.EqualTo(ElementValues));
+    }
+
+    [Test]
     public void LookalikeAndHiddenLengthMembersAreNeverIntrinsic()
     {
         AssertClassification(
@@ -1150,16 +1167,84 @@ public sealed class FrontendLoweringTests
             var environment = CreateEnvironment(lowered, arguments);
             var evaluated = new IrInterpreter(Factory).Evaluate(lowered.Term, environment);
             Assert.That(evaluated.Status, Is.EqualTo(IrEvaluationStatus.Value));
-            var interpreted = evaluated.Value!.Kind switch
-            {
-                IrValueKind.Boolean => evaluated.Value.Boolean,
-                IrValueKind.Integer => evaluated.Value.Integer,
-                IrValueKind.String => evaluated.Value.String,
-                IrValueKind.Null => null,
-                _ => actual
-            };
-            Assert.That(interpreted, Is.EqualTo(actual));
+            var interpreted = ToRuntimeValue(Factory, evaluated.Value!);
+            Assert.That(
+                ValuesAgree(evaluated.Value!, actual),
+                Is.True,
+                "The compiled and interpreted results differ.");
             return interpreted;
+        }
+
+        private static object? ToRuntimeValue(IrFactory factory, IrValue value)
+        {
+            return value.Kind switch
+            {
+                IrValueKind.Boolean => value.Boolean,
+                IrValueKind.Integer => value.Integer,
+                IrValueKind.String => value.String,
+                IrValueKind.Null => null,
+                IrValueKind.Reference => value.Reference,
+                IrValueKind.Sequence => ToRuntimeArray(factory, value),
+                _ => throw new InvalidOperationException(
+                    "Unsupported interpreter value kind: " + value.Kind + ".")
+            };
+        }
+
+        private static Array ToRuntimeArray(IrFactory factory, IrValue value)
+        {
+            var info = factory.GetTypeInfo(value.Type);
+            if (info.ElementType == null)
+            {
+                throw new InvalidOperationException(
+                    "The interpreter sequence has no element type.");
+            }
+
+            var result = Array.CreateInstance(
+                RuntimeType(factory, info.ElementType.Value),
+                value.Elements.Length);
+            for (var index = 0; index < value.Elements.Length; index++)
+            {
+                result.SetValue(
+                    ToRuntimeValue(factory, value.Elements[index]),
+                    index);
+            }
+            return result;
+        }
+
+        private static Type RuntimeType(IrFactory factory, IrTypeId type)
+        {
+            var info = factory.GetTypeInfo(type);
+            return info.Kind switch
+            {
+                IrTypeKind.Boolean => typeof(bool),
+                IrTypeKind.Integer => typeof(long),
+                IrTypeKind.String => typeof(string),
+                IrTypeKind.Reference => typeof(object),
+                IrTypeKind.Sequence when info.ElementType != null =>
+                    RuntimeType(factory, info.ElementType.Value).MakeArrayType(),
+                _ => throw new InvalidOperationException(
+                    "Unsupported interpreter element type: " + info.Kind + ".")
+            };
+        }
+
+        private static bool ValuesAgree(IrValue expected, object? actual)
+        {
+            return expected.Kind switch
+            {
+                IrValueKind.Boolean => actual is bool value &&
+                    value == expected.Boolean,
+                IrValueKind.Integer => actual is long value &&
+                    value == expected.Integer,
+                IrValueKind.String => actual is string value &&
+                    string.Equals(value, expected.String, StringComparison.Ordinal),
+                IrValueKind.Null => actual == null,
+                IrValueKind.Reference => ReferenceEquals(actual, expected.Reference),
+                IrValueKind.Sequence => actual is Array array &&
+                    array.Length == expected.Elements.Length &&
+                    expected.Elements.Select((element, index) =>
+                        ValuesAgree(element, array.GetValue(index))).All(static value => value),
+                _ => false
+            };
         }
 
         internal Dictionary<IrVarId, IrValue> CreateEnvironment(

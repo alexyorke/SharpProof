@@ -1347,6 +1347,25 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsStaticSymbolDisplayStrings()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis.CSharp;
+            namespace SharpProof.Tooling;
+            static class C {
+                static string M(Microsoft.CodeAnalysis.ISymbol symbol) =>
+                    SymbolDisplay.ToDisplayString(symbol);
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA001"));
+    }
+
+    [Test]
     public async Task AllowsLookalikeSymbolTypesInsideSoundnessCriticalLayers()
     {
         const string source =

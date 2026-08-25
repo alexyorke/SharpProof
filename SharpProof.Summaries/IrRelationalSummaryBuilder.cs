@@ -468,7 +468,10 @@ public static class IrRelationalSummaryBuilder
             predicate = Factory.Binary(
                 IrBinaryOperator.AndAlso,
                 predicate,
-                instantiated.NormalRelation);
+                Factory.Binary(
+                    IrBinaryOperator.AndAlso,
+                    instantiated.NormalCompletion,
+                    instantiated.NormalRelation));
             if (!Supported(predicate))
             {
                 return null;
@@ -519,7 +522,7 @@ public static class IrRelationalSummaryBuilder
 
             var relation = Factory.Binary(
                 IrBinaryOperator.AndAlso,
-                predicate,
+                completion,
                 Factory.Binary(
                     IrBinaryOperator.Equal,
                     Factory.Variable(_signature.Result),

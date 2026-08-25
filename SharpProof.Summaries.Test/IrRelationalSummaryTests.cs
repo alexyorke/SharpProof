@@ -565,6 +565,140 @@ public sealed class IrRelationalSummaryTests
     }
 
     [Test]
+    public void ThrowingReturnGuardsTheNormalRelation()
+    {
+        var fixture = new SummaryFixture("Divide");
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "body:divisor",
+            fixture.Factory.IntegerType);
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(
+            entry,
+            fixture.Factory.CreateOperation("return"),
+            fixture.Factory.Binary(
+                IrBinaryOperator.Divide,
+                fixture.Factory.Integer(10),
+                fixture.Factory.Variable(bodyParameter)));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            fixture.Signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = fixture.Factory.Variable(fixture.Parameter)
+            });
+
+        Assert.That(built.IsSuccess, Is.True);
+        var relation = built.Summary!.NormalRelation as IrBinaryTerm;
+        Assert.That(relation, Is.Not.Null);
+        Assert.That(relation!.Operator, Is.EqualTo(IrBinaryOperator.AndAlso));
+        Assert.That(
+            ReferenceEquals(relation.Left, built.Summary.NormalCompletion),
+            Is.True);
+        Assert.That(
+            Evaluate(fixture, built.Summary.NormalRelation, 2, 5),
+            Is.True);
+    }
+
+    [Test]
+    public void CallCompositionCarriesCalleeNormalCompletion()
+    {
+        var callee = new SummaryFixture("DivideCallee");
+        var calleeBodyParameter = callee.Factory.CreateVariable(
+            "callee:divisor",
+            callee.Factory.IntegerType);
+        var calleeBuilder = new IrProgramBuilder(callee.Factory);
+        var calleeEntry = calleeBuilder.CreateBlock("callee:entry");
+        calleeBuilder.Return(
+            calleeEntry,
+            callee.Factory.CreateOperation("callee:return"),
+            callee.Factory.Binary(
+                IrBinaryOperator.Divide,
+                callee.Factory.Integer(10),
+                callee.Factory.Variable(calleeBodyParameter)));
+        var calleeBuilt = IrRelationalSummaryBuilder.Build(
+            calleeBuilder.Build(),
+            callee.Signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [calleeBodyParameter] = callee.Factory.Variable(callee.Parameter)
+            });
+        Assert.That(calleeBuilt.IsSuccess, Is.True, calleeBuilt.Reason.ToString());
+        var calleeSummary = calleeBuilt.Summary!;
+
+        var callerMember = callee.CreateMember("DivideCaller");
+        var callerParameter = callee.Factory.CreateVariable(
+            "caller:parameter",
+            callee.Factory.IntegerType);
+        var callerResult = callee.Factory.CreateVariable(
+            "caller:result",
+            callee.Factory.IntegerType);
+        var callResult = callee.Factory.CreateVariable(
+            "caller:call-result",
+            callee.Factory.IntegerType);
+        var callerBuilder = new IrProgramBuilder(callee.Factory);
+        var callerEntry = callerBuilder.CreateBlock("caller:entry");
+        var call = callerBuilder.Call(
+            callerEntry,
+            callee.Factory.CreateOperation("caller:call"),
+            callResult,
+            callee.Member,
+            receiver: null,
+            callee.Factory.Variable(callerParameter));
+        callerBuilder.Return(
+            callerEntry,
+            callee.Factory.CreateOperation("caller:return"),
+            callee.Factory.Variable(callResult));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            callerBuilder.Build(),
+            new IrSummarySignature(
+                callerMember,
+                receiver: null,
+                [callerParameter],
+                callerResult,
+                Provenance('c')),
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [callerParameter] = callee.Factory.Variable(callerParameter)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [call.Id] = calleeSummary
+            });
+
+        Assert.That(built.IsSuccess, Is.True, built.Reason.ToString());
+        var instantiated = IrRelationalSummaryInstantiator.Instantiate(
+            calleeSummary,
+            receiver: null,
+            [callee.Factory.Variable(callerParameter)],
+            call.Id.Value);
+        var completion = built.Summary!.NormalCompletion as IrBinaryTerm;
+        Assert.That(completion, Is.Not.Null);
+        Assert.That(completion!.Operator, Is.EqualTo(IrBinaryOperator.AndAlso));
+        var calleeGuard = completion.Right as IrBinaryTerm;
+        Assert.That(calleeGuard, Is.Not.Null);
+        Assert.That(calleeGuard!.Operator, Is.EqualTo(IrBinaryOperator.AndAlso));
+        Assert.That(
+            ReferenceEquals(calleeGuard.Left, instantiated.NormalCompletion),
+            Is.True);
+
+        var valid = new Dictionary<IrVarId, IrValue>
+        {
+            [callerParameter] = callee.Factory.CreateIntegerValue(2),
+            [callerResult] = callee.Factory.CreateIntegerValue(5),
+            [built.Summary.ExistentialVariables.Single()] =
+                callee.Factory.CreateIntegerValue(5)
+        };
+        var evaluation = new IrInterpreter(callee.Factory).Evaluate(
+            built.Summary.NormalRelation,
+            valid);
+        Assert.That(evaluation.Status, Is.EqualTo(IrEvaluationStatus.Value));
+        Assert.That(evaluation.Value!.Boolean, Is.True);
+    }
+
+    [Test]
     public void BranchSummaryJoinsAllNormalReturns()
     {
         var fixture = new SummaryFixture("Absolute");

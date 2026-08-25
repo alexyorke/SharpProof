@@ -145,6 +145,49 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
+    public async Task CompilationReferenceReturnContractActivatesAdvisoryAnalysis()
+    {
+        var external = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            namespace External.Contracts {
+                public static class Container {
+                    [return: Positive]
+                    public static int RequirePositive() => -1;
+                }
+            }
+            """,
+            []);
+        var caller = AnalyzerTestHost.CreateCompilation(
+            """
+            internal static class Caller {
+                internal static int Call() =>
+                    External.Contracts.Container.RequirePositive();
+            }
+            """,
+            ["SP0027"],
+            [external.ToMetadataReference()]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            caller,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factory.CreateCount, Is.EqualTo(1));
+            Assert.That(
+                diagnostics,
+                Is.Empty);
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Does.Not.Contain("AD0001"));
+        }
+    }
+
+    [Test]
     public async Task CompilationReferenceWithoutClosedContractsKeepsFastPath()
     {
         var external = AnalyzerTestHost.CreateCompilation(

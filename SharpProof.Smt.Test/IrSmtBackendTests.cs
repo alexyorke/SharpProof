@@ -566,7 +566,6 @@ public sealed class IrSmtBackendTests
             () => IsMonitorHeld(gate!),
             TimeSpan.FromSeconds(5));
         Assert.That(entered, Is.True);
-        Thread.Sleep(10);
         cancellation.Cancel();
 
         Func<Task> action = async () => await check;
