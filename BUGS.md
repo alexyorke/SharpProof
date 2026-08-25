@@ -446,15 +446,6 @@ These assignments are redundant since the guard simply returns the input if it's
 3. Observe identical `Finish()` outputs for semantically distinct types.
 **Confidence**: Medium
 
-### 142. CanonicalHashWriter.Add(Stream) Poisons the Running Digest on Mid-Stream Failure Instead of Failing Closed
-**Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Lines 43-65)
-**Description**: `Add(Stream)` appends the frame header and absorbs bytes incrementally; if `stream.Read` throws midway, `_hash` retains the header plus partial payload with no rollback or poisoned flag. A caller catching and continuing produces a `Finish()` digest covering truncated data indistinguishable from a legitimate one. Also, remaining length > int.MaxValue throws a bare `OverflowException` from the checked cast rather than a descriptive error.
-**Reproduction Steps**:
-1. Wrap a stream whose `Read` throws `IOException` after returning half the declared bytes.
-2. Call `writer.Add(stream)`, ignore the exception, add another frame.
-3. `Finish()` returns a digest mixing partial stream contents into the canonical hash with no error signal.
-**Confidence**: Medium
-
 ### 143. Interpreter Equality Compares Sequences by Reference Identity While All Other Kinds Compare by Value
 **Location**: `SharpProof.Ir\IrInterpreter.cs` (Line 354)
 **Description**: `EvaluateEquality` maps `(Sequence, Sequence)` to `ReferenceEquals(left, right)` - equality of `IrValue` wrapper instances, not elements. Structurally identical sequences yield `Equal == false`, while the identical term compared to itself folds `true` solely due to per-term-ID result memoization. Sequence comparisons become branch-dependent and memoization-sensitive, making concrete counterexample replay unstable.

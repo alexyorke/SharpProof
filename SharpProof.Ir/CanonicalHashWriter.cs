@@ -5,6 +5,7 @@ internal sealed class CanonicalHashWriter : IDisposable
     private readonly IncrementalHash _hash =
         IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
     private bool _finished;
+    private bool _poisoned;
 
     internal CanonicalHashWriter Add(string? value)
     {
@@ -51,22 +52,42 @@ internal sealed class CanonicalHashWriter : IDisposable
     internal CanonicalHashWriter Add(Stream stream)
     {
         stream = ArgumentNullGuard.NotNull(stream, nameof(stream));
-        var length = checked((int)(stream.Length - stream.Position));
-        AddFrameHeader(ValueKind.Bytes, length);
-        var buffer = new byte[Math.Min(length, 81920)];
-        var bytesRead = 0;
-        int read;
-        while ((read = stream.Read(
-                   buffer, 0, Math.Min(buffer.Length, length - bytesRead))) != 0)
+        EnsureWritable();
+        var completed = false;
+        try
         {
-            bytesRead += read;
-            _hash.AppendData(buffer, 0, read);
-        }
+            var remaining = stream.Length - stream.Position;
+            if (remaining is < 0 or > int.MaxValue)
+            {
+                throw new InvalidDataException(
+                    "The canonical hash stream length is outside the supported range.");
+            }
 
-        if (bytesRead != length || stream.ReadByte() != -1)
+            var length = (int)remaining;
+            AddFrameHeader(ValueKind.Bytes, length);
+            var buffer = new byte[Math.Min(length, 81920)];
+            var bytesRead = 0;
+            int read;
+            while ((read = stream.Read(
+                       buffer, 0, Math.Min(buffer.Length, length - bytesRead))) != 0)
+            {
+                bytesRead += read;
+                _hash.AppendData(buffer, 0, read);
+            }
+
+            if (bytesRead != length || stream.ReadByte() != -1)
+            {
+                throw new InvalidDataException(
+                    "The canonical hash stream does not match its declared length.");
+            }
+            completed = true;
+        }
+        finally
         {
-            throw new InvalidDataException(
-                "The canonical hash stream does not match its declared length.");
+            if (!completed)
+            {
+                _poisoned = true;
+            }
         }
 
         return this;
@@ -111,10 +132,7 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     private void AddFrameHeader(ValueKind kind, int length)
     {
-        if (_finished)
-        {
-            throw new ObjectDisposedException(nameof(CanonicalHashWriter));
-        }
+        EnsureWritable();
 
         _hash.AppendData([
             (byte)kind, (byte)length, (byte)(length >> 8),
@@ -146,10 +164,7 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     internal string Finish()
     {
-        if (_finished)
-        {
-            throw new ObjectDisposedException(nameof(CanonicalHashWriter));
-        }
+        EnsureWritable();
 
         _finished = true;
         return string.Concat(_hash.GetHashAndReset().Select(static value =>
@@ -159,6 +174,19 @@ internal sealed class CanonicalHashWriter : IDisposable
     {
         _finished = true;
         _hash.Dispose();
+    }
+
+    private void EnsureWritable()
+    {
+        if (_finished)
+        {
+            throw new ObjectDisposedException(nameof(CanonicalHashWriter));
+        }
+        if (_poisoned)
+        {
+            throw new InvalidOperationException(
+                "The canonical hash writer cannot continue after a failed stream write.");
+        }
     }
 
     private enum ValueKind : byte

@@ -104,6 +104,19 @@ public sealed class CanonicalHashWriterTests
     }
 
     [Test]
+    public void FailedStreamWritePoisonsTheWriter()
+    {
+        using var writer = new CanonicalHashWriter();
+        using var stream = new ThrowingStream([0, 1, 2, 3]);
+
+        Assert.Throws<IOException>((Action)(() => writer.Add(stream)));
+        Assert.Throws<InvalidOperationException>(
+            (Action)(() => writer.Add("after failure")));
+        Assert.Throws<InvalidOperationException>(
+            (Action)(() => writer.Finish()));
+    }
+
+    [Test]
     public void ZeroLengthStreamGrowthFailsClosed()
     {
         using var writer = new CanonicalHashWriter();
@@ -157,6 +170,22 @@ public sealed class CanonicalHashWriterTests
             }
 
             return base.Read(buffer, offset, count);
+        }
+    }
+
+    private sealed class ThrowingStream(byte[] bytes) : MemoryStream(bytes, writable: false)
+    {
+        private bool _returnedPrefix;
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_returnedPrefix)
+            {
+                throw new IOException("synthetic stream failure");
+            }
+
+            _returnedPrefix = true;
+            return base.Read(buffer, offset, Math.Min(2, count));
         }
     }
 }
