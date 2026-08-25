@@ -1,5 +1,9 @@
 # Coverage authority and TCB ownership - 2026-08-08
 
+> Historical evidence: this note records a dated checkpoint. It is not a
+> current product guide; see the [documentation map](../README.md) and
+> [coverage and limits](../coverage-and-limits.md).
+
 ## Decision
 
 At the time of this decision, coverage measured every production

@@ -1,5 +1,9 @@
 # Formatting-neutral source metrics - 2026-07-29
 
+> Historical evidence: this note records a dated checkpoint. It is not a
+> current product guide; see the [documentation map](../README.md) and
+> [coverage and limits](../coverage-and-limits.md).
+
 ## Decision
 
 SharpProof no longer uses physical-line, nonblank-line, or source-span limits as

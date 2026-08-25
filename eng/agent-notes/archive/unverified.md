@@ -1,5 +1,9 @@
 # Unverified / could not demonstrate
 
+> Historical archive: this file records earlier audit leads and their evidence.
+> It is not an active queue; use the [current documentation map](../../../docs/README.md)
+> for current guidance.
+
 ## `ManagedContractFacts.cs:158` — reversed-refinement branch
 
 The line is `Evaluate(binary.Left, values)` inside the

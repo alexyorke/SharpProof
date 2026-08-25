@@ -8,6 +8,7 @@ jobs; they are not interchangeable sources of truth.
 | Document | Audience | Role |
 |---|---|---|
 | [Project README](../README.md) | Package users | Installation, activation, examples, and the short product overview |
+| [Getting started](getting-started.md) | New package users and CI authors | Task-oriented package setup, profile selection, strict verification, samples, and the first repository checks |
 | [Coverage and limits](coverage-and-limits.md) | Users and contributors | Authoritative inventory of the currently implemented analyzer, worker, language, contract, and API-spec surface |
 | [Supported public API](public-api.md) | Library authors | Supported contract types, package boundary, and XML-documentation guarantee |
 | [Diagnostics](diagnostic-examples.md) | Analyzer and verifier users | Current `SP`, `SPCF`, SP0047, SP0048, and SP0049 diagnostics, defaults, policies, and examples |
@@ -108,8 +109,10 @@ The implementation remains the authority for enumerated surfaces:
 | [2026-07-25 hardening audit](soundness-notes/2026-07-25-hardening.md) | Dated evidence | Records one completed hardening tranche and its remaining checkpoints. |
 | [2026-07-25 API-spec result domains](soundness-notes/2026-07-25-api-spec-result-domains.md) | Dated evidence | Records the bounded worker result-projection tranche. |
 
-Soundness notes record what was reviewed at a point in time. They do not replace
-the current coverage inventory or normative semantics.
+Soundness notes record what was reviewed at a point in time. They are historical
+evidence, not current product instructions; their old protocol, schema, host,
+and test-count references are intentionally retained as evidence. They do not
+replace the current coverage inventory or normative semantics.
 
 ## Known production gaps
 
@@ -159,6 +162,8 @@ stable 1.0 governance is separate. Current behavior and limits are recorded in
 
 ## Machine-owned Markdown
 
+- docs/api-spec-catalog.generated.md is generated from the declarative API
+  catalog; review and edit the JSON source and rerun its owning generator.
 - `SharpProof.Analyzer/AnalyzerReleases.Shipped.md` and
   `AnalyzerReleases.Unshipped.md` are Roslyn release-tracking inputs. Tests
   reconcile them with the active descriptor catalog; edit them only as part of
@@ -174,4 +179,6 @@ test suite compiles every maintained C# fence. The script does not
 generate these files. When behavior changes, update the relevant source-owned
 table first, then update the coverage, diagnostic, limit, or reason reference
 that mirrors it. Dated soundness notes remain subject to link and file-format
-checks but are excluded from current-version drift checks.
+checks but are excluded from current-version drift checks. Archived agent notes
+under eng/agent-notes/archive/ are historical audit material and are not an
+active work queue.
