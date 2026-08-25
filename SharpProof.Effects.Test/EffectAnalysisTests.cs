@@ -1180,6 +1180,38 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void RecursivePatternDeconstructEffectsAreScanned()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+            }
+
+            public sealed class Value {
+                public void Deconstruct(out int number) {
+                    Global.State++;
+                    number = 0;
+                }
+            }
+
+            public static class Sample {
+                public static int Match(Value value) => value switch {
+                    Value(0) => 1,
+                    _ => 2
+                };
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Match"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void ObjectAndCollectionInitializersContributeTheirEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(

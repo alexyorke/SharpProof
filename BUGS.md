@@ -387,14 +387,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 
 
-### 126. Recursive-Pattern Deconstruct Method Invocations Omit Effects in Scanner
-**Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Line 372) and `SharpProof.Effects\OperationEffectScanner.cs` (Lines 939-942)
-**Description**: Positional and tuple deconstruction patterns (such as `p is var (a, b)` or `p is (A: 1, _)`) invoke a `Deconstruct` method at runtime. `OperationEffectScanner` delegates positional patterns to `ScanDefaultPattern`, which simply walks subpattern child operations (`ScanChildren`) without resolving the underlying `Deconstruct` invocation. As a result, side effects, allocations, or exceptions inside custom `Deconstruct` implementations are completely omitted from effect summaries for callers.
-**Reproduction Steps**:
-1. Define a type with an impure `Deconstruct(out int a, out int b)` method performing I/O or state mutation.
-2. Match an instance using a positional pattern: `p switch { var (x, y) => x }`.
-3. Observe that the generated effect summary for the pattern match is empty, missing the effects of `Deconstruct`.
-**Confidence**: High
 
 ### 127. Foreach Loop Enumerator Protocol Effects Omitted from Effect Scanner
 **Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Lines 375-376)

@@ -11,6 +11,47 @@ internal sealed partial class OperationEffectScanner
             : member.Summary;
     }
 
+    private EffectSummary ScanRecursivePattern(
+        IRecursivePatternOperation pattern)
+    {
+        var result = ScanChildren(pattern);
+        if (pattern.DeconstructSymbol is not IMethodSymbol deconstruct)
+        {
+            return result;
+        }
+
+        var governingValue = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (governingValue == null ||
+            _nullnessEvaluator.IsProvenNull(governingValue, pattern))
+        {
+            return result;
+        }
+
+        var arguments = Enumerable.Repeat(
+                EffectRegionSet.Empty,
+                deconstruct.Parameters.Length)
+            .ToImmutableArray();
+        var actualArguments = Enumerable.Repeat<IOperation?>(
+                null,
+                deconstruct.Parameters.Length)
+            .ToImmutableArray();
+        var call = _callResolver.Resolve(
+            deconstruct,
+            _conversionOwnership.ClassifyRegion(
+                governingValue,
+                aliasSource: true),
+            _conversionOwnership.ClassifyRegion(
+                governingValue,
+                aliasSource: true),
+            arguments,
+            actualArguments,
+            deconstruct.IsVirtual || deconstruct.IsAbstract,
+            pattern,
+            governingValue,
+            ImmutableArray<IArgumentOperation>.Empty);
+        return EffectSummaryDomain.Instance.Join(result, call);
+    }
+
     private EffectSummary ScanDeconstruction(
         IDeconstructionAssignmentOperation deconstruction)
     {
@@ -363,6 +404,8 @@ internal sealed partial class OperationEffectScanner
                 ScanConditionalAccess(conditional),
             ISwitchExpressionOperation switchExpression =>
                 ScanSwitchExpression(switchExpression),
+            IRecursivePatternOperation recursivePattern =>
+                ScanRecursivePattern(recursivePattern),
             IListPatternOperation listPattern =>
                 ScanListPattern(listPattern),
             IIsPatternOperation isPattern => ScanChildren(isPattern),
