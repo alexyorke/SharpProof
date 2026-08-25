@@ -504,20 +504,7 @@ public sealed class ArchitectureTests
         var offenders = ProductionProjects
             .Append("SharpProof.Gates")
             .SelectMany(ProductionSourceFiles)
-            .SelectMany(path =>
-            {
-                var root = CSharpSyntaxTree.ParseText(
-                    File.ReadAllText(path)).GetRoot();
-                return root.DescendantNodes()
-                    .OfType<VariableDeclarationSyntax>()
-                    .Where(declaration =>
-                        declaration.Type is IdentifierNameSyntax identifier &&
-                        outcomeTypes.Contains(identifier.Identifier.ValueText))
-                    .SelectMany(declaration => declaration.Variables
-                        .Where(variable => variable.Initializer?.Value is
-                            ImplicitObjectCreationExpressionSyntax)
-                        .Select(variable => Relative(path)));
-            })
+            .SelectMany(path => FindTargetTypedOutcomeCallers(path, outcomeTypes))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static path => path, StringComparer.Ordinal)
             .ToArray();
@@ -527,6 +514,95 @@ public sealed class ArchitectureTests
             Is.Empty,
             "Target-typed proof outcomes must be constructed only by " +
             "SharpProof.Verify/ProofKernel.cs.");
+    }
+
+    private static IEnumerable<string> FindTargetTypedOutcomeCallers(
+        string path,
+        ISet<string> outcomeTypes)
+    {
+        var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetRoot();
+        var variableInitializers = root.DescendantNodes()
+            .OfType<VariableDeclarationSyntax>()
+            .Where(declaration => IsOutcomeType(declaration.Type, outcomeTypes))
+            .SelectMany(declaration => declaration.Variables
+                .Where(variable => variable.Initializer?.Value is
+                    ImplicitObjectCreationExpressionSyntax));
+        var returns = root.DescendantNodes()
+            .OfType<ReturnStatementSyntax>()
+            .Where(statement =>
+                statement.Expression is ImplicitObjectCreationExpressionSyntax &&
+                IsOutcomeType(GetEnclosingCallableType(statement), outcomeTypes));
+        var arrows = root.DescendantNodes()
+            .OfType<ArrowExpressionClauseSyntax>()
+            .Where(arrow =>
+                arrow.Expression is ImplicitObjectCreationExpressionSyntax &&
+                IsOutcomeType(GetEnclosingCallableType(arrow), outcomeTypes));
+
+        return variableInitializers
+            .Cast<SyntaxNode>()
+            .Concat(returns)
+            .Concat(arrows)
+            .Select(_ => Relative(path));
+    }
+
+    private static bool IsOutcomeType(TypeSyntax? type, ISet<string> outcomeTypes)
+    {
+        return type != null &&
+            outcomeTypes.Contains(GetTypeName(type));
+    }
+
+    private static string GetTypeName(TypeSyntax type)
+    {
+        return type switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            QualifiedNameSyntax qualified => GetRightmostTypeName(qualified.Right),
+            AliasQualifiedNameSyntax alias => GetRightmostTypeName(alias.Name),
+            NullableTypeSyntax nullable => GetTypeName(nullable.ElementType),
+            _ => string.Empty
+        };
+    }
+
+    private static string GetRightmostTypeName(NameSyntax name)
+    {
+        return name switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+            QualifiedNameSyntax qualified => GetRightmostTypeName(qualified.Right),
+            AliasQualifiedNameSyntax alias => GetRightmostTypeName(alias.Name),
+            _ => string.Empty
+        };
+    }
+
+    private static TypeSyntax? GetEnclosingCallableType(SyntaxNode node)
+    {
+        foreach (var ancestor in node.Ancestors())
+        {
+            switch (ancestor)
+            {
+                case MethodDeclarationSyntax method:
+                    return method.ReturnType;
+                case LocalFunctionStatementSyntax localFunction:
+                    return localFunction.ReturnType;
+                case OperatorDeclarationSyntax operatorDeclaration:
+                    return operatorDeclaration.ReturnType;
+                case ConversionOperatorDeclarationSyntax conversion:
+                    return conversion.Type;
+                case PropertyDeclarationSyntax property:
+                    return property.Type;
+                case IndexerDeclarationSyntax indexer:
+                    return indexer.Type;
+                case AccessorDeclarationSyntax accessor:
+                    return accessor.Parent?.Parent switch
+                    {
+                        PropertyDeclarationSyntax property => property.Type,
+                        IndexerDeclarationSyntax indexer => indexer.Type,
+                        _ => null
+                    };
+            }
+        }
+
+        return null;
     }
 
     [Test]
