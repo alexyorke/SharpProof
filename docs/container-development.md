@@ -42,6 +42,8 @@ Use the short `sp` command inside the container:
 sp test-changed
 sp check
 sp build
+sp self-apply
+sp self-apply -Configuration Release -PackageSource artifacts/container-packages
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj
 sp semantic-tests
 sp portable-tests

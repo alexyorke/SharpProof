@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -52,6 +52,89 @@ switch ($Command) {
     'build' {
         Invoke-DotNet @('restore', $Target, '--locked-mode')
         Invoke-DotNet @('build', $Target, '--configuration', $Configuration, '--no-restore')
+    }
+    'self-apply' {
+        $trackedProjects = @(
+            & git -C $repositoryRoot ls-files -- '*.csproj' |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                ForEach-Object {
+                    Join-Path $repositoryRoot $_
+                } |
+                Sort-Object
+        )
+        if ($LASTEXITCODE -ne 0 -or $trackedProjects.Count -eq 0) {
+            throw 'self-apply requires a Git-backed repository with tracked project files.'
+        }
+
+        $sourceProjects = @(
+            $trackedProjects |
+                Where-Object {
+                    $relative = [IO.Path]::GetRelativePath(
+                        $repositoryRoot, $_).Replace('\', '/')
+                    $relative -notlike 'samples/*' -and
+                        $relative -notlike 'eng/pilots/*'
+                }
+        )
+        if ($sourceProjects.Count -eq 0) {
+            throw 'self-apply found no source-tree projects to analyze.'
+        }
+
+        # Build the complete source tree once with the self lane disabled so
+        # every analyzer and generator output is available as a stable input.
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+        Invoke-DotNet @(
+            'build', 'SharpProof.sln', '--configuration', $Configuration,
+            '--no-restore', '--nologo',
+            '-p:SharpProofSelfApplication=false',
+            '-p:SharpProofProfile=off',
+            '-p:SharpProofVerify=false',
+            '-p:GeneratePackageOnBuild=false')
+
+        $ordinal = 0
+        foreach ($project in $sourceProjects) {
+            $ordinal++
+            Write-Host ("Self-applying SharpProof ({0}/{1}): {2}" -f
+                $ordinal, $sourceProjects.Count,
+                [IO.Path]::GetRelativePath($repositoryRoot, $project))
+            Invoke-DotNet @(
+                'build', $project, '--configuration', $Configuration,
+                '--no-restore', '--no-dependencies', '--nologo',
+                '-p:SharpProofSelfApplication=true',
+                '-p:SharpProofProfile=advisory',
+                '-p:SharpProofFeatures=all',
+                '-p:SharpProofVerify=false',
+                '-p:GeneratePackageOnBuild=false')
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
+            $resolvedPackageSource = if ([IO.Path]::IsPathRooted($PackageSource)) {
+                [IO.Path]::GetFullPath($PackageSource)
+            }
+            else {
+                [IO.Path]::GetFullPath(
+                    (Join-Path $repositoryRoot $PackageSource))
+            }
+            if (-not (Test-Path -LiteralPath $resolvedPackageSource -PathType Container)) {
+                throw "self-apply package source is missing: '$resolvedPackageSource'."
+            }
+            & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPilots.ps1') `
+                -PackageSource $resolvedPackageSource
+            if ($LASTEXITCODE -ne 0) {
+                throw 'SharpProof self-application pilot validation failed.'
+            }
+        }
+
+        # Package-backed samples exercise the same analyzer payload through
+        # the supported package-consumer path.  The sample harness creates and
+        # cleans its own isolated local feed and temporary build roots.  Keep
+        # this after pilots because its pack restores may update lock files in
+        # the disposable checkout, which would violate the pilot clean guard.
+        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofSamples.ps1') `
+            -Configuration $Configuration `
+            -ExpectedSmt Required
+        if ($LASTEXITCODE -ne 0) {
+            throw 'SharpProof self-application sample validation failed.'
+        }
     }
     'check' {
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofDevCheck.ps1') `

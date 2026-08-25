@@ -1,6 +1,7 @@
 <Project>
   <!-- Import this file after the consuming project's SharpProof settings. -->
   <PropertyGroup>
+    <_SharpProofAnalyzerConsumerPresent>true</_SharpProofAnalyzerConsumerPresent>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>

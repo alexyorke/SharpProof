@@ -1,4 +1,7 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)eng/self-application/SharpProof.SelfApplication.props"
+          Condition="'$(SharpProofSelfApplication)' == 'true' AND Exists('$(MSBuildThisFileDirectory)eng/self-application/SharpProof.SelfApplication.props')" />
+
   <Target Name="_RequireSharpProofCanonicalContainer"
           BeforeTargets="Restore;PrepareForBuild"
           Condition="'$(SHARPPROOF_CONTAINER)' != '1' Or !Exists('/etc/sharpproof/container-contract.json')">
