@@ -138,4 +138,16 @@ public sealed class IntervalDomainTests
             _domain.Compare(_domain.Bottom, _domain.Top),
             Is.LessThan(0));
     }
+
+    [Test]
+    public void FullRangeUsesTheCanonicalTopRepresentation()
+    {
+        var fullRange = _domain.Range(long.MinValue, long.MaxValue);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(fullRange, Is.EqualTo(_domain.Top));
+            Assert.That(fullRange.GetHashCode(), Is.EqualTo(_domain.Top.GetHashCode()));
+        }
+    }
 }

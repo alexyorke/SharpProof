@@ -421,14 +421,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 **Confidence**: Medium
 
-### 165. Lattice Equivalence and .NET Equality Diverge for Interval Values (Top vs Full-Range): AreEquivalent True, Equals False
-**Location**: `SharpProof.Dataflow\IntervalValue.cs` (Lines 98-129) vs `ClosedAbstractDomain.cs` (Lines 23-26)
-**Description**: `Range(long.MinValue, long.MaxValue)` denotes the same set as Top; LessThanOrEqual holds both ways so solver equivalence checks treat them as identical fixpoint states, but IntervalValue.Equals/GetHashCode distinguish them (null vs sentinel bounds). Consumers caching, deduping, or diffing states with Equals see phantom differences the engine considers convergence-equivalent, breaking same-fixpoint-implies-same-cached-result assumptions.
-**Reproduction Steps**:
-1. `var t = IntervalValue.Top; var f = IntervalDomain.Instance.Range(long.MinValue, long.MaxValue);`
-2. t == f is false and hash codes differ, while AreEquivalent(t, f) is true.
-**Confidence**: High (behavior certain; impact depends on consumer usage)
-
 ### 166. Single-Entry Seeding Leaves Blocks Not Reachable From Entry Permanently Bottom With No Diagnostic
 **Location**: `SharpProof.Dataflow\ForwardDataflowAnalysis.cs` (Lines 115-120, 167-173)
 **Description**: Only EntryBlockId is seeded; non-entry inputs start at domain.Bottom. A block whose predecessors are themselves unreachable from entry is never enqueued, so GetInputState/GetOutputState return Bottom ("provably unreachable") forever, and Analyze completes successfully instead of flagging the dead region. A consumer wiring exception edges incorrectly gets silent all-Bottom catch states rather than an error.
