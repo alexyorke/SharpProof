@@ -274,9 +274,10 @@ foreach ($pilot in $catalog.pilots) {
             -WorkingDirectory $projectDirectory `
             -LogPath $negativeLog `
             -Arguments (@(
-                'build', $project, '-c', 'Release', '--no-restore', '--nologo',
-                '-p:SharpProofVerify=false',
-                '-p:DefineConstants=SHARPPROOF_NEGATIVE_PROBE') + $common)
+            'build', $project, '-c', 'Release', '--no-restore', '--nologo',
+            '-p:SharpProofVerify=false',
+            "-p:SharpProofVerifySarifFile=$sarifPath",
+            '-p:DefineConstants=SHARPPROOF_NEGATIVE_PROBE') + $common)
         $negativeText = Get-Content -LiteralPath $negativeLog -Raw
         $negativeProbePassed = $negative.exitCode -ne 0 -and
             $negativeText.Contains('SP0027', [StringComparison]::Ordinal)
