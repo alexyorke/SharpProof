@@ -188,7 +188,9 @@ internal static class LanguageSubsetGate
                 binary.OperatorMethod == null &&
                 (!rejectUnsupportedStringOperations || !IsStringConcat(binary)),
             ICompoundAssignmentOperation compound =>
-                compound.OperatorMethod == null,
+                compound.OperatorMethod == null &&
+                (!rejectUnsupportedStringOperations ||
+                 !IsStringCompoundConcat(compound)),
             IIncrementOrDecrementOperation increment =>
                 increment.OperatorMethod == null,
             _ => true
@@ -228,6 +230,13 @@ internal static class LanguageSubsetGate
     {
         return binary.OperatorKind == BinaryOperatorKind.Add &&
             binary.Type?.SpecialType == SpecialType.System_String;
+    }
+
+    private static bool IsStringCompoundConcat(
+        ICompoundAssignmentOperation compound)
+    {
+        return compound.OperatorKind == BinaryOperatorKind.Add &&
+            compound.Type?.SpecialType == SpecialType.System_String;
     }
 
     private static bool SupportsCall(

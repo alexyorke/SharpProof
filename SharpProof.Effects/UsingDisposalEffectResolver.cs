@@ -14,6 +14,7 @@ internal sealed class UsingDisposalEffectResolver
     private readonly EffectCallSiteResolver _calls;
     private readonly Compilation _compilation;
     private readonly ManagedFlowResult? _flow;
+    private readonly Func<IOperation, bool> _isReachable;
     private readonly EffectAnalysisSession _session;
 
     internal UsingDisposalEffectResolver(
@@ -21,7 +22,8 @@ internal sealed class UsingDisposalEffectResolver
         Compilation compilation,
         IMethodSymbol caller,
         EffectCallSiteResolver calls,
-        ManagedFlowResult? flow)
+        ManagedFlowResult? flow,
+        Func<IOperation, bool> isReachable)
     {
         _session = ArgumentNullGuard.NotNull(session, nameof(session));
         _compilation = ArgumentNullGuard.NotNull(
@@ -30,6 +32,7 @@ internal sealed class UsingDisposalEffectResolver
         _caller = ArgumentNullGuard.NotNull(caller, nameof(caller));
         _calls = ArgumentNullGuard.NotNull(calls, nameof(calls));
         _flow = flow;
+        _isReachable = ArgumentNullGuard.NotNull(isReachable, nameof(isReachable));
     }
 
     internal EffectSummary Scan(
@@ -47,7 +50,7 @@ internal sealed class UsingDisposalEffectResolver
                              IUsingDeclarationOperation))
         {
             if (IsInsideNestedCallable(operation, root) ||
-                _flow != null && !_flow.IsReachable(operation))
+                !_isReachable(operation))
             {
                 continue;
             }

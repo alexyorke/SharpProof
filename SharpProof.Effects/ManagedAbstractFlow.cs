@@ -2070,7 +2070,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             ILoopOperation loop when
                 LoopConditionIsAlwaysTrue(loop) &&
                 loop.Body != null &&
-                !LoopHasReachableBreak(loop.Body) => false,
+                !LoopHasReachableExit(loop) => false,
             ITryOperation @try =>
                 (@try.Finally == null || MayCompleteNormally(@try.Finally)) &&
                 (MayCompleteNormally(@try.Body) ||
@@ -2234,24 +2234,46 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         };
     }
 
-    private static bool LoopHasReachableBreak(IOperation body)
+    private static bool LoopHasReachableExit(ILoopOperation loop)
     {
-        foreach (var child in body.ChildOperations)
+        foreach (var branch in loop.Body!.DescendantsAndSelf()
+                     .OfType<IBranchOperation>())
         {
-            if (child is IBranchOperation { BranchKind: BranchKind.Break })
+            if (branch.BranchKind == BranchKind.Break &&
+                IsDirectlyInsideLoop(branch, loop))
             {
                 return true;
             }
-            if (child is ILoopOperation or ISwitchOperation)
+            if (branch.Syntax is not GotoStatementSyntax ||
+                branch.Target == null)
             {
                 continue;
             }
-            if (LoopHasReachableBreak(child))
+
+            if (branch.Target.DeclaringSyntaxReferences.Any(reference =>
+                    !loop.Body.Syntax.Span.Contains(
+                        reference.GetSyntax().Span)))
             {
                 return true;
             }
         }
         return false;
+    }
+
+    private static bool IsDirectlyInsideLoop(
+        IBranchOperation branch,
+        ILoopOperation loop)
+    {
+        for (var parent = branch.Parent;
+             parent != null && !ReferenceEquals(parent, loop);
+             parent = parent.Parent)
+        {
+            if (parent is ILoopOperation)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private bool InvocationMayCompleteNormally(IInvocationOperation invocation)

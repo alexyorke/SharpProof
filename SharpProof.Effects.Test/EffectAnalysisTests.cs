@@ -2307,6 +2307,78 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void UsingDisposalsRemainVisibleOnHandlerOnlyPaths()
+    {
+        var result = Analyze(
+            """
+            using System;
+
+            public sealed class Resource : IDisposable {
+                private static volatile int s_state;
+                public void Dispose() => s_state = 1;
+            }
+
+            public static class Sample {
+                public static void HandlerOnly(Resource resource) {
+                    try { throw new InvalidOperationException(); }
+                    catch (InvalidOperationException) {
+                        using (resource) { }
+                    }
+                }
+
+                public static void AfterHandler(Resource resource) {
+                    try { throw new InvalidOperationException(); }
+                    catch (InvalidOperationException) { }
+                    using (resource) { }
+                }
+            }
+            """,
+            "Sample",
+            "HandlerOnly");
+        var afterHandler = Analyze(
+            """
+            using System;
+
+            public sealed class Resource : IDisposable {
+                private static volatile int s_state;
+                public void Dispose() => s_state = 1;
+            }
+
+            public static class Sample {
+                public static void AfterHandler(Resource resource) {
+                    try { throw new InvalidOperationException(); }
+                    catch (InvalidOperationException) { }
+                    using (resource) { }
+                }
+            }
+            """,
+            "Sample",
+            "AfterHandler");
+
+        Assert.That(result.Summary.Writes.Contains(EffectRegionId.Static()), Is.True);
+        Assert.That(afterHandler.Summary.Writes.Contains(EffectRegionId.Static()), Is.True);
+    }
+
+    [Test]
+    public void InfiniteLoopsWithGotoExitsPreserveFollowingEffects()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                private static int s_state;
+                public static void Exit() {
+                    while (true) { goto Done; }
+                    Done: s_state = 1;
+                }
+            }
+            """,
+            "Sample",
+            "Exit");
+
+        Assert.That(result.Summary.Writes.Contains(EffectRegionId.Static()), Is.True);
+    }
+
+    [Test]
     public void UsingValueTypesDisposeOnlyTheirAcquiredCopies()
     {
         var compilation = EffectTestHost.CreateCompilation(

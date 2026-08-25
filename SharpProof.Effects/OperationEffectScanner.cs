@@ -205,7 +205,8 @@ internal sealed partial class OperationEffectScanner
             _session.Compilation,
             _method,
             _callResolver,
-            _abstractFlow).Scan(
+            _abstractFlow,
+            IsReachable).Scan(
                 root,
                 _conversionOwnership.ClassifyRegion,
                 _completionEvaluator.CanCompleteNormally,
