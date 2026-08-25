@@ -71,6 +71,7 @@ public sealed class ContractClauseInventoryTests
         Assert.That(
             inventory.Clauses.Select(static clause => clause.Ordinal),
             Is.EqualTo(InventoryOrdinals));
+        Assert.That(inventory.Clauses[^1].IsValid, Is.False);
         Assert.That(
             inventory.Clauses.All(static clause =>
                 clause.Location.IsInSource &&

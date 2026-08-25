@@ -248,12 +248,17 @@ public static partial class WorkerProtocolJson
             string domain,
             WorkerSourceLocation? value)
         {
-            return Add(domain).Add(value == null ? -1 : 5)
-                .Add("location.path").Add(value?.Path)
-                .Add("location.start").Add(value?.Start ?? -1)
-                .Add("location.length").Add(value?.Length ?? -1)
-                .Add("location.line").Add(value?.Line ?? -1)
-                .Add("location.column").Add(value?.Column ?? -1);
+            if (value == null)
+            {
+                return Add(domain).Add(-1);
+            }
+
+            return Add(domain).Add(5)
+                .Add("location.path").Add(value.Path)
+                .Add("location.start").Add(value.Start)
+                .Add("location.length").Add(value.Length)
+                .Add("location.line").Add(value.Line)
+                .Add("location.column").Add(value.Column);
         }
 
         public override string ToString()

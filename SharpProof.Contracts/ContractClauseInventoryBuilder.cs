@@ -222,13 +222,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         try
         {
             var flow = model.AnalyzeControlFlow(statement);
-            return flow == null ||
-                !flow.Succeeded ||
-                flow.StartPointIsReachable;
+            return flow is { Succeeded: true, StartPointIsReachable: true };
         }
         catch (ArgumentException)
         {
-            return true;
+            // An inability to establish reachability must not turn a clause
+            // into valid prologue evidence. The caller classifies false as
+            // unreachable, which fails closed for binding and verification.
+            return false;
         }
     }
 

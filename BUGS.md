@@ -428,22 +428,6 @@ These assignments are redundant since the guard simply returns the input if it's
 1. Graph with entry 0→1 and an isolated cycle 2↔3; Analyze returns normally with InputStates[2]/[3] == Bottom and no signal two blocks were never analyzed.
 **Confidence**: High (behavior), Medium (design-gap classification)
 
-### 169. Duplicate Intrinsic Declarations Crash ContractApiSymbols.TryCreate Instead of Degrading to ContractApiUnavailable
-**Location**: `SharpProof.Contracts\ContractApiSymbols.cs` (Lines 59-70 FindGenericIntrinsic using SingleOrDefault)
-**Description**: `SingleOrDefault(method => ...)` throws InvalidOperationException when two members satisfy the shape filter (e.g., duplicate declarations via partials/metadata). TryCreate is invoked eagerly in ContractBinder and ContractIntrinsicValidator constructors, none of which catch it - the documented graceful degradation ContractBindingFailure.ContractApiUnavailable (used when members are merely missing) is bypassed in favor of an unhandled crash of the binding pipeline.
-**Reproduction Steps**:
-1. Reference a Contract type declaring two applicable static generic zero-arg Result methods.
-2. Construct ContractBinder or call ContractApiSymbols.TryCreate: InvalidOperationException escapes instead of null/ContractApiUnavailable.
-**Confidence**: Low
-
-### 170. Unanalyzable Statements Default to Reachable, Admitting Unreachable Contracts as Valid Prologue
-**Location**: `SharpProof.Contracts\ContractClauseInventoryBuilder.cs` (Lines 214-233 IsReachable)
-**Description**: IsReachable catches ArgumentException from SemanticModel.AnalyzeControlFlow and defaults to StartPointIsReachable == true. For statements Roslyn cannot analyze (error-code constructs, malformed trees), a Contract.Requires that is actually unreachable is classified ValidPrologue, bound into BoundMethodContracts, and verified as a live obligation - malformed input accepted at the boundary instead of abstaining.
-**Reproduction Steps**:
-1. Place a Requires clause in a construct where AnalyzeControlFlow throws (error-recovery/speculative positions).
-2. The clause comes back IsValid == true and is included in bindings instead of Unreachable.
-**Confidence**: Low
-
 ### 171. Protocol Identity Hashing Uses Lossy UTF-8 Replacement Fallback: Distinct Callable/Claim IDs Seal to Identical Manifest Hashes
 **Location**: `SharpProof.Worker.Protocol\ProtocolJson.cs` (Line 75 ComputeRequestHash; strict encoder s_strictUtf8 defined Line 14 but unused for hashing); `ProtocolManifest.cs` (Lines 44-51, 67-76)
 **Description**: Identity strings are hashed via Encoding.UTF8, whose encoder replaces unpaired surrogates with U+FFFD, while uniqueness validation operates on decoded UTF-16 strings accepting `"id\uD800"` and `"id\uFFFD"` as distinct. SealManifest/ComputeManifestHash therefore produce identical hashes and ManifestsEqual returns true, so a response verified against one manifest passes manifest-binding validation for a different manifest and cache entries alias across distinct compilations. Same collision class as accepted issue #133 but a distinct site.
@@ -466,14 +450,6 @@ These assignments are redundant since the guard simply returns the input if it's
 **Reproduction Steps**:
 1. Start a worker ignoring SIGTERM so Terminate exceeds its grace period; call Dispose(): InvalidOperationException, and a second Dispose reruns Kill/WaitForExit on the undisposed handle.
 2. Race Dispose from thread B while thread A polls WaitForExit: intermittent ObjectDisposedException.
-**Confidence**: Medium
-
-### 174. Manifest-Writer Frame Violates Its Own Length-Prefix Convention: -1 ("Absent") Count Followed by Five Present Fields
-**Location**: `SharpProof.Worker.Protocol\ProtocolJsonSupport.cs` (Lines 217-230 Add/AddItems: -1 strictly means no fields follow; 247-257 AddLocation)
-**Description**: The ManifestWriter framing establishes negative length = absence: Add(null) emits exactly `-1:;` and AddItems emits count -1 followed by zero records. AddLocation breaks the invariant: for a null location it emits count -1 yet appends all five length-prefixed fields with -1 sentinels. Today nothing parses these payloads (only SHA-256'd/compared) so producer and consumer stay accidentally consistent, but any count-driven decoder misparses every null-location frame, and the sentinel is ambiguous between "null location" and "location with all fields -1".
-**Reproduction Steps**:
-1. Call `AddLocation("t", null).ToString()`: output contains five records after a -1 (absent) count.
-2. Compare AddItems(domain, null, ...) emitting zero records after -1; implement the obvious count-driven decoder and observe desynchronization.
 **Confidence**: Medium
 
 ### 175. Launcher Launch-Wait Polls CancellationToken.WaitHandle on a Sourceless Token, Mapping Every Real Verification to Bogus containment.unavailable

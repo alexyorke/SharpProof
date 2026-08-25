@@ -34,25 +34,54 @@ public static partial class WorkerProtocolJson
 
     internal static string ReadUtf8File(string path)
     {
-        using var reader = OpenJsonReader(path);
-        return reader.ReadToEnd().TrimStart('\uFEFF');
+        using var stream = OpenJsonStream(path);
+        var bytes = new byte[MaximumJsonBytes + 1];
+        var length = 0;
+        while (length < bytes.Length)
+        {
+            var read = stream.Read(bytes, length, bytes.Length - length);
+            if (read == 0)
+            {
+                break;
+            }
+
+            length += read;
+        }
+        if (length > MaximumJsonBytes)
+        {
+            throw new InvalidDataException(
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
+        return s_strictUtf8.GetString(bytes, 0, length).TrimStart('\uFEFF');
     }
 
     internal static async Task<string> ReadUtf8FileAsync(
         string path, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var reader = OpenJsonReader(path);
-        var builder = new StringBuilder();
-        var buffer = new char[81920];
-        int read;
-        while ((read = await reader.ReadAsync(buffer, 0, buffer.Length)
-                   .ConfigureAwait(false)) != 0)
+        using var stream = OpenJsonStream(path);
+        var bytes = new byte[MaximumJsonBytes + 1];
+        var length = 0;
+        while (length < bytes.Length)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            builder.Append(buffer, 0, read);
+            var read = await stream.ReadAsync(
+                    bytes, length, bytes.Length - length, cancellationToken)
+                .ConfigureAwait(false);
+            if (read == 0)
+            {
+                break;
+            }
+
+            length += read;
         }
-        return builder.ToString().TrimStart('\uFEFF');
+        if (length > MaximumJsonBytes)
+        {
+            throw new InvalidDataException(
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
+        return s_strictUtf8.GetString(bytes, 0, length).TrimStart('\uFEFF');
     }
 
     public static WorkerVerifyRequest? DeserializeRequest(string json)
@@ -75,7 +104,7 @@ public static partial class WorkerProtocolJson
         return ComputeSha256(s_strictUtf8.GetBytes(SerializeRequest(request)));
     }
 
-    private static StreamReader OpenJsonReader(string path)
+    private static FileStream OpenJsonStream(string path)
     {
         var stream = new FileStream(
             path,
@@ -91,7 +120,7 @@ public static partial class WorkerProtocolJson
                 $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
         }
 
-        return new StreamReader(stream, s_strictUtf8, detectEncodingFromByteOrderMarks: false);
+        return stream;
     }
 
     public static string SerializeResponse(WorkerVerifyResponse response)
