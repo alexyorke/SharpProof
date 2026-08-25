@@ -253,7 +253,7 @@ foreach ($pilot in $catalog.pilots) {
             if ($matches.Count -ne 1) {
                 throw "Pilot '$($pilot.id)' has an incoherent manifest/result claim set."
             }
-            [ordered]@{
+            [pscustomobject]@{
                 claimId = [string]$manifestClaim.claimId
                 kind = [string]$manifestClaim.kind
                 outcome = [string]$matches[0].outcome
