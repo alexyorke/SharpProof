@@ -428,46 +428,6 @@ These assignments are redundant since the guard simply returns the input if it's
 1. Graph with entry 0→1 and an isolated cycle 2↔3; Analyze returns normally with InputStates[2]/[3] == Bottom and no signal two blocks were never analyzed.
 **Confidence**: High (behavior), Medium (design-gap classification)
 
-### 175. Launcher Launch-Wait Polls CancellationToken.WaitHandle on a Sourceless Token, Mapping Every Real Verification to Bogus containment.unavailable
-**Location**: `SharpProof.Worker.Launcher\Program.cs` (Lines 276-278 calling WaitForExit(terminationStart, finalLimit)); root cause `SharpProof.Host\LinuxWorkerProcess.cs` (Line 133); second instance `LinuxPathIdentity.cs` (Line 1285)
-**Description**: RunWorker calls WaitForExit without a CancellationToken, so the poll loop accesses CancellationToken.None.WaitHandle, which throws InvalidOperationException on the first iteration whenever the worker survives one poll tick (~25 ms - i.e., every real cold start). RunMain's general handler maps InvalidOperationException to exit 125 containment.unavailable, writing a fail-closed result asserting containment failed - masking the actual verification entirely. The identical idiom in publication-lock acquire throws under lock contention.
-**Reproduction Steps**:
-1. Invoke the launcher with any worker startup exceeding ~25 ms (all of them).
-2. Observe stderr "worker containment could not be established", exit 125, synthesized containment.unavailable result even though the worker started fine; contrast the passing test which supplies a real CTS token.
-**Confidence**: Medium
-
-### 176. SARIF PROJECTROOT Base URI Is the Launcher's CWD, Not the Verified Project Directory
-**Location**: `SharpProof.Worker.Launcher\SarifProjection.cs` (Lines 69-77; project directory available at Program.cs Lines 205-206 but not passed)
-**Description**: originalUriBaseIds["PROJECTROOT"] is built from Environment.CurrentDirectory of the launcher process, while compiler artifactLocations are intentionally project-relative (per the file's own comment). Every relative location resolves against whatever directory the launcher started in, not the actual project directory.
-**Reproduction Steps**:
-1. From /repo run the launcher for a project at /repo/sub/proj with --publish-sarif.
-2. SARIF viewers resolve relative locations to /repo/src/... instead of /repo/sub/proj/src/....
-**Confidence**: High
-
-### 178. Method-Timeout Timer Stays Armed Through Result Assembly, Converting Completed Proofs Into Spurious Timeout/Incomplete
-**Location**: `SharpProof.Worker\CallableVerificationPolicy.cs` (Lines 23-59)
-**Description**: CancelAfter(methodWallTimeMilliseconds) remains live while the successful proof is post-processed (effect record assembly and ordering inside the same try). If the timer fires in that window (routinely fires up to a tick late), any OperationCanceledException jumps to catch, discarding the completed proof and labeling the callable Incomplete/MethodTimeout. Coverage flips Complete→Incomplete, VerificationCache.IsCacheable rejects the run, and RequireProven policies fail purely due to assembly-time jitter.
-**Reproduction Steps**:
-1. Set --method-wall-ms near a callable's real solve time so the deadline lands just after proof completion.
-2. Intermittently observe claims computed but callable reported MethodTimeout/Incomplete and no cache write; slightly larger budget completes and caches identical work.
-**Confidence**: Medium
-
-### 180. Aggregate SP0048/SP0047 Diagnostics Anchored at the Wrong Callable; SARIF and Console Reports Disagree on Location Fields
-**Location**: `SharpProof.Worker.Launcher\Program.cs` (SP0048 anchored at Manifest.Callables[0].Location Lines 525-528; SP0047 anchored at incomplete[0] Lines 479-483); `SarifProjection.cs` (Notifications carry no location, Lines 36-44, 177-192)
-**Description**: Assumption totals are computed across ALL callables but the console diagnostic anchors at the first manifest callable's location, pointing at unrelated code; the SARIF notification carries no region/artifactLocation at all. Similarly aggregate-counted SP0047 anchors only at the first incomplete callable.
-**Reproduction Steps**:
-1. Verify a project where only a late-declared callable declares assumptions.
-2. Console SP0048 prefixed with callable #1's file/line; the SARIF toolExecutionNotification for SP0048 has no location.
-**Confidence**: Medium
-
-### 181. SARIF invocations[0].executionSuccessful Is true for Runs Containing Refuted (Failing) Postconditions
-**Location**: `SharpProof.Worker.Launcher\SarifProjection.cs` (Lines 78-82)
-**Description**: executionSuccessful = runStatus == Complete && errors.Length == 0. A verification completing with a definite contract violation produces results with kind:"fail"/level:"error" and exit code 5, yet the invocation is marked executionSuccessful:true. CI consumers gating on this field treat violated postconditions as successful verification because the failure signal exists only in results[] and the process exit code.
-**Reproduction Steps**:
-1. Verify a project with one provably false [Ensures] clause.
-2. Published SARIF contains a fail result yet invocations[0].executionSuccessful == true.
-**Confidence**: Low
-
 ### 182. Raw SyntaxTree.FilePath Stored in Source-Summary Authority Never Matches Path.GetFullPath-Normalized Snapshot Trees, Aborting the Entire Manifest
 **Location**: `SharpProof.CompilerCollector\CompilerArtifact\CompilerRelationalSummaryProvider.cs` (Line 358) vs `CompilerCompilationCapture.cs` (Line 141) and `CompilerManifestArtifactProducer.cs` (Lines 118-127); worker-side mirror `SharpProof.CompilerArtifact\CompilationFingerprint.cs` (Lines 167-171)
 **Description**: Captured snapshot trees store normalized full paths, but summary evidence rows store the raw declaration.SyntaxTree.FilePath, and BuildSummaryEvidence demands ordinal string equality, throwing "A source summary authority is not bound to the captured source tree" - converted into a manifest-failure diagnostic dropping the whole manifest. Divergence occurs for generator-added trees with relative hint names (e.g., "Gen.g.cs") or forward-slash paths on Windows. The worker-side validator repeats the comparison, rejecting hand-repaired manifests too.

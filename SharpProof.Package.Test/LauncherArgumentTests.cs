@@ -1424,6 +1424,130 @@ public sealed class LauncherArgumentTests
         }
     }
 
+    [Test]
+    public void AssumptionDiagnosticUsesCallableWithEvidence()
+    {
+        var request = new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "compiler.manifest.json",
+                Sha256 = new('c', 64)
+            },
+            Cache = new WorkerCacheOptions { Enabled = false },
+            AssumptionPolicy = WorkerAssumptionPolicy.Error
+        };
+        var manifest = CreateSarifManifest();
+        var lateLocation = new WorkerSourceLocation
+        {
+            Path = "late.cs",
+            Line = 17,
+            Column = 4
+        };
+        manifest.Callables[0].Assumptions = [];
+        manifest.Callables[0].ClaimIds = [];
+        manifest.Callables[1].Location = lateLocation;
+        manifest.Callables[1].Assumptions = [
+            new WorkerAssumptionEvidence
+            {
+                Id = "assumption-1",
+                Kind = WorkerAssumptionKind.UserAssume
+            }
+        ];
+        manifest.Claims = [manifest.Claims[1]];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+            InputHash = new('a', 64),
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = [
+                new WorkerCallableResult {
+                    CallableId = "C.M",
+                    Coverage = WorkerCallableCoverage.Complete,
+                    Reason = WorkerCallableCoverageReason.None
+                },
+                new WorkerCallableResult {
+                    CallableId = "C.Unsupported",
+                    Coverage = WorkerCallableCoverage.Complete,
+                    Reason = WorkerCallableCoverageReason.None,
+                    Assumptions = [
+                        new WorkerAssumptionEvidence
+                        {
+                            Id = "assumption-1",
+                            Kind = WorkerAssumptionKind.UserAssume
+                        }
+                    ]
+                }
+            ],
+            ClaimResults = [
+                new WorkerClaimResult {
+                    ClaimId = "claim-2",
+                    Outcome = WorkerClaimOutcome.Proven,
+                    Reason = WorkerClaimReason.None,
+                    EffectCertainty =
+                        WorkerEffectEvidenceCertainty.CompleteMayEffectSummary,
+                    Assumptions = [UsedUserAssumption()]
+                }
+            ],
+            Summary = new WorkerVerificationSummary
+            {
+                CallableCount = 2,
+                ClaimCount = 1,
+                OutcomeCounts = [
+                    new WorkerClaimOutcomeCount {
+                        Outcome = WorkerClaimOutcome.Proven,
+                        Count = 1
+                    }
+                ],
+                ReasonCounts = [
+                    new WorkerClaimReasonCount {
+                        Reason = WorkerClaimReason.None,
+                        Count = 1
+                    }
+                ],
+                Assumptions = new WorkerAssumptionSummary
+                {
+                    Total = 1,
+                    Used = 1,
+                    User = 1
+                },
+                CacheStatus = WorkerCacheStatus.Disabled,
+                Versions = new WorkerVersionSummary
+                {
+                    WorkerVersion = "launcher-test",
+                    ApiSpecVersion = "launcher-test"
+                },
+                Budgets = request.Budgets
+            }
+        };
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        try
+        {
+            Console.SetError(error);
+            File.WriteAllText(path, WorkerProtocolJson.SerializeResponse(response));
+            Assert.That(
+                Program.ValidateAndReport(
+                    path, request, response.InputHash, manifest,
+                    response.Summary.Versions, out var valid, out _),
+                Is.EqualTo(6),
+                error.ToString());
+            Assert.That(valid, Is.True);
+            Assert.That(error.ToString(), Does.Contain("\"file\":\"late.cs\""));
+        }
+        finally
+        {
+            Console.SetError(originalError);
+            File.Delete(path);
+        }
+    }
+
     private static WorkerVerifyRequest CreateValidRequest()
     {
         return new WorkerVerifyRequest
@@ -1517,7 +1641,7 @@ public sealed class LauncherArgumentTests
             Assert.That(
                 run.GetProperty("invocations")[0]
                     .GetProperty("executionSuccessful").GetBoolean(),
-                Is.True);
+                Is.False);
             Assert.That(results.GetArrayLength(), Is.EqualTo(2));
             Assert.That(
                 results[0].GetProperty("ruleId").GetString(),
@@ -1561,6 +1685,16 @@ public sealed class LauncherArgumentTests
             Assert.That(
                 assumption.GetProperty("level").GetString(),
                 Is.EqualTo("error"));
+            var assumptionLocation = assumption.GetProperty("locations")[0]
+                .GetProperty("physicalLocation");
+            Assert.That(
+                assumptionLocation.GetProperty("artifactLocation")
+                    .GetProperty("uri").GetString(),
+                Is.EqualTo("file:///C:/source/Subject.cs"));
+            Assert.That(
+                assumptionLocation.GetProperty("region")
+                    .GetProperty("startLine").GetInt32(),
+                Is.EqualTo(2));
         }
     }
 

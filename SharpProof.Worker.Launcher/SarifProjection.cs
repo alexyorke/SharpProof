@@ -35,12 +35,15 @@ internal static class SarifProjection
         var assumptions = summary.Assumptions;
         if (assumptions.User + assumptions.Trusted != 0)
         {
+            var assumptionLocation = manifest.Callables.FirstOrDefault(
+                static callable => callable.Assumptions.Length != 0)?.Location;
             notifications.Add(Notification(
                 "SP0048",
                 "User assumption/trusted evidence declared: total=" +
                     (assumptions.User + assumptions.Trusted) + ", user=" +
                     assumptions.User + ", trusted=" + assumptions.Trusted + ".",
-                LauncherPresentation.Level(request.AssumptionPolicy, "note")));
+                LauncherPresentation.Level(request.AssumptionPolicy, "note"),
+                assumptionLocation));
         }
 
         if (runStatus != WorkerRunStatus.Complete)
@@ -76,7 +79,10 @@ internal static class SarifProjection
                 }
             },
             invocations = new[] { new {
-                executionSuccessful = runStatus == WorkerRunStatus.Complete && errors.Length == 0,
+                executionSuccessful = runStatus == WorkerRunStatus.Complete &&
+                    errors.Length == 0 &&
+                    !claimResults.Any(static result =>
+                        result.Outcome == WorkerClaimOutcome.Refuted),
                 properties = new { RunStatus = runStatus, FailureReason = failureReason },
                 toolExecutionNotifications = notifications
             }},
@@ -174,21 +180,40 @@ internal static class SarifProjection
         };
     }
 
-    private static object Notification(
-        string id, string message, string level = "error")
+    private static Dictionary<string, object> Notification(
+        string id, string message, string level = "error",
+        WorkerSourceLocation? location = null)
     {
-        return new
+        var notification = new Dictionary<string, object>
         {
-            descriptor = new
+            ["descriptor"] = new
             {
                 id
             },
-            level,
-            message = new
+            ["level"] = level,
+            ["message"] = new
             {
                 text = message
             }
         };
+        if (location != null)
+        {
+            notification["locations"] = new[] { new { physicalLocation = new
+            {
+                artifactLocation = new
+                {
+                    uri = LocationUri(location.Path),
+                    uriBaseId = "PROJECTROOT"
+                },
+                region = new
+                {
+                    startLine = location.Line,
+                    startColumn = location.Column
+                }
+            }}};
+        }
+
+        return notification;
     }
 
     private static string LocationUri(string path)
