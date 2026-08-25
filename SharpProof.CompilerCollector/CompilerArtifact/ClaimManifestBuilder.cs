@@ -94,6 +94,7 @@ internal sealed partial class ClaimManifestBuilder(
                  MethodKind.PropertySet or
                  MethodKind.EventAdd or
                  MethodKind.EventRemove) &&
+            !(analyzerEffectsSelected && HasStaticStateMutation(target)) &&
             selectedSubset.IsSupported;
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
@@ -170,7 +171,31 @@ internal sealed partial class ClaimManifestBuilder(
             seed.Model,
             [],
             _effectSession.HasResolvedApiSpec,
-            cancellationToken);
+            cancellationToken,
+            rejectUnsupportedStringOperations: false);
+    }
+
+    private bool HasStaticStateMutation(IMethodSymbol method)
+    {
+        foreach (var constructor in method.ContainingType.StaticConstructors
+                     .Where(static constructor => !constructor.IsImplicitlyDeclared))
+        {
+            foreach (var reference in constructor.DeclaringSyntaxReferences)
+            {
+                var syntax = reference.GetSyntax(cancellationToken);
+                var model = SharpProof.Frontend.Host.CompilationModelProvider
+                    .GetSemanticModel(_compilation, syntax.SyntaxTree);
+                var operation = model.GetOperation(syntax, cancellationToken);
+                if (operation?.DescendantsAndSelf().Any(static candidate =>
+                        candidate is IAssignmentOperation or
+                            IIncrementOrDecrementOperation) == true)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private ImmutableArray<ManifestClaim> CreatePostconditions(

@@ -3925,7 +3925,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task UndefinedPostconditionProducesTypedNonfatalUnknown()
+    public async Task UnsupportedUncheckedDivisionInPostconditionRemainsTypedUnknown()
     {
         using var project = TestProject.Create(
             """
@@ -3958,8 +3958,7 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.PostconditionMayBeUndefined));
+                Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
         }
     }
 

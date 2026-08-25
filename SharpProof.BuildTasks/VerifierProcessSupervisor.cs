@@ -20,7 +20,17 @@ internal static partial class VerifierProcessSupervisor
     private const string CleanupMessage = "SharpProof.Cleanup/1";
     private const int CleanupMilliseconds = 750;
     private const int RetryCleanupMilliseconds = 100;
+    private const int CleanupRetryBudgetMilliseconds = 5000;
     private const int CleanupDescriptorReserveCount = 3;
+
+    // This hook is test-only and is intentionally limited to the supervisor's
+    // cleanup boundary. It lets the failure-path test hold cleanup incomplete
+    // without manufacturing descendant processes in the test process.
+    internal static Func<int, int, DescendantStopResult>? StopDescendantsOverrideForTest
+    {
+        get;
+        set;
+    }
 
     internal static int Run(string[] command)
     {
@@ -136,24 +146,35 @@ internal static partial class VerifierProcessSupervisor
                 : 143;
             var descriptorReserves = cleanupDescriptorReserves;
             cleanupDescriptorReserves = [];
-            var cleanup = StopDescendants(
+            var cleanup = StopDescendantsForRun(
                 Environment.ProcessId,
                 CleanupMilliseconds,
                 descriptorReserves: descriptorReserves,
                 protectedProcessId: process.Id);
             var hadDescendants = cleanup.HadDescendants;
             var retryDelayMilliseconds = 10;
-            while (!cleanup.Complete)
+            var cleanupBudget = Stopwatch.StartNew();
+            while (!cleanup.Complete &&
+                   cleanupBudget.ElapsedMilliseconds < CleanupRetryBudgetMilliseconds)
             {
-                Thread.Sleep(retryDelayMilliseconds);
+                var remaining = CleanupRetryBudgetMilliseconds -
+                    (int)cleanupBudget.ElapsedMilliseconds;
+                Thread.Sleep(Math.Min(retryDelayMilliseconds, remaining));
                 retryDelayMilliseconds = Math.Min(
                     retryDelayMilliseconds * 2,
                     5000);
-                cleanup = StopDescendants(
+                cleanup = StopDescendantsForRun(
                     Environment.ProcessId,
                     RetryCleanupMilliseconds,
                     protectedProcessId: process.Id);
                 hadDescendants |= cleanup.HadDescendants;
+            }
+            if (!cleanup.Complete)
+            {
+                // Do not emit an authenticated cleanup receipt when the
+                // supervisor could not prove that all owned descendants are
+                // gone. The caller must treat this as containment failure.
+                return 125;
             }
             if (!process.HasExited && !process.WaitForExit(1000))
             {
@@ -177,6 +198,25 @@ internal static partial class VerifierProcessSupervisor
     {
         return nonce.Length == 64 && nonce.All(static character =>
             character is >= '0' and <= '9' or >= 'A' and <= 'F');
+    }
+
+    private static DescendantStopResult StopDescendantsForRun(
+        int supervisorId,
+        int maximumMilliseconds,
+        IReadOnlyList<int>? descriptorReserves = null,
+        int? protectedProcessId = null)
+    {
+        if (StopDescendantsOverrideForTest is { } overrideForTest)
+        {
+            CloseDescriptors(descriptorReserves ?? []);
+            return overrideForTest(supervisorId, maximumMilliseconds);
+        }
+
+        return StopDescendants(
+            supervisorId,
+            maximumMilliseconds,
+            descriptorReserves: descriptorReserves,
+            protectedProcessId: protectedProcessId);
     }
 
     private static void WriteCleanupReceipt(string nonce)

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.Versioning;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Host;
@@ -7,6 +8,7 @@ namespace SharpProof.Worker.Test;
 
 [TestFixture]
 [Platform("Linux")]
+[SupportedOSPlatform("linux")]
 public sealed class LinuxPublicationSetTests
 {
     [TestCase(false, false)]
@@ -529,6 +531,78 @@ public sealed class LinuxPublicationSetTests
             Assert.That(
                 File.Exists(LinuxPathIdentity.PublicationMarkerPath(result)),
                 Is.False);
+        }
+    }
+
+    [Test]
+    public void ResetRemovesTornMarkerWhenDestinationIsAbsent()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var result = Path.Combine(directory.Path, "torn-result.json");
+        var marker = LinuxPathIdentity.PublicationMarkerPath(result);
+        var metadataDirectory = Path.GetDirectoryName(marker)!;
+        Directory.CreateDirectory(metadataDirectory);
+        File.SetUnixFileMode(
+            metadataDirectory,
+            UnixFileMode.UserRead |
+            UnixFileMode.UserWrite |
+            UnixFileMode.UserExecute);
+        File.WriteAllText(
+            marker,
+            "SharpProof.PublicationSet/1\n");
+
+        LinuxPathIdentity.ResetPublicationSet(
+            [result],
+            TimeSpan.FromSeconds(1));
+
+        using var publication = LinuxPathIdentity.AcquirePublicationSet(
+            [result],
+            TimeSpan.FromSeconds(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(result), Is.False);
+            Assert.That(File.Exists(marker), Is.True);
+        }
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void CaseFoldProbeChecksEveryExistingAncestorAndFailsClosed()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var nested = Directory.CreateDirectory(
+            Path.Combine(directory.Path, "middle")).FullName;
+        var target = Path.Combine(nested, "result.json");
+        var visited = new List<string>();
+        try
+        {
+            LinuxPathIdentity.CaseFoldedParentProbeOverrideForTest = path =>
+            {
+                visited.Add(path);
+                return string.Equals(
+                    path,
+                    directory.Path,
+                    StringComparison.Ordinal)
+                    ? true
+                    : false;
+            };
+
+            Assert.Throws<ArgumentException>((Action)(() =>
+                LinuxPathIdentity.RequireLocalPath(target)));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(visited, Does.Contain(nested));
+                Assert.That(visited, Does.Contain(directory.Path));
+            }
+
+            LinuxPathIdentity.CaseFoldedParentProbeOverrideForTest =
+                static _ => null;
+            Assert.Throws<IOException>((Action)(() =>
+                LinuxPathIdentity.RequireLocalPath(target)));
+        }
+        finally
+        {
+            LinuxPathIdentity.CaseFoldedParentProbeOverrideForTest = null;
         }
     }
 

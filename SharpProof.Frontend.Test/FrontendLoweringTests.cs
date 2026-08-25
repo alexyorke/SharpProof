@@ -269,6 +269,12 @@ public sealed class FrontendLoweringTests
             FrontendAbstention.UncheckedOverflowSemantics);
         AssertClassification(
             """
+            public static long Target(long divisor) => 1L / divisor;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
             public static uint Target(uint left, uint right) => left % right;
             """,
             FrontendSubsetDecision.ClosedAbstention,

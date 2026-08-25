@@ -74,11 +74,17 @@ internal static class PackageBuildSdkPin
                 $"but the pinned performance probe selected '{probeVersion}'.");
         }
 
+        // The standalone release envelope defines this digest as lowercase;
+        // keep the producer aligned with its case-sensitive validator.
+#pragma warning disable CA1308
+        var globalJsonSha256 = Convert.ToHexString(
+            SHA256.HashData(bytes)).ToLowerInvariant();
+#pragma warning restore CA1308
         return new PackageBuildSdkIdentity(
             configuredVersion,
             rollForward,
             probeVersion,
-            Convert.ToHexString(SHA256.HashData(bytes)));
+            globalJsonSha256);
     }
 
     private static async Task<string> ResolveSdkVersionAsync(

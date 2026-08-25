@@ -262,7 +262,7 @@ public sealed class DependencyAutomationTests
     }
 
     [Test]
-    public void RepositoryWorkflowsUseOnlyThePinnedContainerSdk()
+    public void RepositoryWorkflowsUsePinnedContainerAndPortableSdks()
     {
         var root = RepositoryRoot();
         var workflowDirectory = Path.Combine(root, ".github", "workflows");
@@ -292,8 +292,8 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 dotnet.GetProperty("minimumSdkVersion").GetString(),
                 Is.EqualTo("9.0.300"));
-            Assert.That(workflows, Does.Not.Contain("actions/setup-dotnet"));
-            Assert.That(workflows, Does.Not.Contain("dotnet-version:"));
+            Assert.That(workflows, Does.Contain("actions/setup-dotnet@"));
+            Assert.That(workflows, Does.Contain("dotnet-version: 9.0.316"));
             Assert.That(
                 workflows,
                 Does.Contain("uses: ./.github/actions/build-tooling"));

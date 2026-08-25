@@ -37,6 +37,7 @@ internal static class WorkerPerformanceProbe
             .ConfigureAwait(false);
         var cancellationLatencies = await MeasureWorkerCancellationAsync(
                 workspace,
+                contract.Warmups,
                 contract.Samples,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -67,11 +68,12 @@ internal static class WorkerPerformanceProbe
 
     private static async Task<double[]> MeasureWorkerCancellationAsync(
         WorkerProbeWorkspace workspace,
+        int warmups,
         int samples,
         CancellationToken outerCancellationToken)
     {
-        var latencies = new double[samples];
-        for (var index = 0; index < samples; index++)
+        var latencies = new double[warmups + samples];
+        for (var index = 0; index < warmups + samples; index++)
         {
             outerCancellationToken.ThrowIfCancellationRequested();
             var backend = new CancellationProbeBackend();
@@ -95,7 +97,24 @@ internal static class WorkerPerformanceProbe
 
             latencies[index] = stopwatch.Elapsed.TotalMilliseconds;
         }
-        return latencies;
+        return SelectMeasuredLatencies(latencies, warmups, samples);
+    }
+
+    internal static double[] SelectMeasuredLatencies(
+        IReadOnlyList<double> latencies,
+        int warmups,
+        int samples)
+    {
+        ArgumentNullException.ThrowIfNull(latencies);
+        ArgumentOutOfRangeException.ThrowIfNegative(warmups);
+        ArgumentOutOfRangeException.ThrowIfNegative(samples);
+        if (latencies.Count != warmups + samples)
+        {
+            throw new ArgumentException(
+                "The latency sequence must contain warmups followed by samples.",
+                nameof(latencies));
+        }
+        return latencies.Skip(warmups).Take(samples).ToArray();
     }
 
     private static bool IsCompleteCancellation(WorkerVerifyResponse response)

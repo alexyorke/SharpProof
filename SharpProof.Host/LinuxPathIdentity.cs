@@ -13,7 +13,9 @@ public static partial class LinuxPathIdentity
     private const int ErrorNoEntry = 2;
     private const int ErrorInterrupted = 4;
     private const int ErrorWouldBlock = 11;
+    private const int ErrorInvalidArgument = 22;
     private const int ErrorNotDirectory = 20;
+    private const int ErrorNotTty = 25;
     private const uint FileTypeMask = 0xF000;
     private const uint FileTypeDirectory = 0x4000;
     private const uint FileTypeRegular = 0x8000;
@@ -52,6 +54,14 @@ public static partial class LinuxPathIdentity
         {
             "cifs", "nfs", "nfs4", "smb3", "sshfs", "fuse.sshfs", "fuse"
         };
+
+    // Test-only probe. A null result represents an unexpected native probe
+    // failure and must remain fail-closed just like the real ioctl path.
+    internal static Func<string, bool?>? CaseFoldedParentProbeOverrideForTest
+    {
+        get;
+        set;
+    }
 
     public static string Canonicalize(string path)
     {
@@ -148,6 +158,21 @@ public static partial class LinuxPathIdentity
         var parent = Path.GetDirectoryName(canonicalPath);
         while (!string.IsNullOrEmpty(parent))
         {
+            if (CaseFoldedParentProbeOverrideForTest is { } probe)
+            {
+                var result = probe(parent);
+                if (result is null)
+                {
+                    throw new IOException(
+                        "SharpProof could not inspect case-folding flags.");
+                }
+                if (result.Value)
+                {
+                    return true;
+                }
+                parent = Path.GetDirectoryName(parent);
+                continue;
+            }
             if (NativeMethods.LStat(parent, out _) == 0)
             {
                 var descriptor = NativeMethods.Open(
@@ -156,17 +181,42 @@ public static partial class LinuxPathIdentity
                     mode: 0);
                 if (descriptor < 0)
                 {
-                    return false;
+                    var error = Marshal.GetLastPInvokeError();
+                    if (error == ErrorNoEntry)
+                    {
+                        parent = Path.GetDirectoryName(parent);
+                        continue;
+                    }
+
+                    throw new IOException(
+                        $"SharpProof could not inspect case-folding flags " +
+                        $"(errno {error}).");
                 }
 
                 try
                 {
                     var flags = 0u;
-                    return NativeMethods.Ioctl(
-                               descriptor,
-                               IoctlGetFlags,
-                               ref flags) == 0 &&
-                        (flags & Ext4CasefoldFlag) != 0;
+                    if (NativeMethods.Ioctl(
+                            descriptor,
+                            IoctlGetFlags,
+                            ref flags) == 0)
+                    {
+                        if ((flags & Ext4CasefoldFlag) != 0)
+                        {
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        var error = Marshal.GetLastPInvokeError();
+                        if (error != ErrorNotTty &&
+                            error != ErrorInvalidArgument)
+                        {
+                            throw new IOException(
+                                "SharpProof could not inspect case-folding " +
+                                $"flags (errno {error}).");
+                        }
+                    }
                 }
                 finally
                 {
@@ -254,6 +304,19 @@ public static partial class LinuxPathIdentity
         var pathState = canonicalPaths
             .Select(static path => TryInformation(path))
             .ToArray();
+        // A process killed while writing the old in-place marker could leave
+        // malformed metadata behind. It is safe to remove that metadata only
+        // when its destination is absent; a present destination still requires
+        // an exact authenticated marker before any cleanup is allowed.
+        for (var index = 0; index < markerPaths.Length; index++)
+        {
+            if (markerState[index].HasValue &&
+                !pathState[index].HasValue &&
+                TryRemoveTornPublicationMarker(markerPaths[index]))
+            {
+                markerState[index] = null;
+            }
+        }
         var markerCount = markerState.Count(static value => value.HasValue);
         if (markerCount == 0 && pathState.All(static value => !value.HasValue))
         {
@@ -831,22 +894,39 @@ public static partial class LinuxPathIdentity
                     throw new IOException(
                         "SharpProof refuses to adopt a pre-existing publication destination without an exact ownership marker.");
                 }
+                var temporaryMarker = item.MarkerPath + "." +
+                    Guid.NewGuid().ToString("N") + ".tmp";
                 try
                 {
-                    using var stream = new FileStream(
-                        item.MarkerPath,
-                        FileMode.CreateNew,
-                        FileAccess.Write,
-                        FileShare.Read);
-                    created.Add(item.MarkerPath);
-                    stream.Write(bytes);
-                    stream.Flush(true);
+                    using (var stream = new FileStream(
+                               temporaryMarker,
+                               FileMode.CreateNew,
+                               FileAccess.Write,
+                               FileShare.Read))
+                    {
+                        stream.Write(bytes);
+                        stream.Flush(true);
+                    }
+                    try
+                    {
+                        File.Move(temporaryMarker, item.MarkerPath);
+                        created.Add(item.MarkerPath);
+                    }
+                    catch (IOException) when (File.Exists(item.MarkerPath))
+                    {
+                        ValidatePublicationMarker(item.MarkerPath, marker);
+                    }
                 }
-                catch (IOException) when (
-                    !created.Contains(item.MarkerPath, StringComparer.Ordinal) &&
-                    File.Exists(item.MarkerPath))
+                finally
                 {
-                    ValidatePublicationMarker(item.MarkerPath, marker);
+                    try
+                    {
+                        File.Delete(temporaryMarker);
+                    }
+                    catch (Exception exception) when (exception is
+                        IOException or UnauthorizedAccessException)
+                    {
+                    }
                 }
             }
             foreach (var directory in created
@@ -943,16 +1023,36 @@ public static partial class LinuxPathIdentity
 
     private static void ValidatePublicationMarkerFormat(string markerPath)
     {
+        if (!IsPublicationMarkerWellFormed(markerPath))
+        {
+            throw new IOException(
+                "SharpProof publication ownership marker is malformed.");
+        }
+    }
+
+    private static bool TryRemoveTornPublicationMarker(string markerPath)
+    {
+        if (IsPublicationMarkerWellFormed(markerPath))
+        {
+            return false;
+        }
+
+        File.Delete(markerPath);
+        SyncDirectory(Path.GetDirectoryName(markerPath)!);
+        return true;
+    }
+
+    private static bool IsPublicationMarkerWellFormed(string markerPath)
+    {
         using var handle = OpenRegularMetadata(
             markerPath,
             OpenReadOnly,
             mode: 0,
             "publication ownership marker",
-            out var information);
+        out var information);
         if (information.Size is < 0 or > 256)
         {
-            throw new IOException(
-                "SharpProof publication ownership marker is malformed.");
+            return false;
         }
         using var stream = new FileStream(handle, FileAccess.Read);
         using var reader = new StreamReader(
@@ -961,17 +1061,21 @@ public static partial class LinuxPathIdentity
             detectEncodingFromByteOrderMarks: false,
             bufferSize: 256,
             leaveOpen: false);
-        var marker = reader.ReadToEnd();
-        if (marker.Length < PublicationMarkerHeader.Length + 64 ||
-            !marker.StartsWith(PublicationMarkerHeader, StringComparison.Ordinal) ||
-            marker.Length != PublicationMarkerHeader.Length + 64 + 1 ||
-            marker[^1] != '\n' ||
-            marker.AsSpan(PublicationMarkerHeader.Length, 64).IndexOfAnyExcept(
-                HexUppercase) >= 0)
+        string marker;
+        try
         {
-            throw new IOException(
-                "SharpProof publication ownership marker is malformed.");
+            marker = reader.ReadToEnd();
         }
+        catch (DecoderFallbackException)
+        {
+            return false;
+        }
+        return marker.Length >= PublicationMarkerHeader.Length + 64 &&
+            marker.StartsWith(PublicationMarkerHeader, StringComparison.Ordinal) &&
+            marker.Length == PublicationMarkerHeader.Length + 64 + 1 &&
+            marker[^1] == '\n' &&
+            marker.AsSpan(PublicationMarkerHeader.Length, 64).IndexOfAnyExcept(
+                HexUppercase) < 0;
     }
 
     private static SafeFileHandle OpenRegularMetadata(

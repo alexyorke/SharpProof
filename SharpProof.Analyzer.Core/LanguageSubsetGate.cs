@@ -47,7 +47,8 @@ internal static class LanguageSubsetGate
         SemanticModel semanticModel,
         ImmutableArray<IOperation> operationBlocks,
         Func<IMethodSymbol, bool> hasResolvedGenericApiSpec,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool rejectUnsupportedStringOperations = true)
     {
         if (!SupportsCallable(method, declaration))
         {
@@ -83,7 +84,10 @@ internal static class LanguageSubsetGate
                         operation.Kind);
                 }
 
-                if (!SupportsOperationShape(operation, hasResolvedGenericApiSpec))
+                if (!SupportsOperationShape(
+                        operation,
+                        hasResolvedGenericApiSpec,
+                        rejectUnsupportedStringOperations))
                 {
                     return LanguageSubsetDecision.Abstain(
                         LanguageSubsetAbstentionReason.UnsupportedOperationShape,
@@ -146,7 +150,8 @@ internal static class LanguageSubsetGate
 
     private static bool SupportsOperationShape(
         IOperation operation,
-        Func<IMethodSymbol, bool> hasResolvedGenericApiSpec)
+        Func<IMethodSymbol, bool> hasResolvedGenericApiSpec,
+        bool rejectUnsupportedStringOperations)
     {
         return operation switch
         {
@@ -170,7 +175,7 @@ internal static class LanguageSubsetGate
                 creation.Constructor != null &&
                 SupportsCall(creation.Constructor, hasResolvedGenericApiSpec),
             IPropertyReferenceOperation property =>
-                !IsStringLength(property) &&
+                (!rejectUnsupportedStringOperations || !IsStringLength(property)) &&
                 SupportsProperty(property, hasResolvedGenericApiSpec),
             IConversionOperation conversion =>
                 conversion.OperatorMethod == null,
@@ -180,7 +185,8 @@ internal static class LanguageSubsetGate
             IUnaryOperation unary =>
                 unary.OperatorMethod == null,
             IBinaryOperation binary =>
-                binary.OperatorMethod == null && !IsStringConcat(binary),
+                binary.OperatorMethod == null &&
+                (!rejectUnsupportedStringOperations || !IsStringConcat(binary)),
             ICompoundAssignmentOperation compound =>
                 compound.OperatorMethod == null,
             IIncrementOrDecrementOperation increment =>

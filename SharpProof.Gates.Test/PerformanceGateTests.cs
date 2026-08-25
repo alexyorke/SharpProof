@@ -46,6 +46,17 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public void WorkerCancellationMeasurementExcludesWarmups()
+    {
+        var measured = WorkerPerformanceProbe.SelectMeasuredLatencies(
+            [1d, 2d, 10d, 11d],
+            warmups: 2,
+            samples: 2);
+
+        Assert.That(measured, Is.EqualTo([10d, 11d]));
+    }
+
+    [Test]
     public void PackageBuildEstimatorUsesPairedRatiosAndBalancesOrder()
     {
         PackageBuildSample[] samples =
@@ -278,8 +289,11 @@ public sealed class PerformanceGateTests
                 Assert.That(identity.ResolvedVersion, Is.Not.Empty);
                 Assert.That(
                     identity.GlobalJsonSha256,
+#pragma warning disable CA1308
                     Is.EqualTo(Convert.ToHexString(
-                        SHA256.HashData(repositoryGlobalJson))));
+                        SHA256.HashData(repositoryGlobalJson))
+                        .ToLowerInvariant()));
+#pragma warning restore CA1308
             }
         }
         finally

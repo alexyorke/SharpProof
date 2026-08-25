@@ -33,6 +33,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     private const int SignalTerminate = 15;
     private const int SignalStop = 19;
     private const int SignalKill = 9;
+    private const int ProcessNotFound = 3;
     private const string ProcessGroupLauncher = "/usr/bin/setsid";
     private const string ProcessGateStartMessage = "SharpProof.Start/1";
     private const string SupervisorArmedMessage = "SharpProof.Armed/1";
@@ -1184,19 +1185,33 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     terminationStopwatch,
                     terminationWaitMilliseconds),
                     LauncherProcessReserveMilliseconds));
-            if (SendPidFdSignal(_processGroupPidFd, SignalStop) == 0)
+            var stopResult = SendPidFdSignal(_processGroupPidFd, SignalStop);
+            var stopError = stopResult == 0
+                ? 0
+                : Marshal.GetLastPInvokeError();
+            if (ShouldKillProcessGroupAfterStop(stopResult, stopError))
             {
                 // The stopped session leader keeps this process-group identity
-                // live while the group-directed signal is delivered.
+                // live while the group-directed signal is delivered. ESRCH is
+                // also a group-kill case: the leader may have exited after the
+                // authenticated pidfd/pgid was captured while descendants
+                // remain in the session.
                 _ = NativeMethods.Kill(-processGroupId, SignalKill);
                 _ = SendPidFdSignal(_processGroupPidFd, SignalKill);
             }
-            else if (Marshal.GetLastPInvokeError() != 3)
+            else
             {
                 _ = SendPidFdSignal(_processGroupPidFd, SignalKill);
             }
             return cleanup.Complete;
         }
+    }
+
+    internal static bool ShouldKillProcessGroupAfterStop(
+        int stopResult,
+        int stopError)
+    {
+        return stopResult == 0 || stopError == ProcessNotFound;
     }
 
     private int OpenPidFdRequired(int processId)

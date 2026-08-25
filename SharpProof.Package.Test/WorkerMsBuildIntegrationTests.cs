@@ -1079,6 +1079,71 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    [SupportedOSPlatform("linux")]
+    public async Task LauncherInputFailureInvalidatesOwnedPreviousPublication()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        using var publicationDirectory =
+            TemporaryPublicationDirectory.Create();
+        var publishRequest = Path.Combine(
+            publicationDirectory.Path, "direct-publish-request.json");
+        var publishResult = Path.Combine(
+            publicationDirectory.Path, "direct-publish-result.json");
+        var publishManifest = Path.Combine(
+            publicationDirectory.Path, "direct-publish-manifest.json");
+        var publishSarif = Path.Combine(
+            publicationDirectory.Path, "direct-publish.sarif.json");
+        var publicationPaths = new[]
+        {
+            publishRequest,
+            publishResult,
+            publishManifest,
+            publishSarif
+        };
+        var privateRequest = Path.Combine(
+            publicationDirectory.Path, "private-request.json");
+        var privateResult = Path.Combine(
+            publicationDirectory.Path, "private-result.json");
+        var privateManifest = Path.Combine(
+            publicationDirectory.Path, "private-manifest.json");
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   publicationPaths,
+                   TimeSpan.FromSeconds(5)))
+        {
+        }
+        foreach (var path in publicationPaths)
+        {
+            await File.WriteAllTextAsync(path, "stale-publication");
+        }
+
+        var exitCode = await Program.RunMain(
+            [
+                "verify",
+                "--worker", Path.Combine(project.Root, "missing-worker.dll"),
+                "--request", privateRequest,
+                "--result", privateResult,
+                "--compiler-manifest", privateManifest,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow",
+                "--publish-request", publishRequest,
+                "--publish-result", publishResult,
+                "--publish-compiler-manifest", publishManifest,
+                "--publish-sarif", publishSarif
+            ],
+            static _ => string.Empty);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(publicationPaths, Has.None.Matches<string>(File.Exists));
+            Assert.That(
+                publicationPaths.Select(LinuxPathIdentity.PublicationMarkerPath),
+                Has.None.Matches<string>(File.Exists));
+        }
+    }
+
+    [Test]
     public async Task PublicationRejectsCompilerOwnedOutputsBeforeMutation()
     {
         RequireContainerWorker();
@@ -4250,6 +4315,35 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             throw new InvalidOperationException(
                 "Repository root was not found.");
+        }
+    }
+
+    private sealed class TemporaryPublicationDirectory : IDisposable
+    {
+        private TemporaryPublicationDirectory(string path)
+        {
+            Path = path;
+            Directory.CreateDirectory(path);
+        }
+
+        internal string Path { get; }
+
+        internal static TemporaryPublicationDirectory Create()
+        {
+            return new TemporaryPublicationDirectory(System.IO.Path.Combine(
+                OperatingSystem.IsLinux()
+                    ? "/var/tmp"
+                    : System.IO.Path.GetTempPath(),
+                "SharpProof.Publication.Test",
+                "publication-" + Guid.NewGuid().ToString("N")));
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+            {
+                Directory.Delete(Path, recursive: true);
+            }
         }
     }
 

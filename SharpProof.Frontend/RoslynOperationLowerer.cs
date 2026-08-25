@@ -749,7 +749,12 @@ public sealed class RoslynOperationLowerer
                 }
 
                 if (CSharpScalarSemantics.RequiresCheckedArithmetic(
-                        operation.OperatorKind) && !operation.IsChecked)
+                        operation.OperatorKind) &&
+                    !operation.IsChecked &&
+                    !IsKnownSafeUncheckedArithmetic(
+                        operation.OperatorKind,
+                        left.Term,
+                        right.Term))
                 {
                     return OpaqueBinary(
                         operation,
@@ -773,6 +778,21 @@ public sealed class RoslynOperationLowerer
             return operand.Type is ITypeParameterSymbol &&
                 _owner.TypeSpecializer(operand.Type)?.SpecialType ==
                     SpecialType.System_String;
+        }
+
+        private static bool IsKnownSafeUncheckedArithmetic(
+            BinaryOperatorKind kind,
+            IrTerm left,
+            IrTerm right)
+        {
+            // The only overflow case for integral division is
+            // long.MinValue / -1. An exact non-minimum numerator or exact
+            // denominator therefore remains safe even when the surrounding
+            // operation is unchecked; divide-by-zero and the exceptional
+            // minimum-value case are represented by the IR interpreter.
+            return kind == BinaryOperatorKind.Divide &&
+                (left is IrIntegerTerm { Value: not long.MinValue } ||
+                 right is IrIntegerTerm);
         }
 
         public override LoweredExpression VisitConditional(

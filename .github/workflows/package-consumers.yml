@@ -142,12 +142,42 @@ jobs:
           - os: macos-latest
             family: macos
     runs-on: ${{ matrix.os }}
+    env:
+      NUGET_PACKAGES: ${{ runner.temp }}/sharpproof-framework-packages
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
           path: nupkgs
+      - name: Install the pinned consumer SDK
+        uses: actions/setup-dotnet@d4c94342e560b34958eacfc5d055d214d2f5f1e4 # v4.3.1
+        with:
+          dotnet-version: 9.0.316
+      - name: Seed exact offline framework packages
+        shell: pwsh
+        run: |
+          $seedRoot = Join-Path $env:RUNNER_TEMP 'sharpproof-framework-seed'
+          Remove-Item -LiteralPath $seedRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $seedRoot -Force | Out-Null
+          $project = @'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net8.0</TargetFramework>
+              <RestorePackagesPath>$(NUGET_PACKAGES)</RestorePackagesPath>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="netstandard.library" Version="2.0.3" />
+              <PackageReference Include="microsoft.netcore.platforms" Version="1.1.0" />
+              <PackageReference Include="microsoft.netframework.referenceassemblies" Version="1.0.3" />
+              <PackageReference Include="microsoft.netframework.referenceassemblies.net472" Version="1.0.3" />
+              <PackageReference Include="microsoft.netcore.app.ref" Version="8.0.29" />
+              <PackageReference Include="microsoft.aspnetcore.app.ref" Version="8.0.29" />
+            </ItemGroup>
+          </Project>
+          '@
+          Set-Content -LiteralPath (Join-Path $seedRoot 'Seed.csproj') -Value $project -Encoding utf8
+          dotnet restore (Join-Path $seedRoot 'Seed.csproj') --packages $env:NUGET_PACKAGES --nologo
       - name: Run portable-consumer against exact packages
         run: >-
           pwsh scripts/Test-SharpProofPortableConsumer.ps1

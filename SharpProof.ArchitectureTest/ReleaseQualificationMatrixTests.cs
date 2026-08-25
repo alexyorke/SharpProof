@@ -53,6 +53,21 @@ public sealed partial class ReleaseQualificationMatrixTests
             Assert.That(portable, Does.Contain("windows-latest"));
             Assert.That(portable, Does.Contain("macos-latest"));
             Assert.That(portable, Does.Contain("Test-SharpProofPortableConsumer.ps1"));
+            Assert.That(portable, Does.Contain("actions/setup-dotnet@"));
+            Assert.That(portable, Does.Contain("dotnet-version: 9.0.316"));
+            Assert.That(portable, Does.Contain("NUGET_PACKAGES"));
+            foreach (var package in new[]
+                     {
+                         "netstandard.library",
+                         "microsoft.netcore.platforms",
+                         "microsoft.netframework.referenceassemblies",
+                         "microsoft.netframework.referenceassemblies.net472",
+                         "microsoft.netcore.app.ref",
+                         "microsoft.aspnetcore.app.ref"
+                     })
+            {
+                Assert.That(portable, Does.Contain(package), package);
+            }
             Assert.That(qualification, Does.Contain("- portable-consumers"));
             Assert.That(
                 FoldedCommand().IsMatch(qualification),

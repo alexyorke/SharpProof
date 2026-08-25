@@ -53,6 +53,7 @@ internal static class Program
             // A colliding output can otherwise make closure staging fail first
             // with an unrelated missing-component error.
             arguments.ValidateDistinctPaths(null);
+            InvalidatePreviousPublication(arguments);
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
             arguments.ValidateDistinctPaths(runtimeSnapshot);
@@ -819,6 +820,25 @@ internal static class Program
         {
             throw failure;
         }
+    }
+
+    private static void InvalidatePreviousPublication(
+        LauncherArguments arguments)
+    {
+        if (arguments.PublishRequestPath == null)
+        {
+            return;
+        }
+
+        LinuxPathIdentity.InvalidatePublicationSet(
+            new[]
+            {
+                arguments.PublishRequestPath,
+                arguments.PublishResultPath,
+                arguments.PublishCompilerManifestPath,
+                arguments.PublishSarifPath
+            }.OfType<string>(),
+            TimeSpan.FromSeconds(30));
     }
 
     private sealed class PublicationMember

@@ -79,6 +79,59 @@ public sealed class BuildTaskTests
         }
     }
 
+    [TestCase(0, 0, true)]
+    [TestCase(-1, 3, true)]
+    [TestCase(-1, 5, false)]
+    public void ExitedSessionLeaderStillTriggersProcessGroupKill(
+        int stopResult,
+        int stopError,
+        bool expected)
+    {
+        Assert.That(
+            RunVerifier.ShouldKillProcessGroupAfterStop(stopResult, stopError),
+            Is.EqualTo(expected));
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void SupervisorBoundsIncompleteCleanupWithoutAuthenticatingIt()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        var originalInput = Console.In;
+        var originalOutput = Console.Out;
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            Console.SetIn(new StringReader(
+                "SharpProof.Start/1 " + nonce + Environment.NewLine));
+            Console.SetOut(output);
+            VerifierProcessSupervisor.StopDescendantsOverrideForTest =
+                static (_, _) => new VerifierProcessSupervisor.DescendantStopResult(
+                    HadDescendants: false,
+                    Complete: false);
+
+            var exitCode = VerifierProcessSupervisor.Run(["/bin/true"]);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(125));
+                Assert.That(output.ToString(), Does.Not.Contain(
+                    "SharpProof.Cleanup/1"));
+                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(7)));
+            }
+        }
+        finally
+        {
+            VerifierProcessSupervisor.StopDescendantsOverrideForTest = null;
+            Console.SetIn(originalInput);
+            Console.SetOut(originalOutput);
+        }
+    }
+
     [Test]
     public void MissingCleanupReceiptInvokesContainmentFailureDecision()
     {

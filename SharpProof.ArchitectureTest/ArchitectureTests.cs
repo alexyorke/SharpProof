@@ -1486,23 +1486,42 @@ public sealed class ArchitectureTests
             RepositoryRoot(),
             ".github",
             "workflows");
-        var workflows = Directory
+        var workflowFiles = Directory
             .EnumerateFiles(workflowRoot, "*.yml")
             .Concat(Directory.EnumerateFiles(workflowRoot, "*.yaml"))
-            .Select(File.ReadAllText)
+            .Select(path => new
+            {
+                Path = path,
+                Contents = File.ReadAllText(path)
+            })
             .ToArray();
+        var workflows = workflowFiles.Select(static workflow => workflow.Contents);
         var productWorkflows = workflows
             .Where(static workflow => workflow.Contains(
                 "SharpProof",
                 StringComparison.OrdinalIgnoreCase))
             .ToArray();
+        var portableWorkflowRecord = workflowFiles.Single(workflow =>
+            workflow.Path.EndsWith(
+                "package-consumers.yml",
+                StringComparison.OrdinalIgnoreCase));
+        var portableWorkflow = portableWorkflowRecord.Contents;
+        var nonPortableWorkflows = workflowFiles
+            .Where(workflow => !string.Equals(
+                workflow.Path,
+                portableWorkflowRecord.Path,
+                StringComparison.Ordinal))
+            .Select(static workflow => workflow.Contents)
+            .ToArray();
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(workflows, Has.None.Contain("actions/setup-dotnet"));
-            Assert.That(workflows, Has.None.Contain("runs-on: windows"));
-            Assert.That(workflows, Has.None.Contain("runs-on: macos"));
-            Assert.That(workflows, Has.None.Contain("shell: pwsh"));
+            Assert.That(portableWorkflow, Does.Contain("actions/setup-dotnet@"));
+            Assert.That(portableWorkflow, Does.Contain("shell: pwsh"));
+            Assert.That(nonPortableWorkflows, Has.None.Contain("actions/setup-dotnet"));
+            Assert.That(nonPortableWorkflows, Has.None.Contain("runs-on: windows"));
+            Assert.That(nonPortableWorkflows, Has.None.Contain("runs-on: macos"));
+            Assert.That(nonPortableWorkflows, Has.None.Contain("shell: pwsh"));
             Assert.That(productWorkflows, Has.Some.Contain("docker compose"));
         }
     }
