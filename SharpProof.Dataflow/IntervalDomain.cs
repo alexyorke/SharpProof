@@ -32,8 +32,8 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         }
 
         if (modulus.IsOne &&
-            lowerBound == long.MinValue &&
-            upperBound == long.MaxValue)
+            (!lowerBound.HasValue || lowerBound == long.MinValue) &&
+            (!upperBound.HasValue || upperBound == long.MaxValue))
         {
             lowerBound = null;
             upperBound = null;

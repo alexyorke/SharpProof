@@ -13,9 +13,11 @@ internal sealed class EffectModuleInitialization
         var attribute = compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.ModuleInitializerAttribute);
         _attribute = attribute != null &&
-            !SymbolEqualityComparer.Default.Equals(
+            (SymbolEqualityComparer.Default.Equals(
                 attribute.ContainingAssembly,
                 compilation.Assembly)
+                ? IsValidSourceDefinition(attribute)
+                : true)
                 ? attribute.OriginalDefinition
                 : null;
     }
@@ -106,5 +108,36 @@ internal sealed class EffectModuleInitialization
         return SymbolEqualityComparer.Default.Equals(
             attribute.AttributeClass?.OriginalDefinition,
             _attribute);
+    }
+
+    private bool IsValidSourceDefinition(INamedTypeSymbol attribute)
+    {
+        var systemAttribute = _compilation.GetTypeByMetadataName("System.Attribute");
+        var attributeBase = attribute.BaseType;
+        if (attributeBase == null ||
+            !SymbolEqualityComparer.Default.Equals(
+                attributeBase.OriginalDefinition,
+                systemAttribute?.OriginalDefinition) ||
+            !attribute.IsSealed ||
+            !attribute.InstanceConstructors.Any(static constructor =>
+                constructor.DeclaredAccessibility == Accessibility.Public &&
+                constructor.Parameters.IsEmpty))
+        {
+            return false;
+        }
+
+        var attributeUsage = _compilation.GetTypeByMetadataName(
+            "System.AttributeUsageAttribute");
+        var usage = attribute.GetAttributes().FirstOrDefault(candidate =>
+            SymbolEqualityComparer.Default.Equals(
+                candidate.AttributeClass?.OriginalDefinition,
+                attributeUsage?.OriginalDefinition));
+        if (usage == null || usage.ConstructorArguments.Length != 1 ||
+            usage.ConstructorArguments[0].Value is not int targets)
+        {
+            return false;
+        }
+
+        return ((AttributeTargets)targets & AttributeTargets.Method) != 0;
     }
 }

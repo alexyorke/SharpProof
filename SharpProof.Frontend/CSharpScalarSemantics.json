@@ -96,7 +96,7 @@
       "kind": "Divide",
       "irOperator": "Divide",
       "integerArithmetic": true,
-      "checkedArithmetic": false,
+      "checkedArithmetic": true,
       "reverseKind": null,
       "negatedKind": null
     },

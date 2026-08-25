@@ -95,7 +95,7 @@ internal static class CSharpScalarSemantics
         new(BinaryOperatorKind.Add, IrBinaryOperator.Add, true, true),
         new(BinaryOperatorKind.Subtract, IrBinaryOperator.Subtract, true, true),
         new(BinaryOperatorKind.Multiply, IrBinaryOperator.Multiply, true, true),
-        new(BinaryOperatorKind.Divide, IrBinaryOperator.Divide, true),
+        new(BinaryOperatorKind.Divide, IrBinaryOperator.Divide, true, true),
         new(BinaryOperatorKind.Remainder, IrBinaryOperator.Remainder, true),
         new(BinaryOperatorKind.ConditionalAnd, IrBinaryOperator.AndAlso),
         new(BinaryOperatorKind.ConditionalOr, IrBinaryOperator.OrElse),

@@ -263,6 +263,12 @@ public sealed class FrontendLoweringTests
             FrontendAbstention.UnsupportedType);
         AssertClassification(
             """
+            public static long Target(long left, long right) => left / right;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UncheckedOverflowSemantics);
+        AssertClassification(
+            """
             public static uint Target(uint left, uint right) => left % right;
             """,
             FrontendSubsetDecision.ClosedAbstention,

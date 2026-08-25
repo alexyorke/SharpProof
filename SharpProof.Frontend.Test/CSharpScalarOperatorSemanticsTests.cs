@@ -39,7 +39,8 @@ public sealed class CSharpScalarOperatorSemanticsTests
         var checkedArithmetic = new HashSet<BinaryOperatorKind> {
             BinaryOperatorKind.Add,
             BinaryOperatorKind.Subtract,
-            BinaryOperatorKind.Multiply
+            BinaryOperatorKind.Multiply,
+            BinaryOperatorKind.Divide
         };
 
         Assert.That(

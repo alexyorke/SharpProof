@@ -4,6 +4,44 @@ namespace SharpProof.Effects.Test;
 public sealed class ModuleInitializerEffectTests
 {
     [Test]
+    public void SourceDefinedModuleInitializerPolyfillIsRecognized()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            namespace System.Runtime.CompilerServices {
+                [AttributeUsage(AttributeTargets.Method,
+                    AllowMultiple = false,
+                    Inherited = false)]
+                public sealed class ModuleInitializerAttribute : Attribute {
+                    public ModuleInitializerAttribute() { }
+                }
+            }
+
+            internal static class Startup {
+                private static volatile int s_state;
+
+                [System.Runtime.CompilerServices.ModuleInitializer]
+                internal static void Initialize() {
+                    s_state = 1;
+                }
+            }
+
+            public static class Sample {
+                public static void Entry() {
+                }
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            EffectTestHost.RequireMethod(compilation, "Sample", "Entry"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void SourceModuleInitializerEffectsPrecedeOrdinaryEntryPoints()
     {
         var compilation = EffectTestHost.CreateCompilation(

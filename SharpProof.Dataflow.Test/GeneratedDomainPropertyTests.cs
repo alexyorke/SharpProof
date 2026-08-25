@@ -345,6 +345,17 @@ public sealed class GeneratedIntervalDomainPropertyTests
         GeneratedDomainSamples.Intervals(Seed, 256);
 
     [Test]
+    public void OneSidedFullLongRangesCanonicalizeToTop()
+    {
+        Assert.That(
+            _domain.Range(null, long.MaxValue),
+            Is.EqualTo(_domain.Top));
+        Assert.That(
+            _domain.Range(long.MinValue, null),
+            Is.EqualTo(_domain.Top));
+    }
+
+    [Test]
     public void GeneratedValuesSatisfyLatticeAndBottomLaws()
     {
         GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
