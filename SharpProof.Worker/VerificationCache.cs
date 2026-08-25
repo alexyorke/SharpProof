@@ -2,6 +2,8 @@ namespace SharpProof.Worker;
 
 internal sealed partial class VerificationCache(string directory, long maximumBytes)
 {
+    private const int CacheLockRetryMilliseconds = 25;
+    private static readonly TimeSpan CacheLockWait = TimeSpan.FromSeconds(1);
     private readonly string _directory = Path.GetFullPath(
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
@@ -24,7 +26,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         FileStream? cacheLock = null;
         try
         {
-            cacheLock = AcquireLock(_directory);
+            cacheLock = await AcquireLockAsync(
+                    _directory,
+                    cancellationToken)
+                .ConfigureAwait(false);
             RecoverTransactionDebris(cancellationToken);
             ValidatePath(path);
             var file = new FileInfo(path);
@@ -155,7 +160,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         FileStream? cacheLock = null;
         try
         {
-            cacheLock = AcquireLock(_directory);
+            cacheLock = await AcquireLockAsync(
+                    _directory,
+                    cancellationToken)
+                .ConfigureAwait(false);
             RecoverTransactionDebris(cancellationToken);
             var payload = JsonSerializer.Serialize(new CachePayload(
                 manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
@@ -256,6 +264,28 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             if (!ownershipTransferred)
             {
                 cacheLock.Dispose();
+            }
+        }
+    }
+
+    private static async Task<FileStream> AcquireLockAsync(
+        string directory,
+        CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.GetTimestamp();
+        while (true)
+        {
+            try
+            {
+                return AcquireLock(directory);
+            }
+            catch (IOException) when (
+                Stopwatch.GetElapsedTime(started) < CacheLockWait)
+            {
+                await Task.Delay(
+                        CacheLockRetryMilliseconds,
+                        cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
     }

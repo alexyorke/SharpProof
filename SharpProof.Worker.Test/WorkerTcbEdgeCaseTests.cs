@@ -1249,6 +1249,41 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
+    [Test]
+    public async Task CacheLockContentionRetriesUntilReleased()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-lock-retry-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var lockPath = Path.Combine(directory, ".sharp-proof-cache.lock");
+            using var heldLock = new FileStream(
+                lockPath,
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.None);
+            var cache = new VerificationCache(directory, 1024 * 1024);
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+            var operation = cache.TryWriteAsync(
+                new WorkerVerifyResponse(),
+                new string('9', 64),
+                manifest,
+                CancellationToken.None);
+
+            await Task.Delay(100);
+            await heldLock.DisposeAsync();
+
+            Assert.That(await operation, Is.True);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static Task WriteCacheEnvelopeAsync(
         string directory,
         string inputHash,

@@ -428,30 +428,6 @@ These assignments are redundant since the guard simply returns the input if it's
 1. Graph with entry 0→1 and an isolated cycle 2↔3; Analyze returns normally with InputStates[2]/[3] == Bottom and no signal two blocks were never analyzed.
 **Confidence**: High (behavior), Medium (design-gap classification)
 
-### 171. Protocol Identity Hashing Uses Lossy UTF-8 Replacement Fallback: Distinct Callable/Claim IDs Seal to Identical Manifest Hashes
-**Location**: `SharpProof.Worker.Protocol\ProtocolJson.cs` (Line 75 ComputeRequestHash; strict encoder s_strictUtf8 defined Line 14 but unused for hashing); `ProtocolManifest.cs` (Lines 44-51, 67-76)
-**Description**: Identity strings are hashed via Encoding.UTF8, whose encoder replaces unpaired surrogates with U+FFFD, while uniqueness validation operates on decoded UTF-16 strings accepting `"id\uD800"` and `"id\uFFFD"` as distinct. SealManifest/ComputeManifestHash therefore produce identical hashes and ManifestsEqual returns true, so a response verified against one manifest passes manifest-binding validation for a different manifest and cache entries alias across distinct compilations. Same collision class as accepted issue #133 but a distinct site.
-**Reproduction Steps**:
-1. Build two manifests differing only in CallableId `"X\uD800Y"` vs `"X\uFFFDY"`.
-2. SealManifest both: identical Hash; ManifestsEqual(m1,m2): true; ValidateForRequest accepts the wrong manifest.
-**Confidence**: High
-
-### 172. "Bounded" JSON Reader Enforces Its Size Limit Only Once (TOCTOU) and Cancellation Cannot Abort Pending Reads
-**Location**: `SharpProof.Worker.Protocol\ProtocolJson.cs` (Lines 78-95 OpenJsonReader; 35-39; 41-56 ReadUtf8FileAsync)
-**Description**: The 16 MiB cap is checked against stream.Length once at open; the file is opened FileShare.Read and consumed with unbounded ReadToEnd/chunk-append loops, so content appended after the check is read without limit (memory exhaustion). Additionally ReadUtf8FileAsync polls its CancellationToken only between chunk reads; the underlying ReadAsync gets no token, so a stalled/growing source cannot be cancelled mid-read.
-**Reproduction Steps**:
-1. Start ReadUtf8FileAsync on a small file; concurrently append tens of MiB (permitted by FileShare.Read); observe consumption far beyond MaximumJsonBytes.
-2. Signal ct while blocked in a read: no OperationCanceledException until a chunk boundary (potentially never).
-**Confidence**: Medium
-
-### 173. LinuxWorkerProcess: Unsynchronized _process Access Races Dispose, and Dispose Leaks the Handle When Terminate Throws
-**Location**: `SharpProof.Host\LinuxWorkerProcess.cs` (Lock-free read Lines 106-107 in WaitForExit; Dispose 166-185; Terminate guards 227-241)
-**Description**: WaitForExit snapshots _process without taking _synchronization while Dispose locks, terminates, disposes, and nulls the field; concurrent disposal between the null check and WaitForExit(0)/ExitCode throws ObjectDisposedException. Worse, inside Dispose the Terminate/process.Dispose/_process=null sequence is not try/finally-wrapped: if Terminate throws (grace-period expiry InvalidOperationException or KillProcessGroup NativeFailure), the Process handle is never disposed, _process stays non-null, and every subsequent Dispose retries termination on a stale handle; the exception also escapes using var process in the launcher, replacing real exit status.
-**Reproduction Steps**:
-1. Start a worker ignoring SIGTERM so Terminate exceeds its grace period; call Dispose(): InvalidOperationException, and a second Dispose reruns Kill/WaitForExit on the undisposed handle.
-2. Race Dispose from thread B while thread A polls WaitForExit: intermittent ObjectDisposedException.
-**Confidence**: Medium
-
 ### 175. Launcher Launch-Wait Polls CancellationToken.WaitHandle on a Sourceless Token, Mapping Every Real Verification to Bogus containment.unavailable
 **Location**: `SharpProof.Worker.Launcher\Program.cs` (Lines 276-278 calling WaitForExit(terminationStart, finalLimit)); root cause `SharpProof.Host\LinuxWorkerProcess.cs` (Line 133); second instance `LinuxPathIdentity.cs` (Line 1285)
 **Description**: RunWorker calls WaitForExit without a CancellationToken, so the poll loop accesses CancellationToken.None.WaitHandle, which throws InvalidOperationException on the first iteration whenever the worker survives one poll tick (~25 ms - i.e., every real cold start). RunMain's general handler maps InvalidOperationException to exit 125 containment.unavailable, writing a fail-closed result asserting containment failed - masking the actual verification entirely. The identical idiom in publication-lock acquire throws under lock contention.
@@ -468,28 +444,12 @@ These assignments are redundant since the guard simply returns the input if it's
 2. SARIF viewers resolve relative locations to /repo/src/... instead of /repo/sub/proj/src/....
 **Confidence**: High
 
-### 177. Benign Cache-Lock Contention Reported as CacheStatus.Unavailable, Silently Disabling Cache and Misreporting Health
-**Location**: `SharpProof.Worker\VerificationCache.cs` (AcquireLock Lines 236-261 FileShare.None with no retry/wait; swallow at 108-112, 193-198; consumed SharpProofWorker.cs 224-227, 395-397)
-**Description**: Concurrent verifications sharing one cache directory serialize on a single non-blocking lock file. The loser's open throws IOException, which is swallowed and converted into LastReadUnavailable/TryWriteAsync==false, so SharpProofWorker rebuilds the response with WorkerCacheStatus.Unavailable. The cache was healthy, merely busy; monitoring sees "Unavailable" (disk trouble) and zero caching benefit whenever builds overlap. The same swallow converts transient errors during debris recovery into full run-level cache bypass.
-**Reproduction Steps**:
-1. Start two verify launches for the same project concurrently.
-2. One result reports Miss/Written, the other Unavailable; serial rerun shows normal behavior.
-**Confidence**: High (behavior unambiguous; severity is status integrity/availability, not wrong results)
-
 ### 178. Method-Timeout Timer Stays Armed Through Result Assembly, Converting Completed Proofs Into Spurious Timeout/Incomplete
 **Location**: `SharpProof.Worker\CallableVerificationPolicy.cs` (Lines 23-59)
 **Description**: CancelAfter(methodWallTimeMilliseconds) remains live while the successful proof is post-processed (effect record assembly and ordering inside the same try). If the timer fires in that window (routinely fires up to a tick late), any OperationCanceledException jumps to catch, discarding the completed proof and labeling the callable Incomplete/MethodTimeout. Coverage flips Complete→Incomplete, VerificationCache.IsCacheable rejects the run, and RequireProven policies fail purely due to assembly-time jitter.
 **Reproduction Steps**:
 1. Set --method-wall-ms near a callable's real solve time so the deadline lands just after proof completion.
 2. Intermittently observe claims computed but callable reported MethodTimeout/Incomplete and no cache write; slightly larger budget completes and caches identical work.
-**Confidence**: Medium
-
-### 179. Abnormal Worker Exit Codes Silently Re-Mapped to Exit 3 (Failed/MalformedResult), Losing the True Termination Cause
-**Location**: `SharpProof.Worker.Launcher\Program.cs` (Lines 151-179 NoResultFailure special-cases only 124/125; 224-227 exit mapping); `LauncherProjections.generated.cs` (Lines 24-34)
-**Description**: When the worker dies without writing result.json (SIGKILL/OOM exit 137, segfault 139, canceled exit 4), the default arm fabricates Failed/MalformedResult even though nothing was parsed, and ValidateAndReport maps that to exit 3, discarding the original code. Asymmetry: timeouts preserve 124 via a dedicated branch, cancellations do not preserve 4. Root cause (OOM/crash) appears nowhere in output.
-**Reproduction Steps**:
-1. Force the worker to die before publishing a result (cgroup OOM kill → exit 137).
-2. Launcher exits 3; stderr says worker.no_result then "worker run Failed (MalformedResult)".
 **Confidence**: Medium
 
 ### 180. Aggregate SP0048/SP0047 Diagnostics Anchored at the Wrong Callable; SARIF and Console Reports Disagree on Location Fields

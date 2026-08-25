@@ -202,6 +202,45 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void ConcurrentWaitAndDisposeAreSerialized()
+    {
+        var process = LinuxWorkerProcess.Start(
+            "/bin/sh",
+            ["-c", "sleep 1"],
+            TestContext.CurrentContext.WorkDirectory);
+        try
+        {
+            var waiter = Task.Run(() => process.WaitForExit(
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(6)));
+            Thread.Sleep(100);
+
+            Assert.DoesNotThrow((Action)(() => process.Dispose()));
+            Assert.DoesNotThrow((Action)(() => waiter.GetAwaiter().GetResult()));
+        }
+        finally
+        {
+            process.Dispose();
+        }
+    }
+
+    [TestCase(137)]
+    [TestCase(139)]
+    public void AbnormalWorkerExitPreservesTheProcessCode(int exitCode)
+    {
+        var failure = LauncherPresentation.NoResultFailure(exitCode);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failure.ExitCode, Is.EqualTo(exitCode));
+            Assert.That(
+                failure.Reason,
+                Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
+        }
+    }
+
+    [Test]
     public void UnknownOptionIsRejected()
     {
         string[] arguments = [

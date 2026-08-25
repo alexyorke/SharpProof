@@ -221,13 +221,11 @@ internal static class Program
             return resultExitCode;
         }
 
-        if (validResponse & resultExitCode != 0)
+        if (resultExitCode != 0)
         {
-            return resultExitCode;
+            Console.Error.WriteLine("SharpProof worker failed closed with exit code " +
+                exitCode.ToString(CultureInfo.InvariantCulture) + ".");
         }
-
-        Console.Error.WriteLine("SharpProof worker failed closed with exit code " +
-            exitCode.ToString(CultureInfo.InvariantCulture) + ".");
         return exitCode;
     }
 

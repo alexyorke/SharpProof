@@ -103,41 +103,44 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         ArgumentOutOfRangeException.ThrowIfLessThan(
             finalLimit,
             terminationStart);
-        var process = _process ?? throw new ObjectDisposedException(
-            nameof(LinuxWorkerProcess));
-        while (!process.WaitForExit(0))
+        lock (_synchronization)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var elapsed = Stopwatch.GetElapsedTime(_startedTimestamp);
-            if (elapsed >= terminationStart)
+            var process = _process ?? throw new ObjectDisposedException(
+                nameof(LinuxWorkerProcess));
+            while (!process.WaitForExit(0))
             {
-                // The non-blocking check at the top of the loop and the
-                // deadline calculation are not atomic. Recheck before
-                // classifying the completion so a child that exits at the
-                // boundary is reported as exited rather than timed out.
-                if (process.WaitForExit(0))
+                cancellationToken.ThrowIfCancellationRequested();
+                var elapsed = Stopwatch.GetElapsedTime(_startedTimestamp);
+                if (elapsed >= terminationStart)
                 {
+                    // The non-blocking check at the top of the loop and the
+                    // deadline calculation are not atomic. Recheck before
+                    // classifying the completion so a child that exits at the
+                    // boundary is reported as exited rather than timed out.
+                    if (process.WaitForExit(0))
+                    {
+                        return new LinuxWorkerCompletion(
+                            LinuxWorkerCompletionKind.Exited,
+                            process.ExitCode);
+                    }
+                    Terminate(process, _startedTimestamp, finalLimit);
                     return new LinuxWorkerCompletion(
-                        LinuxWorkerCompletionKind.Exited,
-                        process.ExitCode);
+                        LinuxWorkerCompletionKind.TimedOut,
+                        124);
                 }
-                Terminate(process, _startedTimestamp, finalLimit);
-                return new LinuxWorkerCompletion(
-                    LinuxWorkerCompletionKind.TimedOut,
-                    124);
+                var remaining = terminationStart - elapsed;
+                var waitMilliseconds = (int)Math.Min(
+                    Math.Max(1, remaining.TotalMilliseconds),
+                    PollMilliseconds);
+                if (cancellationToken.WaitHandle.WaitOne(waitMilliseconds))
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
             }
-            var remaining = terminationStart - elapsed;
-            var waitMilliseconds = (int)Math.Min(
-                Math.Max(1, remaining.TotalMilliseconds),
-                PollMilliseconds);
-            if (cancellationToken.WaitHandle.WaitOne(waitMilliseconds))
-            {
-                throw new OperationCanceledException(cancellationToken);
-            }
+            return new LinuxWorkerCompletion(
+                LinuxWorkerCompletionKind.Exited,
+                process.ExitCode);
         }
-        return new LinuxWorkerCompletion(
-            LinuxWorkerCompletionKind.Exited,
-            process.ExitCode);
     }
 
     public static void EnterChildBoundaryRequired(int expectedParentProcessId)
@@ -172,15 +175,21 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             {
                 return;
             }
-            if (!process.HasExited)
+            try
             {
-                Terminate(
-                    process,
-                    Stopwatch.GetTimestamp(),
-                    TimeSpan.FromSeconds(1));
+                if (!process.HasExited)
+                {
+                    Terminate(
+                        process,
+                        Stopwatch.GetTimestamp(),
+                        TimeSpan.FromSeconds(1));
+                }
             }
-            process.Dispose();
-            _process = null;
+            finally
+            {
+                process.Dispose();
+                _process = null;
+            }
         }
     }
 

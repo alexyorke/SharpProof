@@ -349,7 +349,7 @@
             {"pattern": "124", "expression": "new Program.LauncherFailure(124, SharpProof.Worker.Protocol.WorkerRunStatus.TimedOut, SharpProof.Worker.Protocol.WorkerRunFailureReason.None, \"worker.timeout\", \"The worker exceeded its project time budget.\", string.Empty)"},
             {"pattern": "125", "expression": "new Program.LauncherFailure(125, SharpProof.Worker.Protocol.WorkerRunStatus.Failed, SharpProof.Worker.Protocol.WorkerRunFailureReason.ContainmentFailure, \"containment.unavailable\", \"Required worker containment could not be established.\", string.Empty)"}
           ],
-          "fallback": "new Program.LauncherFailure(exitCode, SharpProof.Worker.Protocol.WorkerRunStatus.Failed, SharpProof.Worker.Protocol.WorkerRunFailureReason.MalformedResult, \"worker.no_result\", \"The worker exited without a result.\", string.Empty)"
+          "fallback": "new Program.LauncherFailure(exitCode, SharpProof.Worker.Protocol.WorkerRunStatus.Failed, SharpProof.Worker.Protocol.WorkerRunFailureReason.InfrastructureFailure, \"worker.no_result\", \"The worker exited without a result.\", string.Empty)"
         },
         {
           "accessibility": "internal",
