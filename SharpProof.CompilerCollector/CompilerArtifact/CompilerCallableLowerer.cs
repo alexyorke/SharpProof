@@ -47,7 +47,10 @@ internal sealed class CompilerCallableLowerer
         target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (!target.IsVerifierSupported || target.Declaration is not BaseMethodDeclarationSyntax || target.SemanticModel == null)
+        if (!target.IsVerifierSupported ||
+            target.Declaration is not
+                (BaseMethodDeclarationSyntax or AccessorDeclarationSyntax) ||
+            target.SemanticModel == null)
         {
             return Fail(target, WorkerClaimReason.UnsupportedCallable);
         }
@@ -133,17 +136,7 @@ internal sealed class CompilerCallableLowerer
             return Unsupported(out failure);
         }
 
-        Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph? graph;
-        try
-        {
-            graph = Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(
-                target.VerifierDeclaration,
-                target.VerifierSemanticModel);
-        }
-        catch (ArgumentException)
-        {
-            return Unsupported(out failure);
-        }
+        var graph = TryCreateControlFlowGraph(target, cancellationToken);
         if (graph == null)
         {
             return Unsupported(out failure);
@@ -432,12 +425,24 @@ internal sealed class CompilerCallableLowerer
     private int? FindExecutableBodyStart(ManifestCallableTarget target)
     {
         var declaration = target.VerifierDeclaration;
-        if (declaration.ExpressionBody is { } expressionBody)
+        var expressionBody = declaration switch
         {
-            return expressionBody.Expression.SpanStart;
+            BaseMethodDeclarationSyntax method => method.ExpressionBody,
+            AccessorDeclarationSyntax accessor => accessor.ExpressionBody,
+            _ => null
+        };
+        if (expressionBody is { } expression)
+        {
+            return expression.Expression.SpanStart;
         }
 
-        if (declaration.Body is not { } body)
+        var body = declaration switch
+        {
+            BaseMethodDeclarationSyntax method => method.Body,
+            AccessorDeclarationSyntax accessor => accessor.Body,
+            _ => null
+        };
+        if (body is null)
         {
             return null;
         }
@@ -579,8 +584,43 @@ internal sealed class CompilerCallableLowerer
 
     private bool ContainsOnlyContractStatements(ManifestCallableTarget target)
     {
-        return target.VerifierDeclaration.Body is { } body &&
+        var body = target.VerifierDeclaration switch
+        {
+            BaseMethodDeclarationSyntax method => method.Body,
+            AccessorDeclarationSyntax accessor => accessor.Body,
+            _ => null
+        };
+        return body is { } &&
             body.Statements.All(statement => IsContractStatement(target, statement));
+    }
+
+    private static Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph?
+        TryCreateControlFlowGraph(
+            ManifestCallableTarget target,
+            CancellationToken cancellationToken)
+    {
+        try
+        {
+            var operation = target.VerifierSemanticModel.GetOperation(
+                target.VerifierDeclaration,
+                cancellationToken);
+            return operation switch
+            {
+                IMethodBodyOperation methodBody =>
+                    Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(
+                        methodBody,
+                        cancellationToken),
+                IConstructorBodyOperation constructorBody =>
+                    Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(
+                        constructorBody,
+                        cancellationToken),
+                _ => null
+            };
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
     }
 
     private bool IsContractStatement(ManifestCallableTarget target, StatementSyntax statement)

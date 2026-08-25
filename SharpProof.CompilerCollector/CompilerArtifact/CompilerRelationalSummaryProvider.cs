@@ -350,12 +350,18 @@ internal sealed class CompilerRelationalSummaryProvider
             }
 
             var sourceText = declaration.SyntaxTree.GetText(cancellationToken);
+            var sourcePath = declaration.SyntaxTree.FilePath;
+            if (string.IsNullOrWhiteSpace(sourcePath))
+            {
+                return null;
+            }
+
             return new CompilerSummaryEvidenceAuthority(
                 CompilerSummaryOrigin.Source,
                 callIdentity,
                 provenance.EvidenceSha256,
                 provenance.EvidenceIdentity,
-                declaration.SyntaxTree.FilePath ?? string.Empty,
+                CompilerCaptureAuthority.NormalizePath(sourcePath),
                 CompilerCompilationCapture.ComputeTextSha256(sourceText),
                 declaration.FullSpan.Start,
                 declaration.FullSpan.Length,

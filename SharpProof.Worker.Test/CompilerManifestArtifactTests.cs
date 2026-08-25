@@ -172,6 +172,42 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void CompilationFingerprintIsStableAcrossCaptureRoots()
+    {
+        var artifact = CreateArtifact();
+        var baseline = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics);
+        var movedRoot = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "alternate-capture-root");
+
+        artifact.Compilation.ProjectDirectory = Path.GetFullPath(movedRoot);
+        foreach (var tree in artifact.Compilation.SyntaxTrees)
+        {
+            tree.Path = Path.Combine(
+                    movedRoot,
+                    Path.GetFileName(tree.Path))
+                .Replace('\\', '/');
+            foreach (var line in tree.LineMap)
+            {
+                if (Path.IsPathRooted(line.MappedPath))
+                {
+                    line.MappedPath = Path.Combine(
+                            movedRoot,
+                            Path.GetFileName(line.MappedPath))
+                        .Replace('\\', '/');
+                }
+            }
+        }
+
+        var moved = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics);
+        Assert.That(moved, Is.EqualTo(baseline));
+    }
+
+    [Test]
     public void Sp034MalformedCaptureEvidenceIsRejected()
     {
         Action<CompilerCompilationSnapshot>[] corruptions =

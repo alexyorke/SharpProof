@@ -137,8 +137,10 @@ function Resolve-ReleaseDotNet {
             [StringComparison]::Ordinal)) {
         throw "DotNetPath cannot use a project-local host: '$path'."
     }
-    $actualVersion = (& $path --version 2>&1).Trim()
-    if ($LASTEXITCODE -ne 0 -or $actualVersion -ne $SdkVersion) {
+    $versionLines = @(& $path --version 2>$null)
+    $dotnetExitCode = $LASTEXITCODE
+    $actualVersion = ($versionLines -join [Environment]::NewLine).Trim()
+    if ($dotnetExitCode -ne 0 -or $actualVersion -ne $SdkVersion) {
         throw (
             "DotNetPath resolved SDK '$actualVersion'; repository policy " +
             "requires '$SdkVersion'.")

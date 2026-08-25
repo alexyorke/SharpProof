@@ -32,12 +32,27 @@ internal sealed class CompilerResponseEvidenceAuthority :
         }
 
         var errors = new HashSet<string>(StringComparer.Ordinal);
-        var claims = (response.ClaimResults ?? [])
+        var claimGroups = (response.ClaimResults ?? [])
             .Where(static claim => claim != null)
-            .ToDictionary(static claim => claim.ClaimId, StringComparer.Ordinal);
-        var callables = (response.CallableResults ?? [])
+            .GroupBy(static claim => claim.ClaimId, StringComparer.Ordinal)
+            .ToArray();
+        var claims = claimGroups.ToDictionary(
+            static group => group.Key,
+            static group => group.First(),
+            StringComparer.Ordinal);
+        var callableGroups = (response.CallableResults ?? [])
             .Where(static callable => callable != null)
-            .ToDictionary(static callable => callable.CallableId, StringComparer.Ordinal);
+            .GroupBy(static callable => callable.CallableId, StringComparer.Ordinal)
+            .ToArray();
+        var callables = callableGroups.ToDictionary(
+            static group => group.Key,
+            static group => group.First(),
+            StringComparer.Ordinal);
+        if (claimGroups.Any(static group => group.Count() > 1) ||
+            callableGroups.Any(static group => group.Count() > 1))
+        {
+            errors.Add("response.evidence_authority");
+        }
 
         foreach (var target in _targets)
         {

@@ -528,7 +528,7 @@ function Test-SharpProofFrameworkConsumers {
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$testProject = Join-Path $repositoryRoot 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+$testProject = Join-Path $repositoryRoot 'SharpProof.Package.Test/SharpProof.Package.Test.csproj'
 $isSupportedWorkerHost = $IsLinux -and
     $env:SHARPPROOF_CONTAINER -ceq '1' -and
     [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq

@@ -305,6 +305,23 @@ public sealed class CompilerSpecificationPackProviderTests
     }
 
     [Test]
+    public void PublicKeyTokensNormalizeUppercaseHex()
+    {
+        var method = ParseMethod(MethodJson(
+            "M:X.M",
+            "[{\"name\":\"A\",\"publicKeyToken\":\"ABCDEF0123456789\"}]",
+            "[]",
+            "Integer",
+            "{\"kind\":\"integer\",\"type\":\"Integer\",\"value\":1}"));
+        var assemblies = (System.Collections.IEnumerable)
+            method.GetType().GetProperty("Assemblies")!.GetValue(method)!;
+        var assembly = assemblies.Cast<object>().Single();
+        Assert.That(
+            (string)assembly.GetType().GetProperty("PublicKeyToken")!.GetValue(assembly)!,
+            Is.EqualTo("ABCDEF0123456789"));
+    }
+
+    [Test]
     public void SelectionAuthorityIsExplicitCanonicalAndCatalogBound()
     {
         var unset = CompilerSpecificationPackProvider.ResolveAuthority(null);

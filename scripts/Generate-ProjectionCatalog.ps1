@@ -14,7 +14,68 @@ if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
     $CatalogPath = Join-Path $repositoryRoot 'SharpProof.Projection.catalog.json'
 }
 $CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
-$catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json -Depth 100
+$catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
+
+function Assert-UniqueJsonProperties {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Text.Json.JsonElement]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($Value.ValueKind -eq [System.Text.Json.JsonValueKind]::Array) {
+        $index = 0
+        foreach ($item in $Value.EnumerateArray()) {
+            Assert-UniqueJsonProperties $item "$Context[$index]"
+            $index++
+        }
+        return
+    }
+    if ($Value.ValueKind -ne [System.Text.Json.JsonValueKind]::Object) {
+        return
+    }
+    $names = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($property in $Value.EnumerateObject()) {
+        if (-not $names.Add($property.Name)) {
+            throw "$Context contains duplicate property '$($property.Name)'."
+        }
+        Assert-UniqueJsonProperties $property.Value "$Context.$($property.Name)"
+    }
+}
+
+function Assert-AllowedProperties {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Object,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Allowed,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+    $allowedSet = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($name in $Allowed) { [void]$allowedSet.Add($name) }
+    foreach ($name in @($Object.PSObject.Properties.Name)) {
+        if (-not $allowedSet.Contains([string]$name)) {
+            throw "$Context contains unsupported property '$name'."
+        }
+    }
+}
+
+ $catalogDocument = [System.Text.Json.JsonDocument]::Parse($catalogJson)
+try {
+    Assert-UniqueJsonProperties $catalogDocument.RootElement 'projection catalog'
+}
+finally {
+    $catalogDocument.Dispose()
+}
+$catalog = $catalogJson | ConvertFrom-Json -Depth 100
+Assert-AllowedProperties $catalog @('schema', 'schemaVersion', 'outputs') 'Projection catalog'
 
 function Required([object]$Object, [string]$Name, [string]$Context) {
     $property = $Object.PSObject.Properties[$Name]
@@ -62,6 +123,7 @@ if ([string](Required $catalog 'schema' 'Projection catalog') -ne
 }
 
 foreach ($output in @(Required $catalog 'outputs' 'Projection catalog')) {
+    Assert-AllowedProperties $output @('path', 'namespace', 'accessibility', 'modifiers', 'name', 'methods') 'Projection output'
     $relativePath = [string](Required $output 'path' 'Projection output')
     if ($relativePath -notmatch '^[^:]+\.generated\.cs$') {
         throw "Projection output path is not a generated C# file: '$relativePath'."
@@ -90,6 +152,7 @@ foreach ($output in @(Required $catalog 'outputs' 'Projection catalog')) {
     $lines.Add("$accessibility $modifierSource`class $name")
     $lines.Add('{')
     foreach ($method in @(Required $output 'methods' "output '$relativePath'")) {
+        Assert-AllowedProperties $method @('accessibility', 'static', 'returnType', 'name', 'parameters', 'switchMode', 'target', 'cases', 'fallback') "output '$relativePath' method"
         $methodAccess = Identifier ([string](Required $method 'accessibility' "output '$relativePath' method") ) 'projection method accessibility'
         $staticProperty = $method.PSObject.Properties['static']
         $staticSource = if ($null -ne $staticProperty -and [bool]$staticProperty.Value) {
@@ -104,6 +167,7 @@ foreach ($output in @(Required $catalog 'outputs' 'Projection catalog')) {
         $lines.Add("    $methodAccess $staticSource$returnType $methodName(")
         for ($index = 0; $index -lt $parameters.Count; $index++) {
             $parameter = $parameters[$index]
+            Assert-AllowedProperties $parameter @('type', 'name') "method '$methodName' parameter"
             $parameterType = TypeName ([string](Required $parameter 'type' "method '$methodName' parameter") ) "method '$methodName' parameter type"
             $parameterName = Identifier ([string](Required $parameter 'name' "method '$methodName' parameter") ) "method '$methodName' parameter name"
             $comma = if ($index -lt $parameters.Count - 1) { ',' } else { '' }
@@ -119,6 +183,7 @@ foreach ($output in @(Required $catalog 'outputs' 'Projection catalog')) {
         $lines.Add("        return $target switch")
         $lines.Add('        {')
         foreach ($case in @(Required $method 'cases' "method '$methodName'")) {
+            Assert-AllowedProperties $case @('pattern', 'expression') "method '$methodName' case"
             $pattern = Snippet ([string](Required $case 'pattern' "method '$methodName' case") ) "method '$methodName' case pattern"
             $expression = Snippet ([string](Required $case 'expression' "method '$methodName' case") ) "method '$methodName' case expression"
             $lines.Add("            $pattern => $expression,")

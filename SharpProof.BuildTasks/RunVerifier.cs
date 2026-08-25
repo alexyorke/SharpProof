@@ -23,6 +23,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     // deadline semantics.
     private const int WorkerLauncherProcessReserveMilliseconds = 5000;
     private const int CleanupAuthenticationWaitMilliseconds = 5000;
+    private const int CleanupAnchorRetentionMilliseconds = 30000;
+    private const int MaximumRetainedCleanupAnchors = 64;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     internal const int OutputDrainPollingMilliseconds = 25;
     private const int MaximumProtocolLineCharacters = 160;
@@ -789,11 +791,21 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             authenticationFailure);
         if (!RetainedCleanupAnchors.TryAdd(token, anchor))
         {
+            anchor.Dispose();
             throw new InvalidOperationException(
                 "SharpProof could not retain its cleanup anchor.");
         }
         ObserveFault(anchor.StandardOutput);
         ObserveFault(anchor.StandardError);
+        if (RetainedCleanupAnchors.Count > MaximumRetainedCleanupAnchors &&
+            RetainedCleanupAnchors.TryRemove(token, out var overflow))
+        {
+            ForceTerminateCleanupAnchor(overflow);
+            overflow.AuthenticationFailure?.Invoke(
+                "SharpProof exceeded its retained cleanup-anchor limit; " +
+                "the verifier process was terminated.");
+            return;
+        }
         _ = ObserveCleanupAnchorAsync(token, anchor);
     }
 
@@ -802,7 +814,21 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     {
         try
         {
-            await anchor.Process.WaitForExitAsync().ConfigureAwait(false);
+            var exit = anchor.Process.WaitForExitAsync();
+            var completed = await System.Threading.Tasks.Task.WhenAny(
+                exit,
+                System.Threading.Tasks.Task.Delay(
+                    CleanupAnchorRetentionMilliseconds)).ConfigureAwait(false);
+            if (!ReferenceEquals(completed, exit))
+            {
+                ForceTerminateCleanupAnchor(anchor);
+                anchor.AuthenticationFailure?.Invoke(
+                    "The retained SharpProof verifier exceeded its cleanup " +
+                    "retention deadline and was terminated.");
+                return;
+            }
+
+            await exit.ConfigureAwait(false);
             if (anchor.SupervisorNonce != null &&
                 anchor.AuthenticationFailure != null)
             {
@@ -822,12 +848,25 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         catch (InvalidOperationException) { }
         finally
         {
-            if (anchor.ProcessGroupPidFd >= 0)
-            {
-                _ = NativeMethods.Close(anchor.ProcessGroupPidFd);
-            }
-            anchor.Process.Dispose();
+            anchor.Dispose();
             _ = RetainedCleanupAnchors.TryRemove(token, out _);
+        }
+    }
+
+    private static void ForceTerminateCleanupAnchor(CleanupAnchor anchor)
+    {
+        try
+        {
+            if (!anchor.Process.HasExited)
+            {
+                anchor.Process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException) { }
+        catch (NotSupportedException) { }
+        finally
+        {
+            anchor.Dispose();
         }
     }
 
@@ -882,7 +921,24 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         System.Threading.Tasks.Task<BoundedProcessOutput>? StandardError,
         string? SupervisorNonce,
         System.Threading.Tasks.Task? SupervisorCleanupSignal,
-        Action<string>? AuthenticationFailure);
+        Action<string>? AuthenticationFailure)
+    {
+        private int _disposed;
+
+        internal void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            if (ProcessGroupPidFd >= 0)
+            {
+                _ = NativeMethods.Close(ProcessGroupPidFd);
+            }
+            Process.Dispose();
+        }
+    }
 
     internal sealed record BoundedProcessOutput(
         string Text,

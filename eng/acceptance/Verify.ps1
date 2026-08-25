@@ -738,7 +738,7 @@ try {
         Invoke-SharpProofDotnet -Arguments @(
             'run',
             '--project',
-            'Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj',
+            'Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj',
             '-c',
             $Configuration,
             '--no-build',
@@ -756,7 +756,7 @@ try {
         Invoke-SharpProofDotnet -Arguments @(
             'run',
             '--project',
-            'SharpProof.Gates\SharpProof.Gates.csproj',
+            'SharpProof.Gates/SharpProof.Gates.csproj',
             '-c',
             $Configuration,
             '--no-build',

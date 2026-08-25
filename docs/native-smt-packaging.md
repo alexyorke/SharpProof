@@ -30,7 +30,7 @@ official archive and fails unless every pin matches. The binary is not stored
 in Git.
 
 The verifier package places the native library at
-`runtimes/linux-x64/native/libz3.so` and the managed assembly under
+`tools/native/linux-x64/libz3.so` and the managed assembly under
 `tools/net9`. Before constructing a Z3 context, the worker resolves and hashes
 the canonical container library, installs a `NativeLibrary` resolver, and
 loads only that absolute file. `LD_LIBRARY_PATH` and ambient system libraries

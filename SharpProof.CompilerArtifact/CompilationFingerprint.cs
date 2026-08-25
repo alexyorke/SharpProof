@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace SharpProof.CompilerArtifact;
 
@@ -48,17 +49,125 @@ internal static class CompilationFingerprint
         CompilerDiagnosticArtifact[] diagnostics)
     {
         snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
+        diagnostics = ArgumentNullGuard.NotNull(diagnostics, nameof(diagnostics));
+
+        var snapshotIdentity = CreateIdentityNode(snapshot);
+        NormalizeIdentityPaths(snapshotIdentity, snapshot.ProjectDirectory);
+        var diagnosticsIdentity = CreateIdentityNode(
+            CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics));
+        NormalizeIdentityPaths(diagnosticsIdentity, snapshot.ProjectDirectory);
 
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            9,
-            JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
-            JsonSerializer.Serialize(
-                CompilerDiagnosticArtifactOrdering.Canonicalize(
-                    ArgumentNullGuard.NotNull(diagnostics, nameof(diagnostics))),
-                WorkerProtocolJson.Options));
+            10,
+            snapshotIdentity.ToJsonString(WorkerProtocolJson.Options),
+            diagnosticsIdentity.ToJsonString(WorkerProtocolJson.Options));
         return hash.Finish();
+    }
+
+    private static JsonNode CreateIdentityNode<T>(T value)
+    {
+        return JsonSerializer.SerializeToNode(value, WorkerProtocolJson.Options) ??
+            throw new JsonException("Compiler identity serialization returned null.");
+    }
+
+    private static void NormalizeIdentityPaths(
+        JsonNode node,
+        string projectDirectory)
+    {
+        if (node is JsonObject objectNode)
+        {
+            foreach (var property in objectNode.ToArray())
+            {
+                if (property.Value is JsonValue value &&
+                    value.TryGetValue<string>(out var text) &&
+                    IsPathProperty(property.Key))
+                {
+                    objectNode[property.Key] = NormalizeIdentityPath(
+                        text,
+                        projectDirectory);
+                }
+                else if (property.Value != null)
+                {
+                    NormalizeIdentityPaths(property.Value, projectDirectory);
+                }
+            }
+            return;
+        }
+
+        if (node is JsonArray arrayNode)
+        {
+            foreach (var child in arrayNode)
+            {
+                if (child != null)
+                {
+                    NormalizeIdentityPaths(child, projectDirectory);
+                }
+            }
+        }
+    }
+
+    private static bool IsPathProperty(string name)
+    {
+        return name.Equals("projectDirectory", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("path", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("sourcePath", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("mappedPath", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("sourceTreePath", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeIdentityPath(
+        string value,
+        string projectDirectory)
+    {
+        if (value.Length == 0 ||
+            value.StartsWith("<", StringComparison.Ordinal))
+        {
+            return value.Replace('\\', '/');
+        }
+
+        try
+        {
+            var root = Path.GetFullPath(projectDirectory);
+            var fullPath = Path.GetFullPath(value);
+            var comparison = Path.DirectorySeparatorChar == '\\'
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+            if (string.Equals(
+                    root.TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar),
+                    fullPath.TrimEnd(
+                        Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar),
+                    comparison))
+            {
+                return ".";
+            }
+            var rootUri = new Uri(
+                root.TrimEnd(Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar) +
+                Path.DirectorySeparatorChar,
+                UriKind.Absolute);
+            var pathUri = new Uri(fullPath, UriKind.Absolute);
+            var relativeUri = rootUri.MakeRelativeUri(pathUri);
+            var relative = Uri.UnescapeDataString(relativeUri.ToString())
+                .Replace('/', Path.DirectorySeparatorChar);
+            if (!relativeUri.IsAbsoluteUri && relative != ".." &&
+                !relative.StartsWith(".." + Path.DirectorySeparatorChar,
+                    StringComparison.Ordinal))
+            {
+                return relative.Replace('\\', '/');
+            }
+
+            return "@external/" + Path.GetFileName(fullPath).Replace('\\', '/');
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or IOException or NotSupportedException)
+        {
+            return value.Replace('\\', '/');
+        }
     }
 
     internal static void ValidateShape(CompilerCompilationSnapshot snapshot)

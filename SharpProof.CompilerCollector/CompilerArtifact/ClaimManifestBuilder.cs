@@ -84,11 +84,16 @@ internal sealed partial class ClaimManifestBuilder(
             : LanguageSubsetDecision.Supported;
         var supported =
             seed.Declaration is
-                MethodDeclarationSyntax or
-                ConstructorDeclarationSyntax &&
+                (MethodDeclarationSyntax or
+                 ConstructorDeclarationSyntax or
+                 AccessorDeclarationSyntax) &&
             target.MethodKind is
-                MethodKind.Ordinary or
-                MethodKind.Constructor &&
+                (MethodKind.Ordinary or
+                 MethodKind.Constructor or
+                 MethodKind.PropertyGet or
+                 MethodKind.PropertySet or
+                 MethodKind.EventAdd or
+                 MethodKind.EventRemove) &&
             selectedSubset.IsSupported;
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
@@ -653,6 +658,6 @@ internal sealed partial class ClaimManifestBuilder(
 
 internal sealed partial record ManifestCallableTarget
 {
-    internal BaseMethodDeclarationSyntax VerifierDeclaration => (BaseMethodDeclarationSyntax)Declaration!;
+    internal SyntaxNode VerifierDeclaration => Declaration!;
     internal SemanticModel VerifierSemanticModel => SemanticModel!;
 }

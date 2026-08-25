@@ -3,6 +3,15 @@ namespace SharpProof.CompilerProbe.TestAsset;
 [Generator(LanguageNames.CSharp)]
 public sealed class CompilerProbeGenerator : IIncrementalGenerator
 {
+    private static readonly DiagnosticDescriptor s_multipleInputRule =
+        new(
+            CompilerProbeContract.MultipleInputDiagnosticId,
+            "Multiple compiler probe inputs",
+            "The compiler probe received {0} matching additional files; the ordinal-first input is used",
+            "SharpProof.CompilerProbe",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var globalValue = context.AnalyzerConfigOptionsProvider.Select(
@@ -45,11 +54,20 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
             return;
         }
 
+        if (inputs.Length > 1)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                s_multipleInputRule,
+                Location.None,
+                inputs.Length));
+        }
+
         var input = inputs
             .OrderBy(static value => value.Path, StringComparer.Ordinal)
             .First();
         var fingerprint = ProbeHash.Text(
-            globalValue + "\0" + input.Metadata + "\0" + input.Text);
+            globalValue + "\0" + input.Path + "\0" +
+            input.Metadata + "\0" + input.Text);
         context.AddSource(
             CompilerProbeContract.GlobalUsingsHintName,
             SourceText.From(

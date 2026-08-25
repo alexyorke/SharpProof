@@ -514,11 +514,14 @@ internal sealed class CompilerSpecificationPackProvider
             if (token.Length != 0 &&
                 (token.Length != 16 || !token.All(static character =>
                     character is >= '0' and <= '9' or
-                    >= 'a' and <= 'f')))
+                    >= 'a' and <= 'f' or
+                    >= 'A' and <= 'F')))
             {
                 throw new InvalidDataException(
                     "A specification-pack public-key token is invalid.");
             }
+
+            token = token.ToUpperInvariant();
 
             var key = name + "|" + token;
             if (previousAssembly != null &&
