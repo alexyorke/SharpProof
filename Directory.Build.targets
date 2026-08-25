@@ -5,31 +5,9 @@
     <Error Text="SharpProof repository restore, build, test, pack, and release commands must run through the canonical Docker Compose tooling container. See docs/container-development.md." />
   </Target>
 
-  <PropertyGroup>
-    <SharpProofDogfoodAnalyzerDirectory Condition="'$(SharpProofDogfoodAnalyzerDirectory)' == ''">$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0</SharpProofDogfoodAnalyzerDirectory>
-  </PropertyGroup>
-
   <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
     <!-- Test frameworks discover fixtures through reflection; test awaits do not
          expose a reusable library synchronization-context contract. -->
     <NoWarn>$(NoWarn);CA1515;CA2007;CA5394</NoWarn>
   </PropertyGroup>
-
-  <ItemGroup Condition="'$(SharpProofDogfood)' == 'true'">
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll" />
-    <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.ContractForGenerator\bin\$(Configuration)\netstandard2.0\SharpProof.ContractForGenerator.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Contracts.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Dataflow.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Effects.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Frontend.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Ir.dll" />
-    <Analyzer Include="$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Specs.dll" />
-  </ItemGroup>
-
-  <Target Name="_ValidateSharpProofDogfoodAnalyzer"
-          BeforeTargets="CoreCompile"
-          Condition="'$(SharpProofDogfood)' == 'true'">
-    <Error Condition="!Exists('$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll')"
-           Text="SharpProof dogfood analyzer was not built at '$(SharpProofDogfoodAnalyzerDirectory)\SharpProof.Analyzer.dll'." />
-  </Target>
 </Project>
