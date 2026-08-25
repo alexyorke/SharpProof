@@ -386,15 +386,6 @@ These assignments are redundant since the guard simply returns the input if it's
 **Confidence**: Low
 
 
-### 125. Static-Initializer Effects of Base Classes Dropped on Derived Class Instantiation
-**Location**: `SharpProof.Effects\EffectCallSiteResolver.cs` (Lines 99-148) and `SharpProof.Effects\EffectMethodNodeBuilder.cs` (Lines 87-104)
-**Description**: Under ECMA/CLI semantics, instantiating `new Derived()` executes the static constructor of every base type in the hierarchy. In `EffectCallSiteResolver.ResolveConstruction`, the implicit-layer walk only traverses when `IsProvablyEmptyImplicitConstructorLayer` holds (requiring implicitly declared constructors). When `Derived` explicitly declares a constructor, the walk is skipped and `HasExplicitSourceTypeInitialization` only inspects `Derived`. Furthermore, the base `.ctor` node entry gate evaluates false whenever the base has an explicit static constructor, causing the base type's static constructor effects (ambient writes, I/O, exceptions) to be dropped from the summary, resulting in false "pure" classifications for the caller.
-**Reproduction Steps**:
-1. Create `class Base { static Base() { File.WriteAllText(...); } }`.
-2. Create `class Derived : Base { public Derived() { } }`.
-3. Create an entry point `[EnforcePure] void Test() { _ = new Derived(); }`.
-4. Observe that the analyzer certifies `Test` as pure because `Base`'s static constructor effects are omitted from the summary.
-**Confidence**: High
 
 ### 126. Recursive-Pattern Deconstruct Method Invocations Omit Effects in Scanner
 **Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Line 372) and `SharpProof.Effects\OperationEffectScanner.cs` (Lines 939-942)

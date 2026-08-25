@@ -96,6 +96,7 @@ internal sealed class EffectCallSiteResolver(
         {
             return EffectSummaryOperations.Unsupported();
         }
+        var constructionType = creation.Type as INamedTypeSymbol;
         var implicitLayers = EffectSummary.Empty;
         var implicitDepth = 0;
         while (EffectMethodNodeBuilder.IsProvablyEmptyImplicitConstructorLayer(
@@ -131,9 +132,9 @@ internal sealed class EffectCallSiteResolver(
 
         return EffectSummaryOperations.Join(
             implicitLayers,
-            HasExplicitSourceTypeInitialization(constructor)
-                ? EffectSummaryOperations.TypeInitializationBoundary()
-                : EffectSummary.Empty,
+            ResolveConstructionTypeInitialization(
+                constructionType ?? constructor.ContainingType,
+                creation),
             Resolve(
                 constructor,
                 receiver,
@@ -148,16 +149,52 @@ internal sealed class EffectCallSiteResolver(
                 creation.Arguments));
     }
 
-    private bool HasExplicitSourceTypeInitialization(IMethodSymbol constructor)
+    private EffectSummary ResolveConstructionTypeInitialization(
+        INamedTypeSymbol constructionType,
+        IOperation origin)
     {
-        return SymbolEqualityComparer.Default.Equals(
-                constructor.ContainingAssembly,
-                _session.Compilation.Assembly) &&
-            EffectMethodNodeBuilder.HasPotentialStaticInitialization(
-                constructor.ContainingType,
-                _session.ApiSpecs) &&
-            constructor.ContainingType.StaticConstructors.Any(
-                static candidate => !candidate.IsImplicitlyDeclared);
+        var result = EffectSummary.Empty;
+        var seen = new HashSet<INamedTypeSymbol>(
+            SymbolEqualityComparer.Default);
+        for (var type = constructionType;
+             type != null && seen.Add(type.OriginalDefinition);
+             type = type.BaseType)
+        {
+            if (!EffectMethodNodeBuilder.HasPotentialStaticInitialization(
+                    type,
+                    _session.ApiSpecs))
+            {
+                continue;
+            }
+
+            var explicitConstructors = type.StaticConstructors
+                .Where(static candidate => !candidate.IsImplicitlyDeclared)
+                .ToImmutableArray();
+            if (explicitConstructors.Length == 0 ||
+                !SymbolEqualityComparer.Default.Equals(
+                    type.ContainingAssembly,
+                    _session.Compilation.Assembly))
+            {
+                continue;
+            }
+
+            foreach (var staticConstructor in explicitConstructors)
+            {
+                result = EffectSummaryOperations.Join(
+                    result,
+                    EffectSummaryOperations.TypeInitializationBoundary(),
+                    Resolve(
+                        staticConstructor,
+                        EffectRegionSet.Empty,
+                        [],
+                        [],
+                        dispatchUncertain: false,
+                        origin,
+                        instance: null));
+            }
+        }
+
+        return result;
     }
 
     internal static ImmutableArray<IOperation?> AlignActualArguments(

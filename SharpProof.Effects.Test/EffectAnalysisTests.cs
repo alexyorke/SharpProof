@@ -1140,6 +1140,46 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ExplicitDerivedConstructionAccountsForBaseTypeInitialization()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+            }
+
+            public class Base {
+                static Base() {
+                    Global.State++;
+                }
+
+                protected Base() { }
+            }
+
+            public sealed class Derived : Base {
+                public Derived() { }
+            }
+
+            public static class Sample {
+                public static Derived Create() => new Derived();
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Create"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+        }
+    }
+
+    [Test]
     public void ObjectAndCollectionInitializersContributeTheirEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(
