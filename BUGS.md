@@ -437,25 +437,6 @@ These assignments are redundant since the guard simply returns the input if it's
 3. Observe unbounded recursion in `ManagedAbstractFlow.Visit` leading to potential stack overflow in the analyzer process.
 **Confidence**: Medium
 
-### 137. SMT Backend Sticky Cancellation Flag Permanently Disables Verification Instance
-**Location**: `SharpProof.Smt\IrSmtBackend.cs` (Lines 13, 47-50, 85-89)
-**Description**: When a verification check is interrupted or cancelled, `IrSmtBackend.Interrupt()` sets the private field `_interrupted = true`. This flag is never reset on subsequent invocations of `CheckAsync`. Because backend instances are designed to be reused across many verification queries, a single query cancellation permanently puts the backend into an unavailable state where all future queries immediately return `Unknown(Unavailable)`.
-**Reproduction Steps**:
-1. Initialize an `IrSmtBackend` instance.
-2. Execute a verification query with a `CancellationToken` that is triggered before completion.
-3. Execute a subsequent valid query with an active, uncancelled `CancellationToken`.
-4. Observe that the second query immediately aborts returning `Unknown(Unavailable)`.
-**Confidence**: High
-
-### 139. InternExternalIdentity Keys Require Comparer Reference Equality, Splitting One Logical Identity Into Multiple IDs
-**Location**: `SharpProof.Ir\IrFactory.cs` (Lines 741-756)
-**Description**: `ExternalIdentityKey<T>.Equals` returns false unless `ReferenceEquals(_comparer, other._comparer)`, and `GetHashCode` mixes `RuntimeHelpers.GetHashCode(_comparer)`. Any caller constructing a functionally identical comparer as a new instance interns the same external identity under different `IrIdentityId`s. Identity equivalence across components silently breaks: lookups keyed by identity miss each other, producing unsound or vacuous verification conclusions with no diagnostic.
-**Reproduction Steps**:
-1. Call `factory.InternExternalIdentity(id, comparerA)` with `comparerA = new MyIdComparer()`.
-2. Call again with `comparerB = new MyIdComparer()` (same type, same semantics, different instance).
-3. Observe two distinct `IrIdentityId` values for the identical external key.
-**Confidence**: High
-
 ### 140. Canonical Enum Frames Use Assembly Simple Name, Colliding Across Versions and Strong Names
 **Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Lines 77-85)
 **Description**: `Add(Enum)` canonicalizes as assembly simple name + type FullName + member name. The simple assembly name omits version, culture, and public-key token. Two distinct enum types loaded side-by-side (different versions or strong names, same simple name and full type/member names) produce byte-identical Enum frames and identical digests - a canonical-identity collision for claim fingerprints embedding enum options.
@@ -464,14 +445,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Hash `NS.Mode.On` from each with separate `CanonicalHashWriter` instances.
 3. Observe identical `Finish()` outputs for semantically distinct types.
 **Confidence**: Medium
-
-### 141. Validation Asymmetry: IrValue Strings May Carry Ill-Formed UTF-16 That Terms Forbid, Breaking Value-to-Term Round Trips
-**Location**: `SharpProof.Ir\IrFactory.cs` (Lines 241-246 vs 318-335); entry points at `SharpProof.Ir\IrInterpreter.cs` (Lines 362-373, 505-508) and `SharpProof.Ir\IrProgramInterpreter.cs` (Lines 33-45)
-**Description**: Term-level strings enforce well-formed UTF-16 (`String()` rejects lone surrogates), but value-level strings do not (`CreateStringValue` has no check). Ill-formed strings enter values directly, via `IrProgramInterpreter.Execute` initial values, and via `EvaluateStringConcat`. Any later materialization of such a value back into the term layer (`factory.String(value.String)`) throws `ArgumentException`; hashing hits replacement-char folding. The invariant is enforced at one boundary only and fails late elsewhere.
-**Reproduction Steps**:
-1. Run `IrProgramInterpreter.Execute` with an initial value containing `"\uD800"` - it succeeds and propagates the ill-formed value.
-2. Attempt `factory.String(resultValue.String)` and observe `ArgumentException("String terms require well-formed UTF-16.")`.
-**Confidence**: High
 
 ### 142. CanonicalHashWriter.Add(Stream) Poisons the Running Digest on Mid-Stream Failure Instead of Failing Closed
 **Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Lines 43-65)

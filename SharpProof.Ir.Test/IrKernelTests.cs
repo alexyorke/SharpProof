@@ -50,6 +50,16 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void FactoryRejectsIllFormedStringValues()
+    {
+        var factory = new IrFactory();
+
+        Assert.That(
+            (Action)(() => factory.CreateStringValue("\uD800")),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public void MemberInterningIncludesTheMemberName()
     {
         var factory = new IrFactory();
