@@ -397,15 +397,6 @@ These assignments are redundant since the guard simply returns the input if it's
 3. Inspect the computed effect summary and observe that potential writes and allocations during static initialization are missing.
 **Confidence**: Medium
 
-### 140. Canonical Enum Frames Use Assembly Simple Name, Colliding Across Versions and Strong Names
-**Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Lines 77-85)
-**Description**: `Add(Enum)` canonicalizes as assembly simple name + type FullName + member name. The simple assembly name omits version, culture, and public-key token. Two distinct enum types loaded side-by-side (different versions or strong names, same simple name and full type/member names) produce byte-identical Enum frames and identical digests - a canonical-identity collision for claim fingerprints embedding enum options.
-**Reproduction Steps**:
-1. Load two assemblies both named "Lib" (different Version or public-key token), each declaring `namespace NS { enum Mode { On } }`.
-2. Hash `NS.Mode.On` from each with separate `CanonicalHashWriter` instances.
-3. Observe identical `Finish()` outputs for semantically distinct types.
-**Confidence**: Medium
-
 ### 143. Interpreter Equality Compares Sequences by Reference Identity While All Other Kinds Compare by Value
 **Location**: `SharpProof.Ir\IrInterpreter.cs` (Line 354)
 **Description**: `EvaluateEquality` maps `(Sequence, Sequence)` to `ReferenceEquals(left, right)` - equality of `IrValue` wrapper instances, not elements. Structurally identical sequences yield `Equal == false`, while the identical term compared to itself folds `true` solely due to per-term-ID result memoization. Sequence comparisons become branch-dependent and memoization-sensitive, making concrete counterexample replay unstable.

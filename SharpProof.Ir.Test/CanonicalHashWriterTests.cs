@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Reflection.Emit;
 using NUnit.Framework;
 
 namespace SharpProof.Ir.Test;
@@ -51,6 +53,20 @@ public sealed class CanonicalHashWriterTests
                 Hash(new byte[] { 1 })
             }.Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(9));
+    }
+
+    [Test]
+    public void EnumFramesIncludeFullAssemblyIdentity()
+    {
+        var firstType = DefineDynamicEnum(new Version(1, 0, 0, 0));
+        var secondType = DefineDynamicEnum(new Version(2, 0, 0, 0));
+
+        using var firstWriter = new CanonicalHashWriter();
+        using var secondWriter = new CanonicalHashWriter();
+        var firstHash = firstWriter.Add(Enum.ToObject(firstType, 1)).Finish();
+        var secondHash = secondWriter.Add(Enum.ToObject(secondType, 1)).Finish();
+
+        Assert.That(firstHash, Is.Not.EqualTo(secondHash));
     }
 
     [Test]
@@ -146,6 +162,21 @@ public sealed class CanonicalHashWriterTests
     private enum TestEnum
     {
         One = 1
+    }
+
+    private static Type DefineDynamicEnum(Version version)
+    {
+        var assemblyName = new AssemblyName("SharpProof.EnumCollision")
+        {
+            Version = version
+        };
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(
+            assemblyName, AssemblyBuilderAccess.Run);
+        var module = assembly.DefineDynamicModule("Main");
+        var builder = module.DefineEnum(
+            "SharpProof.Test.Mode", TypeAttributes.Public, typeof(int));
+        builder.DefineLiteral("On", 1);
+        return builder.CreateTypeInfo()!.AsType();
     }
 
     private sealed class GrowingStream : MemoryStream

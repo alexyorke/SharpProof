@@ -104,10 +104,12 @@ internal sealed class CanonicalHashWriter : IDisposable
         }
 
         var type = value.GetType();
+        var assemblyIdentity = type.Assembly.GetName().FullName ??
+            type.Assembly.GetName().Name ?? string.Empty;
         return AddFrame(
             ValueKind.Enum,
             Encoding.UTF8.GetBytes(
-                (type.Assembly.GetName().Name ?? string.Empty) +
+                assemblyIdentity +
                 "\n" +
                 (type.FullName ?? type.Name) +
                 "\n" +
