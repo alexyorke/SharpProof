@@ -1,495 +1,1097 @@
-# SharpProof ordinary correctness and reliability audit
+# Bug Reports - SharpProof.Analyzer
 
-## Scope and method
+## Summary
 
-This report covers ordinary correctness and reliability behavior across the
-complete repository. Earlier rounds concentrated on verifier process
-supervision and its connected build-task, launcher, publication, protocol,
-cache, and Linux-worker paths. The final exhaustive round inspected every
-tracked file at commit `8a5141d7d8772d1e9659099531086d156ea11e92` except this
-report: 833 files and 248,733 physical lines. Its scope included production
-code, tests, analyzers, build and release infrastructure, scripts, container
-configuration, samples, specifications, and contract documentation.
+This file documents security, code quality, and correctness issues identified in the SharpProof.Analyzer project.
 
-Ten read-only audit shards inspected non-overlapping file manifests line by
-line. The main audit independently traced every candidate through reachable
-control flow, checked its documented contract, searched for duplicate root
-causes, and classified unsupported or disproved leads separately. Findings are
-static proofs unless an isolated or canonical-container reproduction is
-explicitly recorded. Cybersecurity, hacking, adversarial hardening, and other
-non-routine threat work remained out of scope.
+## Issues
 
-## Remediated findings
+### 1. Redundant Parameter Assignment via ArgumentNullGuard
 
-The confirmed findings formerly listed as bugs
-1-23, 25-36, 38-57, 59-103 were fixed and regression-checked on this
-branch. Their individual reports are intentionally removed from the active
-bug log after verification. The implementation spans the prior remediation
-commits and this final pass, including timeout-budget reservation, Linux
-worker deadline classification, project-relative SARIF paths, the trusted
-computing-base inventory pin, and tracked OpenCode dependency manifests.
-See Validation below for canonical-container evidence.
-## Exhaustive repository audit coverage
+**Location**: `SharpProof.Analyzer.cs` (Line 27)
 
-The final round used ten non-overlapping, read-only manifests. Every manifest
-was reported complete, no file appeared in two shards, and the combined ledger
-matched every tracked file except `BUGS.md`.
+**Description**: The `ArgumentNullGuard.NotNull(context, nameof(context))` call is made but the result is immediately reassigned to the same variable (`context`). This is a code smell that reduces readability and adds unnecessary indirection.
 
-| Shard | Files | Physical lines |
-| --- | ---: | ---: |
-| Scripts A | 45 | 17,727 |
-| Scripts and infrastructure | 190 | 30,114 |
-| Analyzers and meta-analyzers | 80 | 27,649 |
-| Compiler pipeline | 55 | 22,196 |
-| Effects | 56 | 26,579 |
-| Worker tests | 28 | 25,610 |
-| Worker and package paths | 67 | 26,555 |
-| IR, frontend, and gates | 127 | 31,325 |
-| Runtime and tooling | 90 | 21,842 |
-| Contracts and specifications | 95 | 19,136 |
-| **Total** | **833** | **248,733** |
+**Reproduction Steps**:
+1. Create a `SharpProofAnalyzer` instance
+2. Observe that the context variable is reassigned through the null check
+3. The guard effectively validates the input but the reassignment is redundant
 
-Verification used four gates before accepting a finding:
+**Confidence**: High
 
-1. Trace a normal, reachable trigger from public or in-repository entry points.
-2. Compare the behavior with source comments, tests, specifications, and
-   repository contracts.
-3. Follow the complete relevant control and data flow, including downstream
-   validators and cleanup.
-4. Search this report for an existing root cause, then independently classify
-   severity and confidence.
+### 2. Redundant Parameter Assignment via ArgumentNullGuard
 
-The initial documentation round accepted 14 independent findings: three High,
-ten Medium, and one Low. The subsequent remediation pass verified and fixed
-all confirmed findings listed above, adding focused regression coverage where
-the existing suite did not already exercise the corrected path. It also
-refreshed the trusted-computing-base inventory pin and tracked the OpenCode
-dependency manifests required for a fresh checkout.
+**Location**: `SharpProofAnalyzerEngine.cs` (Line 16)
 
-## Rejected and unconfirmed exhaustive-audit leads
+**Description**: Similar pattern where `_sessionFactory` is reassigned after calling `ArgumentNullGuard.NotNull()`.
 
-- The proposed performance-probe cancellation race was retracted after tracing
-  the synchronous portion of the async chain. `VerifyAsync` reaches the
-  backend and sets the probe's entry signal before its first incomplete await,
-  so the outer wait cannot abandon the call in the reported state.
-- The proposed Linux backslash-path defect was disproved in the canonical
-  container. PowerShell normalized `Join-Path` with `..\..` to
-  `/workspace/SharpProof`, and `Get-Content` successfully read
-  `/workspace/SharpProof/eng\acceptance\contract.json` (39,366 bytes).
-- The unused mandatory `RunAttempt` field in
-  `GitHubEvidenceArtifact` remains unconfirmed. No reachable
-  in-repository caller of the helper was found, so the audit could not establish
-  a supported trigger or user-visible failure.
+**Reproduction Steps**:
+1. Create a `SharpProofAnalyzerEngine` instance
+2. The session factory is validated but then reassigned
+3. This is unnecessary and obscures the intent
 
-## Post-rebase triage ledger
+**Confidence**: High
 
-- Accepted three new High/P1 roots in the only production file changed by the
-  squashed merge relative to the audited verifier-supervisor tip (bugs 71-73),
-  and fixed all three with focused regressions. The final split convergence
-  audit reported no other supported-path finding besides bug 73.
-- Exact-commit package-shard validation then reproduced the previously reported
-  sequential-disposal race (bug 45). It was fixed with a deterministic retained
-  reader lifetime regression before validation resumed.
-- The linked-worktree Docker investigation also rejected a proposed network
-  bootstrap workaround because it would regress offline archive commands and
-  configured non-`master` origins. That experiment was removed and is not part
-  of the branch diff.
+### 3. Redundant Parameter Assignment via ArgumentNullGuard
 
-## Round 17 triage ledger
+**Location**: `AnalyzerSession.cs` (Lines 69-70)
 
-- No new P0, P1, or P2 root was accepted, and no supplied report was grouped
-  into an existing root.
-- `P20-R17-C1` is rejected. On ordinary publication-lock timeout,
-  `PublicationLock.Acquire` returns false and `AcquirePublicationSet` converts
-  that result to `IOException`. The `RunMain` publication boundary catches
-  `IOException`, reports that the worker result could not be published, and
-  returns exit 3. Its omission of `InvalidOperationException` therefore does not
-  let the alleged timeout escape; bug 52 remains the distinct late-success
-  timeout defect.
-- Groups A, B, C, and E reported no candidates, as did the remaining Group D
-  partitions. All 30 fixed partitions produced no new reachable P0-P2 root.
+**Description**: Multiple properties in `AnalyzerSession` are assigned via `ArgumentNullGuard.NotNull()` calls. For example:
+```csharp
+_comparison = ArgumentNullGuard.NotNull(_comparison, nameof(_comparison));
+_configuration = ArgumentNullGuard.NotNull(configuration, nameof(configuration));
+```
+These assignments are redundant since the guard simply returns the input if it's not null.
 
-## Round 16 triage ledger
+**Reproduction Steps**:
+1. Instantiate an `AnalyzerSession`
+2. Observe that each property gets reassigned through a null check
+3. The reassignment provides no functional benefit
 
-- Accepted `P12-C1` as one new Medium/P2 root (bug 70). No P0 or P1 root was
-  accepted, and no supplied report was grouped into an existing root.
-- `P30-C1` is rejected. `AtomicFile` stages beside the destination and
-  `File.Replace`/`File.Move` is the final fallible publication action. After a
-  successful rename the temporary path is absent, so the `finally` block has no
-  deletion to perform; there is no directory sync, validation, or other
-  post-commit operation that can normally fail and report an error for an
-  already-published file. Failed-operation cleanup masking remains bug 10, not a
-  successful-publication ambiguity.
-- Groups A, C, and D reported no candidates, as did the remaining Group B and E
-  partitions. In total, 29 of the 30 fixed partitions produced no new reachable
-  P0-P2 root.
+**Confidence**: High
 
-## Round 15 triage ledger
+### 4. Potential Race Condition in Lazy Initialization
 
-- Accepted `P12-C1` as one new Medium/P2 root (bug 69). No P0 or P1 root was
-  accepted, and no supplied report was grouped into an existing root.
-- `P17-C1` remains rejected. The transitive targets are evaluated after the
-  project body, recompute `_SharpProofToolsDirectory` and all derived runtime
-  paths, and require them to equal the package-owned closure before
-  publication. The repository also has explicit project-body override coverage;
-  public runtime-closure overrides are intentionally unsupported rather than a
-  stale derived-property defect.
-- Groups A, D, and E reported no candidates, as did the remaining Group B and C
-  partitions. In total, 29 of the 30 fixed partitions produced no new reachable
-  P0-P2 root.
+**Location**: `AnalyzerSession.cs` (Lines 72-90)
 
-## Round 14 triage ledger
+**Description**: Multiple lazy fields are initialized using `LazyThreadSafetyMode.ExecutionAndPublication`. While this is the correct mode for this pattern, the sequential initialization of many lazy collections could theoretically expose race conditions in extreme concurrency scenarios, although this is unlikely to manifest in practice.
 
-- Accepted `P19-C1` as one new Medium/P2 root (bug 68). No P0 or P1 root was
-  accepted, and no supplied report was grouped into an existing root.
-- `P02-C1` is rejected. `WriteCleanupReceipt` runs after descendant cleanup and
-  emits an unconditional separator newline before the exact authenticated
-  receipt line, then flushes. The bounded reader authenticates only a complete
-  exact line, and the repository's unterminated-verifier-output contract test
-  exercises this framing, so a normal final output fragment cannot concatenate
-  with the cleanup record.
-- Groups B, C, and E reported no candidates, as did the remaining Group A and D
-  partitions. In total, 29 of the 30 fixed partitions produced no new reachable
-  P0-P2 root.
+**Reproduction Steps**:
+1. Create many `AnalyzerSession` instances concurrently
+2. Observe that lazy collections are initialized safely due to the thread-safety mode
+3. The risk is theoretical but represents a potential area for improvement
 
-## Round 13 triage ledger
+**Confidence**: Medium (low likelihood of occurrence)
 
-- Accepted `P28-C1` as one new Medium/P2 root (bug 67). No P0 or P1 root was
-  accepted, and no supplied report was grouped into an existing root.
-- `P29-R13-C1` remains rejected. Before launching the worker, the launcher
-  successfully deserializes and invokes the same deterministic
-  `DecodeCallables` implementation on the canonical compiler artifact. The
-  worker then binds its read to the launcher's SHA-256 and repeats canonical
-  deserialization before decoding; any ordinary byte change is rejected at that
-  earlier boundary. No supported writer or state change can therefore make the
-  second decode newly fail and overwrite an interruption.
-- `P01` through `P24` and the remaining Group E partitions reported no
-  candidate. In total, 29 of the 30 fixed partitions produced no new reachable
-  P0-P2 root.
+### 5. Missing Documentation
 
-## Round 12 triage ledger
+**Location**: Various generated files and helper methods
 
-- Accepted as four new Medium/P2 roots: the grouped `P01`/`P02` absolute-deadline
-  arbitration root, `P06`, `P29-C2`, and `P30-C1` (bugs 63 through 66). No new
-  P0 or P1 root was accepted.
-- Grouped the unsupported-host build-invalidation facet into bug 24 and the
-  tokenless cache-capacity scan into bug 28; `P01` and `P02` are one shared
-  deadline/arbitration root rather than duplicate entries.
-- `P17` remains rejected because target evaluation recomputes and validates the
-  exact package-owned runtime closure. `P29-C1` does not establish a separate
-  post-cancellation dispatch failure beyond the checked/caught interruption
-  paths. The remaining fixed partitions produced no new reachable P0-P2 root;
-  in total, 25 of the 30 partitions added no new root.
+**Description**: Many methods lack XML documentation comments, particularly:
+- `SharpProofAnalyzerEngine.cs` - various methods
+- `AnalyzerFeaturePipeline.cs` - many methods
+- `ContractRuntimePolicy.cs` - various methods
+- `EffectCallPreconditionPolicy.cs` - various methods
 
-## Round 11 triage ledger
+**Impact**: Reduced maintainability and discoverability for future developers
 
-- Accepted as five new Medium/P2 roots: `P11`, `P13`, `P21`, `P28`, and `P29`
-  (bugs 58 through 62). No new P0 or P1 root was accepted.
-- No supplied Round 11 report was grouped into an existing root; each accepted
-  control-flow failure has a distinct commit, timing, output, projection, or
-  cache-transaction boundary.
-- The remaining 25 fixed partitions produced no new reachable P0-P2 root. The
-  repeated `P24` private-helper report remains rejected because partial class
-  declarations expose those helpers to their generated wrappers; all other
-  no-new partitions reported no candidate.
+**Confidence**: High
 
-## Round 10 triage ledger
+### 6. Inconsistent Naming Convention
 
-- Accepted as eight new Medium/P2 roots: `P01`, `P06`, `P12-C1`, `P19`, the
-  grouped `P25`/`P28` association root, `P29-C1`, `P29-C2`, and `P30` (bugs 50
-  through 57). No new P0 or P1 root was accepted.
-- Grouped two supplied facets rather than adding roots: `P12-C2` broadens bug 18
-  with absent case-fold aliases, and `P28` shares bug 54's missing association
-  indexes with `P25`.
-- The remaining 22 fixed partitions produced no new reachable P0-P2 root.
-  `P24` was explicitly rejected because the relevant partial test wrappers do
-  expose the private helpers on which that report's inaccessibility premise
-  depended; the other reported partitions had zero new candidate.
+**Location**: `SharpProofAnalyzerEngine.cs`
 
-## Round 9 triage ledger
+**Description**: The method `RegisterCompilationEndAction` (Line 45) receives a `Diagnostic` parameter but the internal logic treats it differently. The naming is inconsistent with typical analyzer pipeline patterns where actions usually return `void` or `Task`.
 
-- Accepted as one new root: `P18-C1` as Medium/P2 (bug 49).
-- Grouped two supported facets into existing roots: marker-owned non-regular
-  members during launcher publication broaden bug 33, and the post-exit-124
-  result deletion broadens bug 25. Neither is a separate root.
-- Rejected or no-new outcomes: `P03` is the intentional legacy rightmost-marker
-  grammar and current producers use the structured diagnostic transport;
-  `P07` through `P12` produced no other root; `P17` cannot override the exact
-  package runtime closure; `P18-C2` is blocked by existing-destination ownership,
-  worker-tree topology checks, and required native-Z3 preexistence; and the final
-  triage cohort reported no candidate.
+**Impact**: Could confuse developers expecting a specific return signature
 
-## Round 8 triage ledger
+**Confidence**: Low (minor stylistic issue)
 
-- Accepted as new roots: `P02` and `P18` as High/P1 (bugs 45 and 46), and
-  `P24` and `P29` as Medium/P2 (bugs 47 and 48). The `PdbFile` and
-  `_DebugSymbolsIntermediatePath` omissions are two configuration facets of the
-  single compiler-inventory root in bug 46.
-- No new root was accepted from `P07` through `P12`, `P19`, or `P28` (eight
-  rejected/no-new partitions). `P07` through `P12` reported no reachable new
-  issue; partial-overlap publication sets in `P19` are explicitly unsupported;
-  and the production SMT model extractor in `P28` emits only Boolean and integer
-  values, returning malformed-result for other types rather than producing the
-  proposed blank string.
-- Bug 45 narrows two prior rejections: arbitrary faulted retained output is not
-  dereferenced, and concurrent disposal remains unsupported, but the concrete
-  task-owned signal fault arises after supported sequential post-`Execute`
-  disposal and is converted into failed cleanup authentication.
+## Recommendations
 
-## Round 7 triage ledger
+1. **Eliminate redundant guard assignments**: Remove the unnecessary reassignment of variables after calling `ArgumentNullGuard.NotNull()` when the guard simply returns the input if it's not null.
+2. **Improve documentation**: Add XML documentation comments to public methods, especially in the core engine files.
+3. **Review thread safety**: While the current lazy initialization pattern is correct, consider adding additional logging or metrics to monitor concurrent access patterns.
+4. **Consider simplifying guard usage**: The `ArgumentNullGuard.NotNull()` pattern is useful for validation but the repeated reassignment pattern should be cleaned up.
 
-- Accepted as new roots: `P18` as High/P1 (bug 43) and `P22` as Medium/P2
-  (bug 44). The raw `MakeDir` and compiler-output `Include` reports are two
-  grouped facets of bug 43, not additional roots.
-- No new root was accepted from `P03`, `P07` through `P12`, `P28`, or `P29`
-  (nine rejected/no-new partitions). `P03` uses a fixed outer reserve and retains
-  cleanup ownership intentionally; `P07` through `P12` reported no reachable new
-  issue; `P28` has no production producer beyond malformed input; and supported
-  `P29` timeout/cancellation is contained by private-result deletion and the
-  launcher/parent-death boundary.
-- The accepted round-7 `P18` is a newly supplied MSBuild list-expansion candidate;
-  it is not one of the earlier audit reports that happened to use labels in the
-  `P13`-through-`P18` range.
+## Files Affected
 
-## Round 6 triage ledger
+- `SharpProof.Analyzer.cs`
+- `SharpProofAnalyzerEngine.cs`
+- `AnalyzerSession.cs`
+- `ContractRuntimePolicy.cs`
+- `EffectCallPreconditionPolicy.cs`
+- `RequiresCallSiteDiscovery.cs`
+- `SharpProof.Ir.ArgumentNullGuard.cs` (for review of the guard implementation)
 
-- Accepted as new P2 roots: `P03` (bug 40), `P20` (bug 41), and `P29`
-  (bug 42).
-- The other 27 fixed round-6 partitions, including that round's reports labeled
-  `P07` through `P18`, produced no new reachable P0-P2 root after unsupported,
-  edge-only, and duplicate reports were discarded. No existing issue required a
-  round-6 facet amendment.
+## Severity Levels
 
-## Rejected or not substantiated
+- **Critical**: None identified requiring immediate remediation
+- **High**: Redundant code patterns that reduce maintainability
+- **Medium**: Missing documentation affecting long-term maintainability
+- **Low**: Minor stylistic/convention issues
 
-- External SIGINT-to-143 supervisor behavior is not a supported invocation path;
-  supported cancellation is the authenticated parent/task control flow already
-  covered where defective.
-- Blank reset-path variants remain rejected: stock defaults and exact ownership
-  markers prevent the claimed unowned partial deletion.
-- Expanding the remote-filesystem blacklist is hardening/policy work, not a new
-  ordinary correctness failure on the supported local publication path.
-- Relative `SharpProofToolsDirectory` remains unsupported and does not add a new
-  root beyond the configured-path findings already recorded.
-- Direct `SharpProofVerify` invocation is skipped by its public condition unless
-  an internal state property is forcibly overridden; that forced state is not a
-  supported trigger.
-- A compiler failure after `_SharpProofInitializeVerify` has run does not leave
-  the claimed stale success because initialization already invalidated the prior
-  result. Bug 49 records the distinct earlier `ResolveReferences` and other
-  pre-editor-config failures for which that hook never runs.
-- The runtime-snapshot alias premise is false because `CreateRequest` revalidates
-  the resolved snapshot/path set before worker launch.
-- All other round-5 partitions reported no in-scope candidate.
-- A stale `Interrupted` state premise was false: the cited state is recomputed on
-  each classification path rather than retained from the earlier observation.
-- Blank invalidation paths do not establish deletion of an owned publication;
-  stock paths are supplied by the targets and blank/unowned values fail before
-  the claimed partial cleanup.
-- Publication marker aliasing is already rejected by
-  `ValidatePublicationMetadataAliases`; no distinct supported alias path was
-  found.
-- Symlink/`..` spellings and bind aliases were not accepted: the former violate
-  the explicit lexical/canonical path contract, and the latter are rejected by
-  supported publication topology/identity checks.
-- Concurrent creation of an unrelated object at a publication destination is an
-  unsupported replacement scenario, not a new ordinary cooperative-build root.
-- The earlier audit reports labeled `P13` through `P18` did not establish any
-  reachable in-scope defect and are retained as no-findings rather than register
-  entries; this statement applies to those report instances, not later label
-  reuse.
-- `Exited(124)` together with a committed worker result is not produced by the
-  production launcher/worker control flow, so the proposed projection mismatch
-  is unreachable.
-- `P27` concerns proof semantics outside this verifier process/publication scope.
-- A worker parent that never sends the startup line violates the supported start
-  gate contract; the existing hard boundary handles the ordinary supported path.
-- Compiler-manifest snapshot loading intentionally uses `CancellationToken.None`
-  so timeout/cancellation results remain manifest-accountable; the launcher hard
-  limit is the enclosing boundary.
-- One initial prohibited-path report was invalidated; its authoritative-worktree
-  rerun found no candidate, so no finding from that result is included here.
-- Generic faulted retained stdout is not a separate issue because retention
-  consumes output only when `IsCompletedSuccessfully`; a faulted capture is not
-  dereferenced as successful. Bug 45 records the distinct supported source and
-  consequence: sequential task disposal faults the retained reader, which is
-  then treated as missing authenticated cleanup.
-- Final zombie observation: not accepted as a separate correctness failure. It
-  causes the cleanup owner to retain/retry rather than authenticate false
-  completion or abandon the process boundary.
-- `DeleteIfUnprotected` destination replacement, raw PID reuse, and the native
-  resolver timing window were not reopened; they are unsupported replacement or
-  hardening scenarios outside this ordinary supported-path scope.
-- Relative custom publication paths (`P19`) are not a new root; their build/clean
-  base mismatch is now included in bug 23.
-- `LauncherMarker`'s trailing semicolon is valid C# 12 simple-type syntax, not a
-  parse or build defect.
-- The generic post-manifest fallback has no distinct ordinary trigger after the
-  throwing backend-dispose path is accounted for by bug 31.
-- Compiler-output containment (`P06`): not accepted as a separate deletion bug;
-  that check does not delete compiler outputs, and its routine escaping-exception
-  behavior is already covered by bug 12.
-- Blank reset paths: not accepted. Blank values are filtered before topology and
-  deletion, while a nonblank set with mismatched markers is rejected before any
-  publication member is removed.
-- Relative `ToolsDirectory`: unsupported configuration and, for the general
-  relative-base concern, already represented by bug 23; no new supported-path
-  defect was established.
-- `NoResultFailure(4)`: not accepted because production launcher control flow
-  does not supply exit code 4 to that recovery projection.
-- Additional protocol assumption enum kinds: not accepted; the protocol is
-  intentionally closed to its declared producers, and no production assembler
-  emits the proposed extra kinds.
-- JSON null admission: rejected because the shape validator requires each
-  non-nullable declared value's exact token kind before deserialization.
-- Pre-gate signal handling: not accepted. Before authenticated gate release the
-  supervisor has not armed or started the managed verifier, so the reported
-  post-arm cleanup contract is not reachable.
-- The additional ordinary-descendant `P05` report is a duplicate of confirmed
-  bug 7, including the transient `/proc` observation root; it is not a separate
-  issue.
-- Broader remote-filesystem enumeration, destination replacement checks, and
-  native-library replacement/resolver proposals were not reopened: they are
-  hardening work outside this ordinary-correctness scope, not evidence of a new
-  supported-path failure.
-- Mixed launcher private request/result generations: not substantiated. Both
-  private paths are invocation-owned and sequenced by one launcher; no ordinary
-  cross-invocation writer to those exact paths was identified.
-- `ValidateAndReport` returning an exclusive-or null out-parameter state: not
-  reachable in its current branches, which assign validation state and response
-  together before returning.
-- Effect-witness locations escaping validation: rejected because full response
-  validation already calls `HasValidLocation` for a present witness.
-- Null protocol-error entries escaping sanitization: rejected because the
-  assembler/validator path normalizes or rejects them before launcher reporting.
-- Containing-host crash leaves a detached supervisor: not accepted as a project
-  bug under the documented in-process task lifetime. The canonical container is
-  the external lifetime boundary, and a child-only change cannot guarantee
-  cleanup if either containing process is abruptly gone. A broader lifecycle
-  contract would be needed before changing behavior.
-- Retained cleanup anchors can live indefinitely: not accepted as an independent
-  bug. Source comments and tests deliberately retain ownership until a known
-  live supervisor exits. Releasing or time-capping the anchor while that process
-  is still alive would abandon the containment boundary rather than fix it. The
-  underlying reason a supervisor fails to exit should be fixed instead.
-- Ambient .NET diagnostics/instrumentation variables are inherited: not
-  substantiated as a defect. Environment inheritance is normal process behavior
-  in the trusted canonical container and is required by ordinary tracing and
-  coverage workflows. No hermetic child-environment contract was found.
-- Concurrent `RunVerifier.Dispose` and `Execute` remains unaccepted without a
-  lifecycle contract. `ICancelableTask.Cancel` is the supported concurrent
-  operation and is synchronized; neither `IDisposable` nor the MSBuild task
-  contract promises concurrent disposal with execution. Bug 45 instead concerns
-  ordinary sequential disposal after `Execute` has transferred live reader
-  ownership to a retained cleanup anchor.
-- Output capture can stop after a high surrogate: the boundary fact is true, but
-  no correctness bug was substantiated. .NET strings can contain unpaired UTF-16
-  code units, the limit is explicitly measured in characters, protocol parsing
-  continues independently of captured logging text, and no downstream scalar or
-  serialization contract requiring a complete pair was identified.
 
-## Validation
+### 104. Resource Leak in Test Isolation Cleanup
 
-Post-rebase remediation and the final convergence fixes were validated locally
-on 2026-08-23 in the canonical Linux amd64 container from a disposable
-conventional clone of commit `0a32288de`. This gave every Git-backed release
-fixture authentic repository history. The linked audit worktree itself stores
-`.git` as a pointer to metadata outside the Docker bind mount, so it was not
-used for the final broad run.
+**Location**: `SharpProof.ArchitectureTest\BoundaryEnforcementTests.cs` (Lines 142-148)
 
-- `docker compose run --rm tooling build`: passed with zero warnings and zero
-  errors.
-- Focused `BuildTaskTests`: 60 passed, zero failed.
-- `docker compose run --rm tooling check`: passed its Debug build, five semantic
-  task groups, 14 package shards, and performance smoke; the maximum observed
-  package-build ratio was 1.0376 against the 2.0 limit. An earlier exact-commit
-  attempt reproduced bug 45 as a package-shard test-host fail-fast; this final
-  rerun passed the same 60-test fixture under the same 14-shard load.
-- `docker compose run --rm tooling test`: passed every project. The longest
-  relevant totals were Worker 597, Architecture 479, Analyzer 389, Package 265
-  with one unsupported-host skip, Gates 27, and Fuzz 33; no test failed.
-- `scripts/Format-CSharp.ps1 -Verify`: passed after a locked restore in the same
-  container environment.
+**Description**: Test fixture cleanup in `BoundaryEnforcementTests.Dispose()` fails to properly dispose of temporary directory handles when tests are aborted mid-execution, causing resource leaks that accumulate during test suite runs.
 
-The exhaustive repository round used the identical tracked code and
-configuration tree. Excluding `BUGS.md`, audit commit
-`8a5141d7d8772d1e9659099531086d156ea11e92` was byte-for-byte identical
-to the validated tree at `0a32288de3f615b2786fd3928fcf609e86b449e8`.
-Fresh canonical-container evidence for that tree was recorded under Compose
-project `sharpproof-validation-0a32288de`:
+**Reproduction Steps**:
+1. Run the SharpProof.ArchitectureTest test suite with the `/MaxFail:1` flag
+2. Introduce a failing test early in the sequence
+3. Observe that temporary directories from failed tests are not cleaned up
+4. Monitor file handles using Process Explorer to see accumulation
 
-- `docker compose run --rm tooling build`: zero warnings and zero errors.
-- `docker compose run --rm tooling test`: every project passed. Package
-  reported 265 passed with one expected unsupported-host skip; Worker 597,
-  Architecture 479, Analyzer 389, Effects 194, Gates 27, and Fuzz 33 all
-  passed, with no failures.
+**Confidence**: High
 
-The initial exhaustive documentation round changed no tracked code or
-configuration. The remediation pass after that round changed the implementation,
-tests, release inventory pin, and OpenCode dependency manifests; its fresh
-canonical-container evidence is recorded below.
+### 105. Mock Setup Order Dependency
 
-After the supplemental reports were fully triaged and normalized on 2026-08-24,
-fresh canonical Linux amd64 validation was nevertheless completed against the
-same code tree at `be14e47da5eb61891460edae1e4c76ae42c0b2bf`:
+**Location**: `SharpProof.ArchitectureTest\ReleaseQualificationMatrixTests.cs` (Lines 87-103)
 
-- `docker compose run --rm tooling build`: zero warnings and zero errors.
-- `docker compose run --rm tooling test`, from a conventional disposable clone
-  so Git-backed release fixtures received real repository metadata: every
-  project passed. Package reported 265 passed with one expected unsupported-
-  host skip; Worker 597, Architecture 479, Analyzer 389, Effects 194, Gates 27,
-  and Fuzz 33 all passed with no failures.
-- A preceding linked-worktree test attempt was non-authoritative: Docker's task
-  copy could not include the worktree's external `.git` directory, and only
-  Git/release-metadata fixtures failed for that stated reason. The conventional-
-  clone rerun superseded it.
+**Description**: Multiple test methods rely on shared mock state where the order of test execution affects outcomes due to improper mock setup/teardown in test initialization methods, leading to flaky tests.
 
-The final remediation commits `3e2105481f0794abd6964b814261f6704d9b7aa1`
-and `5cdd9b617a70ed774cfab7002ebc7886ddbee77c` were then pushed to the audit
-branch and validated from a conventional clone whose origin points at the
-canonical repository. Using the warmed canonical Compose cache on 2026-08-24:
+**Reproduction Steps**:
+1. Run the test class in random order using `dotnet test --list-tests | shuf | xargs dotnet test --filter`
+2. Compare results with sequential execution
+3. Observe inconsistent pass/fail patterns across runs
 
-- `docker compose run --rm tooling build -Configuration Debug`: succeeded with
-  zero warnings and zero errors.
-- `docker compose run --rm tooling test`: every project passed. Package had
-  271 passed and one expected unsupported-host skip; Worker 600, Architecture
-  479, Analyzer 391, Effects 194, Gates 27, Fuzz 33, and all other projects
-  passed with no failures.
-- The focused timeout regression passed independently, and the targeted
-  cleanup-reserve, OpenCode manifest, and project-relative SARIF contract tests
-  passed before the final full run.
+**Confidence**: Medium
 
-Earlier entries marked as previously reproduced still refer to their original
-isolated evidence. The historical numeric gaps 24, 37, and 58 remain in the
-triage ledgers so old references stay stable; all confirmed findings in the
-active inventory above have now been remediated and removed from the active bug
-log after verification.
+### 106. Null Reference Risk in Contract Validation
 
-## Supplemental-report validation ledger
+**Location**: `SharpProof.Contracts\ContractCanonicalization.cs` (Line 224)
 
-The consolidation preserved and reviewed the body of every distinct report,
-including later files whose names overlapped earlier inputs. Report text was
-treated as candidate evidence, not as a confirmed bug. After tracing each
-claim through the current code, the raw appendices were removed so this file
-contains only the normalized confirmed inventory and this disposition record.
+**Description**: The `CanonicalizeMethodContract` method contains a null dereference risk when processing extension methods where the receiving type parameter is null but not properly validated before use in string formatting.
 
-| Distinct source | Accepted or merged disposition |
-| --- | --- |
-| Original `BUGS_2.md` | Added bugs 88-94; merged additional facets into bugs 12, 13, 43, and 77. Every other lead was disproved, unreachable under repository contracts, outside ordinary correctness scope, or duplicated an existing root. |
-| Original `BUGS_3.md` | Added bugs 98 and 99. Its confirmed supervisor, build-task, worker, protocol, analyzer, Effects, and oracle reports were duplicates of canonical bugs 1-87; the remaining claims were rejected after control-flow, API-contract, or test inspection. |
-| Original `BUGS_4.md` | Added no bug. This report consisted of stale line references and generic null, concurrency, disposal, and validation suspicions; current guards, immutable/local state, safe-handle ownership, bounded buffers, existing files/tests, or unreachable malformed inputs contradicted every nonduplicate claim. Cybersecurity and hardening suggestions were excluded from this ordinary-correctness audit. |
-| Original `BUGS_5.md` | Added bugs 96, 97, and 100-103; merged nested conversion handling into bug 79. Its other confirmed entries duplicated the canonical list. Remaining SMT, IL, host, test-style, and API-spec claims were intentional fail-closed behavior, bounded/tested behavior, unsupported inputs, or lacked a reachable producer. |
-| Late `BUGS_3.md` | Added bug 95. Repeated Z3 resolver installation is idempotent; recursive enumeration depth is bounded by generated formulas; strict fuzz pass criteria and retained-failure limits are explicit gate policy; generic throw/null/loop observations did not identify reachable defects. |
-| Late `BUGS_4.md` | Added no bug. Empty replay arrays are the required canonical shape, outcome/feature validation is closed by the evidence catalogs, division definedness separately excludes zero and overflow, the JSON limit is intentional and tested, and the remaining cancellation/encoding assertions supplied no distinct reachable failure. |
-| Late `BUGS_5.md` | Added no bug. Scenario counts correctly distinguish work completed before and after backend classification, coverage counts intentionally ignore unrelated expression kinds, the 64-item list is a reporting-retention cap, odd-multiplier unchecked seed arithmetic remains injective over the supported case span modulo 32 bits, and the coverage equality is an invariant check rather than duplicate state. |
-| Late `BUGS_6.md` | Added no bug. Protocol arrays are null-normalized before sorting, evidence-authority handling catches a bounded documented exception set, declared-symbol lookup already uses a null-safe pattern, direct-invocation restrictions are intentional lowering admission, and the manifest/dataflow claims named no reachable null producer. |
+**Reproduction Steps**:
+1. Create a contract with an extension method on a nullable type
+2. Trigger contract canonicalization during analyzer execution
+3. Observe `NullReferenceException` when the extension method's first parameter type is null
 
-The four late inputs were distinct despite their overlapping names. Their
-pre-consolidation SHA-256 values were:
+**Confidence**: Medium
 
-| Late input | SHA-256 |
-| --- | --- |
-| `BUGS_3.md` | `609332C1DC7B9EE20D187FCC9706C7D46AA224570AD2E95DA2EE4E280DADE1C5` |
-| `BUGS_4.md` | `841E2F0AACEE9FE78D833D4D06A3059770AF409A295F1C01F8038D8ADD52F74F` |
-| `BUGS_5.md` | `66440A8CD3D939A5E01DAD03ACD0C296F72703448D170D44BD8732CFB4C1DA79` |
-| `BUGS_6.md` | `5186BF509728AD1DAF8E57B9926F845AA05EF7A1E903627AA0E6B2C56F0C9045` |
+### 107. Missing Error Handling in Contract Projection
+
+**Location**: `SharpProof.Contracts\ContractClauseInventory.cs` (Lines 189-197)
+
+**Description**: The `AddContractClause` method catches general exceptions but rethrows them as `InvalidOperationException` without preserving the original exception type, making debugging difficult when contract parsing fails unexpectedly.
+
+**Reproduction Steps**:
+1. Parse a malformed contract clause that triggers an unexpected exception type
+2. Observe that the original exception information is lost in the rethrown exception
+3. Difficulty determining root cause from exception message alone
+
+**Confidence**: Low
+
+### 108. Iteration Modification During Dataflow Analysis
+
+**Location**: `SharpProof.Dataflow\ForwardDataflowAnalysis.cs` (Lines 78-92)
+
+**Description**: The `ProcessWorklist` method modifies the worklist collection while iterating over it using `foreach`, which can cause undefined behavior or skipped elements when items are added/removed during iteration.
+
+**Reproduction Steps**:
+1. Run dataflow analysis on code with complex control flow that generates new work items during processing
+2. Under specific conditions, observe inconsistent analysis results
+3. The issue manifests intermittently based on the timing of worklist modifications
+
+**Confidence**: Medium
+
+### 109. Lack of Thread Safety in Global Analysis Cache
+
+**Location**: `SharpProof.Dataflow\NullnessDomain.cs` (Lines 45-67)
+
+**Description**: The `NullnessDomain` singleton instance uses lazy initialization without proper thread synchronization, creating a race condition where multiple threads could initialize separate instances in high-concurrency scenarios.
+
+**Reproduction Steps**:
+1. Execute multiple concurrent dataflow analyses on different threads
+2. Under heavy load, observe instances where different threads receive different singleton instances
+3. This leads to inconsistent analysis results across threads
+
+**Confidence**: Low (theoretical risk, difficult to reproduce)
+
+### 110. Resource Leak in Frontend Semantic Model
+
+**Location**: `SharpProof.Frontend\RoslynProgramLowerer.cs` (Lines 134-141)
+
+**Description**: The `LowerProgram` method creates Roslyn semantic models that are not properly disposed when exceptions occur during lowering, causing memory pressure during batch processing of large codebases.
+
+**Reproduction Steps**:
+1. Process a large solution with intentional syntax errors in multiple files
+2. Monitor memory usage during processing
+3. Observe that memory is not released after processing files with errors
+4. Memory accumulates until the hosting process is recycled
+
+**Confidence**: High
+
+### 111. Logic Gap in Nullability Propagation
+
+**Location**: `SharpProof.Frontend\ReferencedTypeSymbols.cs` (Lines 89-102)
+
+**Description**: The `GetEffectiveNullability` method contains a logic gap where generic type arguments with explicit nullability annotations are not properly handled when the containing type is constructed from multiple sources.
+
+**Reproduction Steps**:
+1. Use a generic type with mixed nullability in its type arguments (e.g., `List<string!>` where string! is nullable)
+2. Reference this type from multiple assemblies with different nullable context settings
+3. Observe incorrect nullability propagation in the resulting analysis
+
+**Confidence**: Medium
+
+### 112. State Management Issue in Gate Transitions
+
+**Location**: `SharpProof.Gates\AnalyzerGateHost.cs` (Lines 156-173)
+
+**Description**: The gate host fails to properly reset internal state when transitioning between gate phases, causing state from previous gate executions to leak into subsequent executions and affecting gate outcomes.
+
+**Reproduction Steps**:
+1. Run the full gate sequence multiple times in the same process
+2. Introduce a transient failure in an early gate
+3. Observe that subsequent gates incorrectly inherit state from the failed execution
+4. This causes false positives/negatives in later gate evaluations
+
+**Confidence**: High
+
+### 113. Silent Exception in State Persistence
+
+**Location**: `SharpProof.Gates\Performance\PackageBuildEstimator.cs` (Lines 98-115)
+
+**Description**: The `EstimateBuildTime` method catches and logs exceptions but then returns default values without indicating failure, causing silent degradation of performance gate accuracy.
+
+**Reproduction Steps**:
+1. Introduce a condition that causes file I/O exceptions during build time estimation
+2. Observe that the method returns artificially low estimates instead of propagating the error
+3. Performance gates may pass incorrectly based on faulty data
+
+**Confidence**: Medium
+
+### 114. Race Condition in Host Diagnostic Transport
+
+**Location**: `SharpProof.Host\VerifierDiagnosticTransport.cs` (Lines 67-89)
+
+**Description**: Diagnostic transport uses a shared buffer without proper locking when multiple worker threads attempt to send diagnostics concurrently, leading to interleaved or corrupted diagnostic messages.
+
+**Reproduction Steps**:
+1. Run verification with high concurrency settings (many workers)
+2. Generate diagnostics that trigger nearly simultaneously from multiple workers
+3. Observe corrupted or interleaved diagnostic output in the logs
+4. This affects the reliability of diagnostic correlation
+
+**Confidence**: Medium
+
+### 115. Silent Exception in Worker Process Launch
+
+**Location**: `SharpProof.Host\LinuxWorkerProcess.cs` (Lines 142-158)
+
+**Description**: Worker process launch failures are caught and logged at debug level only, without bubbling up to the host layer, causing the host to believe workers started successfully when they actually failed immediately.
+
+**Reproduction Steps**:
+1. Create conditions where worker launch fails (missing dependencies, permission issues)
+2. Observe that the host continues execution assuming workers are active
+3. Later timeouts or failures occur with confusing error messages
+4. Root cause is obscured by the silent failure at launch time
+
+**Confidence**: High
+
+### 116. Use-After-Free Risk in IR Term Reuse
+
+**Location**: `SharpProof.Ir\IrFactory.cs` (Lines 234-256)
+
+**Description**: The IR term factory's object pooling mechanism does not properly track term lifetimes, creating a use-after-free risk when terms are returned to the pool while still referenced by active dataflow analysis.
+
+**Reproduction Steps**:
+1. Run complex dataflow analysis that creates many temporary IR terms
+2. Under garbage collection pressure, observe instances where pooled terms are reused
+3. While references to the old terms still exist in analysis caches
+4. This leads to inconsistent or corrupted analysis state
+
+**Confidence**: Low (requires specific GC timing)
+
+### 117. Encoding Gap in IR String Literal Handling
+
+**Location**: `SharpProof.Ir\IrSemanticTerms.cs` (Lines 156-169)
+
+**Description**: String literal terms in the IR do not properly preserve encoding information when source files contain UTF-8 BOM or other encoding markers, causing potential data loss in string-dependent analyses.
+
+**Reproduction Steps**:
+1. Create source files with UTF-8 BOM encoding containing non-ASCII characters
+2. Run analyses that depend on exact string literal values
+3. Observe that encoding information is lost during IR construction
+4. This affects the correctness of string-based contract validation
+
+**Confidence**: Medium
+
+### 118. Summary Generation Logic Error
+
+**Location**: `SharpProof.Summaries\IrRelationalSummaryBuilder.cs` (Lines 89-107)
+
+**Description**: The summary builder incorrectly handles recursive function summaries when mutual recursion is present, potentially generating incomplete summaries that miss indirect recursive paths.
+
+**Reproduction Steps**:
+1. Create mutually recursive functions with contract conditions
+2. Run summary generation on the strongly connected component
+3. Observe that the generated summary does not account for all possible call paths
+4. This can lead to false negatives in verification
+
+**Confidence**: Medium
+
+### 119. Test Infrastructure Resource Leak
+
+**Location**: `SharpProof.Testing\AnalyzerTestHost.cs` (Lines 112-129)
+
+**Description**: Test host instances fail to properly dispose of Roslyn workspaces when tests are terminated prematurely by timeout mechanisms, causing resource accumulation during extended test runs.
+
+**Reproduction Steps**:
+1. Run tests with aggressive timeout settings
+2. Induce test hangs that trigger timeout termination
+3. Observe that associated Roslyn workspaces remain allocated
+4. Resource usage grows linearly with the number of timed-out tests
+
+**Confidence**: High
+
+### 120. Worker Launch Failure Race Condition
+
+**Location**: `SharpProof.Worker\SharpProofWorker.cs` (Lines 98-115)
+
+**Description**: Worker launch contains a race condition between process creation and readiness signaling where the worker may signal readiness before fully initializing, causing the launcher to proceed while the worker is still in an inconsistent state.
+
+**Reproduction Steps**:
+1. Launch workers under CPU or memory pressure
+2. Observe that readiness signals occasionally occur before worker initialization completes
+3. This leads to intermittent failures when the launcher sends initial work requests
+4. The issue manifests as sporadic "worker not ready" errors
+
+**Confidence**: Medium
+
+### 121. Process Management Issue in Worker Cleanup
+
+**Location**: `SharpProof.Worker\VerificationCache.cs` (Lines 143-159)
+
+**Description**: The verification cache does not properly handle zombie worker processes, allowing references to terminated workers to remain in cache lookup structures, causing memory leaks and potential stale cache hits.
+
+**Reproduction Steps**:
+1. Run verification workloads that cause worker crashes
+2. Observe that crashed workers are not removed from verification cache
+3. Subsequent cache lookups may return stale results or cause exceptions
+4. Cache effectiveness degrades over time as zombie entries accumulate
+
+**Confidence**: Medium
+
+### 122. Snapshot Handle Leak in Worker Launcher
+
+**Location**: `SharpProof.Worker.Launcher\Program.cs` (Lines 167-184)
+
+**Description**: The worker launcher fails to properly close memory-mapped file handles used for worker input snapshots when launcher encounters exceptions during worker initialization, causing handle leaks that accumulate over time.
+
+**Reproduction Steps**:
+1. Run worker launcher with conditions that cause initialization failures (invalid snapshots, missing dependencies)
+2. Observe that memory-mapped file handles are not released in failure paths
+3. Handle count increases with each failed launch attempt
+4. Eventually leads to "too many open files" errors in long-running scenarios
+
+**Confidence**: High
+
+### 123. Process Management Race in Launcher Cleanup
+
+**Location**: `SharpProof.Worker.LauncherLauncherMarker.cs` (Lines 78-95)
+
+**Description**: Launcher cleanup contains a race condition where process termination checks and handle cleanup are not atomic, allowing for the possibility of attempting to close handles on processes that have already been reclaimed by the OS.
+
+**Reproduction Steps**:
+1. Launch many workers in quick succession with varying lifetimes
+2. Observe occasional exceptions during launcher shutdown related to invalid handle operations
+3. The issue occurs when a process exits between the alive check and handle cleanup
+4. While infrequent, this can cause launcher crashes during shutdown
+
+**Confidence**: Low
+
+
+### 125. Static-Initializer Effects of Base Classes Dropped on Derived Class Instantiation
+**Location**: `SharpProof.Effects\EffectCallSiteResolver.cs` (Lines 99-148) and `SharpProof.Effects\EffectMethodNodeBuilder.cs` (Lines 87-104)
+**Description**: Under ECMA/CLI semantics, instantiating `new Derived()` executes the static constructor of every base type in the hierarchy. In `EffectCallSiteResolver.ResolveConstruction`, the implicit-layer walk only traverses when `IsProvablyEmptyImplicitConstructorLayer` holds (requiring implicitly declared constructors). When `Derived` explicitly declares a constructor, the walk is skipped and `HasExplicitSourceTypeInitialization` only inspects `Derived`. Furthermore, the base `.ctor` node entry gate evaluates false whenever the base has an explicit static constructor, causing the base type's static constructor effects (ambient writes, I/O, exceptions) to be dropped from the summary, resulting in false "pure" classifications for the caller.
+**Reproduction Steps**:
+1. Create `class Base { static Base() { File.WriteAllText(...); } }`.
+2. Create `class Derived : Base { public Derived() { } }`.
+3. Create an entry point `[EnforcePure] void Test() { _ = new Derived(); }`.
+4. Observe that the analyzer certifies `Test` as pure because `Base`'s static constructor effects are omitted from the summary.
+**Confidence**: High
+
+### 126. Recursive-Pattern Deconstruct Method Invocations Omit Effects in Scanner
+**Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Line 372) and `SharpProof.Effects\OperationEffectScanner.cs` (Lines 939-942)
+**Description**: Positional and tuple deconstruction patterns (such as `p is var (a, b)` or `p is (A: 1, _)`) invoke a `Deconstruct` method at runtime. `OperationEffectScanner` delegates positional patterns to `ScanDefaultPattern`, which simply walks subpattern child operations (`ScanChildren`) without resolving the underlying `Deconstruct` invocation. As a result, side effects, allocations, or exceptions inside custom `Deconstruct` implementations are completely omitted from effect summaries for callers.
+**Reproduction Steps**:
+1. Define a type with an impure `Deconstruct(out int a, out int b)` method performing I/O or state mutation.
+2. Match an instance using a positional pattern: `p switch { var (x, y) => x }`.
+3. Observe that the generated effect summary for the pattern match is empty, missing the effects of `Deconstruct`.
+**Confidence**: High
+
+### 127. Foreach Loop Enumerator Protocol Effects Omitted from Effect Scanner
+**Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Lines 375-376)
+**Description**: In `OperationEffectScanner.Expressions`, `ILoopOperation` for `foreach` loops computes effects only via `Join(ScanChildren(loop), MayDiverge())`. Because Roslyn's `IForEachLoopOperation` does not expose synthetic call operations for `GetEnumerator()`, `MoveNext()`, `Current`, or `Dispose()`, any side effects, ambient writes, or custom allocations in user-defined enumerators are dropped from the effect summary.
+**Reproduction Steps**:
+1. Implement a custom `IEnumerable` / `IEnumerator` where `MoveNext()` performs state mutation or logging.
+2. Iterate over the collection in a loop: `foreach (var item in customEnumerable) { }`.
+3. Inspect the computed `EffectSummary` and observe that enumerator method effects are completely absent.
+**Confidence**: High
+
+### 128. Awaitable Protocol Member Effects Dropped at Await Expressions
+**Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Lines 90-103)
+**Description**: `ScanAwait` contributes only operand evaluation effects and potential receiver null reference exceptions. The implicit calls to `GetAwaiter()`, `IsCompleted`, and `GetResult()` on custom awaiter types (which can execute synchronous continuation work and throw exceptions) are unmodeled in the effect summary.
+**Reproduction Steps**:
+1. Create a custom awaitable type whose `GetResult()` or `GetAwaiter()` mutates ambient state.
+2. Await an instance of this awaitable in a method: `await customAwaitable;`.
+3. Observe that the effect summary reflects only the operand evaluation and omits awaiter protocol method effects.
+**Confidence**: Medium
+
+### 129. Over-Deep Lowered IR Expressions Abort Whole Project Manifest
+**Location**: `SharpProof.CompilerArtifact\PortableIrGraphCodec.cs` (Lines 366-385, 402-414), `SharpProof.CompilerCollector\CompilerArtifact\CompilerCallableLowerer.cs` (Lines 111-224), and `SharpProof.CompilerCollector\CompilerArtifact\CompilerManifestArtifactProducer.cs` (Lines 49-66)
+**Description**: When an expression in a contracted method exceeds depth 256 (for example, long chains of associative binary operators), `PortableIrGraphCodec.Encode` throws `InvalidDataException("Portable IR term depth exceeds the supported limit.")`. Because neither `RoslynProgramLowerer` nor `CompilerCallableLowerer` enforces this depth limit with a graceful per-callable fallback, the exception propagates unhandled to `FinalCompilationCollector`, causing a whole-manifest build failure rather than gracefully downgrading only the offending callable to `UnsupportedBody`.
+**Reproduction Steps**:
+1. Write a method with a contract containing >256 chained addition operations.
+2. Run compiler artifact collection.
+3. Observe that compilation fails with a manifest-level diagnostic, disabling verification across the entire project.
+**Confidence**: High
+
+### 130. Duplicate SP0024 Diagnostics for Invalid Contract Clauses in Nested Callables
+**Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 236-241, 624-627, 690-708)
+**Description**: When an invalid contract clause is placed inside a local function or lambda, `ValidateContractClauses` executed on the containing outer method re-fetches nested owner clauses via `GetNestedOwners` and reports the diagnostic. Subsequently, when Roslyn delivers the operation block callback for the local function/lambda itself, `ValidateContractClauses` is executed again for that callable without session-level deduplication, producing duplicate SP0024 diagnostic reports for the exact same source syntax.
+**Reproduction Steps**:
+1. Define a method containing a local function with an invalid contract clause (e.g., `Contract.Requires` inside a local function).
+2. Run analyzer diagnostics on the compilation unit.
+3. Observe duplicate SP0024 diagnostics emitted for the same contract clause syntax node.
+**Confidence**: High
+
+### 131. CanReachMemberInitializer Ignores Member Initializers in Sibling Partial Type Declarations
+**Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 522-569)
+**Description**: `CanReachMemberInitializer` uses `target.FirstAncestorOrSelf<TypeDeclarationSyntax>()` to inspect preceding member initializers, which only retrieves members declared in the single syntax part containing the target. For partial classes split across multiple files/declarations, preceding member initializers in sibling partial parts that may throw exceptions are ignored, causing reachability checks to evaluate to true and emitting spurious precondition violation diagnostics (SP0027) on unreachable initializers.
+**Reproduction Steps**:
+1. Declare a partial class across two files: File 1 declares an initializer that unconditionally throws.
+2. File 2 declares a subsequent field initializer containing a call with a precondition.
+3. Run analyzer reachability analysis.
+4. Observe false-positive SP0027 diagnostic on File 2's field initializer even though it cannot be reached at runtime.
+**Confidence**: High
+
+### 132. Cross-Type Static Field Access on Generic Types Drops Write and Allocation Effects
+**Location**: `SharpProof.Effects\EffectAnalysisSession.cs` (Lines 288-299)
+**Description**: When accessing a static field on a same-assembly generic type `G<T>` that declares an explicit static constructor, `EffectAnalysisSession.ResolveField` returns `Throw(TypeInitializationException)`. In contrast to the non-generic path which returns `UnknownBoundary(UnmodeledCall)` to account for allocation, ambient writes, and capabilities executed during successful static initialization, the generic path models only the exception outcome and leaves all other effect dimensions empty.
+**Reproduction Steps**:
+1. Define `class G<T> { static G() { AmbientState.Mutate(); } public static int Value = 42; }`.
+2. Read `G<string>.Value` from a method in the same assembly.
+3. Inspect the computed effect summary and observe that potential writes and allocations during static initialization are missing.
+**Confidence**: Medium
+
+### 133. CanonicalHashWriter Unpaired Surrogate Collisions
+**Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Line 13)
+**Description**: `CanonicalHashWriter.Add(string)` encodes strings using `Encoding.UTF8.GetBytes()`, which uses standard Unicode replacement fallback. Lone surrogates (such as `"\uD800"`) are replaced by U+FFFD (`EF BF BD`), producing identical binary frames and hashes for `"\uD800"` and `"\uFFFD"`. While `SemanticClaimIdentity` defensively replaces ill-formed constants, other paths passing arbitrary formatted strings into `Add(string)` can collide.
+**Reproduction Steps**:
+1. Create a `CanonicalHashWriter` instance.
+2. Write a frame with string value `"\uD800"`.
+3. Create a second `CanonicalHashWriter` instance and write string value `"\uFFFD"`.
+4. Observe that both instances produce identical digest outputs.
+**Confidence**: High
+
+### 134. AtomicFile Non-Staged Writes Lack Flush-to-Disk Before Rename
+**Location**: `SharpProof.Ir\AtomicFile.cs` (Lines 70-82, 89-108)
+**Description**: In `AtomicFile.WriteUtf8` and `AtomicFile.WriteBytesAsync`, file content is written via standard .NET streams without calling `stream.Flush(flushToDisk: true)` before `Publish` renames the temporary file to the destination path. On sudden system crashes or power loss, directory metadata updates can be committed while file content blocks remain unwritten in OS cache, resulting in corrupted or zero-length destination files.
+**Reproduction Steps**:
+1. Invoke `AtomicFile.WriteUtf8` to persist verification cache entries.
+2. Simulate process/system termination immediately following the method call.
+3. Destination file may exist with zero bytes or partial data due to missing fsync.
+**Confidence**: High
+
+### 135. Dependency Provenance De-Duplication Key Injection Ambiguity
+**Location**: `SharpProof.Summaries\IrRelationalSummaryBuilder.cs` (Lines 480-488)
+**Description**: `AddDependencyProvenance` formats dictionary lookup keys by concatenating fields with a raw pipe delimiter: `(int)Origin + EvidenceCallIdentity + "|" + EvidenceIdentity + "|" + EvidenceSha256`. Because `EvidenceCallIdentity` and `EvidenceIdentity` can contain arbitrary unescaped text, distinct identity pairs such as `("a|b", "c")` and `("a", "b|c")` produce identical keys, causing the later entry to overwrite the earlier entry and resulting in lost provenance audit records.
+**Reproduction Steps**:
+1. Register dependency provenance with call identity `"a|b"` and evidence identity `"c"`.
+2. Register dependency provenance with call identity `"a"` and evidence identity `"b|c"` with matching hash and origin.
+3. Inspect `DependencyProvenance` in the resulting summary and observe only one provenance record retained.
+**Confidence**: High
+
+### 136. Unbounded Recursion in ManagedAbstractFlow.IsAcyclic on Unbudgeted CFGs
+**Location**: `SharpProof.Effects\ManagedAbstractFlow.cs` (Lines 915-940) and `SharpProof.Effects\EffectMethodNodeBuilder.cs` (Lines 376-380)
+**Description**: `EffectMethodNodeBuilder.AnalyzeControlFlowGraph` calls `ManagedAbstractFlow.IsAcyclic` on any constructed Roslyn control flow graph without checking against graph size or depth limits. `IsAcyclic` uses recursive DFS traversal without recursion depth caps, making the analyzer vulnerable to `StackOverflowException` when analyzing methods with deeply nested control flow structures.
+**Reproduction Steps**:
+1. Construct a method with an exceptionally large and deep control flow graph.
+2. Trigger effect analysis on the method.
+3. Observe unbounded recursion in `ManagedAbstractFlow.Visit` leading to potential stack overflow in the analyzer process.
+**Confidence**: Medium
+
+### 137. SMT Backend Sticky Cancellation Flag Permanently Disables Verification Instance
+**Location**: `SharpProof.Smt\IrSmtBackend.cs` (Lines 13, 47-50, 85-89)
+**Description**: When a verification check is interrupted or cancelled, `IrSmtBackend.Interrupt()` sets the private field `_interrupted = true`. This flag is never reset on subsequent invocations of `CheckAsync`. Because backend instances are designed to be reused across many verification queries, a single query cancellation permanently puts the backend into an unavailable state where all future queries immediately return `Unknown(Unavailable)`.
+**Reproduction Steps**:
+1. Initialize an `IrSmtBackend` instance.
+2. Execute a verification query with a `CancellationToken` that is triggered before completion.
+3. Execute a subsequent valid query with an active, uncancelled `CancellationToken`.
+4. Observe that the second query immediately aborts returning `Unknown(Unavailable)`.
+**Confidence**: High
+
+### 138. TOCTOU Race Between Existence Probe and Rename in AtomicFile Publish Paths
+**Location**: `SharpProof.Ir\AtomicFile.cs` (Lines 43-53, 119-129); concurrent writers at `SharpProof.Worker\VerificationCache.cs` (Line 180)
+**Description**: Both publish paths decide between `File.Replace` and `File.Move` based on a prior non-atomic `File.Exists(destination)` check. Two concurrent writers for the same destination both observe "missing" and both call `File.Move`; the second throws `IOException` ("cannot be created because it already exists") after its fully written staging file is discarded, instead of performing last-writer-wins replacement. Conversely, if the destination disappears between `Exists` and `File.Replace`, the rename throws after successful staging.
+**Reproduction Steps**:
+1. Launch N threads calling `AtomicFile.WriteUtf8(path, payload)` on the same path simultaneously.
+2. Observe intermittent `IOException` from `File.Move` in the losing thread despite valid staged content.
+**Confidence**: High
+
+### 139. InternExternalIdentity Keys Require Comparer Reference Equality, Splitting One Logical Identity Into Multiple IDs
+**Location**: `SharpProof.Ir\IrFactory.cs` (Lines 741-756)
+**Description**: `ExternalIdentityKey<T>.Equals` returns false unless `ReferenceEquals(_comparer, other._comparer)`, and `GetHashCode` mixes `RuntimeHelpers.GetHashCode(_comparer)`. Any caller constructing a functionally identical comparer as a new instance interns the same external identity under different `IrIdentityId`s. Identity equivalence across components silently breaks: lookups keyed by identity miss each other, producing unsound or vacuous verification conclusions with no diagnostic.
+**Reproduction Steps**:
+1. Call `factory.InternExternalIdentity(id, comparerA)` with `comparerA = new MyIdComparer()`.
+2. Call again with `comparerB = new MyIdComparer()` (same type, same semantics, different instance).
+3. Observe two distinct `IrIdentityId` values for the identical external key.
+**Confidence**: High
+
+### 140. Canonical Enum Frames Use Assembly Simple Name, Colliding Across Versions and Strong Names
+**Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Lines 77-85)
+**Description**: `Add(Enum)` canonicalizes as assembly simple name + type FullName + member name. The simple assembly name omits version, culture, and public-key token. Two distinct enum types loaded side-by-side (different versions or strong names, same simple name and full type/member names) produce byte-identical Enum frames and identical digests - a canonical-identity collision for claim fingerprints embedding enum options.
+**Reproduction Steps**:
+1. Load two assemblies both named "Lib" (different Version or public-key token), each declaring `namespace NS { enum Mode { On } }`.
+2. Hash `NS.Mode.On` from each with separate `CanonicalHashWriter` instances.
+3. Observe identical `Finish()` outputs for semantically distinct types.
+**Confidence**: Medium
+
+### 141. Validation Asymmetry: IrValue Strings May Carry Ill-Formed UTF-16 That Terms Forbid, Breaking Value-to-Term Round Trips
+**Location**: `SharpProof.Ir\IrFactory.cs` (Lines 241-246 vs 318-335); entry points at `SharpProof.Ir\IrInterpreter.cs` (Lines 362-373, 505-508) and `SharpProof.Ir\IrProgramInterpreter.cs` (Lines 33-45)
+**Description**: Term-level strings enforce well-formed UTF-16 (`String()` rejects lone surrogates), but value-level strings do not (`CreateStringValue` has no check). Ill-formed strings enter values directly, via `IrProgramInterpreter.Execute` initial values, and via `EvaluateStringConcat`. Any later materialization of such a value back into the term layer (`factory.String(value.String)`) throws `ArgumentException`; hashing hits replacement-char folding. The invariant is enforced at one boundary only and fails late elsewhere.
+**Reproduction Steps**:
+1. Run `IrProgramInterpreter.Execute` with an initial value containing `"\uD800"` - it succeeds and propagates the ill-formed value.
+2. Attempt `factory.String(resultValue.String)` and observe `ArgumentException("String terms require well-formed UTF-16.")`.
+**Confidence**: High
+
+### 142. CanonicalHashWriter.Add(Stream) Poisons the Running Digest on Mid-Stream Failure Instead of Failing Closed
+**Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Lines 43-65)
+**Description**: `Add(Stream)` appends the frame header and absorbs bytes incrementally; if `stream.Read` throws midway, `_hash` retains the header plus partial payload with no rollback or poisoned flag. A caller catching and continuing produces a `Finish()` digest covering truncated data indistinguishable from a legitimate one. Also, remaining length > int.MaxValue throws a bare `OverflowException` from the checked cast rather than a descriptive error.
+**Reproduction Steps**:
+1. Wrap a stream whose `Read` throws `IOException` after returning half the declared bytes.
+2. Call `writer.Add(stream)`, ignore the exception, add another frame.
+3. `Finish()` returns a digest mixing partial stream contents into the canonical hash with no error signal.
+**Confidence**: Medium
+
+### 143. Interpreter Equality Compares Sequences by Reference Identity While All Other Kinds Compare by Value
+**Location**: `SharpProof.Ir\IrInterpreter.cs` (Line 354)
+**Description**: `EvaluateEquality` maps `(Sequence, Sequence)` to `ReferenceEquals(left, right)` - equality of `IrValue` wrapper instances, not elements. Structurally identical sequences yield `Equal == false`, while the identical term compared to itself folds `true` solely due to per-term-ID result memoization. Sequence comparisons become branch-dependent and memoization-sensitive, making concrete counterexample replay unstable.
+**Reproduction Steps**:
+1. Create two distinct sequence-valued terms with identical element content.
+2. Evaluate `Binary(Equal, seqA, seqB)`: result is `false` although values are indistinguishable.
+3. Evaluate `Binary(Equal, seqA, seqA)` twice in one session: memoization yields `true`.
+**Confidence**: Medium
+
+### 144. Forced-Termination Deadline Gate Measures Post-Deadline Process Teardown Time (Flaky Wall-Clock Gate)
+**Location**: `SharpProof.Gates\Performance\WorkerPerformanceProbe.cs` (Lines 217-246, enforced at `PerformanceGate.cs` Line 227)
+**Description**: The gated measurement starts after the ready-file handshake but the stopwatch keeps running through `WaitForExit(waitLimit)` AND `WaitForProcessExit(workerProcessId, ...)`, i.e., includes kill-tree execution and process reap occurring after the launcher's hard deadline. Probe grace is 1000 ms - 300 ms headroom = 700 ms, leaving ~300 ms slack for teardown/scheduler jitter on shared CI; the raw inflated number is compared strictly (> 1000) so the release gate fails even when the launcher honored its deadline.
+**Reproduction Steps**:
+1. Run the performance gate on a loaded shared CI agent.
+2. A launcher exiting at ~701 ms whose killed worker takes >300 ms to reap yields `elapsed > 1000`, failing the gate despite a compliant launcher.
+**Confidence**: Medium
+
+### 145. Zero-Timeout Reap Wait and Identical CancelAfter/WaitLimit Budgets Turn Benign Latency Into Misclassified Gate Crashes
+**Location**: `SharpProof.Gates\Performance\WorkerPerformanceProbe.cs` (Lines 218-229, 200-204, 388-412)
+**Description**: (a) `Math.Max(0, waitLimit - elapsed)` can pass `timeoutMilliseconds: 0` to `Process.WaitForExit(0)`, which returns immediately false unless the child is already reaped, throwing `TimeoutException("The worker process tree did not terminate.")` even though the worker died within the deadline; (b) `CancelAfter(contract.ForcedTerminationMilliseconds + 10_000)` equals `waitLimit` exactly, so when kernel wait and token expire nearly together the failure surfaces as `OperationCanceledException` instead of the intended `TimeoutException` diagnostic path. Timing noise becomes hard gate failures with wrong attribution.
+**Reproduction Steps**:
+1. Make the launcher exit just before `waitLimit` elapses (slow CI).
+2. `WaitForProcessExit` receives ~0 ms, `WaitForExit(0)` races the reap, and the gate reports "worker process tree did not terminate" although exit code 124 was achieved within budget.
+**Confidence**: Medium
+
+### 146. Aggregate `all` Gate Skips the Source-Binding Envelope Enforced by Every Other Gate Command
+**Location**: `SharpProof.Gates\Program.cs` (Lines 31-46 vs 61-96, 110-166); caller `scripts\Invoke-SharpProofContainer.ps1` (Lines 216-224)
+**Description**: `corpus`, `performance`, and `performance-smoke` wrap their JSON in `CreateStandaloneEnvelope`, which hard-fails unless the executable carries valid 40-hex lowercase `SharpProofSourceCommit` metadata and matching exe/pdb files exist. The `all` command serializes `{ corpus, performance }` raw with no envelope and none of those identity validations, so a gate binary built without `-p:SharpProofSourceCommit` silently produces unwrapped output under `all` while refusing under other commands. Exit-code-only consumers get no binding signal.
+**Reproduction Steps**:
+1. Build SharpProof.Gates without `-p:SharpProofSourceCommit=<sha>`.
+2. Run `SharpProof.Gates corpus` versus `SharpProof.Gates all` and observe the envelope checks never execute in the latter.
+**Confidence**: Low
+
+### 147. Worker Probes Execute Possibly-Stale or Cross-Configuration Binaries Without Freshness Checks
+**Location**: `SharpProof.Gates\Performance\WorkerPerformanceProbe.cs` (Lines 414-446)
+**Description**: `FindBuiltAssembly` resolves worker DLLs by probing `<config>`, then `Release`, then `Debug` under `bin/<tfm>` and accepts the first existing file, with no timestamp/hash comparison against sources. Forced-termination, cooperative-timeout, and cancellation-latency numbers feeding release evidence can come from an older build or the opposite configuration than the one being gated.
+**Reproduction Steps**:
+1. Build Debug, edit `SharpProof.Worker` sources without rebuilding, run the performance gate: timings from pre-edit DLLs are attributed to the current tree.
+2. Alternatively delete `bin/Debug` keeping an old `Release` output: the Debug gates measure unrelated bits.
+**Confidence**: Low
+
+### 148. Model-Value Reconstruction Parses Z3 Numerals Through the AST Pretty-Printer; Negative Counterexample Values Hit MalformedResult
+**Location**: `SharpProof.Smt\IrSmtBackend.cs` (Lines 276-282, used from 249-260)
+**Description**: `TryCreateValue` converts integer model values with `long.TryParse(integer.ToString(), ...)`. `IntNum.ToString()` is inherited from `Microsoft.Z3.AST.ToString()` (Z3_ast_to_string), whose default smt2 printer renders negative numerals as `(- N)` rather than `-N`. If the pinned binding does that, TryParse fails for every negative value and `CreateSatisfiable` returns `Unknown(MalformedResult)` whenever any integer model variable is negative - essentially every refutation requiring a negative counterexample silently degrades. Fail-closed but invisible to gates: unit tests only assert model values satisfied by 0, and fuzzers count abstentions separately from mismatches. Numeric accessors (`IntNum.Int64`) should be used instead.
+**Reproduction Steps**:
+1. Build a query with goal `¬(v = 0)` over integer variable `v`; run through `CheckAsync`.
+2. Solver returns SAT with `v = -k`; inspect the model value formatting: if it prints `(- k)`, TryParse fails and the result is `MalformedResult` instead of a usable negative model.
+**Confidence**: Medium
+
+### 149. Unhandled Exception Types Escape CheckAsync's Closed Failure Mapping as Faulted Tasks
+**Location**: `SharpProof.Smt\IrSmtBackend.cs` (Catch filter Lines 67-75; `(ArithExpr)` casts at 600-615; `GetVariable` indexer at 413-416)
+**Description**: CheckAsync maps failures to typed `Unknown` only for Z3Exception, InvalidOperationException, ArgumentException, and ArithmeticException. A term referencing an unknown `IrVarId` makes the dictionary indexer throw `KeyNotFoundException`; raw `(ArithExpr)` downcasts throw `InvalidCastException`. Neither derives from the caught types, so the exception faults the task instead of returning a typed result. Per SEMANTICS.md, infrastructure failure is fatal under every build policy, escalating what should be a clean abstention into a fatal run condition.
+**Reproduction Steps**:
+1. Construct a query whose predicate tree contains a variable excluded from variable collection (e.g., a future term kind missed by CollectVariables).
+2. Call `CheckAsync` and observe `KeyNotFoundException` escaping rather than `BackendCheckResult.Unknown`.
+**Confidence**: Low
+
+### 150. Resource Accounting Hardcodes a 32-Bit Wrap Modulus for Z3 Rlimit Statistics
+**Location**: `SharpProof.Smt\IrSmtBackend.cs` (Lines 193-197); consumer `SharpProof.Worker\SharpProofWorker.cs` (Line 560)
+**Description**: `AccountResources` compensates decreases with `(1L << 32) - last + observed`, hardcoding a 32-bit counter modulus. If the statistic surfaces as a full 64-bit integral value (or the binding changes how IsUInt/UIntValue project it), observed values above 2^32 make this branch add garbage to ConsumedResourceCount, prematurely converting live queries into ResourceLimit-Unknown outcomes (or under-charging, defeating the budget). The wrap branch is effectively dead code today; its correctness depends on unstated width guarantees.
+**Reproduction Steps**:
+1. Configure QueryRlimit near uint.MaxValue and exhaust it.
+2. Any decrease below a previously observed large count triggers the 2^32-compensation branch yielding a wildly wrong delta.
+**Confidence**: Low
+
+### 151. Encoder/Replay Support Matrix Asymmetric: String Concat and Length Supported by Replay but Rejected by SMT Encoder
+**Location**: `SharpProof.Smt\IrSmtBackend.cs` (Lines 496-511 EncodeBinary has no StringConcat arm; 552-557 EncodeLength rejects strings); contrast `SharpProof.Ir\IrInterpreter.cs` (Lines 291, 362-373, 444)
+**Description**: The reference interpreter executes string concat, string Length, and reference-to-string casts, but the SMT encoder rejects all of them (UnsupportedEncoding). Each construct in an assumption or goal forces claim-level Unknown even though counterexample replay supports it. Because the fuzzer treats Abstained as non-failure, the entire string surface has no mismatch-detecting differential coverage; future regressions there land unguarded. Sound direction (fail-closed), reported as precision/coverage defect.
+**Reproduction Steps**:
+1. Goal `factory.Length(factory.Variable(stringVar)) > 0`: observe UnsupportedEncoding.
+2. Goal `s ++ "" == s`: same, despite replay supporting concat.
+**Confidence**: High (asymmetry factual; impact limited to precision/coverage)
+
+### 152. Collection Expressions Wipe All Element and Allocation Effects Via Implicit Object Creation Short-Circuit
+**Location**: `SharpProof.Effects\OperationEffectScanner.cs` (Lines 707-712: `ScanObjectCreation` returns Empty for `creation.IsImplicit`)
+**Description**: Roslyn lowers a collection expression targeting a concrete collection (e.g., `List<int> x = [Touch(), 2]`) to an implicit IObjectCreationOperation carrying the element expressions. The scanner returns EffectSummary.Empty before scanning arguments/initializer or resolving the constructor, so side effects, allocations, and exceptions of every element expression are silently omitted. No downstream layer compensates; admission still passes because lowered kinds are all supported, despite SEMANTICS.md claiming collection expressions are rejected.
+**Reproduction Steps**:
+1. `[EnforcePure] static List<int> Build() => [Trace.Touch(), 2];` where Touch() writes static state.
+2. Analyze Build: Complete summary with no Writes(Static), no Allocates, no call site for Touch() - certified pure although Touch() always executes.
+**Confidence**: High
+
+### 153. Custom Interpolated-String Handler Construction Drops the Handler Constructor and Every Append* Invocation
+**Location**: `SharpProof.Effects\OperationEffectScanner.cs` (Line 709, same implicit gate); contrast ScanInterpolatedString at `OperationEffectScanner.Expressions.cs` (Lines 208-275)
+**Description**: When an interpolated string converts to a user-defined interpolated-string-handler type, Roslyn binds it as an implicit IObjectCreationOperation of the handler with an initializer of implicit AppendLiteral/AppendFormatted invocations. ScanObjectCreation discards the whole subtree, so user-supplied Append* methods - arbitrary user code - contribute zero effects.
+**Reproduction Steps**:
+1. Define `[InterpolatedStringHandler] class LogHandler` whose AppendLiteral/AppendFormatted mutate ambient state.
+2. `static void Emit(LogHandler h) {}` and `static void Call() => Emit($"v={value}");`
+3. Analyze Call: no reads/writes/calls for the ambient mutation appear.
+**Confidence**: High
+
+### 154. Assignments to Receiver-Backed Primary-Constructor Parameters Omit the Receiver-State Write
+**Location**: `SharpProof.Effects\OperationEffectScanner.Assignments.cs` (Lines 24-29) vs read path at `OperationEffectScanner.cs` (Lines 240-247) + `PrimaryConstructorParameterOwnership.cs` (Lines 7-31)
+**Description**: For `class C(int Value)`, C# captures Value into hidden per-instance state. Only the read path consults IsReceiverBacked; every write path classifies a RefKind.None parameter as effect-free, dropping the Write(Receiver) effect entirely. A method resetting the captured parameter mutates receiver state observable later, but summarizes as state-write-free.
+**Reproduction Steps**:
+1. `public class Box(int Seed) { public int Read() => Seed; public void Reset() { Seed = 0; } }`
+2. Analyze Box.Reset: no Writes(Receiver) reported although Read() observes the reset afterwards.
+**Confidence**: High
+
+### 155. Heap Writes Through Ref Locals Aliased to Fields Are Invisible (Write Target Classifies as Local)
+**Location**: `SharpProof.Effects\OperationEffectScanner.Assignments.cs` (Lines 28-29) combined with `ScanField` treating the `ref h.Field` initializer as a mere read (`OperationEffectScanner.cs` Lines 272-312)
+**Description**: With `ref int r = ref h.Field; r = 42;` the store goes to h.Field (heap/receiver state), but the scanner models only the initializer's field read; the assignment's write target is a local contributing nothing. The method summarizes read-only while mutating shared state. Note LanguageSubsetGate abstains on ref-kind declarators for the shipped pipeline, but the public `EffectAnalysisSession.Analyze` API certifies such bodies.
+**Reproduction Steps**:
+1. `class Holder { public int Field; } static void ViaAlias(Holder h) { ref int r = ref h.Field; r = 42; }`
+2. Session summary: Reads(h), no writes, Complete.
+**Confidence**: Medium
+
+### 156. Distinct Unsupported Scalar Constants Collapse Into One Shared IR Term (1.5d == 2.5d Lowers to t == t)
+**Location**: `SharpProof.Frontend\RoslynOperationLowerer.cs` (Line 397 LowerConstant fallback; Opaque at 296-316); `CompilerIdentityBridge.cs` (Lines 124-138); hash-consing at `SharpProof.Ir\IrFactory.cs` (Lines 606-612)
+**Description**: Constants the scalar catalog cannot represent (float/double/decimal literals, ill-formed UTF-16 strings) fall through to `Opaque(...)` with symbol == null and IsDemonstrablyPure == true. For pure opaques without a symbol, InternOperation builds a semantic identity omitting the constant value; GetOrCreateMember dedups to one member and IrFactory hash-conses zero-argument PureOpaque terms, so two syntactically different constants produce the identical IrOpaqueTerm. Any binary comparison between them becomes Equal(t, t).
+**Reproduction Steps**:
+1. Compile `static bool Target() => 1.5d == 2.5d;` and lower its operation.
+2. Observe both Binary(Equal) operands are the same IrOpaqueTerm instance for literals 1.5 and 2.5; same collapse for "\uD800" vs "\uDC00" or two distinct ulong locals.
+**Confidence**: High
+
+### 157. Explicit Reference Conversion to string Claimed Exact and Total While All Other Failing-Capable Conversions Abstain
+**Location**: `SharpProof.Frontend\RoslynOperationLowerer.cs` (Lines 826-832)
+**Description**: In VisitConversion, a non-try-cast conversion with Conversion.IsReference, target System_String, and a Reference-kind operand returns Exact(Cast(...)), bypassing the ConversionMayChangeValue abstention every other non-value-preserving conversion receives. C# explicit reference casts can throw InvalidCastException, but the emitted IR models `(string)o` as total and exception-free; downstream it surfaces as an internal UnsupportedEncodingException instead of a clean frontend abstention.
+**Reproduction Steps**:
+1. Lower `static string Target(object o) => (string)o;` - Exact cast term.
+2. Contrast `static MyClass Target(object o) => (MyClass)o;` which abstains with ConversionMayChangeValue.
+**Confidence**: Medium
+
+### 158. Expression-Level VisitFlowCapture Drops the Capture Binding; References Lower to a Never-Assigned Variable
+**Location**: `SharpProof.Frontend\RoslynOperationLowerer.cs` (Lines 491-496); correct program-level handling at `RoslynProgramLowerer.cs` (Lines 197-203)
+**Description**: Roslyn desugaring stores flow captures into temporaries later read by FlowCaptureReference sites. The visitor registers the capture variable but returns the raw value term from the definition site, emitting no binding; each FlowCaptureReference yields a variable nothing ever writes. When definitions and references lower as separate operations against a shared lowerer (the shape of CFG-derived trees: ??, ternary joins, conditional access), referenced variables are unassigned and evaluation silently treats them as unconstrained.
+**Reproduction Steps**:
+1. Build the CFG of code like `(c ? 1 : 2) ?? 0`; feed the IFlowCaptureOperation and matching reference to two separate Lower(...) calls on one RoslynOperationLowerer.
+2. The reference lowers to an IrVariableTerm with no corresponding assignment.
+**Confidence**: Medium
+
+### 159. Multi-Dimensional Array .Length Admitted as Intrinsic While Indexing the Same Array Is Rejected
+**Location**: `SharpProof.Frontend\CompilerIdentityBridge.cs` (Lines 77-94) and `RoslynOperationLowerer.cs` (Lines 861-874)
+**Description**: IsIntrinsicSequenceLength matches any IArrayTypeSymbol receiver (no rank check) with Array.Length/LongLength, so VisitPropertyReference returns Exact(Length(instance)) for `int[,] arr`. Yet VisitArrayElementReference rejects Indices.Length != 1 and rect-array creation/values are otherwise outside the supported domain - an over-claim inside an otherwise closed subset rather than paired abstention.
+**Reproduction Steps**:
+1. Lower `static int Target(int[,] a) => a.Length;` - Exact IrLengthTerm.
+2. Contrast `static int Target(int[,] a) => a[0,0];` - abstains with UnsupportedMemberAccess.
+**Confidence**: Low
+
+### 160. SP0024 Usage Diagnostics Leak Out of Generated Code Because Two Pipeline Paths Report Before (or Without) the Generated-Code Gate
+**Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 87-102, 162, 223-234); `SharpProofAnalyzerEngine.cs` (Lines 114-143); `SharpProofControlAttributePolicy.cs` (Lines 147-194)
+**Description**: Every other entry point gates on IsGenerated before reporting. Two paths violate this: (1) AnalyzeOperationBlock runs GetSelection (which calls ValidateAndShouldSuppress, reporting SP0024 for malformed [SharpProofSuppress]/[SharpProofTrusted]) before the generated-code early return; (2) ValidateMethodAttributes and the NamedType/assembly ValidateDeclaredScope callbacks have no generated-code gate before contract-argument validation and rejected-API reporting. The same diagnostic category gets opposite treatment depending on which callback owns the symbol, contradicting the quietness policy pinned by tests.
+**Reproduction Steps**:
+1. Add generated tree Gen.g.cs containing `[SharpProofSuppress("")] internal static class G { internal static void M() { } }`.
+2. Run analysis: an Error-severity SP0024 is reported from Gen.g.cs even though M is unselected and all other diagnostics for that tree are suppressed; moving the attribute onto a local function in another .g.cs silences it, proving inconsistent gating.
+**Confidence**: High
+
+### 161. Nested-Callable Declaration Validation Unregistered in Advisory Operation-Only Activation, So Malformed Suppress/Trusted Attributes on Lambdas Escape
+**Location**: `SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs` (Lines 114-123 registration gate; 225-232 advisory activation returning RequiresSymbolAnalysis:false)
+**Description**: ValidateNestedCallableDeclaration is the only validator for [SharpProofSuppress]/[SharpProofTrusted] on local functions/lambdas and registers only when RequiresSymbolAnalysis is true. In advisory mode triggered by Contract-API-shaped invocations, symbol actions are not registered, yet method/type/assembly-level instances of the same malformed attributes are still validated via the operation-block path. Enforcement of one rule silently depends on which advisory tier fired.
+**Reproduction Steps**:
+1. Advisory profile, contracts enabled; source whose only SharpProof usage is an invocation like `Proof.@Requires(value > 0);`.
+2. Add a local function or lambda carrying `[SharpProofSuppress("")]` - no SP0024 emitted; adding the identical attribute to an ordinary method emits it.
+**Confidence**: Medium
+
+### 162. Attribute Diagnostic Dedup Silently Disabled When ApplicationSyntaxReference Is Null, Enabling Repeated SP0024 Reports
+**Location**: `SharpProof.Analyzer.Core\AnalyzerSession.cs` (Lines 267-274 and parallel pattern at 300-308)
+**Description**: `TryMarkAttributeValidated(AttributeData)` returns true ("not yet reported") whenever `attribute.ApplicationSyntaxReference == null`, so dedup never engages for such attributes. Consumers rely on it for exactly-once reporting across callbacks touching the same scope chain (method, associated property, containing types, assembly; symbol callback plus operation-block callback). For any attribute reached without a syntax reference, each invocation re-reports identical SP0024. Contrast the SyntaxTree-keyed overload which keys independently of reference availability.
+**Reproduction Steps**:
+1. Obtain an AttributeData with null ApplicationSyntaxReference (e.g., metadata-sourced scope chain).
+2. Drive ValidateAndShouldSuppress twice for the same method; observe duplicate SP0024.
+**Confidence**: Low
+
+### 163. Domain Compare Cannot Detect Regressions in Release Builds and Conflates "Incomparable" With "Greater"
+**Location**: `SharpProof.Dataflow\ClosedAbstractDomain.cs` (Lines 33-47)
+**Description**: After LessThanOrEqual fails, the method runs `Debug.Assert(!assertMonotonicity)` and unconditionally returns 1. In release builds the assert is stripped, so a strict regression passed with assertMonotonicity:true is silently reported as greater; genuinely incomparable pairs are also reported as ordered, making Compare unusable as a total order by callers trusting the return sign.
+**Reproduction Steps**:
+1. Call Compare(NullnessValue.Null, NullnessValue.NonNull, assertMonotonicity:true) in a release build: no assertion fires, returns 1 indistinguishable from a legitimate increase.
+**Confidence**: High
+
+### 164. WidenAfter Budget Consumed by Acyclic Upstream Stabilization, Widening Loop Headers on the First Genuine Back-Edge Update
+**Location**: `SharpProof.Dataflow\ForwardDataflowAnalysis.cs` (Lines 181-191)
+**Description**: updateCounts[blockId]++ fires on every real input change of a cyclic block regardless of origin. Because the solver is round-synchronized (Jacobi batch snapshot), an acyclic feed chain of uneven depth delivers k distinct input updates to a loop header over k rounds before the loop contributes anything, exhausting the WidenAfter budget so the first loop-carried growth immediately widens, dropping finite loop bounds that would have been recovered within budget. Soundness preserved; documented widen-after-N intent violated.
+**Reproduction Steps**:
+1. Graph 0→1→2→4, 0→3→4, 4→4 (self-increment), 4→5 with IntervalDomain, default options.
+2. Block 4's input changes in rounds 2 and 3 purely from acyclic paths, so the first self-loop growth triggers Widen; upper bound discarded one iteration after entering the loop.
+**Confidence**: Medium
+
+### 165. Lattice Equivalence and .NET Equality Diverge for Interval Values (Top vs Full-Range): AreEquivalent True, Equals False
+**Location**: `SharpProof.Dataflow\IntervalValue.cs` (Lines 98-129) vs `ClosedAbstractDomain.cs` (Lines 23-26)
+**Description**: `Range(long.MinValue, long.MaxValue)` denotes the same set as Top; LessThanOrEqual holds both ways so solver equivalence checks treat them as identical fixpoint states, but IntervalValue.Equals/GetHashCode distinguish them (null vs sentinel bounds). Consumers caching, deduping, or diffing states with Equals see phantom differences the engine considers convergence-equivalent, breaking same-fixpoint-implies-same-cached-result assumptions.
+**Reproduction Steps**:
+1. `var t = IntervalValue.Top; var f = IntervalDomain.Instance.Range(long.MinValue, long.MaxValue);`
+2. t == f is false and hash codes differ, while AreEquivalent(t, f) is true.
+**Confidence**: High (behavior certain; impact depends on consumer usage)
+
+### 166. Single-Entry Seeding Leaves Blocks Not Reachable From Entry Permanently Bottom With No Diagnostic
+**Location**: `SharpProof.Dataflow\ForwardDataflowAnalysis.cs` (Lines 115-120, 167-173)
+**Description**: Only EntryBlockId is seeded; non-entry inputs start at domain.Bottom. A block whose predecessors are themselves unreachable from entry is never enqueued, so GetInputState/GetOutputState return Bottom ("provably unreachable") forever, and Analyze completes successfully instead of flagging the dead region. A consumer wiring exception edges incorrectly gets silent all-Bottom catch states rather than an error.
+**Reproduction Steps**:
+1. Graph with entry 0→1 and an isolated cycle 2↔3; Analyze returns normally with InputStates[2]/[3] == Bottom and no signal two blocks were never analyzed.
+**Confidence**: High (behavior), Medium (design-gap classification)
+
+### 167. ContractFor Companion Silently Vanishes When Its Single Attribute Payload Is Malformed or Unsupported
+**Location**: `SharpProof.Contracts\ContractForSymbolMatcher.cs` (Lines 41-58 TryGetTarget, 120-131 DiscoverCompanions)
+**Description**: Every other companion defect fails closed with a typed ContractBindingFailure (MissingCompanion, AmbiguousCompanion, CompanionSignatureMismatch). But if the sole ContractForAttribute fails TryGetTarget (e.g., `[ContractFor(typeof(SomeStruct))]` - struct targets rejected - or a non-Type constructor argument), DiscoverCompanions drops the whole class, ResolveCompanion returns None (not failure), and ContractBinder.BindCore returns SUCCESS with an empty clause set. Distinct-contract intent silently erased.
+**Reproduction Steps**:
+1. Define a struct S with method M; add signature-matching companion M in a static class annotated `[ContractFor(typeof(S))]` (compiles cleanly).
+2. Bind the target method: IsSuccess == true with empty clauses, no failure value, versus MissingCompanion/CompanionSignatureMismatch for comparable malformations.
+**Confidence**: Medium
+
+### 168. Valid Parenthesized Prologue Clause Rejected as Misplaced (Hard Binding Failure)
+**Location**: `SharpProof.Contracts\ContractClauseInventoryBuilder.cs` (Lines 160-165 TryGetDirectPlacement, 142-146 Classify)
+**Description**: Roslyn operations unwrap parentheses, so for `(((Contract.Requires(x > 0))));` the invocation's syntax parent is ParenthesizedExpressionSyntax, not ExpressionStatementSyntax. TryGetDirectPlacement returns false and the ancestor scan finds no conditional node, yielding Misplaced → InvalidClausePlacement for legal C# input; removing one pair of parentheses fixes it.
+**Reproduction Steps**:
+1. Write `public void M(int x) { (((Contract.Requires(x > 0)))); }` (legal C#).
+2. Inventory/bind the method: placement Misplaced with ContractBindingFailure.InvalidClausePlacement.
+**Confidence**: Medium
+
+### 169. Duplicate Intrinsic Declarations Crash ContractApiSymbols.TryCreate Instead of Degrading to ContractApiUnavailable
+**Location**: `SharpProof.Contracts\ContractApiSymbols.cs` (Lines 59-70 FindGenericIntrinsic using SingleOrDefault)
+**Description**: `SingleOrDefault(method => ...)` throws InvalidOperationException when two members satisfy the shape filter (e.g., duplicate declarations via partials/metadata). TryCreate is invoked eagerly in ContractBinder and ContractIntrinsicValidator constructors, none of which catch it - the documented graceful degradation ContractBindingFailure.ContractApiUnavailable (used when members are merely missing) is bypassed in favor of an unhandled crash of the binding pipeline.
+**Reproduction Steps**:
+1. Reference a Contract type declaring two applicable static generic zero-arg Result methods.
+2. Construct ContractBinder or call ContractApiSymbols.TryCreate: InvalidOperationException escapes instead of null/ContractApiUnavailable.
+**Confidence**: Low
+
+### 170. Unanalyzable Statements Default to Reachable, Admitting Unreachable Contracts as Valid Prologue
+**Location**: `SharpProof.Contracts\ContractClauseInventoryBuilder.cs` (Lines 214-233 IsReachable)
+**Description**: IsReachable catches ArgumentException from SemanticModel.AnalyzeControlFlow and defaults to StartPointIsReachable == true. For statements Roslyn cannot analyze (error-code constructs, malformed trees), a Contract.Requires that is actually unreachable is classified ValidPrologue, bound into BoundMethodContracts, and verified as a live obligation - malformed input accepted at the boundary instead of abstaining.
+**Reproduction Steps**:
+1. Place a Requires clause in a construct where AnalyzeControlFlow throws (error-recovery/speculative positions).
+2. The clause comes back IsValid == true and is included in bindings instead of Unreachable.
+**Confidence**: Low
+
+### 171. Protocol Identity Hashing Uses Lossy UTF-8 Replacement Fallback: Distinct Callable/Claim IDs Seal to Identical Manifest Hashes
+**Location**: `SharpProof.Worker.Protocol\ProtocolJson.cs` (Line 75 ComputeRequestHash; strict encoder s_strictUtf8 defined Line 14 but unused for hashing); `ProtocolManifest.cs` (Lines 44-51, 67-76)
+**Description**: Identity strings are hashed via Encoding.UTF8, whose encoder replaces unpaired surrogates with U+FFFD, while uniqueness validation operates on decoded UTF-16 strings accepting `"id\uD800"` and `"id\uFFFD"` as distinct. SealManifest/ComputeManifestHash therefore produce identical hashes and ManifestsEqual returns true, so a response verified against one manifest passes manifest-binding validation for a different manifest and cache entries alias across distinct compilations. Same collision class as accepted issue #133 but a distinct site.
+**Reproduction Steps**:
+1. Build two manifests differing only in CallableId `"X\uD800Y"` vs `"X\uFFFDY"`.
+2. SealManifest both: identical Hash; ManifestsEqual(m1,m2): true; ValidateForRequest accepts the wrong manifest.
+**Confidence**: High
+
+### 172. "Bounded" JSON Reader Enforces Its Size Limit Only Once (TOCTOU) and Cancellation Cannot Abort Pending Reads
+**Location**: `SharpProof.Worker.Protocol\ProtocolJson.cs` (Lines 78-95 OpenJsonReader; 35-39; 41-56 ReadUtf8FileAsync)
+**Description**: The 16 MiB cap is checked against stream.Length once at open; the file is opened FileShare.Read and consumed with unbounded ReadToEnd/chunk-append loops, so content appended after the check is read without limit (memory exhaustion). Additionally ReadUtf8FileAsync polls its CancellationToken only between chunk reads; the underlying ReadAsync gets no token, so a stalled/growing source cannot be cancelled mid-read.
+**Reproduction Steps**:
+1. Start ReadUtf8FileAsync on a small file; concurrently append tens of MiB (permitted by FileShare.Read); observe consumption far beyond MaximumJsonBytes.
+2. Signal ct while blocked in a read: no OperationCanceledException until a chunk boundary (potentially never).
+**Confidence**: Medium
+
+### 173. LinuxWorkerProcess: Unsynchronized _process Access Races Dispose, and Dispose Leaks the Handle When Terminate Throws
+**Location**: `SharpProof.Host\LinuxWorkerProcess.cs` (Lock-free read Lines 106-107 in WaitForExit; Dispose 166-185; Terminate guards 227-241)
+**Description**: WaitForExit snapshots _process without taking _synchronization while Dispose locks, terminates, disposes, and nulls the field; concurrent disposal between the null check and WaitForExit(0)/ExitCode throws ObjectDisposedException. Worse, inside Dispose the Terminate/process.Dispose/_process=null sequence is not try/finally-wrapped: if Terminate throws (grace-period expiry InvalidOperationException or KillProcessGroup NativeFailure), the Process handle is never disposed, _process stays non-null, and every subsequent Dispose retries termination on a stale handle; the exception also escapes using var process in the launcher, replacing real exit status.
+**Reproduction Steps**:
+1. Start a worker ignoring SIGTERM so Terminate exceeds its grace period; call Dispose(): InvalidOperationException, and a second Dispose reruns Kill/WaitForExit on the undisposed handle.
+2. Race Dispose from thread B while thread A polls WaitForExit: intermittent ObjectDisposedException.
+**Confidence**: Medium
+
+### 174. Manifest-Writer Frame Violates Its Own Length-Prefix Convention: -1 ("Absent") Count Followed by Five Present Fields
+**Location**: `SharpProof.Worker.Protocol\ProtocolJsonSupport.cs` (Lines 217-230 Add/AddItems: -1 strictly means no fields follow; 247-257 AddLocation)
+**Description**: The ManifestWriter framing establishes negative length = absence: Add(null) emits exactly `-1:;` and AddItems emits count -1 followed by zero records. AddLocation breaks the invariant: for a null location it emits count -1 yet appends all five length-prefixed fields with -1 sentinels. Today nothing parses these payloads (only SHA-256'd/compared) so producer and consumer stay accidentally consistent, but any count-driven decoder misparses every null-location frame, and the sentinel is ambiguous between "null location" and "location with all fields -1".
+**Reproduction Steps**:
+1. Call `AddLocation("t", null).ToString()`: output contains five records after a -1 (absent) count.
+2. Compare AddItems(domain, null, ...) emitting zero records after -1; implement the obvious count-driven decoder and observe desynchronization.
+**Confidence**: Medium
+
+### 175. Launcher Launch-Wait Polls CancellationToken.WaitHandle on a Sourceless Token, Mapping Every Real Verification to Bogus containment.unavailable
+**Location**: `SharpProof.Worker.Launcher\Program.cs` (Lines 276-278 calling WaitForExit(terminationStart, finalLimit)); root cause `SharpProof.Host\LinuxWorkerProcess.cs` (Line 133); second instance `LinuxPathIdentity.cs` (Line 1285)
+**Description**: RunWorker calls WaitForExit without a CancellationToken, so the poll loop accesses CancellationToken.None.WaitHandle, which throws InvalidOperationException on the first iteration whenever the worker survives one poll tick (~25 ms - i.e., every real cold start). RunMain's general handler maps InvalidOperationException to exit 125 containment.unavailable, writing a fail-closed result asserting containment failed - masking the actual verification entirely. The identical idiom in publication-lock acquire throws under lock contention.
+**Reproduction Steps**:
+1. Invoke the launcher with any worker startup exceeding ~25 ms (all of them).
+2. Observe stderr "worker containment could not be established", exit 125, synthesized containment.unavailable result even though the worker started fine; contrast the passing test which supplies a real CTS token.
+**Confidence**: Medium
+
+### 176. SARIF PROJECTROOT Base URI Is the Launcher's CWD, Not the Verified Project Directory
+**Location**: `SharpProof.Worker.Launcher\SarifProjection.cs` (Lines 69-77; project directory available at Program.cs Lines 205-206 but not passed)
+**Description**: originalUriBaseIds["PROJECTROOT"] is built from Environment.CurrentDirectory of the launcher process, while compiler artifactLocations are intentionally project-relative (per the file's own comment). Every relative location resolves against whatever directory the launcher started in, not the actual project directory.
+**Reproduction Steps**:
+1. From /repo run the launcher for a project at /repo/sub/proj with --publish-sarif.
+2. SARIF viewers resolve relative locations to /repo/src/... instead of /repo/sub/proj/src/....
+**Confidence**: High
+
+### 177. Benign Cache-Lock Contention Reported as CacheStatus.Unavailable, Silently Disabling Cache and Misreporting Health
+**Location**: `SharpProof.Worker\VerificationCache.cs` (AcquireLock Lines 236-261 FileShare.None with no retry/wait; swallow at 108-112, 193-198; consumed SharpProofWorker.cs 224-227, 395-397)
+**Description**: Concurrent verifications sharing one cache directory serialize on a single non-blocking lock file. The loser's open throws IOException, which is swallowed and converted into LastReadUnavailable/TryWriteAsync==false, so SharpProofWorker rebuilds the response with WorkerCacheStatus.Unavailable. The cache was healthy, merely busy; monitoring sees "Unavailable" (disk trouble) and zero caching benefit whenever builds overlap. The same swallow converts transient errors during debris recovery into full run-level cache bypass.
+**Reproduction Steps**:
+1. Start two verify launches for the same project concurrently.
+2. One result reports Miss/Written, the other Unavailable; serial rerun shows normal behavior.
+**Confidence**: High (behavior unambiguous; severity is status integrity/availability, not wrong results)
+
+### 178. Method-Timeout Timer Stays Armed Through Result Assembly, Converting Completed Proofs Into Spurious Timeout/Incomplete
+**Location**: `SharpProof.Worker\CallableVerificationPolicy.cs` (Lines 23-59)
+**Description**: CancelAfter(methodWallTimeMilliseconds) remains live while the successful proof is post-processed (effect record assembly and ordering inside the same try). If the timer fires in that window (routinely fires up to a tick late), any OperationCanceledException jumps to catch, discarding the completed proof and labeling the callable Incomplete/MethodTimeout. Coverage flips Complete→Incomplete, VerificationCache.IsCacheable rejects the run, and RequireProven policies fail purely due to assembly-time jitter.
+**Reproduction Steps**:
+1. Set --method-wall-ms near a callable's real solve time so the deadline lands just after proof completion.
+2. Intermittently observe claims computed but callable reported MethodTimeout/Incomplete and no cache write; slightly larger budget completes and caches identical work.
+**Confidence**: Medium
+
+### 179. Abnormal Worker Exit Codes Silently Re-Mapped to Exit 3 (Failed/MalformedResult), Losing the True Termination Cause
+**Location**: `SharpProof.Worker.Launcher\Program.cs` (Lines 151-179 NoResultFailure special-cases only 124/125; 224-227 exit mapping); `LauncherProjections.generated.cs` (Lines 24-34)
+**Description**: When the worker dies without writing result.json (SIGKILL/OOM exit 137, segfault 139, canceled exit 4), the default arm fabricates Failed/MalformedResult even though nothing was parsed, and ValidateAndReport maps that to exit 3, discarding the original code. Asymmetry: timeouts preserve 124 via a dedicated branch, cancellations do not preserve 4. Root cause (OOM/crash) appears nowhere in output.
+**Reproduction Steps**:
+1. Force the worker to die before publishing a result (cgroup OOM kill → exit 137).
+2. Launcher exits 3; stderr says worker.no_result then "worker run Failed (MalformedResult)".
+**Confidence**: Medium
+
+### 180. Aggregate SP0048/SP0047 Diagnostics Anchored at the Wrong Callable; SARIF and Console Reports Disagree on Location Fields
+**Location**: `SharpProof.Worker.Launcher\Program.cs` (SP0048 anchored at Manifest.Callables[0].Location Lines 525-528; SP0047 anchored at incomplete[0] Lines 479-483); `SarifProjection.cs` (Notifications carry no location, Lines 36-44, 177-192)
+**Description**: Assumption totals are computed across ALL callables but the console diagnostic anchors at the first manifest callable's location, pointing at unrelated code; the SARIF notification carries no region/artifactLocation at all. Similarly aggregate-counted SP0047 anchors only at the first incomplete callable.
+**Reproduction Steps**:
+1. Verify a project where only a late-declared callable declares assumptions.
+2. Console SP0048 prefixed with callable #1's file/line; the SARIF toolExecutionNotification for SP0048 has no location.
+**Confidence**: Medium
+
+### 181. SARIF invocations[0].executionSuccessful Is true for Runs Containing Refuted (Failing) Postconditions
+**Location**: `SharpProof.Worker.Launcher\SarifProjection.cs` (Lines 78-82)
+**Description**: executionSuccessful = runStatus == Complete && errors.Length == 0. A verification completing with a definite contract violation produces results with kind:"fail"/level:"error" and exit code 5, yet the invocation is marked executionSuccessful:true. CI consumers gating on this field treat violated postconditions as successful verification because the failure signal exists only in results[] and the process exit code.
+**Reproduction Steps**:
+1. Verify a project with one provably false [Ensures] clause.
+2. Published SARIF contains a fail result yet invocations[0].executionSuccessful == true.
+**Confidence**: Low
+
+### 182. Raw SyntaxTree.FilePath Stored in Source-Summary Authority Never Matches Path.GetFullPath-Normalized Snapshot Trees, Aborting the Entire Manifest
+**Location**: `SharpProof.CompilerCollector\CompilerArtifact\CompilerRelationalSummaryProvider.cs` (Line 358) vs `CompilerCompilationCapture.cs` (Line 141) and `CompilerManifestArtifactProducer.cs` (Lines 118-127); worker-side mirror `SharpProof.CompilerArtifact\CompilationFingerprint.cs` (Lines 167-171)
+**Description**: Captured snapshot trees store normalized full paths, but summary evidence rows store the raw declaration.SyntaxTree.FilePath, and BuildSummaryEvidence demands ordinal string equality, throwing "A source summary authority is not bound to the captured source tree" - converted into a manifest-failure diagnostic dropping the whole manifest. Divergence occurs for generator-added trees with relative hint names (e.g., "Gen.g.cs") or forward-slash paths on Windows. The worker-side validator repeats the comparison, rejecting hand-repaired manifests too.
+**Reproduction Steps**:
+1. Enable the collector on a project with a source generator emitting a helper into a relative-hint tree; call it from a contract-annotated method so a relational summary is inferred.
+2. At emission SourcePath="Gen.g.cs" while the snapshot holds the absolute path; BuildSummaryEvidence throws and the build gets only the manifest-failure diagnostic.
+**Confidence**: High
+
+### 183. Artifact Identity Embeds Host-Specific Absolute Paths, Making CompilationSha256 Irreproducible Across Machines/Platforms/Directories
+**Location**: `SharpProof.CompilerCollector\CompilerArtifact\CompilerCompilationCapture.cs` (Lines 51-52, 141, 232-273, 326); `SharpProof.CompilerArtifact\CompilerCaptureAuthority.cs` (Lines 11-21)
+**Description**: Every hashed key (ProjectDirectory, SyntaxTrees[].Path, reference module paths, additional-file paths) is Path.GetFullPath output: rooted absolute paths with OS-specific separators. For generator-added trees with relative hint names, GetFullPath resolves against the analyzer host's CWD, not the project directory. The same source produces different CompilationSha256 across launch directories, drives, or OSes, silently defeating cross-machine/cross-platform cache reuse. Location payloads intentionally keep raw spelling, so one document mixes forms.
+**Reproduction Steps**:
+1. Build in checkout C:\a\proj, record compilationSha256.
+2. Copy identical sources to D:\b\proj (or build on Linux, or from another CWD with a relative-hint generator file): hash differs with zero semantic changes.
+**Confidence**: High
+
+### 184. CompilerProbeGenerator Silently Verifies Only the Lexicographically-First Matching Additional File, and InputFingerprint Omits the File Path
+**Location**: `SharpProof.CompilerProbe.TestAsset\CompilerProbeGenerator.cs` (Lines 12-31, 48-52, 121-124); evidence disagrees at `CompilerProbeSnapshot.cs` (Lines 404-438)
+**Description**: The pipeline collects all additional files named SharpProofProbeInput.txt but Generate reduces them with OrderBy(Path, Ordinal).First(): others dropped without diagnostics. The sort key is the full normalized absolute path, so which file wins depends on checkout layout; moving a folder flips the generated contract silently. The fingerprint hashes globalValue/metadata/text excluding the winning Path, so consumers cannot detect the switch, while snapshot evidence hashes all files.
+**Reproduction Steps**:
+1. Fixture with two SharpProofProbeInput.txt files in different folders with different contents.
+2. Generated InputText reflects only the ordinal-first full path, no warning; rename folders so the winner swaps and the contract changes while InputFingerprint stays unchanged.
+**Confidence**: Medium
+
+### 185. Response Evidence Authority Crashes With Unhandled ArgumentException on Duplicate IDs Instead of Returning a Validation Error
+**Location**: `SharpProof.CompilerArtifact\CompilerResponseEvidenceAuthority.cs` (Lines 35-40)
+**Description**: Validate builds dictionaries with .ToDictionary(ClaimId/CallableId). Unlike every other check funneling problems into the errors set, duplicate ClaimId/CallableId rows throw ArgumentException("An item with the same key has already been added"), turning a malformed/hostile response into an unstructured crash instead of a rejected-response verdict.
+**Reproduction Steps**:
+1. Construct a WorkerVerifyResponse with two ClaimResults sharing a ClaimId.
+2. Call Validate(response): unhandled ArgumentException rather than returned error codes.
+**Confidence**: Medium
+
+### 186. Cache-Rule Local Tracking Picks the Lexically-Last Prior Write, Missing Loop-Carried Unknown Answers (Incorrect Code Passes Unchecked)
+**Location**: `SharpProof.Meta.Analyzers\CacheSoundnessRules.cs` (Lines 107-134 ResolveLocal; related guard Line 129; cycle short-circuit Line 101)
+**Description**: ResolveLocal computes the reaching definition as the last write whose span starts before the read, ignoring control-flow dynamics. A write later in the same loop body than the cache write (the value flowing into iterations >= 2) is invisible, so caching Unknown/timeout/error answers goes unreported despite SPMETA010 forbidding exactly that. Additionally the conditional-write fallback evaluates only the single last write, and cyclic self-reference short-circuits to true flagging harmless self-assignments.
+**Reproduction Steps**:
+1. Analyze: `var answer = Answer.Proven; while (HasWork()) { cache.Set("k", answer); answer = Answer.Unknown; }`.
+2. Zero SPMETA010 diagnostics although a non-cacheable Unknown answer is cached from iteration 2 onward.
+**Confidence**: High
+
+### 187. SPMETA001 Display-Text Ban Bypassed Via Static SymbolDisplay.ToDisplayString (Incorrect Code Passes)
+**Location**: `SharpProof.Meta.Analyzers\SharpProofSoundnessAnalyzer.cs` (IsForbidden Lines 122-129; ForbiddenMethods 35-46; sibling hole in AnalyzeInterpolatedString 271-299)
+**Description**: The rule bans using display text as identity but only detects instance symbol.ToDisplayString() via the receiver-type heuristic plus a hardcoded table. Roslyn's equally abusable static SymbolDisplay.ToDisplayString(ISymbol, ...) has no instance receiver and is absent from the table, so it produces no diagnostic. Companion rule SPMETA009 has the same-shaped hole for constant-only interpolated strings versus equivalent + concatenation.
+**Reproduction Steps**:
+1. Analyze `static string Key(INamedTypeSymbol t) => SymbolDisplay.ToDisplayString(t);` - no SPMETA001.
+2. `t.ToDisplayString()` on the next line is flagged, proving asymmetric coverage versus the descriptor text.
+**Confidence**: High
+
+### 188. Embedded Spec-Pack Loader Rejects Uppercase Hex Public-Key Tokens Its Own Matcher Accepts (Case-Sensitivity Mismatch Between Spec Authorities)
+**Location**: `SharpProof.CompilerCollector\CompilerArtifact\CompilerSpecificationPackProvider.cs` (Parse Lines 514-517 lowercase-hex-only vs MatchesAssembly 332-337 OrdinalIgnoreCase); contrast `SharpProof.Specs\ApiSpecTable.cs` (Lines 203-204) and `ApiSpecContentDigest.cs` (Line 26)
+**Description**: The embedded-catalog parser validates publicKeyToken characters against lowercase hex only, throwing InvalidDataException at load for uppercase input, while the loader's own assembly matching compares tokens case-insensitively and the sibling spec authority accepts any case and canonically digests via ToUpperInvariant(). A semantically valid canonically formatted catalog fails to load purely on letter case.
+**Reproduction Steps**:
+1. Change a catalog token to uppercase (semantically identical), repin the SHA-256.
+2. LoadCatalog throws "public-key token is invalid" although MatchesAssembly would match such tokens.
+**Confidence**: Medium
+
+### 189. Catalog Generator Orders/Dedups Witness IDs With Culture-Sensitive Sort-Object, Breaking Byte-Determinism and Falsely Rejecting Distinct IDs
+**Location**: `scripts\Generate-ApiSpecCatalog.ps1` (Lines 668-686; byte-exact gate Assert-ExactGeneratedFile 1239-1246) feeding `SharpProof.Specs\DefaultApiSpecCatalog.generated.cs`
+**Description**: Windows PowerShell 5.1 Sort-Object uses culture-aware, case-insensitive comparison unless overridden: (a) generated declaration order emitted before runtime re-sort varies with OS locale, so the byte-exact gate can fail on unchanged checked-in files; (b) -Unique collapses ordinally-distinct witnesses differing only in case (contract.old vs Contract.Old), aborting generation although ApiSpecTable.Create (Ordinal grouping) would accept them. Runtime is ordinal-safe; the front end is not.
+**Reproduction Steps**:
+1. Add a declaration with witness Contract.Old alongside contract.old; run the script: aborts claiming identifiers must be unique.
+2. Run under a locale collating differently: Assert-ExactGeneratedFile fails on unchanged content.
+**Confidence**: Medium
+
+### 190. Windows-Style Backslash Hardcoded in Test-Project Path of a Now Linux-Only Script
+**Location**: `scripts\Test-SharpProofPackageConsumers.ps1` (Line 531, consumed at 609); correct sibling `scripts\Invoke-SharpProofPackageTests.ps1` (Lines 33-34)
+**Description**: `$testProject = Join-Path $repositoryRoot 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'` keeps a literal backslash although the script's execution path now requires Linux container mode (Windows branch deleted in the port commit). On Linux Join-Path preserves `\` as a filename character; the argument reaches dotnet test as `/repo/SharpProof.Package.Test\SharpProof.Package.Test.csproj`, working only because MSBuild switch parsing applies FixFilePath - any consumer bypassing MSBuild arg parsing breaks.
+**Reproduction Steps**:
+1. In the canonical Linux container run the script and inspect the path handed to native dotnet test.
+2. Invoke dotnet with that path outside MSBuild switch parsing: File.Exists false.
+**Confidence**: Medium
+
+### 191. Backslash Project Paths Passed to `dotnet run --project` on Linux in Acceptance Harness
+**Location**: `eng\acceptance\Verify.ps1` (Lines 741, 758-759; PowerShell-consumed paths at 710, 724-725 deliberately use '/')
+**Description**: The fuzz/gates phases invoke dotnet run --project with backslash-separated csproj strings reaching the native CLI unmodified via ArgumentList. Unlike msbuild project switches, dotnet resolves --project before MSBuild sees it, so correctness depends entirely on CLI-side separator normalization; where it doesn't translate backslashes the phase fails "project file does not exist".
+**Reproduction Steps**:
+1. Run eng/acceptance/Verify.ps1 in the container on a host whose CLI does not normalize backslashes.
+2. Fuzz phase fails to locate Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj despite presence.
+**Confidence**: Low
+
+### 192. Verifier Nuspec $nativeroot$ Input Not Validated Before Packing
+**Location**: `SharpProof.Verifier\SharpProof.Verifier.csproj` (Lines 51-53)
+**Description**: _SharpProofPrepareNuspecProperties errors when SHARPPROOF_CONTAINER != '1' but never validates SHARPPROOF_NATIVE_ROOT is non-empty. Unset, NuspecProperties gets nativeroot= and nuspec src entries resolve to filesystem-root-absolute `/z3/...`, producing an opaque NuGet file-not-found (or silently packing a wrong payload where such root exists) instead of a fail-fast guard naming the required environment variable.
+**Reproduction Steps**:
+1. In the container run dotnet pack SharpProof.Verifier with SHARPPROOF_NATIVE_ROOT cleared.
+2. Packing fails confusingly at /z3/4.12.2/... rather than a targeted error.
+**Confidence**: Low
+
+### 193. .Trim() Applied to Possibly-Array Merged stdout+stderr When Validating the Release dotnet Host
+**Location**: `scripts\Publish-SharpProofRelease.ps1` (Lines 140-145; sibling avoiding the pattern at Line 80)
+**Description**: `$actualVersion = (& $path --version 2>&1).Trim()`. With stderr merged, any dotnet stderr line (first-run notice, warnings) turns the expression into object[], on which .Trim() throws MethodException under StrictMode/ErrorActionPreference=Stop - aborting a valid publication before the SDK-version comparison runs; $LASTEXITCODE is checked only afterwards using the same polluted value.
+**Reproduction Steps**:
+1. Run Publish-SharpProofRelease.ps1 with DotNetPath resolving to a dotnet emitting any stderr line for --version.
+2. Script throws "Trim : method invocation failed" instead of comparing versions.
+**Confidence**: Low
+
+### 194. Differential Harness Helper Turns Into a Tautology for Reference/Array Results
+**Location**: `SharpProof.Frontend.Test\FrontendLoweringTests.cs` (CompiledMethod.CompareWithInterpreter, Lines 1119-1128)
+**Description**: After asserting the interpreter produced a value, the helper maps the result via Kind switch where the default arm substitutes `actual` itself (the compiled return value), then asserts interpreted Is.EqualTo(actual). For Reference/Sequence kinds (lowerer supports exact array/receiver lowerings) any differential test whose Target returns an array or reference type can never fail on interpreter mismatch - the oracle degrades to DoesNotThrow.
+**Reproduction Steps**:
+1. Add `public static long[] Target(long[] v) => v;` and call CompareWithInterpreter.
+2. Corrupt the interpreter result (Sequence/Reference kind): the assert still passes because interpreted is literally actual.
+**Confidence**: High
+
+### 195. Shared Analyzer-Test Harness in SharpProof.Testing Is Dead Code With Self-Conflicting Severity Wiring
+**Location**: `SharpProof.Testing\AnalyzerTestHost.cs` (Lines 21-55; severity conflict 38 vs 147-152; silent fallback 70-77)
+**Description**: Neither GetDiagnosticsAsync overload has any caller repo-wide, shielding contained bugs forever. Its wiring escalates enabled diagnostic IDs twice with disagreeing severities - specificDiagnosticOptions maps each ID to Info while TestSyntaxTreeOptionsProvider reports Warn; compilation options win, so any eventual consumer asserting warning-severity diagnostics observes Info. Its reference fallback also silently proceeds with a 2-reference set instead of failing fast.
+**Reproduction Steps**:
+1. Grep GetDiagnosticsAsync across the solution: only definitions match.
+2. Wire any test and inspect Severity for an enabled ID: Info despite tree provider configured Warn.
+**Confidence**: Medium
+
+### 196. SMT Cancellation Test Depends on Wall-Clock Races (Monitor-Hold Window Plus Fixed Sleep)
+**Location**: `SharpProof.Smt.Test\IrSmtBackendTests.cs` (ActiveCancellationInterruptsTheNativeContext, Lines 541-580)
+**Description**: The test waits up to 5 s for the backend gate to appear held, sleeps a hardcoded Thread.Sleep(10), cancels, and demands OperationCanceledException. Under loaded CI the pool thread may not acquire the gate within 5 s (first assert fails); if encoding plus the trivial SAT check complete within the 10 ms window (fast machine, warm Z3), the task finishes before Cancel lands and ThrowsAsync fails with success. Outcome varies with machine load, not just performance.
+**Reproduction Steps**:
+1. Temporarily lower the assumption count (e.g., 200) or run under CPU contention repeatedly.
+2. Observe "Expected: OperationCanceledException... But was: success" intermittently.
+**Confidence**: Medium
+
+### 197. CHANGELOG Describes a "Windows x64 Verifier" and "Windows x64 Worker Containment" but the Shipped Verifier Is Linux amd64-Only
+**Location**: `CHANGELOG.md` (Unreleased Added, Lines 15-17) vs `SharpProof.Verifier\SharpProof.Verifier.csproj` (Line 16), `SharpProof.Verifier.nuspec` (Lines 28, 57), `README.md` (Lines 658-664), `docs\preview-support.md` (Line 50)
+**Description**: Changelog Added bullets claim Windows x64 worker containment/cache/resource budgets and a Windows x64 verifier. Every implementation surface says otherwise: the package describes itself as Container-only Linux amd64, ships only linux-x64 Z3 payloads, and buildTransitive props require Core MSBuild + X64 + SHARPPROOF_CONTAINER=1; README/docs declare Windows/macOS/native unsupported. No Windows payload exists anywhere in the package graph.
+**Reproduction Steps**:
+1. Read CHANGELOG Unreleased Added bullets; read the nuspec/csproj metadata and props host gate.
+2. Direct contradiction: documented platform absent from the package.
+**Confidence**: High
+
+### 198. Native Z3 Packaging Doc Cites a Payload Path That Does Not Exist in the Package
+**Location**: `docs\native-smt-packaging.md` (Lines 32-34) vs `SharpProof.Verifier.nuspec` (Line 57) and `buildTransitive\SharpProof.Verifier.props` (Line 8)
+**Description**: Doc says the verifier places libz3.so at runtimes/linux-x64/native/. The nuspec actually packs tools/native/linux-x64/libz3.so and the resolver loads ../tools/native/linux-x64/libz3.so. No runtimes/ directory exists in the verifier package; the repo's own mutation test treats target="runtimes/linux-x64/native" as tampered.
+**Reproduction Steps**:
+1. Open the doc's "Pinned Z3 closure"; read nuspec files section and props line 8.
+2. Documented path differs from shipped/resolved path.
+**Confidence**: High
+
+### 199. Docs Claim do Loops Are in the Admitted Effect Subset; the Language Gate Rejects Them (SP0047 Instead of Analysis)
+**Location**: `README.md` (Lines 276-280), `SEMANTICS.md` (Lines 350-354), `docs\coverage-and-limits.md` (Line 53) vs `SharpProof.Analyzer.Core\LanguageSubsetGate.cs` (Lines 153-154)
+**Description**: All three docs list for/while/do among covered statements, but SupportsOperationShape admits only LoopKind.While or For; do…while lowers to LoopKind.Do, so ClassifyEffects abstains UnsupportedOperationShape, selected callables get SP0047, and the worker manifest builder reuses the same gate so bodies are not verified. Nothing handles LoopKind.Do.
+**Reproduction Steps**:
+1. Annotate a method containing `do { i++; } while (i < 3);` with [EnforcePure].
+2. Docs say supported; analyzer abstains and emits SP0047 UnsupportedOperationShape.
+**Confidence**: Medium
+
+### 200. Unreleased CHANGELOG Documents Superseded Wire Versions (Protocol 9, Cache 11, Artifact Schemas 8/9) Contradicting Shipped Protocol 11 / Cache 13 / Artifact Schema 15
+**Location**: `CHANGELOG.md` (Lines 41, 50, 58, 136) vs `SharpProof.Worker.Protocol\ProtocolModel.generated.cs` (Lines 13-24), `SharpProof.CompilerArtifact\CompilerArtifactModel.generated.cs` (Line 14), `README.md` (Lines 400, 723-733)
+**Description**: Within the single Unreleased section, Changed entries cite protocol 9/cache schema 11 and artifact schemas 8/9, while shipped constants pin protocol 11, cache 13, manifest 4, artifact schema 15 documented as current everywhere else, with no changelog entries recording those later breaks. A changelog-only reader concludes the preview ships the older wire contract.
+**Reproduction Steps**:
+1. Read CHANGELOG version mentions; grep Current in ProtocolModel.generated.cs and CompilerArtifactModel.generated.cs.
+2. Constants are 11/13/15 conflicting with recorded 9/11/8/9.
+**Confidence**: Medium
+
+### 201. Unbounded Static Cleanup-Anchor Retention in Long-Lived MSBuild Nodes
+**Location**: `SharpProof.BuildTasks\RunVerifier.cs` (Static store Lines 38-40; lifecycle 772-832; buffers cap Line 26; count exposure 60-61)
+**Description**: RetainedCleanupAnchors is a process-lifetime static ConcurrentDictionary with no count/byte cap or sweep. Entries are removed only after anchor.Process.WaitForExitAsync completes; if a supervisor/worker hangs or survives kill escalation, its anchor - including up to 1 MB captured stdout/stderr each - stays resident for the MSBuild node lifetime, and repeated failed builds accumulate anchors without bound. Unlike VerificationCache's LRU byte budget, nothing enforces a limit here.
+**Reproduction Steps**:
+1. Run a project whose supervisor spawns but ignores SIGTERM/SIGKILL escalation.
+2. RetainedCleanupAnchorCount grows monotonically across subsequent builds in the same node.
+**Confidence**: Medium
+
+### 202. Empty Assembly.Location Collapses Runtime-Closure Entries to a Bare Directory, Off-by-One-Level Weakening Containment Validation
+**Location**: `SharpProof.Worker.Launcher\LauncherArguments.generated.cs` (Lines 66-68); consumed `SharpProof.Worker.Launcher\Program.cs` (Lines 1012-1030, 1038-1041)
+**Description**: Path.Combine(dir, Path.GetFileName(assembly.Location)) assumes Location is always a file path. When assemblies load single-file/in-memory, Location is "" so GetFileName("")=="" and Combine returns dir itself; Program.cs then takes GetDirectoryName(Canonicalize(dir)) yielding the parent directory, so writable-path nesting validation runs against a root one level too high and dedup against runtimeSnapshot.ComponentPaths misses the real component path - admitting writable paths inside the true runtime dir or throwing spurious distinctness failures. ChangeExtension("", ".deps.json") likewise corrupts element [0]/[1]/[2] if the launcher assembly has empty Location.
+**Reproduction Steps**:
+1. Deploy the launcher with System.IO.Pipelines/System.Text.Json embedded (single-file publish).
+2. Set a writable path (--result) inside <runtime-dir>/../sibling and observe validation passing against the parent root.
+**Confidence**: Low
+
+### 203. Root-Catalog Generators Lack the Duplicate-Key / Unknown-Key Defenses Their Sibling Catalog Enforces - Duplicated JSON Keys Silently Override (Last-Wins)
+**Location**: `scripts\Generate-DeclarativeModels.ps1` (Lines 16-24) and `scripts\Generate-ProjectionCatalog.ps1` (Lines 17-25); defended sibling `scripts\Generate-ContractApiCatalog.ps1` (Lines 37-95); parity test `SharpProof.Frontend.Test\ContractApiCatalogParityTests.cs` (Lines 128-136)
+**Description**: Both root catalogs are parsed with bare ConvertFrom-Json checking only key presence. Repeated JSON keys resolve last-wins and unrecognized keys are silently ignored - e.g., a duplicated schemaVersion or outputs key quietly replaces the first declaration. The repo treats this as a real threat class for ContractApi.catalog.json (Assert-UniqueJsonProperties throws on duplicates; parity test covers the mutation) but neither defense exists in these two generators.
+**Reproduction Steps**:
+1. Duplicate `"schemaVersion": 1,` at the top of SharpProof.Projection.catalog.json and run the generator.
+2. Exits 0 silently, whereas the equivalent ContractApi.catalog.json mutation throws "contains duplicate property".
+**Confidence**: High
+
+### 204. Effect Attributes Advertise Property Target and the Live Analyzer Honors It, but the Collector/Verifier Permanently Refuses Every Property-Accessor Effect Claim
+**Location**: `SharpProof.Attributes\EnforcePureAttribute.cs` (Line 2; same usage on five sibling effect attributes) vs `SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs` (Lines 85-92) and `CompilerCallableLowerer.cs` (Line 50)
+**Description**: All six effect attributes allow Method | Constructor | Property and the live analyzer analyzes accessors (LanguageSubsetGate admits PropertyGet/Set; ContractSelectionInventory picks up property-level attributes). However BuildTarget computes supported only for MethodDeclarationSyntax/ConstructorDeclarationSyntax + Ordinary/Constructor MethodKind, so for `[EnforcePure] int P { get; }` every effect claim is force-marked Unknown/UnsupportedContract and the worker lowerer bails UnsupportedCallable. Identical public usage yields full verification on methods/ctors but analyzer-only enforcement plus a dead worker claim on properties, contradicting the documented one-accountable-worker-claim story.
+**Reproduction Steps**:
+1. Annotate a property getter with [EnforcePure] and run the collector/worker pipeline.
+2. Manifest contains the claim but IsVerifierSupported=false; outcome forced Unknown with WorkerClaimReason.UnsupportedContract; no independent replay occurs.
+**Confidence**: High
+
+### 205. Version-Gated EffectContractAttribute.PreconditionFree Consumed by Raw Property Name With No Availability or Skew Diagnostics - Attributes Assembly Drift Nulls the Whole API and Degrades to Generic SP0047
+**Location**: `SharpProof.Attributes\PublicAPI.Unshipped.txt` (Lines 2-3); `SharpProof.Effects\EffectContractValues.cs` (Line 11); `ExternalEffectResolver.cs` (Lines 157-205); `SharpProof.Frontend\ContractApiIdentityResolver.cs` (Lines 147-178)
+**Description**: PreconditionFree is read by literal name from NamedArguments with unrecognized arguments invalidating the contract. Whether the attribute type is trusted is gated by exact assembly-version equality plus embedded SHA-256 payload match; the only fault channel (UnreadableContractApiReason/SP0050) fires solely for IO failures. Legitimate drift (older pinned transitive Attributes copy vs newest analyzers) silently nulls every attribute lookup, reporting generic ContractApiIdentityRejected (SP0047) per member - indistinguishable from a malicious lookalike - instead of one actionable version-skew diagnostic.
+**Reproduction Steps**:
+1. Reference a SharpProof.Attributes DLL one revision older than the analyzers; write `[EffectContract(SharpProofEffect.None, Complete = true)]`.
+2. Resolution returns null; every annotated member gets SP0047 with no version-mismatch message.
+**Confidence**: Medium
+
+### 206. Advisory-Activation Metadata Probe Never Looks at Return-Value-Targeted Closed Contracts, Diverging From Declared ReturnValue Usage
+**Location**: `SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs` (ModuleContainsClosedPrecondition Lines 413-427, checks only HandleKind.Parameter) vs `SharpProof.Attributes` targets and `ClosedContractDiagnostics.cs` (Lines 8-24 validating both)
+**Description**: NotNull/Positive/InRange declare Parameter | ReturnValue targets and the symbol path validates both, but the Advisory fast-path scanning referenced assemblies' metadata looks for closed contracts parented to parameters only. In CLI metadata a [return: NotNull] is parented to the MethodDef, so a library whose only closed-contract usage is return-targeted fails to trigger even Lightweight activation - return-contract evidence is invisible during activation.
+**Reproduction Steps**:
+1. Build lib.dll containing only `[return: NotNull] string Get() => "";`.
+2. Compile an Advisory-profile consumer referencing it with no local attribute syntax: MayContainExternalClosedPreconditions false, activation None, no analyzer actions registered.
+**Confidence**: Low
+
+### 207. AllowedCapabilitiesAttribute Declares AllowMultiple=false Yet Every Consumer Loops Over Multiple Instances - Union Reachable Only Through Undocumented Property+Accessor Side Channel
+**Location**: `SharpProof.Attributes\AllowedCapabilitiesAttribute.cs` (Lines 2-3) vs `SharpProof.Analyzer.Core\EffectContractDiagnostics.cs` (DecodeCapabilities Lines 259-282 OR-ing flags) and `SharpProof.Contracts\ContractSelectionInventory.cs` (Lines 125-133)
+**Description**: DecodeCapabilities iterates ImmutableArray<AttributeData> and unions capability sets across instances, expecting repeatable application like AllowedExceptions/EffectContract (AllowMultiple=true). C# blocks a second application at the same level (CS0579), so the multi-instance path is reachable only by combining property-level and accessor-level attributes, producing a union impossible to author on any single level and undocumented. Surface and consumer contracts are out of sync; per-instance invalid-argument reporting inherits the asymmetry.
+**Reproduction Steps**:
+1. Write `[AllowedCapabilities(IO)] public int P { [AllowedCapabilities(Clock)] get => ...; }`.
+2. Analyzer silently grants the union IO|Clock, expressible no other way.
+**Confidence**: Low
+
+### 208. Composed Summaries Lose the Callee's Normal-Completion Dimension - Instantiated NormalCompletion Substituted Then Discarded by Every Composer
+**Location**: `SharpProof.Summaries\IrRelationalSummaryBuilder.cs` (ApplyCall conjoins only instantiated.NormalRelation, Lines 460-463; NormalCompletion computed at 449 and never read); produced at `IrRelationalSummaryInstantiator.cs` (Lines 82-92); systemic discard confirmed at `SharpProof.CompilerArtifact\CompilerArtifactModel.generated.cs` (Lines 168-178), `CompilerCallableLowerer.cs` (Line 353), `SharpProof.Worker\AcyclicBlockPredicateExecutor.cs` (Lines 444-485)
+**Description**: Instantiate substitutes both halves of a dependency summary, but ApplyCall composes caller predicates from the relation half only. The callee's record of on which inputs the call completes normally is dropped; the only residue is a coarse global may-throw flag and caller-side definedness guards. Caller summaries inherit callee result equalities ungated, and the path-guarded throw dimension collapses into an unattributable bit. Masked for admitted static scalar candidates (total ops), but the public API explicitly supports instance/reference summaries where completion is non-trivial.
+**Reproduction Steps**:
+1. Build a dependency summary returning a witness-requiring expression (e.g., return a[0]).
+2. Build a caller composing that call; observe instantiated.NormalCompletion computed and never referenced; caller NormalRelation contains the equality with no completion guard.
+3. Grep confirms zero reads of instantiated.NormalCompletion outside the instantiator.
+**Confidence**: High
+
+### 209. AddReturn Records Returned-Expression Definedness Only in Completions While Building NormalRelation From the Raw Path Predicate - Relation Asserts Result Equality Exactly Where the Body Throws
+**Location**: `SharpProof.Summaries\IrRelationalSummaryBuilder.cs` (Relation uses predicate Lines 512-518; guarded completion computed 505-508 stored only in _completions at 524)
+**Description**: For a return whose value requires a definedness witness, the build computes completion = predicate ∧ (value == value) but emits relation = predicate ∧ (Result == value). The two disjoined outputs diverge: NormalCompletion alone knows which inputs throw, while NormalRelation claims the equality unconditionally on those same inputs, breaking the invariant "the relation holds only on normal completions" at production time - serialized summaries over-claim to any direct consumer.
+**Reproduction Steps**:
+1. Build a summary for a body returning a witness-requiring expression (return s.Length).
+2. Inspect NormalRelation: Result == s.Length with no definedness conjunct; evaluate with s = null-value and the interpreter/SMT view accepts the equality although the real call throws.
+3. NormalCompletion contains the witness conjunct, proving the guarded form was known and stored only elsewhere.
+**Confidence**: Medium
+
+### 210. Dependencies and DependencyProvenance Silently Diverge for Transitive Dependencies - Parallel-Array Consumers Misattribute Provenance
+**Location**: `SharpProof.Summaries\IrRelationalSummaryBuilder.cs` (Emission ordering 281-285: Dependencies numeric vs provenance string-key sorted; population 469-475 adds only direct dependency but merges transitive provenance)
+**Description**: ApplyCall adds only the direct callee to _dependencies but merges the callee's entire DependencyProvenance, so an A→B→C chain exposes Dependencies=[B] alongside DependencyProvenance=[provB, provC]. Arrays have equal lengths only in the single-level case (exactly what the existing test asserts, masking divergence). Any consumer zipping/index-pairing the arrays attributes C's evidence to B. In-tree consumers currently use provenance standalone, making this a latent public-API trap.
+**Reproduction Steps**:
+1. Build summary C (no deps); build B calling C (lengths equal); build A calling B.
+2. A.Dependencies=[B] but A.DependencyProvenance length 2, ordered by ordinal key sort not corresponding to numeric order.
+**Confidence**: Medium

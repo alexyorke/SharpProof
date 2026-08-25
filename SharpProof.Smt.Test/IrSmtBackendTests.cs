@@ -168,7 +168,7 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
-    public async Task SignedRemainderOverflowProducesTypedUnknown()
+    public async Task SignedRemainderAtDivisionOverflowBoundaryIsDefined()
     {
         var factory = new IrFactory();
         var dividend = factory.CreateVariable("dividend", factory.IntegerType);
@@ -209,10 +209,7 @@ public sealed class IrSmtBackendTests
         using var backend = new IrSmtBackend();
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(
-            ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
+        Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [TestCase(-7L, 3L, -2L, -1L)]
