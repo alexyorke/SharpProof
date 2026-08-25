@@ -44,4 +44,5 @@ M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System
 M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System.Int32,Microsoft.CodeAnalysis.ParseOptions,System.Boolean);Use compiler-bound Roslyn operations instead of reparsing source text.
 
 # Display text is presentation only and must not become a semantic identity.
+M:Microsoft.CodeAnalysis.ISymbol.ToDisplayString();Do not use display text as a semantic identity.
 M:Microsoft.CodeAnalysis.ISymbol.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat);Use typed symbols or an explicit structural identity.

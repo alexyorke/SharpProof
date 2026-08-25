@@ -28,7 +28,10 @@ internal static class CacheSoundnessRules
 
     internal static void AnalyzeAssignment(OperationAnalysisContext context)
     {
-        var assignment = (ISimpleAssignmentOperation)context.Operation;
+        if (context.Operation is not IAssignmentOperation assignment)
+        {
+            return;
+        }
         if (assignment.Target is not IPropertyReferenceOperation property ||
             !IsCacheType(property.Instance?.Type ?? property.Property.ContainingType) ||
             !IsNonCacheableSemanticAnswer(

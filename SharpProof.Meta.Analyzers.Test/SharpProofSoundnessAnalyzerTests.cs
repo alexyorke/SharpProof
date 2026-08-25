@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using SharpProof.Meta.Analyzers;
@@ -274,7 +275,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             sealed class ProofCache {
                 internal Answer this[string key] { set { } }
-                internal Answer Latest { set { } }
+                internal Answer Latest { get; set; }
+                internal Answer? Optional { get; set; }
                 internal void Add(string key, Answer answer) { }
                 internal void AddOrUpdate(string key, Answer answer) { }
                 internal void Write(Answer answer) { }
@@ -301,6 +303,10 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache["key"] = Answer.Unknown;
                 void Property(ProofCache cache) =>
                     cache.Latest = Answer.Failed;
+                void Coalesce(ProofCache cache) =>
+                    cache.Optional ??= Answer.Unknown;
+                void Compound(ProofCache cache) =>
+                    cache.Latest |= Answer.Unknown;
                 void Overwrite(ProofCache cache) =>
                     cache.AddOrUpdate("key", Answer.TimedOut);
                 void Unresolved(ProofCache cache, Answer answer) =>
@@ -325,7 +331,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(8));
+            Is.EqualTo(10));
     }
 
     [Test]
@@ -1373,6 +1379,24 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsParameterlessDisplayStrings()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Tooling;
+            static class C {
+                static string M(ISymbol symbol) => symbol.ToDisplayString();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA001"));
+    }
+
+    [Test]
     public async Task RejectsStaticSymbolDisplayStrings()
     {
         const string source =
@@ -1489,6 +1513,64 @@ public sealed class SharpProofSoundnessAnalyzerTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain("SPMETA001"));
+    }
+
+    [Test]
+    public async Task RejectsCSharpCompilationAndSpeculativeExtensionApis()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            using Microsoft.CodeAnalysis.CSharp.Syntax;
+            using Microsoft.CodeAnalysis.CSharp;
+            namespace SharpProof.Tooling;
+            static class C {
+                static SemanticModel CompilationModel(
+                    CSharpCompilation compilation,
+                    SyntaxTree tree) =>
+                    compilation.GetSemanticModel(tree);
+
+                static bool Speculative(
+                    SemanticModel model,
+                    int position,
+                    TypeSyntax type,
+                    out SemanticModel result) =>
+                    Microsoft.CodeAnalysis.CSharp.CSharpExtensions.TryGetSpeculativeSemanticModel(
+                        model,
+                        position,
+                        type,
+                        out result,
+                        SpeculativeBindingOption.BindAsTypeOrNamespace);
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task RejectsSemanticComparisonsOutsideConditionalSyntax()
+    {
+        const string source =
+            """
+            namespace SharpProof.Dataflow;
+            static class C {
+                static bool Returned(string reason) =>
+                    reason == "ir_returned";
+
+                static bool Assigned(string reason) {
+                    var result = reason.Equals("ir_assigned");
+                    return result;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA004"),
+            Is.EqualTo(2));
     }
 
     [Test]

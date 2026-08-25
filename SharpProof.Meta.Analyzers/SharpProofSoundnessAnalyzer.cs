@@ -12,6 +12,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 {
     private static readonly ImmutableArray<string> KnownTypeNames = [
         "Microsoft.CodeAnalysis.Compilation", "Microsoft.CodeAnalysis.SemanticModel",
+        "Microsoft.CodeAnalysis.CSharp.CSharpCompilation",
+        "Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel",
+        "Microsoft.CodeAnalysis.CSharp.CSharpExtensions",
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.ISymbol",
         "Microsoft.CodeAnalysis.CSharp.SymbolDisplay",
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
@@ -42,7 +45,22 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "RemoveSyntaxTrees",
                 "RemoveAllSyntaxTrees",
                 "GetSymbolsWithName"),
-            [KnownType.SemanticModel] = Names("TryGetSpeculativeSemanticModel", "GetSpeculativeTypeInfo", "GetDiagnostics"),
+            [KnownType.SemanticModel] = Names(
+                "TryGetSpeculativeSemanticModel",
+                "GetSpeculativeSymbolInfo",
+                "GetSpeculativeTypeInfo",
+                "GetSpeculativeAliasInfo",
+                "GetDiagnostics"),
+            [KnownType.CSharpSemanticModel] = Names(
+                "TryGetSpeculativeSemanticModelForMethodBody",
+                "TryGetSpeculativeSemanticModel",
+                "GetSpeculativeSymbolInfo",
+                "GetSpeculativeTypeInfo",
+                "GetSpeculativeAliasInfo",
+                "GetDiagnostics"),
+            [KnownType.CSharpExtensions] = Names(
+                "TryGetSpeculativeSemanticModelForMethodBody",
+                "TryGetSpeculativeSemanticModel"),
             [KnownType.SyntaxFactory] = Names("ParseStatement", "ParseExpression", "ParseTypeName")
         }.ToImmutableDictionary();
 
@@ -64,7 +82,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             var symbols = new KnownSymbols(startContext.Compilation);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
-            startContext.RegisterOperationAction(CacheSoundnessRules.AnalyzeAssignment, OperationKind.SimpleAssignment);
+            startContext.RegisterOperationAction(
+                CacheSoundnessRules.AnalyzeAssignment,
+                OperationKind.SimpleAssignment,
+                OperationKind.CoalesceAssignment,
+                OperationKind.CompoundAssignment);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
             startContext.RegisterOperationAction(
@@ -115,7 +137,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        if (method.Name == "GetSemanticModel" && IsSameType(method.ContainingType, symbols[KnownType.Compilation]))
+        if (method.Name == "GetSemanticModel" &&
+            (IsSameType(method.ContainingType, symbols[KnownType.Compilation]) ||
+             IsSameType(method.ContainingType, symbols[KnownType.CSharpCompilation])))
         {
             return !IsSameType(containingSymbol.ContainingType, symbols[KnownType.CompilationModelProvider]);
         }
@@ -193,8 +217,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if (context.Operation is not IBinaryOperation
             {
                 OperatorKind: BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals
-            } binary ||
-            !IsInsideCondition(binary.Syntax))
+            } binary)
         {
             return;
         }
@@ -212,8 +235,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         KnownSymbols symbols)
     {
         if (!IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.String]) ||
-            invocation.TargetMethod.Name != "Equals" ||
-            !IsInsideCondition(invocation.Syntax))
+            invocation.TargetMethod.Name != "Equals")
         {
             return;
         }
@@ -327,20 +349,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
              text.StartsWith("ir_", StringComparison.Ordinal))
                 ? text
                 : null;
-    }
-
-    private static bool IsInsideCondition(SyntaxNode syntax)
-    {
-        return syntax.AncestorsAndSelf().Any(node => node switch
-        {
-            IfStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
-            WhileStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
-            DoStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
-            ForStatementSyntax { Condition: not null } statement => statement.Condition.Span.Contains(syntax.Span),
-            ConditionalExpressionSyntax conditional => conditional.Condition.Span.Contains(syntax.Span),
-            WhenClauseSyntax whenClause => whenClause.Condition.Span.Contains(syntax.Span),
-            _ => false
-        });
     }
 
     private static void AnalyzeField(SymbolAnalysisContext context)
@@ -479,7 +487,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     internal enum KnownType
     {
-        Compilation, SemanticModel, SyntaxFactory, Symbol, SymbolDisplay, DiagnosticDescriptor,
+        Compilation, SemanticModel, CSharpCompilation, CSharpSemanticModel,
+        CSharpExtensions, SyntaxFactory, Symbol, SymbolDisplay, DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
         AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, String,
         Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,
