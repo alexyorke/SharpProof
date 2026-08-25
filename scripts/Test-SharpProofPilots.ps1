@@ -107,7 +107,12 @@ $packageArtifacts = @(Get-SharpProofPilotPackageAuthority `
     -ExpectedVersion $version `
     -ExpectedCommit $head)
 $runId = [Guid]::NewGuid().ToString('N')
-$runRoot = Join-Path $repositoryRoot "artifacts/pilots/runs/$runId"
+# Container task workspaces redirect artifacts to the host mount. Use the
+# physical target for verifier-owned caches and requests so SharpProof's
+# publication paths never traverse that infrastructure symlink.
+$artifactsRoot = Resolve-SharpProofPhysicalPath (
+    Join-Path $repositoryRoot 'artifacts')
+$runRoot = Join-Path $artifactsRoot "pilots/runs/$runId"
 $nugetCache = Join-Path $runRoot 'nuget'
 $dotnetHome = Join-Path $runRoot 'dotnet-home'
 $qualificationStartedUtc = [DateTimeOffset]::UtcNow
