@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace SharpProof.Dataflow;
 
 /// <summary>
@@ -42,7 +40,12 @@ public abstract class ClosedAbstractDomain<T> : IAbstractDomain<T>
             return -1;
         }
 
-        Debug.Assert(!assertMonotonicity);
+        if (assertMonotonicity)
+        {
+            throw new InvalidOperationException(
+                "Abstract-domain comparison is not monotone: the new value is not above the old value.");
+        }
+
         return 1;
     }
 }

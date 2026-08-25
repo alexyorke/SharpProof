@@ -421,13 +421,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 **Confidence**: Medium
 
-### 163. Domain Compare Cannot Detect Regressions in Release Builds and Conflates "Incomparable" With "Greater"
-**Location**: `SharpProof.Dataflow\ClosedAbstractDomain.cs` (Lines 33-47)
-**Description**: After LessThanOrEqual fails, the method runs `Debug.Assert(!assertMonotonicity)` and unconditionally returns 1. In release builds the assert is stripped, so a strict regression passed with assertMonotonicity:true is silently reported as greater; genuinely incomparable pairs are also reported as ordered, making Compare unusable as a total order by callers trusting the return sign.
-**Reproduction Steps**:
-1. Call Compare(NullnessValue.Null, NullnessValue.NonNull, assertMonotonicity:true) in a release build: no assertion fires, returns 1 indistinguishable from a legitimate increase.
-**Confidence**: High
-
 ### 164. WidenAfter Budget Consumed by Acyclic Upstream Stabilization, Widening Loop Headers on the First Genuine Back-Edge Update
 **Location**: `SharpProof.Dataflow\ForwardDataflowAnalysis.cs` (Lines 181-191)
 **Description**: updateCounts[blockId]++ fires on every real input change of a cyclic block regardless of origin. Because the solver is round-synchronized (Jacobi batch snapshot), an acyclic feed chain of uneven depth delivers k distinct input updates to a loop header over k rounds before the loop contributes anything, exhausting the WidenAfter budget so the first loop-carried growth immediately widens, dropping finite loop bounds that would have been recovered within budget. Soundness preserved; documented widen-after-N intent violated.

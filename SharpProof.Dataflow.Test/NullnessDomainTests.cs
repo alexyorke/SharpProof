@@ -67,6 +67,12 @@ public sealed class NullnessDomainTests
             Assert.That(
                 _domain.Compare(NullnessValue.MaybeNull, NullnessValue.Null),
                 Is.Positive);
+            Assert.Throws<InvalidOperationException>(
+                (Action)(() =>
+                    _domain.Compare(
+                        NullnessValue.Null,
+                        NullnessValue.NonNull,
+                        assertMonotonicity: true)));
             Assert.Throws<ArgumentOutOfRangeException>(
                 (Action)(() =>
                     _domain.AssumeNull((NullnessValue)int.MaxValue)));
