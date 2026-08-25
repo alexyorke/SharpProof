@@ -107,6 +107,11 @@ switch ($Command) {
         }
 
         if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
+            # The source self-application builds can leave Roslyn's shared
+            # compiler server holding source-built analyzer load contexts.
+            # Stop it before package pilots so the package lane observes only
+            # the candidate analyzer payload.
+            Invoke-DotNet @('build-server', 'shutdown')
             $resolvedPackageSource = if ([IO.Path]::IsPathRooted($PackageSource)) {
                 [IO.Path]::GetFullPath($PackageSource)
             }
