@@ -276,8 +276,11 @@ boundary. Trust without an explicit complete contract proves nothing. A
 The analyzer admits a checked subset of ordinary methods, explicit
 constructors, static constructors, and accessors. It covers common primitive
 expressions, locals, assignments, direct calls, object and array creation,
-`if`, ordinary `for`/`while`/`do` loops, constant `switch`, exception handling,
+`if`, ordinary `for`/`while` loops, constant `switch`, exception handling,
 `using`, `lock`, conditional access, and ordinary interpolation.
+Members of types declared with primary-constructor parameters are included;
+captured parameters are modeled as receiver-backed state, while the
+synthesized primary-constructor body is not selected as a separate callable.
 
 Async, iterators, `foreach`, closures, local functions, delegates, dynamic
 binding, ref parameters or locals, ref returns, ref-like and pointer shapes,

@@ -12,9 +12,9 @@ contain documented breaking changes.
 - Exact manifest/result accountability and deterministic worker summaries.
 - Independent SMT-term and whole-body counterexample replay.
 - Advisory and strict profiles with explicit incomplete-analysis diagnostics.
-- Windows x64 worker containment, cache validation, and resource budgets.
+- Linux amd64 container worker containment, cache validation, and resource budgets.
 - Three exact-version packages for the contract API, portable analyzer and
-  generator, and Windows x64 verifier.
+  generator, and Linux amd64 verifier.
 - Portable-PDB symbol packages with SourceLink bound to the packaged commit.
 - Deterministic SHA-256 release manifests, SPDX 2.3 package/component SBOM
   generation, restored-dependency version checks, and separately permissioned
@@ -38,7 +38,7 @@ contain documented breaking changes.
   generator hosts, with a clear older-host rejection.
 - Opt-in deterministic SARIF 2.1.0 projection of validated claim, incomplete
   callable, assumption, and run-failure results.
-- Compiler artifact schema 9 adds source-located, sealed effect replay events
+- Compiler artifact schema 15 adds source-located, sealed effect replay events
   for unconditional object and array allocations. The worker independently
   interprets those events before reporting a `Refuted` allocation contract;
   every other direct effect candidate remains a typed `Unknown`.
@@ -47,7 +47,7 @@ contain documented breaking changes.
 
 - The verifier consumes the final compiler compilation artifact instead of
   reconstructing a compilation from source files.
-- Protocol version 9 and cache schema 11 distinguish undefined
+- Protocol version 11 and cache schema 13 distinguish undefined
   postconditions, non-replayable modeled calls, genuine replay failures,
   effect-evidence certainty, and explicit vacuity evidence.
 - The semantic disk cache accepts only complete, postcondition-only responses
@@ -55,7 +55,7 @@ contain documented breaking changes.
   scalar models, validates source intervals and entry assumptions, and replays
   every claim on both read and write eligibility; `Proven` and effect claims
   are never cached.
-- Compiler artifact schema 8 records both raw and effective per-tree
+- Compiler artifact schema 15 records both raw and effective per-tree
   preprocessor symbols and binds them through compilation fingerprint domain
   5; worker-side validation rejects runtime-enabled ghost contracts.
 - `require-proven` runs bypass the local semantic cache.
@@ -133,7 +133,7 @@ contain documented breaking changes.
 - Trusted complete effect contracts on bodyless source boundaries are honored,
   while malformed, incomplete, conflicting, or untrusted boundaries remain
   visible instead of disappearing.
-- Compiler artifact schema 8 binds exception constraints and exact witness
+- Compiler artifact schema 15 binds exception constraints and exact witness
   hierarchies to canonical full assembly identities, including version,
   culture, and public-key token, plus constructed-type reference IDs, so
   aliased same-name assemblies cannot collide during independent worker replay.

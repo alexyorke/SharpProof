@@ -349,7 +349,7 @@ supported subset or proof semantics.
 
 The current effect subset accepts non-generic ordinary methods, explicit
 constructors, and accessors using locals, primitive expressions, assignments,
-direct calls, object and array creation, `if`, `for`, `while`, `do`, constant
+direct calls, object and array creation, `if`, `for`, `while`, constant
 `switch`, `try`/`catch`/`finally`, `using`, `lock`, conditional access, and
 ordinary interpolation.
 
@@ -363,10 +363,13 @@ It rejects async and iterator bodies, `foreach`, closures, local functions,
 delegates, ref parameters or locals, ref returns, ref-like types, open type
 parameters, dynamic binding, unsafe and pointer constructs, function pointers,
 patterns, deconstruction, queries, `with`, ranges, implicit indexers, custom
-interpolated-string handlers, inline arrays, collection expressions and spread,
-and primary constructors. A closed constructed generic API call is accepted only
-when a specification resolves for that exact call. Every Roslyn `OperationKind`
-is classified by a checked-in decision table; an unknown future kind is rejected.
+interpolated-string handlers, inline arrays, collection expressions and spread.
+The synthesized body of a primary constructor is not a separately selected
+callable, but members of primary-constructor types are admitted and captured
+parameters are modeled as receiver-backed state. A closed constructed generic
+API call is accepted only when a specification resolves for that exact call.
+Every Roslyn `OperationKind` is classified by a checked-in decision table; an
+unknown future kind is rejected.
 
 That rejection defines selected effect admission, not whether the contracts
 feature can inspect a call site. Call-site precondition analysis recursively
