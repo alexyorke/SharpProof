@@ -44,6 +44,16 @@ internal static class SwitchExpressionFacts
         };
     }
 
+    internal static bool IsCompilerIntrinsicListPatternMember(
+        IListPatternOperation pattern,
+        IMethodSymbol method)
+    {
+        return method.DeclaringSyntaxReferences.Length == 0 &&
+            method.ContainingType is { } containingType &&
+            (pattern.InputType is IArrayTypeSymbol ||
+             containingType.IsRefLikeType);
+    }
+
     internal static IReadOnlyList<ISwitchExpressionArmOperation> GetReachableArms(
         ISwitchExpressionOperation operation,
         Func<IOperation?, bool> canCompleteNormally,

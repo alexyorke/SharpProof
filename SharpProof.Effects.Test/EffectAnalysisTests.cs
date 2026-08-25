@@ -9,6 +9,96 @@ namespace SharpProof.Effects.Test;
 public sealed class EffectAnalysisTests
 {
     [Test]
+    public void MetadataListPatternAccessorsRemainConservative()
+    {
+        var external = EffectTestHost.EmitImage(
+            """
+            namespace External;
+            public sealed class MetadataList {
+                private static int state;
+                public int Length { get { state++; return 1; } }
+                public int this[int index] =>
+                    throw new System.InvalidOperationException();
+            }
+            """,
+            "ExternalListPatterns");
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int state;
+                public static void Check(External.MetadataList values) {
+                    try { _ = values is [0]; }
+                    catch (System.InvalidOperationException) { state++; }
+                }
+            }
+            """,
+            external.Reference);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Check"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+        }
+    }
+
+    [Test]
+    public void DivergentCatchDoesNotHideCallerTail()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                private static int state;
+                private static void MaybeHang(bool fail) {
+                    try { if (fail) throw new System.Exception(); }
+                    catch { while (true) { } }
+                }
+                public static void Caller() {
+                    MaybeHang(false);
+                    state++;
+                }
+            }
+            """,
+            "Sample",
+            "Caller");
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
+    public void CaughtThrowInsideFinallyDoesNotHideFollowingWrite()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                private static int state;
+                public static void Example() {
+                    try { }
+                    finally {
+                        try { throw new System.InvalidOperationException(); }
+                        catch (System.InvalidOperationException) { }
+                    }
+                    state++;
+                }
+            }
+            """,
+            "Sample",
+            "Example");
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void PureArithmeticHasNoMayEffects()
     {
         var result = Analyze(

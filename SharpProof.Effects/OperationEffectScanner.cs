@@ -906,7 +906,8 @@ internal sealed partial class OperationEffectScanner
         foreach (var method in _completionEvaluator
                      .GetReachableImplicitListPatternMembers(pattern))
         {
-            if (method.DeclaringSyntaxReferences.Length == 0)
+            if (SwitchExpressionFacts
+                .IsCompilerIntrinsicListPatternMember(pattern, method))
             {
                 continue;
             }

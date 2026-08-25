@@ -757,12 +757,13 @@ internal sealed class ExceptionHandlerReachability(
                 var members = getReachableListPatternMembers(listPattern);
                 foreach (var member in members)
                 {
-                    if (member.DeclaringSyntaxReferences.Length == 0)
-                    {
-                        continue;
-                    }
                     Add(
-                        member.IsVirtual || member.IsAbstract
+                        SwitchExpressionFacts
+                            .IsCompilerIntrinsicListPatternMember(
+                                listPattern,
+                                member)
+                            ? EmptyPotential
+                            : member.IsVirtual || member.IsAbstract
                             ? UnknownPotential
                             : GetCallableExceptions(
                                 member,

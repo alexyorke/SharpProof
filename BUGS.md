@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 24 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 32 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -2082,6 +2082,24 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
 
 Material supported-surface defects: incorrect verdicts or diagnostics, missing required qualification, or workflows that produce the wrong result.
 
+### SP-AUDIT-249 - Sequential conditional writes hide a reachable non-cacheable answer (P1)
+
+- [x] `CacheSoundnessRules.ResolveLocal` examines only the last two syntactic
+  writes when the final write is conditional. With an `Unknown` initializer
+  followed by two independent conditional `Proven` assignments, both conditions
+  can be false, yet the initializer is discarded from the reaching-definition
+  join.
+- Supported impact: SPMETA010 is suppressed for a cache write that can persist a
+  non-cacheable semantic answer, weakening the analyzer that guards verifier
+  cache soundness conventions.
+- Reproduction: a detached canonical-container analyzer test expected one
+  SPMETA010 for the two-conditional example and received zero diagnostics. This
+  is distinct from the fixed alias/indexer shapes in SP-AUDIT-105.
+- Required closure: compute all reaching local definitions with CFG/dataflow
+  semantics rather than a last-two syntax heuristic. Add zero/one/two/many
+  conditional writes, mutually exclusive branches, loops, safe initializers,
+  and straight-line overwrite controls.
+
 ### SP-AUDIT-004 - Release qualification matrix is incomplete (fixed)
 
 - [x] The tag-only `release-qualification` job in
@@ -2263,6 +2281,83 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 ## P2 active bugs
 
 Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
+
+### SP-AUDIT-250 - Changed-test selection ignores imported root build inputs (P2)
+
+- [x] `Invoke-SharpProofChangedTests.ps1` treats only `Directory.*`,
+  `global.json`, `NuGet.Config`, and `SharpProof.sln` as global inputs. Its
+  project graph reads `ProjectReference` and explicit `Compile` items but never
+  follows MSBuild `Import` elements.
+- Supported impact: changing only `SharpProof.Release.props`,
+  `SharpProof.PackageMetadata.props`, `SharpProof.AnalyzerConsumer.props`, or
+  another imported root input selects only the Architecture fallback. A routine
+  `test-changed` run silently omits the affected product and package tests.
+- Evidence: `Directory.Build.props` imports `SharpProof.Release.props`; several
+  packable projects import `SharpProof.PackageMetadata.props`. None can enter
+  `$changedProjectPaths`, and the special package-test rule covers only
+  `scripts/`, `eng/container/`, `SharpProof.Package/`, and
+  `SharpProof.Verifier/` paths.
+- Required closure: derive imported inputs from evaluated MSBuild project data
+  or maintain one tested global/shared-input catalog. Add plan-only fixtures for
+  every root props file and require package tests where package metadata or
+  release authority changes.
+
+### SP-AUDIT-251 - Pre-launch setup can consume the verifier cleanup reserve (P2)
+
+- [x] `RunVerifier.Execute` starts `processStopwatch` before resolving the host,
+  supervisor, working directory, process start, pidfd, stream readers, and gate
+  handshake. The same outer stopwatch later bounds termination, output drain,
+  and cleanup-receipt authentication.
+- Supported impact: setup beyond the nominal reserve (one second for direct task
+  calls and five seconds for worker-launcher calls) consumes cleanup time before
+  the verifier begins. At the outer deadline `TryTerminate` and output
+  authentication can receive zero milliseconds, producing containment failure
+  or leaving deferred cleanup for an otherwise ordinary slow launch.
+- Evidence: the initial wait is the minimum of the verifier budget and
+  `RemainingMilliseconds(processStopwatch, processTimeout)`; every cleanup path
+  at lines 228-267 reuses that remaining value. Existing deadline tests delay
+  the child after startup and do not delay resolution/start/gate setup.
+- Required closure: separate the execution deadline from a cleanup clock or
+  start the bounded process deadline at the authenticated launch boundary while
+  retaining an independently guaranteed cleanup reserve. Add deterministic
+  setup-delay tests below, at, and above both reserves.
+
+### SP-AUDIT-252 - An exit at the worker deadline is reported as a timeout (P2)
+
+- [x] `LinuxWorkerProcess.WaitForExit` checks `WaitForExit(0)`, then checks the
+  elapsed deadline. The child can exit between those operations. `Terminate`
+  notices `HasExited` and returns without killing, but the caller unconditionally
+  returns `TimedOut` with exit code 124.
+- Supported impact: a normally completed worker can have its real exit code and
+  valid result overwritten by launcher timeout handling at the deadline edge.
+  This is a fail-closed publication/lifecycle error, not a containment bypass.
+- Evidence: the timeout branch at `LinuxWorkerProcess.cs:104-109` has no second
+  exit observation after the elapsed-time check. Existing boundary tests cover
+  deadline arithmetic, timeout, cancellation, and grace, but not exit in this
+  check-to-classification window.
+- Required closure: recheck process completion immediately before timeout
+  classification and return the real exit when termination observes an already
+  exited child. Add a synchronizable deadline-edge regression and repeated race
+  stress control.
+
+### SP-AUDIT-253 - Relative multitarget SARIF paths are anchored to process CWD (P2)
+
+- [x] `SharpProof.Verifier.targets` calls one-argument
+  `Path.GetFullPath(SharpProofVerifySarifFile)` when scoping a configured SARIF
+  path by target framework. That overload uses the MSBuild process current
+  directory, not `MSBuildProjectDirectory`.
+- Supported impact: invoking `dotnet build /path/to/project.csproj` from another
+  directory writes and cleans `evidence/<tfm>/result.sarif` under the caller's
+  directory instead of the project. Verification can report success while the
+  configured project-relative evidence is missing or misplaced.
+- Reproduction: canonical Linux MSBuild evaluated a project at `/probe` from
+  `/tmp`; `reports/result.sarif` resolved to
+  `/tmp/reports/result.sarif`. The current multitarget integration test runs
+  with its working directory equal to the consumer project, masking the defect.
+- Required closure: combine a relative configured path with
+  `MSBuildProjectDirectory` before canonicalization in both build and clean
+  property groups. Add build/clean/incremental tests invoked from a distinct
+  working directory, with rooted-path controls.
 
 ### SP-AUDIT-034 - Compilation snapshots are not exact canonical capture images (fixed)
 
@@ -2605,6 +2700,48 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
 ## P3 active bugs
 
 Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
+
+### SP-AUDIT-254 - Sequence-valued differential checks always report mismatch (P3)
+
+- [x] `IrCSharpDifferentialOracle` renders sequence result types as C# arrays and
+  converts sequence inputs to runtime arrays, but `CompareValue` handles only
+  Boolean, Integer, String, and Null. Every `IrValueKind.Sequence` falls through
+  to false.
+- Impact: correct sequence-valued IR/C# executions are reported as differential
+  mismatches, preventing the oracle from validating a supported executable
+  shape and creating false fuzz/test failures.
+- Reproduction: a detached canonical-container test compared a sequence variable
+  containing one integer against the generated C# array. It expected Agreement
+  and received Mismatch.
+- Required closure: recursively compare array length, elements, nulls, and nested
+  sequences. Add empty, scalar-element, nested, null-element, and unequal
+  controls; extend randomized roots beyond scalar results.
+
+### SP-AUDIT-255 - The Unreleased changelog advertises a removed Windows verifier (P3)
+
+- [x] `CHANGELOG.md` claims Windows x64 worker containment and a Windows x64
+  verifier. The current package, `ContainerContract`, Dockerfile, README, and
+  support boundary require the canonical Linux amd64 container and reject native
+  Windows verification.
+- Impact: the release-facing feature list gives users a materially incorrect
+  platform/install expectation even though runtime enforcement fails closed.
+- Required closure: replace the obsolete bullets with the Linux amd64
+  container-only package contract and include changelog platform statements in
+  the generated documentation/support-contract validation.
+
+### SP-AUDIT-256 - The checked-in OpenCode plugin has no declared dependency (P3)
+
+- [x] `opencode.json` loads `.opencode/plugins/oh-my-goal.js`, whose only line is
+  a bare import from `oh-my-goal`. The repository ignores `.opencode/package.json`
+  and lock files; the locally generated ignored manifest declares only
+  `@opencode-ai/plugin`, and `oh-my-goal` is absent.
+- Impact: a fresh checkout cannot resolve the configured plugin, so the checked-
+  in OpenCode setup fails before the goal helper loads. This affects developer
+  tooling only, not verifier execution.
+- Required closure: track a deterministic OpenCode dependency manifest/lock that
+  includes `oh-my-goal`, or remove the checked-in local-plugin import and use a
+  configuration form whose package installation is itself declared. Add a fresh-
+  checkout plugin-resolution smoke check.
 
 ## Current comprehensive audit evidence
 
@@ -3295,6 +3432,34 @@ Precision, documentation, and developer-experience debt that does not change a s
   package, ContractFor, and SMT partitions were clean or duplicates. Only the
   coordinator edited this register; no network, credential, permission,
   cybersecurity, adversarial, or hacking work was performed.
+
+- [x] Pass DG partitioned all 833 tracked files other than this register into
+  ten disjoint read-only manifests at commit `387773e67`, covering 248,312
+  physical lines with no missing or duplicate path. Shard file/line counts were
+  48/5,400, 85/27,047, 86/25,840, 87/25,699, 87/23,936, 88/28,090,
+  88/26,816, 88/29,058, 88/28,200, and 88/28,226.
+- [x] The coordinator independently traced every candidate through callers,
+  contracts, and existing tests, searched this register for duplicates, and
+  admitted SP-AUDIT-245 through SP-AUDIT-256. Detached canonical-container
+  probes reproduced the primary-constructor, divergent-catch, caught-throw,
+  cache-dataflow, and sequence-oracle failures; a canonical MSBuild probe
+  reproduced process-CWD SARIF anchoring. Static call-path proofs established
+  the metadata list-pattern, changed-test selection, launcher-reserve, and
+  deadline-race defects.
+- [x] Rejected leads included a worker factory/request query-limit mismatch that
+  is unreachable through the production executable (which constructs from the
+  same request budgets), a reassigned-null lock claim disproved by focused
+  summary probes, atomic-file crash durability outside that helper's contract,
+  conservative ownership/dataflow precision, unsupported `ulong` fuzz roots,
+  manifest-first ordering, and already-fixed release/coverage authority cases.
+  All ten reviewers made no repository writes; only the coordinator edited this
+  register, and no cybersecurity or hacking work was performed.
+- [x] Fresh canonical Linux amd64 validation on the audited code tree passed:
+  `tooling build` completed with zero warnings and zero errors, and the full
+  `tooling test` run passed all 19 projects with 2,627 tests passed, one expected
+  unsupported-host skip, and zero failures. The longest suites included Package
+  254 passed/one skipped, Worker 597, Architecture 479, Analyzer 389, Effects
+  194, ContractFor 117, and Contracts 125.
 
 ## Previously closed bounded audit
 

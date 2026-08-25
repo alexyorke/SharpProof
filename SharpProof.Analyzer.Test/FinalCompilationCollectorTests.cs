@@ -18,6 +18,31 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class FinalCompilationCollectorTests
 {
+    [Test]
+    public async Task PrimaryConstructorSameNamedOverloadIsInventoried()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("primary-constructor-overload");
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [method: DoesNotThrow]
+            public sealed class Subject(int value) {
+                public Subject(string value) : this(0) { }
+            }
+            """);
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        Assert.That(diagnostics, Is.Empty);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+
+        Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+    }
+
     [TestCase('\uD800')]
     [TestCase('\uDC00')]
     public void TextHashRejectsLoneSurrogatesBeforeEncoding(char value)

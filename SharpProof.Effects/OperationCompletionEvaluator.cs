@@ -108,9 +108,7 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteWriteTarget(increment.Target),
             IConditionalOperation conditional =>
                 CanCompleteConditional(conditional),
-            ITryOperation @try =>
-                (@try.Finally == null || CanCompleteNormally(@try.Finally)) &&
-                ChildrenCanComplete(@try),
+            ITryOperation @try => CanCompleteTry(@try),
             ISwitchExpressionOperation switchExpression =>
                 CanCompleteSwitchExpression(switchExpression),
             ISwitchExpressionArmOperation arm =>
@@ -152,6 +150,20 @@ internal sealed class OperationCompletionEvaluator
                     switchExpression.Value,
                     switchExpression))
             .Any(CanCompleteNormally);
+    }
+
+    private bool CanCompleteTry(ITryOperation @try)
+    {
+        if (@try.Finally != null && !CanCompleteNormally(@try.Finally))
+        {
+            return false;
+        }
+
+        return CanCompleteNormally(@try.Body) ||
+            @try.Catches.Any(catchClause =>
+                (catchClause.Filter == null ||
+                 CanCompleteNormally(catchClause.Filter)) &&
+                CanCompleteNormally(catchClause.Handler));
     }
 
     private bool CanCompletePatternEvaluation(

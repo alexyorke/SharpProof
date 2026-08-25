@@ -21,12 +21,11 @@ internal static class PrimaryConstructorCallableInventory
         var matches = type.InstanceConstructors
             .Where(candidate =>
                 candidate.MethodKind == MethodKind.Constructor &&
-                candidate.Parameters.Length == parameters.Value.Count &&
-                candidate.Parameters.Select(static parameter => parameter.Name)
-                    .SequenceEqual(
-                        parameters.Value.Select(static parameter =>
-                            parameter.Identifier.ValueText),
-                        StringComparer.Ordinal))
+                candidate.DeclaringSyntaxReferences.Any(reference =>
+                    reference.SyntaxTree == declaration.SyntaxTree &&
+                    reference.GetSyntax(cancellationToken) is
+                        TypeDeclarationSyntax owner &&
+                    owner.Span == declaration.Span))
             .ToArray();
         if (matches.Length != 1)
         {

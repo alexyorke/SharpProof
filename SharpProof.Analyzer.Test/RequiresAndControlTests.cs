@@ -9,6 +9,27 @@ namespace SharpProof.Analyzer.Test;
 public sealed class RequiresAndControlTests
 {
     [Test]
+    public async Task PrimaryConstructorSameNamedOverloadIsAnalyzed()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public class Base {
+                public Base(int value) { Contract.Requires(value > 0); }
+            }
+            public sealed class Derived(int value) : Base(-1) {
+                public Derived(string value) : this(0) { }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task ParenthesizedDirectCallsReplayPreconditionsInEveryOwnedShape()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

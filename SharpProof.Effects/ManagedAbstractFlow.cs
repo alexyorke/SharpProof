@@ -2052,10 +2052,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 LoopConditionIsAlwaysTrue(loop) &&
                 loop.Body != null &&
                 !LoopHasReachableBreak(loop.Body) => false,
-            ITryOperation @try =>
-                (@try.Finally == null || MayCompleteNormally(@try.Finally)) &&
-                @try.Catches.All(catchClause =>
-                    MayCompleteNormally(catchClause.Handler)),
+            ITryOperation @try => TryMayCompleteNormally(@try),
             ILoopOperation or ISwitchOperation => true,
             _ => true
         };
@@ -2082,6 +2079,20 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 MayCompleteNormally,
                 IsDefinitelyNonNull(switchExpression.Value))
             .Any(MayCompleteNormally);
+    }
+
+    private bool TryMayCompleteNormally(ITryOperation @try)
+    {
+        if (@try.Finally != null && !MayCompleteNormally(@try.Finally))
+        {
+            return false;
+        }
+
+        return MayCompleteNormally(@try.Body) ||
+            @try.Catches.Any(catchClause =>
+                (catchClause.Filter == null ||
+                 MayCompleteNormally(catchClause.Filter)) &&
+                MayCompleteNormally(catchClause.Handler));
     }
 
     private bool MayCompleteRecursivePattern(
