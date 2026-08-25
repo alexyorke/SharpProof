@@ -210,14 +210,14 @@ release gates, not end-user MSBuild defaults.
 | Retained-memory absolute increase | At most 32 MiB |
 | Enabled analyzer retained compilations | 0 |
 | Enabled analyzer retained-memory increase | At most 32 MiB |
+| Simulated IDE edits | 200 |
+| IDE edit p95 | At most 100 ms |
+| IDE edit maximum | At most 250 ms |
 
 Nightly campaign evidence parses every runner JSON result and requires the
 exact schema, seed, configured parallelism, passing coverage, empty failure
 set, and full `agreements + abstentions` case accounting. Its published total
 is the observed runner total rather than the requested budget.
-| Simulated IDE edits | 200 |
-| IDE edit p95 | At most 100 ms |
-| IDE edit maximum | At most 250 ms |
 
 The active contract also fixes protocol version 11, cache schema version 13,
 claim-manifest schema version 4, compiler artifact schema version 15,

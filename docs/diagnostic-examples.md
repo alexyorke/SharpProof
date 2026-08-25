@@ -263,11 +263,12 @@ attempted use reports SP0047 `ContractApiIdentityRejected`; the rejected symbol
 supplies no proof fact. SP0050 is reserved for a payload that cannot be read.
 
 <a id="contractfor-generator-diagnostics"></a>
-## ContractFor generator diagnostics
+## ContractFor analyzer diagnostics
 
-The incremental `ContractFor` generator validates companions and emits no
-source. All eight rules are enabled-by-default errors once the generator is
-loaded.
+The analyzer's final-compilation reconciliation validates companions and emits
+the diagnostics below. The incremental generator emits no source or
+diagnostics by itself. All eight rules are enabled-by-default errors once the
+SharpProof analyzer is loaded.
 
 A valid instance-member companion uses a static class and an explicit receiver
 parameter:

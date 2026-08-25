@@ -29,8 +29,10 @@ specifications, and produce SP0047. A rejected `ContractForAttribute`
 lookalike produces SPCF0001.
 
 `ContractForAttribute` associates a static companion class with a target
-interface or class. The generator validates the association and member
-matching by compiler symbol identity.
+interface or class. The analyzer's final-compilation reconciliation validates
+the association and member matching by compiler symbol identity. The generator
+is present in the package for the incremental pipeline but emits no source or
+diagnostics by itself.
 
 Direct and companion clauses are alternative sources, not additive ones. Any
 valid direct clause on a target member makes that member the source for all of
