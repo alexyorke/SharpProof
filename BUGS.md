@@ -421,14 +421,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 **Confidence**: Medium
 
-### 162. Attribute Diagnostic Dedup Silently Disabled When ApplicationSyntaxReference Is Null, Enabling Repeated SP0024 Reports
-**Location**: `SharpProof.Analyzer.Core\AnalyzerSession.cs` (Lines 267-274 and parallel pattern at 300-308)
-**Description**: `TryMarkAttributeValidated(AttributeData)` returns true ("not yet reported") whenever `attribute.ApplicationSyntaxReference == null`, so dedup never engages for such attributes. Consumers rely on it for exactly-once reporting across callbacks touching the same scope chain (method, associated property, containing types, assembly; symbol callback plus operation-block callback). For any attribute reached without a syntax reference, each invocation re-reports identical SP0024. Contrast the SyntaxTree-keyed overload which keys independently of reference availability.
-**Reproduction Steps**:
-1. Obtain an AttributeData with null ApplicationSyntaxReference (e.g., metadata-sourced scope chain).
-2. Drive ValidateAndShouldSuppress twice for the same method; observe duplicate SP0024.
-**Confidence**: Low
-
 ### 163. Domain Compare Cannot Detect Regressions in Release Builds and Conflates "Incomparable" With "Greater"
 **Location**: `SharpProof.Dataflow\ClosedAbstractDomain.cs` (Lines 33-47)
 **Description**: After LessThanOrEqual fails, the method runs `Debug.Assert(!assertMonotonicity)` and unconditionally returns 1. In release builds the assert is stripped, so a strict regression passed with assertMonotonicity:true is silently reported as greater; genuinely incomparable pairs are also reported as ordered, making Compare unusable as a total order by callers trusting the return sign.

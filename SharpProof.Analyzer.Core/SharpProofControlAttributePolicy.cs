@@ -28,7 +28,7 @@ internal static class SharpProofControlAttributePolicy
             cancellationToken.ThrowIfCancellationRequested();
             if (!session.Attributes.IsRejectedControlAttribute(attribute) ||
                 IsGeneratedAttribute(attribute, session, cancellationToken) ||
-                !session.TryMarkRejectedControlAttributeReported(attribute))
+                !session.TryMarkRejectedControlAttributeReported(attribute, symbol))
             {
                 continue;
             }
@@ -183,7 +183,7 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        if (!session.TryMarkAttributeValidated(attribute))
+        if (!session.TryMarkAttributeValidated(attribute, symbol))
         {
             return;
         }

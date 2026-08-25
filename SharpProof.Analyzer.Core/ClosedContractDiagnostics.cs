@@ -11,7 +11,8 @@ internal static class ClosedContractDiagnostics
                 parameter.Type,
                 parameter.RefKind,
                 parameter.GetAttributes(),
-                parameter.Locations.FirstOrDefault() ?? Location.None);
+                parameter.Locations.FirstOrDefault() ?? Location.None,
+                parameter);
         }
 
         if (!method.ReturnsVoid)
@@ -20,14 +21,16 @@ internal static class ClosedContractDiagnostics
                 method.ReturnType,
                 RefKind.None,
                 method.GetReturnTypeAttributes(),
-                method.Locations.FirstOrDefault() ?? Location.None);
+                method.Locations.FirstOrDefault() ?? Location.None,
+                method);
         }
 
         void ValidateValue(
             ITypeSymbol type,
             RefKind refKind,
             ImmutableArray<AttributeData> attributes,
-            Location fallback)
+            Location fallback,
+            ISymbol owner)
         {
             foreach (var attribute in attributes)
             {
@@ -38,7 +41,7 @@ internal static class ClosedContractDiagnostics
                     session.Attributes);
                 if (!validation.IsRecognized ||
                     validation.IsValid ||
-                    !session.TryMarkAttributeValidated(attribute))
+                    !session.TryMarkAttributeValidated(attribute, owner))
                 {
                     continue;
                 }

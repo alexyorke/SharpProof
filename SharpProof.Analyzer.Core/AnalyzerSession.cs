@@ -46,6 +46,10 @@ internal sealed class AnalyzerSession
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<(SyntaxTree Tree, TextSpan Span), byte>
         _reportedRejectedControlAttributes = new();
+    private readonly ConcurrentDictionary<string, byte>
+        _validatedMetadataAttributes = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte>
+        _reportedRejectedMetadataAttributes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<IMethodSymbol, byte>
         _requiresCallSiteAnalyses =
             new(SymbolEqualityComparer.Default);
@@ -264,13 +268,16 @@ internal sealed class AnalyzerSession
                 .FirstOrDefault()?.Span.Start ?? int.MaxValue)];
     }
 
-    internal bool TryMarkAttributeValidated(AttributeData attribute)
+    internal bool TryMarkAttributeValidated(
+        AttributeData attribute,
+        ISymbol? owner = null)
     {
         var reference = attribute.ApplicationSyntaxReference;
-        return reference == null ||
-               TryMarkAttributeValidated(
-                   reference.SyntaxTree,
-                   reference.Span);
+        return reference != null
+            ? TryMarkAttributeValidated(reference.SyntaxTree, reference.Span)
+            : _validatedMetadataAttributes.TryAdd(
+                CreateMetadataAttributeKey(attribute, owner),
+                0);
     }
 
     internal bool TryMarkAttributeValidated(
@@ -298,12 +305,44 @@ internal sealed class AnalyzerSession
     }
 
     internal bool TryMarkRejectedControlAttributeReported(
-        AttributeData attribute)
+        AttributeData attribute,
+        ISymbol? owner = null)
     {
         var reference = attribute.ApplicationSyntaxReference;
-        return reference == null ||
-            _reportedRejectedControlAttributes.TryAdd(
+        return reference != null
+            ? _reportedRejectedControlAttributes.TryAdd(
                 (reference.SyntaxTree, reference.Span),
+                0)
+            : _reportedRejectedMetadataAttributes.TryAdd(
+                CreateMetadataAttributeKey(attribute, owner),
                 0);
+    }
+
+    private static string CreateMetadataAttributeKey(
+        AttributeData attribute,
+        ISymbol? owner)
+    {
+        var attributeName = attribute.AttributeClass == null
+            ? "<unknown>"
+            : DocumentationCommentId.CreateDeclarationId(
+                attribute.AttributeClass) ??
+                attribute.AttributeClass.Kind + ":" +
+                attribute.AttributeClass.MetadataName;
+        var constructorArguments = string.Join(
+            ",",
+            attribute.ConstructorArguments.Select(static argument =>
+                argument.Kind + ":" + argument.ToString()));
+        var namedArguments = string.Join(
+            ",",
+            attribute.NamedArguments
+                .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                .Select(static pair =>
+                    pair.Key + "=" + pair.Value.Kind + ":" + pair.Value));
+        var ownerName = owner == null
+            ? "<unknown-owner>"
+            : DocumentationCommentId.CreateDeclarationId(owner) ??
+              owner.Kind + ":" + owner.MetadataName;
+        return ownerName + "|" + attributeName + "|" +
+            constructorArguments + "|" + namedArguments;
     }
 }

@@ -8,9 +8,11 @@ internal static class EffectContractDiagnostics
         var attributes = ContractSelectionInventory.GetCallableAttributes(method).ToImmutableArray();
         var location = method.Locations.FirstOrDefault() ?? Location.None;
         _ = DecodeCapabilities(
-            Select(attributes, session.Attributes.AllowedCapabilities), location, session, reportDiagnostic);
+            Select(attributes, session.Attributes.AllowedCapabilities), location, session,
+            reportDiagnostic, method);
         _ = DecodeAllowedExceptions(
-            Select(attributes, session.Attributes.AllowedExceptions), session.Compilation, location, session, reportDiagnostic);
+            Select(attributes, session.Attributes.AllowedExceptions), session.Compilation,
+            location, session, reportDiagnostic, method);
         if (!attributes.Any(attribute =>
                 ContractSelectionInventory.Is(attribute, session.Attributes.EffectContract)))
         {
@@ -23,7 +25,8 @@ internal static class EffectContractDiagnostics
             invalid != null)
         {
             ReportInvalidOnce(
-                invalid, "[EffectContract]", contract.InvalidReason, location, session, reportDiagnostic);
+                invalid, "[EffectContract]", contract.InvalidReason, location,
+                session, reportDiagnostic, method);
         }
     }
 
@@ -83,9 +86,11 @@ internal static class EffectContractDiagnostics
             return [];
         }
 
-        var capabilities = DecodeCapabilities(allowedCapabilities, location, session, reportDiagnostic);
+        var capabilities = DecodeCapabilities(
+            allowedCapabilities, location, session, reportDiagnostic, method);
         var exceptions = DecodeAllowedExceptions(
-            allowedExceptions, session.Compilation, location, session, reportDiagnostic);
+            allowedExceptions, session.Compilation, location, session,
+            reportDiagnostic, method);
         cancellationToken.ThrowIfCancellationRequested();
         var contract = session.ResolveEffectContract(method);
         var bodyless = method is { IsAbstract: true } or { IsExtern: true };
@@ -258,7 +263,8 @@ internal static class EffectContractDiagnostics
 
     private static (EffectContractCapabilityKind Value, bool IsValid) DecodeCapabilities(
         ImmutableArray<AttributeData> attributes, Location fallbackLocation,
-        AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
+        AnalyzerSession session, Action<Diagnostic> reportDiagnostic,
+        ISymbol? owner = null)
     {
         var value = EffectContractCapabilityKind.None;
         foreach (var attribute in attributes)
@@ -275,7 +281,7 @@ internal static class EffectContractDiagnostics
             ReportInvalidOnce(
                 attribute, "[AllowedCapabilities]",
                 "expected a defined SharpProofCapability flags value",
-                fallbackLocation, session, reportDiagnostic);
+                fallbackLocation, session, reportDiagnostic, owner);
             return (EffectContractCapabilityKind.None, false);
         }
         return (value, true);
@@ -283,7 +289,8 @@ internal static class EffectContractDiagnostics
 
     private static (ImmutableArray<INamedTypeSymbol> Types, bool IsValid) DecodeAllowedExceptions(
         ImmutableArray<AttributeData> attributes, Compilation compilation, Location fallbackLocation,
-        AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
+        AnalyzerSession session, Action<Diagnostic> reportDiagnostic,
+        ISymbol? owner = null)
     {
         var exceptionType = compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         var types = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
@@ -306,7 +313,7 @@ internal static class EffectContractDiagnostics
             ReportInvalidOnce(
                 attribute, "[AllowedExceptions]",
                 "expected only closed System.Exception-derived types",
-                fallbackLocation, session, reportDiagnostic);
+                fallbackLocation, session, reportDiagnostic, owner);
             valid = false;
         }
         return valid ? (types.ToImmutable(), true) : ([], false);
@@ -314,9 +321,10 @@ internal static class EffectContractDiagnostics
 
     private static void ReportInvalidOnce(
         AttributeData attribute, string contract, string reason, Location fallbackLocation,
-        AnalyzerSession session, Action<Diagnostic> reportDiagnostic)
+        AnalyzerSession session, Action<Diagnostic> reportDiagnostic,
+        ISymbol? owner = null)
     {
-        if (session.TryMarkAttributeValidated(attribute))
+        if (session.TryMarkAttributeValidated(attribute, owner))
         {
             reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
                 contract, "<invalid>", reason, GetLocation(attribute, fallbackLocation)));
