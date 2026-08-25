@@ -233,6 +233,43 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void OverDeepPreparedPredicateBecomesUnsupportedArtifact()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static bool Identity(bool value) {
+                    Contract.Ensures(Contract.Result<bool>() == value);
+                    return value;
+                }
+            }
+            """,
+            "Identity");
+        var factory = preparation.Factory;
+        IrTerm term = factory.Variable(
+            factory.CreateVariable("deep", factory.BooleanType));
+        for (var index = 0;
+             index < PortableIrGraphCodec.MaximumGraphDepth + 8;
+             index++)
+        {
+            term = factory.Unary(IrUnaryOperator.Not, term);
+        }
+
+        var deepPreparation = preparation with
+        {
+            Clauses = [
+                preparation.Clauses.Single() with { Condition = term }
+            ]
+        };
+        var artifact = CompilerLoweredArtifact.Encode(deepPreparation);
+
+        Assert.That(
+            artifact.FailureReason,
+            Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+    }
+
+    [Test]
     public async Task RequiresOnlySupportedBodyIsAdmittedAndComplete()
     {
         var preparation = Prepare(

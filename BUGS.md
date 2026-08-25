@@ -390,14 +390,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 
 
-### 129. Over-Deep Lowered IR Expressions Abort Whole Project Manifest
-**Location**: `SharpProof.CompilerArtifact\PortableIrGraphCodec.cs` (Lines 366-385, 402-414), `SharpProof.CompilerCollector\CompilerArtifact\CompilerCallableLowerer.cs` (Lines 111-224), and `SharpProof.CompilerCollector\CompilerArtifact\CompilerManifestArtifactProducer.cs` (Lines 49-66)
-**Description**: When an expression in a contracted method exceeds depth 256 (for example, long chains of associative binary operators), `PortableIrGraphCodec.Encode` throws `InvalidDataException("Portable IR term depth exceeds the supported limit.")`. Because neither `RoslynProgramLowerer` nor `CompilerCallableLowerer` enforces this depth limit with a graceful per-callable fallback, the exception propagates unhandled to `FinalCompilationCollector`, causing a whole-manifest build failure rather than gracefully downgrading only the offending callable to `UnsupportedBody`.
-**Reproduction Steps**:
-1. Write a method with a contract containing >256 chained addition operations.
-2. Run compiler artifact collection.
-3. Observe that compilation fails with a manifest-level diagnostic, disabling verification across the entire project.
-**Confidence**: High
 
 ### 130. Duplicate SP0024 Diagnostics for Invalid Contract Clauses in Nested Callables
 **Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 236-241, 624-627, 690-708)

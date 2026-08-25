@@ -41,7 +41,25 @@ internal static class CompilerLoweredArtifact
                 call.ExistentialVariables.Insert(0, call.Result)))
             .Distinct()
             .ToArray();
-        var encoded = PortableIrGraphCodec.Encode(preparation.Factory, body?.Program, roots, variables);
+        EncodedPortableIrGraph encoded;
+        try
+        {
+            encoded = PortableIrGraphCodec.Encode(
+                preparation.Factory,
+                body?.Program,
+                roots,
+                variables);
+        }
+        catch (InvalidDataException exception) when (
+            PortableIrGraphCodec.IsDepthLimitFailure(exception))
+        {
+            return new CompilerCallableArtifact
+            {
+                CallableId = preparation.Entry.CallableId,
+                FailureReason = WorkerClaimReason.UnsupportedBody,
+                EffectClaims = preparation.EffectClaims.ToArray()
+            };
+        }
         var canonicalByVariable = preparation.Variables.ToDictionary(
             static variable => variable.Variable);
         var artifact = new CompilerCallableArtifact

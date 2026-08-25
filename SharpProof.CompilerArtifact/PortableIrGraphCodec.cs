@@ -20,6 +20,15 @@ internal static partial class PortableIrGraphCodec
             IsComplete(HavocKinds)
         }.All(static complete => complete);
 
+    internal static bool IsDepthLimitFailure(
+        InvalidDataException exception)
+    {
+        ArgumentNullGuard.NotNull(exception, nameof(exception));
+        return exception.Message is
+            "Portable IR term depth exceeds the supported limit." or
+            "Portable IR type depth exceeds the supported limit.";
+    }
+
     internal static bool HasCompleteSlotCatalogs =>
         IsCompleteSlots(PortableIrSlotCatalog.Terms, typeof(IrTermKind)) &&
         IsCompleteSlots(PortableIrSlotCatalog.Locations, typeof(IrLocationKind)) &&
