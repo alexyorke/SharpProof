@@ -419,14 +419,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Any decrease below a previously observed large count triggers the 2^32-compensation branch yielding a wildly wrong delta.
 **Confidence**: Low
 
-### 155. Heap Writes Through Ref Locals Aliased to Fields Are Invisible (Write Target Classifies as Local)
-**Location**: `SharpProof.Effects\OperationEffectScanner.Assignments.cs` (Lines 28-29) combined with `ScanField` treating the `ref h.Field` initializer as a mere read (`OperationEffectScanner.cs` Lines 272-312)
-**Description**: With `ref int r = ref h.Field; r = 42;` the store goes to h.Field (heap/receiver state), but the scanner models only the initializer's field read; the assignment's write target is a local contributing nothing. The method summarizes read-only while mutating shared state. Note LanguageSubsetGate abstains on ref-kind declarators for the shipped pipeline, but the public `EffectAnalysisSession.Analyze` API certifies such bodies.
-**Reproduction Steps**:
-1. `class Holder { public int Field; } static void ViaAlias(Holder h) { ref int r = ref h.Field; r = 42; }`
-2. Session summary: Reads(h), no writes, Complete.
-**Confidence**: Medium
-
 ### 161. Nested-Callable Declaration Validation Unregistered in Advisory Operation-Only Activation, So Malformed Suppress/Trusted Attributes on Lambdas Escape
 **Location**: `SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs` (Lines 114-123 registration gate; 225-232 advisory activation returning RequiresSymbolAnalysis:false)
 **Description**: ValidateNestedCallableDeclaration is the only validator for [SharpProofSuppress]/[SharpProofTrusted] on local functions/lambdas and registers only when RequiresSymbolAnalysis is true. In advisory mode triggered by Contract-API-shaped invocations, symbol actions are not registered, yet method/type/assembly-level instances of the same malformed attributes are still validated via the operation-block path. Enforcement of one rule silently depends on which advisory tier fired.

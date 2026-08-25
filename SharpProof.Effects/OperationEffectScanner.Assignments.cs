@@ -28,6 +28,9 @@ internal sealed partial class OperationEffectScanner
                         _method) =>
                 EffectSummaryOperations.Write(
                     _conversionOwnership.ClassifyParameter(parameter.Parameter)),
+            ILocalReferenceOperation local
+                when local.Local.RefKind != RefKind.None =>
+                EffectSummaryOperations.Unsupported(),
             ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation =>
                 EffectSummary.Empty,
             _ => EffectSummaryOperations.Join(

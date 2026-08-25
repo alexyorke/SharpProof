@@ -138,6 +138,37 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void RefLocalStoresAbstainInsteadOfClaimingHeapPurity()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Holder {
+                public int Field;
+            }
+
+            public static class Sample {
+                public static void ViaAlias(Holder holder) {
+                    ref int alias = ref holder.Field;
+                    alias = 42;
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "ViaAlias"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                result.Summary.Uncertainty & EffectUncertainty.UnsupportedOperation,
+                Is.EqualTo(EffectUncertainty.UnsupportedOperation));
+        }
+    }
+
+    [Test]
     public void OrdinaryInterpolationPreservesFormattingAndEvaluationEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(
