@@ -8,9 +8,17 @@ internal sealed class CanonicalHashWriter : IDisposable
 
     internal CanonicalHashWriter Add(string? value)
     {
-        return value == null
-            ? AddFrame(ValueKind.Null, [])
-            : AddFrame(ValueKind.String, Encoding.UTF8.GetBytes(value));
+        if (value == null)
+        {
+            return AddFrame(ValueKind.Null, []);
+        }
+        if (!Utf16WellFormedness.IsWellFormed(value))
+        {
+            throw new ArgumentException(
+                "Canonical hash strings require well-formed UTF-16.",
+                nameof(value));
+        }
+        return AddFrame(ValueKind.String, Encoding.UTF8.GetBytes(value));
     }
 
     internal CanonicalHashWriter Add(bool value)

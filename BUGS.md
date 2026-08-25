@@ -410,16 +410,6 @@ These assignments are redundant since the guard simply returns the input if it's
 3. Inspect the computed effect summary and observe that potential writes and allocations during static initialization are missing.
 **Confidence**: Medium
 
-### 133. CanonicalHashWriter Unpaired Surrogate Collisions
-**Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Line 13)
-**Description**: `CanonicalHashWriter.Add(string)` encodes strings using `Encoding.UTF8.GetBytes()`, which uses standard Unicode replacement fallback. Lone surrogates (such as `"\uD800"`) are replaced by U+FFFD (`EF BF BD`), producing identical binary frames and hashes for `"\uD800"` and `"\uFFFD"`. While `SemanticClaimIdentity` defensively replaces ill-formed constants, other paths passing arbitrary formatted strings into `Add(string)` can collide.
-**Reproduction Steps**:
-1. Create a `CanonicalHashWriter` instance.
-2. Write a frame with string value `"\uD800"`.
-3. Create a second `CanonicalHashWriter` instance and write string value `"\uFFFD"`.
-4. Observe that both instances produce identical digest outputs.
-**Confidence**: High
-
 ### 134. AtomicFile Non-Staged Writes Lack Flush-to-Disk Before Rename
 **Location**: `SharpProof.Ir\AtomicFile.cs` (Lines 70-82, 89-108)
 **Description**: In `AtomicFile.WriteUtf8` and `AtomicFile.WriteBytesAsync`, file content is written via standard .NET streams without calling `stream.Flush(flushToDisk: true)` before `Publish` renames the temporary file to the destination path. On sudden system crashes or power loss, directory metadata updates can be committed while file content blocks remain unwritten in OS cache, resulting in corrupted or zero-length destination files.

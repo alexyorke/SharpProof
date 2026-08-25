@@ -54,6 +54,16 @@ public sealed class CanonicalHashWriterTests
     }
 
     [Test]
+    public void IllFormedStringsAreRejectedBeforeUtf8Replacement()
+    {
+        using var writer = new CanonicalHashWriter();
+
+        Assert.That(
+            (Action)(() => writer.Add("\uD800")),
+            Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
     public void UnsupportedBatchValueFailsClosed()
     {
         using var writer = new CanonicalHashWriter();
