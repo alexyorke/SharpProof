@@ -30,6 +30,7 @@ $currentMaintainedDocuments = @(
     'SharpProof.Gates\Corpus\README.md'
 )
 $datedEvidenceDocuments = @(
+    'docs\code-usefulness-audit.md',
     'docs\soundness-notes\2026-08-08-relational-interprocedural-verification.md',
     'docs\soundness-notes\2026-07-25-api-spec-result-domains.md',
     'docs\soundness-notes\2026-07-25-hardening.md',

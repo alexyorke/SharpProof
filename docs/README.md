@@ -97,6 +97,7 @@ The implementation remains the authority for enumerated surfaces:
 
 | Document | Status | Role |
 |---|---|---|
+| [Exhaustive code-usefulness audit](code-usefulness-audit.md) | Dated evidence | Records the fixed 838-file baseline, line-level coverage ledger, accepted cleanup, rejected leads, metrics, and validation. |
 | [Acceptance contract](../eng/acceptance/README.md) | Active | Defines the release checks for the 1.0 preview. |
 | [Release gates](../SharpProof.Gates/README.md) | Active | Documents the corpus, metamorphic, performance, and cancellation runners. |
 | [Open-source corpus](../SharpProof.Gates/Corpus/README.md) | Active | Records corpus provenance, licensing, instrumentation, and update procedure. |
