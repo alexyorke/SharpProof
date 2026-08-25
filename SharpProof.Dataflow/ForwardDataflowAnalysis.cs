@@ -178,7 +178,13 @@ public static class ForwardDataflowAnalysis
                     continue;
                 }
 
-                var updated = graph.IsCyclicBlock(blockId) &&
+                var cyclicPredecessorChanged =
+                    graph.IsCyclicBlock(blockId) &&
+                    graph.GetPredecessors(blockId).Any(
+                        predecessor =>
+                            graph.IsCyclicBlock(predecessor) &&
+                            changedOutputs.ContainsKey(predecessor));
+                var updated = cyclicPredecessorChanged &&
                     updateCounts[blockId] >= options.WidenAfter
                     ? domain.Widen(inputs[blockId], candidate)
                     : candidate;
@@ -188,7 +194,10 @@ public static class ForwardDataflowAnalysis
                     throw new InvalidOperationException("Domain widening must be an upper bound.");
                 }
 
-                updateCounts[blockId]++;
+                if (cyclicPredecessorChanged)
+                {
+                    updateCounts[blockId]++;
+                }
                 if (!domain.AreEquivalent(inputs[blockId], updated))
                 {
                     inputs[blockId] = updated;

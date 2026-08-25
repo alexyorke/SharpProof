@@ -421,14 +421,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 **Confidence**: Medium
 
-### 164. WidenAfter Budget Consumed by Acyclic Upstream Stabilization, Widening Loop Headers on the First Genuine Back-Edge Update
-**Location**: `SharpProof.Dataflow\ForwardDataflowAnalysis.cs` (Lines 181-191)
-**Description**: updateCounts[blockId]++ fires on every real input change of a cyclic block regardless of origin. Because the solver is round-synchronized (Jacobi batch snapshot), an acyclic feed chain of uneven depth delivers k distinct input updates to a loop header over k rounds before the loop contributes anything, exhausting the WidenAfter budget so the first loop-carried growth immediately widens, dropping finite loop bounds that would have been recovered within budget. Soundness preserved; documented widen-after-N intent violated.
-**Reproduction Steps**:
-1. Graph 0→1→2→4, 0→3→4, 4→4 (self-increment), 4→5 with IntervalDomain, default options.
-2. Block 4's input changes in rounds 2 and 3 purely from acyclic paths, so the first self-loop growth triggers Widen; upper bound discarded one iteration after entering the loop.
-**Confidence**: Medium
-
 ### 165. Lattice Equivalence and .NET Equality Diverge for Interval Values (Top vs Full-Range): AreEquivalent True, Equals False
 **Location**: `SharpProof.Dataflow\IntervalValue.cs` (Lines 98-129) vs `ClosedAbstractDomain.cs` (Lines 23-26)
 **Description**: `Range(long.MinValue, long.MaxValue)` denotes the same set as Top; LessThanOrEqual holds both ways so solver equivalence checks treat them as identical fixpoint states, but IntervalValue.Equals/GetHashCode distinguish them (null vs sentinel bounds). Consumers caching, deduping, or diffing states with Equals see phantom differences the engine considers convergence-equivalent, breaking same-fixpoint-implies-same-cached-result assumptions.

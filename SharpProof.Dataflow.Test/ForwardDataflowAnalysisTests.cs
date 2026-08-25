@@ -81,6 +81,39 @@ public sealed class ForwardDataflowAnalysisTests
     }
 
     [Test]
+    public void AcyclicFeedsDoNotConsumeLoopWideningBudget()
+    {
+        var domain = new TrackingDomain();
+        var graph = new DataflowGraph<int>(
+            [
+                new(0, value => value),
+                new(1, value => value + 1),
+                new(2, value => value + 1),
+                new(3, value => value + 2),
+                new(4, value => value + 1),
+                new(5, value => value)
+            ],
+            [
+                new(0, 1),
+                new(1, 2),
+                new(2, 4),
+                new(0, 3),
+                new(3, 4),
+                new(4, 4),
+                new(4, 5)
+            ]);
+
+        var result = ForwardDataflowAnalysis.Analyze(
+            graph,
+            domain,
+            1,
+            new ForwardDataflowAnalysisOptions(widenAfter: 2));
+
+        Assert.That(graph.IsCyclicBlock(4), Is.True);
+        Assert.That(domain.FirstWidenPrevious, Is.EqualTo(5));
+    }
+
+    [Test]
     public void RandomizedBatchOrderDoesNotChangeFixpoint()
     {
         var domain = IntervalDomain.Instance;
@@ -162,6 +195,50 @@ public sealed class ForwardDataflowAnalysisTests
                 new(3, 3),
                 new(3, 4)
             ]);
+    }
+
+    private sealed class TrackingDomain : IAbstractDomain<int>
+    {
+        internal int FirstWidenPrevious
+        {
+            get;
+            private set;
+        } = -1;
+
+        public int Bottom
+        {
+            get { return 0; }
+        }
+        public int Top
+        {
+            get { return int.MaxValue; }
+        }
+        public bool LessThanOrEqual(int left, int right)
+        {
+            return left <= right;
+        }
+        public bool AreEquivalent(int left, int right)
+        {
+            return left == right;
+        }
+        public int Join(int left, int right)
+        {
+            return Math.Max(left, right);
+        }
+        public int Widen(int previous, int candidate)
+        {
+            if (FirstWidenPrevious < 0)
+            {
+                FirstWidenPrevious = previous;
+            }
+
+            return Top;
+        }
+
+        public int Havoc(int value)
+        {
+            return Top;
+        }
     }
 
     [Test]
