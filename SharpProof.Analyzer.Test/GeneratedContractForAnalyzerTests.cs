@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 
@@ -284,6 +286,73 @@ public sealed class GeneratedContractForAnalyzerTests
     }
 
     [Test]
+    public async Task GeneratedCompanionIntrinsicMisuseReportsInvalidContractArgument()
+    {
+        var diagnostics = await AnalyzeGeneratedAsync(
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts
+            {
+                public static int Map(IService receiver, int value)
+                {
+                    var result = Contract.Result<int>();
+                    return result;
+                }
+            }
+            """,
+            additionalDiagnosticIds: ["SP0024"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0024"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("Contract.Result")
+                    .And.Contain("expected use inside Contract.Ensures"));
+        }
+    }
+
+    [Test]
+    public async Task TreeConfigurationDiagnosticDoesNotSkipCompanionReconciliation()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public interface IService {
+                int Map(int value);
+            }
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts {
+            }
+            """,
+            ["SP0025", "SPCF0004"]);
+        compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+            "namespace InvalidOptions { internal sealed class Marker { } }",
+            new CSharpParseOptions(LanguageVersion.Preview),
+            "invalid-options.cs"));
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            new PerTreeOptionsProvider("invalid-options.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Count(static diagnostic => diagnostic.Id == "SP0025"),
+                Is.EqualTo(1));
+            Assert.That(
+                diagnostics.Count(static diagnostic => diagnostic.Id == "SPCF0004"),
+                Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public async Task MixedGeneratedCompanionBodyIsNotAnalyzedAsAnImplementation()
     {
         const string input = """
@@ -458,6 +527,59 @@ public sealed class GeneratedContractForAnalyzerTests
                 outputContext.AddSource(
                     hintName,
                     SourceText.From(source, System.Text.Encoding.UTF8)));
+        }
+    }
+
+    private sealed class PerTreeOptionsProvider(string invalidTreeFileName)
+        : AnalyzerConfigOptionsProvider
+    {
+        private static readonly AnalyzerConfigOptions Empty =
+            new DictionaryOptions(new Dictionary<string, string>());
+        private static readonly AnalyzerConfigOptions Global =
+            new DictionaryOptions(new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["build_property.SharpProofProfile"] = "advisory",
+                ["build_property.SharpProofFeatures"] = "contracts"
+            });
+        private static readonly AnalyzerConfigOptions Invalid =
+            new DictionaryOptions(new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["sharpproof_features"] = "invalid"
+            });
+
+        public override AnalyzerConfigOptions GlobalOptions => Global;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            return string.Equals(
+                    Path.GetFileName(tree.FilePath),
+                    invalidTreeFileName,
+                    StringComparison.Ordinal)
+                ? Invalid
+                : Empty;
+        }
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+        {
+            return Empty;
+        }
+    }
+
+    private sealed class DictionaryOptions(
+        IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+        {
+            if (values.TryGetValue(key, out var found))
+            {
+                value = found;
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
         }
     }
 }

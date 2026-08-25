@@ -1,3 +1,5 @@
+using SharpProof.Analyzer;
+
 namespace SharpProof.ContractForValidation;
 
 /// <summary>
@@ -163,6 +165,24 @@ internal static class ContractForCompanionValidator
                 GetSourceLocation(method, compilation, fallback),
                 method.Name));
             return;
+        }
+
+        foreach (var violation in new ContractIntrinsicValidator(compilation).Validate(
+                     method,
+                     inventory.ImplementationBody,
+                     includeNestedCallables: true))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var isOld = violation.Failure is
+                ContractBindingFailure.OldOutsideEnsures or
+                ContractBindingFailure.NestedOld;
+            var (argument, reason) = SharpProof.Analyzer.AnalyzerDiagnosticCatalog
+                .DescribeIntrinsicViolation(violation.Failure, isOld);
+            diagnostics.Add(SharpProof.Analyzer.InvalidContractArgumentDiagnostics.Create(
+                isOld ? "Contract.Old" : "Contract.Result",
+                argument,
+                reason,
+                violation.Invocation.Syntax.GetLocation()));
         }
 
         foreach (var clause in inventory.Clauses)

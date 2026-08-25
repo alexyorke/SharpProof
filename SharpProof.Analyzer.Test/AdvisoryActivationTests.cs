@@ -95,6 +95,63 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
+    public async Task AdvisoryActivationAggregatesAttributesAcrossSyntaxTrees()
+    {
+        const string contractTree = """
+            using SharpProof.Attributes;
+
+            internal static class ContractFixture {
+                internal static void Requires(int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+            """;
+        const string selectedTree = """
+            using SharpProof.Attributes;
+
+            public abstract class SelectedFixture {
+                [DoesNotThrow]
+                public abstract void Run();
+            }
+            """;
+        var firstContract = AnalyzerTestHost.CreateCompilation(
+            contractTree,
+            ["SP0047"],
+            filePath: "Contract.cs")
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+                selectedTree,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "Selected.cs"));
+        var firstSelected = AnalyzerTestHost.CreateCompilation(
+            selectedTree,
+            ["SP0047"],
+            filePath: "Selected.cs")
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+                contractTree,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "Contract.cs"));
+
+        var forward = await AnalyzerTestHost.AnalyzeAsync(
+            firstContract,
+            mode: null,
+            analyzer: new SharpProofAnalyzer());
+        var reverse = await AnalyzerTestHost.AnalyzeAsync(
+            firstSelected,
+            mode: null,
+            analyzer: new SharpProofAnalyzer());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                forward.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+            Assert.That(
+                reverse.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+        }
+    }
+
+    [Test]
     public async Task CompilationReferenceNestedParameterContractActivatesCallAnalysis()
     {
         var external = AnalyzerTestHost.CreateCompilation(

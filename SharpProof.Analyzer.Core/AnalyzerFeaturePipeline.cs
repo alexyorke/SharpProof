@@ -134,7 +134,10 @@ internal static partial class AnalyzerFeaturePipeline
             }
             session.RegisterSelectedSemicolonAccessor(method);
         }
-        if ((!method.IsAbstract && !method.IsExtern) || !selection.Any)
+        if ((!method.IsAbstract &&
+             !method.IsExtern &&
+             !InvocationEmissionPolicy.IsUnimplementedPartial(method)) ||
+            !selection.Any)
         {
             return;
         }

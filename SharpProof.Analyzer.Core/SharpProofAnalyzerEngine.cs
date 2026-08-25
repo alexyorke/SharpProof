@@ -50,6 +50,14 @@ internal sealed partial class SharpProofAnalyzerEngine
             return;
         }
 
+        // ContractFor validation is a final-compilation reconciliation. The
+        // analyzer is the sole owner so every source tree, including output
+        // added by peer generators, is observed exactly once. Register it
+        // before configuration/activation early returns so invalid companions
+        // are never hidden by an unrelated configuration diagnostic.
+        context.RegisterCompilationEndAction(
+            ValidateContractForCompanions);
+
         // A contract API that is referenced but unreadable disables every
         // contract silently, which is indistinguishable from "nothing to
         // report". Surface it instead.
@@ -84,15 +92,6 @@ internal sealed partial class SharpProofAnalyzerEngine
                     configurationDiagnostics));
             return;
         }
-
-        // ContractFor validation is a final-compilation reconciliation. The
-        // analyzer is the sole owner so every source tree, including output
-        // added by peer generators, is observed exactly once. This is
-        // intentionally independent of feature selection and advisory
-        // activation: every non-off profile must reject malformed companions
-        // rather than silently treating them as absent.
-        context.RegisterCompilationEndAction(
-            ValidateContractForCompanions);
 
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(
@@ -208,6 +207,8 @@ internal sealed partial class SharpProofAnalyzerEngine
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        var hasFullAttribute = false;
+        var hasContractApiCandidate = false;
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -223,18 +224,28 @@ internal sealed partial class SharpProofAnalyzerEngine
                 if (node is AttributeSyntax attribute &&
                     !IsAssemblyOrModuleAttribute(attribute))
                 {
-                    return AdvisoryActivation.Full;
+                    hasFullAttribute = true;
                 }
 
                 if (node is InvocationExpressionSyntax invocation &&
                     IsContractApiCandidate(invocation.Expression))
                 {
-                    return new(
-                        RequiresSymbolAnalysis: false,
-                        RequiresOperationAnalysis: true,
-                        RequiresFullOperationAnalysis: true);
+                    hasContractApiCandidate = true;
                 }
             }
+        }
+
+        if (hasFullAttribute)
+        {
+            return AdvisoryActivation.Full;
+        }
+
+        if (hasContractApiCandidate)
+        {
+            return new(
+                RequiresSymbolAnalysis: false,
+                RequiresOperationAnalysis: true,
+                RequiresFullOperationAnalysis: true);
         }
 
         var hasSharpProofAssemblyAttribute =

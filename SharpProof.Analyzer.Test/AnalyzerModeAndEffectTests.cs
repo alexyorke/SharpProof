@@ -2124,6 +2124,38 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task SelectedUnimplementedPartialRecordsAbstention()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static partial class Fixture {
+                [EnforcePure]
+                static partial void Missing();
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("MissingOperationRoot"));
+            Assert.That(factory.OutcomeCounts["Missing"], Is.EqualTo(1));
+            Assert.That(
+                factory.Outcomes["Missing"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+        }
+    }
+
+    [Test]
     public async Task ConcreteSelectedAutoAccessorsAbstainExactlyOnce()
     {
         var factory = new RecordingSessionFactory();
