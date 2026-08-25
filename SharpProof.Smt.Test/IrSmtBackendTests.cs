@@ -570,9 +570,40 @@ public sealed class IrSmtBackendTests
 
         Func<Task> action = async () => await check;
         Assert.ThrowsAsync<OperationCanceledException>(action);
-        var retired = backend.CheckAsync(query, CancellationToken.None)
+        var healthyQuery = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        var retired = backend.CheckAsync(healthyQuery, CancellationToken.None)
             .GetAwaiter().GetResult();
-        Assert.That(retired.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
+        Assert.That(retired.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+    }
+
+    [Test]
+    public async Task ResourceAccountingTreatsEachSolverStatisticsSnapshotAsFresh()
+    {
+        var factory = new IrFactory();
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend();
+
+        await backend.CheckAsync(query, CancellationToken.None);
+        var first = backend.ConsumedResourceCount;
+        await backend.CheckAsync(query, CancellationToken.None);
+        var second = backend.ConsumedResourceCount;
+
+        Assert.That(second, Is.GreaterThanOrEqualTo(first));
+        Assert.That(second, Is.LessThan(1L << 32));
     }
 
     [Test]

@@ -44,6 +44,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 lock (_gate)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    Volatile.Write(ref _interrupted, false);
                     if (_disposed || Volatile.Read(ref _interrupted))
                     {
                         return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
@@ -193,7 +194,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             long observed = entry.UIntValue;
             _consumedResourceCount += observed >= _lastObservedResourceCount
                 ? observed - _lastObservedResourceCount
-                : (1L << 32) - _lastObservedResourceCount + observed;
+                : observed;
             _lastObservedResourceCount = observed;
             return;
         }
