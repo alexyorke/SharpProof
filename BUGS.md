@@ -397,15 +397,6 @@ These assignments are redundant since the guard simply returns the input if it's
 3. Inspect the computed effect summary and observe that potential writes and allocations during static initialization are missing.
 **Confidence**: Medium
 
-### 134. AtomicFile Non-Staged Writes Lack Flush-to-Disk Before Rename
-**Location**: `SharpProof.Ir\AtomicFile.cs` (Lines 70-82, 89-108)
-**Description**: In `AtomicFile.WriteUtf8` and `AtomicFile.WriteBytesAsync`, file content is written via standard .NET streams without calling `stream.Flush(flushToDisk: true)` before `Publish` renames the temporary file to the destination path. On sudden system crashes or power loss, directory metadata updates can be committed while file content blocks remain unwritten in OS cache, resulting in corrupted or zero-length destination files.
-**Reproduction Steps**:
-1. Invoke `AtomicFile.WriteUtf8` to persist verification cache entries.
-2. Simulate process/system termination immediately following the method call.
-3. Destination file may exist with zero bytes or partial data due to missing fsync.
-**Confidence**: High
-
 ### 136. Unbounded Recursion in ManagedAbstractFlow.IsAcyclic on Unbudgeted CFGs
 **Location**: `SharpProof.Effects\ManagedAbstractFlow.cs` (Lines 915-940) and `SharpProof.Effects\EffectMethodNodeBuilder.cs` (Lines 376-380)
 **Description**: `EffectMethodNodeBuilder.AnalyzeControlFlowGraph` calls `ManagedAbstractFlow.IsAcyclic` on any constructed Roslyn control flow graph without checking against graph size or depth limits. `IsAcyclic` uses recursive DFS traversal without recursion depth caps, making the analyzer vulnerable to `StackOverflowException` when analyzing methods with deeply nested control flow structures.

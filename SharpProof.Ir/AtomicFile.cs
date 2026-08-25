@@ -65,7 +65,7 @@ internal static class AtomicFile
         var (destination, temporary) = Prepare(path);
         try
         {
-            File.WriteAllText(temporary, content, Utf8);
+            WriteStagedBytes(temporary, Utf8.GetBytes(content));
             Publish(temporary, destination);
         }
         finally
@@ -90,6 +90,9 @@ internal static class AtomicFile
             {
                 await stream.WriteAsync(content, 0, content.Length, cancellationToken)
                     .ConfigureAwait(false);
+#pragma warning disable CA1849 // Flush(true) is required for atomic durability.
+                stream.Flush(true);
+#pragma warning restore CA1849
             }
 
             Publish(temporary, destination);
