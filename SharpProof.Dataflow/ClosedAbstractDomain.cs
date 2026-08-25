@@ -46,6 +46,12 @@ public abstract class ClosedAbstractDomain<T> : IAbstractDomain<T>
                 "Abstract-domain comparison is not monotone: the new value is not above the old value.");
         }
 
-        return 1;
+        if (LessThanOrEqual(newValue, oldValue))
+        {
+            return 1;
+        }
+
+        throw new InvalidOperationException(
+            "Abstract-domain values are incomparable; a three-way comparison is undefined.");
     }
 }
