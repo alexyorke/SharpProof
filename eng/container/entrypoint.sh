@@ -140,6 +140,8 @@ case "${command_name}" in
       --exclude='*/obj/*' \
       --exclude='./.vs' \
       --exclude='./.baseline-check' \
+      --exclude='./.claude' \
+      --exclude='./.claude/*' \
       -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
     ln -s "${repo_root}/artifacts" "${task_root}/artifacts"
     if [[ "${source_has_git}" = "true" ]] &&
