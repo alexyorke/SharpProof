@@ -74,10 +74,11 @@ public sealed class ProofKernel(ISmtBackend backend)
         }
         cancellationToken.ThrowIfCancellationRequested();
         var goal = interpreter.Evaluate(query.Goal.Predicate, result.Model.Assignments, cancellationToken);
-        if (goal.Status == IrEvaluationStatus.Exception &&
-            query.Goal.Diagnostic == ProofDiagnosticKind.Postcondition)
+        if (goal.Status == IrEvaluationStatus.Exception)
         {
-            return Unknown(AbstentionReason.PostconditionMayBeUndefined);
+            return Unknown(query.Goal.Diagnostic == ProofDiagnosticKind.InternalConsistency
+                ? AbstentionReason.InternalConsistencyMayBeUndefined
+                : AbstentionReason.PostconditionMayBeUndefined);
         }
 
         return IsBoolean(goal, expected: false)

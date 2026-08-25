@@ -526,7 +526,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                     Own(_context.MkMul(quotient, rightInteger))));
             var operationDefined = @operator == IrBinaryOperator.Divide
                 ? DivisionDefined(leftInteger, rightInteger)
-                : RemainderDefined(rightInteger);
+                : RemainderDefined(leftInteger, rightInteger);
             return Bounded(result,
                 Own(_context.MkAnd(defined, operationDefined)));
         }
@@ -621,7 +621,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
 
         private BoolExpr DivisionDefined(ArithExpr left, ArithExpr right)
         {
-            var nonzero = RemainderDefined(right);
+            var nonzero = NonZero(right);
             var notOverflow = Own(_context.MkNot(Own(_context.MkAnd(
                 Own(_context.MkEq(
                     left,
@@ -632,7 +632,16 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             return Own(_context.MkAnd(nonzero, notOverflow));
         }
 
-        private BoolExpr RemainderDefined(ArithExpr right)
+        private BoolExpr RemainderDefined(ArithExpr left, ArithExpr right)
+        {
+            return Own(_context.MkNot(Own(_context.MkOr(
+                Own(_context.MkEq(right, Own(_context.MkInt(0)))),
+                Own(_context.MkAnd(
+                    Own(_context.MkEq(left, Own(_context.MkInt(long.MinValue)))),
+                    Own(_context.MkEq(right, Own(_context.MkInt(-1))))))))));
+        }
+
+        private BoolExpr NonZero(ArithExpr right)
         {
             return Own(_context.MkNot(Own(_context.MkEq(
                 right,

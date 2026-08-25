@@ -286,7 +286,7 @@ public sealed class PartialTermSmtDifferentialOracle
             RefutedOutcome => PartialTermSemanticOutcome.DefinedFalse,
             UnknownOutcome
             {
-                Reason: AbstentionReason.CounterexampleReplayFailed
+                Reason: AbstentionReason.InternalConsistencyMayBeUndefined
             } => PartialTermSemanticOutcome.Undefined,
             _ => null
         };
