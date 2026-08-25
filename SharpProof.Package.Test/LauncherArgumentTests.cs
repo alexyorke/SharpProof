@@ -202,6 +202,38 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void LinuxWorkerDeadlinePreservesAnExitObservedBeforeTermination()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        using var process = System.Diagnostics.Process.Start(
+            new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "/bin/sh",
+                UseShellExecute = false,
+                ArgumentList = { "-c", "exit 17" }
+            })!;
+        process.WaitForExit();
+
+        var completion = LinuxWorkerProcess.CompleteAtDeadline(
+            process,
+            System.Diagnostics.Stopwatch.StartNew(),
+            TimeSpan.FromSeconds(1));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                completion.Kind,
+                Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+            Assert.That(completion.ExitCode, Is.EqualTo(17));
+        }
+    }
+
+    [Test]
     public void UnknownOptionIsRejected()
     {
         string[] arguments = [

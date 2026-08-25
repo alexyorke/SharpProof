@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 30 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 24 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -2231,83 +2231,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 
 Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 
-### SP-AUDIT-250 - Changed-test selection ignores imported root build inputs (P2)
-
-- [x] `Invoke-SharpProofChangedTests.ps1` treats only `Directory.*`,
-  `global.json`, `NuGet.Config`, and `SharpProof.sln` as global inputs. Its
-  project graph reads `ProjectReference` and explicit `Compile` items but never
-  follows MSBuild `Import` elements.
-- Supported impact: changing only `SharpProof.Release.props`,
-  `SharpProof.PackageMetadata.props`, `SharpProof.AnalyzerConsumer.props`, or
-  another imported root input selects only the Architecture fallback. A routine
-  `test-changed` run silently omits the affected product and package tests.
-- Evidence: `Directory.Build.props` imports `SharpProof.Release.props`; several
-  packable projects import `SharpProof.PackageMetadata.props`. None can enter
-  `$changedProjectPaths`, and the special package-test rule covers only
-  `scripts/`, `eng/container/`, `SharpProof.Package/`, and
-  `SharpProof.Verifier/` paths.
-- Required closure: derive imported inputs from evaluated MSBuild project data
-  or maintain one tested global/shared-input catalog. Add plan-only fixtures for
-  every root props file and require package tests where package metadata or
-  release authority changes.
-
-### SP-AUDIT-251 - Pre-launch setup can consume the verifier cleanup reserve (P2)
-
-- [x] `RunVerifier.Execute` starts `processStopwatch` before resolving the host,
-  supervisor, working directory, process start, pidfd, stream readers, and gate
-  handshake. The same outer stopwatch later bounds termination, output drain,
-  and cleanup-receipt authentication.
-- Supported impact: setup beyond the nominal reserve (one second for direct task
-  calls and five seconds for worker-launcher calls) consumes cleanup time before
-  the verifier begins. At the outer deadline `TryTerminate` and output
-  authentication can receive zero milliseconds, producing containment failure
-  or leaving deferred cleanup for an otherwise ordinary slow launch.
-- Evidence: the initial wait is the minimum of the verifier budget and
-  `RemainingMilliseconds(processStopwatch, processTimeout)`; every cleanup path
-  at lines 228-267 reuses that remaining value. Existing deadline tests delay
-  the child after startup and do not delay resolution/start/gate setup.
-- Required closure: separate the execution deadline from a cleanup clock or
-  start the bounded process deadline at the authenticated launch boundary while
-  retaining an independently guaranteed cleanup reserve. Add deterministic
-  setup-delay tests below, at, and above both reserves.
-
-### SP-AUDIT-252 - An exit at the worker deadline is reported as a timeout (P2)
-
-- [x] `LinuxWorkerProcess.WaitForExit` checks `WaitForExit(0)`, then checks the
-  elapsed deadline. The child can exit between those operations. `Terminate`
-  notices `HasExited` and returns without killing, but the caller unconditionally
-  returns `TimedOut` with exit code 124.
-- Supported impact: a normally completed worker can have its real exit code and
-  valid result overwritten by launcher timeout handling at the deadline edge.
-  This is a fail-closed publication/lifecycle error, not a containment bypass.
-- Evidence: the timeout branch at `LinuxWorkerProcess.cs:104-109` has no second
-  exit observation after the elapsed-time check. Existing boundary tests cover
-  deadline arithmetic, timeout, cancellation, and grace, but not exit in this
-  check-to-classification window.
-- Required closure: recheck process completion immediately before timeout
-  classification and return the real exit when termination observes an already
-  exited child. Add a synchronizable deadline-edge regression and repeated race
-  stress control.
-
-### SP-AUDIT-253 - Relative multitarget SARIF paths are anchored to process CWD (P2)
-
-- [x] `SharpProof.Verifier.targets` calls one-argument
-  `Path.GetFullPath(SharpProofVerifySarifFile)` when scoping a configured SARIF
-  path by target framework. That overload uses the MSBuild process current
-  directory, not `MSBuildProjectDirectory`.
-- Supported impact: invoking `dotnet build /path/to/project.csproj` from another
-  directory writes and cleans `evidence/<tfm>/result.sarif` under the caller's
-  directory instead of the project. Verification can report success while the
-  configured project-relative evidence is missing or misplaced.
-- Reproduction: canonical Linux MSBuild evaluated a project at `/probe` from
-  `/tmp`; `reports/result.sarif` resolved to
-  `/tmp/reports/result.sarif`. The current multitarget integration test runs
-  with its working directory equal to the consumer project, masking the defect.
-- Required closure: combine a relative configured path with
-  `MSBuildProjectDirectory` before canonicalization in both build and clean
-  property groups. Add build/clean/incremental tests invoked from a distinct
-  working directory, with rooted-path controls.
-
 ### SP-AUDIT-034 - Compilation snapshots are not exact canonical capture images (fixed)
 
 - [x] Fixed by the canonical identity foundation `33bd36adc`, residual-state
@@ -2356,46 +2279,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   mutation cases.
 - Consolidated cases: SP-AUDIT-081, SP-AUDIT-090, SP-AUDIT-139, SP-AUDIT-201, SP-AUDIT-212.
 - Unified closure: Generate one exact capture/fingerprint predicate for canonical strings and paths, module roles/properties, additional-file identity, and empty-tree derivations.
-
-### SP-AUDIT-041 - Proof evidence and used assumptions are not jointly bound (P2)
-
-- [x] Protocol validation checks proof cores, counterexample models, effect
-  witnesses, and assumption-use flags only for local shape or self-consistency.
-  It never ties proof labels or model variables to the compiler artifact, never
-  requires an effect witness to violate the sealed claim's specific contract
-  kind, and deliberately omits `Used` from its manifest-assumption comparison.
-- Supported impact: a response can remain request-, input-, manifest-, budget-,
-  and result-set-bound while falsely explaining why a claim was proved or
-  refuted. This violates the documented canonical-proof-core contract, permits
-  invented counterexample assignments, can report a state write as the reason
-  a `DoesNotThrow` contract failed, and can inflate the reported use of a
-  trusted boundary without corresponding solver evidence.
-- Reproduction: temporary canonical-container protocol tests passed four
-  fabricated payloads through `ValidateForRequest`: a proven result with sole
-  core label `fabricated-proof-core`; a refuted postcondition with invented
-  model variable `fabricated = 999`; and a refuted `DoesNotThrow` claim whose
-  witness contained only `WritesStaticState`; plus a proven result that changed
-  a declared `TrustedBoundary` assumption from unused to used and recomputed
-  the summary. An existing vacuity test likewise accepts `requires:0` although
-  its fixture manifest declares no precondition, so current coverage codifies
-  shape-only acceptance.
-- Required closure: validate claim evidence with the decoded compiler artifact,
-  or replace free-form rows with typed identities. Require every proof label to
-  name admitted compiler/spec/domain/summary evidence, every model variable and
-  value kind to match the claim's canonical replay inventory, and every effect
-  witness to contradict its exact effect contract; bind every `Used` flag to
-  admitted proof/vacuity evidence. Add fabricated/wrong-ordinal core, model
-  name/type/value, mismatched effect kind/capability/throw hierarchy, assumption
-  use, vacuity, empty hygienic, valid controls, canonical ordering, and
-  mutations restoring each shape-only path.
-- Consolidated cases: SP-AUDIT-217.
-- Unified closure: Share one artifact-aware mapping from proof-core labels to exact manifest assumptions, Used flags, and summary counts in producer and validator.
-- Resolution: compiler-artifact-aware response validation now authenticates
-  proof labels, replay-model variables, exact effect witnesses, vacuity, and
-  assumption-use flags against the sealed claim authority. Failed compiler
-  targets and summary dependency labels use the producer's exact canonical
-  forms. The adversarial authority matrix passes 8/8 and the full Worker suite
-  passes 581/581.
 
 ### SP-AUDIT-048 - Invocation lifecycle leaks temporary runtime state (fixed)
 
@@ -2532,38 +2415,6 @@ Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, c
   SBOM, and checksum file. Both emission and standalone replay reopen and hash
   current bytes under the exact release-authority closure; stale and changed
   bundle fixtures and the removal mutation are covered.
-
-### SP-AUDIT-132 - Source locations lack one source-bound canonical geometry (P2)
-
-- [x] The compiler-artifact producer stores Roslyn's zero-based mapped line and
-  column directly, while all other `WorkerSourceLocation` producers and the
-  protocol contract require positive, one-based coordinates. Artifact validation
-  contains a weaker diagnostic-only exception that admits zero.
-- Supported impact: a physical line 5, column 16 error was recorded as 4,15; a
-  first-character error was accepted as 0,0 even though
-  `WorkerProtocolMetadata.IsSourceLocationValid` rejects that location.
-- Reproduction: the read-only compiler auditor produced both artifacts and
-  confirmed the source span remained correct while only display coordinates
-  violated the shared model.
-- Partial remediation (04d933623): compiler diagnostics now emit one-based
-  mapped coordinates and share the protocol's positive-location/all-zero
-  non-source predicate. Regression coverage includes first position, multiline,
-  `#line`, generated source, exact-end zero-length spans, malformed mixed-zero
-  shapes, and a conversion-removal mutation. The row remains active because
-  schema 12 has no syntax-tree ordinal/hash, source text, or line-map authority
-  with which hydration could recompute and authenticate mapped geometry.
-- Required closure: add one to mapped source coordinates, allow the all-zero
-  sentinel only for genuinely non-source diagnostics, then version the artifact
-  so hydration can bind every location to its physical tree, checked source
-  extent, and authenticated line map.
-- Consolidated cases: SP-AUDIT-179, SP-AUDIT-220, SP-AUDIT-236.
-- Unified closure: Bind every location to a physical tree and line-map identity; validate checked spans, sealed source length, and recomputed one-based mapped coordinates together.
-- Resolution: compiler-artifact schema 14 binds source diagnostics, callable and
-  claim locations, and effect replay events to canonical captured tree paths,
-  text hashes, checked spans, and authenticated line maps. Hydration recomputes
-  exact one-based mapped geometry, distinguishes genuine non-source sentinels,
-  and rejects omitted, substituted, or coordinately resealed bindings. Primary
-  constructor paths are normalized through the same capture authority.
 
 ### SP-AUDIT-140 - Relational-summary work lacks an end-to-end resource budget (fixed)
 

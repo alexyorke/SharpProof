@@ -856,6 +856,39 @@ public sealed class BuildTaskTests
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
+    public void VerifierPreLaunchSetupDoesNotConsumeCleanupReserve()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-launcher-setup-");
+        try
+        {
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "System.Threading.Thread.Sleep(900);");
+            using var task = new RunVerifier
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 1200,
+                TerminationGraceMilliseconds = 50,
+                PreLaunchSetupOverride = () => Thread.Sleep(1500)
+            };
+
+            Assert.That(task.Execute(), Is.True);
+            Assert.That(task.ExitCode, Is.Zero);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierTaskRejectsOverflowingTimeoutBeforeLaunch()
     {
         var directory = Directory.CreateTempSubdirectory(

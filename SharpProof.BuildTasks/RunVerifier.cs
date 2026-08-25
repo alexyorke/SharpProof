@@ -53,6 +53,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     internal Func<int, int>? OpenPidFdOverride { get; set; }
     internal Func<Process?, int, int, bool>? TryTerminateOverride { get; set; }
     internal Action<string>? ContainmentAuthenticationFailureOverride { get; set; }
+    internal Action? PreLaunchSetupOverride { get; set; }
 
     internal static int RetainedCleanupAnchorCount =>
         RetainedCleanupAnchors.Count;
@@ -147,7 +148,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             var verifierTimeout = workerLauncherBudget
                 ? processTimeout
                 : processTimeout - LauncherProcessReserveMilliseconds;
-            var processStopwatch = Stopwatch.StartNew();
+            PreLaunchSetupOverride?.Invoke();
             var resolvedExecutable = ResolveDotNetHost(Executable);
             supervisorNonce = CreateSupervisorNonce();
             process = new Process
@@ -214,6 +215,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     ProcessGateStartMessage + " " + supervisorNonce);
                 process.StandardInput.Close();
             }
+            var processStopwatch = Stopwatch.StartNew();
             var timedOut = !WaitForExitOrCancellation(
                 process,
                 Math.Min(

@@ -120,6 +120,7 @@ foreach ($changedPath in $changedPaths) {
     $fullChangedPath = [IO.Path]::GetFullPath(
         (Join-Path $repositoryRoot $changedPath))
     if ($changedPath -match '^Directory\.' -or
+        $changedPath -match '^[^/]+\.(props|targets)$' -or
         $changedPath -in @('global.json', 'NuGet.Config', 'SharpProof.sln')) {
         $globalImpact = $true
         continue

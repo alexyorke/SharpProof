@@ -103,10 +103,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             if (stopwatch.Elapsed >= terminationStart)
             {
-                Terminate(process, stopwatch, finalLimit);
-                return new LinuxWorkerCompletion(
-                    LinuxWorkerCompletionKind.TimedOut,
-                    124);
+                return CompleteAtDeadline(process, stopwatch, finalLimit);
             }
             if (cancellationToken.WaitHandle.WaitOne(PollMilliseconds))
             {
@@ -151,23 +148,41 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         if (!process.HasExited)
         {
             var stopwatch = Stopwatch.StartNew();
-            Terminate(process, stopwatch, TimeSpan.FromSeconds(1));
+            _ = Terminate(process, stopwatch, TimeSpan.FromSeconds(1));
         }
         process.Dispose();
     }
 
-    private static void Terminate(
+    internal static LinuxWorkerCompletion CompleteAtDeadline(
+        Process process,
+        Stopwatch stopwatch,
+        TimeSpan finalLimit)
+    {
+        return Terminate(process, stopwatch, finalLimit)
+            ? new LinuxWorkerCompletion(
+                LinuxWorkerCompletionKind.TimedOut,
+                124)
+            : new LinuxWorkerCompletion(
+                LinuxWorkerCompletionKind.Exited,
+                process.ExitCode);
+    }
+
+    private static bool Terminate(
         Process process,
         Stopwatch stopwatch,
         TimeSpan finalLimit)
     {
         if (process.HasExited)
         {
-            return;
+            return false;
         }
-        if (NativeMethods.Kill(process.Id, SignalTerminate) != 0 &&
-            Marshal.GetLastPInvokeError() != 3)
+        if (NativeMethods.Kill(process.Id, SignalTerminate) != 0)
         {
+            if (Marshal.GetLastPInvokeError() == 3 &&
+                process.WaitForExit(0))
+            {
+                return false;
+            }
             throw NativeFailure(
                 "SharpProof could not terminate the worker process.");
         }
@@ -197,6 +212,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                     "The SharpProof worker did not terminate within its grace period.");
             }
         }
+        return true;
     }
 
     private static void TerminateNow(Process process)
