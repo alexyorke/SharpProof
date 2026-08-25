@@ -713,6 +713,38 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task StringOperationsAbstainBeforeSmtEncoding()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                [EnforcePure]
+                public static string Concat(string text) => text + "proof";
+
+                [EnforcePure]
+                public static int Length(string text) => text.Length;
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047", "SP0047"]));
+        Assert.That(
+            diagnostics.Select(diagnostic => diagnostic.GetMessage(
+                CultureInfo.InvariantCulture)),
+            Has.All.Contain("UnsupportedOperationShape"));
+        Assert.That(
+            factory.Outcomes.Values,
+            Has.All.EqualTo(AnalyzerSemanticOutcome.Abstained));
+    }
+
+    [Test]
     public async Task ExternalClosedPreconditionMustAlsoBeEstablished()
     {
         var external = AnalyzerTestHost.EmitReference(

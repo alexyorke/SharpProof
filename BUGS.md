@@ -419,14 +419,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Any decrease below a previously observed large count triggers the 2^32-compensation branch yielding a wildly wrong delta.
 **Confidence**: Low
 
-### 151. Encoder/Replay Support Matrix Asymmetric: String Concat and Length Supported by Replay but Rejected by SMT Encoder
-**Location**: `SharpProof.Smt\IrSmtBackend.cs` (Lines 496-511 EncodeBinary has no StringConcat arm; 552-557 EncodeLength rejects strings); contrast `SharpProof.Ir\IrInterpreter.cs` (Lines 291, 362-373, 444)
-**Description**: The reference interpreter executes string concat, string Length, and reference-to-string casts, but the SMT encoder rejects all of them (UnsupportedEncoding). Each construct in an assumption or goal forces claim-level Unknown even though counterexample replay supports it. Because the fuzzer treats Abstained as non-failure, the entire string surface has no mismatch-detecting differential coverage; future regressions there land unguarded. Sound direction (fail-closed), reported as precision/coverage defect.
-**Reproduction Steps**:
-1. Goal `factory.Length(factory.Variable(stringVar)) > 0`: observe UnsupportedEncoding.
-2. Goal `s ++ "" == s`: same, despite replay supporting concat.
-**Confidence**: High (asymmetry factual; impact limited to precision/coverage)
-
 ### 152. Collection Expressions Wipe All Element and Allocation Effects Via Implicit Object Creation Short-Circuit
 **Location**: `SharpProof.Effects\OperationEffectScanner.cs` (Lines 707-712: `ScanObjectCreation` returns Empty for `creation.IsImplicit`)
 **Description**: Roslyn lowers a collection expression targeting a concrete collection (e.g., `List<int> x = [Touch(), 2]`) to an implicit IObjectCreationOperation carrying the element expressions. The scanner returns EffectSummary.Empty before scanning arguments/initializer or resolving the constructor, so side effects, allocations, and exceptions of every element expression are silently omitted. No downstream layer compensates; admission still passes because lowered kinds are all supported, despite SEMANTICS.md claiming collection expressions are rejected.

@@ -169,6 +169,7 @@ internal static class LanguageSubsetGate
                 creation.Constructor != null &&
                 SupportsCall(creation.Constructor, hasResolvedGenericApiSpec),
             IPropertyReferenceOperation property =>
+                !IsStringLength(property) &&
                 SupportsProperty(property, hasResolvedGenericApiSpec),
             IConversionOperation conversion =>
                 conversion.OperatorMethod == null,
@@ -178,7 +179,7 @@ internal static class LanguageSubsetGate
             IUnaryOperation unary =>
                 unary.OperatorMethod == null,
             IBinaryOperation binary =>
-                binary.OperatorMethod == null,
+                binary.OperatorMethod == null && !IsStringConcat(binary),
             ICompoundAssignmentOperation compound =>
                 compound.OperatorMethod == null,
             IIncrementOrDecrementOperation increment =>
@@ -206,6 +207,20 @@ internal static class LanguageSubsetGate
         var availableAccessors = accessors.Where(static accessor => accessor != null).ToArray();
         return availableAccessors.Length != 0 &&
                availableAccessors.All(accessor => hasResolvedGenericApiSpec(accessor!));
+    }
+
+    private static bool IsStringLength(IPropertyReferenceOperation property)
+    {
+        return property.Instance?.Type?.SpecialType == SpecialType.System_String &&
+            property.Property.OriginalDefinition.ContainingType.SpecialType ==
+            SpecialType.System_String &&
+            property.Property.OriginalDefinition.MetadataName == "Length";
+    }
+
+    private static bool IsStringConcat(IBinaryOperation binary)
+    {
+        return binary.OperatorKind == BinaryOperatorKind.Add &&
+            binary.Type?.SpecialType == SpecialType.System_String;
     }
 
     private static bool SupportsCall(
