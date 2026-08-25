@@ -347,8 +347,6 @@ public sealed class WorkerClaimResult
     public WorkerVacuityKind Vacuity { get; set; }
     public string[] ProofCore { get; set; } = [];
     public WorkerModelValue[] Model { get; set; } = [];
-    // Null means the claim inherits its callable's manifest declarations. This
-    // compact wire form keeps a large failure response inside the JSON limit.
     public WorkerAssumptionEvidence[]? Assumptions { get; set; }
 }
 
@@ -873,8 +871,7 @@ internal static class WorkerProtocolMetadata
         new("response.claim_reason", static value => WorkerProtocolMetadata.MatchesClaimOutcome(value.Outcome, value.Reason)),
         new("response.proof_core", static value => WorkerProtocolJson.AreDistinctNonblank(value.ProofCore)),
         new("response.model", static value => WorkerProtocolJson.AreValidModel(value.Model)),
-        new("response.assumptions", static value => value.Assumptions == null ||
-            WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
+        new("response.assumptions", static value => value.Assumptions == null || WorkerProtocolJson.AreValidAssumptions(value.Assumptions)),
         new("response.vacuity_evidence", static value =>
             (!(value.Vacuity != WorkerVacuityKind.None)
             || (value.ProofCore is { Length: > 0 }))),

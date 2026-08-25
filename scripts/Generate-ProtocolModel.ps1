@@ -297,7 +297,12 @@ function ConvertTo-ValidationConditionSource {
             return "WorkerProtocolJson.AreDistinctNonblank($($property.Source))"
         }
         'validAssumptions' {
-            return "WorkerProtocolJson.AreValidAssumptions($($property.Source))"
+            $validation =
+                "WorkerProtocolJson.AreValidAssumptions($($property.Source))"
+            if ($property.Type.EndsWith('?')) {
+                return "$($property.Source) == null || $validation"
+            }
+            return $validation
         }
         'assumptionsUnused' {
             return "($($property.Source) ?? []).All(" +
