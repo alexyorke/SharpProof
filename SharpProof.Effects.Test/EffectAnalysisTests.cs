@@ -1259,6 +1259,56 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void AwaitProtocolEffectsAreScanned()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+
+            public static class Global {
+                public static int State;
+            }
+
+            public sealed class Awaitable {
+                public Awaiter GetAwaiter() {
+                    Global.State++;
+                    return new Awaiter();
+                }
+
+                public sealed class Awaiter : INotifyCompletion {
+                    public bool IsCompleted {
+                        get {
+                            Global.State++;
+                            return true;
+                        }
+                    }
+
+                    public void OnCompleted(Action continuation) { }
+
+                    public int GetResult() {
+                        Global.State++;
+                        return 0;
+                    }
+                }
+            }
+
+            public static class Sample {
+                public static async Task<int> Run(Awaitable awaitable) =>
+                    await awaitable;
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Run"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void ObjectAndCollectionInitializersContributeTheirEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(

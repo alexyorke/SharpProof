@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace SharpProof.Effects;
 
 internal sealed partial class OperationEffectScanner
@@ -137,10 +139,115 @@ internal sealed partial class OperationEffectScanner
         }
 
         var receiver = awaitOperation.Operation;
+        var receiverRegion = _conversionOwnership.ClassifyRegion(
+            receiver,
+            aliasSource: true);
         var nullCheck = new EffectStep(
             PotentialNullReceiver(receiver, awaitOperation),
             _nullnessEvaluator.IsProvenNonNull(receiver, awaitOperation));
         return operand.Then(nullCheck).Summary;
+    }
+
+    internal EffectStep ScanAwaitProtocol(
+        IAwaitOperation awaitOperation)
+    {
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(
+                _session.Compilation,
+                awaitOperation.Syntax.SyntaxTree);
+        var info = awaitOperation.Syntax is AwaitExpressionSyntax awaitSyntax
+            ? Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+                .GetAwaitExpressionInfo(model, awaitSyntax)
+            : default;
+        if (info.GetAwaiterMethod is not { } getAwaiter)
+        {
+            return new EffectStep(
+                EffectSummaryOperations.Unsupported(),
+                false);
+        }
+
+        var receiver = awaitOperation.Operation;
+        var receiverRegion = _conversionOwnership.ClassifyRegion(
+            receiver,
+            aliasSource: true);
+        var awaiter = EffectRegionSet.Create(
+            EffectRegionId.Fresh(awaitOperation.Syntax.SpanStart));
+        var result = ResolveAwaitProtocolStep(
+            getAwaiter,
+            getAwaiter.ReducedFrom != null || !getAwaiter.IsStatic
+                ? receiver
+                : null,
+            receiverRegion,
+            awaitOperation);
+        if (!result.CompletesNormally)
+        {
+            return result;
+        }
+
+        if (info.IsCompletedProperty?.GetMethod is { } isCompleted)
+        {
+            result = result.Then(ResolveAwaitProtocolStep(
+                isCompleted,
+                instance: null,
+                awaiter,
+                awaitOperation));
+            if (!result.CompletesNormally)
+            {
+                return result;
+            }
+        }
+        else
+        {
+            result = result.WithSummary(
+                EffectSummaryOperations.Join(
+                    result.Summary,
+                    EffectSummaryOperations.Unsupported()));
+        }
+
+        if (info.GetResultMethod is not { } getResult)
+        {
+            return result.WithSummary(
+                EffectSummaryOperations.Join(
+                    result.Summary,
+                    EffectSummaryOperations.Unsupported()));
+        }
+
+        return result.Then(ResolveAwaitProtocolStep(
+            getResult,
+            instance: null,
+            awaiter,
+            awaitOperation));
+    }
+
+    private EffectStep ResolveAwaitProtocolStep(
+        IMethodSymbol method,
+        IOperation? instance,
+        EffectRegionSet receiver,
+        IOperation origin)
+    {
+        var arguments = Enumerable.Repeat(
+                EffectRegionSet.Empty,
+                method.Parameters.Length)
+            .ToImmutableArray();
+        var actualArguments = Enumerable.Repeat<IOperation?>(
+                null,
+                method.Parameters.Length)
+            .ToImmutableArray();
+        var call = _callResolver.Resolve(
+            method,
+            receiver,
+            receiver,
+            arguments,
+            actualArguments,
+            method.IsVirtual || method.IsAbstract,
+            origin,
+            instance);
+        return new EffectStep(
+            call,
+            _completionEvaluator.CanCompleteInvocation(
+                method,
+                instance,
+                origin));
     }
 
     private EffectSummary ScanWith(IWithOperation withOperation)

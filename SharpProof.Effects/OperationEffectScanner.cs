@@ -175,6 +175,29 @@ internal sealed partial class OperationEffectScanner
         return result;
     }
 
+    internal EffectSummary ScanAwaitProtocolEffects(IOperation root)
+    {
+        var result = EffectSummary.Empty;
+        foreach (var awaitOperation in root.DescendantsAndSelf()
+                     .OfType<IAwaitOperation>()
+                     .Where(operation =>
+                         !ConversionOwnershipClassifier
+                             .IsInsideNestedCallable(operation, root) &&
+                         IsReachable(operation) &&
+                         _completionEvaluator.CanCompleteNormally(
+                             operation.Operation) &&
+                         !_nullnessEvaluator.IsProvenNull(
+                             operation.Operation,
+                             operation)))
+        {
+            result = EffectSummaryDomain.Instance.Join(
+                result,
+                ScanAwaitProtocol(awaitOperation).Summary);
+        }
+
+        return result;
+    }
+
     internal EffectSummary ScanUsingDisposalEffects(IOperation root)
     {
         return new UsingDisposalEffectResolver(

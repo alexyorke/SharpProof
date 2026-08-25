@@ -389,14 +389,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 
 
-### 128. Awaitable Protocol Member Effects Dropped at Await Expressions
-**Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Lines 90-103)
-**Description**: `ScanAwait` contributes only operand evaluation effects and potential receiver null reference exceptions. The implicit calls to `GetAwaiter()`, `IsCompleted`, and `GetResult()` on custom awaiter types (which can execute synchronous continuation work and throw exceptions) are unmodeled in the effect summary.
-**Reproduction Steps**:
-1. Create a custom awaitable type whose `GetResult()` or `GetAwaiter()` mutates ambient state.
-2. Await an instance of this awaitable in a method: `await customAwaitable;`.
-3. Observe that the effect summary reflects only the operand evaluation and omits awaiter protocol method effects.
-**Confidence**: Medium
 
 ### 129. Over-Deep Lowered IR Expressions Abort Whole Project Manifest
 **Location**: `SharpProof.CompilerArtifact\PortableIrGraphCodec.cs` (Lines 366-385, 402-414), `SharpProof.CompilerCollector\CompilerArtifact\CompilerCallableLowerer.cs` (Lines 111-224), and `SharpProof.CompilerCollector\CompilerArtifact\CompilerManifestArtifactProducer.cs` (Lines 49-66)

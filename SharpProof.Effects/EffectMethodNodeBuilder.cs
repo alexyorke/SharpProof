@@ -78,6 +78,7 @@ internal sealed class EffectMethodNodeBuilder
                 localSummary,
                 bodySummary,
                 scanner.ScanLexicalControlEffects(root),
+                scanner.ScanAwaitProtocolEffects(root),
                 scanner.ScanUsingDisposalEffects(root));
         }
 
