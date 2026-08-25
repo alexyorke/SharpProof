@@ -427,14 +427,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Session summary: Reads(h), no writes, Complete.
 **Confidence**: Medium
 
-### 156. Distinct Unsupported Scalar Constants Collapse Into One Shared IR Term (1.5d == 2.5d Lowers to t == t)
-**Location**: `SharpProof.Frontend\RoslynOperationLowerer.cs` (Line 397 LowerConstant fallback; Opaque at 296-316); `CompilerIdentityBridge.cs` (Lines 124-138); hash-consing at `SharpProof.Ir\IrFactory.cs` (Lines 606-612)
-**Description**: Constants the scalar catalog cannot represent (float/double/decimal literals, ill-formed UTF-16 strings) fall through to `Opaque(...)` with symbol == null and IsDemonstrablyPure == true. For pure opaques without a symbol, InternOperation builds a semantic identity omitting the constant value; GetOrCreateMember dedups to one member and IrFactory hash-conses zero-argument PureOpaque terms, so two syntactically different constants produce the identical IrOpaqueTerm. Any binary comparison between them becomes Equal(t, t).
-**Reproduction Steps**:
-1. Compile `static bool Target() => 1.5d == 2.5d;` and lower its operation.
-2. Observe both Binary(Equal) operands are the same IrOpaqueTerm instance for literals 1.5 and 2.5; same collapse for "\uD800" vs "\uDC00" or two distinct ulong locals.
-**Confidence**: High
-
 ### 157. Explicit Reference Conversion to string Claimed Exact and Total While All Other Failing-Capable Conversions Abstain
 **Location**: `SharpProof.Frontend\RoslynOperationLowerer.cs` (Lines 826-832)
 **Description**: In VisitConversion, a non-try-cast conversion with Conversion.IsReference, target System_String, and a Reference-kind operand returns Exact(Cast(...)), bypassing the ConversionMayChangeValue abstention every other non-value-preserving conversion receives. C# explicit reference casts can throw InvalidCastException, but the emitted IR models `(string)o` as total and exception-free; downstream it surfaces as an internal UnsupportedEncodingException instead of a clean frontend abstention.

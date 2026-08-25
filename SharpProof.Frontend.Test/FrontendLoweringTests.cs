@@ -117,6 +117,27 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void UnsupportedConstantsDoNotSharePureOpaqueTerms()
+    {
+        using var compiled = CompiledMethod.Create(
+            "public static bool Target() => 1.5d == 2.5d;");
+
+        var result = compiled.Lower();
+        var opaque = result.Term as IrOpaqueTerm;
+
+        Assert.That(opaque, Is.Not.Null);
+        Assert.That(opaque!.Arguments, Has.Length.EqualTo(2));
+        Assert.That(opaque.Arguments[0], Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(opaque.Arguments[1], Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(
+            ReferenceEquals(opaque.Arguments[0], opaque.Arguments[1]),
+            Is.False);
+        Assert.That(
+            ((IrOpaqueTerm)opaque.Arguments[0]).Purity,
+            Is.EqualTo(IrOpaquePurity.Impure));
+    }
+
+    [Test]
     public void ArrayLengthAndElementAccessMatchCompiledCSharp()
     {
         using var element = CompiledMethod.Create(

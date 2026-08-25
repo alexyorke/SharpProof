@@ -320,7 +320,7 @@ public sealed class RoslynOperationLowerer
     {
         if (operation.ConstantValue.HasValue)
         {
-            return true;
+            return IsRepresentableConstant(operation);
         }
 
         return operation switch
@@ -356,6 +356,18 @@ public sealed class RoslynOperationLowerer
                     IsDemonstrablyPure(argument.Value)),
             _ => false
         };
+    }
+
+    private bool IsRepresentableConstant(IOperation operation)
+    {
+        var value = operation.ConstantValue.Value;
+        var type = GetTypeId(operation.Type);
+        return value == null ||
+            value is bool && type == _factory.BooleanType ||
+            value is string text && type == _factory.StringType &&
+                Utf16WellFormedness.IsWellFormed(text) ||
+            type == _factory.IntegerType && value is
+                sbyte or byte or short or ushort or int or uint or long or char;
     }
 
     private LoweredExpression LowerConstant(IOperation operation)
