@@ -189,11 +189,24 @@ function New-SharpProofCSharpParseOptions {
         'preview' { 'Preview'; break }
         'default' { 'Default'; break }
         default {
-            $digits = $normalizedLanguageVersion.Replace('.', '')
-            if ($digits -notmatch '^\d+$') {
+            if ($normalizedLanguageVersion -notmatch
+                '^(?<major>\d+)(?:\.(?<minor>\d+))?$') {
                 throw "Unsupported C# language version '$LanguageVersion'."
             }
-            'CSharp' + $digits
+            $major = [int]$Matches['major']
+            $minor = if ($Matches.ContainsKey('minor') -and
+                -not [string]::IsNullOrEmpty($Matches['minor'])) {
+                [int]$Matches['minor']
+            }
+            else {
+                0
+            }
+            if ($minor -eq 0) {
+                'CSharp' + $major
+            }
+            else {
+                'CSharp' + $major + '_' + $minor
+            }
         }
     }
     try {

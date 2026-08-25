@@ -130,6 +130,35 @@ public sealed class ProductionInventoryAuthorityTests
         }
     }
 
+    [Test]
+    public async Task ProductionComplexityGatePassesAgainstCanonicalInventory()
+    {
+        var root = RepositoryRoot();
+        var result = await RunAsync(
+            root,
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            Path.Combine(root, "scripts", "Test-ProductionCSharpComplexity.ps1"),
+            "-Json");
+
+        Assert.That(result.ExitCode, Is.Zero, result.Error + result.Output);
+        using var document = JsonDocument.Parse(result.Output);
+        Assert.That(
+            document.RootElement.GetProperty("schemaVersion").GetInt32(),
+            Is.EqualTo(1));
+        Assert.That(
+            document.RootElement.GetProperty("passed").GetBoolean(),
+            Is.True);
+        Assert.That(
+            document.RootElement.GetProperty("exclusions")
+                .GetProperty("generatedFiles")
+                .GetRawText(),
+            Does.Contain("SharpProof.Ir/IrIdentifierAliases.cs"));
+    }
+
     private static async Task WriteFixtureAsync(string repository)
     {
         Directory.CreateDirectory(Path.Combine(repository, "Project"));
@@ -283,4 +312,3 @@ public sealed class ProductionInventoryAuthorityTests
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }
-

@@ -416,11 +416,8 @@ function Measure-RepositoryCSharpSyntax {
     )
 
     Assert-RepositoryPaths -Paths $Paths -Scope $Scope
-    $syntaxTokens = 0
-    $syntaxNodes = 0
     $expressionNodes = 0
     $decisionPoints = 0
-    $members = 0
     foreach ($untypedRelativePath in $Paths) {
         $relativePath = [string]$untypedRelativePath
         if (-not $relativePath.EndsWith(
@@ -440,18 +437,12 @@ function Measure-RepositoryCSharpSyntax {
             $parseOptions = New-SharpProofCSharpParseOptions -LanguageVersion ([string]$optionMatches[0].parseOptions.languageVersion) -PreprocessorSymbols @($optionMatches[0].parseOptions.preprocessorSymbols | ForEach-Object { [string]$_ })
         }
         $metrics = Measure-CSharpSourceText -Source (Get-Content -LiteralPath $fullPath -Raw) -Path $relativePath -ParseOptions $parseOptions
-        $syntaxTokens += $metrics.syntaxTokens
-        $syntaxNodes += $metrics.syntaxNodes
         $expressionNodes += $metrics.expressionNodes
         $decisionPoints += $metrics.decisionPoints
-        $members += $metrics.members
     }
     return [pscustomobject]@{
-        syntaxTokens = $syntaxTokens
-        syntaxNodes = $syntaxNodes
         expressionNodes = $expressionNodes
         decisionPoints = $decisionPoints
-        members = $members
     }
 }
 
