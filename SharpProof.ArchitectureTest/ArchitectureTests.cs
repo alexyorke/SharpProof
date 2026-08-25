@@ -458,6 +458,7 @@ public sealed class ArchitectureTests
     {
         var productionFiles = ProductionProjects
             .SelectMany(ProductionSourceFiles)
+            .Concat(ProductionSourceFiles("SharpProof.Gates"))
             .ToArray();
         Assert.That(
             FindRelativeCallers(productionFiles, "new ProvenOutcome("),
@@ -489,6 +490,43 @@ public sealed class ArchitectureTests
                 "SharpProof.Effects/EffectSummaryOperations.cs",
                 "SharpProof.Effects/ExternalEffectResolver.cs"
             ]));
+    }
+
+    [Test]
+    public void TargetTypedProofOutcomeConstructorsStayInTheKernel()
+    {
+        var outcomeTypes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "ProvenOutcome",
+            "RefutedOutcome",
+            "ValidatedModel"
+        };
+        var offenders = ProductionProjects
+            .Append("SharpProof.Gates")
+            .SelectMany(ProductionSourceFiles)
+            .SelectMany(path =>
+            {
+                var root = CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path)).GetRoot();
+                return root.DescendantNodes()
+                    .OfType<VariableDeclarationSyntax>()
+                    .Where(declaration =>
+                        declaration.Type is IdentifierNameSyntax identifier &&
+                        outcomeTypes.Contains(identifier.Identifier.ValueText))
+                    .SelectMany(declaration => declaration.Variables
+                        .Where(variable => variable.Initializer?.Value is
+                            ImplicitObjectCreationExpressionSyntax)
+                        .Select(variable => Relative(path)));
+            })
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(
+            offenders,
+            Is.Empty,
+            "Target-typed proof outcomes must be constructed only by " +
+            "SharpProof.Verify/ProofKernel.cs.");
     }
 
     [Test]
