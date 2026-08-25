@@ -263,7 +263,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'effect-discovery-operation-stage'
-        File = 'SharpProof.Effects\OperationEffectScanner.cs'
+        File = 'SharpProof.Effects\OperationEffectScanner.Expressions.cs'
         Original = '            OperationSupportStage.EffectDiscovery,'
         Mutated = '            OperationSupportStage.ContractExpressionLowering,'
         Project = 'SharpProof.Effects.Test\SharpProof.Effects.Test.csproj'
@@ -832,8 +832,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'launcher-single-termination-grace-deadline'
         File = 'SharpProof.Host\LinuxWorkerProcess.cs'
-        Original = '                Terminate(process, stopwatch, finalLimit);'
-        Mutated = '                Terminate(process, Stopwatch.StartNew(), finalLimit);'
+        Original = '        return Terminate(process, stopwatch, finalLimit)'
+        Mutated = '        return Terminate(process, Stopwatch.StartNew(), finalLimit)'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~LinuxWorkerTimeoutTerminatesTheDirectChild'
     },
@@ -1280,8 +1280,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'release-authority-contained-path-case-sensitivity'
         File = 'scripts\Resolve-SharpProofContainedPath.ps1'
-        Original = "    if (-not `$physicalPath.StartsWith(`n            `$physicalPrefix,`n            [StringComparison]::Ordinal)) {"
-        Mutated = "    if (-not `$physicalPath.StartsWith(`n            `$physicalPrefix,`n            [StringComparison]::OrdinalIgnoreCase)) {"
+        Original = "        -not `$physicalPath.StartsWith(`n            `$physicalPrefix,`n            [StringComparison]::Ordinal)) {"
+        Mutated = "        -not `$physicalPath.StartsWith(`n            `$physicalPrefix,`n            [StringComparison]::OrdinalIgnoreCase)) {"
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~LinuxEvidencePathsUseOrdinalCanonicalContainment'
     },
@@ -2266,7 +2266,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'compiler-manifest-opened-handle-nonempty'
         File = 'SharpProof.CompilerArtifact\CompilerManifestArtifact.cs'
-        Original = '        if (stream.Length <= 0)'
+        Original = '        if (fileLength <= 0)'
         Mutated = '        if (false)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerManifestReaderRejectsEmptyOpenedFile'
