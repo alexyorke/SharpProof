@@ -346,6 +346,30 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task PartialTypeInitializersRespectCompilationOrder()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            "using System; using SharpProof.Attributes; " +
+            "public static class Guard { public static int Fail() => " +
+            "throw new InvalidOperationException(); public static int Positive(int value) { " +
+            "Contract.Requires(value > 0); return value; } } " +
+            "public partial class Subject { private int first = Guard.Fail(); }",
+            ["SP0027"],
+            filePath: "first.cs").AddSyntaxTrees(
+                CSharpSyntaxTree.ParseText(
+                    "public partial class Subject { private int second = Guard.Positive(-1); }",
+                    new CSharpParseOptions(LanguageVersion.Preview),
+                    "second.cs"));
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation, "contracts");
+
+        Assert.That(
+            diagnostics.Where(static diagnostic => diagnostic.Id == "SP0027"),
+            Is.Empty);
+    }
+
+    [Test]
     public async Task GeneratedInitializersAreNotAnalyzed()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

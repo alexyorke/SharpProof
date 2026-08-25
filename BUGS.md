@@ -378,25 +378,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 
 
-### 131. CanReachMemberInitializer Ignores Member Initializers in Sibling Partial Type Declarations
-**Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 522-569)
-**Description**: `CanReachMemberInitializer` uses `target.FirstAncestorOrSelf<TypeDeclarationSyntax>()` to inspect preceding member initializers, which only retrieves members declared in the single syntax part containing the target. For partial classes split across multiple files/declarations, preceding member initializers in sibling partial parts that may throw exceptions are ignored, causing reachability checks to evaluate to true and emitting spurious precondition violation diagnostics (SP0027) on unreachable initializers.
-**Reproduction Steps**:
-1. Declare a partial class across two files: File 1 declares an initializer that unconditionally throws.
-2. File 2 declares a subsequent field initializer containing a call with a precondition.
-3. Run analyzer reachability analysis.
-4. Observe false-positive SP0027 diagnostic on File 2's field initializer even though it cannot be reached at runtime.
-**Confidence**: High
-
-### 132. Cross-Type Static Field Access on Generic Types Drops Write and Allocation Effects
-**Location**: `SharpProof.Effects\EffectAnalysisSession.cs` (Lines 288-299)
-**Description**: When accessing a static field on a same-assembly generic type `G<T>` that declares an explicit static constructor, `EffectAnalysisSession.ResolveField` returns `Throw(TypeInitializationException)`. In contrast to the non-generic path which returns `UnknownBoundary(UnmodeledCall)` to account for allocation, ambient writes, and capabilities executed during successful static initialization, the generic path models only the exception outcome and leaves all other effect dimensions empty.
-**Reproduction Steps**:
-1. Define `class G<T> { static G() { AmbientState.Mutate(); } public static int Value = 42; }`.
-2. Read `G<string>.Value` from a method in the same assembly.
-3. Inspect the computed effect summary and observe that potential writes and allocations during static initialization are missing.
-**Confidence**: Medium
-
 ### 143. Interpreter Equality Compares Sequences by Reference Identity While All Other Kinds Compare by Value
 **Location**: `SharpProof.Ir\IrInterpreter.cs` (Line 354)
 **Description**: `EvaluateEquality` maps `(Sequence, Sequence)` to `ReferenceEquals(left, right)` - equality of `IrValue` wrapper instances, not elements. Structurally identical sequences yield `Equal == false`, while the identical term compared to itself folds `true` solely due to per-term-ID result memoization. Sequence comparisons become branch-dependent and memoization-sensitive, making concrete counterexample replay unstable.

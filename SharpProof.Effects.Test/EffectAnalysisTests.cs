@@ -1860,6 +1860,50 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void CrossTypeGenericStaticFieldAccessAccountsForTypeInitialization()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int Value;
+            }
+
+            public static class Initialized<T> {
+                public static readonly object Value = Initialize();
+
+                private static object Initialize() {
+                    Global.Value = 1;
+                    return new object();
+                }
+            }
+
+            public static class Sample {
+                public static object Read() => Initialized<string>.Value;
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Read"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                result.Summary.Uncertainty & EffectUncertainty.UnmodeledCall,
+                Is.EqualTo(EffectUncertainty.UnmodeledCall));
+            Assert.That(result.Summary.Reads.IsUnknown, Is.True);
+            Assert.That(result.Summary.Writes.IsUnknown, Is.True);
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Unknown));
+            Assert.That(result.Summary.Throws.IncludesUnknown, Is.True);
+            Assert.That(result.Projection.IsComplete, Is.False);
+        }
+    }
+
+    [Test]
     public void MetadataStaticFieldAccessFailsClosedAtTypeInitializationBoundary()
     {
         var externalReference = EffectTestHost.EmitReference(

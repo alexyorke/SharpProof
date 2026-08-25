@@ -285,18 +285,6 @@ public sealed class EffectAnalysisSession
 
         var isSourceType = SymbolEqualityComparer.Default.Equals(
             normalizedTarget.ContainingAssembly, _compilation.Assembly);
-        if (isSourceType &&
-            field.ContainingType.IsGenericType &&
-            !SymbolEqualityComparer.Default.Equals(
-                caller.ContainingType,
-                field.ContainingType) &&
-            normalizedTarget.StaticConstructors.Any(
-                static constructor => !constructor.IsImplicitlyDeclared))
-        {
-            return EffectSummaryOperations.Throw(
-                ResolveExceptionSet(
-                    FrameworkTypeMetadataNames.TypeInitializationException));
-        }
         var mayInitialize = !isSourceType ||
             EffectMethodNodeBuilder.HasPotentialStaticInitialization(
                 normalizedTarget,

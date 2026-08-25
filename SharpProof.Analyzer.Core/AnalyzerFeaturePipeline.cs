@@ -533,36 +533,61 @@ internal static partial class AnalyzerFeaturePipeline
             return true;
         }
 
-        foreach (var member in containingType.Members)
+        var containingTypeSymbol = semanticModel.GetDeclaredSymbol(
+            containingType, cancellationToken) as INamedTypeSymbol;
+        if (containingTypeSymbol == null)
         {
-            foreach (var initializer in GetMemberInitializers(member))
+            return true;
+        }
+
+        var syntaxTrees = semanticModel.Compilation.SyntaxTrees.ToImmutableArray();
+        var declarations = containingTypeSymbol.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<TypeDeclarationSyntax>()
+            .OrderBy(declaration => Array.IndexOf(
+                syntaxTrees.ToArray(), declaration.SyntaxTree))
+            .ThenBy(static declaration => declaration.SpanStart);
+        foreach (var declaration in declarations)
+        {
+            foreach (var member in declaration.Members)
             {
-                if (initializer.SyntaxTree == target.SyntaxTree &&
-                    initializer.Span == target.Span)
+                foreach (var initializer in GetMemberInitializers(member))
+                {
+                    if (initializer.SyntaxTree == target.SyntaxTree &&
+                        initializer.Span == target.Span)
+                    {
+                        return true;
+                    }
+                    var initializerModel = initializer.SyntaxTree ==
+                        semanticModel.SyntaxTree
+                        ? semanticModel
+                        : SharpProof.Frontend.Host.CompilationModelProvider
+                            .GetSemanticModel(
+                                semanticModel.Compilation,
+                                initializer.SyntaxTree);
+                    if (!HasMatchingInitializationKind(
+                            initializer,
+                            isStatic,
+                            initializerModel,
+                            cancellationToken))
+                    {
+                        continue;
+                    }
+                    var operation = initializerModel.GetOperation(
+                        initializer.Value,
+                        cancellationToken);
+                    if (operation != null &&
+                        !operationFacts.MayCompleteNormally(operation))
+                    {
+                        return false;
+                    }
+                }
+
+                if (member.SyntaxTree == targetMember.SyntaxTree &&
+                    member.Span == targetMember.Span)
                 {
                     return true;
                 }
-                if (!HasMatchingInitializationKind(
-                        initializer,
-                        isStatic,
-                        semanticModel,
-                        cancellationToken))
-                {
-                    continue;
-                }
-                var operation = semanticModel.GetOperation(
-                    initializer.Value,
-                    cancellationToken);
-                if (operation != null &&
-                    !operationFacts.MayCompleteNormally(operation))
-                {
-                    return false;
-                }
-            }
-            if (member.SyntaxTree == targetMember.SyntaxTree &&
-                member.Span == targetMember.Span)
-            {
-                return true;
             }
         }
         return true;
