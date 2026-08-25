@@ -215,6 +215,22 @@ trap {
     throw
 }
 
+function Invoke-SharpProofDotnet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [int]$TimeoutSeconds = 300
+    )
+
+    & $wrapperPath `
+        -TimeoutSeconds $TimeoutSeconds `
+        @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
+}
+
 Start-AcceptanceTimingPhase -Name 'restore'
 Invoke-SharpProofDotnet -Arguments @(
     'restore', 'SharpProof.sln', '--locked-mode')
@@ -351,22 +367,6 @@ function Get-MsBuildDefault {
         throw "Required $Owner default '$Name' is missing."
     }
     return $nodes[0].InnerText
-}
-
-function Invoke-SharpProofDotnet {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Arguments,
-
-        [int]$TimeoutSeconds = 300
-    )
-
-    & $wrapperPath `
-        -TimeoutSeconds $TimeoutSeconds `
-        @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
 }
 
 function Assert-RepositoryPaths {

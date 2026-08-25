@@ -47,6 +47,8 @@ public sealed class AcceptanceScriptTests
             RepositoryRoot(), "eng", "acceptance", "Verify.ps1"));
         var started = verify.IndexOf(
             "$timingStartedUtc =", StringComparison.Ordinal);
+        var dotnetWrapper = verify.IndexOf(
+            "function Invoke-SharpProofDotnet", StringComparison.Ordinal);
         var restore = verify.IndexOf(
             "Start-AcceptanceTimingPhase -Name 'restore'",
             StringComparison.Ordinal);
@@ -55,6 +57,8 @@ public sealed class AcceptanceScriptTests
             StringComparison.Ordinal);
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(dotnetWrapper, Is.GreaterThan(started));
+            Assert.That(restore, Is.GreaterThan(dotnetWrapper));
             Assert.That(restore, Is.GreaterThan(started));
             Assert.That(staticValidation, Is.GreaterThan(restore));
             Assert.That(

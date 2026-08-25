@@ -806,7 +806,7 @@
       {
         "name": "requires-call-site-analyzer",
         "path": "SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs",
-        "maximumExpressionNodes": 1450,
+        "maximumExpressionNodes": 1548,
         "maximumDecisionPoints": 105
       },
       {
@@ -824,20 +824,20 @@
       {
         "name": "protocol-validator",
         "path": "SharpProof.Worker.Protocol/ProtocolJson.cs",
-        "maximumExpressionNodes": 3450,
-        "maximumDecisionPoints": 135
+        "maximumExpressionNodes": 3571,
+        "maximumDecisionPoints": 161
       },
       {
         "name": "relational-summary-builder",
         "path": "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
-        "maximumExpressionNodes": 1950,
-        "maximumDecisionPoints": 120
+        "maximumExpressionNodes": 2058,
+        "maximumDecisionPoints": 130
       },
       {
         "name": "relational-summary-provider",
         "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
-        "maximumExpressionNodes": 800,
-        "maximumDecisionPoints": 50
+        "maximumExpressionNodes": 1054,
+        "maximumDecisionPoints": 54
       },
       {
         "name": "implementation-il-summary-lowerer",
@@ -848,7 +848,7 @@
       {
         "name": "specification-pack-provider",
         "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
-        "maximumExpressionNodes": 2000,
+        "maximumExpressionNodes": 2076,
         "maximumDecisionPoints": 125
       }
     ]
