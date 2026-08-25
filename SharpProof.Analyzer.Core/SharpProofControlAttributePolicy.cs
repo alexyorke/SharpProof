@@ -136,6 +136,16 @@ internal static class SharpProofControlAttributePolicy
         }
     }
 
+    internal static bool HasTrustedAttribute(
+        IMethodSymbol method,
+        ContractSelectionInventory inventory)
+    {
+        return EnumerateScopes(method)
+            .SelectMany(static symbol => symbol.GetAttributes())
+            .Any(attribute => ContractSelectionInventory.Is(
+                attribute, inventory.Trusted));
+    }
+
     private static bool TryGetReason(AttributeData attribute, out string reason)
     {
         reason = attribute.ConstructorArguments.Length == 1 &&

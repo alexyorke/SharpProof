@@ -20,6 +20,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
         "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
         "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors",
+        "SharpProof.Meta.Analyzers.MetaDiagnosticDescriptors",
         "System.String", "SharpProof.Verify.Assumption", "SharpProof.Verify.ProofKernel",
         "SharpProof.Worker.CallableEvidenceBuilder",
         "SharpProof.Worker.CallableVerifier", "SharpProof.Worker.PostconditionObligationBuilder",
@@ -161,7 +162,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         var containingType = context.ContainingSymbol.ContainingType;
         if (IsSameType(creation.Type, symbols[KnownType.DiagnosticDescriptor]) &&
             !IsExactNamespace(context.ContainingSymbol.ContainingNamespace, "SharpProof", "Meta", "Analyzers") &&
-            !IsAnyType(containingType, symbols, KnownType.AnalyzerDiagnosticDescriptors, KnownType.ContractForDiagnosticDescriptors))
+            !IsAnyType(containingType, symbols, KnownType.AnalyzerDiagnosticDescriptors, KnownType.ContractForDiagnosticDescriptors, KnownType.MetaDiagnosticDescriptors))
         {
             Report(context, MetaDiagnosticDescriptors.DescriptorConstruction, creation.Syntax.GetLocation());
         }
@@ -490,7 +491,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         Compilation, SemanticModel, CSharpCompilation, CSharpSemanticModel,
         CSharpExtensions, SyntaxFactory, Symbol, SymbolDisplay, DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
-        AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, String,
+        AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, MetaDiagnosticDescriptors, String,
         Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,
         PostconditionObligationBuilder,
         EffectSummary, EffectSummaryDomain,

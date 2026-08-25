@@ -67,7 +67,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 !string.Equals(envelopeInputHash, inputHash, StringComparison.Ordinal) ||
                 !string.Equals(payloadHash, HashText(envelopePayload), StringComparison.Ordinal))
             {
-                DiscardStaged(staged);
+                RestoreStaged(staged);
+                TryDeleteCorruptEntry(path);
                 committed = true;
                 return null;
             }
@@ -83,7 +84,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 callables.Any(static result => result == null) ||
                 claims.Any(static result => result == null))
             {
-                DiscardStaged(staged);
+                RestoreStaged(staged);
+                TryDeleteCorruptEntry(path);
                 committed = true;
                 return null;
             }
@@ -98,7 +100,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                     targets,
                     cancellationToken))
             {
-                DiscardStaged(staged);
+                RestoreStaged(staged);
+                TryDeleteCorruptEntry(path);
                 committed = true;
                 return null;
             }
@@ -118,7 +121,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         catch (Exception exception) when (exception is
             ArgumentException or JsonException or InvalidDataException)
         {
-            DiscardStaged(staged);
+            RestoreStaged(staged);
+            TryDeleteCorruptEntry(path);
             committed = true;
             return null;
         }
@@ -304,8 +308,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 ".rollback", StringComparison.Ordinal)
                 ? ".rollback"
                 : ".eviction";
+            var stemLength = debrisPath.Name.Length - suffix.Length;
+            if (stemLength <= 0)
+            {
+                continue;
+            }
             var separator = debrisPath.Name.LastIndexOf(
-                '.', debrisPath.Name.Length - suffix.Length - 1);
+                '.', stemLength - 1);
             if (separator <= 0 ||
                 !IsOwnedCacheEntry(debrisPath.Name[..separator]))
             {
@@ -463,6 +472,20 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException)
         {
+        }
+    }
+
+    private void TryDeleteCorruptEntry(string path)
+    {
+        try
+        {
+            ValidatePath(path);
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            LastReadUnavailable = true;
         }
     }
 

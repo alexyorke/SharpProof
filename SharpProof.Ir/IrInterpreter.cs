@@ -415,10 +415,21 @@ public sealed class IrInterpreter(IrFactory factory)
         if (target.Kind == IrTypeKind.String &&
             operand.Value.Kind == IrValueKind.Reference)
         {
-            return operand.Value.Reference is string value
-                ? Text(value)
-                : Fault(IrExceptionKind.InvalidCast,
+            if (operand.Value.Reference is not string value)
+            {
+                return Fault(IrExceptionKind.InvalidCast,
                     "The concrete reference is not a string.");
+            }
+
+            try
+            {
+                return Text(value);
+            }
+            catch (ArgumentException)
+            {
+                return InvalidValue(
+                    "The concrete string reference is not well-formed UTF-16.");
+            }
         }
 
         return Unsupported(IrUnsupportedReason.UnsupportedCast,

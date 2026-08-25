@@ -154,17 +154,8 @@ internal static class ContractForSymbolMatcher
             return CompanionResolution.None;
         }
 
-        var invalid = companions.Where(static companion =>
-                companion.Failure != ContractBindingFailure.None)
-            .ToImmutableArray();
-        if (!invalid.IsDefaultOrEmpty)
-        {
-            return CompanionResolution.Fail(invalid.Length == 1
-                ? invalid[0].Failure
-                : ContractBindingFailure.AmbiguousCompanion);
-        }
-
         var matching = companions.Where(companion =>
+            companion.Failure == ContractBindingFailure.None &&
             TargetsType(companion.ContractTarget, target.ContainingType)).ToImmutableArray();
         if (matching.IsDefaultOrEmpty)
         {

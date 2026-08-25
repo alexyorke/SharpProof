@@ -262,6 +262,16 @@ internal sealed class CompilerRelationalSummaryProvider
             calls.Add(binding.Key.Id, dependency!);
         }
 
+        string evidenceSha256;
+        try
+        {
+            evidenceSha256 = EvidenceSha256(declaration, cancellationToken);
+        }
+        catch (EncoderFallbackException)
+        {
+            return false;
+        }
+
         var signature = new IrSummarySignature(
             member,
             receiver: null,
@@ -269,7 +279,7 @@ internal sealed class CompilerRelationalSummaryProvider
             result,
             new IrSummaryProvenance(
                 IrSummaryOrigin.Source,
-                EvidenceSha256(declaration, cancellationToken),
+                evidenceSha256,
                 evidenceCallIdentity: method.GetDocumentationCommentId() ?? string.Empty));
         var built = IrRelationalSummaryBuilder.Build(
             selected.Lowering.Program,
@@ -319,7 +329,7 @@ internal sealed class CompilerRelationalSummaryProvider
         var text = declaration.SyntaxTree.GetText(cancellationToken)
             .ToString(declaration.FullSpan);
         using var hash = SHA256.Create();
-        var bytes = hash.ComputeHash(Encoding.UTF8.GetBytes(text));
+        var bytes = hash.ComputeHash(new UTF8Encoding(false, true).GetBytes(text));
         return string.Concat(bytes.Select(static value =>
             value.ToString("x2", CultureInfo.InvariantCulture)));
     }

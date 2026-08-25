@@ -330,6 +330,8 @@ public sealed class IrKernelTests
                     (IEqualityComparer<object>)null!)));
             Assert.Throws<ArgumentNullException>(
                 (Action)(() => factory.InternString(null!)));
+            Assert.Throws<ArgumentException>(
+                (Action)(() => factory.InternString("a\uD800")));
             Assert.Throws<ArgumentNullException>(
                 (Action)(() => factory.CreateStringValue(null!)));
             Assert.Throws<ArgumentNullException>(
@@ -988,6 +990,14 @@ public sealed class IrKernelTests
                     factory.ObjectType,
                     new object())
             });
+        var malformed = interpreter.Evaluate(
+            cast,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [source] = factory.CreateReferenceValue(
+                    factory.ObjectType,
+                    "a\uD800")
+            });
         var concatNull = interpreter.Evaluate(
             factory.Binary(
                 IrBinaryOperator.StringConcat,
@@ -997,6 +1007,10 @@ public sealed class IrKernelTests
         Assert.That(succeeded.Status, Is.EqualTo(IrEvaluationStatus.Value));
         Assert.That(succeeded.Value!.String, Is.EqualTo("sharp"));
         Assert.That(failed.Status, Is.EqualTo(IrEvaluationStatus.Exception));
+        Assert.That(malformed.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+        Assert.That(
+            malformed.Unsupported!.Reason,
+            Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
         Assert.That(
             failed.Exception!.Kind,
             Is.EqualTo(IrExceptionKind.InvalidCast));

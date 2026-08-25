@@ -63,9 +63,11 @@ internal sealed partial class ClaimManifestBuilder(
             return null;
         }
 
+        var hasTrustedAttributes = TrustedAttributes(target).Any();
         var analyzerSelection = _attributes.Select(
             target,
-            resolution.HasSelectedContractIntent);
+            resolution.HasSelectedContractIntent,
+            hasTrustedAttributes);
         var analyzerContractsSelected =
             ContractsEnabled &&
             (analyzerSelection &

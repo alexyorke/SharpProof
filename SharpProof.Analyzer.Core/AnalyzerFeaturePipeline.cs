@@ -769,7 +769,9 @@ internal static partial class AnalyzerFeaturePipeline
         var features = session.Attributes.Select(
             method,
             session.Configuration.ContractsEnabled &&
-            session.ResolveContractSource(method).HasSelectedContractIntent) &
+            session.ResolveContractSource(method).HasSelectedContractIntent,
+            SharpProofControlAttributePolicy.HasTrustedAttribute(
+                method, session.Attributes)) &
             ((session.Configuration.ContractsEnabled
                   ? ContractSelectionFeatures.Contracts
                   : ContractSelectionFeatures.None) |
@@ -788,7 +790,9 @@ internal static partial class AnalyzerFeaturePipeline
         var features = session.Attributes.Select(
             method,
             session.Configuration.ContractsEnabled &&
-            session.ResolveContractSource(method).HasSelectedContractIntent) &
+            session.ResolveContractSource(method).HasSelectedContractIntent,
+            SharpProofControlAttributePolicy.HasTrustedAttribute(
+                method, session.Attributes)) &
             ((session.Configuration.ContractsEnabled
                   ? ContractSelectionFeatures.Contracts
                   : ContractSelectionFeatures.None) |

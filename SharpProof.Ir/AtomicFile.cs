@@ -174,6 +174,10 @@ internal static class AtomicFile
                 // the existence check and the rename. The staged file remains
                 // valid, so retry using the new destination state.
                 lastFailure = exception;
+                if (attempt + 1 < 8)
+                {
+                    Thread.Sleep(1 << Math.Min(attempt, 5));
+                }
             }
         }
 

@@ -80,6 +80,11 @@ public sealed class IrFactory
     public IrStringId InternString(string value)
     {
         ArgumentNullGuard.NotNull(value, nameof(value));
+        if (!Utf16WellFormedness.IsWellFormed(value))
+        {
+            throw new ArgumentException(
+                "Strings require well-formed UTF-16.", nameof(value));
+        }
 
         lock (_gate)
         {

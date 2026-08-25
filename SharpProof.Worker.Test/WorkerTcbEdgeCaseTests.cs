@@ -899,6 +899,44 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task CacheRecoveryIgnoresBareTransactionSuffixesAndRemovesCorruptEntries()
+    {
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-recovery-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(directory, ".rollback"), string.Empty);
+            await File.WriteAllTextAsync(Path.Combine(directory, ".eviction"), string.Empty);
+            var inputHash = new string('f', 64);
+            var cachePath = Path.Combine(
+                directory,
+                inputHash + ".sharp-proof-cache.json");
+            await File.WriteAllTextAsync(cachePath, "{corrupt");
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+            var cache = new VerificationCache(directory, 1024 * 1024);
+
+            var response = await cache.TryReadAsync(
+                inputHash,
+                manifest,
+                [],
+                new WorkerBudgets(),
+                CancellationToken.None);
+
+            Assert.That(response, Is.Null);
+            Assert.That(File.Exists(cachePath), Is.False);
+            Assert.That(File.Exists(Path.Combine(directory, ".rollback")), Is.True);
+            Assert.That(File.Exists(Path.Combine(directory, ".eviction")), Is.True);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task CacheRejectsPayloadSealedForADifferentManifest()
     {
         var directory = Path.Combine(
