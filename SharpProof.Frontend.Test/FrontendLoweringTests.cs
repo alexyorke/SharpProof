@@ -584,6 +584,32 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void PureOpaqueTypeOperationsIncludeTheirOperandTypeInIdentity()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            private sealed class First { }
+            private sealed class Second { }
+            public static bool Target() => typeof(First) == typeof(Second);
+            """);
+
+        var operations = compiled.TargetExpression
+            .DescendantsAndSelf()
+            .OfType<ITypeOfOperation>()
+            .ToArray();
+        Assert.That(operations, Has.Length.EqualTo(2));
+
+        var lowerer = new RoslynOperationLowerer(compiled.Factory);
+        var first = lowerer.Lower(operations[0]).Term;
+        var second = lowerer.Lower(operations[1]).Term;
+
+        Assert.That(first, Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(second, Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(second, Is.Not.SameAs(first));
+        Assert.That(second.Id, Is.Not.EqualTo(first.Id));
+    }
+
+    [Test]
     public void CompilerIdentitySeparatesSameNamedTypesFromDifferentAssemblies()
     {
         var leftReference = CreateAliasedTypeReference(

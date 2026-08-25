@@ -60,6 +60,22 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void SemanticTermCombinatorsRejectNonBooleanSingletons()
+    {
+        var factory = new IrFactory();
+
+        Action conjoin = () => IrSemanticTerms.Conjoin(
+            factory, [factory.Integer(1)]);
+        Action disjoin = () => IrSemanticTerms.Disjoin(
+            factory, [factory.Integer(1)]);
+        Assert.Throws<ArgumentException>(conjoin);
+        Assert.Throws<ArgumentException>(disjoin);
+        Assert.That(
+            IrSemanticTerms.Conjoin(factory, [factory.Boolean(true)]),
+            Is.SameAs(factory.Boolean(true)));
+    }
+
+    [Test]
     public void MemberInterningIncludesTheMemberName()
     {
         var factory = new IrFactory();

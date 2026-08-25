@@ -84,6 +84,17 @@ public static class IrSemanticTerms
             return factory.Boolean(identity);
         }
 
+        for (var index = 0; index < terms.Count; index++)
+        {
+            var term = ArgumentNullGuard.NotNull(terms[index], nameof(terms));
+            if (term.Type != factory.BooleanType)
+            {
+                throw new ArgumentException(
+                    "Semantic conjunction and disjunction terms must be Boolean.",
+                    nameof(terms));
+            }
+        }
+
         return Visit(0, terms.Count);
 
         IrTerm Visit(int start, int count)

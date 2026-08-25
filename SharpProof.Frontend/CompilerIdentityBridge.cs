@@ -130,6 +130,12 @@ public static class CompilerIdentityBridge
             operation.Type == null
                 ? default
                 : InternType(factory, operation.Type),
+            operation switch
+            {
+                ITypeOfOperation typeOf => InternType(factory, typeOf.TypeOperand),
+                ISizeOfOperation sizeOf => InternType(factory, sizeOf.TypeOperand),
+                _ => default
+            },
             (operation as IBinaryOperation)?.OperatorKind,
             (operation as IUnaryOperation)?.OperatorKind,
             (operation as IInstanceReferenceOperation)?.ReferenceKind,
@@ -205,7 +211,7 @@ public static class CompilerIdentityBridge
     }
 
     private readonly struct OperationSemanticIdentity(
-        OperationKind kind, IrIdentityId type,
+        OperationKind kind, IrIdentityId type, IrIdentityId operandType,
         BinaryOperatorKind? binaryOperator,
         UnaryOperatorKind? unaryOperator,
         InstanceReferenceKind? instanceReference,
@@ -213,9 +219,9 @@ public static class CompilerIdentityBridge
         : IEquatable<OperationSemanticIdentity>
     {
         private readonly (
-            OperationKind, IrIdentityId, BinaryOperatorKind?,
+            OperationKind, IrIdentityId, IrIdentityId, BinaryOperatorKind?,
             UnaryOperatorKind?, InstanceReferenceKind?, bool, bool) _value =
-            (kind, type, binaryOperator, unaryOperator, instanceReference,
+            (kind, type, operandType, binaryOperator, unaryOperator, instanceReference,
              isChecked, isLifted);
 
         public bool Equals(OperationSemanticIdentity other)

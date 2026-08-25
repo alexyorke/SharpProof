@@ -2073,8 +2073,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 !LoopHasReachableBreak(loop.Body) => false,
             ITryOperation @try =>
                 (@try.Finally == null || MayCompleteNormally(@try.Finally)) &&
-                @try.Catches.All(catchClause =>
-                    MayCompleteNormally(catchClause.Handler)),
+                (MayCompleteNormally(@try.Body) ||
+                 @try.Catches.Any(catchClause =>
+                     MayCompleteNormally(catchClause.Handler))),
             ILoopOperation or ISwitchOperation => true,
             _ => true
         };

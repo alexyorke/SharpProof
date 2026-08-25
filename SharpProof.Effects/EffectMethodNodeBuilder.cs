@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 namespace SharpProof.Effects;
 
 /// <summary>
@@ -92,12 +90,8 @@ internal sealed class EffectMethodNodeBuilder
                 ? true
                 : method.MethodKind == MethodKind.Constructor
                     ? method.ContainingType.StaticConstructors.All(
-                        static constructor => constructor.IsImplicitlyDeclared)
-                    : !method.ContainingType.IsGenericType &&
-                      method.ContainingType.StaticConstructors.Any(
-                          constructor =>
-                              !constructor.IsImplicitlyDeclared &&
-                              StaticConstructorCanAffectEntry(constructor))) &&
+                          static constructor => constructor.IsImplicitlyDeclared)
+                    : true) &&
             HasPotentialStaticInitialization(
                 method.ContainingType,
                 _session.ApiSpecs)
@@ -285,23 +279,6 @@ internal sealed class EffectMethodNodeBuilder
         return method.MethodKind == MethodKind.Constructor ||
         method.MethodKind != MethodKind.StaticConstructor &&
         (method.IsStatic || method.ContainingType.IsValueType);
-    }
-
-    private bool StaticConstructorCanAffectEntry(
-        IMethodSymbol constructor)
-    {
-        if (constructor.DeclaringSyntaxReferences.Any(reference =>
-            reference.GetSyntax().DescendantNodesAndSelf().Any(
-                static syntax => syntax is ThrowStatementSyntax or
-                    ThrowExpressionSyntax)))
-        {
-            return true;
-        }
-        return constructor.DeclaringSyntaxReferences.Length == 0 ||
-            new DefiniteOperationFacts(
-                _compilation,
-                CancellationToken.None).MethodCanCompleteNormally(
-                    constructor);
     }
 
     private static bool IsInitializableMember(

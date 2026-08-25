@@ -143,6 +143,21 @@ public sealed class AtomicFileTests
         Assert.That(TemporaryFiles(path), Is.Empty);
     }
 
+    [Test]
+    public void SweepStagedRemovesOnlyExpiredSharpProofFiles()
+    {
+        var expired = Path.Combine(_root, ".sharpproof-expired.tmp");
+        var fresh = Path.Combine(_root, ".sharpproof-fresh.tmp");
+        File.WriteAllText(expired, "old");
+        File.WriteAllText(fresh, "new");
+        File.SetLastWriteTimeUtc(expired, DateTime.UtcNow - TimeSpan.FromHours(2));
+
+        AtomicFile.SweepStaged(_root, TimeSpan.FromHours(1));
+
+        Assert.That(File.Exists(expired), Is.False);
+        Assert.That(File.Exists(fresh), Is.True);
+    }
+
     private static string[] TemporaryFiles(string path)
     {
         return Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*.tmp");

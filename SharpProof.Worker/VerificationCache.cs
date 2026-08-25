@@ -292,6 +292,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private void RecoverTransactionDebris(CancellationToken cancellationToken)
     {
+        AtomicFile.SweepStaged(_directory);
         foreach (var debrisPath in new DirectoryInfo(_directory)
                      .EnumerateFiles()
                      .Where(static file =>

@@ -1926,6 +1926,70 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void TryBodyCompletionPreservesEffectsAfterARecoverableCatch()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int Value;
+            }
+
+            public static class Sample {
+                public static void AfterTry(bool shouldThrow) {
+                    try {
+                        if (shouldThrow) throw new System.Exception();
+                    } catch {
+                        return;
+                    }
+                    Global.Value = 1;
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "AfterTry"));
+
+        Assert.That(result.Summary.Writes.Contains(EffectRegionId.Static()), Is.True);
+    }
+
+    [Test]
+    public void StaticMethodsAccountForImplicitAndGenericTypeInitialization()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int Value;
+            }
+
+            public static class Initialized<T> {
+                private static readonly object Value = Initialize();
+
+                private static object Initialize() {
+                    Global.Value = 1;
+                    return new object();
+                }
+
+                public static object Read() => Value;
+            }
+
+            public static class Sample {
+                public static object Call() => Initialized<string>.Read();
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Call"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(result.Summary.Writes.IsUnknown, Is.True);
+            Assert.That(result.Summary.Uncertainty & EffectUncertainty.UnmodeledCall,
+                Is.EqualTo(EffectUncertainty.UnmodeledCall));
+        }
+    }
+
+    [Test]
     public void CrossTypeGenericStaticFieldAccessAccountsForTypeInitialization()
     {
         var compilation = EffectTestHost.CreateCompilation(

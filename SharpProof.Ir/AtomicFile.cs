@@ -2,6 +2,7 @@ namespace SharpProof.Ir;
 internal static class AtomicFile
 {
     private static readonly UTF8Encoding Utf8 = new(false);
+    private static readonly TimeSpan StagingLifetime = TimeSpan.FromHours(1);
 
     internal static string PrepareStaged(string path)
     {
@@ -9,6 +10,7 @@ internal static class AtomicFile
         var directory = Path.GetDirectoryName(destination) ??
             throw new InvalidOperationException("The output path has no directory.");
         Directory.CreateDirectory(directory);
+        SweepStaged(directory);
         for (var attempt = 0; attempt < 8; attempt++)
         {
             var temporary = Path.Combine(
@@ -56,6 +58,42 @@ internal static class AtomicFile
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    internal static void SweepStaged(
+        string directory,
+        TimeSpan? maximumAge = null)
+    {
+        directory = Path.GetFullPath(
+            ArgumentNullGuard.NotNull(directory, nameof(directory)));
+        var age = maximumAge ?? StagingLifetime;
+        if (age < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumAge));
+        }
+
+        DateTime cutoff = DateTime.UtcNow - age;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(directory, ".sharpproof-*.tmp"))
+            {
+                try
+                {
+                    if (File.GetLastWriteTimeUtc(file) < cutoff)
+                    {
+                        File.Delete(file);
+                    }
+                }
+                catch (Exception exception) when (
+                    exception is IOException or UnauthorizedAccessException)
+                {
+                }
+            }
+        }
+        catch (Exception exception) when (
+            exception is DirectoryNotFoundException or IOException or UnauthorizedAccessException)
         {
         }
     }
@@ -108,6 +146,7 @@ internal static class AtomicFile
         var directory = Path.GetDirectoryName(destination) ??
             throw new InvalidOperationException("The output path has no directory.");
         Directory.CreateDirectory(directory);
+        SweepStaged(directory);
         return (destination, Path.Combine(
             directory,
             ".sharpproof-" + Guid.NewGuid().ToString("N") + ".tmp"));
