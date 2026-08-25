@@ -391,15 +391,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 
 
-### 130. Duplicate SP0024 Diagnostics for Invalid Contract Clauses in Nested Callables
-**Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 236-241, 624-627, 690-708)
-**Description**: When an invalid contract clause is placed inside a local function or lambda, `ValidateContractClauses` executed on the containing outer method re-fetches nested owner clauses via `GetNestedOwners` and reports the diagnostic. Subsequently, when Roslyn delivers the operation block callback for the local function/lambda itself, `ValidateContractClauses` is executed again for that callable without session-level deduplication, producing duplicate SP0024 diagnostic reports for the exact same source syntax.
-**Reproduction Steps**:
-1. Define a method containing a local function with an invalid contract clause (e.g., `Contract.Requires` inside a local function).
-2. Run analyzer diagnostics on the compilation unit.
-3. Observe duplicate SP0024 diagnostics emitted for the same contract clause syntax node.
-**Confidence**: High
-
 ### 131. CanReachMemberInitializer Ignores Member Initializers in Sibling Partial Type Declarations
 **Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 522-569)
 **Description**: `CanReachMemberInitializer` uses `target.FirstAncestorOrSelf<TypeDeclarationSyntax>()` to inspect preceding member initializers, which only retrieves members declared in the single syntax part containing the target. For partial classes split across multiple files/declarations, preceding member initializers in sibling partial parts that may throw exceptions are ignored, causing reachability checks to evaluate to true and emitting spurious precondition violation diagnostics (SP0027) on unreachable initializers.
