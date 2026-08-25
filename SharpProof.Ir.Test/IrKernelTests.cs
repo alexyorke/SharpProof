@@ -1138,6 +1138,24 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void PrinterRejectsTermsBeyondItsDepthBudget()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var term = (IrTerm)factory.Variable(value);
+        for (var index = 0; index < 512; index++)
+        {
+            term = factory.Binary(
+                IrBinaryOperator.Add,
+                term,
+                factory.Variable(value));
+        }
+
+        Assert.Throws<InvalidOperationException>(
+            (Action)(() => new IrPrinter(factory).Print(term)));
+    }
+
+    [Test]
     public void TermsWithinTheDepthBudgetStillEvaluate()
     {
         var factory = new IrFactory();

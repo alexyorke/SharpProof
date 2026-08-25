@@ -2,6 +2,12 @@ namespace SharpProof.Ir;
 
 public sealed partial class IrPrinter(IrFactory factory)
 {
+    /// <summary>
+    /// Caps recursive formatting before it can exhaust the process stack.
+    /// The depth is measured iteratively by <see cref="IrTermAnalysis"/>.
+    /// </summary>
+    private const int MaximumPrintDepth = 256;
+
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
 
@@ -10,6 +16,13 @@ public sealed partial class IrPrinter(IrFactory factory)
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
+        if (IrTermAnalysis.GetDepth(term) > MaximumPrintDepth)
+        {
+            throw new InvalidOperationException(
+                "The IR term exceeds the printer depth budget of " +
+                MaximumPrintDepth.ToString(CultureInfo.InvariantCulture) + ".");
+        }
+
         return Format(term);
     }
 
