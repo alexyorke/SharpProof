@@ -44,7 +44,7 @@ public static partial class WorkerProtocolJson
     public static string ComputeManifestHash(
         WorkerClaimManifest manifest)
     {
-        return ComputeSha256(Encoding.UTF8.GetBytes(
+        return ComputeSha256(s_strictUtf8.GetBytes(
             CreateManifestPayload(
                 manifest ??
                 throw new ArgumentNullException(nameof(manifest)))));

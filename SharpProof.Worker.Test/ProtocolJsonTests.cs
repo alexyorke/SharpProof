@@ -280,7 +280,18 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.Validate(CreateResponse(manifest)).Errors
                 .Select(static error => error.Code),
-            Does.Contain("manifest.hash"));
+                Does.Contain("manifest.hash"));
+    }
+
+    [Test]
+    public void ManifestHashRejectsIllFormedUtf16InsteadOfReplacingIt()
+    {
+        var manifest = CreateManifest();
+        manifest.Callables[0].CallableId = "callable.\uD800";
+
+        Assert.That(
+            (Action)(() => WorkerProtocolJson.ComputeManifestHash(manifest)),
+            Throws.TypeOf<EncoderFallbackException>());
     }
 
     [Test]

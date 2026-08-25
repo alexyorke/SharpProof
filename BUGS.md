@@ -428,14 +428,6 @@ These assignments are redundant since the guard simply returns the input if it's
 1. Graph with entry 0→1 and an isolated cycle 2↔3; Analyze returns normally with InputStates[2]/[3] == Bottom and no signal two blocks were never analyzed.
 **Confidence**: High (behavior), Medium (design-gap classification)
 
-### 168. Valid Parenthesized Prologue Clause Rejected as Misplaced (Hard Binding Failure)
-**Location**: `SharpProof.Contracts\ContractClauseInventoryBuilder.cs` (Lines 160-165 TryGetDirectPlacement, 142-146 Classify)
-**Description**: Roslyn operations unwrap parentheses, so for `(((Contract.Requires(x > 0))));` the invocation's syntax parent is ParenthesizedExpressionSyntax, not ExpressionStatementSyntax. TryGetDirectPlacement returns false and the ancestor scan finds no conditional node, yielding Misplaced → InvalidClausePlacement for legal C# input; removing one pair of parentheses fixes it.
-**Reproduction Steps**:
-1. Write `public void M(int x) { (((Contract.Requires(x > 0)))); }` (legal C#).
-2. Inventory/bind the method: placement Misplaced with ContractBindingFailure.InvalidClausePlacement.
-**Confidence**: Medium
-
 ### 169. Duplicate Intrinsic Declarations Crash ContractApiSymbols.TryCreate Instead of Degrading to ContractApiUnavailable
 **Location**: `SharpProof.Contracts\ContractApiSymbols.cs` (Lines 59-70 FindGenericIntrinsic using SingleOrDefault)
 **Description**: `SingleOrDefault(method => ...)` throws InvalidOperationException when two members satisfy the shape filter (e.g., duplicate declarations via partials/metadata). TryCreate is invoked eagerly in ContractBinder and ContractIntrinsicValidator constructors, none of which catch it - the documented graceful degradation ContractBindingFailure.ContractApiUnavailable (used when members are merely missing) is bypassed in favor of an unhandled crash of the binding pipeline.

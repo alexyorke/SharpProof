@@ -72,7 +72,7 @@ public static partial class WorkerProtocolJson
 
     public static string ComputeRequestHash(WorkerVerifyRequest request)
     {
-        return ComputeSha256(Encoding.UTF8.GetBytes(SerializeRequest(request)));
+        return ComputeSha256(s_strictUtf8.GetBytes(SerializeRequest(request)));
     }
 
     private static StreamReader OpenJsonReader(string path)
