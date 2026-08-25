@@ -111,7 +111,8 @@ internal sealed partial class SharpProofAnalyzerEngine
             context.Compilation,
             configuration,
             context.CancellationToken);
-        if (activation.RequiresSymbolAnalysis)
+        if (configuration.ContractsEnabled &&
+            activation.RequiresOperationAnalysis)
         {
             context.RegisterSyntaxNodeAction(
                 syntaxContext =>
@@ -121,6 +122,9 @@ internal sealed partial class SharpProofAnalyzerEngine
                 SyntaxKind.LocalFunctionStatement,
                 SyntaxKind.SimpleLambdaExpression,
                 SyntaxKind.ParenthesizedLambdaExpression);
+        }
+        if (activation.RequiresSymbolAnalysis)
+        {
             context.RegisterSymbolAction(
                 symbolContext => AnalyzerFeaturePipeline.ValidateMethodAttributes(
                     symbolContext,

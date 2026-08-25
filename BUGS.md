@@ -419,12 +419,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Any decrease below a previously observed large count triggers the 2^32-compensation branch yielding a wildly wrong delta.
 **Confidence**: Low
 
-### 161. Nested-Callable Declaration Validation Unregistered in Advisory Operation-Only Activation, So Malformed Suppress/Trusted Attributes on Lambdas Escape
-**Location**: `SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs` (Lines 114-123 registration gate; 225-232 advisory activation returning RequiresSymbolAnalysis:false)
-**Description**: ValidateNestedCallableDeclaration is the only validator for [SharpProofSuppress]/[SharpProofTrusted] on local functions/lambdas and registers only when RequiresSymbolAnalysis is true. In advisory mode triggered by Contract-API-shaped invocations, symbol actions are not registered, yet method/type/assembly-level instances of the same malformed attributes are still validated via the operation-block path. Enforcement of one rule silently depends on which advisory tier fired.
-**Reproduction Steps**:
-1. Advisory profile, contracts enabled; source whose only SharpProof usage is an invocation like `Proof.@Requires(value > 0);`.
-2. Add a local function or lambda carrying `[SharpProofSuppress("")]` - no SP0024 emitted; adding the identical attribute to an ordinary method emits it.
 **Confidence**: Medium
 
 ### 162. Attribute Diagnostic Dedup Silently Disabled When ApplicationSyntaxReference Is Null, Enabling Repeated SP0024 Reports
