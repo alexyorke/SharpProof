@@ -42,14 +42,7 @@ internal static class AtomicFile
 
     internal static void PublishStaged(string temporary, string destination)
     {
-        if (File.Exists(destination))
-        {
-            File.Replace(temporary, destination, null);
-        }
-        else
-        {
-            File.Move(temporary, destination);
-        }
+        Publish(temporary, Path.GetFullPath(destination));
     }
 
     internal static void TryDeleteStaged(string temporary)
@@ -118,13 +111,31 @@ internal static class AtomicFile
     }
     private static void Publish(string temporary, string destination)
     {
-        if (File.Exists(destination))
+        Exception? lastFailure = null;
+        for (var attempt = 0; attempt < 8; attempt++)
         {
-            File.Replace(temporary, destination, null);
+            try
+            {
+                if (File.Exists(destination))
+                {
+                    File.Replace(temporary, destination, null);
+                }
+                else
+                {
+                    File.Move(temporary, destination);
+                }
+                return;
+            }
+            catch (IOException exception) when (File.Exists(temporary))
+            {
+                // A concurrent publisher can change the destination between
+                // the existence check and the rename. The staged file remains
+                // valid, so retry using the new destination state.
+                lastFailure = exception;
+            }
         }
-        else
-        {
-            File.Move(temporary, destination);
-        }
+
+        throw lastFailure ?? new IOException(
+            "The staged file disappeared before publication completed.");
     }
 }

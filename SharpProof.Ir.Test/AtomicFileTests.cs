@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -94,6 +95,41 @@ public sealed class AtomicFileTests
         {
             AtomicFile.TryDeleteStaged(temporary);
         }
+    }
+
+    [Test]
+    public void ConcurrentPublishersDoNotFailWhenDestinationStartsMissing()
+    {
+        var path = Path.Combine(_root, "concurrent", "result.txt");
+        const int publisherCount = 8;
+        using var ready = new CountdownEvent(publisherCount);
+        using var release = new ManualResetEventSlim();
+        var tasks = Enumerable.Range(0, publisherCount)
+            .Select(index => Task.Run(() =>
+            {
+                var temporary = AtomicFile.PrepareStaged(path);
+                try
+                {
+                    AtomicFile.WriteStagedBytes(
+                        temporary,
+                        Encoding.UTF8.GetBytes(
+                            index.ToString(CultureInfo.InvariantCulture)));
+                    ready.Signal();
+                    release.Wait();
+                    AtomicFile.PublishStaged(temporary, path);
+                }
+                finally
+                {
+                    AtomicFile.TryDeleteStaged(temporary);
+                }
+            }))
+            .ToArray();
+
+        Assert.That(ready.Wait(TimeSpan.FromSeconds(5)), Is.True);
+        release.Set();
+        Action wait = () => Task.WaitAll(tasks);
+        Assert.DoesNotThrow(wait);
+        Assert.That(File.Exists(path), Is.True);
     }
 
     [Test]

@@ -447,14 +447,6 @@ These assignments are redundant since the guard simply returns the input if it's
 4. Observe that the second query immediately aborts returning `Unknown(Unavailable)`.
 **Confidence**: High
 
-### 138. TOCTOU Race Between Existence Probe and Rename in AtomicFile Publish Paths
-**Location**: `SharpProof.Ir\AtomicFile.cs` (Lines 43-53, 119-129); concurrent writers at `SharpProof.Worker\VerificationCache.cs` (Line 180)
-**Description**: Both publish paths decide between `File.Replace` and `File.Move` based on a prior non-atomic `File.Exists(destination)` check. Two concurrent writers for the same destination both observe "missing" and both call `File.Move`; the second throws `IOException` ("cannot be created because it already exists") after its fully written staging file is discarded, instead of performing last-writer-wins replacement. Conversely, if the destination disappears between `Exists` and `File.Replace`, the rename throws after successful staging.
-**Reproduction Steps**:
-1. Launch N threads calling `AtomicFile.WriteUtf8(path, payload)` on the same path simultaneously.
-2. Observe intermittent `IOException` from `File.Move` in the losing thread despite valid staged content.
-**Confidence**: High
-
 ### 139. InternExternalIdentity Keys Require Comparer Reference Equality, Splitting One Logical Identity Into Multiple IDs
 **Location**: `SharpProof.Ir\IrFactory.cs` (Lines 741-756)
 **Description**: `ExternalIdentityKey<T>.Equals` returns false unless `ReferenceEquals(_comparer, other._comparer)`, and `GetHashCode` mixes `RuntimeHelpers.GetHashCode(_comparer)`. Any caller constructing a functionally identical comparer as a new instance interns the same external identity under different `IrIdentityId`s. Identity equivalence across components silently breaks: lookups keyed by identity miss each other, producing unsound or vacuous verification conclusions with no diagnostic.
