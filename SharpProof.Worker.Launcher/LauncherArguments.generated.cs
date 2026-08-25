@@ -54,18 +54,29 @@ internal sealed partial class LauncherArguments
         get
         {
             var path = typeof(LauncherArguments).Assembly.Location;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new InvalidOperationException(
+                    "The launcher assembly must have a file location.");
+            }
+            var directory = System.IO.Path.GetDirectoryName(path);
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                throw new InvalidOperationException(
+                    "The launcher assembly location has no directory.");
+            }
             return [
                 path,
                 System.IO.Path.ChangeExtension(path, ".deps.json"),
                 System.IO.Path.ChangeExtension(path, ".runtimeconfig.json"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.CompilerArtifact.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Host.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Ir.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Specs.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "SharpProof.Worker.Protocol.dll"),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
+                System.IO.Path.Combine(directory, "SharpProof.CompilerArtifact.dll"),
+                System.IO.Path.Combine(directory, "SharpProof.Host.dll"),
+                System.IO.Path.Combine(directory, "SharpProof.Ir.dll"),
+                System.IO.Path.Combine(directory, "SharpProof.Specs.dll"),
+                System.IO.Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),
+                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
+                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
+                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
             ];
         }
     }

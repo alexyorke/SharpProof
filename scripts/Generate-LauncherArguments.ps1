@@ -279,6 +279,17 @@ $lines.Add('    {')
 $lines.Add('        get')
 $lines.Add('        {')
 $lines.Add('            var path = typeof(LauncherArguments).Assembly.Location;')
+$lines.Add('            if (string.IsNullOrWhiteSpace(path))')
+$lines.Add('            {')
+$lines.Add('                throw new InvalidOperationException(')
+$lines.Add('                    "The launcher assembly must have a file location.");')
+$lines.Add('            }')
+$lines.Add('            var directory = System.IO.Path.GetDirectoryName(path);')
+$lines.Add('            if (string.IsNullOrWhiteSpace(directory))')
+$lines.Add('            {')
+$lines.Add('                throw new InvalidOperationException(')
+$lines.Add('                    "The launcher assembly location has no directory.");')
+$lines.Add('            }')
 $lines.Add('            return [')
 $lines.Add('                path,')
 foreach ($extension in $runtimeCompanionExtensions) {
@@ -302,7 +313,7 @@ foreach ($file in $runtimeCompanionFiles) {
         Quote-CSharpString $file
     }
     $lines.Add(
-        "                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, " +
+        "                System.IO.Path.Combine(directory, " +
         "$fileExpression),")
 }
 $lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
