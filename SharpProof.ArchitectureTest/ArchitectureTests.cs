@@ -1459,7 +1459,7 @@ public sealed class ArchitectureTests
             archiveExpansion,
             StringComparison.Ordinal);
         var restore = mutationDriver.IndexOf(
-            "$restoreExit = Invoke-IsolatedDotnet",
+            "$restoreRun = Invoke-IsolatedDotnet",
             archiveExpansion,
             StringComparison.Ordinal);
         var baseline = mutationDriver.IndexOf(

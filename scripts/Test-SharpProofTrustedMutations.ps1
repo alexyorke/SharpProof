@@ -2496,7 +2496,6 @@ $mutationElapsedMilliseconds = 0L
 $baselineInvocationCount = 0
 $mutationInvocationCount = 0
 $mutationTimings = [Collections.Generic.List[object]]::new()
-$lastInvocationElapsedMilliseconds = 0L
 
 function Invoke-IsolatedDotnet {
     param(
@@ -2509,18 +2508,23 @@ function Invoke-IsolatedDotnet {
 
     $log = Join-Path $logs $LogName
     $timer = [Diagnostics.Stopwatch]::StartNew()
+    $exitCode = $null
     Push-Location $sourceRoot
     try {
         & (Join-Path $sourceRoot 'scripts\Invoke-SharpProofDotnet.ps1') `
             -TimeoutSeconds 600 `
             @Arguments *> $log
-        return $LASTEXITCODE
+        $exitCode = [int]$LASTEXITCODE
     }
     finally {
         $timer.Stop()
-        $script:lastInvocationElapsedMilliseconds =
-            [long]$timer.Elapsed.TotalMilliseconds
         Pop-Location
+    }
+
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        LogPath = $log
+        ElapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
     }
 }
 
@@ -2605,11 +2609,11 @@ try {
             -Name $mutation.Name
     }
 
-    $restoreExit = Invoke-IsolatedDotnet `
+    $restoreRun = Invoke-IsolatedDotnet `
         -Arguments @('restore', 'SharpProof.sln') `
         -LogName 'restore.log'
-    $restoreElapsedMilliseconds = $lastInvocationElapsedMilliseconds
-    if ($restoreExit -ne 0) {
+    $restoreElapsedMilliseconds = $restoreRun.ElapsedMilliseconds
+    if ($restoreRun.ExitCode -ne 0) {
         throw "Mutation workspace restore failed; see $logs\restore.log."
     }
 
@@ -2719,7 +2723,7 @@ try {
             $baselineTrx = Join-Path $logs $baselineTrxName
             Remove-Item -LiteralPath $baselineTrx `
                 -Force -ErrorAction SilentlyContinue
-            $baselineExit = Invoke-IsolatedDotnet `
+            $baselineRun = Invoke-IsolatedDotnet `
                 -Arguments @(
                     'test',
                     $invocation.Project,
@@ -2737,17 +2741,17 @@ try {
                 -LogName ('project-' + $baselineGroupIndex.ToString(
                         'D2', [Globalization.CultureInfo]::InvariantCulture) +
                     '-baseline.log')
-            $baselineElapsedMilliseconds += $lastInvocationElapsedMilliseconds
+            $baselineElapsedMilliseconds += $baselineRun.ElapsedMilliseconds
             $baselineInvocationCount++
             Assert-SharpProofMutationBaselineResult `
-                -ExitCode $baselineExit `
+                -ExitCode $baselineRun.ExitCode `
                 -TrxPath $baselineTrx `
                 -EvidenceName ($invocation.Project + '::' + $invocation.Filter)
             $baselineTestEvidence = Read-SharpProofMutationTestEvidence `
                 -TrxPath $baselineTrx `
                 -EvidenceName ($invocation.Project + ' baseline') `
                 -Mode Baseline `
-                -ProcessExitCode $baselineExit `
+                -ProcessExitCode $baselineRun.ExitCode `
                 -ExpectedMethodName $expectedMethodName
             $ledger = @($baselineTestEvidence.testLedgers[$expectedMethodName])
             $baselineEvidenceRoot = if ($null -ne $baselineFile) {
@@ -2836,7 +2840,7 @@ try {
             $testTrxName = $mutation.Name + '-test.trx'
             $testTrx = Join-Path $logs $testTrxName
             Remove-Item -LiteralPath $testTrx -Force -ErrorAction SilentlyContinue
-            $testExit = Invoke-IsolatedDotnet `
+            $testRun = Invoke-IsolatedDotnet `
                 -Arguments @(
                     'test',
                     $mutation.Project,
@@ -2852,11 +2856,12 @@ try {
                     '--results-directory',
                     $logs) `
                 -LogName ($mutation.Name + '-test.log')
-            $mutationElapsedMilliseconds += $lastInvocationElapsedMilliseconds
+            $testExit = $testRun.ExitCode
+            $mutationElapsedMilliseconds += $testRun.ElapsedMilliseconds
             $mutationInvocationCount++
             $mutationTimings.Add([pscustomobject]@{
                 name = $mutation.Name
-                elapsedMilliseconds = $lastInvocationElapsedMilliseconds
+                elapsedMilliseconds = $testRun.ElapsedMilliseconds
             })
             if ($testExit -eq 0) {
                 throw (
@@ -2906,7 +2911,7 @@ try {
                 log = "mutation-logs/$runId/$($mutation.Name)-test.log"
                 trx = "mutation-logs/$runId/$testTrxName"
                 logSha256 = (Get-FileHash `
-                    -LiteralPath $testLog `
+                    -LiteralPath $testRun.LogPath `
                     -Algorithm SHA256).Hash.ToLowerInvariant()
                 trxSha256 = (Get-FileHash `
                     -LiteralPath $testTrx `
