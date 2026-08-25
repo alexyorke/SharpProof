@@ -328,6 +328,83 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.EqualTo(8));
     }
 
+    [Test]
+    public async Task SemanticCacheWritesRetainAllConditionalDefinitions()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                void M(ProofCache cache, bool first, bool second) {
+                    var answer = Answer.Unknown;
+                    if (first) answer = Answer.Proven;
+                    if (second) answer = Answer.Proven;
+                    cache.Write(answer);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task SemanticCacheWritesJoinBranchesLoopsAndOverwrites()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                void ExhaustiveSafe(ProofCache cache, bool condition) {
+                    var answer = Answer.Unknown;
+                    if (condition) answer = Answer.Proven;
+                    else answer = Answer.Proven;
+                    cache.Write(answer);
+                }
+                void StraightLineSafe(ProofCache cache, bool condition) {
+                    var answer = Answer.Unknown;
+                    if (condition) answer = Answer.Unknown;
+                    answer = Answer.Proven;
+                    cache.Write(answer);
+                }
+                void LoopMayWriteUnknown(ProofCache cache, bool condition) {
+                    var answer = Answer.Proven;
+                    while (condition) answer = Answer.Unknown;
+                    cache.Write(answer);
+                }
+                void ManyIndependentConditions(
+                    ProofCache cache, bool first, bool second, bool third) {
+                    var answer = Answer.Unknown;
+                    if (first) answer = Answer.Proven;
+                    if (second) answer = Answer.Proven;
+                    if (third) answer = Answer.Proven;
+                    cache.Write(answer);
+                }
+                void ExhaustiveMixed(ProofCache cache, bool condition) {
+                    var answer = Answer.Proven;
+                    if (condition) answer = Answer.Unknown;
+                    else answer = Answer.Proven;
+                    cache.Write(answer);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(3));
+    }
+
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
     public async Task ReportsCSharpExpressionTextConstruction(string source)
     {

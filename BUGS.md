@@ -17,7 +17,7 @@ change the commit they qualify.
 - **P2:** Fail-closed reliability and evidence-integrity defects: lifecycle, provenance, canonicality, resource, or reporting failures without a demonstrated false proof or invalid release.
 - **P3:** Precision, documentation, and developer-experience debt that does not change a supported proof or release decision.
 
-The active backlog contains 32 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
+The active backlog contains 30 root-cause rows. Stable IDs are not renumbered; merged historical IDs remain aliases below.
 
 ## Merged and removed historical IDs
 
@@ -2082,24 +2082,6 @@ Release blockers: false proofs, missing verifier obligations, destructive suppor
 
 Material supported-surface defects: incorrect verdicts or diagnostics, missing required qualification, or workflows that produce the wrong result.
 
-### SP-AUDIT-249 - Sequential conditional writes hide a reachable non-cacheable answer (P1)
-
-- [x] `CacheSoundnessRules.ResolveLocal` examines only the last two syntactic
-  writes when the final write is conditional. With an `Unknown` initializer
-  followed by two independent conditional `Proven` assignments, both conditions
-  can be false, yet the initializer is discarded from the reaching-definition
-  join.
-- Supported impact: SPMETA010 is suppressed for a cache write that can persist a
-  non-cacheable semantic answer, weakening the analyzer that guards verifier
-  cache soundness conventions.
-- Reproduction: a detached canonical-container analyzer test expected one
-  SPMETA010 for the two-conditional example and received zero diagnostics. This
-  is distinct from the fixed alias/indexer shapes in SP-AUDIT-105.
-- Required closure: compute all reaching local definitions with CFG/dataflow
-  semantics rather than a last-two syntax heuristic. Add zero/one/two/many
-  conditional writes, mutually exclusive branches, loops, safe initializers,
-  and straight-line overwrite controls.
-
 ### SP-AUDIT-004 - Release qualification matrix is incomplete (fixed)
 
 - [x] The tag-only `release-qualification` job in
@@ -2169,39 +2151,6 @@ Material supported-surface defects: incorrect verdicts or diagnostics, missing r
 - Unified closure: Model source-order normal completion once; join later receiver, argument, conditional-access, lock, constructor, and initializer effects only when prior evaluation may complete.
 - Null receiver, throwing-first-argument, and null-lock regressions passed 3/3;
   the complete Effects suite passed 179/179 after the uncertainty repair.
-
-### SP-AUDIT-056 - Final ContractFor reconciliation is provenance-incomplete (P1)
-
-- [x] Final-compilation ContractFor validation filters syntax trees through
-  `AnalyzerGeneratedCodePolicy`, which recognizes provider classification,
-  conventional generated suffixes, or an auto-generated header. A peer source
-  generator is permitted to add an ordinary `.cs` hint without that header;
-  the incremental ContractFor generator cannot see the peer's output, and the
-  final analyzer silently excludes it.
-- Supported impact: malformed or overlapping generated ContractFor companions
-  can participate in the final compilation and runtime binding without any
-  SPCF diagnostic solely because their generator chose an ordinary filename.
-- Reproduction: the existing generated-companion regression was changed only
-  from `AddSource("GeneratedContracts.g.cs", ...)` to the legal hint
-  `GeneratedContracts.cs`. The malformed empty companion previously produced
-  SPCF0004; the focused canonical-container run returned no diagnostics. The
-  temporary filename change was removed.
-- Required closure: identify post-generator trees from authoritative final-
-  compilation provenance rather than filename/header heuristics, while keeping
-  handwritten generated-code suppression separate. Add ordinary, `.g.cs`,
-  header, provider-classified, peer-generator ordering, profile-off,
-  overlap/malformed, and handwritten controls plus a mutation restoring the
-  heuristic-only filter.
-- Consolidated cases: SP-AUDIT-064, SP-AUDIT-068, SP-AUDIT-127.
-- Unified closure: After all generators, reconcile every logical target/companion once in every non-off profile, independent of filename, partial ownership, and generator order.
-- Resolution: ContractFor ownership now transfers entirely to the final
-  analyzer in every non-off profile. The incremental generator remains
-  loadable but emits no reconciliation diagnostics, while the final analyzer
-  examines every final-compilation tree without generated-code heuristics.
-- Evidence: ordinary no-header, suffix/header/provider-classified, profile-off,
-  overlap/malformed, handwritten, partial-companion, and reversed peer-generator
-  ordering controls pass; Analyzer passed 349/349, ContractFor generator passed
-  117/117, and the exact heuristic-restoration mutation was killed.
 
 ### SP-AUDIT-086 - Unboxed struct copies retain boxed-argument ownership (fixed)
 

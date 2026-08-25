@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace SharpProof.Meta.Analyzers;
@@ -99,34 +100,13 @@ internal static class CacheSoundnessRules
         }
         try
         {
-            var writes = root.DescendantsAndSelf()
-                .Where(candidate => candidate.Syntax.SpanStart < reference.Syntax.SpanStart &&
-                                    !IsInsideNestedCallable(candidate, root))
-                .Select(candidate => candidate switch
-                {
-                    IVariableDeclaratorOperation declarator
-                        when SymbolEqualityComparer.Default.Equals(
-                            declarator.Symbol, reference.Local) => declarator.Initializer?.Value,
-                    ISimpleAssignmentOperation { Target: ILocalReferenceOperation local } assignment
-                        when SymbolEqualityComparer.Default.Equals(
-                            local.Local, reference.Local) => assignment.Value,
-                    _ => null
-                })
-                .Where(static value => value != null)
-                .Cast<IOperation>()
-                .OrderBy(static value => value.Syntax.SpanStart)
-                .ToArray();
+            var writes = GetReachingLocalValues(reference, root);
             if (writes.Length == 0)
             {
                 return IsSemanticAnswerType(reference.Type);
             }
-            var last = writes[writes.Length - 1];
-            if (IsConditionallyExecuted(last, root) && writes.Length > 1)
-            {
-                return IsNonCacheableSemanticAnswer(writes[writes.Length - 2], root, resolving) ||
-                       IsNonCacheableSemanticAnswer(last, root, resolving);
-            }
-            return IsNonCacheableSemanticAnswer(last, root, resolving);
+            return writes.Any(value =>
+                IsNonCacheableSemanticAnswer(value, root, resolving));
         }
         finally
         {
@@ -134,17 +114,155 @@ internal static class CacheSoundnessRules
         }
     }
 
-    private static bool IsConditionallyExecuted(IOperation operation, IOperation root)
+    private static IOperation[] GetReachingLocalValues(
+        ILocalReferenceOperation reference,
+        IOperation root)
     {
-        for (var current = operation.Parent; current != null && !ReferenceEquals(current, root);
-             current = current.Parent)
+        var graph = CreateControlFlowGraph(root);
+        if (graph == null)
         {
-            if (current is IConditionalOperation or ISwitchOperation or ILoopOperation)
+            return GetPriorLocalValues(reference, root);
+        }
+
+        var target = graph.Blocks.FirstOrDefault(block =>
+            BlockOperations(block).Any(operation =>
+                operation.DescendantsAndSelf().Any(candidate =>
+                    candidate is ILocalReferenceOperation local &&
+                    SymbolEqualityComparer.Default.Equals(
+                        local.Local,
+                        reference.Local) &&
+                    candidate.Syntax.SyntaxTree == reference.Syntax.SyntaxTree &&
+                    candidate.Syntax.Span == reference.Syntax.Span)));
+        if (target == null)
+        {
+            return GetPriorLocalValues(reference, root);
+        }
+
+        var outputs = graph.Blocks.ToDictionary(
+            static block => block.Ordinal,
+            static _ => new HashSet<IOperation>());
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var block in graph.Blocks.Where(static block => block.IsReachable))
             {
-                return true;
+                var input = new HashSet<IOperation>();
+                foreach (var predecessor in block.Predecessors)
+                {
+                    input.UnionWith(outputs[predecessor.Source.Ordinal]);
+                }
+                var output = TransferLocalValues(
+                    block,
+                    reference.Local,
+                    input,
+                    int.MaxValue,
+                    root);
+                if (!outputs[block.Ordinal].SetEquals(output))
+                {
+                    outputs[block.Ordinal] = output;
+                    changed = true;
+                }
             }
         }
-        return false;
+        while (changed);
+
+        var reaching = new HashSet<IOperation>();
+        foreach (var predecessor in target.Predecessors)
+        {
+            reaching.UnionWith(outputs[predecessor.Source.Ordinal]);
+        }
+        return TransferLocalValues(
+                target,
+                reference.Local,
+                reaching,
+                reference.Syntax.SpanStart,
+                root)
+            .ToArray();
+    }
+
+    private static ControlFlowGraph? CreateControlFlowGraph(IOperation root)
+    {
+        try
+        {
+            return root switch
+            {
+                IMethodBodyOperation method => ControlFlowGraph.Create(method),
+                IConstructorBodyOperation constructor =>
+                    ControlFlowGraph.Create(constructor),
+                IBlockOperation block => ControlFlowGraph.Create(block),
+                _ => null
+            };
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static HashSet<IOperation> TransferLocalValues(
+        BasicBlock block,
+        ILocalSymbol local,
+        IEnumerable<IOperation> input,
+        int before,
+        IOperation root)
+    {
+        var result = new HashSet<IOperation>(input);
+        foreach (var value in BlockOperations(block)
+                     .SelectMany(static operation =>
+                         operation.DescendantsAndSelf())
+                     .Where(candidate =>
+                         candidate.Syntax.SpanStart < before &&
+                         !IsInsideNestedCallable(candidate, root))
+                     .Select(candidate => GetLocalWriteValue(candidate, local))
+                     .Where(static value => value != null)
+                     .Cast<IOperation>()
+                     .OrderBy(static value => value.Syntax.SpanStart))
+        {
+            result.Clear();
+            result.Add(value);
+        }
+        return result;
+    }
+
+    private static IEnumerable<IOperation> BlockOperations(BasicBlock block)
+    {
+        return block.Operations.Concat(
+            block.BranchValue == null ? [] : [block.BranchValue]);
+    }
+
+    private static IOperation? GetLocalWriteValue(
+        IOperation candidate,
+        ILocalSymbol local)
+    {
+        return candidate switch
+        {
+            IVariableDeclaratorOperation declarator
+                when SymbolEqualityComparer.Default.Equals(
+                    declarator.Symbol,
+                    local) => declarator.Initializer?.Value,
+            ISimpleAssignmentOperation
+            { Target: ILocalReferenceOperation target } assignment
+                when SymbolEqualityComparer.Default.Equals(
+                    target.Local,
+                    local) => assignment.Value,
+            _ => null
+        };
+    }
+
+    private static IOperation[] GetPriorLocalValues(
+        ILocalReferenceOperation reference,
+        IOperation root)
+    {
+        return root.DescendantsAndSelf()
+            .Where(candidate =>
+                candidate.Syntax.SpanStart < reference.Syntax.SpanStart &&
+                !IsInsideNestedCallable(candidate, root))
+            .Select(candidate => GetLocalWriteValue(candidate, reference.Local))
+            .Where(static value => value != null)
+            .Cast<IOperation>()
+            .ToArray();
     }
 
     private static bool IsInsideNestedCallable(IOperation operation, IOperation root)
