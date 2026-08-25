@@ -427,22 +427,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Session summary: Reads(h), no writes, Complete.
 **Confidence**: Medium
 
-### 157. Explicit Reference Conversion to string Claimed Exact and Total While All Other Failing-Capable Conversions Abstain
-**Location**: `SharpProof.Frontend\RoslynOperationLowerer.cs` (Lines 826-832)
-**Description**: In VisitConversion, a non-try-cast conversion with Conversion.IsReference, target System_String, and a Reference-kind operand returns Exact(Cast(...)), bypassing the ConversionMayChangeValue abstention every other non-value-preserving conversion receives. C# explicit reference casts can throw InvalidCastException, but the emitted IR models `(string)o` as total and exception-free; downstream it surfaces as an internal UnsupportedEncodingException instead of a clean frontend abstention.
-**Reproduction Steps**:
-1. Lower `static string Target(object o) => (string)o;` - Exact cast term.
-2. Contrast `static MyClass Target(object o) => (MyClass)o;` which abstains with ConversionMayChangeValue.
-**Confidence**: Medium
-
-### 158. Expression-Level VisitFlowCapture Drops the Capture Binding; References Lower to a Never-Assigned Variable
-**Location**: `SharpProof.Frontend\RoslynOperationLowerer.cs` (Lines 491-496); correct program-level handling at `RoslynProgramLowerer.cs` (Lines 197-203)
-**Description**: Roslyn desugaring stores flow captures into temporaries later read by FlowCaptureReference sites. The visitor registers the capture variable but returns the raw value term from the definition site, emitting no binding; each FlowCaptureReference yields a variable nothing ever writes. When definitions and references lower as separate operations against a shared lowerer (the shape of CFG-derived trees: ??, ternary joins, conditional access), referenced variables are unassigned and evaluation silently treats them as unconstrained.
-**Reproduction Steps**:
-1. Build the CFG of code like `(c ? 1 : 2) ?? 0`; feed the IFlowCaptureOperation and matching reference to two separate Lower(...) calls on one RoslynOperationLowerer.
-2. The reference lowers to an IrVariableTerm with no corresponding assignment.
-**Confidence**: Medium
-
 ### 159. Multi-Dimensional Array .Length Admitted as Intrinsic While Indexing the Same Array Is Rejected
 **Location**: `SharpProof.Frontend\CompilerIdentityBridge.cs` (Lines 77-94) and `RoslynOperationLowerer.cs` (Lines 861-874)
 **Description**: IsIntrinsicSequenceLength matches any IArrayTypeSymbol receiver (no rank check) with Array.Length/LongLength, so VisitPropertyReference returns Exact(Length(instance)) for `int[,] arr`. Yet VisitArrayElementReference rejects Indices.Length != 1 and rect-array creation/values are otherwise outside the supported domain - an over-claim inside an otherwise closed subset rather than paired abstention.

@@ -10,6 +10,7 @@ public sealed class RoslynOperationLowerer
     private readonly Dictionary<ITypeSymbol, IrVarId> _instances =
         new(SymbolEqualityComparer.Default);
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
+    private readonly HashSet<CaptureId> _boundCaptures = [];
     private readonly List<IrVarId> _captureOrder = [];
     private readonly LoweringVisitor _visitor;
     private IrVarId? _missingInstance;
@@ -139,6 +140,16 @@ public sealed class RoslynOperationLowerer
             _captureOrder.Add(variable);
         }
         return _factory.Variable(variable);
+    }
+
+    internal void BindCapture(CaptureId id)
+    {
+        _boundCaptures.Add(id);
+    }
+
+    internal bool IsCaptureBound(CaptureId id)
+    {
+        return _boundCaptures.Contains(id);
     }
 
     internal IrVarId? GetReferencedVariable(
@@ -503,19 +514,24 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitFlowCapture(
             IFlowCaptureOperation operation, LoweringContext argument)
         {
-            _owner.GetCapture(operation.Id, operation.Value.Type);
-            return _owner.LowerCore(operation.Value);
+            return _owner.Opaque(
+                operation,
+                FrontendAbstention.UnsupportedControlFlow,
+                arguments: [operation.Value]);
         }
 
         public override LoweredExpression VisitFlowCaptureReference(
             IFlowCaptureReferenceOperation operation, LoweringContext argument)
         {
-            return _owner.IsSupportedValueDomain(operation.Type)
+            return _owner.IsSupportedValueDomain(operation.Type) &&
+                _owner.IsCaptureBound(operation.Id)
                 ? LoweredExpression.Exact(
                     _owner.GetCapture(operation.Id, operation.Type))
                 : _owner.Opaque(
                     operation,
-                    FrontendAbstention.UnsupportedType);
+                    _owner.IsSupportedValueDomain(operation.Type)
+                        ? FrontendAbstention.UnsupportedControlFlow
+                        : FrontendAbstention.UnsupportedType);
         }
 
         public override LoweredExpression VisitInstanceReference(
@@ -833,14 +849,6 @@ public sealed class RoslynOperationLowerer
             if (operation.Operand.ConstantValue.HasValue)
             {
                 return _owner.LowerConstant(operation);
-            }
-
-            if (!operation.IsTryCast &&
-                operation.Conversion.IsReference &&
-                operation.Type?.SpecialType == SpecialType.System_String &&
-                _owner._factory.GetTypeInfo(operand.Term.Type).Kind == IrTypeKind.Reference)
-            {
-                return LoweredExpression.Exact(_owner._factory.Cast(target, operand.Term));
             }
 
             return OpaqueOperand(operation, operation.Operand,

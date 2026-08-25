@@ -198,6 +198,7 @@ public sealed class RoslynProgramLowerer(
             IrBlockId block, OperationId operation, IFlowCaptureOperation capture)
         {
             var target = _expressions.GetCapture(capture.Id, capture.Value.Type);
+            _expressions.BindCapture(capture.Id);
             var value = LowerValue(block, operation, capture.Value);
             AssignOrHavoc(block, operation, target.Variable, value);
         }

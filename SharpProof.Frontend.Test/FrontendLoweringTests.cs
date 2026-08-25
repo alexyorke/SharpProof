@@ -4,6 +4,7 @@ using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Ir;
@@ -259,8 +260,8 @@ public sealed class FrontendLoweringTests
             """
             public static string Target(object value) => (string)value;
             """,
-            FrontendSubsetDecision.Exact,
-            FrontendAbstention.None);
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.ConversionMayChangeValue);
     }
 
     [Test]
@@ -815,6 +816,12 @@ public sealed class FrontendLoweringTests
                 Assert.That(
                     result.Classification.Abstention,
                     Is.Not.EqualTo(FrontendAbstention.None));
+            }
+            if (operation is IFlowCaptureOperation)
+            {
+                Assert.That(
+                    result.Classification.Abstention,
+                    Is.EqualTo(FrontendAbstention.UnsupportedControlFlow));
             }
         }
     }
