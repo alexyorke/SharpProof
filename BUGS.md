@@ -419,31 +419,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Any decrease below a previously observed large count triggers the 2^32-compensation branch yielding a wildly wrong delta.
 **Confidence**: Low
 
-### 152. Collection Expressions Wipe All Element and Allocation Effects Via Implicit Object Creation Short-Circuit
-**Location**: `SharpProof.Effects\OperationEffectScanner.cs` (Lines 707-712: `ScanObjectCreation` returns Empty for `creation.IsImplicit`)
-**Description**: Roslyn lowers a collection expression targeting a concrete collection (e.g., `List<int> x = [Touch(), 2]`) to an implicit IObjectCreationOperation carrying the element expressions. The scanner returns EffectSummary.Empty before scanning arguments/initializer or resolving the constructor, so side effects, allocations, and exceptions of every element expression are silently omitted. No downstream layer compensates; admission still passes because lowered kinds are all supported, despite SEMANTICS.md claiming collection expressions are rejected.
-**Reproduction Steps**:
-1. `[EnforcePure] static List<int> Build() => [Trace.Touch(), 2];` where Touch() writes static state.
-2. Analyze Build: Complete summary with no Writes(Static), no Allocates, no call site for Touch() - certified pure although Touch() always executes.
-**Confidence**: High
-
-### 153. Custom Interpolated-String Handler Construction Drops the Handler Constructor and Every Append* Invocation
-**Location**: `SharpProof.Effects\OperationEffectScanner.cs` (Line 709, same implicit gate); contrast ScanInterpolatedString at `OperationEffectScanner.Expressions.cs` (Lines 208-275)
-**Description**: When an interpolated string converts to a user-defined interpolated-string-handler type, Roslyn binds it as an implicit IObjectCreationOperation of the handler with an initializer of implicit AppendLiteral/AppendFormatted invocations. ScanObjectCreation discards the whole subtree, so user-supplied Append* methods - arbitrary user code - contribute zero effects.
-**Reproduction Steps**:
-1. Define `[InterpolatedStringHandler] class LogHandler` whose AppendLiteral/AppendFormatted mutate ambient state.
-2. `static void Emit(LogHandler h) {}` and `static void Call() => Emit($"v={value}");`
-3. Analyze Call: no reads/writes/calls for the ambient mutation appear.
-**Confidence**: High
-
-### 154. Assignments to Receiver-Backed Primary-Constructor Parameters Omit the Receiver-State Write
-**Location**: `SharpProof.Effects\OperationEffectScanner.Assignments.cs` (Lines 24-29) vs read path at `OperationEffectScanner.cs` (Lines 240-247) + `PrimaryConstructorParameterOwnership.cs` (Lines 7-31)
-**Description**: For `class C(int Value)`, C# captures Value into hidden per-instance state. Only the read path consults IsReceiverBacked; every write path classifies a RefKind.None parameter as effect-free, dropping the Write(Receiver) effect entirely. A method resetting the captured parameter mutates receiver state observable later, but summarizes as state-write-free.
-**Reproduction Steps**:
-1. `public class Box(int Seed) { public int Read() => Seed; public void Reset() { Seed = 0; } }`
-2. Analyze Box.Reset: no Writes(Receiver) reported although Read() observes the reset afterwards.
-**Confidence**: High
-
 ### 155. Heap Writes Through Ref Locals Aliased to Fields Are Invisible (Write Target Classifies as Local)
 **Location**: `SharpProof.Effects\OperationEffectScanner.Assignments.cs` (Lines 28-29) combined with `ScanField` treating the `ref h.Field` initializer as a mere read (`OperationEffectScanner.cs` Lines 272-312)
 **Description**: With `ref int r = ref h.Field; r = 42;` the store goes to h.Field (heap/receiver state), but the scanner models only the initializer's field read; the assignment's write target is a local contributing nothing. The method summarizes read-only while mutating shared state. Note LanguageSubsetGate abstains on ref-kind declarators for the shipped pipeline, but the public `EffectAnalysisSession.Analyze` API certifies such bodies.

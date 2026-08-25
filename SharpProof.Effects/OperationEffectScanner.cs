@@ -731,7 +731,12 @@ internal sealed partial class OperationEffectScanner
     {
         if (creation.IsImplicit)
         {
-            return EffectSummary.Empty;
+            var children = ScanSequence(creation.ChildOperations);
+            return children.CompletesNormally
+                ? EffectSummaryDomain.Instance.Join(
+                    children.Summary,
+                    EffectSummaryOperations.Unsupported())
+                : children.Summary;
         }
         var receiver = EffectRegionSet.Create(EffectRegionId.Fresh(creation.Syntax.SpanStart));
         var arguments = ScanSequence(
