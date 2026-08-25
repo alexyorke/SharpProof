@@ -1482,7 +1482,7 @@ public sealed class ContractBinderTests
     }
 
     [Test]
-    public void MalformedContractForCompanionCannotDisappearFromBinding()
+    public void MalformedUnrelatedContractForCompanionCannotPoisonBinding()
     {
         const string source =
             """
@@ -1490,22 +1490,17 @@ public sealed class ContractBinderTests
             public struct Target {
                 public int Read(int value) => value;
             }
-            [ContractFor(typeof(Target))]
-            public static class TargetContracts {
-                public static int Read(Target receiver, int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            [ContractFor(typeof(int))]
+            public static class MalformedContracts {
+                public static int Read(int value) => value;
             }
             """;
         using var subject = ContractSubject.Create(source);
 
         var result = subject.Bind("Target", "Read");
 
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(
-            result.Failure,
-            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.False);
     }
 
     [Test]

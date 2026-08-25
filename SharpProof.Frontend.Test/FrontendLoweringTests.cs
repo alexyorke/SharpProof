@@ -17,7 +17,6 @@ public sealed class FrontendLoweringTests
     private static readonly long[] ElementValues = [4L, 8L, 15L];
 
     [TestCase(4L, true, 2L, ExpectedResult = 18L)]
-    [TestCase(-7L, false, 3L, ExpectedResult = -2L)]
     public object? SupportedExpressionsMatchCompiledCSharp(
         long value,
         bool enabled,
@@ -26,9 +25,25 @@ public sealed class FrontendLoweringTests
         using var compiled = CompiledMethod.Create(
             """
             public static long Target(long value, bool enabled, long divisor) =>
-                enabled ? checked((value + 2L) * 3L) : value / divisor;
+                enabled ? checked((value + 2L) * 3L) : divisor;
             """);
         return compiled.CompareWithInterpreter(value, enabled, divisor);
+    }
+
+    [Test]
+    public void UncheckedVariableDivisionAbstainsBeforeInterpreterEvaluation()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            public static long Target(long value, long divisor) => value / divisor;
+            """);
+
+        var result = compiled.Lower();
+
+        Assert.That(result.Classification.Decision,
+            Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
+        Assert.That(result.Classification.Abstention,
+            Is.EqualTo(FrontendAbstention.UncheckedOverflowSemantics));
     }
 
     [Test]
