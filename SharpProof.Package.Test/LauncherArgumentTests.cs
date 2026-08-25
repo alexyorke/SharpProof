@@ -267,6 +267,19 @@ public sealed class LauncherArgumentTests
             Is.False);
     }
 
+    [TestCase("--publish-request")]
+    [TestCase("--publish-result")]
+    [TestCase("--publish-compiler-manifest")]
+    [TestCase("--publish-sarif")]
+    public void BlankPublicationPathsAreRejected(string option)
+    {
+        string[] arguments = [.. ValidArguments(), option, ""];
+
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out _),
+            Is.False);
+    }
+
     [Test]
     [Platform("Linux")]
     public void CompletePublicationAcceptsSarif()

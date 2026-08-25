@@ -106,6 +106,49 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void DuplicateManifestIdsAreReportedWithoutDictionaryExceptions()
+    {
+        var manifest = CreateManifest();
+        manifest.Claims = [manifest.Claims[0], new WorkerClaimManifestEntry
+        {
+            ClaimId = manifest.Claims[0].ClaimId,
+            CallableId = manifest.Claims[0].CallableId,
+            Ordinal = 1,
+            Kind = manifest.Claims[0].Kind,
+            Evidence = manifest.Claims[0].Evidence,
+            Location = manifest.Claims[0].Location
+        }];
+        manifest.Callables[0].ClaimIds = [manifest.Claims[0].ClaimId];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+
+        Assert.DoesNotThrow((Action)(() => WorkerProtocolJson.Validate(response)));
+        Assert.That(
+            WorkerProtocolJson.Validate(response).IsValid,
+            Is.False);
+    }
+
+    [Test]
+    public void DuplicateCallableIdsDoNotEscapeAsArgumentExceptionsDuringCompaction()
+    {
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        manifest.Callables = [manifest.Callables[0], new WorkerCallableManifestEntry
+        {
+            CallableId = manifest.Callables[0].CallableId,
+            SelectedFeatures = [WorkerSelectedFeature.Contracts],
+            SelectionReasons = [WorkerSelectionReason.DiscoveredPostcondition],
+            Location = manifest.Callables[0].Location,
+            ClaimIds = [],
+            Assumptions = []
+        }];
+        WorkerProtocolJson.SealManifest(manifest);
+        response.Manifest = manifest;
+
+        Assert.DoesNotThrow((Action)(() => WorkerProtocolJson.SerializeResponse(response)));
+    }
+
+    [Test]
     public void VersionNineRequestCarriesOnlyArtifactAndRuntimeControls()
     {
         var request = CreateRequest();

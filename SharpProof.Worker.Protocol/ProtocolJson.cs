@@ -640,7 +640,8 @@ public static partial class WorkerProtocolJson
     {
         var callables = (response.Manifest?.Callables ?? [])
             .Where(static callable => callable != null)
-            .ToDictionary(static callable => callable.CallableId, s_ordinal);
+            .GroupBy(static callable => callable.CallableId, s_ordinal)
+            .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
         var claims = response.Manifest?.Claims ?? [];
         foreach (var result in response.ClaimResults ?? [])
         {
@@ -716,7 +717,8 @@ public static partial class WorkerProtocolJson
         {
             var manifestClaimsById = response.Manifest.Claims
                 .Where(static claim => claim != null)
-                .ToDictionary(static claim => claim.ClaimId, s_ordinal);
+                .GroupBy(static claim => claim.ClaimId, s_ordinal)
+                .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
             var claimsByCallable = claims
                 .GroupBy(claim => manifestClaimsById.TryGetValue(
                     claim.ClaimId, out var manifestClaim)

@@ -1171,6 +1171,37 @@ public sealed class CompilerManifestArtifactTests
         }
     }
 
+    [Test]
+    public void MalformedEffectEvidenceDoesNotDiscardOtherClaimRows()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [ZeroAllocations]
+                internal static object Allocate() => new object();
+            }
+            """);
+        var target = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
+        var evidence = target.EffectClaims.Single();
+        evidence.Certainty = (WorkerEffectEvidenceCertainty)999;
+
+        var result = CallableVerificationPolicy.AssembleEffectClaim(
+            target,
+            evidence,
+            CallableEntryFeasibility.Feasible,
+            CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.Reason,
+                Is.EqualTo(WorkerClaimReason.MalformedBackendResult));
+            Assert.That(result.EffectCertainty,
+                Is.EqualTo(WorkerEffectEvidenceCertainty.Unavailable));
+        }
+    }
+
     private static void CopyEffectPayload(
         CompilerEffectClaimArtifact source,
         CompilerEffectClaimArtifact destination)

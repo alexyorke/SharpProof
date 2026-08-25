@@ -975,6 +975,13 @@ internal sealed partial class LauncherArguments
             return false;
         }
 
+        if (s_publication.Concat(["publish-sarif"]).Any(key =>
+                values.TryGetValue(key, out var value) &&
+                string.IsNullOrWhiteSpace(value)))
+        {
+            return false;
+        }
+
         var publicationCount = s_publication.Count(key => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value));
         if (publicationCount is not (0 or 3) ||
             values.TryGetValue("publish-sarif", out var sarif) &&

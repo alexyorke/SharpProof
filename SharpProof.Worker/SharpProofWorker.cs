@@ -326,7 +326,7 @@ public sealed class SharpProofWorker : IDisposable
             await Task.WhenAll(solverLanes.Select(RunLane)).ConfigureAwait(false);
             if (CallerCancellationWon())
             {
-                return Canceled(cacheStatus);
+                return Canceled(interruptionCacheStatus);
             }
             projectBoundary.Token.ThrowIfCancellationRequested();
 

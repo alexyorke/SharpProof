@@ -189,6 +189,19 @@ internal sealed class CompilerResponseEvidenceAuthority :
         IEnumerable<string> expectedUsed,
         HashSet<string> errors)
     {
+        // Compact claim rows use null as an explicit inheritance marker for
+        // the callable's canonical declarations. The marker carries no
+        // per-row Used bits, so the authoritative manifest shape is the only
+        // information available in this representation.
+        if ((object?)actual is null)
+        {
+            if (!IsCanonicalAssumptions(expected, expected))
+            {
+                errors.Add("response.assumption_usage_authority");
+            }
+            return;
+        }
+
         if (!SameAssumptions(actual, expected) ||
             !IsCanonicalAssumptions(actual, expected))
         {
@@ -197,7 +210,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         }
 
         var used = new HashSet<string>(expectedUsed, StringComparer.Ordinal);
-        foreach (var assumption in actual ?? [])
+        foreach (var assumption in actual!)
         {
             if (assumption.Used != used.Contains(assumption.Id))
             {

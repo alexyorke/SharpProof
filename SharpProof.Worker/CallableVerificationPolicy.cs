@@ -42,7 +42,7 @@ internal static class CallableVerificationPolicy
                 .ToDictionary(static item => item.claimId, static item => item.index, StringComparer.Ordinal);
             var records = proof.Postconditions
                 .Concat(target.EffectClaims.Select(evidence =>
-                    EffectClaimResultAssembler.Assemble(
+                    AssembleEffectClaim(
                         target,
                         evidence,
                         proof.EntryFeasibility,
@@ -72,6 +72,34 @@ internal static class CallableVerificationPolicy
         {
             return Unknown(target, WorkerClaimReason.InfrastructureFailure,
                 WorkerCallableCoverageReason.InfrastructureFailure);
+        }
+    }
+
+    internal static WorkerClaimResult AssembleEffectClaim(
+        CompilerCallablePreparation target,
+        CompilerEffectClaimArtifact evidence,
+        CallableEntryFeasibility entryFeasibility,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return EffectClaimResultAssembler.Assemble(
+                target, evidence, entryFeasibility, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (
+            exception is not OutOfMemoryException and
+            not StackOverflowException)
+        {
+            return CallableClaimResultAssembler.Create(
+                target,
+                evidence.ClaimId,
+                WorkerClaimOutcome.Unknown,
+                WorkerClaimReason.MalformedBackendResult,
+                WorkerEffectEvidenceCertainty.Unavailable);
         }
     }
 
