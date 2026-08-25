@@ -41,6 +41,24 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void DeepAcyclicControlFlowDoesNotUseTheCallStack()
+    {
+        const int depth = 1024;
+        var source = "public static class Sample { public static int Calls(bool value) {" +
+            string.Concat(Enumerable.Repeat("if (value) {", depth)) +
+            "return 0;" + string.Concat(Enumerable.Repeat("}", depth)) +
+            "return 1; } }";
+        var compilation = EffectTestHost.CreateCompilation(source);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var graph = ControlFlowGraph.Create(root);
+
+        Assert.That(ManagedAbstractFlow.IsAcyclic(graph), Is.True);
+    }
+
+    [Test]
     public void MultidimensionalArrayEvaluationRemainsNonNull()
     {
         var compilation = EffectTestHost.CreateCompilation(

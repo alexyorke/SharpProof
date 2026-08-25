@@ -915,28 +915,47 @@ internal sealed class ManagedAbstractFlow
     internal static bool IsAcyclic(ControlFlowGraph graph)
     {
         var marks = new byte[graph.Blocks.Length];
-        bool Visit(BasicBlock block)
+        foreach (var start in graph.Blocks.Where(static block => block.IsReachable))
         {
-            if (marks[block.Ordinal] != 0)
+            if (marks[start.Ordinal] != 0)
             {
-                return marks[block.Ordinal] == 2;
+                continue;
             }
 
-            marks[block.Ordinal] = 1;
-            foreach (var (branch, _) in Successors(block))
+            marks[start.Ordinal] = 1;
+            var stack = new Stack<(
+                BasicBlock Block, BasicBlock[] Successors, int Next)>();
+            stack.Push((start, Successors(start)
+                .Select(static successor => successor.Branch.Destination!)
+                .ToArray(), 0));
+            while (stack.Count != 0)
             {
-                if (!Visit(branch.Destination!))
+                var frame = stack.Pop();
+                if (frame.Next >= frame.Successors.Length)
+                {
+                    marks[frame.Block.Ordinal] = 2;
+                    continue;
+                }
+
+                var next = frame.Successors[frame.Next];
+                frame.Next++;
+                stack.Push(frame);
+                if (marks[next.Ordinal] == 1)
                 {
                     return false;
                 }
-            }
 
-            marks[block.Ordinal] = 2;
-            return true;
+                if (marks[next.Ordinal] == 0)
+                {
+                    marks[next.Ordinal] = 1;
+                    stack.Push((next, Successors(next)
+                        .Select(static successor => successor.Branch.Destination!)
+                        .ToArray(), 0));
+                }
+            }
         }
-        return graph.Blocks
-            .Where(static block => block.IsReachable)
-            .All(Visit);
+
+        return true;
     }
 
     private static IEnumerable<(ControlFlowBranch Branch, bool? Expected)> Successors(BasicBlock block)

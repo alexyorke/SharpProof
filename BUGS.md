@@ -397,15 +397,6 @@ These assignments are redundant since the guard simply returns the input if it's
 3. Inspect the computed effect summary and observe that potential writes and allocations during static initialization are missing.
 **Confidence**: Medium
 
-### 136. Unbounded Recursion in ManagedAbstractFlow.IsAcyclic on Unbudgeted CFGs
-**Location**: `SharpProof.Effects\ManagedAbstractFlow.cs` (Lines 915-940) and `SharpProof.Effects\EffectMethodNodeBuilder.cs` (Lines 376-380)
-**Description**: `EffectMethodNodeBuilder.AnalyzeControlFlowGraph` calls `ManagedAbstractFlow.IsAcyclic` on any constructed Roslyn control flow graph without checking against graph size or depth limits. `IsAcyclic` uses recursive DFS traversal without recursion depth caps, making the analyzer vulnerable to `StackOverflowException` when analyzing methods with deeply nested control flow structures.
-**Reproduction Steps**:
-1. Construct a method with an exceptionally large and deep control flow graph.
-2. Trigger effect analysis on the method.
-3. Observe unbounded recursion in `ManagedAbstractFlow.Visit` leading to potential stack overflow in the analyzer process.
-**Confidence**: Medium
-
 ### 140. Canonical Enum Frames Use Assembly Simple Name, Colliding Across Versions and Strong Names
 **Location**: `SharpProof.Ir\CanonicalHashWriter.cs` (Lines 77-85)
 **Description**: `Add(Enum)` canonicalizes as assembly simple name + type FullName + member name. The simple assembly name omits version, culture, and public-key token. Two distinct enum types loaded side-by-side (different versions or strong names, same simple name and full type/member names) produce byte-identical Enum frames and identical digests - a canonical-identity collision for claim fingerprints embedding enum options.
