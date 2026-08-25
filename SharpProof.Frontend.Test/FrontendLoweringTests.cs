@@ -177,6 +177,12 @@ public sealed class FrontendLoweringTests
             """,
             FrontendSubsetDecision.ClosedAbstention,
             FrontendAbstention.UnsupportedMemberAccess);
+        AssertClassification(
+            """
+            public static int Target(int[,] values) => values.Length;
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedMemberAccess);
     }
 
     [Test]

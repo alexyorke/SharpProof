@@ -427,14 +427,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Session summary: Reads(h), no writes, Complete.
 **Confidence**: Medium
 
-### 159. Multi-Dimensional Array .Length Admitted as Intrinsic While Indexing the Same Array Is Rejected
-**Location**: `SharpProof.Frontend\CompilerIdentityBridge.cs` (Lines 77-94) and `RoslynOperationLowerer.cs` (Lines 861-874)
-**Description**: IsIntrinsicSequenceLength matches any IArrayTypeSymbol receiver (no rank check) with Array.Length/LongLength, so VisitPropertyReference returns Exact(Length(instance)) for `int[,] arr`. Yet VisitArrayElementReference rejects Indices.Length != 1 and rect-array creation/values are otherwise outside the supported domain - an over-claim inside an otherwise closed subset rather than paired abstention.
-**Reproduction Steps**:
-1. Lower `static int Target(int[,] a) => a.Length;` - Exact IrLengthTerm.
-2. Contrast `static int Target(int[,] a) => a[0,0];` - abstains with UnsupportedMemberAccess.
-**Confidence**: Low
-
 ### 160. SP0024 Usage Diagnostics Leak Out of Generated Code Because Two Pipeline Paths Report Before (or Without) the Generated-Code Gate
 **Location**: `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 87-102, 162, 223-234); `SharpProofAnalyzerEngine.cs` (Lines 114-143); `SharpProofControlAttributePolicy.cs` (Lines 147-194)
 **Description**: Every other entry point gates on IsGenerated before reporting. Two paths violate this: (1) AnalyzeOperationBlock runs GetSelection (which calls ValidateAndShouldSuppress, reporting SP0024 for malformed [SharpProofSuppress]/[SharpProofTrusted]) before the generated-code early return; (2) ValidateMethodAttributes and the NamedType/assembly ValidateDeclaredScope callbacks have no generated-code gate before contract-argument validation and rejected-API reporting. The same diagnostic category gets opposite treatment depending on which callback owns the symbol, contradicting the quietness policy pinned by tests.

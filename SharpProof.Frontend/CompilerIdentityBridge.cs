@@ -74,7 +74,7 @@ public static class CompilerIdentityBridge
                 definition.Type.SpecialType == SpecialType.System_Int32;
         }
 
-        if (property.Instance.Type is not IArrayTypeSymbol)
+        if (property.Instance.Type is not IArrayTypeSymbol { Rank: 1 })
         {
             return false;
         }
@@ -98,7 +98,7 @@ public static class CompilerIdentityBridge
     {
         if (type is IArrayTypeSymbol array)
         {
-            return IsSupportedValueDomain(array.ElementType);
+            return array.Rank == 1 && IsSupportedValueDomain(array.ElementType);
         }
         if (type == null || type.TypeKind == TypeKind.Error)
         {

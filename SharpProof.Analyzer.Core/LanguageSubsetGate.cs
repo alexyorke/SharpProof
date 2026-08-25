@@ -280,7 +280,8 @@ internal static class LanguageSubsetGate
             TypeKind.TypeParameter ||
         type switch
         {
-            IArrayTypeSymbol array => IsUnsupportedType(array.ElementType),
+            IArrayTypeSymbol array => array.Rank != 1 ||
+                IsUnsupportedType(array.ElementType),
             INamedTypeSymbol named =>
                 named.IsRefLikeType ||
                 named.TypeArguments.Any(IsUnsupportedType),
