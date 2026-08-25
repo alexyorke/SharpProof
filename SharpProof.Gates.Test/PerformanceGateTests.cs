@@ -559,6 +559,48 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public void WorkerProbeUsesOnlyItsActiveBuildConfiguration()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.PerformanceProbe." + Guid.NewGuid().ToString("N"));
+        var configuration = new DirectoryInfo(
+            AppContext.BaseDirectory.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar)).Parent!.Name;
+        try
+        {
+            var project = Path.Combine(
+                root, "SharpProof.Worker", "bin", "Release", "net9.0");
+            Directory.CreateDirectory(project);
+            File.WriteAllText(
+                Path.Combine(project, "SharpProof.Worker.dll"), "stale");
+
+            Assert.Throws<FileNotFoundException>((Action)(() =>
+                WorkerPerformanceProbe.FindBuiltAssembly(
+                    root, "SharpProof.Worker")));
+
+            var active = Path.Combine(
+                root, "SharpProof.Worker", "bin", configuration, "net9.0");
+            Directory.CreateDirectory(active);
+            var expected = Path.Combine(active, "SharpProof.Worker.dll");
+            File.WriteAllText(expected, "active");
+
+            Assert.That(
+                WorkerPerformanceProbe.FindBuiltAssembly(
+                    root, "SharpProof.Worker"),
+                Is.EqualTo(expected));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     [Category("Performance")]
     [NonParallelizable]
     public async Task ReleasePerformanceContractPasses()

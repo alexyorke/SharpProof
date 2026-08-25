@@ -411,7 +411,7 @@ internal static class WorkerPerformanceProbe
         }
     }
 
-    private static string FindBuiltAssembly(
+    internal static string FindBuiltAssembly(
         string repositoryRoot,
         string projectName)
     {
@@ -419,27 +419,24 @@ internal static class WorkerPerformanceProbe
             AppContext.BaseDirectory.TrimEnd(
                 Path.DirectorySeparatorChar,
                 Path.AltDirectorySeparatorChar)).Parent?.Name;
-        var candidates = new[] {
-            configuration,
-            "Release",
-            "Debug"
-        };
-        foreach (var candidate in candidates
-                     .Where(static value => !string.IsNullOrWhiteSpace(value))
-                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(configuration))
         {
-            var path = Path.Combine(
-                repositoryRoot,
-                projectName,
-                "bin",
-                candidate!,
-                "net9.0",
-                projectName + ".dll");
-            if (File.Exists(path))
-            {
-                return path;
-            }
+            throw new InvalidOperationException(
+                "The performance probe could not determine its build configuration.");
         }
+
+        var path = Path.Combine(
+            repositoryRoot,
+            projectName,
+            "bin",
+            configuration,
+            "net9.0",
+            projectName + ".dll");
+        if (File.Exists(path))
+        {
+            return path;
+        }
+
         throw new FileNotFoundException(
             "The required worker executable was not built.",
             projectName + ".dll");

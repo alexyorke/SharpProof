@@ -395,14 +395,6 @@ These assignments are redundant since the guard simply returns the input if it's
 2. Run `SharpProof.Gates corpus` versus `SharpProof.Gates all` and observe the envelope checks never execute in the latter.
 **Confidence**: Low
 
-### 147. Worker Probes Execute Possibly-Stale or Cross-Configuration Binaries Without Freshness Checks
-**Location**: `SharpProof.Gates\Performance\WorkerPerformanceProbe.cs` (Lines 414-446)
-**Description**: `FindBuiltAssembly` resolves worker DLLs by probing `<config>`, then `Release`, then `Debug` under `bin/<tfm>` and accepts the first existing file, with no timestamp/hash comparison against sources. Forced-termination, cooperative-timeout, and cancellation-latency numbers feeding release evidence can come from an older build or the opposite configuration than the one being gated.
-**Reproduction Steps**:
-1. Build Debug, edit `SharpProof.Worker` sources without rebuilding, run the performance gate: timings from pre-edit DLLs are attributed to the current tree.
-2. Alternatively delete `bin/Debug` keeping an old `Release` output: the Debug gates measure unrelated bits.
-**Confidence**: Low
-
 ### 148. Model-Value Reconstruction Parses Z3 Numerals Through the AST Pretty-Printer; Negative Counterexample Values Hit MalformedResult
 **Location**: `SharpProof.Smt\IrSmtBackend.cs` (Lines 276-282, used from 249-260)
 **Description**: `TryCreateValue` converts integer model values with `long.TryParse(integer.ToString(), ...)`. `IntNum.ToString()` is inherited from `Microsoft.Z3.AST.ToString()` (Z3_ast_to_string), whose default smt2 printer renders negative numerals as `(- N)` rather than `-N`. If the pinned binding does that, TryParse fails for every negative value and `CreateSatisfiable` returns `Unknown(MalformedResult)` whenever any integer model variable is negative - essentially every refutation requiring a negative counterexample silently degrades. Fail-closed but invisible to gates: unit tests only assert model values satisfied by 0, and fuzzers count abstentions separately from mismatches. Numeric accessors (`IntNum.Int64`) should be used instead.
