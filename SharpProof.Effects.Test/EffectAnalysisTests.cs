@@ -1212,6 +1212,53 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ForeachProtocolEffectsAreScanned()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+            }
+
+            public sealed class Sequence {
+                public Enumerator GetEnumerator() => new Enumerator();
+
+                public sealed class Enumerator {
+                    public int Current {
+                        get {
+                            Global.State++;
+                            return 0;
+                        }
+                    }
+
+                    public bool MoveNext() {
+                        Global.State++;
+                        return false;
+                    }
+
+                    public void Dispose() {
+                        Global.State++;
+                    }
+                }
+            }
+
+            public static class Sample {
+                public static void Iterate(Sequence sequence) {
+                    foreach (var item in sequence) {
+                    }
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Iterate"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void ObjectAndCollectionInitializersContributeTheirEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(

@@ -388,14 +388,6 @@ These assignments are redundant since the guard simply returns the input if it's
 
 
 
-### 127. Foreach Loop Enumerator Protocol Effects Omitted from Effect Scanner
-**Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Lines 375-376)
-**Description**: In `OperationEffectScanner.Expressions`, `ILoopOperation` for `foreach` loops computes effects only via `Join(ScanChildren(loop), MayDiverge())`. Because Roslyn's `IForEachLoopOperation` does not expose synthetic call operations for `GetEnumerator()`, `MoveNext()`, `Current`, or `Dispose()`, any side effects, ambient writes, or custom allocations in user-defined enumerators are dropped from the effect summary.
-**Reproduction Steps**:
-1. Implement a custom `IEnumerable` / `IEnumerator` where `MoveNext()` performs state mutation or logging.
-2. Iterate over the collection in a loop: `foreach (var item in customEnumerable) { }`.
-3. Inspect the computed `EffectSummary` and observe that enumerator method effects are completely absent.
-**Confidence**: High
 
 ### 128. Awaitable Protocol Member Effects Dropped at Await Expressions
 **Location**: `SharpProof.Effects\OperationEffectScanner.Expressions.cs` (Lines 90-103)
