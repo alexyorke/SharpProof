@@ -402,6 +402,12 @@ switch ($Command) {
         }
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPilots.ps1') -PackageSource $PackageSource
         if ($LASTEXITCODE -ne 0) { throw 'Pilot validation failed.' }
+        & (Join-Path $repositoryRoot `
+            'scripts/Write-SharpProofQualificationReceipt.ps1') `
+            -Gate pilots `
+            -EvidencePath (Join-Path $repositoryRoot 'artifacts/pilots/report.json') `
+            -Automated
+        if ($LASTEXITCODE -ne 0) { throw 'Pilot qualification receipt failed.' }
     }
     'pilot-review' {
         & (Join-Path $repositoryRoot 'scripts/Complete-SharpProofPilotReview.ps1') `

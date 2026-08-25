@@ -9,13 +9,19 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$EvidencePath,
 
-    [string]$ReceiptDirectory = 'artifacts/release-qualification/qualification-receipts'
+    [string]$ReceiptDirectory = 'artifacts/release-qualification/qualification-receipts',
+
+    [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+
+    [string]$CatalogPath = (Join-Path $PSScriptRoot '..\eng\pilots\catalog.json'),
+
+    [switch]$Automated
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $resolvedEvidence = (Resolve-Path -LiteralPath $EvidencePath).Path
@@ -89,9 +95,10 @@ $valid = switch -Regex ($Gate) {
         $packageArtifacts.Count -eq 6
     }
     'pilots' {
-        [string]$evidence.reviewStatus -ceq 'Reviewed' -and
+        ([string]$evidence.reviewStatus -ceq 'Reviewed' -and -not $Automated -or
+         [string]$evidence.reviewStatus -ceq 'Unreviewed' -and $Automated) -and
         (Test-SharpProofPilotReport -Report $evidence -ExpectedCommit $commit `
-            -RepositoryRoot $repositoryRoot) -and
+            -RepositoryRoot $repositoryRoot -CatalogPath $CatalogPath) -and
         $packageArtifacts.Count -eq 6
     }
 }
@@ -128,6 +135,10 @@ if ($packageArtifacts.Count -ne 0) {
     $receipt.packageArtifacts = $packageArtifacts
 }
 if ($Gate -eq 'pilots') {
+    $receipt.review = [ordered]@{
+        mode = if ($Automated) { 'automated' } else { 'human' }
+        requiredHumanApprovals = if ($Automated) { 0 } else { 1 }
+    }
     $receipt.pilotEvidence = @($evidence.pilots | Sort-Object id | ForEach-Object {
             [ordered]@{ id = [string]$_.id; evidence = @($_.evidence) }
         })
