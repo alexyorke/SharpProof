@@ -12,6 +12,30 @@ namespace SharpProof.Contracts.Test;
 public sealed class ContractBinderTests
 {
     [Test]
+    public void CompanionDiscoveryIsSharedPerCompilation()
+    {
+        using var subject = ContractSubject.Create(
+            """
+            using SharpProof.Attributes;
+            public interface Target { int Map(int value); }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Map(Target receiver, int value) => value;
+            }
+            """);
+
+        var first = subject.DiscoverCompanions();
+        var second = subject.DiscoverCompanions();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Has.Length.EqualTo(1));
+            Assert.That(second, Has.Length.EqualTo(1));
+            Assert.That(ReferenceEquals(first[0], second[0]), Is.True);
+        }
+    }
+
+    [Test]
     public void UnconstructedGenericMethodDefinitionReturnsTypedFailure()
     {
         const string source =
@@ -1641,6 +1665,14 @@ public sealed class ContractBinderTests
         {
             var method = GetMethod(typeName, methodName);
             return _binder.Bind(method);
+        }
+
+        internal ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor>
+            DiscoverCompanions(CancellationToken cancellationToken = default)
+        {
+            return ContractForSymbolMatcher.DiscoverCompanions(
+                Compilation,
+                cancellationToken);
         }
 
         internal ContractBindingResult Bind(

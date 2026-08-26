@@ -21,9 +21,11 @@ internal static class CompilerManifestArtifactProducer
             specificationPackAuthority.SpecificationPackCatalogVersion;
         snapshot.SpecificationPackCatalogSha256 =
             specificationPackAuthority.SpecificationPackCatalogSha256;
+        var locationValidation =
+            new CompilerSourceLocationAuthority.ValidationContext();
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item.Severity == DiagnosticSeverity.Error)
-            .Select(item => CreateDiagnostic(item, snapshot));
+            .Select(item => CreateDiagnostic(item, snapshot, locationValidation));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
         var targets = discovery.Targets.Values.OrderBy(static item => item.Entry.CallableId, StringComparer.Ordinal);
@@ -83,7 +85,8 @@ internal static class CompilerManifestArtifactProducer
             MaximumExpressionDepth = maximumExpressionDepth,
             LocationAuthorities = CreateLocationAuthorities(
                 discovery.Manifest,
-                snapshot),
+                snapshot,
+                locationValidation),
             CompilerDiagnostics = diagnosticArtifacts,
             Callables = callables
         };
@@ -180,7 +183,8 @@ internal static class CompilerManifestArtifactProducer
 
     private static CompilerLocationAuthorityArtifact[] CreateLocationAuthorities(
         WorkerClaimManifest manifest,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        CompilerSourceLocationAuthority.ValidationContext locationValidation)
     {
         return [
             .. manifest.Callables
@@ -188,13 +192,15 @@ internal static class CompilerManifestArtifactProducer
                     CompilerSourceLocationOwnerKind.Callable,
                     entry.CallableId,
                     entry.Location,
-                    compilation))
+                    compilation,
+                    locationValidation))
                 .Concat(manifest.Claims.Select(entry =>
                     CompilerSourceLocationAuthority.CreateAuthority(
                         CompilerSourceLocationOwnerKind.Claim,
                         entry.ClaimId,
                         entry.Location,
-                        compilation)))
+                        compilation,
+                        locationValidation)))
                 .OrderBy(static value => value.OwnerKind)
                 .ThenBy(static value => value.OwnerId, StringComparer.Ordinal)
         ];
@@ -202,7 +208,8 @@ internal static class CompilerManifestArtifactProducer
 
     private static CompilerDiagnosticArtifact CreateDiagnostic(
         Diagnostic diagnostic,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        CompilerSourceLocationAuthority.ValidationContext locationValidation)
     {
         var source = diagnostic.Location.IsInSource;
         var span = source ? diagnostic.Location.GetMappedLineSpan() : default;
@@ -238,7 +245,8 @@ internal static class CompilerManifestArtifactProducer
             out var sourceTreeOrdinal,
             out var sourceTreePath,
             out var sourceTreeSha256,
-            out var sourceLineMapSha256);
+            out var sourceLineMapSha256,
+            locationValidation);
         result.SourceTreeOrdinal = sourceTreeOrdinal;
         result.SourceTreePath = sourceTreePath;
         result.SourceTreeSha256 = sourceTreeSha256;

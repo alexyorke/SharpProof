@@ -178,6 +178,36 @@ public sealed class CompilerSourceLocationAuthorityTests
     }
 
     [Test]
+    public void ValidationContextCachesLineMapValidationPerTree()
+    {
+        var artifact = CreateArtifact(
+            "#line 42 \"mapped.cs\"\n" +
+            "internal sealed class Subject {}\n");
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        var location = new WorkerSourceLocation
+        {
+            Path = "mapped.cs",
+            Start = 0,
+            Length = 0,
+            Line = 42,
+            Column = 1
+        };
+        var context = new CompilerSourceLocationAuthority.ValidationContext();
+
+        for (var index = 0; index < 8; index++)
+        {
+            Assert.That(
+                CompilerSourceLocationAuthority.HasValidLocationGeometry(
+                    location,
+                    tree,
+                    context),
+                Is.True);
+        }
+
+        Assert.That(context.LineMapValidationCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public void GenuineNonSourceCompilerDiagnosticUsesExplicitSentinelClassification()
     {
         var artifact = CreateNonSourceDiagnosticArtifact();

@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace SharpProof.CompilerArtifact;
 
 // Source locations are compiler evidence, not display-only hints.  Keep the
@@ -5,6 +7,49 @@ namespace SharpProof.CompilerArtifact;
 // assembly so the collector and worker cannot gradually diverge.
 internal static class CompilerSourceLocationAuthority
 {
+    // A producer validates many locations against the same immutable
+    // compilation snapshot.  Keep the cache scoped to that validation
+    // operation so mutable/deserialized snapshots are never trusted across
+    // calls or consumers.
+    internal sealed class ValidationContext
+    {
+        private readonly Dictionary<CompilerSyntaxTreeSnapshot, bool> _lineMaps =
+            new(ReferenceComparer.Instance);
+
+        internal int LineMapValidationCount { get; private set; }
+
+        internal bool HasValidLineMap(CompilerSyntaxTreeSnapshot tree)
+        {
+            if (_lineMaps.TryGetValue(tree, out var valid))
+            {
+                return valid;
+            }
+
+            LineMapValidationCount++;
+            valid = HasValidLineMapCore(tree);
+            _lineMaps.Add(tree, valid);
+            return valid;
+        }
+    }
+
+    private sealed class ReferenceComparer :
+        IEqualityComparer<CompilerSyntaxTreeSnapshot>
+    {
+        internal static readonly ReferenceComparer Instance = new();
+
+        public bool Equals(
+            CompilerSyntaxTreeSnapshot? left,
+            CompilerSyntaxTreeSnapshot? right)
+        {
+            return ReferenceEquals(left, right);
+        }
+
+        public int GetHashCode(CompilerSyntaxTreeSnapshot value)
+        {
+            return RuntimeHelpers.GetHashCode(value);
+        }
+    }
+
     internal static bool IsNone(WorkerSourceLocation? value)
     {
         return value is
@@ -19,6 +64,20 @@ internal static class CompilerSourceLocationAuthority
 
     internal static bool HasValidLineMap(
         CompilerSyntaxTreeSnapshot? tree)
+    {
+        return tree != null && HasValidLineMapCore(tree);
+    }
+
+    internal static bool HasValidLineMap(
+        CompilerSyntaxTreeSnapshot? tree,
+        ValidationContext? context)
+    {
+        return tree != null &&
+            (context?.HasValidLineMap(tree) ?? HasValidLineMapCore(tree));
+    }
+
+    private static bool HasValidLineMapCore(
+        CompilerSyntaxTreeSnapshot tree)
     {
         if (tree == null ||
             !WorkerProtocolJson.IsSha256(tree.LineMapSha256) ||
@@ -52,11 +111,12 @@ internal static class CompilerSourceLocationAuthority
 
     internal static bool HasValidLocationGeometry(
         WorkerSourceLocation? location,
-        CompilerSyntaxTreeSnapshot? tree)
+        CompilerSyntaxTreeSnapshot? tree,
+        ValidationContext? context = null)
     {
         if (location == null || tree == null ||
             !WorkerProtocolJson.HasValidLocation(location) ||
-            !HasValidLineMap(tree) ||
+            !HasValidLineMap(tree, context) ||
             location.Start < 0 ||
             location.Length < 0 ||
             location.Start > tree.TextLength ||
@@ -80,7 +140,8 @@ internal static class CompilerSourceLocationAuthority
     // example two trees using the same #line path).  Never guess in that case.
     internal static int FindUniqueTree(
         WorkerSourceLocation? location,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        ValidationContext? context = null)
     {
         if (location == null || compilation is not { SyntaxTrees: not null })
         {
@@ -91,7 +152,8 @@ internal static class CompilerSourceLocationAuthority
         for (var index = 0; index < compilation.SyntaxTrees.Length; index++)
         {
             var tree = compilation.SyntaxTrees[index];
-            if (tree == null || !HasValidLocationGeometry(location, tree))
+            if (tree == null ||
+                !HasValidLocationGeometry(location, tree, context))
             {
                 continue;
             }
@@ -114,7 +176,8 @@ internal static class CompilerSourceLocationAuthority
         string? sourceTreeSha256,
         string? sourceLineMapSha256,
         CompilerCompilationSnapshot? compilation,
-        bool allowNone = false)
+        bool allowNone = false,
+        ValidationContext? context = null)
     {
         if (location == null || compilation is not { SyntaxTrees: not null } ||
             sourceTreePath == null || sourceTreeSha256 == null ||
@@ -145,14 +208,15 @@ internal static class CompilerSourceLocationAuthority
             string.Equals(tree.Path, sourceTreePath, StringComparison.Ordinal) &&
             string.Equals(tree.Sha256, sourceTreeSha256, StringComparison.Ordinal) &&
             string.Equals(tree.LineMapSha256, sourceLineMapSha256, StringComparison.Ordinal) &&
-            HasValidLocationGeometry(location, tree);
+            HasValidLocationGeometry(location, tree, context);
     }
 
     internal static CompilerLocationAuthorityArtifact CreateAuthority(
         CompilerSourceLocationOwnerKind ownerKind,
         string ownerId,
         WorkerSourceLocation location,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        ValidationContext? context = null)
     {
         if (!Enum.IsDefined(typeof(CompilerSourceLocationOwnerKind), ownerKind) ||
             string.IsNullOrWhiteSpace(ownerId) ||
@@ -177,7 +241,7 @@ internal static class CompilerSourceLocationAuthority
             };
         }
 
-        var ordinal = FindUniqueTree(location, compilation);
+        var ordinal = FindUniqueTree(location, compilation, context);
         if (ordinal < 0)
         {
             throw new InvalidDataException(
@@ -203,9 +267,10 @@ internal static class CompilerSourceLocationAuthority
         out int sourceTreeOrdinal,
         out string sourceTreePath,
         out string sourceTreeSha256,
-        out string sourceLineMapSha256)
+        out string sourceLineMapSha256,
+        ValidationContext? context = null)
     {
-        var ordinal = FindUniqueTree(location, compilation);
+        var ordinal = FindUniqueTree(location, compilation, context);
         if (ordinal < 0)
         {
             throw new InvalidDataException(

@@ -2,6 +2,16 @@ namespace SharpProof.Contracts;
 
 internal static class ContractForSymbolMatcher
 {
+    private sealed class CompanionCache
+    {
+        internal readonly object Gate = new();
+        internal bool HasValue;
+        internal ImmutableArray<CompanionDescriptor> Value;
+    }
+
+    private static readonly ConditionalWeakTable<
+        Compilation, CompanionCache> DiscoveryCache = new();
+
     internal sealed class CompanionDescriptor(
         INamedTypeSymbol type,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget,
@@ -111,7 +121,30 @@ internal static class ContractForSymbolMatcher
         Compilation compilation,
         CancellationToken cancellationToken = default)
     {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         cancellationToken.ThrowIfCancellationRequested();
+        var cache = DiscoveryCache.GetValue(
+            compilation,
+            static _ => new CompanionCache());
+        lock (cache.Gate)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (cache.HasValue)
+            {
+                return cache.Value;
+            }
+
+            var result = DiscoverCompanionsCore(compilation, cancellationToken);
+            cache.Value = result;
+            cache.HasValue = true;
+            return result;
+        }
+    }
+
+    private static ImmutableArray<CompanionDescriptor> DiscoverCompanionsCore(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
         {
