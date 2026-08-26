@@ -5890,6 +5890,50 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void NullReceiverStillEvaluatesArgumentsFirst()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class Target
+            {
+                public void Touch(int value)
+                {
+                }
+            }
+
+            public static class Sample
+            {
+                public static int State;
+
+                private static int ThrowArgument() =>
+                    throw new ArgumentException();
+
+                public static void Caller()
+                {
+                    Target target = null!;
+                    try
+                    {
+                        target.Touch(ThrowArgument());
+                    }
+                    catch (ArgumentException)
+                    {
+                        State++;
+                    }
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Caller"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void ExceptionFlowReportsOnlyExceptionsThatEscape()
     {
         var compilation = EffectTestHost.CreateCompilation(
