@@ -4,29 +4,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 ## Open and accepted findings
 
-### 151. SMT precision gap for string operations
-
-**Status:** Accepted fail-closed precision limitation.
-
-The reference interpreter can execute string concatenation and length, while the SMT encoder rejects those operations as unsupported. This produces an abstention rather than an unsound proof. The remaining work is differential-coverage expansion, not a correctness fix. Relevant implementations are `SharpProof.Smt/IrSmtBackend.cs` and `SharpProof.Ir/IrInterpreter.cs`.
-
-### 280. Partial-term differential coverage is intentionally narrow
-
-**Status:** Accepted test-coverage limitation.
-
-The partial-term oracle currently exercises only a small set of observable behaviors; division/remainder dimensions are not represented in the retained campaign. This does not make a production result unsound, but it limits the defects the campaign can detect. Expand the generator and retain seed evidence before treating this as a production fix.
-
-### 284. Cache-soundness identification is name-based
-
-**Status:** Open design limitation; no safe production patch identified.
-
-`SharpProof.Meta.Analyzers/CacheSoundnessRules.cs` recognizes a semantic cache when its type name contains `Cache`. A memoization type with another name is therefore outside SPMETA010's current contract. Flagging every answer write would create broad false positives. The durable fix is an explicit internal cache marker or catalog, with positive and negative tests, rather than a broader heuristic.
-
-### 285. Outcome-constructor architecture enforcement has residual semantic gaps
-
-**Status:** Partially addressed; follow-up remains open.
-
-The architecture inventory now includes `SharpProof.Gates` and rejects target-typed outcome construction in the covered source forms. Target-typed construction in arbitrary expressions and other semantic contexts still requires a Roslyn semantic-model pass to avoid source-only false positives and false negatives. No current production escape was found, and the internal constructors remain restricted.
+No non-security findings remain open after the TDD fixes recorded below. The deferred security/integrity items remain intentionally out of scope.
 
 ## Deferred by explicit scope
 
@@ -71,6 +49,10 @@ The detailed reports below were removed after reproduction, implementation, regr
 
 | Findings | Resolution commit(s) |
 | --- | --- |
+| 151 | `7e3ef5c8e` (UTF-16 sequence/null-tag SMT encoding and replay tests) |
+| 280 | `8d166cad1` (defined divide/remainder cases and retained seed evidence) |
+| 284 | `8d166cad1`, `4d2749126` (semantic-cache marker, field/compound alias coverage) |
+| 285 | `8d166cad1` (semantic Roslyn outcome-construction architecture scan) |
 | 202 | `0a2c179f9` (runtime companion path validation and generated launcher coverage) |
 | 257-262 | `68afb8ca1`, `c3ab72290`, `8bd08c6e0` |
 | 263-270 | `0c9e0ec0d`, `0a2c179f9`, `a7b99ca24` |
@@ -79,5 +61,6 @@ The detailed reports below were removed after reproduction, implementation, regr
 | 278 | `a7b99ca24` |
 | 281-283 | `68afb8ca1`, `0a2c179f9`, `a7b99ca24` |
 | 286-287 | `a7b99ca24` |
+| 288 | `4d2749126` (unknown event receivers retain add/remove accessor effects) |
 
 The audit does not claim that the deferred security findings are fixed. Any future change to those areas should receive a separate threat-model review and dedicated validation.
