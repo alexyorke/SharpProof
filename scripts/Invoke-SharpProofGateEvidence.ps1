@@ -18,15 +18,6 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Assert-SharpProofStandaloneGateResult.ps1')
-$sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
-    throw 'Unable to bind gate evidence to the exact source commit.'
-}
-$workingTreeStatus = & git -C $repositoryRoot status --porcelain=v1 `
-    --untracked-files=all
-if ($LASTEXITCODE -ne 0 -or @($workingTreeStatus).Count -ne 0) {
-    throw 'Standalone gate evidence requires clean exact-commit source.'
-}
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 $outputDirectory = Split-Path -Parent $resolvedOutput
@@ -38,6 +29,20 @@ $rawOutput = [IO.Path]::ChangeExtension(
 $standardError = [IO.Path]::ChangeExtension(
     $resolvedOutput,
     '.stderr.txt')
+foreach ($stalePath in @($resolvedOutput, $rawOutput, $standardError)) {
+    if (Test-Path -LiteralPath $stalePath -PathType Leaf) {
+        Remove-Item -LiteralPath $stalePath -Force
+    }
+}
+$sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'Unable to bind gate evidence to the exact source commit.'
+}
+$workingTreeStatus = & git -C $repositoryRoot status --porcelain=v1 `
+    --untracked-files=all
+if ($LASTEXITCODE -ne 0 -or @($workingTreeStatus).Count -ne 0) {
+    throw 'Standalone gate evidence requires clean exact-commit source.'
+}
 $wrapper = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $project = Join-Path $repositoryRoot 'SharpProof.Gates\SharpProof.Gates.csproj'
 $buildArguments = @(

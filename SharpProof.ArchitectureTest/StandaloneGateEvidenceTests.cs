@@ -63,6 +63,13 @@ public sealed class StandaloneGateEvidenceTests
                 Does.Not.Contain("The gate result was not valid JSON:"));
             Assert.That(evidence, Does.Contain("SharpProofSourceCommit"));
             Assert.That(evidence, Does.Contain("GetMetadataReader"));
+            Assert.That(
+                evidence,
+                Does.Contain(
+                    "foreach ($stalePath in @($resolvedOutput, $rawOutput, $standardError))"));
+            Assert.That(
+                evidence,
+                Does.Contain("Remove-Item -LiteralPath $stalePath -Force"));
             Assert.That(producer, Does.Contain("CreateStandaloneEnvelope"));
             Assert.That(producer, Does.Contain("AcceptanceContractSha256"));
             Assert.That(producer, Does.Contain("ModuleVersionId"));
