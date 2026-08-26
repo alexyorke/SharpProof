@@ -2895,25 +2895,27 @@ public sealed class AnalyzerModeAndEffectTests
         {
             Assert.That(
                 diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047", "SP0047"]));
+                Is.EqualTo(["SP0047", "SP0047", "SP0047"]));
             Assert.That(
                 diagnostics.Select(diagnostic =>
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)),
                 Is.EqualTo((string[])[
                     "SharpProof could not completely analyze selected method " +
-                    "'UndeclaredStringRead': EffectContractDoesNotCoverBodySummary",
+                    "'UndeclaredStringRead': UnsupportedOperationShape (PropertyReference)",
                     "SharpProof could not completely analyze selected method " +
-                    "'UndeclaredArrayRead': EffectContractDoesNotCoverBodySummary"
+                    "'UndeclaredArrayRead': EffectContractDoesNotCoverBodySummary",
+                    "SharpProof could not completely analyze selected method " +
+                    "'DeclaredStringRead': UnsupportedOperationShape (PropertyReference)"
                 ]));
             Assert.That(
                 factory.Outcomes["UndeclaredStringRead"],
-                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
             Assert.That(
                 factory.Outcomes["UndeclaredArrayRead"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
             Assert.That(
                 factory.Outcomes["DeclaredStringRead"],
-                Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
             Assert.That(
                 factory.Outcomes["DeclaredArrayRead"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Proven));

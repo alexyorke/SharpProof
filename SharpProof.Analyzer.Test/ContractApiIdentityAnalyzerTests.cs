@@ -262,7 +262,7 @@ public sealed class ContractApiIdentityAnalyzerTests
             enabledIds: ["SP0047"],
             profile: "advisory",
             features: "contracts",
-            filePath: "Generated.Control.g.cs");
+            filePath: "ControlAttributes.cs");
 
         using (Assert.EnterMultipleScope())
         {
