@@ -8,7 +8,7 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
     private readonly INamedTypeSymbol? _conditionalAttribute =
         compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.ConditionalAttribute);
-    private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>>
+    private readonly ConcurrentDictionary<SyntaxTree, ImmutableHashSet<string>>
         _definedPreprocessorSymbols = [];
 
     internal bool IsElided(IInvocationOperation invocation)
@@ -39,16 +39,9 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
         {
             return false;
         }
-        if (!_definedPreprocessorSymbols.TryGetValue(
-                invocation.Syntax.SyntaxTree,
-                out var definedSymbols))
-        {
-            definedSymbols = CSharpPreprocessorSymbols.GetDefined(
-                invocation.Syntax.SyntaxTree);
-            _definedPreprocessorSymbols.Add(
-                invocation.Syntax.SyntaxTree,
-                definedSymbols);
-        }
+        var definedSymbols = _definedPreprocessorSymbols.GetOrAdd(
+            invocation.Syntax.SyntaxTree,
+            static tree => CSharpPreprocessorSymbols.GetDefined(tree));
         return conditionalSymbols.All(symbol =>
             !definedSymbols.Contains(symbol!));
     }
