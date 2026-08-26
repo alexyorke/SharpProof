@@ -81,9 +81,7 @@ internal static class SarifProjection
             {
                 ["PROJECTROOT"] = new
                 {
-                    uri = new Uri(
-                        Path.GetFullPath(projectDirectory) +
-                        Path.DirectorySeparatorChar).AbsoluteUri
+                    uri = ProjectRootUri(projectDirectory)
                 }
             },
             invocations = new[] { new {
@@ -104,6 +102,16 @@ internal static class SarifProjection
             ["runs"] = new[] { run }
         };
         return JsonSerializer.Serialize(document, WorkerProtocolJson.Options);
+    }
+
+    private static string ProjectRootUri(string projectDirectory)
+    {
+        var path = Path.GetFullPath(projectDirectory) +
+            Path.DirectorySeparatorChar;
+        return new UriBuilder(Uri.UriSchemeFile, string.Empty)
+        {
+            Path = path
+        }.Uri.AbsoluteUri;
     }
 
     private static object ClaimResult(

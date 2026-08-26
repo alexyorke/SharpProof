@@ -1059,9 +1059,14 @@ internal sealed partial class LauncherArguments
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
         var cacheEnabled = Boolean("cache-enabled", true);
+        var earlyCacheDirectory = cacheEnabled &&
+            Optional("cache-directory") is { } configuredCacheDirectory &&
+            Path.IsPathFullyQualified(configuredCacheDirectory)
+                ? configuredCacheDirectory
+                : null;
         ValidateDistinctPaths(
             runtimeSnapshot,
-            cacheEnabled ? Optional("cache-directory") : null);
+            earlyCacheDirectory);
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
