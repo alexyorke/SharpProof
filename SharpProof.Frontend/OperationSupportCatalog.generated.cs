@@ -22,6 +22,7 @@ internal static class OperationSupportCatalogData
         OperationKind.IsNull,
         OperationKind.PropertyReference,
         OperationKind.ArrayElementReference,
+        OperationKind.FlowCaptureReference,
     ];
     internal static readonly OperationKind[] EffectDiscovery = [
         OperationKind.Block,

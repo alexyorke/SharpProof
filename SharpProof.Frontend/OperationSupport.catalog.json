@@ -12,7 +12,8 @@
     "Conditional",
     "IsNull",
     "PropertyReference",
-    "ArrayElementReference"
+    "ArrayElementReference",
+    "FlowCaptureReference"
   ],
   "effectDiscovery": [
     "Block",

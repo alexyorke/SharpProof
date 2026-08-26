@@ -943,13 +943,17 @@ public sealed class FrontendLoweringTests
         Assert.That(snapshot.Split('\n'), Has.Length.GreaterThan(100));
         Assert.That(snapshot, Does.Contain("|Invocation|ClosedAbstention|"));
         Assert.That(snapshot, Does.Contain("|Literal|Exact|None"));
+        Assert.That(
+            OperationSubsetClassifier.Classify(
+                OperationKind.FlowCaptureReference).Decision,
+            Is.EqualTo(FrontendSubsetDecision.Exact));
         var snapshotHash = Convert.ToHexString(
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(snapshot)));
         Assert.That(
             snapshotHash,
             Is.EqualTo(
-                "4C2849F3D16A580C09BBB46C9526EBC1404405C9FA54A4056D631269AE2BC736"));
+                "BF75E92BA64EBFB203DE30610631D9FA9FD1759B4F7ECDEC932F78061419C6BA"));
     }
 
     [Test]
