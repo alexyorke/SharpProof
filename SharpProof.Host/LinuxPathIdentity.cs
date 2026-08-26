@@ -694,7 +694,7 @@ public static partial class LinuxPathIdentity
         }
         if ((candidate.Value.Mode & FileTypeMask) != FileTypeRegular)
         {
-            throw new InvalidOperationException(
+            throw new IOException(
                 "SharpProof outputs must be regular files.");
         }
 
@@ -705,7 +705,7 @@ public static partial class LinuxPathIdentity
             if (protectedInformation.HasValue &&
                 SameFile(candidate.Value, protectedInformation.Value))
             {
-                throw new InvalidOperationException(
+                throw new IOException(
                     "SharpProof output aliases a protected file.");
             }
         }

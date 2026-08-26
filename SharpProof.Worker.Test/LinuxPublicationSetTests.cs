@@ -171,7 +171,7 @@ public sealed class LinuxPublicationSetTests
 
         var outputDirectory = Directory.CreateDirectory(
             Path.Combine(directory.Path, "directory-output")).FullName;
-        Assert.Throws<InvalidOperationException>((Action)(() =>
+        Assert.Throws<IOException>((Action)(() =>
             LinuxPathIdentity.DeleteIfUnprotected(
                 outputDirectory,
                 Array.Empty<string>())));
@@ -861,7 +861,7 @@ public sealed class LinuxPublicationSetTests
             Assert.That(link.ExitCode, Is.Zero);
         }
 
-        var error = Assert.Throws<InvalidOperationException>((Action)(() =>
+        var error = Assert.Throws<IOException>((Action)(() =>
             LinuxPathIdentity.DeleteIfUnprotected(alias, [protectedPath])));
 
         using (Assert.EnterMultipleScope())
