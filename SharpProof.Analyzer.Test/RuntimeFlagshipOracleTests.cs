@@ -71,7 +71,7 @@ public sealed class RuntimeFlagshipOracleTests
     [Test]
     public async Task AnalyzerVerdictsMatchConcreteFlagshipEffects()
     {
-        string[] enabledIds = ["SP0002", "SP0016", "SP0045", "SP0046"];
+        string[] enabledIds = ["SP0002", "SP0016", "SP0045", "SP0046", "SP0047"];
         var compilation = AnalyzerTestHost.CreateCompilation(
             Source,
             enabledIds);
@@ -84,7 +84,7 @@ public sealed class RuntimeFlagshipOracleTests
             diagnostics,
             ("SP0002", "Writes"),
             ("SP0045", "Allocate"),
-            ("SP0045", "Concatenate"),
+            ("SP0047", "Concatenate"),
             ("SP0046", "Throws"),
             ("SP0016", "DisallowedSync"),
             ("SP0046", "DisallowedException"));
