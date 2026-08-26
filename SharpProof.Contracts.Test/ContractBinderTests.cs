@@ -168,7 +168,7 @@ public sealed class ContractBinderTests
     }
 
     [Test]
-    public void InvalidTargetPlacementDoesNotPoisonAValidCompanion()
+    public void InvalidTargetPlacementCannotBeHiddenByAValidCompanion()
     {
         const string source =
             """
@@ -195,14 +195,9 @@ public sealed class ContractBinderTests
 
         var result = subject.Bind("Target", "Read");
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-            Assert.That(result.Contracts!.UsesCompanion, Is.True);
-            Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
-            Assert.That(result.Contracts.Clauses[0].Evidence,
-                Is.EqualTo(BoundContractEvidence.Companion));
-        }
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
     }
 
     [Test]
