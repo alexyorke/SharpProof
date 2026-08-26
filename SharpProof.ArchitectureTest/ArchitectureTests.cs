@@ -1,5 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -67,6 +69,9 @@ public sealed class ArchitectureTests
         .. ProductionProjects,
         .. ReleaseSupportProjects
     ];
+
+    private static readonly ConcurrentDictionary<string, EvaluatedProjectItems>
+        EvaluatedProjectItemsCache = new(StringComparer.Ordinal);
 
     private static readonly string[] AcceptanceTimingPhases = [
         "restore",
@@ -274,6 +279,30 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void GovernanceReadsEvaluatedMsbuildItems()
+    {
+        var packages = ProjectPackages("SharpProof.Worker");
+        var references = GetProjectReferences("SharpProof.Worker").ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                packages,
+                Has.Some.EqualTo("Microsoft.CodeAnalysis.BannedApiAnalyzers"),
+                "Directory.Build.props package imports must be visible to " +
+                "governance checks.");
+            Assert.That(
+                references,
+                Does.Contain("SharpProof.CompilerArtifact"),
+                "Evaluated project references must retain the project graph.");
+            Assert.That(
+                references,
+                Does.Not.Contain("SharpProof.Meta.Analyzers"),
+                "Analyzer-only project references are not runtime edges.");
+        }
+    }
+
+    [Test]
     public void ReleaseSupportProjectsAreExplicitlyGoverned()
     {
         using (Assert.EnterMultipleScope())
@@ -311,8 +340,14 @@ public sealed class ArchitectureTests
                 root);
             foreach (var project in closure)
             {
+                var packages = ProjectPackages(project)
+                    .Where(static package => !string.Equals(
+                        package,
+                        "Microsoft.CodeAnalysis.BannedApiAnalyzers",
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
                 Assert.That(
-                    ProjectPackages(project),
+                    packages,
                     Has.None.StartsWith("Microsoft.CodeAnalysis"),
                     project);
                 Assert.That(
@@ -367,14 +402,9 @@ public sealed class ArchitectureTests
     {
         foreach (var project in DependencyGovernedProjects)
         {
-            var xml = XDocument.Load(ProjectFile(project));
-            var packages = xml
-                .Descendants("PackageReference")
-                .Select(static element => (string?)element.Attribute("Include"))
-                .Where(static value => value != null)
-                .ToArray();
+            var packages = ProjectPackages(project);
             Assert.That(
-                packages.Contains("Microsoft.Z3", StringComparer.Ordinal),
+                packages.Contains("Microsoft.Z3", StringComparer.OrdinalIgnoreCase),
                 Is.EqualTo(project is "SharpProof.Smt" or "SharpProof.Fuzz"),
                 project);
         }
@@ -2497,18 +2527,14 @@ public sealed class ArchitectureTests
 
     private static IEnumerable<string> GetProjectReferences(string project)
     {
-        var xml = XDocument.Load(ProjectFile(project));
-        return xml
-            .Descendants("ProjectReference")
-            .Where(static element =>
+        return GetEvaluatedProjectItems(project).ProjectReferences
+            .Where(static item =>
                 !string.Equals(
-                    (string?)element.Attribute("OutputItemType"),
+                    item.OutputItemType,
                     "Analyzer",
                     StringComparison.OrdinalIgnoreCase))
-            .Select(static element => (string?)element.Attribute("Include"))
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .Select(static value =>
-                Path.GetFileNameWithoutExtension(value!.Replace('\\', '/')));
+            .Select(static item =>
+                Path.GetFileNameWithoutExtension(item.Identity.Replace('\\', '/')));
     }
 
     private static IEnumerable<string> TransitiveProjectClosure(string root)
@@ -2534,13 +2560,106 @@ public sealed class ArchitectureTests
 
     private static string[] ProjectPackages(string project)
     {
-        return [..
-        XDocument.Load(ProjectFile(project))
-            .Descendants("PackageReference")
-            .Select(static element => (string?)element.Attribute("Include"))
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .Select(static value => value!)];
+        return [.. GetEvaluatedProjectItems(project).PackageReferences
+            .Select(static item => item.Identity)];
     }
+
+    private static EvaluatedProjectItems GetEvaluatedProjectItems(string project)
+    {
+        return EvaluatedProjectItemsCache.GetOrAdd(
+            project,
+            static projectName => EvaluateProjectItems(projectName));
+    }
+
+    private static EvaluatedProjectItems EvaluateProjectItems(string project)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = Environment.ProcessPath ?? "dotnet",
+            WorkingDirectory = RepositoryRoot(),
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("msbuild");
+        startInfo.ArgumentList.Add(ProjectFile(project));
+        startInfo.ArgumentList.Add("-nologo");
+        startInfo.ArgumentList.Add("-p:Configuration=Release");
+        startInfo.ArgumentList.Add("-p:DesignTimeBuild=false");
+        startInfo.ArgumentList.Add(
+            "-getItem:ProjectReference,PackageReference");
+
+        using var process = Process.Start(startInfo) ??
+            throw new InvalidOperationException(
+                "Could not start dotnet msbuild for " + project + ".");
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(60_000))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // The process exited between the timeout check and Kill.
+            }
+            throw new InvalidOperationException(
+                "dotnet msbuild timed out while evaluating " + project + ".");
+        }
+
+        var output = outputTask.GetAwaiter().GetResult();
+        var error = errorTask.GetAwaiter().GetResult();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                "dotnet msbuild failed while evaluating " + project + ": " +
+                error.Trim());
+        }
+
+        using var document = JsonDocument.Parse(output);
+        var items = document.RootElement.GetProperty("Items");
+        return new EvaluatedProjectItems(
+            ReadEvaluatedItems(items, "ProjectReference"),
+            ReadEvaluatedItems(items, "PackageReference"));
+    }
+
+    private static EvaluatedProjectItem[] ReadEvaluatedItems(
+        JsonElement items,
+        string itemType)
+    {
+        if (!items.TryGetProperty(itemType, out var values) ||
+            values.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return [.. values.EnumerateArray().Select(static item =>
+            new EvaluatedProjectItem(
+                item.GetProperty("Identity").GetString() ?? string.Empty,
+                OptionalItemMetadata(item, "OutputItemType"),
+                OptionalItemMetadata(item, "ReferenceOutputAssembly")))];
+    }
+
+    private static string? OptionalItemMetadata(
+        JsonElement item,
+        string name)
+    {
+        return item.TryGetProperty(name, out var value) &&
+            value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private sealed record EvaluatedProjectItems(
+        EvaluatedProjectItem[] ProjectReferences,
+        EvaluatedProjectItem[] PackageReferences);
+
+    private sealed record EvaluatedProjectItem(
+        string Identity,
+        string? OutputItemType,
+        string? ReferenceOutputAssembly);
 
     private static string ProjectFile(string project)
     {
