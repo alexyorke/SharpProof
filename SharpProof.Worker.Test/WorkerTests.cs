@@ -6640,6 +6640,16 @@ public sealed class WorkerTests
             FormatValidationErrors(response, authority));
 
         var result = response.ClaimResults.Single();
+        var fullAssumptions = result.Assumptions!;
+        result.Assumptions = [fullAssumptions.Single(static assumption => assumption.Used)];
+        var compactUsage = WorkerProtocolJson.Validate(
+            response, response.InputHash, response.Manifest, authority);
+        Assert.That(
+            compactUsage.IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+        result.Assumptions = fullAssumptions;
+
         var originalCore = result.ProofCore.ToArray();
         result.ProofCore = ["fabricated:999"];
         var fabricated = WorkerProtocolJson.Validate(

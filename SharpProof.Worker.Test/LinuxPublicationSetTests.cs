@@ -24,6 +24,42 @@ public sealed class LinuxPublicationSetTests
         Assert.That(Marshal.SizeOf(statsType!), Is.EqualTo(120));
     }
 
+    [TestCase("9p", true)]
+    [TestCase("overlay", false)]
+    [NonParallelizable]
+    public void UnknownStatFsMagicUsesMountInfoFilesystemType(
+        string mountInfoType,
+        bool expectedUnsupported)
+    {
+        using var directory = TemporaryDirectory.Create();
+        var target = Path.Combine(directory.Path, "result.json");
+        try
+        {
+            LinuxPathIdentity.StatFsTypeProbeOverrideForTest =
+                static _ => 0x1021997L;
+            LinuxPathIdentity.MountInfoFileSystemTypeProbeOverrideForTest =
+                _ => mountInfoType;
+
+            if (expectedUnsupported)
+            {
+                var error = Assert.Throws<ArgumentException>((Action)(() =>
+                    LinuxPathIdentity.RequireLocalPath(target)));
+                Assert.That(error!.Message, Does.Contain(
+                    $"'{mountInfoType}' filesystem"));
+            }
+            else
+            {
+                Assert.DoesNotThrow((Action)(() =>
+                    LinuxPathIdentity.RequireLocalPath(target)));
+            }
+        }
+        finally
+        {
+            LinuxPathIdentity.StatFsTypeProbeOverrideForTest = null;
+            LinuxPathIdentity.MountInfoFileSystemTypeProbeOverrideForTest = null;
+        }
+    }
+
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(false, true)]

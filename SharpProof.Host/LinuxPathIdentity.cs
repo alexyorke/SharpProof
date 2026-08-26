@@ -52,12 +52,27 @@ public static partial class LinuxPathIdentity
     private static readonly HashSet<string> UnsupportedRemoteFileSystems =
         new(StringComparer.Ordinal)
         {
-            "cifs", "nfs", "nfs4", "smb3", "sshfs", "fuse.sshfs", "fuse"
+            "9p", "afs", "ceph", "cifs", "nfs", "nfs4", "smb3", "sshfs",
+            "fuse.sshfs", "fuse", "lustre", "virtiofs"
         };
 
     // Test-only probe. A null result represents an unexpected native probe
     // failure and must remain fail-closed just like the real ioctl path.
     internal static Func<string, bool?>? CaseFoldedParentProbeOverrideForTest
+    {
+        get;
+        set;
+    }
+
+    // Test-only probes keep filesystem classification regressions deterministic
+    // without requiring a particular mount type in the test container.
+    internal static Func<string, long?>? StatFsTypeProbeOverrideForTest
+    {
+        get;
+        set;
+    }
+
+    internal static Func<string, string?>? MountInfoFileSystemTypeProbeOverrideForTest
     {
         get;
         set;
@@ -1266,6 +1281,12 @@ public static partial class LinuxPathIdentity
 
     private static string FindFileSystemType(string canonicalPath)
     {
+        if (MountInfoFileSystemTypeProbeOverrideForTest is { } probe)
+        {
+            return probe(canonicalPath) ?? throw new IOException(
+                "SharpProof could not identify the publication filesystem.");
+        }
+
         const string mountInfoPath = "/proc/self/mountinfo";
         if (!File.Exists(mountInfoPath))
         {
@@ -1318,6 +1339,24 @@ public static partial class LinuxPathIdentity
             }
         }
 
+        if (StatFsTypeProbeOverrideForTest is { } probe)
+        {
+            var type = probe(existing);
+            if (type is null)
+            {
+                return FindFileSystemType(canonicalPath);
+            }
+
+            return type.Value switch
+            {
+                0x6969 => "nfs",
+                unchecked((long)0xFF534D42) => "cifs",
+                unchecked((long)0xFE534D42) => "smb3",
+                0x65735546 => "fuse",
+                _ => FindFileSystemType(canonicalPath)
+            };
+        }
+
         if (NativeMethods.StatFs(existing, out var stats) == 0)
         {
             return stats.Type switch
@@ -1326,7 +1365,7 @@ public static partial class LinuxPathIdentity
                 unchecked((long)0xFF534D42) => "cifs",
                 unchecked((long)0xFE534D42) => "smb3",
                 0x65735546 => "fuse",
-                _ => "local"
+                _ => FindFileSystemType(canonicalPath)
             };
         }
         return FindFileSystemType(canonicalPath);

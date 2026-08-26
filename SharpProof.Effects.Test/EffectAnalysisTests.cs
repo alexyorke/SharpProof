@@ -1054,6 +1054,28 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void InstanceLocalFunctionWritesRetainTheOwningReceiver()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Sample {
+                private int _value;
+
+                public void MutateOnly() {
+                    void Mutate() => _value = 0;
+                    Mutate();
+                }
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "MutateOnly"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Receiver),
+            Is.True);
+    }
+
+    [Test]
     public void PrimaryConstructorAndOrdinaryParameterReadsStayLocal()
     {
         var compilation = EffectTestHost.CreateCompilation(

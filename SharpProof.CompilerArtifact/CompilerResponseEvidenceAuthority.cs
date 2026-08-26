@@ -202,21 +202,125 @@ internal sealed class CompilerResponseEvidenceAuthority :
             return;
         }
 
-        if (!SameAssumptions(actual, expected) ||
-            !IsCanonicalAssumptions(actual, expected))
+        if (SameAssumptions(actual, expected) &&
+            IsCanonicalAssumptions(actual, expected))
+        {
+            ValidateUsedFlags(actual, expectedUsed, errors);
+            return;
+        }
+
+        // Oversized protocol responses may carry a compact claim subset: the
+        // rows marked Used, plus every trusted-boundary declaration needed to
+        // preserve the authority chain. Bind that subset back to the
+        // canonical manifest before accepting its usage bits.
+        if (!IsCanonicalAssumptionSubset(actual, expected))
         {
             errors.Add("response.assumption_usage_authority");
             return;
         }
 
-        var used = new HashSet<string>(expectedUsed, StringComparer.Ordinal);
-        foreach (var assumption in actual!)
+        var expectedUsedSet = new HashSet<string>(
+            expectedUsed,
+            StringComparer.Ordinal);
+        if (expectedUsedSet.Count == 0 ||
+            !actual.Any(static assumption => assumption.Used))
+        {
+            errors.Add("response.assumption_usage_authority");
+            return;
+        }
+
+        var actualById = actual.ToDictionary(
+            static assumption => assumption.Id,
+            StringComparer.Ordinal);
+        foreach (var assumption in expected!.Where(static value =>
+                     value.Kind == WorkerAssumptionKind.TrustedBoundary))
+        {
+            if (!actualById.ContainsKey(assumption.Id))
+            {
+                errors.Add("response.assumption_usage_authority");
+                return;
+            }
+        }
+
+        foreach (var assumptionId in expectedUsedSet)
+        {
+            if (!actualById.TryGetValue(assumptionId, out var assumption) ||
+                !assumption.Used)
+            {
+                errors.Add("response.assumption_usage_authority");
+                return;
+            }
+        }
+
+        ValidateUsedFlags(actual, expectedUsedSet, errors);
+    }
+
+    private static void ValidateUsedFlags(
+        WorkerAssumptionEvidence[] actual,
+        IEnumerable<string> expectedUsed,
+        HashSet<string> errors)
+    {
+        var used = expectedUsed as HashSet<string> ??
+            new HashSet<string>(expectedUsed, StringComparer.Ordinal);
+        foreach (var assumption in actual)
         {
             if (assumption.Used != used.Contains(assumption.Id))
             {
                 errors.Add("response.assumption_usage_authority");
             }
         }
+    }
+
+    private static bool IsCanonicalAssumptionSubset(
+        WorkerAssumptionEvidence[]? actual,
+        WorkerAssumptionEvidence[]? expected)
+    {
+        if (actual is not { Length: > 0 } || expected is not { Length: > 0 })
+        {
+            return false;
+        }
+
+        var expectedById = expected
+            .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
+            .GroupBy(static value => value.Id, StringComparer.Ordinal)
+            .ToArray();
+        if (expectedById.Any(static group => group.Count() != 1))
+        {
+            return false;
+        }
+
+        var actualValues = actual
+            .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
+            .ToArray();
+        if (actualValues.Length != actual.Length ||
+            actualValues.GroupBy(static value => value.Id, StringComparer.Ordinal)
+                .Any(static group => group.Count() != 1))
+        {
+            return false;
+        }
+
+        var expectedMap = expectedById.ToDictionary(
+            static group => group.Key,
+            static group => group.Single(),
+            StringComparer.Ordinal);
+        if (actualValues.Any(value =>
+                !expectedMap.TryGetValue(value.Id, out var declaration) ||
+                declaration.Kind != value.Kind))
+        {
+            return false;
+        }
+
+        var actualIds = new HashSet<string>(
+            actualValues.Select(static value => value.Id),
+            StringComparer.Ordinal);
+        var canonical = expected
+            .Where(value => actualIds.Contains(value.Id))
+            .OrderBy(static value => WorkerProtocolMetadata.GetAssumptionOrder(value.Kind))
+            .ThenBy(static value => value.Id, StringComparer.Ordinal)
+            .Select(static value => (value.Id, value.Kind));
+        return actualValues
+            .Select(static value => (value.Id, value.Kind))
+            .SequenceEqual(canonical);
     }
 
     private static void ValidateEffectClaim(

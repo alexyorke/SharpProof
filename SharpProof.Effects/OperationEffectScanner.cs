@@ -770,6 +770,17 @@ internal sealed partial class OperationEffectScanner
 
         var receiverRegion = receiver ??
             _conversionOwnership.ClassifyRegion(instance);
+        // Roslyn represents a lexical local-function invocation without an
+        // instance operation, even when the local function mutates the
+        // containing instance. Preserve the owning receiver in that case so
+        // a local call cannot be mistaken for a receiver-pure operation.
+        if (receiverRegion.IsEmpty &&
+            instance == null &&
+            method.MethodKind == MethodKind.LocalFunction &&
+            !_method.IsStatic)
+        {
+            receiverRegion = EffectRegionSet.Create(EffectRegionId.Receiver);
+        }
         var writeReceiver = UsesDefensiveReceiverCopy(method, instance)
             ? EffectRegionSet.Empty
             : receiverRegion;
