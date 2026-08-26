@@ -177,13 +177,13 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             }
             try
             {
-                if (!process.HasExited)
-                {
-                    Terminate(
-                        process,
-                        Stopwatch.GetTimestamp(),
-                        TimeSpan.FromSeconds(1));
-                }
+                // A naturally exited leader can still leave descendants in
+                // its setsid process group.  Terminate handles both live and
+                // already-exited leaders, so always run it during disposal.
+                Terminate(
+                    process,
+                    Stopwatch.GetTimestamp(),
+                    TimeSpan.FromSeconds(1));
             }
             finally
             {

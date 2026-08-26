@@ -131,6 +131,83 @@ public sealed class WorkerProgramTests
     }
 
     [Test]
+    public void DisposeKillsDescendantsAfterLeaderExits()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Assert.Ignore("The direct worker is supported only in the Linux container.");
+        }
+
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SharpProof-worker-natural-exit-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var childPidPath = Path.Combine(directory, "child.pid");
+        var childProcessId = 0;
+        const string script = "trap '' HUP; sleep 300 & child=$!; " +
+            "printf '%s\\n' \"$child\" > \"$1\"; exit 0";
+        try
+        {
+            using var worker = LinuxWorkerProcess.Start(
+                "/bin/bash",
+                ["-c", script, "sharpproof-natural-exit", childPidPath],
+                directory);
+
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => File.Exists(childPidPath),
+                    TimeSpan.FromSeconds(5)),
+                Is.True,
+                "The worker did not publish its descendant PID.");
+            Assert.That(
+                int.TryParse(File.ReadAllText(childPidPath), out childProcessId),
+                Is.True);
+            Assert.That(
+                Directory.Exists($"/proc/{childProcessId}"),
+                Is.True,
+                "The descendant exited before the natural-exit cleanup test.");
+
+            var completion = worker.WaitForExit(
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(6));
+            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+
+            worker.Dispose();
+
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => !Directory.Exists($"/proc/{childProcessId}"),
+                    TimeSpan.FromSeconds(5)),
+                Is.True,
+                "Disposing a naturally exited worker left a descendant alive.");
+        }
+        finally
+        {
+            if (childProcessId > 0 &&
+                Directory.Exists($"/proc/{childProcessId}"))
+            {
+                try
+                {
+                    using var child = Process.GetProcessById(childProcessId);
+                    child.Kill();
+                    child.WaitForExit(1000);
+                }
+                catch (ArgumentException)
+                {
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public async Task ParentDeathKillsAWorkerBlockedBeforeStartupRelease()
     {
         if (!OperatingSystem.IsLinux())
