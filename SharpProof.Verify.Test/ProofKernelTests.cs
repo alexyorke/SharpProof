@@ -103,7 +103,9 @@ public sealed class ProofKernelTests
     {
         var factory = new IrFactory();
         var integer = factory.CreateVariable("integer", factory.IntegerType);
-        var text = factory.CreateVariable("text", factory.StringType);
+        var unsupportedVariable = factory.CreateVariable(
+            "unsupported",
+            factory.ObjectType);
         var goal = new Goal(
             factory,
             factory.Boolean(false),
@@ -118,13 +120,19 @@ public sealed class ProofKernelTests
                     KeyValuePair.Create(integer, factory.CreateBooleanValue(false))
                 ]))))
             .VerifyAsync(exactQuery);
-        var unsupported = await new ProofKernel(new StubBackend(
+        var unsupportedOutcome = await new ProofKernel(new StubBackend(
                 BackendCheckResult.Satisfiable(new BackendModel([
-                    KeyValuePair.Create(text, factory.CreateStringValue("value"))
+                    KeyValuePair.Create(
+                        unsupportedVariable,
+                        factory.CreateReferenceValue(factory.ObjectType, "value"))
                 ]))))
-            .VerifyAsync(new VerificationQuery(factory, [], goal, [text]));
+            .VerifyAsync(new VerificationQuery(
+                factory,
+                [],
+                goal,
+                [unsupportedVariable]));
 
-        ProofOutcome[] outcomes = [missing, wrongType, unsupported];
+        ProofOutcome[] outcomes = [missing, wrongType, unsupportedOutcome];
         Assert.That(outcomes, Has.All.TypeOf<UnknownOutcome>());
         Assert.That(
             outcomes.Cast<UnknownOutcome>()
