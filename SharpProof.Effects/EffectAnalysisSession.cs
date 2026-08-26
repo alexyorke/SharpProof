@@ -289,10 +289,13 @@ public sealed class EffectAnalysisSession
             EffectMethodNodeBuilder.HasPotentialStaticInitialization(
                 normalizedTarget,
                 ApiSpecs);
-        if (!mayInitialize ||
-            isSourceType && StaticInitializationCannotComplete(normalizedTarget))
+        if (!mayInitialize)
         {
             return EffectSummary.Empty;
+        }
+        if (isSourceType && StaticInitializationCannotComplete(normalizedTarget))
+        {
+            return EffectSummaryOperations.TypeInitializationBoundary();
         }
         return EffectSummaryOperations.UnknownBoundary(
             EffectUncertainty.UnmodeledCall);

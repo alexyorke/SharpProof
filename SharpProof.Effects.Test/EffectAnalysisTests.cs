@@ -6008,6 +6008,40 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void DefinitelyThrowingStaticInitializationIsNotPure()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Bomb
+            {
+                public static int Value = 1;
+
+                static Bomb()
+                {
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample
+            {
+                public static int Read() => Bomb.Value;
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Read"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(result.Summary.Throws.IncludesUnknown, Is.True);
+        }
+    }
+
+    [Test]
     public void ExceptionFlowReportsOnlyExceptionsThatEscape()
     {
         var compilation = EffectTestHost.CreateCompilation(
