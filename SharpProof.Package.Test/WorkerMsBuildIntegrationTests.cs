@@ -1651,6 +1651,8 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             ("request.malformed", WorkerRunStatus.Failed,
                 WorkerRunFailureReason.InvalidRequest, 3),
+            ("budgets.rlimit", WorkerRunStatus.Failed,
+                WorkerRunFailureReason.InvalidRequest, 3),
             ("compiler_manifest.unavailable", WorkerRunStatus.Failed,
                 WorkerRunFailureReason.InputUnavailable, 3),
             ("compiler_manifest.invalid", WorkerRunStatus.Failed,
@@ -1707,11 +1709,24 @@ public sealed class WorkerMsBuildIntegrationTests
                             },
                             Budgets = new WorkerBudgets()
                         },
-                        Errors = [new WorkerProtocolError
-                        {
-                            Code = code,
-                            Message = "The worker stopped before loading its manifest."
-                        }]
+                        Errors = code == "request.malformed"
+                            ? [
+                                new WorkerProtocolError
+                                {
+                                    Code = code,
+                                    Message = "The worker stopped before loading its manifest."
+                                },
+                                new WorkerProtocolError
+                                {
+                                    Code = "budgets.rlimit",
+                                    Message = "The worker request budget is invalid."
+                                }
+                            ]
+                            : [new WorkerProtocolError
+                            {
+                                Code = code,
+                                Message = "The worker stopped before loading its manifest."
+                            }]
                     };
                     File.WriteAllText(
                         arguments.ResultPath,
@@ -1736,6 +1751,11 @@ public sealed class WorkerMsBuildIntegrationTests
                     Does.Contain(code), code);
                 Assert.That(response.Errors.Select(static error => error.Code),
                     Does.Not.Contain("worker.malformed_result"), code);
+                if (code == "request.malformed")
+                {
+                    Assert.That(response.Errors.Select(static error => error.Code),
+                        Does.Contain("budgets.rlimit"), code);
+                }
                 Assert.That(response.InputHash, Is.EqualTo(expectedInputHash), code);
                 Assert.That(response.RequestHash,
                     Is.EqualTo(WorkerProtocolJson.ComputeRequestHash(request)), code);
