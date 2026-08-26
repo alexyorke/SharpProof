@@ -459,7 +459,8 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             BoolExpr nullTag,
             Model model)
         {
-            if (model.Evaluate(nullTag, true) is not BoolExpr evaluatedNull)
+            using var evaluatedNullExpression = model.Evaluate(nullTag, true);
+            if (evaluatedNullExpression is not BoolExpr evaluatedNull)
             {
                 return null;
             }
@@ -469,8 +470,12 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 return factory.CreateNullValue(factory.StringType);
             }
 
+            using var lengthExpression = _context.MkLength(sequence);
+            using var evaluatedLengthExpression = model.Evaluate(
+                lengthExpression,
+                true);
             if (!evaluatedNull.IsFalse ||
-                model.Evaluate(_context.MkLength(sequence), true) is not IntNum lengthValue ||
+                evaluatedLengthExpression is not IntNum lengthValue ||
                 !int.TryParse(lengthValue.ToString(), NumberStyles.None,
                     CultureInfo.InvariantCulture, out var length) ||
                 length < 0 ||
@@ -484,7 +489,10 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             {
                 using var indexExpression = _context.MkInt(index);
                 using var element = _context.MkNth(sequence, indexExpression);
-                if (model.Evaluate(element, true) is not IntNum codeUnit ||
+                using var evaluatedElementExpression = model.Evaluate(
+                    element,
+                    true);
+                if (evaluatedElementExpression is not IntNum codeUnit ||
                     !int.TryParse(codeUnit.ToString(), NumberStyles.None,
                         CultureInfo.InvariantCulture, out var number) ||
                     number is < char.MinValue or > char.MaxValue)
