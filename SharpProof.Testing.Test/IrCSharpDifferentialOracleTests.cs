@@ -31,6 +31,38 @@ public sealed class IrCSharpDifferentialOracleTests
     }
 
     [Test]
+    public void GeneratedNullCastsCoverNullStringAndNonStringReferences()
+    {
+        var factory = new IrFactory();
+        var generator = new WellSortedIrGenerator(factory, seed: 0x5A17);
+        var kinds = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var index = 0; index < 2000; index++)
+        {
+            var generated = generator.Next(maximumDepth: 4);
+            if (generated.Category != GeneratedIrCategory.NullCast)
+            {
+                continue;
+            }
+
+            var reference = generated.Variables.Single(pair =>
+                factory.GetString(factory.GetVariableInfo(pair.Key).Name) ==
+                "reference").Value;
+            kinds.Add(reference.Kind switch
+            {
+                IrValueKind.Null => "null",
+                IrValueKind.Reference when reference.Reference is string => "string",
+                IrValueKind.Reference => "object",
+                _ => reference.Kind.ToString()
+            });
+        }
+
+        Assert.That(
+            kinds,
+            Is.EquivalentTo(["null", "string", "object"]));
+    }
+
+    [Test]
     public void ShortCircuitSkipsDivisionByZero()
     {
         var factory = new IrFactory();

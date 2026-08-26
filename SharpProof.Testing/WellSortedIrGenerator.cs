@@ -103,13 +103,19 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
                 _integerSequence,
                 Enumerable.Range(0, _random.Next(4))
                     .Select(_ => _factory.CreateIntegerValue(NextInteger())));
+        var reference = _random.Next(3) switch
+        {
+            0 => _factory.CreateNullValue(_factory.ObjectType),
+            1 => _factory.CreateReferenceValue(_factory.ObjectType, "sharp"),
+            _ => _factory.CreateReferenceValue(_factory.ObjectType, new object())
+        };
         var variables = new Dictionary<IrVarId, IrValue>
         {
             [_left] = _factory.CreateIntegerValue(NextInteger()),
             [_right] = _factory.CreateIntegerValue(NextInteger()),
             [_condition] = _factory.CreateBooleanValue(_random.Next(2) == 0),
             [_text] = text,
-            [_reference] = _factory.CreateNullValue(_factory.ObjectType),
+            [_reference] = reference,
             [_values] = sequence
         };
         return new GeneratedIrCase(term, variables, category);
