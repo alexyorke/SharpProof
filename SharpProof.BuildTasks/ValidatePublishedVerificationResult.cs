@@ -132,7 +132,9 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
             IOException or UnauthorizedAccessException or InvalidDataException or
             ArgumentException or InvalidOperationException or JsonException)
         {
-            Log.LogError(
+            VerifierBuildDiagnosticCodes.LogError(
+                Log,
+                VerifierBuildDiagnosticCodes.PublishedEvidence,
                 "SharpProof verification did not publish a valid current result: {0}",
                 exception.Message);
             TryInvalidateRejectedPublication();

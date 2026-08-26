@@ -35,9 +35,9 @@
 
   <Target Name="_SharpProofValidateRuntimeClosure"
           Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
-    <Error Condition="$(_SharpProofToolsDirectory) != $(_SharpProofPackageToolsDirectory) OR $(_SharpProofWorkerPath) != $(_SharpProofPackageWorkerPath) OR $(_SharpProofLauncherPath) != $(_SharpProofPackageLauncherPath) OR $(_SharpProofWorkerProtocolPath) != $(_SharpProofPackageWorkerProtocolPath) OR $(_SharpProofBuildTasksPath) != $(_SharpProofPackageBuildTasksPath)"
+    <Error Code="SP0054" Condition="$(_SharpProofToolsDirectory) != $(_SharpProofPackageToolsDirectory) OR $(_SharpProofWorkerPath) != $(_SharpProofPackageWorkerPath) OR $(_SharpProofLauncherPath) != $(_SharpProofPackageLauncherPath) OR $(_SharpProofWorkerProtocolPath) != $(_SharpProofPackageWorkerProtocolPath) OR $(_SharpProofBuildTasksPath) != $(_SharpProofPackageBuildTasksPath)"
            Text="SharpProof verifier runtime paths must resolve to the exact package-owned runtime closure." />
-    <Error Condition="!Exists($(_SharpProofPackageNativeZ3Path))"
+    <Error Code="SP0054" Condition="!Exists($(_SharpProofPackageNativeZ3Path))"
            Text="SharpProof verifier package native payload is missing from its build-tool closure." />
   </Target>
 
@@ -148,9 +148,9 @@
       <_SharpProofCompilerManifestSourcePath Condition="$(_SharpProofCompilerManifestPathConfigured) == ''">$([System.IO.Path]::Combine("$(_SharpProofVerifyDirectory)", 'compiler-manifest.input.json'))</_SharpProofCompilerManifestSourcePath>
       <_SharpProofCompilerManifestSourcePath Condition="$(_SharpProofCompilerManifestPathConfigured) != ''">$(_SharpProofCompilerManifestPathConfigured)</_SharpProofCompilerManifestSourcePath>
     </PropertyGroup>
-    <Error Condition="'$(_SharpProofInvocationIdIsSafe)' != 'True'"
+    <Error Code="SP0054" Condition="'$(_SharpProofInvocationIdIsSafe)' != 'True'"
            Text="SharpProof invocation ID must be an exact safe identifier of 32 lowercase hexadecimal characters." />
-    <Error Condition="'$(_SharpProofInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofInvocationDirectoryIsContained)' != 'True'"
+    <Error Code="SP0054" Condition="'$(_SharpProofInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofInvocationDirectoryIsContained)' != 'True'"
            Text="SharpProof invocation directory must resolve canonically to a direct child of the package-owned runs directory." />
     <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
@@ -213,9 +213,9 @@
       <_SharpProofCleanupInvocationDirectoryParent>$([System.IO.Path]::GetDirectoryName("$(_SharpProofCleanupInvocationDirectoryFullPath)"))</_SharpProofCleanupInvocationDirectoryParent>
       <_SharpProofCleanupInvocationDirectoryIsContained>$([System.String]::Equals("$(_SharpProofCleanupInvocationDirectoryParent)", "$(_SharpProofCleanupRunsDirectory)", System.StringComparison.Ordinal))</_SharpProofCleanupInvocationDirectoryIsContained>
     </PropertyGroup>
-    <Error Condition="'$(_SharpProofCleanupInvocationIdIsSafe)' != 'True'"
+    <Error Code="SP0054" Condition="'$(_SharpProofCleanupInvocationIdIsSafe)' != 'True'"
            Text="SharpProof invocation ID must be an exact safe identifier of 32 lowercase hexadecimal characters." />
-    <Error Condition="'$(_SharpProofCleanupInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryIsContained)' != 'True'"
+    <Error Code="SP0054" Condition="'$(_SharpProofCleanupInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofCleanupInvocationDirectoryIsContained)' != 'True'"
            Text="SharpProof invocation cleanup directory must resolve canonically to a direct child of the package-owned runs directory." />
     <RemoveDir Directories="$(_SharpProofCleanupInvocationDirectoryFullPath)" />
   </Target>
@@ -223,18 +223,18 @@
   <Target Name="_SharpProofVerifyCore"
           DependsOnTargets="_SharpProofInitializeVerify;ResolveReferences"
           Condition="'$(_SharpProofProjectLanguageSupported)' == 'true'">
-    <Error Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
+    <Error Code="SP0054" Condition="'$(_SharpProofVerifierHostSupported)' != 'true'"
            Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
-    <Error Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
+    <Error Code="SP0054" Condition="'$(_SharpProofVerifyPolicyNormalized)' != 'advisory' AND '$(_SharpProofVerifyPolicyNormalized)' != 'warn-on-unknown' AND '$(_SharpProofVerifyPolicyNormalized)' != 'require-proven'"
            Text="SharpProofVerifyPolicy must be advisory, warn-on-unknown, or require-proven." />
-    <Error Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
+    <Error Code="SP0054" Condition="'$(_SharpProofAssumptionPolicyNormalized)' != 'allow' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'warn' AND '$(_SharpProofAssumptionPolicyNormalized)' != 'error'"
            Text="SharpProofAssumptionPolicy must be allow, warn, or error." />
      <Error Code="SP0049"
             Condition="!Exists($(_SharpProofCompilerManifestSourcePath))"
            Text="SharpProof did not receive the required final compiler manifest." />
-    <Error Condition="!Exists($(_SharpProofLauncherPath))"
+    <Error Code="SP0054" Condition="!Exists($(_SharpProofLauncherPath))"
            Text="SharpProof verifier launcher was not found at '$(_SharpProofLauncherPath)'." />
-    <Error Condition="!Exists($(_SharpProofWorkerPath))"
+    <Error Code="SP0054" Condition="!Exists($(_SharpProofWorkerPath))"
            Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
      <MakeDir Directories="$([MSBuild]::Escape(&quot;$(_SharpProofInvocationDirectory)&quot;))" />
      <Copy Condition="'$(_SharpProofCompilerManifestSourcePath)' != '$(_SharpProofCompilerManifestPath)'"
@@ -299,7 +299,7 @@
       <Output TaskParameter="HasStructuredError"
               PropertyName="_SharpProofVerifierHasStructuredError" />
     </SharpProof.BuildTasks.RunVerifier>
-    <Error Condition="'$(_SharpProofVerifierExitCode)' != '0' AND '$(_SharpProofVerifierHasStructuredError)' != 'true'"
+    <Error Code="SP0051" Condition="'$(_SharpProofVerifierExitCode)' != '0' AND '$(_SharpProofVerifierHasStructuredError)' != 'true'"
            Text="SharpProof verifier failed with exit code $(_SharpProofVerifierExitCode)." />
     <SharpProof.BuildTasks.ValidatePublishedVerificationResult
         RequestPath="$(_SharpProofEffectiveRequestFile)"
@@ -362,6 +362,6 @@
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"
           Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
-    <Error Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
+    <Error Code="SP0054" Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
   </Target>
 </Project>

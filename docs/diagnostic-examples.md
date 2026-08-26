@@ -262,6 +262,50 @@ A readable payload whose hash does not match the pin is rejected and every
 attempted use reports SP0047 `ContractApiIdentityRejected`; the rejected symbol
 supplies no proof fact. SP0050 is reserved for a payload that cannot be read.
 
+## MSBuild integration diagnostics
+
+The build-task and transitive-target layer uses the following stable error codes
+for infrastructure failures. They are emitted as MSBuild errors rather than
+Roslyn analyzer descriptors, so IDE and CI tooling can route them without
+parsing prose. They never represent a contract or proof outcome.
+
+| ID | Failure family |
+|---|---|
+| `SP0051` | Verifier execution, launch, timeout, containment, or output-capture failure |
+| `SP0052` | Publication-path topology or invalidation failure |
+| `SP0053` | Published-result validation or reset failure |
+| `SP0054` | Runtime closure, host, invocation, or verifier-policy configuration failure |
+
+The existing `SP0049` compiler-manifest error remains distinct: it identifies
+missing final compiler evidence before the worker runs.
+
+<a id="sp0051"></a>
+## SP0051 - verifier execution failed
+
+SP0051 is emitted when the verifier process cannot complete its integration
+boundary, including a nonzero unstructured exit, bounded diagnostic-output
+overflow, or launch/containment failure reported by the MSBuild target.
+
+<a id="sp0052"></a>
+## SP0052 - publication topology failed
+
+SP0052 identifies rejected or failed publication-path invalidation, including
+aliasing between outputs, inputs, compiler-owned files, the cache, or the worker
+runtime.
+
+<a id="sp0053"></a>
+## SP0053 - published evidence is invalid
+
+SP0053 identifies a published request/result/manifest set that cannot be
+validated or reset. The task invalidates the rejected publication where
+possible; the code does not claim anything about the user's source.
+
+<a id="sp0054"></a>
+## SP0054 - verifier integration configuration failed
+
+SP0054 identifies runtime-closure, host-support, invocation-directory, policy,
+or required-tool validation failures raised before verifier execution.
+
 <a id="contractfor-generator-diagnostics"></a>
 ## ContractFor analyzer diagnostics
 

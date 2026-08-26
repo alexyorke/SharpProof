@@ -70,7 +70,11 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
                 ArgumentException or IOException or UnauthorizedAccessException or
                 InvalidOperationException)
             {
-                Log.LogErrorFromException(exception, showStackTrace: false);
+                VerifierBuildDiagnosticCodes.LogError(
+                    Log,
+                    VerifierBuildDiagnosticCodes.PublicationTopology,
+                    "SharpProof could not invalidate the previous publication: {0}",
+                    exception.Message);
                 return false;
             }
         }
@@ -212,27 +216,44 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
 
         if (aliasesOutput)
         {
-            Log.LogError("SharpProof output paths must be distinct.");
+            VerifierBuildDiagnosticCodes.LogError(
+                Log,
+                VerifierBuildDiagnosticCodes.PublicationTopology,
+                "SharpProof output paths must be distinct.");
         }
         if (aliasesFileIdentity)
         {
-            Log.LogError("SharpProof output aliases a protected file identity.");
+            VerifierBuildDiagnosticCodes.LogError(
+                Log,
+                VerifierBuildDiagnosticCodes.PublicationTopology,
+                "SharpProof output aliases a protected file identity.");
         }
         if (aliasesInput)
         {
-            Log.LogError("SharpProof output paths must not alias input paths.");
+            VerifierBuildDiagnosticCodes.LogError(
+                Log,
+                VerifierBuildDiagnosticCodes.PublicationTopology,
+                "SharpProof output paths must not alias input paths.");
         }
         if (aliasesWorkerTree)
         {
-            Log.LogError("SharpProof output paths must not be inside the worker runtime.");
+            VerifierBuildDiagnosticCodes.LogError(
+                Log,
+                VerifierBuildDiagnosticCodes.PublicationTopology,
+                "SharpProof output paths must not be inside the worker runtime.");
         }
         if (aliasesCache)
         {
-            Log.LogError("SharpProof output, input, cache, and worker paths must be distinct.");
+            VerifierBuildDiagnosticCodes.LogError(
+                Log,
+                VerifierBuildDiagnosticCodes.PublicationTopology,
+                "SharpProof output, input, cache, and worker paths must be distinct.");
         }
         if (aliasesCompilerOutput)
         {
-            Log.LogError(
+            VerifierBuildDiagnosticCodes.LogError(
+                Log,
+                VerifierBuildDiagnosticCodes.PublicationTopology,
                 "SharpProof publication paths must not alias compiler-owned outputs.");
         }
         if (Log.HasLoggedErrors)

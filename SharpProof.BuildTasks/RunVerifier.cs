@@ -359,7 +359,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 outputResult?.LimitExceeded == true ||
                 errorResult?.LimitExceeded == true)
             {
-                Log.LogError(
+                VerifierBuildDiagnosticCodes.LogError(
+                    Log,
+                    VerifierBuildDiagnosticCodes.ExecutionFailure,
                     "SharpProof verifier output exceeded the bounded " +
                     "diagnostic capture limit.");
             }

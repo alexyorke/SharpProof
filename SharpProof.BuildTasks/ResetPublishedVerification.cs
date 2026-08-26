@@ -57,7 +57,11 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
             ArgumentException or IOException or UnauthorizedAccessException or
             InvalidOperationException)
         {
-            Log.LogErrorFromException(exception, showStackTrace: false);
+            VerifierBuildDiagnosticCodes.LogError(
+                Log,
+                VerifierBuildDiagnosticCodes.PublishedEvidence,
+                "SharpProof could not reset the previous publication: {0}",
+                exception.Message);
             return false;
         }
         finally

@@ -3284,6 +3284,10 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static error => error.Attribute("Text")?.Value.StartsWith(
                 "SharpProof verifier failed with exit code",
                 StringComparison.Ordinal) == true);
+        var verifierErrorCodes = targets
+            .Descendants("Error")
+            .Select(static error => error.Attribute("Code")?.Value)
+            .ToArray();
         var arguments = string.Join(
             " ",
             verifyCore.Descendants("_SharpProofVerifierArgument")
@@ -3389,6 +3393,15 @@ public sealed class WorkerMsBuildIntegrationTests
                 verifierExitError.Attribute("Condition")?.Value,
                 Does.Contain(
                     "'$(_SharpProofVerifierHasStructuredError)' != 'true'"));
+            Assert.That(
+                verifierErrorCodes,
+                Is.All.Not.Null,
+                "Every verifier-target MSBuild error must have a stable diagnostic code.");
+            Assert.That(
+                verifierErrorCodes,
+                Is.All.Matches<string>(static code => code is
+                    "SP0049" or "SP0051" or "SP0054"),
+                "Verifier-target diagnostic codes must use the documented infrastructure vocabulary.");
             Assert.That(verifyCore.Descendants("Exec"), Is.Empty);
             Assert.That(
                 runnerTask.Attribute("AssemblyFile")?.Value,

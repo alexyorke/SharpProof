@@ -597,6 +597,10 @@ public sealed class BuildTaskTests
             {
                 Assert.That(task.ExitCode, Is.EqualTo(124));
                 Assert.That(
+                    ((RecordingBuildEngine)task.BuildEngine).Errors
+                        .Select(static error => error.Code),
+                    Is.All.EqualTo(VerifierBuildDiagnosticCodes.ExecutionFailure));
+                Assert.That(
                     stopwatch.Elapsed,
                     Is.LessThan(TimeSpan.FromSeconds(3)));
             }
@@ -764,7 +768,13 @@ public sealed class BuildTaskTests
             };
 
             Assert.That(task.Execute(), Is.False);
-            Assert.That(engine.Errors, Is.Not.Empty);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(engine.Errors, Is.Not.Empty);
+                Assert.That(
+                    engine.Errors.Select(static error => error.Code),
+                    Is.All.EqualTo(VerifierBuildDiagnosticCodes.PublishedEvidence));
+            }
         }
         finally
         {
@@ -802,6 +812,9 @@ public sealed class BuildTaskTests
                 Has.Some.Contains("exceeds the " +
                     WorkerProtocolJson.MaximumJsonBytes.ToString(
                         CultureInfo.InvariantCulture) + " byte limit"));
+            Assert.That(
+                engine.Errors.Select(static error => error.Code),
+                Is.All.EqualTo(VerifierBuildDiagnosticCodes.PublishedEvidence));
         }
         finally
         {
@@ -1663,7 +1676,11 @@ public sealed class BuildTaskTests
                 CultureInfo.InvariantCulture);
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(
+                    task.ExitCode,
+                    Is.EqualTo(137),
+                    "A verifier killed by SIGKILL must retain its direct exit code " +
+                    "after descendant cleanup.");
                 Assert.That(
                     SpinWait.SpinUntil(
                         () => !IsProcessRunning(descendantId.Value),
@@ -1927,6 +1944,9 @@ public sealed class BuildTaskTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(engine.Errors, Is.Not.Empty);
+                Assert.That(
+                    engine.Errors.Select(static error => error.Code),
+                    Is.All.EqualTo(VerifierBuildDiagnosticCodes.PublicationTopology));
                 Assert.That(File.Exists(result), Is.False);
                 Assert.That(
                     new[] { request, manifest, result }
