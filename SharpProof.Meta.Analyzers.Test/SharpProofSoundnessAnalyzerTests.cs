@@ -416,6 +416,34 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheFactoryDelegatesAreInspectedForNonCacheableAnswers()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache : ISemanticCache {
+                internal Answer GetOrAdd(string key, Func<string, Answer> factory) =>
+                    factory(key);
+            }
+            sealed class C {
+                static Answer UnknownAnswer() => Answer.Unknown;
+                void M(ProofCache cache) {
+                    cache.GetOrAdd("direct", static _ => Answer.Unknown);
+                    cache.GetOrAdd("indirect", static _ => UnknownAnswer());
+                    cache.GetOrAdd("block", static _ => { return Answer.Unknown; });
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(3));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesRejectDirectFieldAssignments()
     {
         var diagnostics = await Analyze(

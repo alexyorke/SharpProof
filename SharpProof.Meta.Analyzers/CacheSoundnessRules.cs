@@ -195,11 +195,46 @@ internal static class CacheSoundnessRules
                 IsNonCacheableSemanticAnswer(conditional.WhenTrue, root, resolving) ||
                 conditional.WhenFalse != null &&
                 IsNonCacheableSemanticAnswer(conditional.WhenFalse, root, resolving),
+            IConversionOperation conversion
+                when conversion.OperatorMethod == null =>
+                IsNonCacheableSemanticAnswer(conversion.Operand, root, resolving),
+            IDelegateCreationOperation delegateCreation =>
+                IsNonCacheableSemanticAnswer(delegateCreation.Target, root, resolving),
+            IAnonymousFunctionOperation anonymous
+                when anonymous.Body is { } anonymousBody =>
+                ContainsNonCacheableSemanticAnswer(anonymousBody, root, resolving),
+            ILocalFunctionOperation localFunction
+                when localFunction.Body is { } localBody =>
+                ContainsNonCacheableSemanticAnswer(localBody, root, resolving),
             IPropertyReferenceOperation property => ResolveProperty(property),
             IInvocationOperation invocation => ResolveInvocation(invocation),
             _ => IsSemanticAnswerType(operation.Type) &&
                 operation.ConstantValue is not { HasValue: true }
         };
+    }
+
+    private static bool ContainsNonCacheableSemanticAnswer(
+        IOperation body,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
+    {
+        foreach (var candidate in body.DescendantsAndSelf())
+        {
+            if (ReferenceEquals(candidate, body) ||
+                candidate is IBlockOperation or IExpressionStatementOperation or
+                    IReturnOperation or IAnonymousFunctionOperation or
+                    ILocalFunctionOperation)
+            {
+                continue;
+            }
+
+            if (IsNonCacheableSemanticAnswer(candidate, root, resolving))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool ResolveLocal(
