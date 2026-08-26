@@ -5934,6 +5934,80 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ConditionalReturnPreservesFollowingEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample
+            {
+                public static int State;
+
+                private static void Guard(bool stop)
+                {
+                    if (stop)
+                    {
+                        return;
+                    }
+
+                    while (true)
+                    {
+                    }
+                }
+
+                public static void Caller(bool stop)
+                {
+                    Guard(stop);
+                    State = 1;
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Caller"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
+    public void MutualRecursionWithBaseReturnPreservesFollowingEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample
+            {
+                public static int State;
+
+                private static void First(int value)
+                {
+                    if (value > 100)
+                    {
+                        return;
+                    }
+
+                    Second(value + 1);
+                }
+
+                private static void Second(int value) => First(value);
+
+                public static void Caller()
+                {
+                    Second(200);
+                    State = 1;
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Caller"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void ExceptionFlowReportsOnlyExceptionsThatEscape()
     {
         var compilation = EffectTestHost.CreateCompilation(

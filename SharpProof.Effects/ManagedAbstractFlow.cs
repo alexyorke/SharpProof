@@ -1958,7 +1958,23 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 (GetBody(declaration) is { } methodBody
                     ? model.GetOperation(methodBody, cancellationToken)
                     : null);
-            return operation == null || MayCompleteNormally(operation);
+            if (operation == null)
+            {
+                return true;
+            }
+
+            var graph = operation switch
+            {
+                IMethodBodyOperation body =>
+                    ControlFlowGraph.Create(body, cancellationToken),
+                IConstructorBodyOperation body =>
+                    ControlFlowGraph.Create(body, cancellationToken),
+                IBlockOperation block =>
+                    ControlFlowGraph.Create(block, cancellationToken),
+                _ => null
+            };
+            return graph == null ||
+                graph.Blocks[graph.Blocks.Length - 1].IsReachable;
         }
         catch (ArgumentException)
         {
