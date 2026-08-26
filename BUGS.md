@@ -4,7 +4,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 ## Open and accepted findings
 
-No additional non-security fixes are confirmed for this pass. The remaining entries are deferred, partial, policy, rejected, or not reproduced; cybersecurity and integrity work remains explicitly out of scope.
+No additional non-security findings remain unresolved for this pass. The remaining entries are deferred, partial, policy, rejected, or not reproduced; cybersecurity and integrity work remains explicitly out of scope.
 
 ## Deferred by explicit scope
 
@@ -41,7 +41,7 @@ Reset/invalidation removes publication members without the full filesystem durab
 - **5:** Documentation breadth is maintenance debt, not an independently reproducible product defect; the documentation audit is tracked separately.
 - **6:** `RegisterCompilationEndAction` is a valid Roslyn registration API; the naming claim was based on a mistaken signature assumption.
 - **275:** Exact `Contract.Result<T>` nullability matching is intentional contract identity behavior and is covered by binder tests.
-- **279:** Profile/configuration disagreement is an intentional fail-closed policy boundary; changing it would weaken the configured verification contract.
+- **279:** The original silent profile/configuration disagreement report is superseded. Current configuration parsing detects conflicting aliases and reports the authoritative invalid-configuration diagnostic; no silent shadowing remains.
 
 ## Resolved in this branch
 
@@ -71,9 +71,10 @@ Resolved reports are removed after reproduction, implementation, regression test
 | 296 | `8c71195e9` (canonicalization arity guards and typed regression) |
 | 311 | `9bcb41bd5` (public evidence-authority validation overloads) |
 | 350 | `adc74ffaa` (banner-aware generated header detection) |
-| 396 | `bf772d063` (attribute-aware metadata companion prefilter) |
-| 411 | `3cf5c3747` (cataloged StartsWith/Compare and readonly literal analysis) |
+| 396 | `bf772d063`, `87da87603` (attribute-aware metadata companion prefilter and metadata-table fast path) |
+| 411 | `3cf5c3747`, `39dc0ab87` (cataloged semantic strings and static-constructor-safe readonly inference) |
 | 416 | `acdf88263` (inventory-driven semantic framework identity scan) |
+| 423 | `87da87603` (package tests honor `SHARPPROOF_REPO_ROOT` under isolated coverage output) |
 
 The audit does not claim that the deferred security findings are fixed. Any future change to those areas should receive a separate threat-model review and dedicated validation.
 
@@ -164,13 +165,13 @@ rechecks unchanged refuted, missing, corrupt, and infrastructure results. An
 
 ### 369. [PARTIALLY RESOLVED fa58c7533] Explicit Interface Implementations and Static Constructors Are Analyzed In-Process but Marked Unsupported in the Manifest - Strict Builds Kill Analyzer-Blessed Members While Advisory Builds Silently Lose All Coverage for Them
 
-**Location**: `SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs` (Lines 93-106: `supported` requires `target.MethodKind is (Ordinary or Constructor or PropertyGet or PropertySet or EventAdd or EventRemove)`); admitting counterparts `SharpProof.Analyzer.Core\LanguageSubsetGate.cs` (Lines 140-148 `SupportsCallable` whitelists `StaticConstructor` and `ExplicitInterfaceImplementation`) and `SharpProof.Contracts\ContractBinder.cs` (Lines 74-82 same extended set); enforcement `SharpProof.CompilerCollector\CompilerArtifact\CompilerCallableLowerer.cs` (Lines 50-56 `!target.IsVerifierSupported -> Fail(target, WorkerClaimReason.UnsupportedCallable)`); strict consequence `SharpProof.Worker.Launcher\Program.cs` (Lines 480-493, 519 incomplete callables -> exit 6 under require-proven).
-**Description**: Three layers disagree on one axis: the analyzer deliberately supports EII and static constructors (someone whitelisted both in `SupportsCallable` and `BindCore`), so an explicit interface implementation carrying `[EnforcePure]` is selected, classified Supported, analyzed clean and silent - yet the collector emits `supported=false`, preparation fails `UnsupportedCallable`, every claim becomes Unknown, and callable coverage is Incomplete. Under `require-proven` the launcher exits 6 with the aggregate SP0047 "selected analysis is incomplete" - killing builds the in-process analyzer blessed with zero diagnostics; under advisory, all verification coverage for those members silently disappears. No false Proven (fail-closed), but a guaranteed analyzer-vs-verifier divergence with an opaque strict-mode presentation. Distinct from #341 (DOCUMENTATION enumerating fewer kinds than the gate - this is the collector's whitelist drifting from two code layers that agree), #183 (string-op classification flag), #298/#348 (trusted-attribute axes).
+**Location**: `SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs` (the callable-kind whitelist now admits `ExplicitInterfaceImplementation` but intentionally excludes `StaticConstructor`); admitting counterparts `SharpProof.Analyzer.Core\LanguageSubsetGate.cs` and `SharpProof.Contracts\ContractBinder.cs`; enforcement `SharpProof.CompilerCollector\CompilerArtifact\CompilerCallableLowerer.cs` (unsupported targets fail closed with `WorkerClaimReason.UnsupportedCallable`); strict consequence `SharpProof.Worker.Launcher\Program.cs` (incomplete callables fail under `require-proven`).
+**Description**: The explicit-interface half of the original report was resolved by `fa58c7533` and is covered by manifest and binder tests; EII bodies now remain in the verifier-supported callable set. Static constructors remain analyzer/binder-admitted but collector-unsupported. The collector and worker do not replay type initialization or static-constructor ordering, so broadening that whitelist would make replay evidence unsound. This is a deliberate fail-closed boundary, not a claim that static constructors are currently proven. Distinct from #341 (documentation enumerating fewer kinds than the gate) and #370 (the separate static-state mutation gate).
 **Reproduction Steps**:
-1. Strict-profile project (`SharpProofProfile=strict` => verify policy require-proven) referencing SharpProof.Attributes; add `public interface IFoo { int Compute(int x); }` and `public sealed class Foo : IFoo { [SharpProof.EnforcePure] int IFoo.Compute(int x) => x * 2; }`.
-2. Build in-container: analyzer emits nothing (body supported, purity proven); collector marks the callable unsupported; worker returns Unknown/Incomplete for the claim; require-proven fails the build (exit 6/SP0047) with no analyzer-side counterpart diagnostic.
-3. Switch to advisory profile: same member silently loses all worker coverage - no diagnostic either way, isolating the MethodKind whitelist as the discriminator.
-**Confidence**: High for explicit interface implementations; static-constructor admission remains intentionally fail-closed because constructor initialization and replay semantics need a separate design. Commit `fa58c7533` aligns the collector for explicit interface implementations and adds manifest coverage; it does not broaden static-constructor support.
+1. Strict-profile project (`SharpProofProfile=strict` => verify policy require-proven) referencing SharpProof.Attributes; add an explicitly initialized static constructor and a selected static constructor or static member.
+2. Build in-container: static-constructor replay remains unsupported, so the worker returns Unknown/Incomplete and require-proven fails closed with SP0047. This is expected until type-initialization ordering and replay evidence are modeled.
+3. Use an explicit interface implementation as a control: the same selected EII body remains in the verifier-supported callable set and is covered by `ClaimManifestBuilderTests.ExplicitInterfaceImplementationUsesTheSupportedCallableSet`.
+**Confidence**: High for the original explicit-interface divergence, which is resolved by `fa58c7533`; static-constructor admission remains intentionally fail-closed because constructor initialization and replay semantics need a separate design.
 
 ### 370. [INTENTIONAL FAIL-CLOSED] The Collector-Only HasStaticStateMutation Gate Voids Effect Evidence for Every Selected Member of a Type Whose Static Constructor Contains Any Assignment - Analyzer Proves Pure, Verifier Fails the Strict Build Opaquely
 
