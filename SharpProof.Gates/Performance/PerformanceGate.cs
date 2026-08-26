@@ -1352,6 +1352,7 @@ internal static class PerformanceGate
             "'$(_SharpProofVerifierHostArchitecture)'=='X64'AND" +
             "'$(_SharpProofVerifierProcessArchitecture)'=='X64'";
         const string expectedVerifierCondition =
+            "'$(_SharpProofProjectLanguageSupported)'=='true'AND" +
             "'$(SharpProofVerify)'=='true'AND'$(_SharpProofProfileNormalized)'!='off'AND" +
             "'$(_SharpProofVerifierHostSupported)'=='true'AND" +
             "'$(DesignTimeBuild)'!='true'AND'$(BuildingProject)'!='false'";
