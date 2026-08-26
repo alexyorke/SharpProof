@@ -347,8 +347,9 @@ unexplained canonical snapshot change, and all soundness and performance gates
 green. Promotion changes reporting severity only; it cannot enlarge the
 supported subset or proof semantics.
 
-The current effect subset accepts non-generic ordinary methods, explicit
-constructors, and accessors using locals, primitive expressions, assignments,
+The current effect subset accepts non-generic ordinary methods, instance and
+static constructors, property and event accessors, and explicit interface
+implementations using locals, primitive expressions, assignments,
 direct calls, object and array creation, `if`, `for`, `while`, constant
 `switch`, `try`/`catch`/`finally`, `using`, `lock`, conditional access, and
 ordinary interpolation.

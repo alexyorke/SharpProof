@@ -124,6 +124,12 @@ jobs:
           -Configuration Release
           -PackageSource nupkgs
 
+      - name: Run package-backed samples
+        run: >-
+          docker compose run --rm tooling samples
+          -Configuration Release
+          -PackageSource nupkgs
+
   portable-consumers:
     name: Portable exact-package consumer (${{ matrix.os }})
     if: >-

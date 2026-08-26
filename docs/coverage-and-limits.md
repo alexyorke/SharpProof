@@ -54,6 +54,14 @@ following matrix summarizes that checked table.
 | Expressions | Literals, locals/parameters/instance, fields/properties, array access, built-in unary/binary/conversion operations, conditional/coalesce, `is` type, `typeof`, `nameof`, ordinary interpolation, object/array creation, and direct calls that pass shape checks | User-defined operators or conversions, delegates, dynamic operations, function pointers, anonymous objects, tuples, unsafe/address operations, custom interpolated-string handlers, implicit indexers, and future unknown Roslyn operation kinds |
 | Calls | Direct non-delegate calls without ref arguments; closed constructed generic calls only when an exact `ApiSpec` resolves | Local/delegate/function-pointer calls, ref arguments, open generic shapes, and closed generic calls with no exact resolved spec |
 
+The analyzer language gate is strict about string operations: instance
+`Length`, concatenation, and compound concatenation are rejected with an
+explicit abstention. The compiler collector uses the same operation table with
+its string-operation compatibility switch disabled so that it can retain the
+artifact's incomplete evidence instead of silently dropping a selected
+callable. This analyzer/collector split is intentional and is covered by
+separate tests.
+
 The frontend has a second, expression-level exactness classifier. For example,
 an operation kind can pass the analyzer gate while a lifted operator, narrowing
 conversion, unsupported member access, or unsupported invocation form still

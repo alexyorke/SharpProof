@@ -60,6 +60,22 @@ public sealed class DependencyAutomationTests
     }
 
     [Test]
+    public void PackageWorkflowRunsThePackageBackedSampleMatrix()
+    {
+        var workflow = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            ".github",
+            "workflows",
+            "package-consumers.yml"));
+
+        Assert.That(
+            workflow,
+            Does.Contain(
+                "docker compose run --rm tooling samples"));
+        Assert.That(workflow, Does.Contain("-PackageSource nupkgs"));
+    }
+
+    [Test]
     public void NightlyFailsClosedOnRetainedDependencyAuditEvidence()
     {
         var workflow = File.ReadAllText(Path.Combine(
@@ -123,6 +139,9 @@ public sealed class DependencyAutomationTests
                 architecture,
                 Does.Contain(
                     "ContractForGenerator  -> Analyzer.Core, Contracts"));
+            Assert.That(
+                architecture,
+                Does.Contain("BuildTasks            -> Host, Worker.Protocol"));
             Assert.That(
                 architecture,
                 Does.Contain(

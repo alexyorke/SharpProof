@@ -26,7 +26,7 @@ Analyzer              -> Analyzer.Core
 ContractForGenerator  -> Analyzer.Core, Contracts
 CompilerCollector     -> Analyzer.Core, CompilerArtifact, Contracts, Effects,
                          Frontend, Ir, Specs, Summaries, Worker.Protocol
-BuildTasks            -> Host
+BuildTasks            -> Host, Worker.Protocol
 Host
 Worker.Protocol
 Worker                -> CompilerArtifact, Dataflow, Host, Ir, Smt, Specs,
