@@ -446,6 +446,30 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsCompoundAndConcatCSharpExpressionTextConstruction()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                static string Compound(string name) {
+                    var text = name;
+                    text += " is null";
+                    return text;
+                }
+
+                static string Concat(string name) =>
+                    string.Concat(name, " == ");
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA009"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task AllowsOrdinaryInterpolatedFormattingAndValueDecoys()
     {
         const string source =

@@ -94,6 +94,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 OperationKind.SimpleAssignment,
                 OperationKind.CoalesceAssignment,
                 OperationKind.CompoundAssignment);
+            startContext.RegisterOperationAction(
+                AnalyzeCompoundAssignmentExpressionText,
+                OperationKind.CompoundAssignment);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
             startContext.RegisterOperationAction(
@@ -128,6 +131,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
         AnalyzeSemanticEquals(context, invocation, symbols);
         CacheSoundnessRules.AnalyzeWrite(context, invocation, symbols);
+        AnalyzeStringConcatExpressionText(context, invocation);
     }
 
     private static bool IsForbidden(
@@ -295,6 +299,52 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if (fragment != null)
         {
             Report(context, MetaDiagnosticDescriptors.CSharpExpressionText, binary.Syntax.GetLocation(), fragment);
+        }
+    }
+
+    private static void AnalyzeCompoundAssignmentExpressionText(
+        OperationAnalysisContext context)
+    {
+        if (context.Operation is not ICompoundAssignmentOperation assignment ||
+            assignment.Type?.SpecialType != SpecialType.System_String)
+        {
+            return;
+        }
+
+        var fragment = GetCSharpExpressionFragment(assignment.Value);
+        if (fragment != null)
+        {
+            Report(
+                context,
+                MetaDiagnosticDescriptors.CSharpExpressionText,
+                assignment.Syntax.GetLocation(),
+                fragment);
+        }
+    }
+
+    private static void AnalyzeStringConcatExpressionText(
+        OperationAnalysisContext context,
+        IInvocationOperation invocation)
+    {
+        if (invocation.TargetMethod.Name != "Concat" ||
+            invocation.TargetMethod.ContainingType.SpecialType !=
+                SpecialType.System_String ||
+            invocation.Type?.SpecialType != SpecialType.System_String)
+        {
+            return;
+        }
+
+        var fragment = invocation.Arguments
+            .Select(static argument => argument.Value)
+            .Select(GetCSharpExpressionFragment)
+            .FirstOrDefault(static value => value != null);
+        if (fragment != null)
+        {
+            Report(
+                context,
+                MetaDiagnosticDescriptors.CSharpExpressionText,
+                invocation.Syntax.GetLocation(),
+                fragment);
         }
     }
 
