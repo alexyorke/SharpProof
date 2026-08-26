@@ -4,6 +4,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Worker.Protocol;
+using System.Text;
 using System.Text.Json;
 
 namespace SharpProof.Worker.Test;
@@ -206,6 +207,50 @@ public sealed class CompilerSourceLocationAuthorityTests
         }
 
         Assert.That(context.LineMapValidationCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void LargeLineMapsInternRepeatedMappedPathsOnTheWire()
+    {
+        var artifact = CreateArtifact(
+            "internal sealed class Subject {}\n");
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        const int lineCount = 120_000;
+        tree.TextLength = lineCount;
+        tree.LineMap = Enumerable.Range(0, lineCount)
+            .Select(index => new CompilerSourceLineMapEntry
+            {
+                SourceStart = index,
+                SourceLength = 0,
+                MappedPath = tree.Path,
+                MappedLine = 0,
+                MappedColumn = 0
+            })
+            .ToArray();
+        tree.LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(
+            tree.LineMap);
+        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            artifact.Compilation,
+            artifact.CompilerDiagnostics);
+
+        var json = CompilerManifestArtifactJson.Serialize(artifact);
+        var roundTrip = CompilerManifestArtifactJson.Deserialize(json);
+        var roundTripTree = roundTrip.Compilation.SyntaxTrees.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(json, Does.Contain("\"mappedPathIndex\""));
+            Assert.That(
+                Encoding.UTF8.GetByteCount(json),
+                Is.LessThan(WorkerProtocolJson.MaximumJsonBytes));
+            Assert.That(roundTripTree.LineMap, Has.Length.EqualTo(lineCount));
+            Assert.That(
+                roundTripTree.LineMap.Select(static entry => entry.MappedPath),
+                Is.All.EqualTo(tree.Path));
+            Assert.That(
+                CompilerManifestArtifactJson.Serialize(roundTrip),
+                Is.EqualTo(json));
+        }
     }
 
     [Test]

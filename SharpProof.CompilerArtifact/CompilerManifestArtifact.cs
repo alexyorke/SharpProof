@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using static System.IO.Path;
 
@@ -301,6 +302,8 @@ internal sealed class WorkerRuntimeClosureSnapshot(
 
 internal static class CompilerManifestArtifactJson
 {
+    private const int LineMapInterningThresholdBytes = 64 * 1024;
+
     internal static string Serialize(CompilerManifestArtifact artifact)
     {
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
@@ -325,7 +328,7 @@ internal static class CompilerManifestArtifactJson
         Validate(artifact);
         var json = JsonSerializer.Serialize(
                 artifact,
-                WorkerProtocolJson.Options) +
+                CreateJsonOptions()) +
             "\n";
         if (Encoding.UTF8.GetByteCount(json) >
             CompilerManifestArtifactFile.MaximumBytes)
@@ -344,7 +347,7 @@ internal static class CompilerManifestArtifactJson
         RequireDiagnosticClassificationProperties(json);
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
-            json, WorkerProtocolJson.Options) ??
+            json, CreateJsonOptions()) ??
             throw new JsonException("A compiler manifest artifact is required.");
         Validate(artifact);
         if (Serialize(artifact) != json)
@@ -353,6 +356,142 @@ internal static class CompilerManifestArtifactJson
         }
 
         return artifact;
+    }
+
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        var options = WorkerProtocolJson.Options;
+        options.Converters.Add(new LargeLineMapConverter());
+        return options;
+    }
+
+    // Large source files commonly repeat one mapped path for every physical
+    // line. Keep the historical in-memory model and fingerprints, but replace
+    // repeated path strings with a prior-path index on the wire once a map is
+    // large enough to threaten the protocol limit. Small artifacts retain the
+    // original shape for compatibility with existing tooling.
+    private sealed class LargeLineMapConverter : JsonConverter<CompilerSyntaxTreeSnapshot>
+    {
+        public override CompilerSyntaxTreeSnapshot Read(
+            ref Utf8JsonReader reader,
+            Type typeToConvert,
+            JsonSerializerOptions options)
+        {
+            using var document = JsonDocument.ParseValue(ref reader);
+            var root = document.RootElement;
+            var historicalOptions = WorkerProtocolJson.Options;
+            historicalOptions.UnmappedMemberHandling =
+                JsonUnmappedMemberHandling.Skip;
+            var snapshot = JsonSerializer.Deserialize<CompilerSyntaxTreeSnapshot>(
+                root.GetRawText(),
+                historicalOptions) ??
+                throw new JsonException("A syntax-tree snapshot is required.");
+
+            if (!root.TryGetProperty("lineMap", out var lineMap) ||
+                lineMap.ValueKind != JsonValueKind.Array)
+            {
+                return snapshot;
+            }
+
+            var entries = snapshot.LineMap ?? [];
+            if (entries.Length != lineMap.GetArrayLength())
+            {
+                throw new JsonException("The syntax-tree line map is malformed.");
+            }
+
+            var paths = new List<string>();
+            var index = 0;
+            foreach (var encodedEntry in lineMap.EnumerateArray())
+            {
+                if (encodedEntry.TryGetProperty("mappedPath", out var path))
+                {
+                    if (path.ValueKind != JsonValueKind.String ||
+                        string.IsNullOrWhiteSpace(path.GetString()))
+                    {
+                        throw new JsonException(
+                            "A syntax-tree line-map path is malformed.");
+                    }
+
+                    var mappedPath = path.GetString()!;
+                    paths.Add(mappedPath);
+                    entries[index].MappedPath = mappedPath;
+                }
+                else if (encodedEntry.TryGetProperty(
+                             "mappedPathIndex",
+                             out var pathIndex) &&
+                         pathIndex.ValueKind == JsonValueKind.Number &&
+                         pathIndex.TryGetInt32(out var mappedPathIndex) &&
+                         mappedPathIndex >= 0 &&
+                         mappedPathIndex < paths.Count)
+                {
+                    entries[index].MappedPath = paths[mappedPathIndex];
+                }
+                else
+                {
+                    throw new JsonException(
+                        "A syntax-tree line-map path index is malformed.");
+                }
+
+                index++;
+            }
+
+            snapshot.LineMap = entries;
+            return snapshot;
+        }
+
+        public override void Write(
+            Utf8JsonWriter writer,
+            CompilerSyntaxTreeSnapshot value,
+            JsonSerializerOptions options)
+        {
+            var historical = JsonSerializer.SerializeToElement(
+                value,
+                WorkerProtocolJson.Options);
+            var lineMap = value.LineMap ?? [];
+            var shouldIntern = lineMap.Length > 1 &&
+                historical.GetRawText().Length > LineMapInterningThresholdBytes &&
+                lineMap.Select(static entry => entry.MappedPath)
+                    .Distinct(StringComparer.Ordinal)
+                    .Count() < lineMap.Length;
+
+            writer.WriteStartObject();
+            foreach (var property in historical.EnumerateObject())
+            {
+                writer.WritePropertyName(property.Name);
+                if (!shouldIntern || property.Name != "lineMap")
+                {
+                    property.Value.WriteTo(writer);
+                    continue;
+                }
+
+                writer.WriteStartArray();
+                var pathIndexes = new Dictionary<string, int>(
+                    StringComparer.Ordinal);
+                foreach (var entry in lineMap)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteNumber("sourceStart", entry.SourceStart);
+                    writer.WriteNumber("sourceLength", entry.SourceLength);
+                    if (pathIndexes.TryGetValue(
+                            entry.MappedPath,
+                            out var mappedPathIndex))
+                    {
+                        writer.WriteNumber("mappedPathIndex", mappedPathIndex);
+                    }
+                    else
+                    {
+                        mappedPathIndex = pathIndexes.Count;
+                        pathIndexes.Add(entry.MappedPath, mappedPathIndex);
+                        writer.WriteString("mappedPath", entry.MappedPath);
+                    }
+                    writer.WriteNumber("mappedLine", entry.MappedLine);
+                    writer.WriteNumber("mappedColumn", entry.MappedColumn);
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+            }
+            writer.WriteEndObject();
+        }
     }
 
     internal static ImmutableArray<CompilerCallablePreparation> DecodeCallables(

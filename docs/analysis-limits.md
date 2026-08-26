@@ -108,6 +108,12 @@ miss; the cache's 512 MiB limit remains the aggregate eviction limit for
 active `*.sharp-proof-cache.json` entries, not every file in the configured
 directory.
 
+Large compiler line maps use a deterministic prior-path index for repeated
+mapped paths on the wire once a syntax-tree snapshot is substantial; the
+in-memory line-map model and its fingerprint remain unchanged. This keeps a
+large ordinary file from exhausting the envelope solely by repeating one
+absolute path on every source line.
+
 The configured termination grace must be from 1 through 300000 milliseconds.
 The configured method and project wall values are fail-closed outer boundaries,
 not proof facts. Z3 queries use deterministic resource limits. The launcher
