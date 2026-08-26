@@ -86,6 +86,23 @@ public sealed class AnalyzerConfigurationUnitTests
     }
 
     [Test]
+    public void RetiredModeUsesNonBlankAliasWhenPrimaryIsBlank()
+    {
+        var configuration = AnalyzerConfiguration.FromOptions(
+            new DictionaryProvider(new DictionaryOptions(
+                ("sharpproof_mode", " "),
+                ("build_property.SharpProofMode", "off"))));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(configuration.Profile, Is.EqualTo(SharpProofProfile.Off));
+            Assert.That(configuration.InvalidConfigurationValues, Has.Length.EqualTo(1));
+            Assert.That(configuration.InvalidConfigurationValues[0].Key,
+                Is.EqualTo("sharpproof_mode"));
+        }
+    }
+
+    [Test]
     public void RetiredModeIsReportedAlongsideAnotherInvalidGlobalValue()
     {
         var configuration = AnalyzerConfiguration.FromOptions(
