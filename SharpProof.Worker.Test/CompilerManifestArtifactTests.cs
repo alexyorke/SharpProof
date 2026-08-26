@@ -42,6 +42,29 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void SummaryEvidenceOrderingComparesFieldsIndependently()
+    {
+        var left = new CompilerSummaryEvidenceSnapshot
+        {
+            Origin = CompilerSummaryOrigin.Source,
+            CallIdentity = "a",
+            EvidenceIdentity = "|b",
+            EvidenceSha256 = new string('a', 64)
+        };
+        var right = new CompilerSummaryEvidenceSnapshot
+        {
+            Origin = CompilerSummaryOrigin.Source,
+            CallIdentity = "a|",
+            EvidenceIdentity = "b",
+            EvidenceSha256 = new string('a', 64)
+        };
+
+        Assert.That(
+            CompilationFingerprint.CompareSummaryEvidence(left, right),
+            Is.LessThan(0));
+    }
+
+    [Test]
     public void ArtifactRecordsCompilerAndSyntaxEvidenceWithoutSourceText()
     {
         var parse = new CSharpParseOptions(LanguageVersion.CSharp12)

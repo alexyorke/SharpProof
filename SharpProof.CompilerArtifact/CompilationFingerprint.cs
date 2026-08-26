@@ -223,7 +223,7 @@ internal static class CompilationFingerprint
             return false;
         }
 
-        string? previous = null;
+        CompilerSummaryEvidenceSnapshot? previous = null;
         foreach (var row in values)
         {
             if (row == null ||
@@ -242,19 +242,45 @@ internal static class CompilationFingerprint
                 return false;
             }
 
-            var key = ((int)row.Origin).ToString(CultureInfo.InvariantCulture) + "|" +
-                row.CallIdentity + "|" + row.EvidenceIdentity + "|" + row.EvidenceSha256;
             if (previous != null &&
-                StringComparer.Ordinal.Compare(previous, key) >= 0 ||
+                CompareSummaryEvidence(previous, row) >= 0 ||
                 !ValidSummaryEvidenceRow(row, snapshot))
             {
                 return false;
             }
 
-            previous = key;
+            previous = row;
         }
 
         return true;
+    }
+
+    internal static int CompareSummaryEvidence(
+        CompilerSummaryEvidenceSnapshot left,
+        CompilerSummaryEvidenceSnapshot right)
+    {
+        var comparison = ((int)left.Origin).CompareTo((int)right.Origin);
+        if (comparison != 0)
+        {
+            return comparison;
+        }
+
+        comparison = StringComparer.Ordinal.Compare(
+            left.CallIdentity,
+            right.CallIdentity);
+        if (comparison != 0)
+        {
+            return comparison;
+        }
+
+        comparison = StringComparer.Ordinal.Compare(
+            left.EvidenceIdentity,
+            right.EvidenceIdentity);
+        return comparison != 0
+            ? comparison
+            : StringComparer.Ordinal.Compare(
+                left.EvidenceSha256,
+                right.EvidenceSha256);
     }
 
     private static bool ValidSummaryEvidenceRow(
