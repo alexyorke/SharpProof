@@ -1640,6 +1640,116 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task LauncherBindsPreManifestWorkerFailuresToAuthoritativeEvidence()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var cases = new[]
+        {
+            ("request.malformed", WorkerRunStatus.Failed,
+                WorkerRunFailureReason.InvalidRequest, 3),
+            ("compiler_manifest.unavailable", WorkerRunStatus.Failed,
+                WorkerRunFailureReason.InputUnavailable, 3),
+            ("compiler_manifest.invalid", WorkerRunStatus.Failed,
+                WorkerRunFailureReason.CompilerManifestMismatch, 3),
+            ("backend.unavailable", WorkerRunStatus.Failed,
+                WorkerRunFailureReason.BackendUnavailable, 3),
+            ("worker.infrastructure", WorkerRunStatus.Failed,
+                WorkerRunFailureReason.InfrastructureFailure, 3),
+            ("worker.canceled", WorkerRunStatus.Canceled,
+                WorkerRunFailureReason.None, 4),
+            ("worker.timeout", WorkerRunStatus.TimedOut,
+                WorkerRunFailureReason.None, 124)
+        };
+        foreach (var (code, status, reason, expectedExitCode) in cases)
+        {
+            var requestPath = project.VerifyOutputPath(
+                "net8.0", "pre-manifest-" + code + "-request.json");
+            var resultPath = project.VerifyOutputPath(
+                "net8.0", "pre-manifest-" + code + "-result.json");
+            var exitCode = await Program.RunMain(
+                [
+                    "verify",
+                    "--worker", WorkerOutputPath(),
+                    "--request", requestPath,
+                    "--result", resultPath,
+                    "--compiler-manifest", project.CompilerManifestPath,
+                    "--verify-policy", "advisory",
+                    "--assumption-policy", "allow"
+                ],
+                static path => WorkerBinaryIdentity.ComputeSha256(path),
+                (arguments, _, _, _) =>
+                {
+                    var emptyManifest = new WorkerClaimManifest();
+                    WorkerProtocolJson.SealManifest(emptyManifest);
+                    var placeholder = new WorkerVerifyResponse
+                    {
+                        RequestHash = WorkerProtocolVersions.EmptySha256,
+                        InputHash = WorkerProtocolVersions.EmptySha256,
+                        Manifest = emptyManifest,
+                        RunStatus = status,
+                        FailureReason = reason,
+                        Summary = new WorkerVerificationSummary
+                        {
+                            CacheStatus = WorkerCacheStatus.Disabled,
+                            Versions = new WorkerVersionSummary
+                            {
+                                WorkerVersion = "unavailable",
+                                ApiSpecVersion = "unavailable"
+                            },
+                            Budgets = new WorkerBudgets()
+                        },
+                        Errors = [new WorkerProtocolError
+                        {
+                            Code = code,
+                            Message = "The worker stopped before loading its manifest."
+                        }]
+                    };
+                    File.WriteAllText(
+                        arguments.ResultPath,
+                        WorkerProtocolJson.SerializeResponse(placeholder));
+                    return 0;
+                });
+
+            var request = WorkerProtocolJson.DeserializeRequest(
+                await File.ReadAllTextAsync(requestPath))!;
+            var artifact = await CompilerManifestArtifact.ReadAsync(
+                request.CompilerManifest.Path);
+            var response = WorkerProtocolJson.DeserializeResponse(
+                await File.ReadAllTextAsync(resultPath))!;
+            var expectedInputHash = Program.ComputeExpectedInputHash(
+                WorkerOutputPath(), request, artifact.Bytes);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(expectedExitCode), code);
+                Assert.That(response.RunStatus, Is.EqualTo(status), code);
+                Assert.That(response.FailureReason, Is.EqualTo(reason), code);
+                Assert.That(response.Errors.Select(static error => error.Code),
+                    Does.Contain(code), code);
+                Assert.That(response.Errors.Select(static error => error.Code),
+                    Does.Not.Contain("worker.malformed_result"), code);
+                Assert.That(response.InputHash, Is.EqualTo(expectedInputHash), code);
+                Assert.That(response.RequestHash,
+                    Is.EqualTo(WorkerProtocolJson.ComputeRequestHash(request)), code);
+                Assert.That(response.Manifest.Hash,
+                    Is.EqualTo(artifact.ManifestHash), code);
+                Assert.That(
+                    WorkerProtocolJson.ValidateForRequest(
+                        response,
+                        response.RequestHash,
+                        expectedInputHash,
+                        response.Manifest,
+                        request,
+                        response.Summary.Versions).IsValid,
+                    Is.True, code);
+            }
+        }
+    }
+
+    [Test]
     public async Task LauncherFailsClosedOnAnUnclassifiedException()
     {
         RequireContainerWorker();

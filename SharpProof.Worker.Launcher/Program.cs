@@ -187,14 +187,32 @@ internal static class Program
             responseAuthority);
         if (!validResponse)
         {
-            exitCode = NormalizeNoResultExitCode(exitCode);
-            if (!await TryWriteLauncherFailureAsync(
-                    arguments.ResultPath, request, artifact, expectedInputHash,
-                    expectedVersions, WorkerRunStatus.Failed,
-                    WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
-                    "The worker result was unavailable or malformed.").ConfigureAwait(false))
+            var repaired = TryReadUnboundWorkerFailure(
+                arguments.ResultPath, out var unboundFailure);
+            if (repaired)
             {
-                return 3;
+                if (!await TryWriteLauncherFailureAsync(
+                        arguments.ResultPath, request, artifact, expectedInputHash,
+                        expectedVersions, unboundFailure!.Status,
+                        unboundFailure.Reason, unboundFailure.Code,
+                        unboundFailure.Message,
+                        unboundFailure.CallableReason,
+                        unboundFailure.ClaimReason).ConfigureAwait(false))
+                {
+                    return 3;
+                }
+            }
+            else
+            {
+                exitCode = NormalizeNoResultExitCode(exitCode);
+                if (!await TryWriteLauncherFailureAsync(
+                        arguments.ResultPath, request, artifact, expectedInputHash,
+                        expectedVersions, WorkerRunStatus.Failed,
+                        WorkerRunFailureReason.MalformedResult, "worker.malformed_result",
+                        "The worker result was unavailable or malformed.").ConfigureAwait(false))
+                {
+                    return 3;
+                }
             }
             resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
                 artifact.Manifest, expectedVersions,
@@ -876,19 +894,136 @@ internal static class Program
         internal Dictionary<string, byte[]> Content { get; }
     }
 
+    private sealed record UnboundWorkerFailure(
+        WorkerRunStatus Status,
+        WorkerRunFailureReason Reason,
+        WorkerCallableCoverageReason CallableReason,
+        WorkerClaimReason ClaimReason,
+        string Code,
+        string Message);
+
+    private static bool TryReadUnboundWorkerFailure(
+        string path, out UnboundWorkerFailure? failure)
+    {
+        failure = null;
+        WorkerVerifyResponse? response;
+        try
+        {
+            response = WorkerProtocolJson.DeserializeResponse(
+                WorkerProtocolJson.ReadUtf8File(path));
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or IOException or InvalidDataException or
+                UnauthorizedAccessException or JsonException)
+        {
+            return false;
+        }
+
+        if (response == null || !WorkerProtocolJson.Validate(response).IsValid ||
+            response.RequestHash != WorkerProtocolVersions.EmptySha256 ||
+            response.InputHash != WorkerProtocolVersions.EmptySha256 ||
+            response.Manifest == null ||
+            response.Manifest.Callables.Length != 0 ||
+            response.Manifest.Claims.Length != 0 ||
+            response.CallableResults.Length != 0 ||
+            response.ClaimResults.Length != 0 ||
+            response.Summary == null ||
+            response.Summary.CacheStatus != WorkerCacheStatus.Disabled ||
+            response.Summary.CacheHit ||
+            response.Errors.Length != 1)
+        {
+            return false;
+        }
+
+        var error = response.Errors[0];
+        if (error == null)
+        {
+            return false;
+        }
+
+        (WorkerRunStatus Status, WorkerRunFailureReason Reason,
+            WorkerCallableCoverageReason CallableReason,
+            WorkerClaimReason ClaimReason)? projection = error.Code switch
+            {
+                "worker.timeout" when response.RunStatus == WorkerRunStatus.TimedOut &&
+                    response.FailureReason == WorkerRunFailureReason.None =>
+                    (WorkerRunStatus.TimedOut, WorkerRunFailureReason.None,
+                        WorkerCallableCoverageReason.ProjectTimeout,
+                        WorkerClaimReason.ProjectTimeout),
+                "worker.canceled" when response.RunStatus == WorkerRunStatus.Canceled &&
+                    response.FailureReason == WorkerRunFailureReason.None =>
+                    (WorkerRunStatus.Canceled, WorkerRunFailureReason.None,
+                        WorkerCallableCoverageReason.Canceled,
+                        WorkerClaimReason.Canceled),
+                "request.malformed" when response.RunStatus == WorkerRunStatus.Failed &&
+                    response.FailureReason == WorkerRunFailureReason.InvalidRequest =>
+                    (WorkerRunStatus.Failed, WorkerRunFailureReason.InvalidRequest,
+                        WorkerCallableCoverageReason.InfrastructureFailure,
+                        WorkerClaimReason.InfrastructureFailure),
+                "compiler_manifest.unavailable" or "input.unavailable"
+                    when response.RunStatus == WorkerRunStatus.Failed &&
+                        response.FailureReason == WorkerRunFailureReason.InputUnavailable =>
+                    (WorkerRunStatus.Failed, WorkerRunFailureReason.InputUnavailable,
+                        WorkerCallableCoverageReason.InfrastructureFailure,
+                        WorkerClaimReason.InfrastructureFailure),
+                "compiler_manifest.invalid" when response.RunStatus == WorkerRunStatus.Failed &&
+                    response.FailureReason == WorkerRunFailureReason.CompilerManifestMismatch =>
+                    (WorkerRunStatus.Failed, WorkerRunFailureReason.CompilerManifestMismatch,
+                        WorkerCallableCoverageReason.InfrastructureFailure,
+                        WorkerClaimReason.InfrastructureFailure),
+                "backend.unavailable" when response.RunStatus == WorkerRunStatus.Failed &&
+                    response.FailureReason == WorkerRunFailureReason.BackendUnavailable =>
+                    (WorkerRunStatus.Failed, WorkerRunFailureReason.BackendUnavailable,
+                        WorkerCallableCoverageReason.InfrastructureFailure,
+                        WorkerClaimReason.InfrastructureFailure),
+                "worker.infrastructure" when response.RunStatus == WorkerRunStatus.Failed &&
+                    response.FailureReason == WorkerRunFailureReason.InfrastructureFailure =>
+                    (WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure,
+                        WorkerCallableCoverageReason.InfrastructureFailure,
+                        WorkerClaimReason.InfrastructureFailure),
+                _ => null
+            };
+        if (!projection.HasValue)
+        {
+            return false;
+        }
+
+        failure = new UnboundWorkerFailure(
+            projection.Value.Status,
+            projection.Value.Reason,
+            projection.Value.CallableReason,
+            projection.Value.ClaimReason,
+            error.Code,
+            error.Message);
+        return true;
+    }
+
     private static Task WriteLauncherFailureAsync(
         string path, WorkerVerifyRequest request, CompilerManifestArtifact artifact,
         string expectedInputHash, WorkerVersionSummary expectedVersions,
         WorkerRunStatus status,
-        WorkerRunFailureReason reason, string code, string message)
+        WorkerRunFailureReason reason, string code, string message,
+        WorkerCallableCoverageReason? callableReason = null,
+        WorkerClaimReason? claimReason = null)
     {
-        var timeout = status == WorkerRunStatus.TimedOut;
+        callableReason ??= status switch
+        {
+            WorkerRunStatus.Canceled => WorkerCallableCoverageReason.Canceled,
+            WorkerRunStatus.TimedOut => WorkerCallableCoverageReason.ProjectTimeout,
+            _ => WorkerCallableCoverageReason.InfrastructureFailure
+        };
+        claimReason ??= status switch
+        {
+            WorkerRunStatus.Canceled => WorkerClaimReason.Canceled,
+            WorkerRunStatus.TimedOut => WorkerClaimReason.ProjectTimeout,
+            _ => WorkerClaimReason.InfrastructureFailure
+        };
         var response = WorkerResultAssembler.CreateIncomplete(
             expectedInputHash,
             WorkerProtocolJson.ComputeRequestHash(request),
             artifact.Manifest, request.Budgets, status, reason,
-            timeout ? WorkerCallableCoverageReason.ProjectTimeout : WorkerCallableCoverageReason.InfrastructureFailure,
-            timeout ? WorkerClaimReason.ProjectTimeout : WorkerClaimReason.InfrastructureFailure,
+            callableReason.Value,
+            claimReason.Value,
             [new WorkerProtocolError { Code = code, Message = message }],
             expectedVersions);
         return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeResponse(response));
@@ -903,7 +1038,9 @@ internal static class Program
         WorkerRunStatus status,
         WorkerRunFailureReason reason,
         string code,
-        string message)
+        string message,
+        WorkerCallableCoverageReason? callableReason = null,
+        WorkerClaimReason? claimReason = null)
     {
         try
         {
@@ -916,7 +1053,9 @@ internal static class Program
                 status,
                 reason,
                 code,
-                message).ConfigureAwait(false);
+                message,
+                callableReason,
+                claimReason).ConfigureAwait(false);
             return true;
         }
         catch (Exception exception) when (
