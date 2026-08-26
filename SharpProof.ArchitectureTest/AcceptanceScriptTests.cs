@@ -13,6 +13,8 @@ public sealed class AcceptanceScriptTests
     [TestCase("nonzero-restore", true)]
     [TestCase("boundary-equality", true)]
     [TestCase("restore-failure", true)]
+    [TestCase("skipped-phase", true)]
+    [TestCase("too-many-partial", false)]
     [TestCase("phase-order", false)]
     [TestCase("phase-overlap", false)]
     [TestCase("before-start", false)]
