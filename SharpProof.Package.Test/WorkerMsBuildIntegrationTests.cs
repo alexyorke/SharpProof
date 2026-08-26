@@ -1659,6 +1659,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 WorkerRunFailureReason.BackendUnavailable, 3),
             ("worker.infrastructure", WorkerRunStatus.Failed,
                 WorkerRunFailureReason.InfrastructureFailure, 3),
+            ("worker.response_too_large", WorkerRunStatus.Failed,
+                WorkerRunFailureReason.InfrastructureFailure, 3),
             ("worker.canceled", WorkerRunStatus.Canceled,
                 WorkerRunFailureReason.None, 4),
             ("worker.timeout", WorkerRunStatus.TimedOut,
@@ -1681,13 +1683,16 @@ public sealed class WorkerMsBuildIntegrationTests
                     "--assumption-policy", "allow"
                 ],
                 static path => WorkerBinaryIdentity.ComputeSha256(path),
-                (arguments, _, _, _) =>
+                (arguments, request, _, _) =>
                 {
                     var emptyManifest = new WorkerClaimManifest();
                     WorkerProtocolJson.SealManifest(emptyManifest);
                     var placeholder = new WorkerVerifyResponse
                     {
-                        RequestHash = WorkerProtocolVersions.EmptySha256,
+                        RequestHash = code is "compiler_manifest.unavailable" or
+                            "compiler_manifest.invalid" or "input.unavailable"
+                            ? WorkerProtocolJson.ComputeRequestHash(request)
+                            : WorkerProtocolVersions.EmptySha256,
                         InputHash = WorkerProtocolVersions.EmptySha256,
                         Manifest = emptyManifest,
                         RunStatus = status,

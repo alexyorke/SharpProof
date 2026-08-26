@@ -188,7 +188,9 @@ internal static class Program
         if (!validResponse)
         {
             var repaired = TryReadUnboundWorkerFailure(
-                arguments.ResultPath, out var unboundFailure);
+                arguments.ResultPath,
+                WorkerProtocolJson.ComputeRequestHash(request),
+                out var unboundFailure);
             if (repaired)
             {
                 if (!await TryWriteLauncherFailureAsync(
@@ -931,7 +933,9 @@ internal static class Program
     }
 
     private static bool TryReadUnboundWorkerFailure(
-        string path, out UnboundWorkerFailure? failure)
+        string path,
+        string expectedRequestHash,
+        out UnboundWorkerFailure? failure)
     {
         failure = null;
         WorkerVerifyResponse? response;
@@ -948,7 +952,8 @@ internal static class Program
         }
 
         if (response == null || !WorkerProtocolJson.Validate(response).IsValid ||
-            response.RequestHash != WorkerProtocolVersions.EmptySha256 ||
+            (response.RequestHash != WorkerProtocolVersions.EmptySha256 &&
+                response.RequestHash != expectedRequestHash) ||
             response.InputHash != WorkerProtocolVersions.EmptySha256 ||
             response.Manifest == null ||
             response.Manifest.Callables.Length != 0 ||
@@ -1005,6 +1010,11 @@ internal static class Program
                         WorkerCallableCoverageReason.InfrastructureFailure,
                         WorkerClaimReason.InfrastructureFailure),
                 "worker.infrastructure" when response.RunStatus == WorkerRunStatus.Failed &&
+                    response.FailureReason == WorkerRunFailureReason.InfrastructureFailure =>
+                    (WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure,
+                        WorkerCallableCoverageReason.InfrastructureFailure,
+                        WorkerClaimReason.InfrastructureFailure),
+                "worker.response_too_large" when response.RunStatus == WorkerRunStatus.Failed &&
                     response.FailureReason == WorkerRunFailureReason.InfrastructureFailure =>
                     (WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure,
                         WorkerCallableCoverageReason.InfrastructureFailure,
