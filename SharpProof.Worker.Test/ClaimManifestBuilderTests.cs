@@ -932,6 +932,67 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void InterfaceTrustedAttributeCreatesAnImplementationBoundaryAssumption()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            [SharpProofTrusted("reviewed interface boundary")]
+            public interface IService
+            {
+                int Map(int value);
+            }
+
+            public sealed class Service : IService
+            {
+                public int Map(int value) => value;
+            }
+            """));
+
+        var implementation = result.Targets.Values.Single(target =>
+            target.Method.ContainingType.Name == "Service" &&
+            target.Method.Name == "Map");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(implementation.Entry.SelectedFeatures,
+                Does.Contain(WorkerSelectedFeature.Contracts));
+            Assert.That(
+                implementation.Entry.Assumptions,
+                Has.One.Matches<WorkerAssumptionEvidence>(assumption =>
+                    assumption.Kind == WorkerAssumptionKind.TrustedBoundary));
+        }
+    }
+
+    [Test]
+    public void ExplicitInterfaceImplementationUsesTheSupportedCallableSet()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public interface IService
+            {
+                int Map(int value);
+            }
+
+            public sealed class Service : IService
+            {
+                [EnforcePure]
+                int IService.Map(int value) => value;
+            }
+            """));
+
+        var implementation = result.Targets.Values.Single(target =>
+            target.Method.MethodKind == MethodKind.ExplicitInterfaceImplementation);
+
+        Assert.That(implementation.IsVerifierSupported, Is.True);
+    }
+
+    [Test]
     public void AnonymousCallablesHaveUniqueStableIdsAndRemainUnsupported()
     {
         var first = Build((

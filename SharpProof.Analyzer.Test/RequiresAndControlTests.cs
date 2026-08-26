@@ -2707,6 +2707,36 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task InterfaceSuppressionAppliesToImplementingCallable()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            [SharpProofSuppress("reviewed interface boundary")]
+            public interface IFixture
+            {
+                void Run();
+            }
+
+            public sealed class Fixture : IFixture
+            {
+                private static int state;
+
+                [EnforcePure]
+                public void Run()
+                {
+                    state = 1;
+                }
+            }
+            """,
+            "effects",
+            ["SP0002", "SP0024"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task EmptyControlReasonsReportUsageAndDoNotSuppress()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

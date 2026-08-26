@@ -101,7 +101,8 @@ internal sealed partial class ClaimManifestBuilder(
                  MethodKind.PropertyGet or
                  MethodKind.PropertySet or
                  MethodKind.EventAdd or
-                 MethodKind.EventRemove) &&
+                 MethodKind.EventRemove or
+                 MethodKind.ExplicitInterfaceImplementation) &&
             !(analyzerEffectsSelected && HasStaticStateMutation(target)) &&
             selectedSubset.IsSupported;
         var location = CallableLocation(target, seed.Declaration);
