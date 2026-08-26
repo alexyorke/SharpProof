@@ -773,6 +773,43 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    public void PublishedProtocolFilesAreSizeBoundedBeforeDeserialization()
+    {
+        var directory = Directory.CreateTempSubdirectory("sharpproof-result-limit-");
+        try
+        {
+            var request = Path.Combine(directory.FullName, "request.json");
+            var result = Path.Combine(directory.FullName, "result.json");
+            var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
+            File.WriteAllText(manifest, "{}");
+            using (var stream = File.Create(request))
+            {
+                stream.SetLength(WorkerProtocolJson.MaximumJsonBytes + 1L);
+            }
+
+            var engine = new RecordingBuildEngine();
+            var task = new ValidatePublishedVerificationResult
+            {
+                BuildEngine = engine,
+                RequestPath = request,
+                ResultPath = result,
+                ManifestPath = manifest
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            Assert.That(
+                engine.Errors.Select(static error => error.Message),
+                Has.Some.Contains("exceeds the " +
+                    WorkerProtocolJson.MaximumJsonBytes.ToString(
+                        CultureInfo.InvariantCulture) + " byte limit"));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void CanceledVerifierTaskDoesNotLaunchAProcess()
     {
         var engine = new RecordingBuildEngine();
