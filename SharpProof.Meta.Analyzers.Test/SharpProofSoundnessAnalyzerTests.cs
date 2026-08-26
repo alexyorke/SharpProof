@@ -1053,6 +1053,24 @@ public sealed class SharpProofSoundnessAnalyzerTests
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [Test]
+    public async Task RejectsReadonlyMutableStaticCollections()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System.Collections.Generic;
+            namespace SharpProof.Analyzer;
+            static class C {
+                internal static readonly int[] Values = new int[1];
+                internal static readonly List<int> Answers = new();
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(2));
+    }
+
     [TestCase(
         "true ? await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Failed)) : await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Canceled))")]
     [TestCase(

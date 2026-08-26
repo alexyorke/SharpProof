@@ -73,6 +73,21 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "ToDisplayParts",
         "ToMinimalDisplayString",
         "ToMinimalDisplayParts");
+    private static readonly ImmutableHashSet<string> MutableCollectionNames = Names(
+        "BlockingCollection",
+        "ConcurrentBag",
+        "ConcurrentDictionary",
+        "ConcurrentQueue",
+        "ConcurrentStack",
+        "Dictionary",
+        "HashSet",
+        "LinkedList",
+        "List",
+        "Queue",
+        "SortedDictionary",
+        "SortedList",
+        "SortedSet",
+        "Stack");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => MetaDiagnosticDescriptors.All;
 
@@ -415,7 +430,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (!field.IsReadOnly && IsForbiddenMutableStaticStorage(field))
+        if (IsForbiddenMutableStaticStorage(field) &&
+            (!field.IsReadOnly || IsMutableReferenceStorage(field.Type)))
         {
             Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
         }
@@ -460,6 +476,38 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         return symbol.IsStatic &&
             IsCriticalStateNamespace(symbol.ContainingNamespace);
+    }
+
+    private static bool IsMutableReferenceStorage(ITypeSymbol type)
+    {
+        if (type is IArrayTypeSymbol)
+        {
+            return true;
+        }
+
+        if (type is not INamedTypeSymbol named)
+        {
+            return false;
+        }
+
+        if (IsExactNamespace(
+                named.ContainingNamespace,
+                "System",
+                "Collections",
+                "Generic") &&
+            MutableCollectionNames.Contains(named.Name))
+        {
+            return true;
+        }
+
+        return named.AllInterfaces.Any(interfaceType =>
+            IsExactNamespace(
+                interfaceType.ContainingNamespace,
+                "System",
+                "Collections",
+                "Generic") &&
+            interfaceType.Name is "ICollection" or "IDictionary" or
+                "IList" or "ISet");
     }
 
     private static bool IsAutoProperty(
