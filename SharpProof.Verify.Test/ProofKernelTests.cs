@@ -408,6 +408,24 @@ public sealed class ProofKernelTests
     }
 
     [Test]
+    public async Task DefaultUnsatCoreCannotCreateAProof()
+    {
+        var fixture = CreateFixture();
+        var outcome = await new ProofKernel(new StubBackend(new BackendCheckResult(
+                BackendCheckStatus.Unsatisfiable,
+                default,
+                null,
+                BackendFailureReason.None,
+                new BackendCheckResult.StorageTag())))
+            .VerifyAsync(fixture.Query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.MalformedBackendResult));
+    }
+
+    [Test]
     public async Task SatisfiableResultCannotCarryUnsatCore()
     {
         var fixture = CreateFixture();
