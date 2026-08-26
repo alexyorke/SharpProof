@@ -184,7 +184,7 @@ public static partial class WorkerProtocolJson
         return ValidateResponse(response, expectedInputHash, expectedManifest, null, null, null);
     }
 
-    internal static WorkerProtocolValidationResult Validate(
+    public static WorkerProtocolValidationResult Validate(
         WorkerVerifyResponse? response, string expectedInputHash,
         WorkerClaimManifest? expectedManifest,
         IWorkerResponseEvidenceAuthority evidenceAuthority)
@@ -228,7 +228,7 @@ public static partial class WorkerProtocolJson
             maximumElapsedMilliseconds);
     }
 
-    internal static WorkerProtocolValidationResult ValidateForRequest(
+    public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
         WorkerVersionSummary expectedVersions,

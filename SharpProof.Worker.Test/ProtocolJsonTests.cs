@@ -863,6 +863,71 @@ public sealed class ProtocolJsonTests
             Does.Contain("response.input_mismatch"));
     }
 
+    [Test]
+    public void PublicEvidenceAuthorityOverloadsPreserveLegacyValidation()
+    {
+        var manifest = CreateManifest();
+        var response = CreateResponse(manifest);
+        var request = CreateRequest();
+        response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        var authority = new RejectingEvidenceAuthority();
+
+        var legacyRequestValidation = WorkerProtocolJson.ValidateForRequest(
+            response,
+            response.RequestHash,
+            InputHash,
+            manifest,
+            request,
+            CreateExpectedVersions());
+        var authorityRequestValidation = WorkerProtocolJson.ValidateForRequest(
+            response,
+            response.RequestHash,
+            InputHash,
+            manifest,
+            request,
+            CreateExpectedVersions(),
+            authority);
+        var legacyValidation = WorkerProtocolJson.Validate(
+            response,
+            InputHash,
+            manifest);
+        var authorityValidation = WorkerProtocolJson.Validate(
+            response,
+            InputHash,
+            manifest,
+            authority);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                typeof(IWorkerResponseEvidenceAuthority).IsPublic,
+                Is.True);
+            Assert.That(legacyRequestValidation.IsValid, Is.True);
+            Assert.That(legacyValidation.IsValid, Is.True);
+            Assert.That(
+                authorityRequestValidation.Errors.Select(static error => error.Code),
+                Does.Contain("response.test_authority"));
+            Assert.That(
+                authorityValidation.Errors.Select(static error => error.Code),
+                Does.Contain("response.test_authority"));
+            Assert.That(authority.CallCount, Is.EqualTo(2));
+        }
+    }
+
+    private sealed class RejectingEvidenceAuthority : IWorkerResponseEvidenceAuthority
+    {
+        private int _callCount;
+
+        internal int CallCount => _callCount;
+
+        public IEnumerable<string> Validate(WorkerVerifyResponse response)
+        {
+            ArgumentNullException.ThrowIfNull(response);
+            _callCount++;
+            return ["response.test_authority"];
+        }
+    }
+
     [TestCase(nameof(WorkerVersionSummary.WorkerVersion))]
     [TestCase(nameof(WorkerVersionSummary.ApiSpecVersion))]
     [TestCase(nameof(WorkerVersionSummary.WorkerBinarySha256))]
