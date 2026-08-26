@@ -319,16 +319,6 @@ The numbered entries below were produced by the read-only hunter pass and vetted
 3. Observe acceptance: FindVisibleFileSystemType hits the default arm, UnsupportedRemoteFileSystems.Contains("local") is false, and the path is returned canonical; contrast an NFS mount, which is rejected with the explicit filesystem message.
 **Confidence**: Medium (switch contents, default-arm admission, and fallback-only reachability verified by inspection; severity depends on deployments publishing onto non-table filesystems - common on shared CI homes).
 
-### 314. LinuxFileSystemStats Marshals f_fsid as Two 8-Byte Fields - the Struct Is 128 Bytes vs the 120-Byte x86_64 struct statfs ABI, Misaligning f_namelen/f_frsize/f_flags for Any Future Reader
-
-**Location**: `SharpProof.Host\LinuxPathIdentity.cs` (Struct LinuxFileSystemStats Lines ~1506-1525 with _filesystemId0/_filesystemId1 declared long at ~1516-1517; P/Invoke StatFs; sole reader FindVisibleFileSystemType reading only stats.Type today). Contrast sibling `LinuxStat` (Lines 1484-1504), field-by-field correct against struct stat64 at 144 bytes.
-**Description**: On linux-x86_64 the UAPI struct statfs lays out f_type...f_ffree as seven 8-byte fields (offsets 0-55), then __kernel_fsid_t f_fsid - defined as { int val[2] }, i.e., two 4-byte ints totaling 8 bytes - at offset 56, followed by f_namelen@64, f_frsize@72, f_flags@80, f_spare[4]@88-119: sizeof == 120. The C# mirror declares f_fsid as two sequential longs (16 bytes), pushing NameLength to offset 72 (actually f_frsize), FragmentSize to 80 (actually f_flags), MountFlags to 88 (first spare), and growing the blitted buffer to 128 bytes. Today only stats.Type (offset 0) is read, so the defect is latent - the kernel's 120-byte write stays in-bounds and f_type is correct - but the struct is the project's declared ABI contract for statfs on a public static partial class surface, and any future consumer of f_namelen/f_flags (e.g., checking ST_NOSUID/ST_RDONLY mounts, a natural hardening follow-up to #313) will silently read the neighboring field. Distinct from #272 (which inventories the NativeMethods surface but reports only missing fd-pinning/openat2): no entry examines P/Invoke struct layouts.
-**Reproduction Steps**:
-1. Compile a probe assigning sizeof(LinuxFileSystemStats) via reflection or unsafe in a Linux container: result is 128.
-2. `statfs -f -c %n` on any ext4 mount reports maximum filename length 255; marshal the same mount through LinuxFileSystemStats and read NameLength (offset 72): the value is f_frsize (typically 4096), not 255.
-3. Fix _filesystemId0/_filesystemId1 to an int pair: size becomes 120 and NameLength reads 255, confirming the shift.
-**Confidence**: High (divergence derived field-by-field from the x86_64 UAPI definition and cross-checked against the correct sibling); impact latent because only offset 0 is consumed today.
-
 ### 315. Natural Worker Exit Never Sweeps the Session/Process Group - Orphaned Worker Descendants Survive the Success Path While Every Failure Path Group-Kills
 
 **Location**: `SharpProof.Host\LinuxWorkerProcess.cs` (Exited return Lines 140-143; Dispose early-out at ~Line 180 skipping Terminate when process.HasExited; contrast Terminate ending in KillProcessGroup(process.Id) at Line 240 and TerminateNow at Lines 257-267; session creation via /usr/bin/setsid Lines 34, 57).
