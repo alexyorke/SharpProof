@@ -184,13 +184,14 @@ public sealed class CompilerSourceLocationAuthorityTests
             "#line 42 \"mapped.cs\"\n" +
             "internal sealed class Subject {}\n");
         var tree = artifact.Compilation.SyntaxTrees.Single();
+        var mappedLine = tree.LineMap.First(entry => entry.SourceStart > 0);
         var location = new WorkerSourceLocation
         {
-            Path = "mapped.cs",
-            Start = 0,
+            Path = mappedLine.MappedPath,
+            Start = mappedLine.SourceStart,
             Length = 0,
-            Line = 42,
-            Column = 1
+            Line = mappedLine.MappedLine + 1,
+            Column = mappedLine.MappedColumn + 1
         };
         var context = new CompilerSourceLocationAuthority.ValidationContext();
 
