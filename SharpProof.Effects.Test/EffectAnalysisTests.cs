@@ -107,7 +107,6 @@ public sealed class EffectAnalysisTests
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
-            using System.Collections.Generic;
 
             public static class Sample {
                 private static int s_state;
@@ -3852,6 +3851,50 @@ public sealed class EffectAnalysisTests
                 SharpProofEffect.WritesArgumentState |
                 SharpProofEffect.Throws));
         Assert.That(result.Projection.IsComplete, Is.True);
+    }
+
+    [Test]
+    public void RuntimeBoundReferenceLocalsRemainConservative()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Collections.Generic;
+
+            public sealed class Box : Exception {
+                public int Value;
+            }
+
+            public static class Sample {
+                public static void ForeachMutates(Box[] values) {
+                    foreach (var value in values) {
+                        value.Value = 1;
+                    }
+                }
+
+                public static void CatchMutates(Box value) {
+                    try {
+                        throw value;
+                    }
+                    catch (Box exception) {
+                        exception.Value = 1;
+                    }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var foreachSummary = session.Analyze(
+            Method(compilation, "ForeachMutates")).Summary;
+        var catchSummary = session.Analyze(
+            Method(compilation, "CatchMutates")).Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                foreachSummary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(catchSummary.Writes.IsUnknown, Is.True);
+        }
     }
 
     [Test]

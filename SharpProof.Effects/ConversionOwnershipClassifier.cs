@@ -125,7 +125,15 @@ internal sealed class ConversionOwnershipClassifier
                 _localRegions.Add(declarator.Symbol, EffectRegionSet.Empty);
             }
         }
-
+        foreach (var @catch in relevant.OfType<ICatchClauseOperation>())
+        {
+            foreach (var declarator in @catch.ExceptionDeclarationOrExpression?
+                         .DescendantsAndSelf()
+                         .OfType<IVariableDeclaratorOperation>() ?? [])
+            {
+                _localRegions[declarator.Symbol] = EffectRegionSet.Unknown;
+            }
+        }
         var changed = true;
         while (changed)
         {
@@ -135,6 +143,34 @@ internal sealed class ConversionOwnershipClassifier
                 if (!isReachable(operation))
                 {
                     continue;
+                }
+
+                if (operation is IForEachLoopOperation forEach)
+                {
+                    foreach (var loopVariable in forEach.LoopControlVariable
+                                 .DescendantsAndSelf()
+                                 .OfType<IVariableDeclaratorOperation>())
+                    {
+                        var previousLoopRegions = _localRegions.TryGetValue(
+                            loopVariable.Symbol,
+                            out var loopRegions)
+                                ? loopRegions
+                                : EffectRegionSet.Empty;
+                        var discoveredLoopRegions = loopVariable.Symbol.Type.IsValueType &&
+                            !loopVariable.Symbol.Type.IsRefLikeType &&
+                            loopVariable.Symbol.RefKind == RefKind.None
+                                ? EffectRegionSet.Empty
+                                : ClassifyRegion(
+                                    forEach.Collection,
+                                    aliasSource: true);
+                        var joinedLoopRegions = previousLoopRegions.Union(
+                            discoveredLoopRegions);
+                        if (joinedLoopRegions != previousLoopRegions)
+                        {
+                            _localRegions[loopVariable.Symbol] = joinedLoopRegions;
+                            changed = true;
+                        }
+                    }
                 }
 
                 if (operation is IInvocationOperation invocation)
