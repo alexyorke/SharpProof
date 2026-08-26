@@ -454,6 +454,19 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void InstanceReferencesRespectTheSupportedValueDomain()
+    {
+        AssertClassification(
+            "public struct Box { public Box Target() => this; }",
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+        AssertClassification(
+            "public sealed class Box { public Box Target() => this; }",
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+    }
+
+    [Test]
     public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
     {
         var classification = default(FrontendSubsetClassification);

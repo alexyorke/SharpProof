@@ -537,7 +537,9 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitInstanceReference(
             IInstanceReferenceOperation operation, LoweringContext argument)
         {
-            return LoweredExpression.Exact(_owner.GetInstance(operation));
+            return _owner.IsSupportedValueDomain(operation.Type)
+                ? LoweredExpression.Exact(_owner.GetInstance(operation))
+                : _owner.Opaque(operation, FrontendAbstention.UnsupportedType);
         }
 
         public override LoweredExpression VisitDefaultValue(
