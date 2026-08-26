@@ -23,6 +23,10 @@ public abstract class ProofOutcome
     }
 }
 
+internal interface ISemanticCache
+{
+}
+
 public sealed partial class ProvenOutcome : ProofOutcome
 {
 }

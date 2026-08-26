@@ -42,11 +42,12 @@ public static class PartialTermSmtCaseGenerator
         var divisor = factory.CreateVariable(
             "partial-divisor",
             factory.IntegerType);
+        var numerator = (seed & 32) == 0 ? long.MinValue : -5L;
         var arithmetic = factory.Binary(
             (seed & 1) == 0
                 ? IrBinaryOperator.Divide
                 : IrBinaryOperator.Remainder,
-            factory.Integer(long.MinValue),
+            factory.Integer(numerator),
             factory.Variable(divisor));
         var comparison = factory.Binary(
             IrBinaryOperator.Equal,
@@ -61,7 +62,10 @@ public static class PartialTermSmtCaseGenerator
             comparison);
         var shortCircuitGuard = useOrElse;
         var undefinedGuard = !shortCircuitGuard;
-        var undefinedDivisor = (seed & 4) == 0 ? 0L : -1L;
+        var exceptionalDivisor = (seed & 4) == 0 ? 0L : -1L;
+        var evaluatedDivisor = (seed & 8) == 0
+            ? exceptionalDivisor
+            : (seed & 16) == 0 ? 2L : 3L;
 
         return new PartialTermSmtCase(
             formula,
@@ -71,13 +75,13 @@ public static class PartialTermSmtCaseGenerator
                     guard,
                     shortCircuitGuard,
                     divisor,
-                    undefinedDivisor),
+                    evaluatedDivisor),
                 Scenario(
                     factory,
                     guard,
                     undefinedGuard,
                     divisor,
-                    undefinedDivisor)
+                    evaluatedDivisor)
             ]);
     }
 

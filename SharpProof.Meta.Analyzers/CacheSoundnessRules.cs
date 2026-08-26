@@ -12,10 +12,15 @@ internal static class CacheSoundnessRules
         new[] { "Add", "AddOrUpdate", "GetOrAdd", "Set", "TryAdd", "TryUpdate", "TryWrite", "TryWriteAsync", "Write", "WriteAsync" }
             .ToImmutableHashSet(StringComparer.Ordinal);
 
-    internal static void AnalyzeWrite(OperationAnalysisContext context, IInvocationOperation invocation)
+    internal static void AnalyzeWrite(
+        OperationAnalysisContext context,
+        IInvocationOperation invocation,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
     {
         if (!WriteMethods.Contains(invocation.TargetMethod.Name) ||
-            !IsCacheType(invocation.Instance?.Type ?? invocation.TargetMethod.ContainingType) ||
+            !IsCacheType(
+                invocation.Instance?.Type ?? invocation.TargetMethod.ContainingType,
+                symbols) ||
             !invocation.Arguments.Any(argument => IsNonCacheableSemanticAnswer(
                 argument.Value, Root(argument.Value),
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default))))
@@ -26,14 +31,23 @@ internal static class CacheSoundnessRules
         Report(context, invocation.Syntax.GetLocation());
     }
 
-    internal static void AnalyzeAssignment(OperationAnalysisContext context)
+    internal static void AnalyzeAssignment(
+        OperationAnalysisContext context,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
     {
         if (context.Operation is not IAssignmentOperation assignment)
         {
             return;
         }
-        if (assignment.Target is not IPropertyReferenceOperation property ||
-            !IsCacheType(property.Instance?.Type ?? property.Property.ContainingType) ||
+        var cacheType = assignment.Target switch
+        {
+            IPropertyReferenceOperation property =>
+                property.Instance?.Type ?? property.Property.ContainingType,
+            IFieldReferenceOperation field =>
+                field.Instance?.Type ?? field.Field.ContainingType,
+            _ => null
+        };
+        if (!IsCacheType(cacheType, symbols) ||
             !IsNonCacheableSemanticAnswer(
                 assignment.Value, Root(assignment),
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
@@ -50,9 +64,28 @@ internal static class CacheSoundnessRules
             MetaDiagnosticDescriptors.NonCacheableSemanticAnswer, location));
     }
 
-    private static bool IsCacheType(ITypeSymbol? type)
+    private static bool IsCacheType(
+        ITypeSymbol? type,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
     {
-        return type?.Name.IndexOf("Cache", StringComparison.Ordinal) >= 0;
+        return type != null &&
+            (IsSameType(
+                type,
+                symbols[SharpProofSoundnessAnalyzer.KnownType.SemanticCache]) ||
+             type.AllInterfaces.Any(interfaceType => IsSameType(
+                 interfaceType,
+                 symbols[SharpProofSoundnessAnalyzer.KnownType.SemanticCache])));
+    }
+
+    private static bool IsSameType(
+        ITypeSymbol? actual,
+        INamedTypeSymbol? expected)
+    {
+        return actual != null &&
+            expected != null &&
+            SymbolEqualityComparer.Default.Equals(
+                actual.OriginalDefinition,
+                expected.OriginalDefinition);
     }
 
     private static IOperation Root(IOperation operation)

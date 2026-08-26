@@ -304,6 +304,20 @@ public sealed class FuzzRunnerTests
                     GeneratedCSharpExpression.NullReference()),
                 Left: 0,
                 Right: 0,
+                Condition: false),
+            new GeneratedCSharpCase(
+                GeneratedCSharpExpression.Length(
+                    GeneratedCSharpExpression.String("\uD83D\uDE00")),
+                Left: 0,
+                Right: 0,
+                Condition: false),
+            new GeneratedCSharpCase(
+                GeneratedCSharpExpression.Binary(
+                    GeneratedExpressionKind.StringConcat,
+                    GeneratedCSharpExpression.String("\uD83D\uDE00"),
+                    GeneratedCSharpExpression.String("!")),
+                Left: 0,
+                Right: 0,
                 Condition: false)
         };
 
@@ -319,6 +333,8 @@ public sealed class FuzzRunnerTests
             results[1].ExceptionKind,
             Is.EqualTo(IrExceptionKind.IndexOutOfRange));
         Assert.That(results[2].ExceptionKind, Is.Null);
+        Assert.That(results[3].ExceptionKind, Is.Null);
+        Assert.That(results[4].ExceptionKind, Is.Null);
     }
 
     [Test]
@@ -399,6 +415,8 @@ public sealed class FuzzRunnerTests
 
     [TestCase(0, 0, 1, 1)]
     [TestCase(7, 1, 0, 1)]
+    [TestCase(8, 0, 2, 0)]
+    [TestCase(9, 1, 1, 0)]
     public async Task PartialTermOracleChecksShortCircuitAndUndefinedArithmetic(
         int seed,
         int expectedTrue,

@@ -9,6 +9,7 @@ using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using NUnit.Framework;
 using SharpProof.Effects;
 using SharpProof.Ir;
@@ -516,6 +517,87 @@ public sealed class ArchitectureTests
             "SharpProof.Verify/ProofKernel.cs.");
     }
 
+    [Test]
+    public void SemanticOutcomeBoundaryCoversNestedTargetTypedConstruction()
+    {
+        const string source = """
+            using System;
+            namespace SharpProof.Verify {
+                public sealed class ProvenOutcome {
+                    public ProvenOutcome(int value) { }
+                }
+                public sealed class RefutedOutcome {
+                    public RefutedOutcome(int value) { }
+                }
+                public sealed class ValidatedModel {
+                    public ValidatedModel(int value) { }
+                }
+                public static class ProofKernel {
+                    public static ProvenOutcome Allowed() => new(1);
+                }
+            }
+            namespace Other {
+                public sealed class ProvenOutcome {
+                    public ProvenOutcome(int value) { }
+                }
+            }
+            namespace Consumer {
+                using SharpProof.Verify;
+                sealed class Holder {
+                    public ProvenOutcome Outcome { get; set; } = new(0);
+                }
+                static class Probe {
+                    static void Consume(ProvenOutcome value) { }
+                    static void Argument() => Consume(new(1));
+                    static void Conditional(bool condition) =>
+                        Consume(condition ? new(1) : new(2));
+                    static Holder Initializer() =>
+                        new Holder { Outcome = new(3) };
+                    static Func<ProvenOutcome> Lambda() => () => new(4);
+                    static ProvenOutcome Assignment() {
+                        ProvenOutcome value = new(5);
+                        value = new(6);
+                        return value;
+                    }
+                    static Other.ProvenOutcome Lookalike() => new(7);
+                }
+            }
+            """;
+
+        var offenders = FindUnauthorizedOutcomeCreations(
+            source,
+            "semantic-fixture.cs",
+            PlatformReferences()).ToArray();
+
+        Assert.That(offenders, Has.Length.EqualTo(8));
+        Assert.That(
+            offenders,
+            Has.All.Contains("semantic-fixture.cs:"));
+    }
+
+    [Test]
+    public void SemanticOutcomeConstructorsStayInTheKernelAcrossAllContexts()
+    {
+        var productionFiles = ProductionProjects
+            .Append("SharpProof.Gates")
+            .SelectMany(ProductionSourceFiles)
+            .ToArray();
+        var offenders = productionFiles
+            .SelectMany(path => FindUnauthorizedOutcomeCreations(
+                File.ReadAllText(path),
+                Relative(path),
+                ProductionReferences()))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(
+            offenders,
+            Is.Empty,
+            "Proof-producing outcomes may only be constructed by " +
+            "SharpProof.Verify.ProofKernel.");
+    }
+
     private static IEnumerable<string> FindTargetTypedOutcomeCallers(
         string path,
         ISet<string> outcomeTypes)
@@ -543,6 +625,58 @@ public sealed class ArchitectureTests
             .Concat(returns)
             .Concat(arrows)
             .Select(_ => Relative(path));
+    }
+
+    private static IEnumerable<string> FindUnauthorizedOutcomeCreations(
+        string source,
+        string displayPath,
+        IEnumerable<MetadataReference> references)
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview));
+        var compilation = CSharpCompilation.Create(
+            "SharpProofArchitectureBoundary",
+            [tree],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var outcomeTypes = new[]
+        {
+            compilation.GetTypeByMetadataName("SharpProof.Verify.ProvenOutcome"),
+            compilation.GetTypeByMetadataName("SharpProof.Verify.RefutedOutcome"),
+            compilation.GetTypeByMetadataName("SharpProof.Verify.ValidatedModel")
+        };
+        var kernel = compilation.GetTypeByMetadataName(
+            "SharpProof.Verify.ProofKernel");
+
+        foreach (var syntax in tree.GetRoot()
+                     .DescendantNodes()
+                     .OfType<BaseObjectCreationExpressionSyntax>())
+        {
+            if (model.GetOperation(syntax) is not IObjectCreationOperation creation ||
+                creation.Type is not INamedTypeSymbol actual ||
+                !outcomeTypes.Any(expected => expected != null &&
+                    SymbolEqualityComparer.Default.Equals(
+                        actual.OriginalDefinition,
+                        expected.OriginalDefinition)))
+            {
+                continue;
+            }
+
+            var containingType = model.GetEnclosingSymbol(syntax.SpanStart)?.ContainingType;
+            if (kernel != null &&
+                containingType != null &&
+                SymbolEqualityComparer.Default.Equals(
+                    containingType.OriginalDefinition,
+                    kernel.OriginalDefinition))
+            {
+                continue;
+            }
+
+            var line = tree.GetLineSpan(syntax.Span).StartLinePosition.Line + 1;
+            yield return displayPath + ":" + line.ToString(CultureInfo.InvariantCulture);
+        }
     }
 
     private static bool IsOutcomeType(TypeSyntax? type, ISet<string> outcomeTypes)
@@ -2485,6 +2619,32 @@ public sealed class ArchitectureTests
     private static string Relative(string path)
     {
         return Path.GetRelativePath(RepositoryRoot(), path).Replace('\\', '/');
+    }
+
+    private static IEnumerable<MetadataReference> PlatformReferences()
+    {
+        var trustedAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
+            throw new InvalidOperationException(
+                "Trusted platform assemblies are unavailable.");
+        return trustedAssemblies
+            .Split(Path.PathSeparator)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(static path => MetadataReference.CreateFromFile(path));
+    }
+
+    private static IEnumerable<MetadataReference> ProductionReferences()
+    {
+        return PlatformReferences()
+            .Concat(new[]
+            {
+                typeof(ProvenOutcome).Assembly.Location,
+                typeof(EffectSummary).Assembly.Location,
+                typeof(IrTerm).Assembly.Location
+            }
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(static path => MetadataReference.CreateFromFile(path)));
     }
 
     private static string RepositoryRoot()

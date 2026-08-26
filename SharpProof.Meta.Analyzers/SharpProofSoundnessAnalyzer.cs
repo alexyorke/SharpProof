@@ -28,6 +28,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "SharpProof.Effects.EffectSummaryDomain", "SharpProof.Effects.EffectSummaryOperations",
         "SharpProof.Effects.ExternalEffectResolver", "SharpProof.Verify.ProvenOutcome",
         "SharpProof.Verify.RefutedOutcome", "SharpProof.Verify.ValidatedModel", "SharpProof.Worker.Program",
+        "SharpProof.Verify.ISemanticCache",
         "SharpProof.Worker.Launcher.Program", "SharpProof.Worker.SharpProofWorker",
         "SharpProof.Worker.CallableVerificationPolicy", "SharpProof.Worker.CallableVerificationResult",
         "SharpProof.Worker.Protocol.WorkerClaimReason",
@@ -84,7 +85,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             var symbols = new KnownSymbols(startContext.Compilation);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
             startContext.RegisterOperationAction(
-                CacheSoundnessRules.AnalyzeAssignment,
+                c => CacheSoundnessRules.AnalyzeAssignment(c, symbols),
                 OperationKind.SimpleAssignment,
                 OperationKind.CoalesceAssignment,
                 OperationKind.CompoundAssignment);
@@ -121,7 +122,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         AnalyzeSemanticEquals(context, invocation, symbols);
-        CacheSoundnessRules.AnalyzeWrite(context, invocation);
+        CacheSoundnessRules.AnalyzeWrite(context, invocation, symbols);
     }
 
     private static bool IsForbidden(
@@ -495,7 +496,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         PostconditionObligationBuilder,
         EffectSummary, EffectSummaryDomain,
         EffectSummaryOperations, ExternalEffectResolver, ProvenOutcome, RefutedOutcome,
-        ValidatedModel, WorkerProgram, WorkerLauncherProgram, SharpProofWorker,
+        ValidatedModel, WorkerProgram, SemanticCache, WorkerLauncherProgram, SharpProofWorker,
         CallableVerificationPolicy, CallableVerificationResult,
         WorkerClaimReason, WorkerCallableCoverageReason, WorkerVerifyRequest,
         WorkerVerifyResponse, WorkerResultAssembler, WorkerRunStatus

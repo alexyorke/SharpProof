@@ -363,6 +363,74 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task DynamicStringConcatRemainsAnExplicitFailClosedAbstention()
+    {
+        var factory = new IrFactory();
+        var condition = factory.CreateVariable("condition", factory.BooleanType);
+        var value = factory.Conditional(
+            factory.Variable(condition),
+            factory.String("sharp"),
+            factory.String("proof"));
+        var concatenated = factory.Binary(
+            IrBinaryOperator.StringConcat,
+            value,
+            factory.String("!"));
+        var goal = factory.Binary(
+            IrBinaryOperator.Equal,
+            concatenated,
+            factory.String("sharp!"));
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)),
+            [condition]);
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+    }
+
+    [Test]
+    public async Task DynamicStringLengthRemainsAnExplicitFailClosedAbstention()
+    {
+        var factory = new IrFactory();
+        var condition = factory.CreateVariable("condition", factory.BooleanType);
+        var value = factory.Conditional(
+            factory.Variable(condition),
+            factory.String("sharp"),
+            factory.String("proof"));
+        var goal = factory.Binary(
+            IrBinaryOperator.GreaterThan,
+            factory.Length(value),
+            factory.Integer(0));
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)),
+            [condition]);
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+    }
+
+    [Test]
     public async Task OpaqueTermsFailClosed()
     {
         var factory = new IrFactory();

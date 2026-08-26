@@ -218,8 +218,9 @@ public sealed class SharpProofSoundnessAnalyzerTests
     [TestCase(
         """
         namespace SharpProof.Verify;
+        internal interface ISemanticCache { }
         enum Answer { Unknown }
-        sealed class ProofCache {
+        sealed class ProofCache : ISemanticCache {
             internal void Add(string key, Answer answer) { }
         }
         sealed class C {
@@ -231,8 +232,9 @@ public sealed class SharpProofSoundnessAnalyzerTests
     [TestCase(
         """
         namespace SharpProof.Verify;
+        internal interface ISemanticCache { }
         enum Answer { Unknown }
-        sealed class ProofCache {
+        sealed class ProofCache : ISemanticCache {
             internal void Write(Answer answer) { }
         }
         sealed class C {
@@ -244,8 +246,9 @@ public sealed class SharpProofSoundnessAnalyzerTests
     [TestCase(
         """
         namespace SharpProof.Verify;
+        internal interface ISemanticCache { }
         sealed class ErrorAnswer { }
-        sealed class ProofCache {
+        sealed class ProofCache : ISemanticCache {
             internal void Set(ErrorAnswer answer) { }
         }
         sealed class C {
@@ -268,12 +271,13 @@ public sealed class SharpProofSoundnessAnalyzerTests
             """
             namespace SharpProof.Verify {
             using ExternalAnswer = Other.Answer;
+            internal interface ISemanticCache { }
             enum Answer { Unknown, TimedOut, Failed, Proven }
             sealed class AnswerSource {
                 internal Answer Unknown => Answer.Proven;
                 internal Answer CreateTimeout() => Answer.Proven;
             }
-            sealed class ProofCache {
+            sealed class ProofCache : ISemanticCache {
                 internal Answer this[string key] { set { } }
                 internal Answer Latest { get; set; }
                 internal Answer? Optional { get; set; }
@@ -340,8 +344,9 @@ public sealed class SharpProofSoundnessAnalyzerTests
         var diagnostics = await Analyze(
             """
             namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
             enum Answer { Unknown, Proven }
-            sealed class ProofCache {
+            sealed class ProofCache : ISemanticCache {
                 internal void Set(string key, Answer answer) { }
             }
             sealed class C {
@@ -358,6 +363,61 @@ public sealed class SharpProofSoundnessAnalyzerTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain("SPMETA010"));
+    }
+
+    [Test]
+    public async Task SemanticCacheMarkerIsRequiredForNameIndependentDetection()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { Unknown }
+            sealed class VerificationMemo : ISemanticCache {
+                internal void Set(Answer answer) { }
+            }
+            sealed class AnswerTable {
+                internal void Set(Answer answer) { }
+            }
+            sealed class C {
+                void M(VerificationMemo marked, AnswerTable unmarked) {
+                    marked.Set(Answer.Unknown);
+                    unmarked.Set(Answer.Unknown);
+                }
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+                Is.EqualTo(1));
+            Assert.That(
+                diagnostics.Single(static diagnostic => diagnostic.Id == "SPMETA010")
+                    .GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("Timeout"));
+        }
+    }
+
+    [Test]
+    public async Task SemanticCacheWritesRejectDirectFieldAssignments()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { Unknown }
+            sealed class AnswerTable : ISemanticCache {
+                internal Answer Latest;
+            }
+            sealed class C {
+                void M(AnswerTable cache) => cache.Latest = Answer.Unknown;
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(1));
     }
 
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]

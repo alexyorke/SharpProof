@@ -1,6 +1,6 @@
 namespace SharpProof.Worker;
 
-internal sealed partial class VerificationCache(string directory, long maximumBytes)
+internal sealed partial class VerificationCache(string directory, long maximumBytes) : ISemanticCache
 {
     private const int CacheLockRetryMilliseconds = 25;
     private static readonly TimeSpan CacheLockWait = TimeSpan.FromSeconds(1);
