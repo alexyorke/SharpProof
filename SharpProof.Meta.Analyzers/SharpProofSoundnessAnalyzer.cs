@@ -396,12 +396,30 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     private static string? GetCSharpExpressionFragment(IOperation operation)
     {
-        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value)
+        if (operation.ConstantValue.HasValue && operation.ConstantValue.Value is string value)
         {
-            return null;
+            var fragment = CSharpExpressionFragments.FirstOrDefault(candidate =>
+                value.IndexOf(candidate, StringComparison.Ordinal) >= 0);
+            if (fragment != null)
+            {
+                return fragment;
+            }
         }
 
-        return CSharpExpressionFragments.FirstOrDefault(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
+        // Array and collection expressions used by String.Concat do not carry a
+        // constant value themselves, but their literal elements still contribute
+        // to the emitted expression text. Walk the operation tree so those
+        // fragments cannot evade the construction rule.
+        foreach (var child in operation.ChildOperations)
+        {
+            var fragment = GetCSharpExpressionFragment(child);
+            if (fragment != null)
+            {
+                return fragment;
+            }
+        }
+
+        return null;
     }
 
     private static string? GetSemanticLiteral(IOperation operation)
@@ -510,14 +528,18 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return true;
         }
 
-        return named.AllInterfaces.Any(interfaceType =>
-            IsExactNamespace(
-                interfaceType.ContainingNamespace,
+        return IsMutableCollectionInterface(named) || named.AllInterfaces.Any(interfaceType =>
+            IsMutableCollectionInterface(interfaceType));
+    }
+
+    private static bool IsMutableCollectionInterface(INamedTypeSymbol type)
+    {
+        return IsExactNamespace(
+                type.ContainingNamespace,
                 "System",
                 "Collections",
                 "Generic") &&
-            interfaceType.Name is "ICollection" or "IDictionary" or
-                "IList" or "ISet");
+            type.Name is "ICollection" or "IDictionary" or "IList" or "ISet";
     }
 
     private static bool IsAutoProperty(

@@ -519,13 +519,16 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
                 static string Concat(string name) =>
                     string.Concat(name, " == ");
+
+                static string ConcatArray(string name) =>
+                    string.Concat(new[] { name, " != " });
             }
             """);
 
         Assert.That(
             diagnostics.Count(static diagnostic =>
                 diagnostic.Id == "SPMETA009"),
-            Is.EqualTo(2));
+            Is.EqualTo(3));
     }
 
     [Test]
@@ -1122,12 +1125,13 @@ public sealed class SharpProofSoundnessAnalyzerTests
             static class C {
                 internal static readonly int[] Values = new int[1];
                 internal static readonly List<int> Answers = new();
+                internal static readonly ICollection<int> InterfaceValues = new List<int>();
             }
             """);
 
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
-            Is.EqualTo(2));
+            Is.EqualTo(3));
     }
 
     [TestCase(
