@@ -10,6 +10,12 @@ namespace SharpProof.Gates;
 
 internal static class Program
 {
+    internal const int GateSuccessExitCode = 0;
+    internal const int GateThresholdFailureExitCode = 1;
+    internal const int GateUsageExitCode = 2;
+    internal const int GateInfrastructureFailureExitCode = 3;
+    internal const int GatePartialFailureExitCode = 4;
+
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
@@ -30,19 +36,7 @@ internal static class Program
             var command = args.Length == 0 ? "all" : args[0];
             if (command == "all")
             {
-                var corpus = await CorpusGate.RunAsync(root)
-                    .ConfigureAwait(false);
-                var performance = await PerformanceGate.RunAsync(root)
-                    .ConfigureAwait(false);
-                Console.WriteLine(
-                    JsonSerializer.Serialize(
-                        new
-                        {
-                            corpus,
-                            performance
-                        },
-                        JsonDefaults.Indented));
-                return corpus.Passed && performance.Passed ? 0 : 1;
+                return await RunAllAsync(root).ConfigureAwait(false);
             }
             if (command == "corpus")
             {
@@ -56,21 +50,23 @@ internal static class Program
                             result.Passed,
                             result),
                         JsonDefaults.Indented));
-                return result.Passed ? 0 : 1;
+                return result.Passed
+                    ? GateSuccessExitCode
+                    : GateThresholdFailureExitCode;
             }
             if (command == "corpus-print")
             {
                 Console.Write(
                     await CorpusGate.RenderActualSnapshotAsync()
                         .ConfigureAwait(false));
-                return 0;
+                return GateSuccessExitCode;
             }
             if (command == "corpus-update")
             {
                 await CorpusGate.WriteActualSnapshotAsync(root)
                     .ConfigureAwait(false);
                 Console.WriteLine("Updated the canonical corpus snapshot.");
-                return 0;
+                return GateSuccessExitCode;
             }
             if (command == "performance")
             {
@@ -84,7 +80,9 @@ internal static class Program
                             result.Passed,
                             result),
                         JsonDefaults.Indented));
-                return result.Passed ? 0 : 1;
+                return result.Passed
+                    ? GateSuccessExitCode
+                    : GateThresholdFailureExitCode;
             }
             if (command == "performance-smoke")
             {
@@ -92,19 +90,111 @@ internal static class Program
                     .ConfigureAwait(false);
                 Console.WriteLine(
                     JsonSerializer.Serialize(result, JsonDefaults.Indented));
-                return result.Passed ? 0 : 1;
+                return result.Passed
+                    ? GateSuccessExitCode
+                    : GateThresholdFailureExitCode;
             }
             Console.Error.WriteLine(
                 "Usage: SharpProof.Gates " +
                 "[all|corpus|corpus-print|corpus-update|performance|" +
                 "performance-smoke]");
-            return 2;
+            return GateUsageExitCode;
         }
         catch (Exception exception)
         {
             Console.Error.WriteLine(exception);
-            return 1;
+            return GateInfrastructureFailureExitCode;
         }
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Each gate phase is an executable boundary with a stable failure code and partial result.")]
+    internal static Task<int> RunAllAsync(string repositoryRoot)
+    {
+        return RunAllAsync(
+            repositoryRoot,
+            static root => CorpusGate.RunAsync(root),
+            static root => PerformanceGate.RunAsync(root));
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Each gate phase is an executable boundary with a stable failure code and partial result.")]
+    internal static async Task<int> RunAllAsync(
+        string repositoryRoot,
+        Func<string, Task<CorpusGateResult>> runCorpus,
+        Func<string, Task<PerformanceGateResult>> runPerformance)
+    {
+        ArgumentNullException.ThrowIfNull(repositoryRoot);
+        ArgumentNullException.ThrowIfNull(runCorpus);
+        ArgumentNullException.ThrowIfNull(runPerformance);
+
+        CorpusGateResult corpus;
+        try
+        {
+            corpus = await runCorpus(repositoryRoot).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            WriteGateFailure("corpus", exception);
+            WritePartialResult(null, null, "corpus", exception);
+            return GateInfrastructureFailureExitCode;
+        }
+
+        PerformanceGateResult performance;
+        try
+        {
+            performance = await runPerformance(repositoryRoot).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            WriteGateFailure("performance", exception);
+            WritePartialResult(corpus, null, "performance", exception);
+            return GatePartialFailureExitCode;
+        }
+
+        Console.WriteLine(
+            JsonSerializer.Serialize(
+                new
+                {
+                    corpus,
+                    performance
+                },
+                JsonDefaults.Indented));
+        return corpus.Passed && performance.Passed
+            ? GateSuccessExitCode
+            : GateThresholdFailureExitCode;
+    }
+
+    private static void WriteGateFailure(string phase, Exception exception)
+    {
+        Console.Error.WriteLine(
+            "SharpProof.Gates " + phase + " phase failed: " + exception);
+    }
+
+    private static void WritePartialResult(
+        CorpusGateResult? corpus,
+        PerformanceGateResult? performance,
+        string failedPhase,
+        Exception exception)
+    {
+        Console.WriteLine(
+            JsonSerializer.Serialize(
+                new
+                {
+                    corpus,
+                    performance,
+                    failure = new
+                    {
+                        phase = failedPhase,
+                        type = exception.GetType().Name,
+                        message = exception.Message
+                    }
+                },
+                JsonDefaults.Indented));
     }
 
     private static object CreateStandaloneEnvelope(
