@@ -5,6 +5,7 @@ namespace SharpProof.Worker;
 
 public sealed class SharpProofWorker : IDisposable
 {
+    internal static Action? CachedResponseAssemblyOverride;
     private readonly ISmtBackend? _backend;
     private readonly Func<ISmtBackend>? _backendFactory;
     private readonly Func<long>? _readConsumedResourceCount;
@@ -228,7 +229,7 @@ public sealed class SharpProofWorker : IDisposable
                 projectBoundary.Token.ThrowIfCancellationRequested();
                 if (cached != null)
                 {
-                    interruptionCacheStatus = WorkerCacheStatus.Hit;
+                    CachedResponseAssemblyOverride?.Invoke();
                     var cachedResponse = Assemble(
                         WorkerRunStatus.Complete,
                         WorkerRunFailureReason.None,
@@ -242,6 +243,7 @@ public sealed class SharpProofWorker : IDisposable
                         responseAuthority).IsValid)
                     {
                         projectBoundary.Token.ThrowIfCancellationRequested();
+                        interruptionCacheStatus = WorkerCacheStatus.Hit;
                         return cachedResponse;
                     }
                 }

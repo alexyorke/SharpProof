@@ -1504,6 +1504,40 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task CancellationDuringCacheHitAssemblyDoesNotReportAHit()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        using (var first = new SharpProofWorker(new SpuriousModelBackend()))
+        {
+            Assert.That(
+                (await first.VerifyAsync(request)).Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Written));
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        SharpProofWorker.CachedResponseAssemblyOverride = cancellation.Cancel;
+        try
+        {
+            using var second = new SharpProofWorker(
+                new CountingBackend(BackendCheckResult.Unsatisfiable([])));
+            var response = await second.VerifyAsync(request, cancellation.Token);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
+                Assert.That(response.Summary.CacheStatus, Is.Not.EqualTo(
+                    WorkerCacheStatus.Hit));
+                Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+            }
+        }
+        finally
+        {
+            SharpProofWorker.CachedResponseAssemblyOverride = null;
+        }
+    }
+
+    [Test]
     public async Task ClosedArtifactRecordsCompilerSemanticOptions()
     {
         using var project = TestProject.Create(RefutationSource);
