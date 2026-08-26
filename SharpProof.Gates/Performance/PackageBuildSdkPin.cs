@@ -28,7 +28,19 @@ internal static class PackageBuildSdkPin
                 sourcePath,
                 cancellationToken)
             .ConfigureAwait(false);
-        using var document = JsonDocument.Parse(bytes);
+        var jsonBytes = bytes;
+        if (bytes.Length >= 3 &&
+            bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+        {
+            jsonBytes = bytes[3..];
+        }
+        using var document = JsonDocument.Parse(
+            jsonBytes,
+            new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            });
         if (!document.RootElement.TryGetProperty("sdk", out var sdk) ||
             !sdk.TryGetProperty("version", out var configuredVersionElement))
         {

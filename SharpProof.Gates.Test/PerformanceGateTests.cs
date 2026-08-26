@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Gates.Performance;
 using System.Security.Cryptography;
+using System.Text;
 using System.Xml.Linq;
 
 namespace SharpProof.Gates.Test;
@@ -299,6 +300,53 @@ public sealed class PerformanceGateTests
         finally
         {
             Directory.Delete(probeRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task PackageBuildSdkPinAcceptsGlobalJsonCommentsAndBom()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        var probeRoot = Path.Combine(root, "probe");
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(probeRoot);
+        var globalJson =
+            "// SDK pin used by the performance gate\n" +
+            "{\n" +
+            "  \"sdk\": {\n" +
+            "    \"version\": \"9.0.316\",\n" +
+            "    \"rollForward\": \"disable\",\n" +
+            "  },\n" +
+            "}\n";
+        var bytes = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true)
+            .GetBytes(globalJson);
+        try
+        {
+            await File.WriteAllBytesAsync(
+                Path.Combine(root, "global.json"),
+                bytes);
+
+            var identity = await PackageBuildSdkPin.PinAndValidateAsync(
+                root,
+                probeRoot,
+                CancellationToken.None);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(identity.ConfiguredVersion, Is.EqualTo("9.0.316"));
+                Assert.That(identity.RollForward, Is.EqualTo("disable"));
+                Assert.That(
+                    await File.ReadAllBytesAsync(
+                        Path.Combine(probeRoot, "global.json")),
+                    Is.EqualTo(bytes));
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
         }
     }
 
