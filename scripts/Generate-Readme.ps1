@@ -829,26 +829,45 @@ if ([regex]::Matches(
     throw 'README.md must contain the exact typed-result documentation claim.'
 }
 $containerCpuCount = [int]$acceptanceContract.container.defaultCpuCount
+$autoDetectCpuCount = [bool]$acceptanceContract.container.autoDetectCpuCount
 $containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
 $testProjectCpuDivisor =
     [int]$acceptanceContract.automation.testProjectCpuDivisor
+$testProjectLaneUnit = if ($testProjectCpuDivisor -eq 1) {
+    'CPU'
+} else {
+    "$testProjectCpuDivisor CPUs"
+}
+$testProjectLaneDescription = "one lane per $testProjectLaneUnit"
 $mutationParallelism =
     [int]$acceptanceContract.automation.mutationParallelism
-if ($containerCpuCount -le 0 -or
+if (($autoDetectCpuCount -and $containerCpuCount -ne 0) -or
+    (-not $autoDetectCpuCount -and $containerCpuCount -le 0) -or
     $containerMemoryMiB -le 0 -or
     $testProjectCpuDivisor -le 0 -or
-    $containerCpuCount % $testProjectCpuDivisor -ne 0 -or
+    (-not $autoDetectCpuCount -and
+     $containerCpuCount % $testProjectCpuDivisor -ne 0) -or
     $mutationParallelism -le 0) {
     throw 'Acceptance resource and concurrency authority is invalid.'
 }
-$testProjectLanes = $containerCpuCount / $testProjectCpuDivisor
-$resourceClaims = @(
-    ("The default container budget is $containerCpuCount CPUs and " +
-        "$containerMemoryMiB MiB.")
-    ("Test-project concurrency uses $testProjectLanes lanes " +
-        "(one lane per $testProjectCpuDivisor CPUs).")
-    ("Trusted mutations use $mutationParallelism deterministic weighted lanes.")
-)
+$resourceClaims = if ($autoDetectCpuCount) {
+    @(
+        ("The default container budget follows all CPUs available to Docker " +
+            "and $containerMemoryMiB MiB.")
+        ("Test-project concurrency uses $testProjectLaneDescription " +
+            "visible to the container.")
+        ("Trusted mutations use $mutationParallelism deterministic weighted lanes.")
+    )
+} else {
+    $testProjectLanes = $containerCpuCount / $testProjectCpuDivisor
+    @(
+        ("The default container budget is $containerCpuCount CPUs and " +
+            "$containerMemoryMiB MiB.")
+        ("Test-project concurrency uses $testProjectLanes lanes " +
+            "($testProjectLaneDescription).")
+        ("Trusted mutations use $mutationParallelism deterministic weighted lanes.")
+    )
+}
 foreach ($resourceDocument in @(
         'README.md',
         'docs\container-development.md')) {

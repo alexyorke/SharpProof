@@ -21,7 +21,7 @@
     "solutionBuildWallSeconds": 600,
     "solutionTestWallSeconds": 1800,
     "mutationShardWallSeconds": 3600,
-    "testProjectCpuDivisor": 2,
+    "testProjectCpuDivisor": 1,
     "mutationParallelism": 4,
     "mutationDefaultWeight": 1,
     "acceptanceTimingPhases": [
@@ -53,7 +53,8 @@
   "container": {
     "contractVersion": 1,
     "platform": "linux/amd64",
-    "defaultCpuCount": 16,
+    "defaultCpuCount": 0,
+    "autoDetectCpuCount": true,
     "defaultMemoryMiB": 40960
   },
   "mutationEvidence": {

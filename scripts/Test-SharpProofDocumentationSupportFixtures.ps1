@@ -90,35 +90,35 @@ try {
         }
         'wrong-container-cpu' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 12 CPUs and 40960 MiB.',
+                'The default container budget follows all CPUs available to Docker and 40960 MiB.',
+                'The default container budget follows 12 CPUs and 40960 MiB.',
                 [StringComparison]::Ordinal)
         }
         'wrong-container-memory' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 CPUs and 32768 MiB.',
+                'The default container budget follows all CPUs available to Docker and 40960 MiB.',
+                'The default container budget follows all CPUs available to Docker and 32768 MiB.',
                 [StringComparison]::Ordinal)
         }
         'missing-resource-claim' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
+                'The default container budget follows all CPUs available to Docker and 40960 MiB.',
                 '',
                 [StringComparison]::Ordinal)
         }
         'duplicate-resource-claim' {
-            $text += "`nThe default container budget is 16 CPUs and 40960 MiB.`n"
+            $text += "`nThe default container budget follows all CPUs available to Docker and 40960 MiB.`n"
         }
         'resource-claim-case' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 cpus and 40960 MiB.',
+                'The default container budget follows all CPUs available to Docker and 40960 MiB.',
+                'The default container budget follows all cpus available to Docker and 40960 MiB.',
                 [StringComparison]::Ordinal)
         }
         'resource-claim-spacing' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 CPUs  and 40960 MiB.',
+                'The default container budget follows all CPUs available to Docker and 40960 MiB.',
+                'The default container budget follows all CPUs available to Docker  and 40960 MiB.',
                 [StringComparison]::Ordinal)
         }
         'catalog-resource-drift' {

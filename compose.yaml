@@ -23,7 +23,10 @@ x-sharpproof-common: &sharpproof-common
     - sharpproof-dotnet-home:/home/sharpproof/.dotnet
     - ./artifacts:/workspace/SharpProof/artifacts
   mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-40g}
-  cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-16}
+  # A zero CPU quota means Docker leaves the container uncapped, so the
+  # tooling observes and uses every CPU available on the host. CI and local
+  # resource-constrained runs can still set SHARPPROOF_CONTAINER_CPU_LIMIT.
+  cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-0}
 
 services:
   dev:

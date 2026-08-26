@@ -1546,12 +1546,14 @@ public sealed class ArchitectureTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(container.GetProperty("defaultCpuCount").GetInt32(),
-                Is.EqualTo(16));
+                Is.EqualTo(0));
+            Assert.That(container.GetProperty("autoDetectCpuCount").GetBoolean(),
+                Is.True);
             Assert.That(container.GetProperty("defaultMemoryMiB").GetInt32(),
                 Is.EqualTo(40 * 1024));
             Assert.That(
                 automation.GetProperty("testProjectCpuDivisor").GetInt32(),
-                Is.EqualTo(2));
+                Is.EqualTo(1));
             Assert.That(
                 automation.GetProperty("mutationParallelism").GetInt32(),
                 Is.EqualTo(4));
@@ -1564,7 +1566,7 @@ public sealed class ArchitectureTests
                     .EnumerateObject()
                     .Select(static property => property.Value.GetInt32()),
                 Is.All.Positive);
-            Assert.That(compose, Does.Contain("CPU_LIMIT:-16"));
+            Assert.That(compose, Does.Contain("CPU_LIMIT:-0"));
             Assert.That(compose, Does.Contain("MEMORY_LIMIT:-40g"));
             Assert.That(execution, Does.Contain("Environment]::ProcessorCount"));
             Assert.That(
