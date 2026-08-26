@@ -494,6 +494,15 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 named.ContainingNamespace,
                 "System",
                 "Collections",
+                "Immutable"))
+        {
+            return false;
+        }
+
+        if (IsExactNamespace(
+                named.ContainingNamespace,
+                "System",
+                "Collections",
                 "Generic") &&
             MutableCollectionNames.Contains(named.Name))
         {
