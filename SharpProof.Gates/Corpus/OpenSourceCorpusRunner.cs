@@ -128,6 +128,11 @@ internal static class OpenSourceCorpusRunner
                 concurrentAnalysis: true,
                 cancellationToken)
             .ConfigureAwait(false);
+        ValidateDiagnosticOwnership(
+            diagnostics,
+            targets.Values.Select(static target =>
+                (target.Tree, target.Span)),
+            compilation.Options);
         var outcomes = factory.GetOutcomes();
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
@@ -163,6 +168,31 @@ internal static class OpenSourceCorpusRunner
                     canonicalDiagnostics));
         }
         return observations.ToImmutable();
+    }
+
+    internal static void ValidateDiagnosticOwnership(
+        ImmutableArray<Diagnostic> diagnostics,
+        IEnumerable<(SyntaxTree Tree, TextSpan Span)> targetSpans,
+        CompilationOptions compilationOptions)
+    {
+        var targets = targetSpans.ToArray();
+        var unowned = diagnostics
+            .Where(diagnostic => targets.Count(target =>
+                diagnostic.Location.IsInSource &&
+                ReferenceEquals(diagnostic.Location.SourceTree, target.Tree) &&
+                target.Span.Contains(diagnostic.Location.SourceSpan)) != 1)
+            .Select(diagnostic => CorpusGate.CanonicalizeDiagnostic(
+                diagnostic,
+                compilationOptions))
+            .OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal)
+            .ToImmutableArray();
+        if (!unowned.IsDefaultOrEmpty)
+        {
+            throw new InvalidDataException(
+                "OSS analyzer diagnostics must belong to exactly one " +
+                "instrumented method:" + Environment.NewLine +
+                string.Join(Environment.NewLine, unowned));
+        }
     }
 
     private static MethodDeclarationSyntax Instrument(

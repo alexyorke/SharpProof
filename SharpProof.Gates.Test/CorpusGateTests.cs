@@ -1,3 +1,6 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using System.Text;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
@@ -193,8 +196,38 @@ public sealed class CorpusGateTests
             failures,
             Is.EqualTo([
                 "1 supported corpus cases produced Unknown; supported cases " +
-                "must have an accountable Proven or Refuted result."
+            "must have an accountable Proven or Refuted result."
             ]));
+    }
+
+    [Test]
+    public void OpenSourceDiagnosticsMustHaveExactlyOneInstrumentedOwner()
+    {
+        var tree = CSharpSyntaxTree.ParseText("class C { void M() { } }");
+        var descriptor = new DiagnosticDescriptor(
+            "SPTEST001",
+            "Test diagnostic",
+            "Test diagnostic",
+            "test",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+        var owned = Diagnostic.Create(
+            descriptor,
+            Location.Create(tree, new TextSpan(10, 1)));
+        var unowned = Diagnostic.Create(descriptor, Location.None);
+        var options = new CSharpCompilationOptions(
+            OutputKind.DynamicallyLinkedLibrary);
+
+        Assert.DoesNotThrow((Action)(() =>
+            OpenSourceCorpusRunner.ValidateDiagnosticOwnership(
+                [owned],
+                [(tree, tree.GetRoot().FullSpan)],
+                options)));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            OpenSourceCorpusRunner.ValidateDiagnosticOwnership(
+                [owned, unowned],
+                [(tree, tree.GetRoot().FullSpan)],
+                options)));
     }
 
     [Test]
