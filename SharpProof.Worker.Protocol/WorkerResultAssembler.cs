@@ -278,7 +278,7 @@ internal static class WorkerResultAssembler
             return (WorkerRunStatus.Failed, WorkerRunFailureReason.BackendUnavailable);
         }
         if (code is "worker.infrastructure" or "launcher.infrastructure" or
-            "worker.no_result")
+            "worker.no_result" or "worker.response_too_large")
         {
             return (WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure);
         }

@@ -1433,6 +1433,7 @@ public sealed class ProtocolJsonTests
     [TestCase("compiler_manifest.invalid", WorkerRunFailureReason.CompilerManifestMismatch)]
     [TestCase("backend.unavailable", WorkerRunFailureReason.BackendUnavailable)]
     [TestCase("worker.infrastructure", WorkerRunFailureReason.InfrastructureFailure)]
+    [TestCase("worker.response_too_large", WorkerRunFailureReason.InfrastructureFailure)]
     [TestCase("response.claim_set", WorkerRunFailureReason.MalformedResult)]
     [TestCase("containment.unavailable", WorkerRunFailureReason.ContainmentFailure)]
     public void ExactRunProjectionAcceptsKnownFailureEvidence(
