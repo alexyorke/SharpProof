@@ -977,3 +977,17 @@ The entries below were produced by a third read-only hunter wave run later on th
 2. After the run, inspect SharpProof.Package/obj, SharpProof.Analyzer/obj, SharpProof.CompilerCollector/obj, etc.: restore assets and build outputs exist there, produced during New-LocalPackageFeed, because no -p:Base*OutputPath property reaches the pack invocations (Test-SharpProofSamples.ps1 Lines 245-253).
 3. Contrast the same script's sample builds: their objects live solely under the temp work/<run>/obj|bin (Lines 271-281), isolating the unredirected pack phase as the sole writer of source-tree output.
 **Confidence**: Medium-High - every code/doc fact above was read and quoted directly; residual uncertainty is only whether "all obj, bin..." was intended to scope to sample builds rather than the whole runner, though the sentence explicitly includes the packing phase it contradicts.
+
+### 390. [RESOLVED 386709833] `worker.response_too_large` Was Missing From the Run-Projection Vocabulary
+
+**Status**: Resolved by mapping the worker's bounded-response fallback to `InfrastructureFailure`. The projection matrix now includes the emitted code and the focused protocol suite passes 9/9.
+
+**Location**: `SharpProof.Worker\Program.cs` emits `worker.response_too_large` when response serialization exceeds the protocol limit; `SharpProof.Worker.Protocol\WorkerResultAssembler.cs` projects worker error codes into run status/failure pairs; `SharpProof.Worker.Test\ProtocolJsonTests.cs` pins known failure projections.
+**Description**: The worker emitted a typed infrastructure fallback, but the protocol projection table returned no state for that code. Consequently `ValidateRun` rejected an otherwise well-formed fallback with `response.run_projection`, allowing the launcher to rewrite the useful cause as `MalformedResult`. Adding the missing infrastructure mapping preserves the intended fail-closed taxonomy.
+
+### 391. [RESOLVED 7bc09dfa9] A Null Backend Task Escaped the Kernel's Typed Malformed-Result Path
+
+**Status**: Resolved by checking the task returned from `ISmtBackend.CheckAsync` before awaiting it. The null-task regression and neighboring malformed-backend cases pass 3/3.
+
+**Location**: `SharpProof.Verify\ProofKernel.cs` awaits the public backend task; `SharpProof.Verify.Test\ProofKernelTests.cs` contains the backend-shape regressions.
+**Description**: A backend returning a null `Task<BackendCheckResult>` caused `await` to throw `NullReferenceException`, bypassing the existing typed malformed-result handling. The kernel now returns `Unknown(MalformedBackendResult)` for this shape without broadening the exception filter, so genuine backend exceptions retain their existing handling.
