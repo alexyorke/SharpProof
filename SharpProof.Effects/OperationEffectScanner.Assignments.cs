@@ -21,18 +21,14 @@ internal sealed partial class OperationEffectScanner
                     property,
                     EffectAccess.Write,
                     valueIsStoredDirectly ? value : null),
-            IParameterReferenceOperation parameter
-                when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
-                    PrimaryConstructorParameterOwnership.IsReceiverBacked(
-                        parameter.Parameter,
-                        _method) =>
-                EffectSummaryOperations.Write(
-                    _conversionOwnership.ClassifyParameter(parameter.Parameter)),
             ILocalReferenceOperation local
                 when local.Local.RefKind != RefKind.None =>
                 EffectSummaryOperations.Unsupported(),
-            ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation =>
-                EffectSummary.Empty,
+            ILocalReferenceOperation local =>
+                ScanLocalReference(local, EffectAccess.Write),
+            IParameterReferenceOperation parameter =>
+                ScanParameterReference(parameter, EffectAccess.Write),
+            IDiscardOperation => EffectSummary.Empty,
             _ => EffectSummaryOperations.Join(
                 Scan(target),
                 EffectSummaryOperations.Unsupported())

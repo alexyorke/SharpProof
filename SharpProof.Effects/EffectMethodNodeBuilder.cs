@@ -52,9 +52,11 @@ internal sealed class EffectMethodNodeBuilder
         if (initializers.CompletesNormally)
         {
             var bodySummary = graph == null
-                ? EffectSummaryOperations.Join(
-                    scanner.Scan(root),
-                    EffectSummaryOperations.Unsupported())
+                ? method.MethodKind == MethodKind.LocalFunction
+                    ? scanner.Scan(root)
+                    : EffectSummaryOperations.Join(
+                        scanner.Scan(root),
+                        EffectSummaryOperations.Unsupported())
                 : AnalyzeControlFlowGraph(graph, scanner);
 
             // Cyclic scalar flow does not invalidate the conservative
@@ -593,6 +595,11 @@ internal sealed class EffectMethodNodeBuilder
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(_compilation, syntax.SyntaxTree);
             var operation = model.GetOperation(syntax, cancellationToken);
+            if (operation is ILocalFunctionOperation localFunction &&
+                localFunction.Body != null)
+            {
+                return localFunction.Body;
+            }
             if (operation is
                 IMethodBodyOperation or
                 IConstructorBodyOperation or

@@ -17,6 +17,8 @@ internal sealed partial class OperationEffectScanner
     private readonly INamedTypeSymbol? _exceptionType;
     private readonly ExceptionHandlerReachability _handlerReachability;
     private readonly Dictionary<int, IArrayTypeSymbol> _freshArrayTypes = new();
+    private readonly HashSet<ISymbol> _capturedSymbols = new(
+        SymbolEqualityComparer.Default);
     private readonly ConversionOwnershipClassifier _conversionOwnership;
     private readonly IMethodSymbol _method;
     private readonly INamedTypeSymbol? _monitorType;
@@ -24,6 +26,7 @@ internal sealed partial class OperationEffectScanner
     private readonly EffectAnalysisSession _session;
     private readonly OperationNullnessEvaluator _nullnessEvaluator;
     private readonly bool _useAbstractReachability;
+    private bool _capturesReceiver;
     private IOperation? _directOperation;
     private int _scanDepth;
     private int _nestingDepth;
@@ -96,6 +99,31 @@ internal sealed partial class OperationEffectScanner
                 _freshArrayTypes[creation.Syntax.SpanStart] = type;
             }
         }
+        foreach (var nestedOperation in root.DescendantsAndSelf()
+                     .Where(operation =>
+                         ConversionOwnershipClassifier.IsInsideNestedCallable(
+                             operation,
+                             root)))
+        {
+            switch (nestedOperation)
+            {
+                case ILocalReferenceOperation local
+                    when SymbolEqualityComparer.Default.Equals(
+                        local.Local.ContainingSymbol?.OriginalDefinition,
+                        _method.OriginalDefinition):
+                    _capturedSymbols.Add(local.Local);
+                    break;
+                case IParameterReferenceOperation parameter
+                    when SymbolEqualityComparer.Default.Equals(
+                        parameter.Parameter.ContainingSymbol?.OriginalDefinition,
+                        _method.OriginalDefinition):
+                    _capturedSymbols.Add(parameter.Parameter);
+                    break;
+                case IInstanceReferenceOperation:
+                    _capturesReceiver = true;
+                    break;
+            }
+        }
         _conversionOwnership.BuildLocalRegions(root, IsReachable);
     }
 
@@ -115,7 +143,13 @@ internal sealed partial class OperationEffectScanner
 
         try
         {
-            return Scan(operation, EffectAccess.Read);
+            var result = Scan(operation, EffectAccess.Read);
+            return _capturedSymbols.Count == 0 && !_capturesReceiver
+                ? result
+                : EffectSummaryOperations.Join(
+                    EffectSummaryOperations.Allocate(
+                        EffectAllocationKind.Managed),
+                    result);
         }
         finally
         {
@@ -256,19 +290,16 @@ internal sealed partial class OperationEffectScanner
     {
         return operation switch
         {
-            IAnonymousFunctionOperation or ILocalFunctionOperation or ILiteralOperation or
-                ILocalReferenceOperation or IInstanceReferenceOperation or IDefaultValueOperation or
+            IAnonymousFunctionOperation or ILocalFunctionOperation or
+                IFlowAnonymousFunctionOperation or ILiteralOperation or
+                IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation or ISizeOfOperation => EffectSummary.Empty,
             IFlowCaptureOperation capture => ScanFlowCapture(capture),
             IFlowCaptureReferenceOperation => EffectSummary.Empty,
+            ILocalReferenceOperation local => ScanLocalReference(local, access),
             IParameterReferenceOperation parameter =>
-                parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
-                PrimaryConstructorParameterOwnership.IsReceiverBacked(
-                    parameter.Parameter,
-                    _method)
-                    ? EffectSummaryOperations.Read(
-                        _conversionOwnership.ClassifyParameter(parameter.Parameter))
-                    : EffectSummary.Empty,
+                ScanParameterReference(parameter, access),
+            IInstanceReferenceOperation => EffectSummary.Empty,
             IFieldReferenceOperation field => ScanField(field, access),
             IPropertyReferenceOperation property => ScanProperty(property, access),
             IArrayElementReferenceOperation element => ScanArrayElement(element, access),
@@ -291,6 +322,71 @@ internal sealed partial class OperationEffectScanner
             IArrayCreationOperation array => ScanArrayCreation(array),
             _ => ScanCoreOperationTail(operation)
         };
+    }
+
+    private EffectSummary ScanLocalReference(
+        ILocalReferenceOperation local,
+        EffectAccess access)
+    {
+        if (local.Local.RefKind != RefKind.None ||
+            !IsCapturedLocal(local.Local))
+        {
+            return EffectSummary.Empty;
+        }
+
+        var region = CapturedLocalRegion(local.Local);
+        return access == EffectAccess.Write
+            ? EffectSummaryOperations.Write(region)
+            : EffectSummaryOperations.Read(region);
+    }
+
+    private EffectSummary ScanParameterReference(
+        IParameterReferenceOperation parameter,
+        EffectAccess access)
+    {
+        var isReceiverBacked = PrimaryConstructorParameterOwnership
+            .IsReceiverBacked(parameter.Parameter, _method);
+        var isCurrentMethod = SymbolEqualityComparer.Default.Equals(
+            parameter.Parameter.ContainingSymbol?.OriginalDefinition,
+            _method.OriginalDefinition);
+        var isCaptured = !isCurrentMethod && !isReceiverBacked ||
+            _capturedSymbols.Contains(parameter.Parameter);
+
+        if (isCaptured && !isReceiverBacked)
+        {
+            var captured = EffectRegionSet.Create(
+                EffectRegionId.Captured(parameter.Parameter.Ordinal));
+            return access == EffectAccess.Write
+                ? EffectSummaryOperations.Write(captured)
+                : EffectSummaryOperations.Read(captured);
+        }
+
+        if (parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
+            isReceiverBacked)
+        {
+            var region = _conversionOwnership.ClassifyParameter(
+                parameter.Parameter);
+            return access == EffectAccess.Write
+                ? EffectSummaryOperations.Write(region)
+                : EffectSummaryOperations.Read(region);
+        }
+
+        return EffectSummary.Empty;
+    }
+
+    private bool IsCapturedLocal(ILocalSymbol local)
+    {
+        return _capturedSymbols.Contains(local) ||
+            !SymbolEqualityComparer.Default.Equals(
+                local.ContainingSymbol?.OriginalDefinition,
+                _method.OriginalDefinition);
+    }
+
+    private static EffectRegionSet CapturedLocalRegion(ILocalSymbol local)
+    {
+        var ordinal = local.DeclaringSyntaxReferences
+            .FirstOrDefault()?.Span.Start ?? 0;
+        return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
     }
 
     private EffectSummary ScanField(IFieldReferenceOperation field, EffectAccess access)

@@ -1012,6 +1012,46 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void CapturedLocalsExposeStateAndClosureAllocationEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                public static int Step() {
+                    var shared = 0;
+                    void Bump() => shared++;
+                    Bump();
+                    return shared;
+                }
+
+                public static Func<int> MakeCounter() {
+                    var value = 0;
+                    return () => value++;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var step = session.Analyze(Method(compilation, "Step"));
+        var counter = session.Analyze(Method(compilation, "MakeCounter"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                step.Summary.Writes.Regions,
+                Has.Some.Matches<EffectRegionId>(
+                    region => region.Kind == EffectRegionKind.Captured));
+            Assert.That(
+                step.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                counter.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+        }
+    }
+
+    [Test]
     public void PrimaryConstructorAndOrdinaryParameterReadsStayLocal()
     {
         var compilation = EffectTestHost.CreateCompilation(
