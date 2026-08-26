@@ -83,6 +83,16 @@ public sealed class ArchitectureTests
         "corpus-and-performance"
     ];
 
+    private static readonly string[] FrameworkIdentityApprovedSourcePaths = [
+        "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
+        "SharpProof.Frontend/ContractApiMetadata.generated.cs",
+        "SharpProof.Specs/FrameworkTypeMetadataNames.cs",
+        "SharpProof.Specs/DefaultApiSpecCatalog.generated.cs",
+        // This analyzer intentionally keeps a dependency-free Roslyn symbol
+        // inventory because it runs before the Specs assembly is available.
+        "SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs"
+    ];
+
     [Test]
     public void RepositoryRestoreIsHermeticLockedAndSdkPinned()
     {
@@ -431,56 +441,22 @@ public sealed class ArchitectureTests
     [Test]
     public void SemanticConsumersDoNotEncodeFrameworkIdentitiesAsStringLiterals()
     {
-        var semanticConsumers = new[] {
-            "SharpProof.Analyzer",
-            "SharpProof.CompilerArtifact",
-            "SharpProof.CompilerCollector",
-            "SharpProof.Contracts",
-            "SharpProof.Dataflow",
-            "SharpProof.Effects",
-            "SharpProof.Frontend",
-            "SharpProof.Host",
-            "SharpProof.Ir",
-            "SharpProof.Smt",
-            "SharpProof.Summaries",
-            "SharpProof.Verify",
-            "SharpProof.Worker",
-            "SharpProof.Worker.Protocol",
-            "SharpProof.Worker.Launcher"
-        };
-        var violations = semanticConsumers
+        var root = RepositoryRoot();
+        var inventoryPath = Path.Combine(
+            root,
+            "SharpProof.Specs",
+            "FrameworkTypeMetadataNames.cs");
+        var inventory = FrameworkIdentityScanner.ReadInventory(
+            inventoryPath,
+            File.ReadAllText(inventoryPath));
+        var sourceFiles = FrameworkIdentityScanProjects()
             .SelectMany(ProductionSourceFiles)
-            .Where(file =>
-                !string.Equals(
-                    Relative(file),
-                    "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
-                    StringComparison.Ordinal) &&
-                !string.Equals(
-                    Relative(file),
-                    "SharpProof.Frontend/ContractApiMetadata.generated.cs",
-                    StringComparison.Ordinal))
-            .SelectMany(file => CSharpSyntaxTree.ParseText(
-                    File.ReadAllText(file),
-                    CSharpParseOptions.Default.WithLanguageVersion(
-                        LanguageVersion.CSharp12),
-                    file)
-                .GetRoot()
-                .DescendantNodes()
-                .OfType<LiteralExpressionSyntax>()
-                .Where(static literal =>
-                    literal.Token.ValueText.StartsWith(
-                        "System.",
-                        StringComparison.Ordinal))
-                .Select(literal =>
-                {
-                    var line = literal.GetLocation()
-                        .GetLineSpan()
-                        .StartLinePosition.Line + 1;
-                    return $"{Relative(file)}:{line}: " +
-                        literal.Token.ValueText;
-                }))
-            .OrderBy(static value => value, StringComparer.Ordinal)
+            .Select(file => (Path: Relative(file), Source: File.ReadAllText(file)))
             .ToArray();
+        var violations = FrameworkIdentityScanner.FindViolations(
+            sourceFiles,
+            inventory,
+            FrameworkIdentityApprovedSourcePaths);
 
         Assert.That(
             violations,
@@ -2699,6 +2675,24 @@ public sealed class ArchitectureTests
                     Path.DirectorySeparatorChar,
                     StringComparison.Ordinal))
             .OrderBy(static path => path, StringComparer.Ordinal);
+    }
+
+    private static IEnumerable<string> FrameworkIdentityScanProjects()
+    {
+        var props = XDocument.Load(Path.Combine(
+            RepositoryRoot(),
+            "Directory.Build.props"));
+        var marker = props
+            .Descendants("SharpProofProductionProject")
+            .Single();
+
+        return Regex.Matches(
+                (string?)marker.Attribute("Condition") ?? string.Empty,
+                @"==\s*'([^']+)'")
+            .Select(match => match.Groups[1].Value)
+            .Where(static project => !string.IsNullOrWhiteSpace(project))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static project => project, StringComparer.Ordinal);
     }
 
     private static string[] FindRelativeCallers(
