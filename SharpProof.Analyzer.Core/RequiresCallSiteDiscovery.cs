@@ -196,7 +196,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             operation is IListPatternOperation
                             ? HasReplayableAccessorEvaluation(
                                 call,
-                                operationFacts)
+                                operationFacts) &&
+                                HasReplayableBlockPrefix(
+                                    operation,
+                                    operationFacts)
                             : (hasFlowState || !flowAnalysis.IsComplete) &&
                                 HasReplayablePrefix(
                                     operation,
@@ -487,6 +490,35 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationFacts.CompletesNormally(argument.Value)) &&
             call.ExplicitArguments.Values.All(
                 operationFacts.CompletesNormally);
+    }
+
+    private bool HasReplayableBlockPrefix(
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        var body = ContractClauseInventoryBuilder.GetBody(declaration);
+        if (body is not BlockSyntax block)
+        {
+            return true;
+        }
+
+        var statement = callSite.Syntax.AncestorsAndSelf()
+            .OfType<StatementSyntax>()
+            .FirstOrDefault(candidate => ReferenceEquals(
+                candidate.Parent,
+                block));
+        return statement != null &&
+            block.Statements
+                .TakeWhile(candidate => !ReferenceEquals(
+                    candidate,
+                    statement))
+                .All(prior =>
+                    prior is EmptyStatementSyntax or
+                        LocalFunctionStatementSyntax ||
+                    operationFacts.CompletesNormally(
+                        semanticModel.GetOperation(
+                            prior,
+                            cancellationToken)));
     }
 
     private static bool CanCoalesceGetterComplete(
