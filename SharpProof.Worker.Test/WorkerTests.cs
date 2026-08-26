@@ -898,7 +898,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task InvalidCompilerElidedClauseDoesNotPoisonCompanionProof()
+    public async Task InvalidCompilerElidedClauseBlocksCompanionProof()
     {
         using var project = TestProject.Create(
             """
@@ -934,12 +934,14 @@ public sealed class WorkerTests
         {
             Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(response.Manifest.Claims[0].Evidence,
-                Is.EqualTo(WorkerClaimEvidence.CompanionClause));
+                Is.EqualTo(WorkerClaimEvidence.DirectClause));
             Assert.That(response.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven),
+                Is.EqualTo(WorkerClaimOutcome.Unknown),
                 response.ClaimResults.Single().Reason.ToString());
+            Assert.That(response.ClaimResults.Single().Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
             Assert.That(response.CallableResults.Single().Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Complete));
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
@@ -4058,7 +4060,7 @@ public sealed class WorkerTests
                 public static long DivideOverflow(long value) {
                     Contract.Requires(value == long.MinValue);
                     Contract.Ensures(false);
-                    return value / -1L;
+                    return checked(value / -1L);
                 }
 
                 public static long DivideByZero(long value) {
