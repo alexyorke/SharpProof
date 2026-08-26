@@ -163,6 +163,32 @@ public sealed class DependencyAutomationTests
     }
 
     [Test]
+    public void ScheduledSoundnessWorkflowsSerializeDuplicateRuns()
+    {
+        var root = RepositoryRoot();
+        foreach (var workflowName in new[] { "nightly.yml", "weekly.yml" })
+        {
+            var workflow = File.ReadAllText(Path.Combine(
+                root,
+                ".github",
+                "workflows",
+                workflowName));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(workflow, Does.Contain("\nconcurrency:\n"), workflowName);
+                Assert.That(
+                    workflow,
+                    Does.Contain("group: ${{ github.workflow }}"),
+                    workflowName);
+                Assert.That(
+                    workflow,
+                    Does.Contain("cancel-in-progress: false"),
+                    workflowName);
+            }
+        }
+    }
+
+    [Test]
     public void ArchitectureDocumentsCollectorSplitAndCorpusRatchets()
     {
         var architecture = File.ReadAllText(Path.Combine(

@@ -15,6 +15,7 @@ $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+$contract = $null
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 . (Join-Path $repositoryRoot 'scripts\SharpProof.FuzzEvidenceLifecycle.ps1')
 $pullRequestCases = Assert-SharpProofFuzzCaseBudget `
@@ -27,7 +28,9 @@ function Test-AcceptanceTimingTimeline {
         [Parameter(Mandatory = $true)][DateTime]$StartedUtc,
         [Parameter(Mandatory = $true)][DateTime]$CompletedUtc,
         [Parameter(Mandatory = $true)][long]$TotalElapsedMilliseconds,
-        [Parameter(Mandatory = $true)][object[]]$Phases,
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$Phases,
         [Parameter(Mandatory = $true)][string[]]$ExpectedPhaseNames,
         [Parameter(Mandatory = $true)][bool]$RequireComplete
     )
@@ -41,8 +44,7 @@ function Test-AcceptanceTimingTimeline {
             [long]($outerTicks / [TimeSpan]::TicksPerMillisecond) -or
         ($RequireComplete -and $Phases.Count -ne $ExpectedPhaseNames.Count) -or
         (-not $RequireComplete -and
-            ($Phases.Count -lt 1 -or
-             $Phases.Count -gt $ExpectedPhaseNames.Count))) {
+            $Phases.Count -gt $ExpectedPhaseNames.Count)) {
         throw 'Acceptance outer timing interval is invalid.'
     }
     $previousCompleted = $StartedUtc
@@ -164,10 +166,19 @@ function Write-AcceptanceTimingEvidence {
     if ($timingWritten) {
         return
     }
+    $script:timingWritten = $true
+    $expectedPhases = @()
+    if ($null -ne $contract) {
+        try {
+            $expectedPhases = @(
+                $contract.automation.acceptanceTimingPhases |
+                    ForEach-Object { [string]$_ })
+        }
+        catch {
+            $expectedPhases = @()
+        }
+    }
     if ($Status -eq 'passed') {
-        $expectedPhases = @(
-            $contract.automation.acceptanceTimingPhases |
-                ForEach-Object { [string]$_ })
         $actualPhases = @($timingPhases | ForEach-Object name)
         if (($actualPhases -join ',') -cne ($expectedPhases -join ',')) {
             throw (
@@ -176,7 +187,6 @@ function Write-AcceptanceTimingEvidence {
                 "actual '$($actualPhases -join ',')'.")
         }
     }
-    $script:timingWritten = $true
     [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
     $temporary = $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
     $totalMilliseconds = [long]$timingStopwatch.Elapsed.TotalMilliseconds
@@ -187,13 +197,23 @@ function Write-AcceptanceTimingEvidence {
         -CompletedUtc $timingCompletedUtc `
         -TotalElapsedMilliseconds $totalMilliseconds `
         -Phases @($timingPhases) `
-        -ExpectedPhaseNames @($contract.automation.acceptanceTimingPhases) `
+        -ExpectedPhaseNames $expectedPhases `
         -RequireComplete ($Status -in @('passed','incomplete'))
+    $commit = ''
+    try {
+        $commitOutput = & git -C $repositoryRoot rev-parse HEAD 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $commit = ($commitOutput -join [Environment]::NewLine).Trim()
+        }
+    }
+    catch {
+        $commit = ''
+    }
     [pscustomobject]@{
         schemaVersion = 1
         command = 'acceptance'
         configuration = $Configuration
-        commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+        commit = $commit
         startedUtc = $timingStartedUtc.ToString('o')
         completedUtc = $timingCompletedUtc.ToString('o')
         status = $Status

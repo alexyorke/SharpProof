@@ -14,6 +14,7 @@ public sealed class AcceptanceScriptTests
     [TestCase("boundary-equality", true)]
     [TestCase("restore-failure", true)]
     [TestCase("skipped-phase", true)]
+    [TestCase("empty-failure", true)]
     [TestCase("too-many-partial", false)]
     [TestCase("phase-order", false)]
     [TestCase("phase-overlap", false)]

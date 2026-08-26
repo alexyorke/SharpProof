@@ -4,7 +4,8 @@ param(
     [ValidateSet(
         'canonical','zero-restore','nonzero-restore','boundary-equality',
         'restore-failure','skipped-phase','too-many-partial','phase-order',
-        'phase-overlap','before-start','after-completion','wrong-total')]
+        'phase-overlap','before-start','after-completion','wrong-total',
+        'empty-failure')]
     [string]$Mutation
 )
 
@@ -51,6 +52,10 @@ foreach ($name in $names) {
     if ($Mutation -eq 'restore-failure') { break }
 }
 $outerCompleted = $outerStart.AddMilliseconds($cursor)
+if ($Mutation -eq 'empty-failure') {
+    $phases.Clear()
+    $outerCompleted = $outerStart
+}
 if ($Mutation -eq 'phase-order') {
     $phases[1].name = 'build'
 }
@@ -84,5 +89,5 @@ Test-AcceptanceTimingTimeline `
     -TotalElapsedMilliseconds $total `
     -Phases @($phases) `
     -ExpectedPhaseNames $names `
-    -RequireComplete ($Mutation -notin @('restore-failure','too-many-partial'))
+    -RequireComplete ($Mutation -notin @('restore-failure','too-many-partial','empty-failure'))
 Write-Host "Acceptance timing fixture passed: $Mutation"

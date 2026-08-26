@@ -132,8 +132,7 @@ internal static class SarifProjection
             outcome == WorkerClaimOutcome.Proven ? "pass" :
                 outcome == WorkerClaimOutcome.Refuted ? "fail" : "review",
             outcome == WorkerClaimOutcome.Proven ? "none" :
-                outcome == WorkerClaimOutcome.Refuted ? "error" :
-                LauncherPresentation.Level(request.VerifyPolicy, "note"),
+                outcome == WorkerClaimOutcome.Refuted ? "error" : "none",
             outcome + " " + LauncherPresentation.ClaimKind(claim) + " " +
                 result.ClaimId + " for " + claim.CallableId + reason + witness,
             effectWitness?.Location ?? claim.Location,
@@ -141,7 +140,10 @@ internal static class SarifProjection
             new
             {
                 claim,
-                result
+                result,
+                sharpProofPolicyLevel = LauncherPresentation.Level(
+                    request.VerifyPolicy,
+                    "note")
             });
     }
 
@@ -153,14 +155,17 @@ internal static class SarifProjection
         var reason = result.Reason;
         return Result(
             "SP0047", "review",
-            LauncherPresentation.Level(request.VerifyPolicy, "note"),
+            "none",
             "Selected analysis is incomplete for " + callableId +
                 " (" + reason + ").",
             callable.Location, callableId,
             new
             {
                 callable,
-                result
+                result,
+                sharpProofPolicyLevel = LauncherPresentation.Level(
+                    request.VerifyPolicy,
+                    "note")
             });
     }
 

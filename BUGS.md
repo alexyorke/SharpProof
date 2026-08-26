@@ -918,6 +918,7 @@ The entries below were produced by a third read-only hunter wave run later on th
 2. Inspect runs[0].results[0]: "kind":"review", "level":"warning" (or "error") - a forbidden combination per SARIF 2.1.0; the SP0047 incomplete rows repeat it.
 3. Contrast the Proven sibling row (kind pass, level none) showing the constraint applied selectively; run any spec-conformance checker/GitHub SARIF ingestion to see the rejection/misprojection.
 **Confidence**: Medium-High - emission shape and selective pass/none compliance verified line-by-line plus the pinning test; the sole residual is reliance on the SARIF 2.1.0 normative text (kind != fail => level none), which is widely reproduced by consumer validators.
+**Status**: Resolved by emitting SARIF-compliant `level: "none"` for review results and preserving the requested policy severity in `properties.sharpProofPolicyLevel`; launcher projection tests cover all policy/outcome combinations.
 
 ### 383. Duplicate Byte-Identical Reference Modules Make IL Summary Authorities Ambiguous - Whole-Manifest Collection Aborts With Opaque SP0049
 
@@ -1379,6 +1380,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 3. Trigger workflow_dispatch on nightly.yml while a scheduled run is still executing: the dispatched run starts immediately in parallel (distinct run_id, so distinct COMPOSE_PROJECT_NAME and artifact names - nothing fails; both consume runners simultaneously).
 4. Confirm uncompensated duplication: both runs execute mutation/dependency-audit/acceptance/fuzz-nightly against the same commit, uploading equivalent evidence under different artifact names.
 **Confidence**: High on facts (absence, sibling contrast, collision immunity all read directly); Medium at best on classification - some projects intentionally let scheduled flows overlap, so maintainer intent is the residual; reported for the objective internal inconsistency with the publish-job serialization.
+**Status**: Resolved by adding workflow-level concurrency groups that queue duplicate scheduled or manually dispatched runs; an architecture regression covers both workflows.
 
 ### 425. [RESOLVED aaf0efe81] samples/README.md's Library Specification Row Advertised "locals" That No File in the Library Fixture Ever Declares
 

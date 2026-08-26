@@ -1784,7 +1784,14 @@ public sealed class LauncherArgumentTests
                 results[1].GetProperty("ruleId").GetString(),
                 Is.EqualTo("SP0047"));
             Assert.That(
+                results[1].GetProperty("kind").GetString(),
+                Is.EqualTo("review"));
+            Assert.That(
                 results[1].GetProperty("level").GetString(),
+                Is.EqualTo("none"));
+            Assert.That(
+                results[1].GetProperty("properties")
+                    .GetProperty("sharpProofPolicyLevel").GetString(),
                 Is.EqualTo("error"));
             var assumption = run.GetProperty("invocations")[0]
                 .GetProperty("toolExecutionNotifications")[0];
@@ -2002,22 +2009,23 @@ public sealed class LauncherArgumentTests
 
     [TestCase(
         WorkerClaimOutcome.Proven, WorkerVerifyPolicy.Advisory,
-        "pass", "none")]
+        "pass", "none", "note")]
     [TestCase(
         WorkerClaimOutcome.Refuted, WorkerVerifyPolicy.Advisory,
-        "fail", "error")]
+        "fail", "error", "note")]
     [TestCase(
         WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.Advisory,
-        "review", "note")]
+        "review", "none", "note")]
     [TestCase(
         WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.WarnOnUnknown,
-        "review", "warning")]
+        "review", "none", "warning")]
     [TestCase(
         WorkerClaimOutcome.Unknown, WorkerVerifyPolicy.RequireProven,
-        "review", "error")]
+        "review", "none", "error")]
     public void SarifClaimPresentationFollowsOutcomeAndPolicy(
         WorkerClaimOutcome outcome, WorkerVerifyPolicy policy,
-        string expectedKind, string expectedLevel)
+        string expectedKind, string expectedLevel,
+        string expectedPolicyLevel)
     {
         var response = new WorkerVerifyResponse
         {
@@ -2057,6 +2065,10 @@ public sealed class LauncherArgumentTests
             Assert.That(
                 result.GetProperty("level").GetString(),
                 Is.EqualTo(expectedLevel));
+            Assert.That(
+                result.GetProperty("properties")
+                    .GetProperty("sharpProofPolicyLevel").GetString(),
+                Is.EqualTo(expectedPolicyLevel));
         }
     }
 
