@@ -430,17 +430,19 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             sealed class C {
                 static Answer UnknownAnswer() => Answer.Unknown;
+                static Answer UnknownAnswer(string _) => Answer.Unknown;
                 void M(ProofCache cache) {
                     cache.GetOrAdd("direct", static _ => Answer.Unknown);
                     cache.GetOrAdd("indirect", static _ => UnknownAnswer());
                     cache.GetOrAdd("block", static _ => { return Answer.Unknown; });
+                    cache.GetOrAdd("method", UnknownAnswer);
                 }
             }
             """);
 
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(3));
+            Is.EqualTo(4));
     }
 
     [Test]

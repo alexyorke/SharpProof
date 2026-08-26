@@ -200,6 +200,8 @@ internal static class CacheSoundnessRules
                 IsNonCacheableSemanticAnswer(conversion.Operand, root, resolving),
             IDelegateCreationOperation delegateCreation =>
                 IsNonCacheableSemanticAnswer(delegateCreation.Target, root, resolving),
+            IMethodReferenceOperation methodReference =>
+                ResolveMethod(methodReference.Method),
             IAnonymousFunctionOperation anonymous
                 when anonymous.Body is { } anonymousBody =>
                 ContainsNonCacheableSemanticAnswer(anonymousBody, root, resolving),
@@ -362,9 +364,17 @@ internal static class CacheSoundnessRules
 
     private static bool ResolveInvocation(IInvocationOperation invocation)
     {
-        var values = GetReturnedValueNames(invocation.TargetMethod).ToArray();
+        return ResolveMethod(invocation.TargetMethod, invocation.Type);
+    }
+
+    private static bool ResolveMethod(
+        IMethodSymbol method,
+        ITypeSymbol? returnType = null)
+    {
+        var values = GetReturnedValueNames(method).ToArray();
         return values.Length == 0
-            ? IsSemanticAnswerType(invocation.Type) && IsNonCacheableName(invocation.TargetMethod.Name)
+            ? IsSemanticAnswerType(returnType ?? method.ReturnType) &&
+                IsNonCacheableName(method.Name)
             : values.Any(IsNonCacheableName);
     }
 
