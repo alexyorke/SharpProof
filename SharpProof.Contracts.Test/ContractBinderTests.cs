@@ -37,7 +37,7 @@ public sealed class ContractBinderTests
     }
 
     [Test]
-    public void UnconstructedGenericMethodDefinitionReturnsTypedFailure()
+    public void UnconstructedGenericMethodDefinitionBindsWithoutThrowing()
     {
         const string source =
             """
@@ -53,10 +53,11 @@ public sealed class ContractBinderTests
 
         var result = subject.Bind("Target", "Read");
 
-        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
         Assert.That(
-            result.Failure,
-            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+            result.Contracts.Clauses[0].Kind,
+            Is.EqualTo(BoundContractKind.Requires));
     }
 
     [TestCase("-0.0", "0.0", false)]
