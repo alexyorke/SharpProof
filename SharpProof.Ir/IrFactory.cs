@@ -504,6 +504,9 @@ public sealed class IrFactory
                     nameof(targetType));
             }
 
+            var operandInfo = GetTypeInfoCore(operand.Type, nameof(operand));
+            IrTermServices.ValidateCast(target.Kind, operandInfo.Kind);
+
             return Intern(
                 new StructuralKey(IrTermKind.Cast, targetType.Value, children: [operand.Id.Value]),
                 id => new IrCastTerm(id, targetType, operand));
@@ -690,13 +693,13 @@ public sealed class IrFactory
 
     private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeKind kind, IrTypeId? elementType)
     {
-        var nameId = InternStringCore(name);
         var key = (kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1);
         if (_typeIds.TryGetValue(key, out var existing))
         {
             return existing;
         }
 
+        var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);
         _types.Add(new IrTypeInfo(id, nameId, kind, elementType));

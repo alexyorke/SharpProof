@@ -203,6 +203,17 @@ internal static class IrTermServices
         return IrOperatorCatalog.IsNullable(kind);
     }
 
+    internal static void ValidateCast(
+        IrTypeKind targetKind,
+        IrTypeKind operandKind)
+    {
+        if (!IsNullable(targetKind) || !IsNullable(operandKind))
+        {
+            throw new ArgumentException(
+                "Casts require reference-like source and target types.");
+        }
+    }
+
     private static IrTerm? FoldIntegerBinary(
         IrFactory factory,
         IrBinaryOperator @operator,

@@ -354,7 +354,7 @@ public sealed class PortableIrGraphCodecTests
         Assert.That(
             hash,
             Is.EqualTo(
-                "429FA548B2E9D87501BC4FB7BE5B5D8B329002043B1050A8F991A6355F492566"));
+                "AAA27C6AF3E73A71C545B94A78F722AE239012EB150972129D2FF6BABBF54E5B"));
 
         var decodedGraph = JsonSerializer.Deserialize<PortableIrGraph>(
             bytes,
@@ -594,6 +594,7 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(MalformedMutation.DuplicateHavocVariable)]
     [TestCase(MalformedMutation.WhitespaceOperationDescription)]
     [TestCase(MalformedMutation.WhitespaceBlockName)]
+    [TestCase(MalformedMutation.IllSortedCast)]
     public void DecoderRejectsMalformedGraphs(MalformedMutation mutation)
     {
         var fixture = CreateFixture();
@@ -667,6 +668,19 @@ public sealed class PortableIrGraphCodecTests
                 break;
             case MalformedMutation.WhitespaceBlockName:
                 graph.Blocks[0].Name = "\t";
+                break;
+            case MalformedMutation.IllSortedCast:
+                var castIndex = Array.FindIndex(
+                    graph.Terms,
+                    static row => row.Kind == IrTermKind.Cast);
+                var integerTermIndex = Array.FindIndex(
+                    graph.Terms,
+                    static row => row.Kind == IrTermKind.Integer);
+                var booleanTypeIndex = Array.FindIndex(
+                    graph.Types,
+                    static row => row.Kind == IrTypeKind.Boolean);
+                graph.Terms[castIndex].A = integerTermIndex;
+                graph.Terms[castIndex].Type = booleanTypeIndex;
                 break;
             default:
                 throw new AssertionException("Unknown mutation.");
@@ -849,7 +863,7 @@ public sealed class PortableIrGraphCodecTests
             factory.Unary(IrUnaryOperator.Not, flagTerm),
             factory.Binary(IrBinaryOperator.Add, numberTerm, factory.Integer(1)),
             conditional,
-            factory.Cast(factory.ObjectType, numberTerm),
+            factory.Cast(factory.ObjectType, boxTerm),
             factory.Length(sequenceTerm),
             factory.SequenceAccess(sequenceTerm, numberTerm)
         ];
@@ -916,7 +930,8 @@ public sealed class PortableIrGraphCodecTests
         ProgramShape,
         DuplicateHavocVariable,
         WhitespaceOperationDescription,
-        WhitespaceBlockName
+        WhitespaceBlockName,
+        IllSortedCast
     }
 
     public enum CanonicalSlotMutation

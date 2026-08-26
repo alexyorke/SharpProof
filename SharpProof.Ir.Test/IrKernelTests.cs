@@ -94,6 +94,40 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void TypeInterningDoesNotRetainDiscardedNames()
+    {
+        var factory = new IrFactory();
+        var identity = factory.CreateIdentity();
+        var first = factory.GetOrCreateReferenceType(identity, "Widget");
+        var second = factory.GetOrCreateReferenceType(identity, "Gadget");
+
+        Assert.That(second, Is.EqualTo(first));
+        Assert.That(
+            factory.GetString(factory.GetTypeInfo(second).Name),
+            Is.EqualTo("Widget"));
+        var next = factory.InternString("next");
+        Assert.That(
+            next.Value,
+            Is.EqualTo(factory.InternString("Widget").Value + 1));
+
+        var sequenceIdentity = factory.CreateIdentity();
+        var sequence = factory.GetOrCreateSequenceType(
+            sequenceIdentity,
+            factory.IntegerType,
+            "Numbers");
+        Assert.That(
+            factory.GetOrCreateSequenceType(
+                sequenceIdentity,
+                factory.IntegerType,
+                "OtherNumbers"),
+            Is.EqualTo(sequence));
+        var afterSequence = factory.InternString("after-sequence");
+        Assert.That(
+            afterSequence.Value,
+            Is.EqualTo(factory.InternString("Numbers").Value + 1));
+    }
+
+    [Test]
     public void StructuralTermsAreReferenceIdenticalAndConstantsFoldCentrally()
     {
         var factory = new IrFactory();
@@ -330,6 +364,14 @@ public sealed class IrKernelTests
             (Action)(() => factory.SequenceAccess(
                 factory.Variable(sequence),
                 factory.Boolean(false))));
+        Assert.Throws<ArgumentException>(
+            (Action)(() => factory.Cast(
+                factory.BooleanType,
+                factory.Integer(1))));
+        Assert.Throws<ArgumentException>(
+            (Action)(() => factory.Cast(
+                factory.ObjectType,
+                factory.Integer(1))));
         Assert.Throws<ArgumentException>(
             (Action)(() => factory.CreateSequenceValue(
                 sequenceType,
