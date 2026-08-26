@@ -224,6 +224,33 @@ public sealed class ContainerSourceCleanlinessTests
         }
     }
 
+    [Test]
+    public async Task CorpusUpdatePersistsSourceMutations()
+    {
+        var repository = await CreateRepositoryAsync();
+        try
+        {
+            var result = await RunEntrypointAsync(repository, "corpus-update");
+            var marker = Path.Combine(
+                repository,
+                "Project",
+                "CorpusUpdate.txt");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Zero, result.Error);
+                Assert.That(File.Exists(marker), Is.True);
+                Assert.That(
+                    (await File.ReadAllTextAsync(marker)).Trim(),
+                    Is.EqualTo("updated"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(repository, recursive: true);
+        }
+    }
+
     private static async Task<string> CreateRepositoryAsync()
     {
         var repository = Path.Combine(
@@ -235,6 +262,7 @@ public sealed class ContainerSourceCleanlinessTests
             Path.Combine(repository, "scripts", "Invoke-SharpProofContainer.ps1"),
             "[CmdletBinding()]\n" +
             "param([Parameter(Mandatory = $true)][string]$Command)\n" +
+            "if ($Command -eq 'corpus-update') { Set-Content -LiteralPath Project/CorpusUpdate.txt -Value 'updated' }\n" +
             "Write-Output \"executed:$Command\"\n" +
             "Write-Output ('production:' + (Get-Content Project/Production.cs -Raw).Trim())\n" +
             "Write-Output ('deleted:' + (Test-Path Project/Deleted.cs))\n" +

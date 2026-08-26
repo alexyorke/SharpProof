@@ -51,6 +51,16 @@ if [[ "${command_name}" = "dev" ]]; then
   exec /bin/bash "$@"
 fi
 
+# corpus-update intentionally rewrites checked-in corpus evidence. Run it
+# against the mounted checkout so the generated snapshot and importer files
+# remain available to the caller after this task container exits.
+if [[ "${command_name}" = "corpus-update" ]]; then
+  export SHARPPROOF_REPO_ROOT="${repo_root}"
+  cd "${repo_root}"
+  exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofContainer.ps1 \
+    -Command "${command_name}" "$@"
+fi
+
 requires_clean_exact_commit_source() {
   case "$1" in
     acceptance|mutation|fuzz-nightly|pack|pilots|release-tag|release-baseline|release-plan|release-qualification|release-publish)
