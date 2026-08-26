@@ -151,7 +151,6 @@ internal static partial class VerifierProcessSupervisor
                 CleanupMilliseconds,
                 descriptorReserves: descriptorReserves,
                 protectedProcessId: process.Id);
-            var hadDescendants = cleanup.HadDescendants;
             var retryDelayMilliseconds = 10;
             var cleanupBudget = Stopwatch.StartNew();
             while (!cleanup.Complete &&
@@ -167,7 +166,6 @@ internal static partial class VerifierProcessSupervisor
                     Environment.ProcessId,
                     RetryCleanupMilliseconds,
                     protectedProcessId: process.Id);
-                hadDescendants |= cleanup.HadDescendants;
             }
             if (!cleanup.Complete)
             {
@@ -184,9 +182,7 @@ internal static partial class VerifierProcessSupervisor
             WriteCleanupReceipt(nonce);
             return cancellation.IsCancellationRequested
                 ? 143
-                : hadDescendants
-                    ? 124
-                    : directExitCode;
+                : directExitCode;
         }
         finally
         {

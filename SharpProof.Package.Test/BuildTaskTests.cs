@@ -1159,7 +1159,7 @@ public sealed class BuildTaskTests
                 "start.ArgumentList.Add(\"10\"); start.UseShellExecute = false; " +
                 "var child = Process.Start(start)!; " +
                 "File.WriteAllText(\"descendant.pid\", child.Id.ToString()); " +
-                "Thread.Sleep(800);");
+                "Thread.Sleep(800); System.Environment.Exit(7);");
             using var task = new RunVerifier
             {
                 BuildEngine = new RecordingBuildEngine(),
@@ -1183,7 +1183,7 @@ public sealed class BuildTaskTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(task.ExitCode, Is.EqualTo(7));
                 Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(4)));
                 Assert.That(
                     SpinWait.SpinUntil(
@@ -1242,7 +1242,7 @@ public sealed class BuildTaskTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(task.ExitCode, Is.EqualTo(124));
+                Assert.That(task.ExitCode, Is.Zero);
                 Assert.That(
                     SpinWait.SpinUntil(
                         () => !IsProcessRunning(descendantId.Value),
