@@ -47,7 +47,6 @@
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Ir.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Specs.dll" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Specs.pdb" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.Specs\RelationalSpecPackCatalog.json" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Summaries.dll" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Summaries.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Worker.Protocol.dll" target="tools\shared\netstandard2.0" />

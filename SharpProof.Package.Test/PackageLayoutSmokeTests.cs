@@ -78,7 +78,6 @@ public sealed class PackageLayoutSmokeTests
         "tools/analyzers/dotnet/cs/SharpProof.Analyzer.dll",
         "tools/analyzers/dotnet/cs/SharpProof.ContractForGenerator.dll",
         "tools/collector/SharpProof.CompilerCollector.dll",
-        "tools/collector/RelationalSpecPackCatalog.json",
         "tools/shared/netstandard2.0/Microsoft.Bcl.AsyncInterfaces.dll",
         "tools/shared/netstandard2.0/SharpProof.Analyzer.Core.dll",
         "tools/shared/netstandard2.0/SharpProof.CompilerArtifact.dll",
