@@ -477,7 +477,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         CancellationToken cancellationToken)
     {
         if (!field.IsStatic || !field.IsReadOnly ||
-            field.Type.SpecialType != SpecialType.System_String)
+            field.Type.SpecialType != SpecialType.System_String ||
+            field.ContainingType?.StaticConstructors.Any(
+                static constructor => !constructor.IsImplicitlyDeclared) == true)
         {
             return null;
         }

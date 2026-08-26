@@ -659,6 +659,31 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task DoesNotInferReadonlyInitializerOverriddenByStaticConstructor()
+    {
+        const string source =
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                private static readonly string Code = "ir_initializer";
+                static C() { Code = "ordinary"; }
+
+                internal static bool Matches(string reason)
+                {
+                    if (reason == Code) return true;
+                    return false;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA004"),
+            Is.EqualTo(0));
+    }
+
+    [Test]
     public async Task AllowsImmutableStateAndCancellationRethrow()
     {
         const string source =
