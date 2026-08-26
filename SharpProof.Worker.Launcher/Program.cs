@@ -202,6 +202,16 @@ internal static class Program
                     return 3;
                 }
             }
+            else if (TryReadWorkerResponse(
+                         arguments.ResultPath, out _))
+            {
+                // A response that parsed successfully but failed strict
+                // request binding is evidence of a real worker response. Keep
+                // its bytes and diagnostics intact; replacing it with a
+                // generic envelope would erase the original failure context.
+                exitCode = NormalizeNoResultExitCode(exitCode);
+                resultExitCode = 3;
+            }
             else
             {
                 exitCode = NormalizeNoResultExitCode(exitCode);
@@ -901,6 +911,24 @@ internal static class Program
         WorkerClaimReason ClaimReason,
         string Code,
         string Message);
+
+    private static bool TryReadWorkerResponse(
+        string path, out WorkerVerifyResponse? response)
+    {
+        response = null;
+        try
+        {
+            response = WorkerProtocolJson.DeserializeResponse(
+                WorkerProtocolJson.ReadUtf8File(path));
+            return response != null && WorkerProtocolJson.Validate(response).IsValid;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or IOException or InvalidDataException or
+                UnauthorizedAccessException or JsonException)
+        {
+            return false;
+        }
+    }
 
     private static bool TryReadUnboundWorkerFailure(
         string path, out UnboundWorkerFailure? failure)

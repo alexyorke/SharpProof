@@ -1750,6 +1750,78 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task LauncherPreservesParseableButBindingInvalidWorkerResult()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var baselineResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "binding-invalid-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "binding-invalid-result.json");
+        string? emittedJson = null;
+
+        var exitCode = await Program.RunMain(
+            [
+                "verify",
+                "--worker", WorkerOutputPath(),
+                "--request", requestPath,
+                "--result", resultPath,
+                "--compiler-manifest", project.CompilerManifestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ],
+            static path => WorkerBinaryIdentity.ComputeSha256(path),
+            (arguments, request, _, _) =>
+            {
+                baselineResponse.RequestHash =
+                    WorkerProtocolJson.ComputeRequestHash(request);
+                baselineResponse.InputHash = new string(
+                    '0', WorkerProtocolVersions.EmptySha256.Length);
+                emittedJson = WorkerProtocolJson.SerializeResponse(baselineResponse);
+                File.WriteAllText(arguments.ResultPath, emittedJson);
+                // A parseable result must still normalize reserved worker
+                // exit codes while preserving the original bytes.
+                return 5;
+            });
+
+        var preservedJson = await File.ReadAllTextAsync(resultPath);
+        var preservedResponse = WorkerProtocolJson.DeserializeResponse(preservedJson)!;
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(requestPath))!;
+        var artifact = await CompilerManifestArtifact.ReadAsync(
+            request.CompilerManifest.Path);
+        using var manifestDocument = JsonDocument.Parse(artifact.Bytes);
+        var expectedManifest = manifestDocument.RootElement
+            .GetProperty("manifest")
+            .Deserialize<WorkerClaimManifest>(WorkerProtocolJson.Options)!;
+        var expectedInputHash = Program.ComputeExpectedInputHash(
+            WorkerOutputPath(), request, artifact.Bytes);
+        var validation = WorkerProtocolJson.ValidateForRequest(
+            preservedResponse,
+            preservedResponse.RequestHash,
+            expectedInputHash,
+            expectedManifest,
+            request,
+            preservedResponse.Summary.Versions);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.EqualTo(3));
+            Assert.That(preservedJson, Is.EqualTo(emittedJson));
+            Assert.That(preservedResponse.InputHash,
+                Is.EqualTo(new string('0', WorkerProtocolVersions.EmptySha256.Length)));
+            Assert.That(validation.IsValid, Is.False);
+            Assert.That(validation.Errors.Select(static error => error.Code),
+                Does.Contain("response.input_mismatch"));
+            Assert.That(preservedResponse.Errors.Select(static error => error.Code),
+                Does.Not.Contain("worker.malformed_result"));
+        }
+    }
+
+    [Test]
     public async Task LauncherFailsClosedOnAnUnclassifiedException()
     {
         RequireContainerWorker();
