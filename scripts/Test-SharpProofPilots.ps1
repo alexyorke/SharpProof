@@ -10,7 +10,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-. (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 . (Join-Path $PSScriptRoot 'Get-SharpProofPilotPackageAuthority.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')

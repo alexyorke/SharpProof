@@ -24,7 +24,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 
 function Get-PackageIdentity {
