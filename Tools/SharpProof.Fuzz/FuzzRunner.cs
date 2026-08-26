@@ -561,15 +561,16 @@ public static class FuzzRunner
         return factory.Boolean((caseSeed & 1) == 0);
     }
 
-    private static int CreateCaseSeed(int seed, int index)
+    internal static int CreateCaseSeed(int seed, int index)
     {
-        var value = unchecked(
-            (uint)seed + 0x9E3779B9u * (uint)(index + 1));
-        value ^= value >> 16;
-        value *= 0x85EBCA6Bu;
-        value ^= value >> 13;
-        value *= 0xC2B2AE35u;
-        value ^= value >> 16;
+        // Hash the seed/index pair as a unit. An additive case stride makes
+        // streams for seeds separated by that stride exact shifted copies,
+        // even when the subsequent mixer is a strong bijection.
+        var value = unchecked(((ulong)(uint)seed << 32) | (uint)index);
+        value = unchecked(value + 0x9E3779B97F4A7C15UL);
+        value = unchecked((value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL);
+        value = unchecked((value ^ (value >> 27)) * 0x94D049BB133111EBUL);
+        value ^= value >> 31;
         return unchecked((int)value);
     }
 

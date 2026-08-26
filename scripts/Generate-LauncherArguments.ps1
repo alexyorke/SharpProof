@@ -274,6 +274,32 @@ foreach ($entry in @($catalog.options)) {
 }
 $lines.Add('    ];')
 $lines.Add('')
+$lines.Add('    internal static string RequireRuntimeCompanionPath(')
+$lines.Add('        string directory,')
+$lines.Add('        string assemblyLocation,')
+$lines.Add('        string expectedFileName)')
+$lines.Add('    {')
+$lines.Add('        if (string.IsNullOrWhiteSpace(directory))')
+$lines.Add('        {')
+$lines.Add('            throw new InvalidOperationException(')
+$lines.Add('                "The launcher companion directory is blank.");')
+$lines.Add('        }')
+$lines.Add('        if (string.IsNullOrWhiteSpace(assemblyLocation))')
+$lines.Add('        {')
+$lines.Add('            throw new InvalidOperationException(')
+$lines.Add('                "A launcher runtime companion assembly has no file location.");')
+$lines.Add('        }')
+$lines.Add('        var fileName = System.IO.Path.GetFileName(assemblyLocation);')
+$lines.Add('        if (string.IsNullOrWhiteSpace(fileName) ||')
+$lines.Add('            !string.Equals(fileName, expectedFileName,')
+$lines.Add('                System.StringComparison.Ordinal))')
+$lines.Add('        {')
+$lines.Add('            throw new InvalidOperationException(')
+$lines.Add('                "A launcher runtime companion assembly has an unexpected file name.");')
+$lines.Add('        }')
+$lines.Add('        return System.IO.Path.Combine(directory, fileName);')
+$lines.Add('    }')
+$lines.Add('')
 $lines.Add('    internal static string[] LauncherRuntimePaths')
 $lines.Add('    {')
 $lines.Add('        get')
@@ -307,14 +333,20 @@ foreach ($file in $runtimeCompanionFiles) {
         $null
     }
     $fileExpression = if ($null -ne $assemblyType) {
-        "System.IO.Path.GetFileName(typeof($assemblyType).Assembly.Location)"
+        "RequireRuntimeCompanionPath(directory, typeof($assemblyType).Assembly.Location, " +
+            "$(Quote-CSharpString $file))"
     }
     else {
         Quote-CSharpString $file
     }
+    $pathExpression = if ($null -ne $assemblyType) {
+        $fileExpression
+    }
+    else {
+        "System.IO.Path.Combine(directory, $fileExpression)"
+    }
     $lines.Add(
-        "                System.IO.Path.Combine(directory, " +
-        "$fileExpression),")
+        "                $pathExpression,")
 }
 $lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
 $lines.Add('            ];')

@@ -862,6 +862,15 @@ public sealed class RoslynOperationLowerer
                 return operand;
             }
 
+            var operandInfo = _owner._factory.GetTypeInfo(operand.Term.Type);
+            var targetInfo = _owner._factory.GetTypeInfo(target);
+            if (targetInfo.Kind == IrTypeKind.String &&
+                operandInfo.Kind == IrTypeKind.Reference)
+            {
+                return LoweredExpression.Exact(
+                    _owner._factory.Cast(target, operand.Term));
+            }
+
             // Routing stays keyed on the operand's constant so the abstention
             // reasons keep their existing split. LowerConstant is what guards
             // against the conversion itself carrying no constant, which is the

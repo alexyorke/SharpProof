@@ -14,6 +14,44 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class LauncherArgumentTests
 {
+    [TestCase("")]
+    [TestCase("   ")]
+    public void RuntimeCompanionPathRejectsMissingAssemblyLocation(
+        string assemblyLocation)
+    {
+        Action action = () =>
+        {
+            _ = LauncherArguments.RequireRuntimeCompanionPath(
+                "/tmp/launcher",
+                assemblyLocation,
+                "System.Text.Json.dll");
+        };
+        Assert.Throws<InvalidOperationException>(action);
+    }
+
+    [Test]
+    public void RuntimeCompanionPathRequiresTheCataloguedFileName()
+    {
+        var path = LauncherArguments.RequireRuntimeCompanionPath(
+            "/tmp/launcher",
+            "/runtime/System.Text.Json.dll",
+            "System.Text.Json.dll");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(path, Is.EqualTo(Path.Combine(
+                "/tmp/launcher", "System.Text.Json.dll")));
+            Action action = () =>
+            {
+                _ = LauncherArguments.RequireRuntimeCompanionPath(
+                    "/tmp/launcher",
+                    "/runtime/other.dll",
+                    "System.Text.Json.dll");
+            };
+            Assert.Throws<InvalidOperationException>(action);
+        }
+    }
+
     [Test]
     [NonParallelizable]
     public void LinuxWorkerReceivesTheExactStartupRelease()

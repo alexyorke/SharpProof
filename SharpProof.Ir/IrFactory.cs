@@ -208,6 +208,11 @@ public sealed class IrFactory
 
     public OperationId CreateOperation(string? description = null)
     {
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            ValidateName(description, nameof(description));
+        }
+
         lock (_gate)
         {
             var id = new OperationId(_scope, _operations.Count);
@@ -635,10 +640,21 @@ public sealed class IrFactory
         {
             throw new ArgumentException("A non-empty name is required.", parameterName);
         }
+        if (!Utf16WellFormedness.IsWellFormed(value!))
+        {
+            throw new ArgumentException(
+                "Strings require well-formed UTF-16.", parameterName);
+        }
     }
 
     private IrStringId InternStringCore(string value)
     {
+        if (!Utf16WellFormedness.IsWellFormed(value))
+        {
+            throw new ArgumentException(
+                "Strings require well-formed UTF-16.", nameof(value));
+        }
+
         if (_stringIds.TryGetValue(value, out var existing))
         {
             return existing;

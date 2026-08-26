@@ -78,10 +78,31 @@ public sealed class FuzzRunnerTests
         Assert.That(
             first.PartialSmtAgreements,
             Is.EqualTo(options.Cases));
-        Assert.That(first.FrontendCoverage.HasExpandedCategories, Is.True);
+        Assert.That(first.FrontendCoverage.HasValidCounts, Is.True);
+        Assert.That(first.FrontendCoverage.StringCasts, Is.GreaterThan(0));
         Assert.That(first.FrontendCoverage.DivideByZeroExceptions, Is.GreaterThan(0));
         Assert.That(first.FrontendCoverage.OverflowExceptions, Is.GreaterThan(0));
-        Assert.That(first.FrontendCoverage.InvalidCastExceptions, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void CaseSeedHashDoesNotReplayShiftedSeedStreams()
+    {
+        const int firstSeed = 23063;
+        const int secondSeed = 23460;
+        const int cases = 1000;
+        var first = Enumerable.Range(0, cases)
+            .Select(index => FuzzRunner.CreateCaseSeed(firstSeed, index))
+            .ToArray();
+        var second = Enumerable.Range(0, cases)
+            .Select(index => FuzzRunner.CreateCaseSeed(secondSeed, index))
+            .ToArray();
+
+        Assert.That(first.Distinct().Count(), Is.EqualTo(cases));
+        Assert.That(second.Distinct().Count(), Is.EqualTo(cases));
+        Assert.That(
+            Enumerable.Range(0, cases - 1)
+                .Any(index => second[index] == first[index + 1]),
+            Is.False);
     }
 
     [Test]

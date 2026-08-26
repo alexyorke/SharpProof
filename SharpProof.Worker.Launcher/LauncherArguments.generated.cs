@@ -49,6 +49,32 @@ internal sealed partial class LauncherArguments
         "cache-maximum-bytes",
     ];
 
+    internal static string RequireRuntimeCompanionPath(
+        string directory,
+        string assemblyLocation,
+        string expectedFileName)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            throw new InvalidOperationException(
+                "The launcher companion directory is blank.");
+        }
+        if (string.IsNullOrWhiteSpace(assemblyLocation))
+        {
+            throw new InvalidOperationException(
+                "A launcher runtime companion assembly has no file location.");
+        }
+        var fileName = System.IO.Path.GetFileName(assemblyLocation);
+        if (string.IsNullOrWhiteSpace(fileName) ||
+            !string.Equals(fileName, expectedFileName,
+                System.StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "A launcher runtime companion assembly has an unexpected file name.");
+        }
+        return System.IO.Path.Combine(directory, fileName);
+    }
+
     internal static string[] LauncherRuntimePaths
     {
         get
@@ -74,9 +100,9 @@ internal sealed partial class LauncherArguments
                 System.IO.Path.Combine(directory, "SharpProof.Ir.dll"),
                 System.IO.Path.Combine(directory, "SharpProof.Specs.dll"),
                 System.IO.Path.Combine(directory, "SharpProof.Worker.Protocol.dll"),
-                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.IO.Pipelines.Pipe).Assembly.Location)),
-                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location)),
-                System.IO.Path.Combine(directory, System.IO.Path.GetFileName(typeof(System.Text.Json.JsonSerializer).Assembly.Location))
+                RequireRuntimeCompanionPath(directory, typeof(System.IO.Pipelines.Pipe).Assembly.Location, "System.IO.Pipelines.dll"),
+                RequireRuntimeCompanionPath(directory, typeof(System.Text.Encodings.Web.HtmlEncoder).Assembly.Location, "System.Text.Encodings.Web.dll"),
+                RequireRuntimeCompanionPath(directory, typeof(System.Text.Json.JsonSerializer).Assembly.Location, "System.Text.Json.dll")
             ];
         }
     }

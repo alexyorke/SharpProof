@@ -310,8 +310,8 @@ public sealed class FrontendLoweringTests
             """
             public static string Target(object value) => (string)value;
             """,
-            FrontendSubsetDecision.ClosedAbstention,
-            FrontendAbstention.ConversionMayChangeValue);
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
     }
 
     [Test]

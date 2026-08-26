@@ -133,6 +133,15 @@ public sealed class AtomicFileTests
     }
 
     [Test]
+    public void PublicationRetryBudgetCoversSustainedContentionWindow()
+    {
+        var retryBudget = Enumerable.Range(0, AtomicFile.MaximumPublishAttempts - 1)
+            .Sum(AtomicFile.RetryDelayMilliseconds);
+
+        Assert.That(retryBudget, Is.GreaterThanOrEqualTo(200));
+    }
+
+    [Test]
     public void WriteUtf8SupportsAValidNearLimitDestinationName()
     {
         var path = Path.Combine(_root, new string('x', 240));

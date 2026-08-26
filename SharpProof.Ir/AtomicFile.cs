@@ -1,6 +1,7 @@
 namespace SharpProof.Ir;
 internal static class AtomicFile
 {
+    internal const int MaximumPublishAttempts = 10;
     private static readonly UTF8Encoding Utf8 = new(false);
     private static readonly TimeSpan StagingLifetime = TimeSpan.FromHours(1);
 
@@ -154,7 +155,7 @@ internal static class AtomicFile
     private static void Publish(string temporary, string destination)
     {
         Exception? lastFailure = null;
-        for (var attempt = 0; attempt < 8; attempt++)
+        for (var attempt = 0; attempt < MaximumPublishAttempts; attempt++)
         {
             try
             {
@@ -174,14 +175,19 @@ internal static class AtomicFile
                 // the existence check and the rename. The staged file remains
                 // valid, so retry using the new destination state.
                 lastFailure = exception;
-                if (attempt + 1 < 8)
+                if (attempt + 1 < MaximumPublishAttempts)
                 {
-                    Thread.Sleep(1 << Math.Min(attempt, 5));
+                    Thread.Sleep(RetryDelayMilliseconds(attempt));
                 }
             }
         }
 
         throw lastFailure ?? new IOException(
             "The staged file disappeared before publication completed.");
+    }
+
+    internal static int RetryDelayMilliseconds(int attempt)
+    {
+        return 1 << Math.Min(attempt, 6);
     }
 }

@@ -376,6 +376,51 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void FactoryRejectsMalformedUtf16InAllInternedNames()
+    {
+        var factory = new IrFactory();
+        var identity = factory.CreateIdentity();
+        var referenceType = factory.GetOrCreateReferenceType(
+            identity,
+            "Reference");
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var malformedValues = new[] { "a\uD800", "\uDC00", "\uD800x" };
+        foreach (var malformed in malformedValues)
+        {
+            var actions = new (Action Action, string ParameterName)[]
+            {
+                (() => factory.GetOrCreateReferenceType(
+                    factory.CreateIdentity(), malformed), "displayName"),
+                (() => factory.GetOrCreateSequenceType(
+                    factory.CreateIdentity(), sequenceType, malformed), "displayName"),
+                (() => factory.CreateVariable(malformed, factory.IntegerType), "name"),
+                (() => factory.GetOrCreateMember(
+                    factory.CreateIdentity(),
+                    referenceType,
+                    malformed,
+                    factory.IntegerType,
+                    isStatic: false), "name"),
+                (() => factory.CreateOperation(malformed), "description"),
+                (() => factory.String(malformed), "value"),
+                (() => new IrProgramBuilder(factory).CreateBlock(malformed), "value")
+            };
+
+            foreach (var (action, parameterName) in actions)
+            {
+                var exception = Assert.Throws<ArgumentException>(action);
+                Assert.That(exception!.ParamName, Is.EqualTo(parameterName));
+            }
+        }
+
+        var before = factory.InternString("before");
+        var after = factory.InternString("after");
+        Assert.That(after.Value, Is.EqualTo(before.Value + 1));
+        Assert.That(
+            factory.InternString("\uD83D\uDE00").Value,
+            Is.EqualTo(after.Value + 1));
+    }
+
+    [Test]
     public void InstanceMembersRejectMismatchedReceiverTypesEverywhere()
     {
         var factory = new IrFactory();
