@@ -991,3 +991,10 @@ The entries below were produced by a third read-only hunter wave run later on th
 
 **Location**: `SharpProof.Verify\ProofKernel.cs` awaits the public backend task; `SharpProof.Verify.Test\ProofKernelTests.cs` contains the backend-shape regressions.
 **Description**: A backend returning a null `Task<BackendCheckResult>` caused `await` to throw `NullReferenceException`, bypassing the existing typed malformed-result handling. The kernel now returns `Unknown(MalformedBackendResult)` for this shape without broadening the exception filter, so genuine backend exceptions retain their existing handling.
+
+### 392. [RESOLVED cd811af72] `IrFactory.Cast` Minted Null-to-Nonnullable Terms That Replay as Concrete Invalid-Cast Faults
+
+**Status**: Resolved by rejecting null operands when the target IR type is nonnullable. Existing reference-cast behavior remains unchanged, and the focused IR cast/interpreter suite passes 3/3.
+
+**Location**: `SharpProof.Ir\IrFactory.cs` validates composite term construction; `SharpProof.Ir.Test\IrKernelTests.cs` covers reference casts and invalid construction.
+**Description**: The factory already canonicalized null-to-nullable casts but allowed a null-to-boolean/integer cast to be interned. The interpreter then classified that ill-sorted term as a concrete `InvalidCast` exception while the SMT backend abstained, creating an avoidable oracle mismatch. The construction guard makes the malformed shape fail closed at the API boundary.
