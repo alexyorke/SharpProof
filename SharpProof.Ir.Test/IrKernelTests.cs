@@ -1036,6 +1036,20 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void FactoryRejectsNullCastsToNonNullableTypes()
+    {
+        var factory = new IrFactory();
+
+        Action castNull = () =>
+        {
+            _ = factory.Cast(
+                factory.IntegerType,
+                factory.Null(factory.StringType));
+        };
+        Assert.That(castNull, Throws.ArgumentException);
+    }
+
+    [Test]
     public void InterpreterUsesConcreteStringReferenceTypeForStringCasts()
     {
         var factory = new IrFactory();

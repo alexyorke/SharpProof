@@ -497,6 +497,13 @@ public sealed class IrFactory
                 return Null(targetType);
             }
 
+            if (operand is IrNullTerm)
+            {
+                throw new ArgumentException(
+                    "Null cannot be cast to a non-nullable IR type.",
+                    nameof(targetType));
+            }
+
             return Intern(
                 new StructuralKey(IrTermKind.Cast, targetType.Value, children: [operand.Id.Value]),
                 id => new IrCastTerm(id, targetType, operand));
