@@ -579,6 +579,33 @@ public sealed class LinuxPublicationSetTests
     }
 
     [Test]
+    public void AcquisitionSweepsOrphanedTemporaryMarkers()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var result = Path.Combine(directory.Path, "orphaned-result.json");
+        var marker = LinuxPathIdentity.PublicationMarkerPath(result);
+        var metadataDirectory = Path.GetDirectoryName(marker)!;
+        Directory.CreateDirectory(metadataDirectory);
+        File.SetUnixFileMode(
+            metadataDirectory,
+            UnixFileMode.UserRead |
+            UnixFileMode.UserWrite |
+            UnixFileMode.UserExecute);
+        var temporaryMarker = marker + ".orphan.tmp";
+        File.WriteAllText(temporaryMarker, "incomplete");
+
+        using var publication = LinuxPathIdentity.AcquirePublicationSet(
+            [result],
+            TimeSpan.FromSeconds(1));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(temporaryMarker), Is.False);
+            Assert.That(File.Exists(marker), Is.True);
+        }
+    }
+
+    [Test]
     [NonParallelizable]
     public void CaseFoldProbeChecksEveryExistingAncestorAndFailsClosed()
     {

@@ -630,6 +630,7 @@ public static partial class LinuxPathIdentity
                 throw new IOException(
                     "SharpProof publication path identity changed while acquiring locks.");
             }
+            SweepOrphanedTemporaryMarkers(canonicalPaths);
             if (bind)
             {
                 BindPublicationSet(canonicalPaths);
@@ -952,6 +953,32 @@ public static partial class LinuxPathIdentity
                     {
                     }
                 }
+            }
+        }
+    }
+
+    private static void SweepOrphanedTemporaryMarkers(
+        IEnumerable<string> canonicalPaths)
+    {
+        foreach (var markerPath in canonicalPaths.Select(PublicationMarkerPath))
+        {
+            var metadataDirectory = Path.GetDirectoryName(markerPath) ??
+                throw new IOException(
+                    "SharpProof publication metadata has no directory.");
+            var pattern = Path.GetFileName(markerPath) + ".*.tmp";
+            var removed = false;
+            foreach (var temporaryMarker in Directory.EnumerateFiles(
+                         metadataDirectory,
+                         pattern,
+                         SearchOption.TopDirectoryOnly))
+            {
+                File.Delete(temporaryMarker);
+                removed = true;
+            }
+
+            if (removed)
+            {
+                SyncDirectory(metadataDirectory);
             }
         }
     }
