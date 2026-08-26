@@ -93,12 +93,21 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             var response = WorkerResultAssembler.Create(inputHash, manifest,
                 WorkerRunStatus.Complete, WorkerRunFailureReason.None, callables,
                 claims, budgets, WorkerCacheStatus.Hit, 0);
-            if (!IsCacheable(
-                    response,
-                    inputHash,
-                    manifest,
-                    targets,
-                    cancellationToken))
+            var cacheable = TryIsCacheable(
+                response,
+                inputHash,
+                manifest,
+                targets,
+                cancellationToken,
+                out var admissionFault);
+            if (admissionFault)
+            {
+                RestoreStaged(staged);
+                committed = true;
+                return null;
+            }
+
+            if (!cacheable)
             {
                 RestoreStaged(staged);
                 TryDeleteCorruptEntry(path);
@@ -539,6 +548,24 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ImmutableArray<CompilerCallablePreparation> targets,
         CancellationToken cancellationToken = default)
     {
+        return TryIsCacheable(
+            response,
+            expectedInputHash,
+            expectedManifest,
+            targets,
+            cancellationToken,
+            out _);
+    }
+
+    internal static bool TryIsCacheable(
+        WorkerVerifyResponse? response,
+        string expectedInputHash,
+        WorkerClaimManifest expectedManifest,
+        ImmutableArray<CompilerCallablePreparation> targets,
+        CancellationToken cancellationToken,
+        out bool admissionFault)
+    {
+        admissionFault = false;
         try
         {
             return WorkerProtocolJson.IsSha256(expectedInputHash) &&
@@ -559,6 +586,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             // A cache replay/admission fault must not become a worker-wide
             // infrastructure failure. The caller recomputes the result and
             // leaves the existing cache entry intact.
+            admissionFault = true;
             return false;
         }
     }

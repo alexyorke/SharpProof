@@ -4355,7 +4355,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public void CacheableResponseRequiresValidatedTerminalRecords()
+    public async Task CacheableResponseRequiresValidatedTerminalRecords()
     {
         const string callableId = "M:Subject.M";
         var manifest = new WorkerClaimManifest
@@ -4473,6 +4473,40 @@ public sealed class WorkerTests
                 manifest,
                 [replayFaultTarget]),
             Is.False);
+
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-admission-fault-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var cache = new VerificationCache(directory, 1024 * 1024);
+            Assert.That(
+                await cache.TryWriteAsync(
+                    response,
+                    response.InputHash,
+                    manifest,
+                    CancellationToken.None),
+                Is.True);
+            var cachePath = Path.Combine(
+                directory,
+                response.InputHash + ".sharp-proof-cache.json");
+            Assert.That(File.Exists(cachePath), Is.True);
+
+            Assert.That(
+                await cache.TryReadAsync(
+                    response.InputHash,
+                    manifest,
+                    [replayFaultTarget],
+                    new WorkerBudgets(),
+                    CancellationToken.None),
+                Is.Null);
+            Assert.That(File.Exists(cachePath), Is.True);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
 
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
         Assert.That(
