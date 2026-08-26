@@ -55,6 +55,12 @@ public sealed class StandaloneGateEvidenceTests
             Assert.That(
                 evidence,
                 Does.Contain("Assert-SharpProofStandaloneGateResult"));
+            Assert.That(
+                evidence,
+                Does.Contain("The gate result failed validation:"));
+            Assert.That(
+                evidence,
+                Does.Not.Contain("The gate result was not valid JSON:"));
             Assert.That(evidence, Does.Contain("SharpProofSourceCommit"));
             Assert.That(evidence, Does.Contain("GetMetadataReader"));
             Assert.That(producer, Does.Contain("CreateStandaloneEnvelope"));

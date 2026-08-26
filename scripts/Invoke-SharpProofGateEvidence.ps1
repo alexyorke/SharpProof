@@ -127,7 +127,7 @@ try {
                 -ExpectedContractSha256 $contractSha256
         }
         catch {
-            $failure = 'The gate result was not valid JSON: ' +
+            $failure = 'The gate result failed validation: ' +
                 $_.Exception.Message
         }
     }
