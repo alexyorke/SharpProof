@@ -74,6 +74,52 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task NullAdditionalFileTextProducesPathAndCause()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("null-additional-text");
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(path),
+            [new NullAdditionalText("null.inputs")]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(
+                diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("null.inputs")
+                    .And.Contain("InvalidOperationException")
+                    .And.Contain("no compiler text"));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task ThrowingAdditionalFileTextProducesPathAndCause()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("throwing-additional-text");
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(path),
+            [new ThrowingAdditionalText("throwing.inputs")]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(
+                diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("throwing.inputs")
+                    .And.Contain("IOException")
+                    .And.Contain("locked"));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
     public async Task ValidPairAndReplacementRoundTripWithDistinctFingerprints()
     {
         using var workspace = new CollectorWorkspace();
@@ -1193,6 +1239,28 @@ public sealed class FinalCompilationCollectorTests
             CancellationToken cancellationToken = default)
         {
             return SourceText.From(content, Encoding.UTF8);
+        }
+    }
+
+    private sealed class NullAdditionalText(string path) : AdditionalText
+    {
+        public override string Path { get; } = path;
+
+        public override SourceText? GetText(
+            CancellationToken cancellationToken = default)
+        {
+            return null;
+        }
+    }
+
+    private sealed class ThrowingAdditionalText(string path) : AdditionalText
+    {
+        public override string Path { get; } = path;
+
+        public override SourceText GetText(
+            CancellationToken cancellationToken = default)
+        {
+            throw new IOException("additional file is locked");
         }
     }
 

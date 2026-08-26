@@ -351,8 +351,28 @@ internal static class CompilerCompilationCapture
     {
         cancellationToken.ThrowIfCancellationRequested();
         var path = Path.IsPathRooted(file.Path) ? file.Path : Path.Combine(projectDirectory, file.Path);
-        var text = file.GetText(cancellationToken) ??
-            throw new InvalidOperationException("An additional file has no compiler text.");
+        SourceText text;
+        try
+        {
+            text = file.GetText(cancellationToken) ??
+                throw new InvalidOperationException(
+                    "An additional file has no compiler text.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+#pragma warning disable CA1031
+        catch (Exception exception)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+#pragma warning restore CA1031
+            var normalizedPath = CompilerCaptureAuthority.NormalizePath(path);
+            throw new InvalidDataException(
+                $"Additional file '{normalizedPath}' could not be read: " +
+                $"{exception.GetType().Name}: {exception.Message}");
+        }
+
         return new CompilerAdditionalFileSnapshot
         {
             Path = CompilerCaptureAuthority.NormalizePath(path),
