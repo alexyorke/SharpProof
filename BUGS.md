@@ -998,3 +998,15 @@ The entries below were produced by a third read-only hunter wave run later on th
 
 **Location**: `SharpProof.Ir\IrFactory.cs` validates composite term construction; `SharpProof.Ir.Test\IrKernelTests.cs` covers reference casts and invalid construction.
 **Description**: The factory already canonicalized null-to-nullable casts but allowed a null-to-boolean/integer cast to be interned. The interpreter then classified that ill-sorted term as a concrete `InvalidCast` exception while the SMT backend abstained, creating an avoidable oracle mismatch. The construction guard makes the malformed shape fail closed at the API boundary.
+
+### 393. [RESOLVED 704db705b] Requires-Only Binding Silently Accepted Naked `Contract.Result` and `Contract.Old` Calls
+
+**Status**: Resolved by treating an intrinsic violation with no enclosing contract clause as fatal during `BindRequires`, matching full binding. The existing standalone `Result` and `Old` regressions now exercise both binder entry points and pass 2/2.
+
+**Location**: `SharpProof.Contracts\ContractBinder.cs` (`ValidateIntrinsics`), with coverage in `SharpProof.Contracts.Test\ContractBinderTests.cs` (`StandaloneIntrinsicsFailClosed`).
+**Description**: `ContractIntrinsicValidator` correctly classified a body-level `Contract.Result<T>()` or `Contract.Old(...)` call as `ResultOutsideEnsures`/`OldOutsideEnsures`. Full `Bind` returned that typed failure, but `BindRequires` filtered violations to only those enclosed by a `Requires` clause, so the same method could return successful precondition bindings while the verifier rejected its contract source. The filter now also fails for violations with no enclosing clause; invalid intrinsics inside non-`Requires` clauses retain the existing requires-only scoping.
+
+**Reproduction**:
+1. Define a method containing `_ = Contract.Result<long>();` or `_ = Contract.Old(value);` with no surrounding clause.
+2. Full binding returns the corresponding outside-`Ensures` failure.
+3. Before `704db705b`, `BindRequires` returned success with no clauses; after the fix it returns the same typed failure.
