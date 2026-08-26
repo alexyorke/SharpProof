@@ -1157,6 +1157,40 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [NonParallelizable]
+    public void BrokenDiagnosticStreamDoesNotEscapeResultValidation()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        var originalError = Console.Error;
+        using var throwingError = new ThrowingTextWriter();
+        try
+        {
+            Console.SetError(throwingError);
+            var exitCode = Program.ValidateAndReport(
+                path,
+                new WorkerVerifyRequest(),
+                null,
+                null,
+                null,
+                out var validResponse,
+                out var validatedResponse);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(3));
+                Assert.That(validResponse, Is.False);
+                Assert.That(validatedResponse, Is.Null);
+            }
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    [Test]
     [Platform("Linux")]
     public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
     {
@@ -2209,6 +2243,16 @@ public sealed class LauncherArgumentTests
         "--compiler-manifest", "compiler-manifest.json",
         "--verify-policy", "advisory",
         "--assumption-policy", "allow"
-    ];
+        ];
+    }
+
+    private sealed class ThrowingTextWriter : TextWriter
+    {
+        public override System.Text.Encoding Encoding => System.Text.Encoding.UTF8;
+
+        public override void WriteLine(string? value)
+        {
+            throw new IOException("The diagnostic stream is closed.");
+        }
     }
 }

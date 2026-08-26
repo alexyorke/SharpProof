@@ -31,7 +31,7 @@ internal static class Program
     {
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
-            Console.Error.WriteLine(
+            WriteErrorLine(
                 "Usage: SharpProof.Worker.Launcher verify --worker <path> --request <path> --result <path> " +
                 "--compiler-manifest <path> --verify-policy <policy> --assumption-policy <policy> " +
                 "[--publish-request <path> --publish-result <path> --publish-compiler-manifest <path> " +
@@ -83,7 +83,7 @@ internal static class Program
         {
             runtimeSnapshot?.Dispose();
             runtimeSnapshot = null;
-            Console.Error.WriteLine(
+            WriteErrorLine(
                 "SharpProof launcher input is invalid: " +
                 exception.GetType().Name + ": " + exception.Message);
             return 2;
@@ -102,7 +102,7 @@ internal static class Program
         {
             runtimeSnapshot.Dispose();
             runtimeSnapshot = null;
-            Console.Error.WriteLine(
+            WriteErrorLine(
                 "SharpProof launcher could not stage its private request: " +
                 exception.Message);
             return 3;
@@ -140,7 +140,7 @@ internal static class Program
         {
             var failure = ClassifyLauncherFailure(exception);
             exitCode = failure.ExitCode;
-            Console.Error.WriteLine(failure.ConsoleMessage);
+            WriteErrorLine(failure.ConsoleMessage);
             if (!await TryWriteLauncherFailureAsync(
                     arguments.ResultPath, request, artifact, expectedInputHash,
                     expectedVersions, failure.Status, failure.Reason,
@@ -160,7 +160,7 @@ internal static class Program
                     ArgumentException or InvalidOperationException or
                     System.ComponentModel.Win32Exception)
             {
-                Console.Error.WriteLine(
+                WriteErrorLine(
                     "SharpProof launcher could not clear the timed-out result: " +
                     exception.Message);
                 return 3;
@@ -213,7 +213,7 @@ internal static class Program
                     UnauthorizedAccessException or ArgumentException or
                     System.ComponentModel.Win32Exception)
             {
-                Console.Error.WriteLine(
+                WriteErrorLine(
                     "SharpProof worker result could not be published: " +
                     exception.Message);
                 return 3;
@@ -226,7 +226,7 @@ internal static class Program
 
         if (resultExitCode != 0)
         {
-            Console.Error.WriteLine("SharpProof worker failed closed with exit code " +
+            WriteErrorLine("SharpProof worker failed closed with exit code " +
                 exitCode.ToString(CultureInfo.InvariantCulture) + ".");
         }
         return exitCode;
@@ -410,7 +410,7 @@ internal static class Program
             exception is ArgumentException or IOException or InvalidDataException or
                 UnauthorizedAccessException or JsonException)
         {
-            Console.Error.WriteLine(
+            WriteErrorLine(
                 "SharpProof worker result is unavailable or malformed.");
             return 3;
         }
@@ -463,7 +463,7 @@ internal static class Program
             if (claimLogCharacters + line.Length + Environment.NewLine.Length <=
                 MaximumClaimLogCharacters)
             {
-                Console.WriteLine(line);
+                WriteOutputLine(line);
                 claimLogCharacters += line.Length + Environment.NewLine.Length;
             }
             else
@@ -473,7 +473,7 @@ internal static class Program
         }
         if (omittedClaimLogs != 0)
         {
-            Console.WriteLine(
+            WriteOutputLine(
                 "SharpProof omitted " + omittedClaimLogs.ToString(CultureInfo.InvariantCulture) +
                 " claim log lines to keep launcher output bounded.");
         }
@@ -492,7 +492,7 @@ internal static class Program
         var incompleteError = incomplete.Length != 0 &
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
-        Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(
+        WriteOutputLine("SharpProof summary " + JsonSerializer.Serialize(
             new
             {
                 response.RunStatus,
@@ -502,7 +502,7 @@ internal static class Program
             WorkerProtocolJson.Options));
         if (response.RunStatus != WorkerRunStatus.Complete)
         {
-            Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
+            WriteErrorLine("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
             if (response.FailureReason ==
                 WorkerRunFailureReason.ContainmentFailure)
@@ -570,11 +570,11 @@ internal static class Program
         var diagnostic = prefix + ": " + severity + " " + id + ": " + message;
         if (severity == "info")
         {
-            Console.Out.WriteLine(diagnostic);
+            WriteOutputLine(diagnostic);
             return;
         }
 
-        Console.Error.WriteLine(VerifierDiagnosticTransport.Serialize(
+        WriteErrorLine(VerifierDiagnosticTransport.Serialize(
             new VerifierDiagnostic(
                 severity,
                 id,
@@ -582,7 +582,7 @@ internal static class Program
                 location.Line,
                 location.Column,
                 message)));
-        Console.Out.WriteLine(diagnostic);
+        WriteOutputLine(diagnostic);
     }
 
     private static void PublishOutputs(
@@ -923,7 +923,7 @@ internal static class Program
                 ArgumentException or InvalidDataException or InvalidOperationException or
                 System.ComponentModel.Win32Exception)
         {
-            Console.Error.WriteLine(
+            WriteErrorLine(
                 "SharpProof launcher could not write its failure response: " +
                 exception.Message);
             return false;
@@ -943,7 +943,34 @@ internal static class Program
     {
         foreach (var error in errors)
         {
-            Console.Error.WriteLine(prefix + error.Code + ": " + error.Message);
+            WriteErrorLine(prefix + error.Code + ": " + error.Message);
+        }
+    }
+
+    private static void WriteErrorLine(string message)
+    {
+        try
+        {
+            Console.Error.WriteLine(message);
+        }
+        catch (Exception exception) when (exception is
+            IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            // Reporting must not turn an already-classified worker result into
+            // an unhandled launcher failure when stderr is closed or broken.
+        }
+    }
+
+    private static void WriteOutputLine(string message)
+    {
+        try
+        {
+            Console.Out.WriteLine(message);
+        }
+        catch (Exception exception) when (exception is
+            IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            // Reporting is best-effort for the same reason as stderr output.
         }
     }
 }
