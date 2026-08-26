@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
@@ -222,6 +223,59 @@ public sealed class CallableCounterexampleReplayerTests
                 0,
                 ImmutableDictionary<IrVarId, IrValue>.Empty),
             Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
+    public void ReplayDoesNotClassifyMalformedInterpreterStateAsReplayEvidenceFailure()
+    {
+        var factory = new IrFactory();
+        var bodyValue = factory.CreateVariable("body-value", factory.BooleanType);
+        var modelValue = factory.CreateVariable("model-value", factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var whenTrue = builder.CreateBlock("true");
+        var whenFalse = builder.CreateBlock("false");
+        builder.Branch(
+            entry,
+            factory.CreateOperation(),
+            factory.Variable(bodyValue),
+            whenTrue,
+            whenFalse);
+        builder.Return(whenTrue, factory.CreateOperation(), factory.Boolean(false));
+        builder.Return(whenFalse, factory.CreateOperation(), factory.Boolean(false));
+
+        var target = new CompilerCallablePreparation(
+            factory,
+            new WorkerCallableManifestEntry
+            {
+                CallableId = "malformed-interpreter-state",
+                ClaimIds = ["claim"]
+            },
+            [new CompilerPreparedClause(
+                CompilerContractKind.Ensures,
+                factory.Boolean(false),
+                CompilerContractEvidence.CompilerBoundInvocation,
+                "claim",
+                null)],
+            [],
+            WorkerClaimReason.None,
+            CompilerPreparedBody.ProgramBody(
+                builder.Build(),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty.Add(bodyValue, modelValue),
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty));
+        var malformedValue = (IrValue)typeof(IrValue)
+            .GetConstructor(
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                [typeof(IrTypeId), typeof(IrValueKind), typeof(object)],
+                modifiers: null)!
+            .Invoke([factory.BooleanType, IrValueKind.Integer, 1L]);
+        var model = ImmutableDictionary<IrVarId, IrValue>.Empty
+            .Add(modelValue, malformedValue);
+
+        Assert.Throws<InvalidOperationException>((Action)(() =>
+            CallableCounterexampleReplayer.Replay(target, 0, model)));
     }
 
     private static ReplayFixture CreateIncrementingBranch(

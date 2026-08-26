@@ -104,6 +104,5 @@ internal static class CallableCounterexampleReplayer
                     ? WorkerClaimReason.None : WorkerClaimReason.CounterexampleReplayFailed;
         }
         catch (ArgumentException) { return WorkerClaimReason.CounterexampleReplayFailed; }
-        catch (InvalidOperationException) { return WorkerClaimReason.CounterexampleReplayFailed; }
     }
 }
