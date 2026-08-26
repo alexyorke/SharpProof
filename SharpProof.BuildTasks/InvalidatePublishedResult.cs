@@ -187,6 +187,10 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
                  .Any(path => LinuxPathIdentity.PathsConflict(
                      path,
                      resolvedCachePath)) ||
+             compilerOutputPaths.Any(compilerOutput =>
+                 LinuxPathIdentity.PathsConflict(
+                     resolvedCachePath,
+                     compilerOutput)) ||
              workerTreeExists &&
              !string.IsNullOrWhiteSpace(workerDirectory) &&
              LinuxPathIdentity.PathsConflict(

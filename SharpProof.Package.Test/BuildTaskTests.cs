@@ -2120,6 +2120,65 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    public void CacheRejectsCompilerOwnedOutputOverlap()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-cache-compiler-output-");
+        try
+        {
+            var tools = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "tools"));
+            var worker = Path.Combine(tools.FullName, "worker.dll");
+            var launcher = Path.Combine(tools.FullName, "launcher.dll");
+            var protocol = Path.Combine(tools.FullName, "protocol.dll");
+            foreach (var path in new[] { worker, launcher, protocol })
+            {
+                File.WriteAllText(path, Path.GetFileName(path));
+            }
+
+            var compilerDirectory = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "obj"));
+            var compilerOutput = Path.Combine(
+                compilerDirectory.FullName,
+                "Consumer.dll");
+            File.WriteAllText(compilerOutput, "compiler output");
+            var publication = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "publication"));
+            var result = Path.Combine(publication.FullName, "result.json");
+            var request = Path.Combine(publication.FullName, "request.json");
+            var manifest = Path.Combine(publication.FullName, "manifest.json");
+            var engine = new RecordingBuildEngine();
+            var task = new InvalidatePublishedResult
+            {
+                BuildEngine = engine,
+                ProjectDirectory = directory.FullName,
+                ResultPath = result,
+                RequestPath = request,
+                ManifestPath = manifest,
+                WorkerPath = worker,
+                LauncherPath = launcher,
+                WorkerProtocolPath = protocol,
+                CachePath = compilerDirectory.FullName,
+                CompilerOutputPaths = [new TaskItem(compilerOutput)]
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(engine.Errors.Select(static error => error.Message), Has.Some.Contain(
+                    "SharpProof output, input, cache, and worker paths must be distinct."));
+                Assert.That(File.Exists(compilerOutput), Is.True);
+                Assert.That(File.Exists(result), Is.False);
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public async System.Threading.Tasks.Task PublicationResetRemovesOnlyCompleteOwnedSet()
     {
         var directory = Directory.CreateTempSubdirectory(
