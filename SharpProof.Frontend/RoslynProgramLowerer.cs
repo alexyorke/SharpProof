@@ -256,6 +256,24 @@ public sealed class RoslynProgramLowerer(
                     }
                     Abstain(operation, location.Abstention);
                     break;
+                case IIncrementOrDecrementOperation mutation:
+                    LowerUnsupportedMutation(block, operation, mutation.Target);
+                    return CreateHavocTemporary(
+                        block,
+                        operation,
+                        "mutation",
+                        _expressions.GetTypeId(mutation.Type));
+                case ICompoundAssignmentOperation mutation:
+                    LowerUnsupportedMutation(
+                        block,
+                        operation,
+                        mutation.Target,
+                        mutation.Value);
+                    return CreateHavocTemporary(
+                        block,
+                        operation,
+                        "mutation",
+                        _expressions.GetTypeId(mutation.Type));
             }
 
             var lowered = _expressions.Lower(value);

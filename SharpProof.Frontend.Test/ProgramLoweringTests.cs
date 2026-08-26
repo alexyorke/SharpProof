@@ -205,6 +205,69 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void ExpressionIncrementHavocsItsTarget()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                var updated = value++;
+                return value;
+            }
+            """);
+        var parameter = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "value" }).Variable;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedMutation));
+            Assert.That(
+                lowered.Result.Program.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .OfType<IrHavocInstruction>()
+                    .SelectMany(static havoc => havoc.Variables),
+                Does.Contain(parameter));
+        }
+    }
+
+    [Test]
+    public void ExpressionCompoundAssignmentEvaluatesValueBeforeHavoc()
+    {
+        var lowered = Lower(
+            """
+            private static long Probe(long marker) => marker;
+            public static long Target(long value) {
+                var result = value += Probe(2L);
+                return value;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var parameter = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "value" }).Variable;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedMutation));
+            Assert.That(
+                instructions.OfType<IrCallInstruction>()
+                    .Select(call => lowered.Factory.GetString(
+                        lowered.Factory.GetMemberInfo(call.Member).Name)),
+                Has.Some.Contains("Probe"));
+            Assert.That(
+                instructions.OfType<IrHavocInstruction>()
+                    .SelectMany(static havoc => havoc.Variables),
+                Does.Contain(parameter));
+        }
+    }
+
+    [Test]
     public void InvocationLoweringPreservesReceiverAndSourceArgumentOrder()
     {
         var lowered = Lower(
