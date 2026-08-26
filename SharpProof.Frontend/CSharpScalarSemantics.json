@@ -370,7 +370,8 @@
   "builtInEquality": {
     "allowReferenceTypes": true,
     "excludedReferenceTypeKinds": [
-      "Delegate"
+      "Delegate",
+      "Array"
     ],
     "excludedSpecialTypes": [
       "System_Delegate",

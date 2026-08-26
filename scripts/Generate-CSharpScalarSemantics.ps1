@@ -687,7 +687,7 @@ $excludedReferenceTypeKinds = @(
         ForEach-Object {
             Assert-EnumName `
                 -Value $_ `
-                -Allowed @('Delegate') `
+                -Allowed @('Delegate', 'Array') `
                 -Context 'builtInEquality.excludedReferenceTypeKinds'
         })
 if (@($excludedReferenceTypeKinds | Select-Object -Unique).Count -ne

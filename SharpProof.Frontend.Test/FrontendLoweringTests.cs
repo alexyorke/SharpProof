@@ -444,6 +444,15 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void SequenceEqualityAbstainsUntilIdentityIsModeled()
+    {
+        AssertClassification(
+            "public static bool Target(int[] left, int[] right) => left == right;",
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
     public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
     {
         var classification = default(FrontendSubsetClassification);

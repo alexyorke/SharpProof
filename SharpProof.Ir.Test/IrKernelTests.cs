@@ -163,6 +163,32 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void InterpreterDoesNotInventIdentityForSequenceEquality()
+    {
+        var factory = new IrFactory();
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var left = factory.CreateVariable("left", sequenceType);
+        var right = factory.CreateVariable("right", sequenceType);
+        var equality = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Variable(left),
+            factory.Variable(right));
+        var values = new Dictionary<IrVarId, IrValue>
+        {
+            [left] = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)]),
+            [right] = factory.CreateSequenceValue(sequenceType, [factory.CreateIntegerValue(1)])
+        };
+
+        var result = new IrInterpreter(factory).Evaluate(equality, values);
+
+        Assert.That(result.Status, Is.EqualTo(IrEvaluationStatus.Unsupported));
+        Assert.That(result.Unsupported!.Reason,
+            Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
+        Assert.That(result.Unsupported.Detail,
+            Does.Contain("compatible runtime kinds"));
+    }
+
+    [Test]
     public void IdenticalConditionalBranchesDoNotEraseGuardEvaluation()
     {
         var factory = new IrFactory();

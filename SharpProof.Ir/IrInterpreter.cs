@@ -351,7 +351,6 @@ public sealed class IrInterpreter(IrFactory factory)
                 string.Equals(left.String, right.String, StringComparison.Ordinal),
             (IrValueKind.Reference, IrValueKind.Reference) =>
                 ReferenceEquals(left.Reference, right.Reference),
-            (IrValueKind.Sequence, IrValueKind.Sequence) => ReferenceEquals(left, right),
             _ => null
         };
         return equal is bool established
