@@ -1573,6 +1573,32 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void ManifestRejectsInterleavedPostconditionAndEffectClaims()
+    {
+        var manifest = CreateManifest();
+        var callable = manifest.Callables[0];
+        var postcondition = manifest.Claims[0];
+        var effect = new WorkerClaimManifestEntry
+        {
+            ClaimId = "claim.effect",
+            CallableId = callable.CallableId,
+            Ordinal = 0,
+            Kind = WorkerClaimKind.Effect,
+            Evidence = WorkerClaimEvidence.Attribute,
+            EffectContractKind = WorkerEffectContractKind.EnforcePure,
+            Location = callable.Location
+        };
+        postcondition.Ordinal = 1;
+        callable.ClaimIds = [effect.ClaimId, postcondition.ClaimId];
+        manifest.Claims = [effect, postcondition];
+
+        var errors = WorkerProtocolJson.ValidateManifest(manifest).Errors
+            .Select(static error => error.Code);
+
+        Assert.That(errors, Does.Contain("manifest.claim_kind_order"));
+    }
+
+    [Test]
     public void NullProtocolRootsAndArrayRequestsAreRejected()
     {
         var request = WorkerProtocolJson.Validate((WorkerVerifyRequest?)null);
