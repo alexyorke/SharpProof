@@ -183,7 +183,11 @@ internal static class ContractForSymbolMatcher
 
         var signatureTarget = companion.ContractTarget.IsOpen
             ? target.OriginalDefinition
-            : target.ConstructedFrom;
+            : SymbolEqualityComparer.Default.Equals(
+                target.ContainingType,
+                target.ContainingType.OriginalDefinition)
+                ? target.ConstructedFrom
+                : target;
         var named = GetOrdinaryMethods(companion.Type)
             .Where(candidate => string.Equals(candidate.Name, target.Name, StringComparison.Ordinal))
             .ToImmutableArray();

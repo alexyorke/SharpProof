@@ -101,6 +101,35 @@ public sealed class ConstructedGenericContractTests
     }
 
     [Test]
+    public void ClosedGenericContractForTargetBindsItsConstructedSignature()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public interface IRepository<T> {
+                void Read(T value);
+            }
+
+            [ContractFor(typeof(IRepository<int>))]
+            public static class RepositoryContracts {
+                public static void Read(
+                    IRepository<int> receiver,
+                    int value) {
+                    Contract.Requires(value >= 0);
+                }
+            }
+
+            public static class Caller {
+                public static void Call(
+                    IRepository<int> repository,
+                    int value) => repository.Read(value);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
+    [Test]
     public void ArrayElementTypesAreRecursivelySpecialized()
     {
         AssertBinds(
