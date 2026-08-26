@@ -178,6 +178,8 @@ public sealed class BoundaryEnforcementTests
             "Compilation.RemoveAllSyntaxTrees",
             "Compilation.GetSymbolsWithName",
             "Compilation.GetSemanticModel",
+            "Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions)",
+            "CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean)",
             "SemanticModel.GetDiagnostics",
             "GetSpeculativeSemanticModel",
             "SemanticModel.GetSpeculativeTypeInfo",

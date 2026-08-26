@@ -11,6 +11,8 @@ M:Microsoft.CodeAnalysis.Compilation.GetSymbolsWithName(System.String,Microsoft.
 
 # Semantic models may only be obtained by the audited host adapter.
 M:Microsoft.CodeAnalysis.Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean);Use SharpProof.Frontend.Host.CompilationModelProvider.
+M:Microsoft.CodeAnalysis.Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions);Use SharpProof.Frontend.Host.CompilationModelProvider.
+M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean);Use SharpProof.Frontend.Host.CompilationModelProvider.
 M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions);Use SharpProof.Frontend.Host.CompilationModelProvider.
 M:Microsoft.CodeAnalysis.SemanticModel.GetDiagnostics(System.Nullable{Microsoft.CodeAnalysis.Text.TextSpan},System.Threading.CancellationToken);Do not make proof behavior depend on semantic-model diagnostics.
 M:Microsoft.CodeAnalysis.SemanticModel.GetSpeculativeSymbolInfo(System.Int32,Microsoft.CodeAnalysis.SyntaxNode,Microsoft.CodeAnalysis.SpeculativeBindingOption);Do not use speculative semantic binding.
