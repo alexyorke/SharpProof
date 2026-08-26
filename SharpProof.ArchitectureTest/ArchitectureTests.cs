@@ -56,6 +56,13 @@ public sealed class ArchitectureTests
         "SharpProof.Worker.Launcher"
     ];
 
+    // Release-evidence tooling is production code for dependency and native
+    // package isolation, even though it is not part of the shipped libraries.
+    private static readonly string[] DependencyGovernedProjects = [
+        .. ProductionProjects,
+        "SharpProof.Gates"
+    ];
+
     private static readonly string[] AcceptanceTimingPhases = [
         "restore",
         "static-validation",
@@ -233,10 +240,20 @@ public sealed class ArchitectureTests
                 "SharpProof.Ir",
                 "SharpProof.Specs",
                 "SharpProof.Worker.Protocol"
+            ],
+            ["SharpProof.Gates"] = [
+                "SharpProof.Analyzer.Core",
+                "SharpProof.Analyzer",
+                "SharpProof.Attributes",
+                "SharpProof.CompilerArtifact",
+                "SharpProof.CompilerCollector",
+                "SharpProof.ContractForGenerator",
+                "SharpProof.Worker",
+                "SharpProof.Worker.Launcher"
             ]
         };
 
-        foreach (var project in ProductionProjects)
+        foreach (var project in DependencyGovernedProjects)
         {
             var actual = GetProjectReferences(project)
                 .OrderBy(static value => value, StringComparer.Ordinal)
@@ -322,7 +339,7 @@ public sealed class ArchitectureTests
     [Test]
     public void OnlyTheSmtLayerAndFuzzHarnessReferenceZ3InTheProductionGraph()
     {
-        foreach (var project in ProductionProjects)
+        foreach (var project in DependencyGovernedProjects)
         {
             var xml = XDocument.Load(ProjectFile(project));
             var packages = xml

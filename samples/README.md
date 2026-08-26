@@ -10,7 +10,7 @@ project reference into the repository.
 | `Preconditions` | Method and constructor preconditions plus `NotNull`, `Positive`, and `InRange` | Build succeeds |
 | `ContractFor` | A compiler-symbol-bound interface companion and consumer call | Build succeeds |
 | `TrustedBoundary` | A reviewed external boundary with a complete effect summary | Build succeeds |
-| `Library` | Multi-file decision logic with branches, multiple returns, locals, and `Old` | All five claims are `Proven` in strict CI |
+| `Library` | Multi-file decision logic with branches, multiple returns, parameter updates, and `Old` | All five claims are `Proven` in strict CI |
 | `Outcomes` | One each of `Proven`, `Refuted`, and `Unknown` | The assertion runner validates all three records |
 | `Diagnostics` | SP0027, SP0045, and SP0047 without failing the build | Expected warnings are present |
 | `MalformedContract` | A late contract clause | Build fails with SP0024 |

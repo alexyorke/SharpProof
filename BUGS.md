@@ -1114,7 +1114,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 4. Remove the redundant Include (or Deduplicate): identical project builds green, isolating duplicate paths as the sole variable.
 **Confidence**: Medium (rejecting predicate, dual enforcement, absent upstream dedup verified line-by-line; residual uncertainty is frequency of real-world duplicate `@(AdditionalFiles)` accumulation).
 
-### 401. Goal-Fault Abstention Reason Is Misattributed for Precondition- and EffectContract-Diagnostic Goals - Any Exception-Status Goal That Is Not InternalConsistency Is Reported as PostconditionMayBeUndefined and Republished Verbatim
+### 401. [RESOLVED 218106924] Goal-Fault Abstention Reason Was Misattributed for Precondition- and EffectContract-Diagnostic Goals - Any Exception-Status Goal That Was Not InternalConsistency Was Reported as PostconditionMayBeUndefined and Republished Verbatim
 
 **Location**: `SharpProof.Verify\ProofKernel.cs` (Lines 92-97: goal-fault switch `query.Goal.Diagnostic == ProofDiagnosticKind.InternalConsistency ? InternalConsistencyMayBeUndefined : PostconditionMayBeUndefined` - a two-arm switch over a four-member enum); vocabulary `SharpProof.Verify\Evidence.cs` (Lines 13-19: `ProofDiagnosticKind` declares EffectContract, Precondition, Postcondition, InternalConsistency); publication table `SharpProof.Projection.catalog.json` (MapAbstention explicit case `PostconditionMayBeUndefined -> WorkerClaimReason.PostconditionMayBeUndefined`, consumed by `SharpProof.Worker\CallableVerifier.cs` and `CallableEntryFeasibility.cs`).
 **Description**: Goals built with `ProofDiagnosticKind.Precondition` or `EffectContract` whose predicate raises an IR exception under the counterexample model receive `AbstentionReason.PostconditionMayBeUndefined` - a factually wrong label naming a postcondition when none exists in the query. The reason is public outcome metadata that `WorkerProjections.MapAbstention` republishes verbatim as `WorkerClaimReason.PostconditionMayBeUndefined`, so an embedder composing queries through the public `VerificationQuery`/`Goal` API gets misleading abstention diagnostics rather than a neutral fact. Shipped pipeline impact is nil today: both production goal-construction sites use only `Postcondition` (CallableVerifier) and constant-false `InternalConsistency` goals that cannot fault (CallableVerifier/CallableEntryFeasibility probes) - mislabeled metadata only, fully fail-closed. Distinctness: no BUGS.md entry touches AbstentionReason selection; #293 is the Frontend support catalog (different assembly/snapshot/axis); #300 is the exception-escape family; the nearest lineage is the commit that introduced the two reasons (separating undefined internal-consistency replay outcomes), of which this is the residue left for the other two enum members.
@@ -1124,6 +1124,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 3. Observe `UnknownOutcome.Reason == AbstentionReason.PostconditionMayBeUndefined` although the query contains no postcondition - the label is fabricated by the else-arm.
 4. Control: repeat with `InternalConsistency` - correctly typed `InternalConsistencyMayBeUndefined` (pinned at Lines ~212-243), isolating the two-arm dispatch.
 **Confidence**: High on behavior (switch, enum membership, republication verified); Medium-Low overall - vocabulary reuse could be deliberate and shipped reachability is currently zero.
+**Status**: Fixed by preserving the specialized Postcondition and InternalConsistency reasons and routing EffectContract/Precondition goal faults to the neutral CounterexampleReplayFailed reason. Focused and full Verify tests pass (17/17).
 
 ### 402. Four Malformed-Shape Arms of the Kernel's Outcome Union Have No Pinning Test - Single-Conjunct Regressions Keep SharpProof.Verify.Test Green While Public/IVT Constructors Reach Exactly Those Clauses
 
@@ -1268,6 +1269,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 3. In SharpProof.Gates add `_ = model.GetSpeculativeSymbolInfo(position, node, SpeculativeBindingOption.BindToDefinition);` and build: zero RS0030 (deleted entry), zero SPMETA001 (no Meta.Analyzers reference in Gates) - the boundary is gone silently.
 4. Restore the lines: identical code now fails under TWAE+RS0030, proving the deleted lines were load-bearing and their loss undetectable.
 **Confidence**: High (file content, required-list contents, sole-reader status, meta-analyzer coverage boundary verified line-by-line).
+**Status**: Resolved by pinning both speculative symbol and alias entries in the architecture inventory test; the focused boundary test passes.
 
 ### 415. Every Dependency/Package Governance Scan Parses Raw csproj XML Only - References Injected via Imported .props/.targets or Spelled in Any Casing Evade the DAG, the Z3-Isolation Scan, and Compiler Neutrality Simultaneously
 
@@ -1334,6 +1336,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 4. After the container exits, git status/diff on the host checkout shows expected.canonical.snapshot unchanged - the update existed only under /tmp/sharpproof-task.* and is gone.
 5. Control: perform the documented dev-shell flow (unstaged branch): the host file changes, isolating the staging bridge as the cause.
 **Confidence**: High on mechanism (all five sites read end-to-end; write path and staging topology verified); residual uncertainty limited to whether unusable-by-construction was intended for a first-class ValidateSet member that nothing warns about.
+**Status**: Resolved by routing the `corpus-update` task through the mounted checkout and adding a source-mutation persistence regression; the focused cleanliness suite passes 34/34.
 
 ### 421. Git Failures Inside Process Substitutions Are Invisible to `set -euo pipefail` - the Clean-Exact-Commit Assertion Can Pass Without Scanning, and Deleted-File Sweeps Can Silently Skip
 
@@ -1377,7 +1380,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 4. Confirm uncompensated duplication: both runs execute mutation/dependency-audit/acceptance/fuzz-nightly against the same commit, uploading equivalent evidence under different artifact names.
 **Confidence**: High on facts (absence, sibling contrast, collision immunity all read directly); Medium at best on classification - some projects intentionally let scheduled flows overlap, so maintainer intent is the residual; reported for the objective internal inconsistency with the publish-job serialization.
 
-### 425. samples/README.md's Library Specification Row Advertises "locals" That No File in the Library Fixture Ever Declares
+### 425. [RESOLVED aaf0efe81] samples/README.md's Library Specification Row Advertised "locals" That No File in the Library Fixture Ever Declares
 
 **Location**: `samples\README.md` Line 13 (Library row Demonstrates cell: "Multi-file decision logic with branches, multiple returns, locals, and `Old`") vs `samples\Library\VerifiedLibrary.cs` (Lines 5-10), `AccessPolicy.cs` (Lines 5-23), `QuotaPolicy.cs` (Lines 5-23) - the five annotated members contain only parameters, if-branches, multiple returns, and one parameter reassignment (`enabled = !enabled;`, QuotaPolicy.cs Lines 20-22); zero local-variable declarations of any form exist in the project (grep for var/out-var/typed locals returns only method parameters).
 **Description**: samples/README.md Line 3 declares the sample projects executable package-consumer specifications, and the Library row is factually wrong on one of its four enumerated body constructs while the other three verify true (three files; branches; multiple returns in IsAuthorized/SelectApproval/SelectLimit; Contract.Old in Flip) - isolating "locals" as the sole falsehood. Blast radius: Library is the one sample whose worker verdicts are CI-enforced (exactly five Proven claims under strict via the package-consumer job), so a maintainer extending the fixture to actually exercise locals would believe the construct is already pinned by the executable spec, and a reader auditing coverage from the README over-credits what it pins. Documentation-only: the Expected-result column and runner assertions were cross-checked consistent (counts/outcomes/codes), so no runtime expectation is falsified. Git history shows original mismatch, not drift: the initial row already said "local use" while QuotaPolicy.cs was created without any local, and neither changed since. Distinct from #252 (docs advertising a nonexistent HOST-REJECTION SAMPLE - different surface and claim type: construct-category absent from an existing fixture vs an entire missing sample), #346/#389/#339 (CI orphaning/redirection/isolation - none touch the Demonstrates column), and squarely in the accepted maintained-doc-vs-artifact family of #388 (CHANGELOG enumerating environments that never run), #340/#341 (summaries stating surfaces the checked artifacts do not).
@@ -1387,6 +1390,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 3. Contrast the neighboring claims of the same cell (branches, multiple returns, Old) which each verify true against the same files, isolating "locals" as the sole false enumeration.
 4. Optional: run `tooling samples -PackageSource nupkgs` - green, because the runner asserts only counts/outcomes/codes, never the Demonstrates column: nothing would catch a fixture silently contradicting the README here.
 **Confidence**: High (all three files and README read in full; history checked); severity explicitly Low (documentation accuracy of an executable-spec asset).
+**Status**: Resolved by describing the fixture's actual parameter update instead of claiming an undeclared local variable.
 
 ### 426. [RESOLVED f691e311f] Default API-Spec Digest Pin Lagged the Canonical Hash-Writer Format
 
