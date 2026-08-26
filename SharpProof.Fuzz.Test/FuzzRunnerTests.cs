@@ -365,6 +365,23 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void FrontendShrinkPredicateRejectsCompileFailures()
+    {
+        Assert.That(
+            FuzzRunner.IsSemanticFrontendMismatch(
+                new FrontendDifferentialResult(
+                    FuzzOracleStatus.Mismatch,
+                    "Generated C# did not compile: CS0020")),
+            Is.False);
+        Assert.That(
+            FuzzRunner.IsSemanticFrontendMismatch(
+                new FrontendDifferentialResult(
+                    FuzzOracleStatus.Mismatch,
+                    "Compiled C# and the lowered IR produced different values.")),
+            Is.True);
+    }
+
+    [Test]
     public void ExpandedCoverageRequirementFailsClosed()
     {
         var empty = new FrontendFuzzCoverage(

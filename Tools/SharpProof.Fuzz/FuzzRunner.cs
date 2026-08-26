@@ -267,10 +267,8 @@ public static class FuzzRunner
                     var frontendCase = frontendCases[index];
                     var minimizedFrontend = CSharpStructuralShrinker.Minimize(
                         frontendCase,
-                        candidate => frontendOracle.Compare(
-                            candidate,
-                            cancellationToken).Status ==
-                            FuzzOracleStatus.Mismatch,
+                        candidate => IsSemanticFrontendMismatch(
+                            frontendOracle.Compare(candidate, cancellationToken)),
                         cancellationToken);
                     var minimizedFrontendResult = frontendOracle.Compare(
                         minimizedFrontend,
@@ -572,6 +570,16 @@ public static class FuzzRunner
         value = unchecked((value ^ (value >> 27)) * 0x94D049BB133111EBUL);
         value ^= value >> 31;
         return unchecked((int)value);
+    }
+
+    internal static bool IsSemanticFrontendMismatch(
+        FrontendDifferentialResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Status == FuzzOracleStatus.Mismatch &&
+            !result.Detail.StartsWith(
+                "Generated C# did not compile:",
+                StringComparison.Ordinal);
     }
 
     private static int PositiveModulo(int value, int divisor)
