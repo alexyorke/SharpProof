@@ -72,4 +72,24 @@ public sealed class ArgumentNullGuardBoundaryTests
             errors.Select(static error => error!.ParamName),
             Is.EqualTo(ExpectedParameterNames));
     }
+
+    [Test]
+    public void AnalysisResultGuardsBlockIdsWithTheBlockIdParameterName()
+    {
+        var graph = new DataflowGraph<NullnessValue>(
+            [new(0, static value => value)],
+            []);
+        var result = ForwardDataflowAnalysis.Analyze(
+            graph,
+            NullnessDomain.Instance,
+            NullnessValue.MaybeNull);
+
+        var inputError = Assert.Throws<ArgumentOutOfRangeException>(
+            (Action)(() => result.GetInputState(-1)));
+        var outputError = Assert.Throws<ArgumentOutOfRangeException>(
+            (Action)(() => result.GetOutputState(graph.Blocks.Length)));
+
+        Assert.That(inputError!.ParamName, Is.EqualTo("blockId"));
+        Assert.That(outputError!.ParamName, Is.EqualTo("blockId"));
+    }
 }

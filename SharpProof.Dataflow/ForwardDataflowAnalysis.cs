@@ -41,12 +41,14 @@ public sealed class DataflowAnalysisResult<T>
 
     public T GetInputState(int blockId)
     {
-        return InputStates[blockId];
+        return InputStates[ArgumentNullGuard.RequireIndex(
+            blockId, InputStates.Length, nameof(blockId))];
     }
 
     public T GetOutputState(int blockId)
     {
-        return OutputStates[blockId];
+        return OutputStates[ArgumentNullGuard.RequireIndex(
+            blockId, OutputStates.Length, nameof(blockId))];
     }
 }
 

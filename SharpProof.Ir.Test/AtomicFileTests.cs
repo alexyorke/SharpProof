@@ -167,8 +167,20 @@ public sealed class AtomicFileTests
         Assert.That(File.Exists(fresh), Is.True);
     }
 
+    [Test]
+    public void TemporaryFileProbeRecognizesCurrentStagingNames()
+    {
+        var staged = Path.Combine(_root, ".sharpproof-orphan.tmp");
+        File.WriteAllText(staged, "orphan");
+
+        Assert.That(TemporaryFiles(Path.Combine(_root, "result.txt")),
+            Does.Contain(staged));
+    }
+
     private static string[] TemporaryFiles(string path)
     {
-        return Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*.tmp");
+        return Directory.GetFiles(
+            Path.GetDirectoryName(path)!,
+            ".sharpproof-*.tmp");
     }
 }
