@@ -1865,9 +1865,36 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 (fieldReference.Field.IsStatic ||
                  fieldReference.Instance != null &&
                  IsDefinitelyNonNull(fieldReference.Instance)),
+            IPropertyReferenceOperation property =>
+                CompletesPropertyGetNormally(property),
+            IEventAssignmentOperation eventAssignment =>
+                CompletesEventAssignmentNormally(eventAssignment),
             ISimpleAssignmentOperation assignment =>
-                assignment.Target is ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation &&
-                CompletesNormally(assignment.Value),
+                assignment.Target switch
+                {
+                    ILocalReferenceOperation or
+                        IParameterReferenceOperation or
+                        IDiscardOperation =>
+                        CompletesNormally(assignment.Value),
+                    IFieldReferenceOperation field =>
+                        CompletesNormally(field) &&
+                        CompletesNormally(assignment.Value),
+                    IPropertyReferenceOperation property =>
+                        CompletesPropertySetNormally(
+                            property,
+                            assignment.Value),
+                    _ => false
+                },
+            ICompoundAssignmentOperation assignment =>
+                assignment.OperatorMethod == null &&
+                !assignment.IsChecked &&
+                assignment.OperatorKind is not (
+                    BinaryOperatorKind.Divide or
+                    BinaryOperatorKind.Remainder) &&
+                assignment.Target is IPropertyReferenceOperation property &&
+                CompletesPropertyReadWriteNormally(
+                    property,
+                    assignment.Value),
             IBinaryOperation binary =>
                 binary.OperatorMethod == null && !binary.IsChecked &&
                 binary.OperatorKind is not (BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) &&
@@ -1876,7 +1903,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 unary.OperatorMethod == null && !unary.IsChecked && ChildrenCompleteNormally(unary),
             IIncrementOrDecrementOperation increment =>
                 increment.OperatorMethod == null && !increment.IsChecked &&
-                increment.Target is ILocalReferenceOperation or IParameterReferenceOperation,
+                (increment.Target is ILocalReferenceOperation or
+                    IParameterReferenceOperation ||
+                 increment.Target is IPropertyReferenceOperation property &&
+                    CompletesPropertyReadWriteNormally(property, null)),
             IConversionOperation conversion =>
                 HarmlessConversion(conversion) &&
                 CompletesNormally(conversion.Operand),
@@ -1896,6 +1926,92 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
          invocation.Instance is IInstanceReferenceOperation && CompletesNormally(invocation.Instance)) &&
         invocation.Arguments.All(argument => CompletesNormally(argument.Value)) &&
         CompletesNormally(invocation.TargetMethod);
+    }
+
+    private bool CompletesPropertyGetNormally(
+        IPropertyReferenceOperation property)
+    {
+        return CompletesPropertyReceiverNormally(property) &&
+            property.Property.GetMethod is { } getter &&
+            CompletesAccessorNormally(getter);
+    }
+
+    private bool CompletesPropertySetNormally(
+        IPropertyReferenceOperation property,
+        IOperation value)
+    {
+        return CompletesPropertyReceiverNormally(property) &&
+            CompletesNormally(value) &&
+            property.Property.SetMethod is { } setter &&
+            CompletesAccessorNormally(setter);
+    }
+
+    private bool CompletesPropertyReadWriteNormally(
+        IPropertyReferenceOperation property,
+        IOperation? value)
+    {
+        return CompletesPropertyReceiverNormally(property) &&
+            (value == null || CompletesNormally(value)) &&
+            property.Property.GetMethod is { } getter &&
+            CompletesAccessorNormally(getter) &&
+            property.Property.SetMethod is { } setter &&
+            CompletesAccessorNormally(setter);
+    }
+
+    private bool CompletesPropertyReceiverNormally(
+        IPropertyReferenceOperation property)
+    {
+        return (property.Instance == null
+                ? property.Property.IsStatic
+                : CompletesNormally(property.Instance) &&
+                  IsDefinitelyNonNull(property.Instance)) &&
+            property.Arguments.All(argument =>
+                CompletesNormally(argument.Value));
+    }
+
+    private bool CompletesEventAssignmentNormally(
+        IEventAssignmentOperation assignment)
+    {
+        return assignment.EventReference is IEventReferenceOperation reference &&
+            (reference.Instance == null
+                ? reference.Event.IsStatic
+                : CompletesNormally(reference.Instance) &&
+                  IsDefinitelyNonNull(reference.Instance)) &&
+            CompletesNormally(assignment.HandlerValue) &&
+            (assignment.Adds
+                ? reference.Event.AddMethod
+                : reference.Event.RemoveMethod) is { } accessor &&
+            CompletesAccessorNormally(accessor);
+    }
+
+    private bool CompletesAccessorNormally(IMethodSymbol accessor)
+    {
+        if (accessor.AssociatedSymbol is IPropertySymbol property &&
+            !property.IsStatic &&
+            property.DeclaringSyntaxReferences.Length > 0 &&
+            (accessor.DeclaringSyntaxReferences.Length == 0 ||
+             accessor.DeclaringSyntaxReferences.All(reference =>
+                 GetBody(reference.GetSyntax(cancellationToken)) == null)))
+        {
+            return true;
+        }
+
+        if (accessor.AssociatedSymbol is IEventSymbol @event &&
+            !@event.IsStatic &&
+            @event.DeclaringSyntaxReferences.Length > 0 &&
+            (accessor.DeclaringSyntaxReferences.Length == 0 ||
+             accessor.DeclaringSyntaxReferences.All(reference =>
+                 GetBody(reference.GetSyntax(cancellationToken)) == null)))
+        {
+            return true;
+        }
+
+        if (accessor.DeclaringSyntaxReferences.Length == 0)
+        {
+            return false;
+        }
+
+        return CompletesNormally(accessor);
     }
 
     private bool CompletesNormally(IMethodSymbol method)
