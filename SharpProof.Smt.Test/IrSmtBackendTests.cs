@@ -307,7 +307,7 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
-    public async Task StringVariablesFailClosedWithoutNullTagEncoding()
+    public async Task StringVariablesReportNullabilityWhenLengthIsRequested()
     {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("text", factory.StringType);
@@ -327,13 +327,14 @@ public sealed class IrSmtBackendTests
         using var backend = new IrSmtBackend();
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
     }
 
     [Test]
-    public async Task NullableStringConcatCannotProduceAFalseProof()
+    public async Task NullableStringConcatMatchesInterpreterNullSemantics()
     {
         var factory = new IrFactory();
         var variable = factory.CreateVariable("text", factory.StringType);
@@ -357,13 +358,14 @@ public sealed class IrSmtBackendTests
         using var backend = new IrSmtBackend();
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
         Assert.That(
-            ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+            ((RefutedOutcome)outcome).Model.Assignments[variable].Kind,
+            Is.EqualTo(IrValueKind.Null));
     }
 
     [Test]
-    public async Task DynamicStringConcatRemainsAnExplicitFailClosedAbstention()
+    public async Task DynamicStringConcatFindsTheUnselectedBranchCounterexample()
     {
         var factory = new IrFactory();
         var condition = factory.CreateVariable("condition", factory.BooleanType);
@@ -392,14 +394,11 @@ public sealed class IrSmtBackendTests
         using var backend = new IrSmtBackend();
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(
-            ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+        Assert.That(outcome, Is.TypeOf<RefutedOutcome>());
     }
 
     [Test]
-    public async Task DynamicStringLengthRemainsAnExplicitFailClosedAbstention()
+    public async Task DynamicStringLengthIsProvedForBothBranches()
     {
         var factory = new IrFactory();
         var condition = factory.CreateVariable("condition", factory.BooleanType);
@@ -424,10 +423,30 @@ public sealed class IrSmtBackendTests
         using var backend = new IrSmtBackend();
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(
-            ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+        Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
+    }
+
+    [Test]
+    public async Task NonBmpStringLengthUsesUtf16CodeUnits()
+    {
+        var factory = new IrFactory();
+        var goal = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Length(factory.String("\uD83D\uDE00")),
+            factory.Integer(2));
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
     }
 
     [Test]
@@ -744,7 +763,7 @@ public sealed class IrSmtBackendTests
     {
         var factory = new IrFactory();
         var boolean = factory.CreateVariable("boolean", factory.BooleanType);
-        var text = factory.CreateVariable("text", factory.StringType);
+        var unsupported = factory.CreateVariable("unsupported", factory.ObjectType);
         var query = new VerificationQuery(
             factory,
             [],
@@ -753,7 +772,7 @@ public sealed class IrSmtBackendTests
                 factory.Variable(boolean),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)),
-            [boolean, text]);
+            [boolean, unsupported]);
         using var backend = new IrSmtBackend();
 
         var result = await backend.CheckAsync(query, CancellationToken.None);

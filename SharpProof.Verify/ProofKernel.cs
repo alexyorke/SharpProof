@@ -107,7 +107,10 @@ public sealed class ProofKernel(ISmtBackend backend)
             {
                 var type = query.Factory.GetVariableInfo(assignment.Key).Type;
                 return type == assignment.Value.Type &&
-                    (type == query.Factory.BooleanType || type == query.Factory.IntegerType);
+                    (type == query.Factory.BooleanType ||
+                     type == query.Factory.IntegerType ||
+                     type == query.Factory.StringType &&
+                     assignment.Value.Kind is IrValueKind.String or IrValueKind.Null);
             }
             catch (ArgumentException)
             {

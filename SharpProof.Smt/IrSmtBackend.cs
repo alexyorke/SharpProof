@@ -252,7 +252,16 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         foreach (var variable in encoder.Variables)
         {
             using var evaluated = model.Evaluate(encoder.GetVariable(variable), true);
-            if (!TryCreateValue(query.Factory, variable, evaluated, out var value))
+            using var evaluatedNull = encoder.GetNullVariable(variable) is { } nullVariable
+                ? model.Evaluate(nullVariable, true)
+                : null;
+            if (!encoder.TryCreateValue(
+                    query.Factory,
+                    variable,
+                    evaluated,
+                    evaluatedNull,
+                    model,
+                    out var value))
             {
                 return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
             }
@@ -262,40 +271,15 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         return BackendCheckResult.Satisfiable(new BackendModel(assignments));
     }
 
-    private static bool TryCreateValue(
-        IrFactory factory,
-        IrVarId variable,
-        Expr expression,
-        out IrValue? value)
-    {
-        var type = factory.GetVariableInfo(variable).Type;
-        if (type == factory.BooleanType)
-        {
-            bool? boolean = expression.IsTrue ? true : expression.IsFalse ? false : null;
-            value = boolean.HasValue ? factory.CreateBooleanValue(boolean.Value) : null;
-        }
-        else if (type == factory.IntegerType &&
-                 expression is IntNum integer &&
-                 long.TryParse(integer.ToString(), NumberStyles.AllowLeadingSign,
-                     CultureInfo.InvariantCulture, out var number))
-        {
-            value = factory.CreateIntegerValue(number);
-        }
-        else
-        {
-            value = null;
-        }
-
-        return value != null;
-    }
-
     private sealed class QueryEncoder
     {
         private readonly Context _context;
         private readonly Z3ExpressionOwner _owner;
         private readonly Dictionary<IrId, EncodedValue> _encoded = [];
         private readonly Dictionary<IrVarId, Expr> _variables = [];
+        private readonly Dictionary<IrVarId, BoolExpr> _nullVariables = [];
         private readonly IrFactory _factory;
+        private readonly SeqSort _stringSort;
 
         internal QueryEncoder(
             Context context,
@@ -306,6 +290,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             _context = context;
             _owner = owner;
             _factory = query.Factory;
+            _stringSort = (SeqSort)_context.MkSeqSort(_context.IntSort);
             foreach (var assumption in query.Assumptions)
             {
                 ValidateDepth(assumption.Predicate, cancellationToken);
@@ -318,7 +303,8 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             {
                 var type = _factory.GetVariableInfo(variable).Type;
                 if (type != _factory.BooleanType &&
-                    type != _factory.IntegerType)
+                    type != _factory.IntegerType &&
+                    type != _factory.StringType)
                 {
                     throw new UnsupportedIrEncodingException();
                 }
@@ -336,6 +322,13 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 else if (type == _factory.IntegerType)
                 {
                     expression = Own(_context.MkIntConst(name));
+                }
+                else if (type == _factory.StringType)
+                {
+                    expression = Own(_context.MkConst(name, _stringSort));
+                    _nullVariables.Add(
+                        variable,
+                        Own(_context.MkBoolConst(name + "_null")));
                 }
                 else
                 {
@@ -416,6 +409,100 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             return _variables[variable];
         }
 
+        internal BoolExpr? GetNullVariable(IrVarId variable)
+        {
+            return _nullVariables.TryGetValue(variable, out var value)
+                ? value
+                : null;
+        }
+
+        internal bool TryCreateValue(
+            IrFactory factory,
+            IrVarId variable,
+            Expr expression,
+            Expr? nullExpression,
+            Model model,
+            out IrValue? value)
+        {
+            var type = factory.GetVariableInfo(variable).Type;
+            if (type == factory.BooleanType)
+            {
+                bool? boolean = expression.IsTrue ? true : expression.IsFalse ? false : null;
+                value = boolean.HasValue ? factory.CreateBooleanValue(boolean.Value) : null;
+            }
+            else if (type == factory.IntegerType &&
+                     expression is IntNum integer &&
+                     long.TryParse(integer.ToString(), NumberStyles.AllowLeadingSign,
+                         CultureInfo.InvariantCulture, out var number))
+            {
+                value = factory.CreateIntegerValue(number);
+            }
+            else if (type == factory.StringType &&
+                     expression is SeqExpr sequence &&
+                     nullExpression is BoolExpr nullTag)
+            {
+                value = DecodeString(factory, sequence, nullTag, model);
+            }
+            else
+            {
+                value = null;
+            }
+
+            return value != null;
+        }
+
+        private IrValue? DecodeString(
+            IrFactory factory,
+            SeqExpr sequence,
+            BoolExpr nullTag,
+            Model model)
+        {
+            if (model.Evaluate(nullTag, true) is not BoolExpr evaluatedNull)
+            {
+                return null;
+            }
+
+            if (evaluatedNull.IsTrue)
+            {
+                return factory.CreateNullValue(factory.StringType);
+            }
+
+            if (!evaluatedNull.IsFalse ||
+                model.Evaluate(_context.MkLength(sequence), true) is not IntNum lengthValue ||
+                !int.TryParse(lengthValue.ToString(), NumberStyles.None,
+                    CultureInfo.InvariantCulture, out var length) ||
+                length < 0 ||
+                length > 1_000_000)
+            {
+                return null;
+            }
+
+            var chars = new char[length];
+            for (var index = 0; index < chars.Length; index++)
+            {
+                using var indexExpression = _context.MkInt(index);
+                using var element = _context.MkNth(sequence, indexExpression);
+                if (model.Evaluate(element, true) is not IntNum codeUnit ||
+                    !int.TryParse(codeUnit.ToString(), NumberStyles.None,
+                        CultureInfo.InvariantCulture, out var number) ||
+                    number is < char.MinValue or > char.MaxValue)
+                {
+                    return null;
+                }
+
+                chars[index] = (char)number;
+            }
+
+            try
+            {
+                return factory.CreateStringValue(new string(chars));
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+
         internal EncodedBoolean EncodeBoolean(IrTerm term)
         {
             var encoded = Encode(term);
@@ -439,7 +526,16 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 IrBooleanTerm boolean => Defined(
                     Own(boolean.Value ? _context.MkTrue() : _context.MkFalse())),
                 IrIntegerTerm integer => Defined(Own(_context.MkInt(integer.Value))),
-                IrStringTerm text => Defined(Own(_context.MkString(_factory.GetString(text.Value)))),
+                IrStringTerm text => Defined(
+                    EncodeStringLiteral(_factory.GetString(text.Value)),
+                    Own(_context.MkFalse())),
+                IrNullTerm nullTerm when nullTerm.Type == _factory.StringType =>
+                    new EncodedValue(
+                        Own(_context.MkEmptySeq(_stringSort)),
+                        Own(_context.MkTrue()),
+                        Own(_context.MkTrue())),
+                IrVariableTerm variable when variable.Type == _factory.StringType =>
+                    Defined(GetVariable(variable.Variable), GetNullVariable(variable.Variable)),
                 IrVariableTerm variable => Defined(GetVariable(variable.Variable)),
                 IrUnaryTerm unary => EncodeUnary(unary),
                 IrBinaryTerm binary => EncodeBinary(binary),
@@ -493,6 +589,16 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 return new EncodedValue(value, shortCircuitDefined);
             }
 
+            if (binary.Operator == IrBinaryOperator.StringConcat &&
+                left.Value is SeqExpr leftString &&
+                right.Value is SeqExpr rightString)
+            {
+                return new EncodedValue(
+                    Own(_context.MkConcat(leftString, rightString)),
+                    Own(_context.MkAnd(left.Defined, right.Defined)),
+                    Own(_context.MkFalse()));
+            }
+
             var defined = Own(_context.MkAnd(left.Defined, right.Defined));
             return binary.Operator switch
             {
@@ -501,9 +607,8 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 IrBinaryOperator.Multiply => Bounded(Own(_context.MkMul(Integer(left), Integer(right))), defined),
                 IrBinaryOperator.Divide or IrBinaryOperator.Remainder =>
                     EncodeDivision(binary.Operator, left, right, defined),
-                IrBinaryOperator.Equal => new EncodedValue(Own(_context.MkEq(left.Value, right.Value)), defined),
-                IrBinaryOperator.NotEqual => new EncodedValue(
-                    Own(_context.MkNot(Own(_context.MkEq(left.Value, right.Value)))), defined),
+                IrBinaryOperator.Equal => EncodeEquality(left, right, defined),
+                IrBinaryOperator.NotEqual => EncodeNotEquality(left, right, defined),
                 IrBinaryOperator.LessThan => Comparison(Own(_context.MkLt(Integer(left), Integer(right))), defined),
                 IrBinaryOperator.LessThanOrEqual => Comparison(Own(_context.MkLe(Integer(left), Integer(right))), defined),
                 IrBinaryOperator.GreaterThan => Comparison(Own(_context.MkGt(Integer(left), Integer(right))), defined),
@@ -550,28 +655,86 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 whenTrue.Defined,
                 whenFalse.Defined));
             var defined = Own(_context.MkAnd(condition.Defined, branchDefined));
-            return new EncodedValue(value, defined);
+            var nullValue = whenTrue.IsNull != null || whenFalse.IsNull != null
+                ? Own((BoolExpr)_context.MkITE(
+                    condition.Value,
+                    NullFlag(whenTrue),
+                    NullFlag(whenFalse)))
+                : null;
+            return new EncodedValue(value, defined, nullValue);
         }
 
         private EncodedValue EncodeLength(IrLengthTerm length)
         {
-            if (length.Value.Type == _factory.StringType)
-            {
-                throw new UnsupportedIrEncodingException();
-            }
-
             var value = Encode(length.Value);
             if (value.Value is not SeqExpr sequence)
             {
                 throw new UnsupportedIrEncodingException();
             }
 
-            return Bounded(Own(_context.MkLength(sequence)), value.Defined);
+            var defined = length.Value.Type == _factory.StringType
+                ? Own(_context.MkAnd(
+                    value.Defined,
+                    Own(_context.MkNot(NullFlag(value)))))
+                : value.Defined;
+            return Bounded(Own(_context.MkLength(sequence)), defined);
         }
 
-        private EncodedValue Defined(Expr expression)
+        private SeqExpr EncodeStringLiteral(string value)
         {
-            return new(expression, Own(_context.MkTrue()));
+            var units = value
+                .Select(character => (SeqExpr)Own(_context.MkUnit(
+                    Own(_context.MkInt(character)))))
+                .ToArray();
+            return units.Length == 0
+                ? Own(_context.MkEmptySeq(_stringSort))
+                : Own(_context.MkConcat(units));
+        }
+
+        private EncodedValue EncodeEquality(
+            EncodedValue left,
+            EncodedValue right,
+            BoolExpr defined)
+        {
+            if (left.Value is SeqExpr && right.Value is SeqExpr)
+            {
+                var payloadEqual = Own(_context.MkEq(left.Value, right.Value));
+                var bothNull = Own(_context.MkAnd(
+                    NullFlag(left),
+                    NullFlag(right)));
+                var bothNonNull = Own(_context.MkAnd(
+                    Own(_context.MkNot(NullFlag(left))),
+                    Own(_context.MkNot(NullFlag(right))),
+                    payloadEqual));
+                return new EncodedValue(
+                    Own(_context.MkOr(bothNull, bothNonNull)),
+                    defined);
+            }
+
+            return new EncodedValue(
+                Own(_context.MkEq(left.Value, right.Value)),
+                defined);
+        }
+
+        private EncodedValue EncodeNotEquality(
+            EncodedValue left,
+            EncodedValue right,
+            BoolExpr defined)
+        {
+            var equality = EncodeEquality(left, right, defined);
+            return new EncodedValue(
+                Own(_context.MkNot((BoolExpr)equality.Value)),
+                equality.Defined);
+        }
+
+        private BoolExpr NullFlag(EncodedValue value)
+        {
+            return value.IsNull ?? Own(_context.MkFalse());
+        }
+
+        private EncodedValue Defined(Expr expression, BoolExpr? isNull = null)
+        {
+            return new(expression, Own(_context.MkTrue()), isNull);
         }
 
         private EncodedValue Bounded(ArithExpr expression, BoolExpr defined)
@@ -649,10 +812,14 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         }
     }
 
-    private sealed class EncodedValue(Expr value, BoolExpr defined)
+    private sealed class EncodedValue(
+        Expr value,
+        BoolExpr defined,
+        BoolExpr? isNull = null)
     {
         internal Expr Value { get; } = value;
         internal BoolExpr Defined { get; } = defined;
+        internal BoolExpr? IsNull { get; } = isNull;
     }
 
     private readonly struct EncodedBoolean(BoolExpr value, BoolExpr defined)
