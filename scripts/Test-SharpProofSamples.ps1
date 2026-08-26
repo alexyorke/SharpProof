@@ -242,15 +242,25 @@ function New-LocalPackageFeed {
     }
     foreach ($project in @($manifest.projects)) {
         $projectPath = Join-Path $repositoryRoot ([string]$project)
-        $pack = Invoke-CapturedDotNet -TimeoutSeconds 900 -Arguments @(
-            'pack',
-            $projectPath,
-            '--configuration',
-            $Configuration,
-            '--output',
-            $feed,
-            '--nologo'
+        $projectName = [IO.Path]::GetFileNameWithoutExtension($projectPath)
+        $packRoot = Join-Path $temporaryRoot ('pack/' + $projectName)
+        [void](New-Item -ItemType Directory -Path $packRoot -Force)
+        $packObj = Get-ForwardSlashPath (Join-Path $packRoot 'obj')
+        $packBin = Get-ForwardSlashPath (Join-Path $packRoot 'bin')
+        $packProperties = @(
+            "-p:BaseIntermediateOutputPath=$packObj/",
+            "-p:BaseOutputPath=$packBin/",
+            "-p:RestorePackagesPath=$(Get-ForwardSlashPath $packageCache)"
         )
+        $pack = Invoke-CapturedDotNet -TimeoutSeconds 900 -Arguments (@(
+                'pack',
+                $projectPath,
+                '--configuration',
+                $Configuration,
+                '--output',
+                $feed,
+                '--nologo'
+            ) + $packProperties)
         Assert-ExitCode $pack $true "Packing $projectPath"
     }
     return $feed

@@ -76,6 +76,35 @@ public sealed class DependencyAutomationTests
     }
 
     [Test]
+    public void SamplePackageBuildsUseIsolatedPaths()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Test-SharpProofSamples.ps1"));
+        var start = script.IndexOf(
+            "function New-LocalPackageFeed",
+            StringComparison.Ordinal);
+        var end = script.IndexOf(
+            "function Invoke-SampleBuild",
+            start,
+            StringComparison.Ordinal);
+        var section = start >= 0 && end > start
+            ? script[start..end]
+            : string.Empty;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(start, Is.GreaterThanOrEqualTo(0));
+            Assert.That(end, Is.GreaterThan(start));
+            Assert.That(section, Does.Contain("BaseIntermediateOutputPath"));
+            Assert.That(section, Does.Contain("BaseOutputPath"));
+            Assert.That(section, Does.Contain("RestorePackagesPath"));
+            Assert.That(section, Does.Contain("$packProperties"));
+        }
+    }
+
+    [Test]
     public void FuzzCampaignPublishesFailedSummaryBeforeThrowing()
     {
         var script = File.ReadAllText(Path.Combine(
