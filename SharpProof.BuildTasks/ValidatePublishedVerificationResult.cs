@@ -92,7 +92,7 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
                     "the published result does not satisfy the worker protocol");
             }
 
-            var manifestBytes = File.ReadAllBytes(manifestPath);
+            var manifestBytes = WorkerProtocolJson.ReadBytesFile(manifestPath);
             var manifestHash = Convert.ToHexString(
                 SHA256.HashData(manifestBytes));
             if (!string.Equals(

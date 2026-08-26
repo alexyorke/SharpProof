@@ -53,6 +53,36 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void BoundedByteFileReaderPreservesManifestBytesAndRejectsGrowth()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "protocol-bytes-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var expected = Encoding.UTF8.GetBytes("\uFEFF{\"value\":1}");
+            File.WriteAllBytes(path, expected);
+
+            Assert.That(WorkerProtocolJson.ReadBytesFile(path), Is.EqualTo(expected));
+
+            using (var stream = File.OpenWrite(path))
+            {
+                stream.SetLength(WorkerProtocolJson.MaximumJsonBytes + 1L);
+            }
+
+            Assert.Throws<InvalidDataException>(
+                (Action)(() => WorkerProtocolJson.ReadBytesFile(path)));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Test]
     public void OversizedAssumptionExpansionUsesAValidatedCompactClaimForm()
     {
         const int assumptionCount = 400;
