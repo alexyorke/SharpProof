@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -94,6 +96,69 @@ public sealed class FuzzRunnerEvidenceTests
                 Is.LessThan(campaign.IndexOf(
                     "retained-seeds.json",
                     StringComparison.Ordinal)));
+        }
+    }
+
+    [Test]
+    public void FuzzCoverageThresholdIsSynchronizedAcrossAuthorities()
+    {
+        var root = RepositoryRoot();
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "contract.json")));
+        var contractCases = contract.RootElement
+            .GetProperty("fuzz")
+            .GetProperty("pullRequestCases")
+            .GetInt32();
+        using var retained = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "fuzz",
+            "retained-seeds.json")));
+        var retainedCases = retained.RootElement
+            .GetProperty("casesPerSeed")
+            .GetInt32();
+        var options = File.ReadAllText(Path.Combine(
+            root,
+            "Tools",
+            "SharpProof.Fuzz",
+            "FuzzOptions.cs"));
+        var defaultMatches = Regex.Matches(
+            options,
+            @"DefaultCases\s*=\s*(\d+)",
+            RegexOptions.CultureInvariant);
+        var validator = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Assert-SharpProofFuzzRunnerResult.ps1"));
+        var validatorMatches = Regex.Matches(
+            validator,
+            @"\$cases\s*-ge\s*(\d+)",
+            RegexOptions.CultureInvariant);
+        var runner = File.ReadAllText(Path.Combine(
+            root,
+            "Tools",
+            "SharpProof.Fuzz",
+            "FuzzRunner.cs"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(defaultMatches, Has.Count.EqualTo(1));
+            Assert.That(validatorMatches, Has.Count.EqualTo(1));
+            Assert.That(
+                int.Parse(defaultMatches[0].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
+                Is.EqualTo(contractCases));
+            Assert.That(
+                retainedCases,
+                Is.EqualTo(contractCases));
+            Assert.That(
+                int.Parse(validatorMatches[0].Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
+                Is.EqualTo(contractCases));
+            Assert.That(
+                runner,
+                Does.Contain("PullRequestCoverageBudget = FuzzOptions.DefaultCases"));
         }
     }
 
