@@ -64,7 +64,10 @@ Resolved reports are removed after reproduction, implementation, regression test
 | 288 | `4d2749126` (unknown event receivers retain add/remove accessor effects) |
 | 295 | `47b8d6f7b` (captured closure state and allocation effects) |
 | 403 | `616f9e619`, `6448cab79`, `f00be7ef3` (authoritative pre-manifest failure rebinding) |
-| 410 | `b92cba235`, `f9e77c5b4` (factory method-group delegate inspection) |`n| 326-327 | `f336f1213` (meta-analyzer recursive fragments and interface storage) |`n| 351 | `8e34fcfca` (nonblank retired-mode alias fallback) |`n| 422 | `0ef01b488` (preflight timing evidence remains recordable) |
+| 410 | `b92cba235`, `f9e77c5b4` (factory method-group delegate inspection) |
+| 326-327 | `f336f1213` (meta-analyzer recursive fragments and interface storage) |
+| 351 | `8e34fcfca` (nonblank retired-mode alias fallback) |
+| 422 | `0ef01b488` (preflight timing evidence remains recordable) |
 
 The audit does not claim that the deferred security findings are fixed. Any future change to those areas should receive a separate threat-model review and dedicated validation.
 
