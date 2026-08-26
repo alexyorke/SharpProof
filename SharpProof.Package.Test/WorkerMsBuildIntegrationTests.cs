@@ -1685,6 +1685,51 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    [NonParallelizable]
+    public async Task LauncherClassifiesPreflightPlatformFailureAsInvalidInput()
+    {
+        var previousContainer = Environment.GetEnvironmentVariable(
+            "SHARPPROOF_CONTAINER");
+        var previousContract = Environment.GetEnvironmentVariable(
+            "SHARPPROOF_CONTAINER_CONTRACT");
+        var resultPath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "preflight-platform-failure-" + Guid.NewGuid().ToString("N") +
+            ".json");
+        try
+        {
+            Environment.SetEnvironmentVariable("SHARPPROOF_CONTAINER", null);
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER_CONTRACT", null);
+            var exitCode = await Program.RunMain(
+                [
+                    "verify",
+                    "--worker", "worker.dll",
+                    "--request", "request.json",
+                    "--result", resultPath,
+                    "--compiler-manifest", "manifest.json",
+                    "--verify-policy", "advisory",
+                    "--assumption-policy", "allow"
+                ],
+                static _ => string.Empty);
+
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(File.Exists(resultPath), Is.False);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER", previousContainer);
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER_CONTRACT", previousContract);
+            if (File.Exists(resultPath))
+            {
+                File.Delete(resultPath);
+            }
+        }
+    }
+
+    [Test]
     public async Task LauncherPropagatesWorkerCancellation()
     {
         RequireContainerWorker();

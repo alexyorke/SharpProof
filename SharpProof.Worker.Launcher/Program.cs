@@ -79,7 +79,8 @@ internal static class Program
             exception is IOException or UnauthorizedAccessException or
                 ArgumentException or FormatException or OverflowException or
                 InvalidDataException or JsonException or KeyNotFoundException or
-                InvalidOperationException or System.ComponentModel.Win32Exception)
+                InvalidOperationException or PlatformNotSupportedException or
+                System.ComponentModel.Win32Exception)
         {
             runtimeSnapshot?.Dispose();
             runtimeSnapshot = null;
