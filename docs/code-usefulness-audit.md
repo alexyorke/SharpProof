@@ -845,7 +845,7 @@ The ledger is intentionally verbose so that every baseline text file has an expl
 | `scripts/Generate-ProtocolModel.ps1` | `fb7417c3b9591a4ffe157a9024b3570f73996052` | 1360 | 1339 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
 | `scripts/Generate-Readme.ps1` | `deefd95165c724f017d43c336f9508b19abdee88` | 1026 | 982 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
 | `scripts/GeneratedFileHelpers.ps1` | `b8f52f641c0b29db0825c91ffc1a7ac508469845` | 171 | 157 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
-| `scripts/Get-SharpProofCoverageAuthority.ps1` | `55263c6df6a3ad0e9d0474d7d449fbba011ab3ac` | 346 | 318 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
+| `scripts/Get-SharpProofCoverageAuthority.ps1` | `55263c6df6a3ad0e9d0474d7d449fbba011ab3ac` | 346 | 318 | build/release support | redundant/unreachable | removed; production inventory is the live coverage authority |
 | `scripts/Get-SharpProofDevCheckPlan.ps1` | `651ecbab3d4f80933b8dc928cda700353d951f34` | 59 | 53 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
 | `scripts/Get-SharpProofPilotPackageAuthority.ps1` | `e6c890f738a9ace1352357e63efa69933b3e6404` | 54 | 53 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
 | `scripts/Get-SharpProofProductionInventory.ps1` | `8e2a050a0308c306a9c80113ec54db849b65c19b` | 404 | 382 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
@@ -857,7 +857,7 @@ The ledger is intentionally verbose so that every baseline text file has an expl
 | `scripts/Invoke-SharpProofContainer.ps1` | `41bddda90a46cbfef5a9b16c34d569f41d578220` | 459 | 446 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
 | `scripts/Invoke-SharpProofCoverage.ps1` | `4b032e1d8afced27f3fcfa865ff62c42b8585177` | 252 | 241 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
 | `scripts/Invoke-SharpProofDevCheck.ps1` | `f2123f67eb3d753d512ad1d01afd408e49db04b8` | 109 | 100 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
-| `scripts/Invoke-SharpProofDogfood.ps1` | `94a6ad7dd0493fc56af8fee13b19820d525bd5ac` | 69 | 63 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
+| `scripts/Invoke-SharpProofDogfood.ps1` | `94a6ad7dd0493fc56af8fee13b19820d525bd5ac` | 69 | 63 | build/release support | redundant/unreachable | removed with the obsolete SharpProofDogfood MSBuild path |
 | `scripts/Invoke-SharpProofDotnet.ps1` | `1b803959fed01fdf81574e40074ac145f4af15a7` | 83 | 74 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
 | `scripts/Invoke-SharpProofFuzzCampaign.ps1` | `c50a7d1b8cc163af3a8cd8184d336ddcc59984ec` | 220 | 211 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
 | `scripts/Invoke-SharpProofGateEvidence.ps1` | `ee4c767f6b6ec50f0e79688665f26f78024cc8e4` | 180 | 174 | build/release support | required build/package/release support | none confirmed after references, execution paths, and tests |
@@ -926,4 +926,3 @@ The ledger is intentionally verbose so that every baseline text file has an expl
 ## Stop condition
 
 Every baseline ledger row has a usefulness verdict. The second cross-shard review found no independently confirmed deletion that preserved the documented Attributes, analyzer/generator, and Linux-amd64 verifier surfaces and the existing evidence chain. Further reduction would require a product/design decision (notably cache markers, semantic architecture scanning, or security/integrity hardening) and is therefore left in `BUGS.md` rather than inferred from line counts.
-
