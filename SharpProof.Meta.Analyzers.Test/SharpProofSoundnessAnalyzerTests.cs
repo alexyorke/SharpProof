@@ -1457,11 +1457,39 @@ public sealed class SharpProofSoundnessAnalyzerTests
                         DiagnosticSeverity.Info, true);
                 }
             }
-            namespace SharpProof.ContractForGenerator {
-                static class GeneratedDiagnosticDescriptors {
+            namespace SharpProof.ContractForValidation {
+                static class ContractForDiagnosticDescriptors {
                     static readonly DiagnosticDescriptor Rule = new(
                         "ID", "title", "message", "category",
                         DiagnosticSeverity.Info, true);
+                }
+            }
+            namespace SharpProof.Meta.Analyzers {
+                static class MetaDiagnosticDescriptors {
+                    static readonly DiagnosticDescriptor Rule = new(
+                        "ID", "title", "message", "category",
+                        DiagnosticSeverity.Info, true);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA005"]));
+    }
+
+    [Test]
+    public async Task RejectsHandWrittenDescriptorsInsideTheMetaAnalyzerNamespace()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Meta.Analyzers {
+                static class AdHocDescriptors {
+                    static readonly DiagnosticDescriptor Rule = new(
+                        "SPMETA999", "title", "message", "category",
+                        DiagnosticSeverity.Warning, true);
                 }
             }
             """;

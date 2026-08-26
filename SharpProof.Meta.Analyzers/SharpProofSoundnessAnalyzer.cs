@@ -19,7 +19,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "Microsoft.CodeAnalysis.CSharp.SymbolDisplay",
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
         "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
-        "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors",
+        "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForValidation.ContractForDiagnosticDescriptors",
         "SharpProof.Meta.Analyzers.MetaDiagnosticDescriptors",
         "System.String", "SharpProof.Verify.Assumption", "SharpProof.Verify.ProofKernel",
         "SharpProof.Worker.CallableEvidenceBuilder",
@@ -161,7 +161,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         var creation = (IObjectCreationOperation)context.Operation;
         var containingType = context.ContainingSymbol.ContainingType;
         if (IsSameType(creation.Type, symbols[KnownType.DiagnosticDescriptor]) &&
-            !IsExactNamespace(context.ContainingSymbol.ContainingNamespace, "SharpProof", "Meta", "Analyzers") &&
             !IsAnyType(containingType, symbols, KnownType.AnalyzerDiagnosticDescriptors, KnownType.ContractForDiagnosticDescriptors, KnownType.MetaDiagnosticDescriptors))
         {
             Report(context, MetaDiagnosticDescriptors.DescriptorConstruction, creation.Syntax.GetLocation());

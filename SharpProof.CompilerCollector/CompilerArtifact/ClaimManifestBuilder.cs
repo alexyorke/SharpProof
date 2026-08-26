@@ -64,6 +64,12 @@ internal sealed partial class ClaimManifestBuilder(
         }
 
         var hasTrustedAttributes = TrustedAttributes(target).Any();
+        var explicitSelection = _attributes.Select(
+            target,
+            resolution.HasSelectedContractIntent);
+        var explicitContractsSelected =
+            ContractsEnabled &&
+            (explicitSelection & ContractSelectionFeatures.Contracts) != 0;
         var analyzerSelection = _attributes.Select(
             target,
             resolution.HasSelectedContractIntent,
@@ -81,8 +87,8 @@ internal sealed partial class ClaimManifestBuilder(
             analyzerEffectsSelected
             ? ClassifySelectedSubset(
                 seed,
-                analyzerContractsSelected,
-                analyzerEffectsSelected)
+                analyzerEffectsSelected,
+                explicitContractsSelected)
             : LanguageSubsetDecision.Supported;
         var supported =
             seed.Declaration is
@@ -149,12 +155,12 @@ internal sealed partial class ClaimManifestBuilder(
 
     private LanguageSubsetDecision ClassifySelectedSubset(
         CallableSeed seed,
-        bool contractsSelected,
-        bool effectsSelected)
+        bool effectsSelected,
+        bool explicitContractsSelected)
     {
         if ((seed.Method.IsAbstract || seed.Method.IsExtern) &&
             effectsSelected &&
-            !contractsSelected &&
+            !explicitContractsSelected &&
             _effectSession.ResolveEffectContract(seed.Method).Kind ==
             EffectContractResolutionKind.Valid)
         {

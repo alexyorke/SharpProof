@@ -49,14 +49,13 @@ internal static class ContractForSymbolMatcher
             {
                 Kind: TypedConstantKind.Type,
                 Value: INamedTypeSymbol type
-            } ||
-            type.TypeKind is not (TypeKind.Class or TypeKind.Interface))
+            })
         {
             target = default;
             return false;
         }
         target = new(type.IsUnboundGenericType ? type.OriginalDefinition : type, type.IsUnboundGenericType);
-        return true;
+        return type.TypeKind is TypeKind.Class or TypeKind.Interface;
     }
 
     internal static bool TargetsType(
@@ -133,12 +132,18 @@ internal static class ContractForSymbolMatcher
             {
                 // Preserve a malformed ContractFor declaration as a failed
                 // companion instead of dropping its intent and allowing the
-                // target to bind as if no companion had been declared. The
-                // target tuple is a sentinel only; failed descriptors are
-                // never considered for matching or manifest expansion.
+                // target to bind as if no companion had been declared. A
+                // recognizable but unsupported target (for example a struct)
+                // remains available for target-specific failure reporting;
+                // malformed non-type arguments use an unmatched sentinel.
+                var parsed = TryGetTarget(attributes[0], out var failedTarget);
+                if (!parsed && failedTarget.Target is null)
+                {
+                    failedTarget = (type, false);
+                }
                 result.Add(new CompanionDescriptor(
                     type,
-                    (type, false),
+                    failedTarget,
                     ContractBindingFailure.InvalidClosedAttribute));
             }
         }
@@ -155,7 +160,6 @@ internal static class ContractForSymbolMatcher
         }
 
         var matching = companions.Where(companion =>
-            companion.Failure == ContractBindingFailure.None &&
             TargetsType(companion.ContractTarget, target.ContainingType)).ToImmutableArray();
         if (matching.IsDefaultOrEmpty)
         {
@@ -168,6 +172,10 @@ internal static class ContractForSymbolMatcher
         }
 
         var companion = matching[0];
+        if (companion.Failure != ContractBindingFailure.None)
+        {
+            return CompanionResolution.Fail(companion.Failure);
+        }
         if (!CompanionTypeMatches(companion.Type, companion.ContractTarget))
         {
             return CompanionResolution.Fail(ContractBindingFailure.CompanionSignatureMismatch);

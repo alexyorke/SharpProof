@@ -114,6 +114,13 @@ internal static partial class AnalyzerFeaturePipeline
         }
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
+        var explicitSelection = session.Attributes.Select(
+            method,
+            session.Configuration.ContractsEnabled &&
+            session.ResolveContractSource(method).HasSelectedContractIntent);
+        var explicitContractsSelected =
+            session.Configuration.ContractsEnabled &&
+            (explicitSelection & ContractSelectionFeatures.Contracts) != 0;
         if (IsConcreteSemicolonAccessor(method, context.CancellationToken) &&
             selection.Any)
         {
@@ -154,7 +161,7 @@ internal static partial class AnalyzerFeaturePipeline
                 AnalyzerSemanticOutcome.Abstained);
             return;
         }
-        if (!selection.Contracts &&
+        if (!explicitContractsSelected &&
             selection.Effects &&
             session.ResolveEffectContract(method) is
             { Kind: EffectContractResolutionKind.Valid })

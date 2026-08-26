@@ -200,6 +200,36 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void SummaryDependencyDepthLimitFailsClosedWithoutStackOverflow()
+    {
+        var methods = string.Concat(Enumerable.Range(0, 300).Select(index =>
+            index == 299
+                ? "        private static int F299(int value) => value;\n"
+                : $"        private static int F{index}(int value) => F{index + 1}(value);\n"));
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+            """ + methods +
+            """
+                internal static int Verify(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return F0(value);
+                }
+            }
+            """,
+            "Verify");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
+    [Test]
     public void ConstructorAndRefBodyAreTypedUnsupported()
     {
         var constructor = Prepare(

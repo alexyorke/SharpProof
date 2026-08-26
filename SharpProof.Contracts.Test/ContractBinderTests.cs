@@ -1504,6 +1504,33 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void MalformedContractForCompanionCannotDisappearFromBinding()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public struct Target {
+                public int Read(int value) => value;
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver, int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
+    [Test]
     public void ProductionBinderContainsNoTextualOrSpeculativeBindingEscapeHatches()
     {
         var root = FindRepositoryRoot();
