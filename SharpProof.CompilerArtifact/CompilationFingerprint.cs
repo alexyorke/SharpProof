@@ -450,7 +450,7 @@ internal static class CompilationFingerprint
         All(value.Modules, ValidReferenceModule) &&
         value.Modules.Select(static module => module.Name)
             .Distinct(StringComparer.Ordinal).Count() == value.Modules.Length &&
-        value.Modules.Skip(1).Zip(value.Modules.Skip(2),
+        value.Modules.Zip(value.Modules.Skip(1),
                 static (left, right) => StringComparer.Ordinal.Compare(
                     left.Name, right.Name) < 0)
             .All(static ordered => ordered) &&

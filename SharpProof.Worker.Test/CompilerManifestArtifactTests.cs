@@ -425,6 +425,29 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void Sp034ReferenceModulesMustBeOrderedFromTheFirstPair()
+    {
+        AssertMalformedCapture(snapshot =>
+        {
+            var first = snapshot.References[0].Modules[0];
+            first.Name = "zeta.dll";
+            first.Path += ".zeta";
+            snapshot.References[0].Modules =
+            [
+                first,
+                new CompilerReferenceModuleSnapshot
+                {
+                    Name = "alpha.dll",
+                    Path = first.Path + ".alpha",
+                    Mvid = first.Mvid,
+                    Sha256 = first.Sha256,
+                    SizeBytes = first.SizeBytes
+                }
+            ];
+        });
+    }
+
+    [Test]
     public void Sp034ReferenceRolesRejectModuleOnlyProperties()
     {
         Action<CompilerReferenceSnapshot>[] corruptions =

@@ -272,7 +272,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             namespace SharpProof.Verify {
             using ExternalAnswer = Other.Answer;
             internal interface ISemanticCache { }
-            enum Answer { Unknown, TimedOut, Failed, Proven }
+            enum Answer { Unknown, TimedOut, Failed, Canceled, Proven }
             sealed class AnswerSource {
                 internal Answer Unknown => Answer.Proven;
                 internal Answer CreateTimeout() => Answer.Proven;
@@ -327,6 +327,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 }
                 void Overwrite(ProofCache cache) =>
                     cache.AddOrUpdate("key", Answer.TimedOut);
+                void Canceled(ProofCache cache) =>
+                    cache.Write(Answer.Canceled);
                 void Unresolved(ProofCache cache, Answer answer) =>
                     cache.Write(answer);
                 void Safe(ProofCache cache, AnswerSource source) {
@@ -349,7 +351,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(12));
+            Is.EqualTo(13));
     }
 
     [Test]
@@ -432,6 +434,32 @@ public sealed class SharpProofSoundnessAnalyzerTests
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
             Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task SemanticCacheWritesTrackDeconstructionTargets()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { TimedOut, Proven }
+            sealed class ProofCache : ISemanticCache {
+                internal Answer Latest { get; set; }
+            }
+            sealed class C {
+                void Direct(ProofCache cache) =>
+                    cache.Latest = Answer.TimedOut;
+                void Deconstructed(ProofCache cache) {
+                    var stamp = 0;
+                    (cache.Latest, stamp) = (Answer.TimedOut, 1);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(2));
     }
 
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]

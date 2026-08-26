@@ -39,7 +39,80 @@ internal static class CacheSoundnessRules
         {
             return;
         }
-        var cacheType = assignment.Target switch
+        if (assignment is IDeconstructionAssignmentOperation deconstruction)
+        {
+            AnalyzeDeconstructionTarget(
+                context,
+                symbols,
+                deconstruction.Target,
+                deconstruction.Value,
+                Root(assignment));
+            return;
+        }
+
+        AnalyzeAssignmentTarget(
+            context,
+            symbols,
+            assignment.Target,
+            assignment.Value,
+            Root(assignment));
+    }
+
+    private static void AnalyzeDeconstructionTarget(
+        OperationAnalysisContext context,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols,
+        IOperation target,
+        IOperation value,
+        IOperation root)
+    {
+        target = UnwrapAssignmentOperation(target);
+        value = UnwrapAssignmentOperation(value);
+        if (target is ITupleOperation targetTuple &&
+            value is ITupleOperation valueTuple)
+        {
+            var count = Math.Min(
+                targetTuple.Elements.Length,
+                valueTuple.Elements.Length);
+            for (var index = 0; index < count; index++)
+            {
+                AnalyzeDeconstructionTarget(
+                    context,
+                    symbols,
+                    targetTuple.Elements[index],
+                    valueTuple.Elements[index],
+                    root);
+            }
+            return;
+        }
+
+        AnalyzeAssignmentTarget(context, symbols, target, value, root);
+    }
+
+    private static IOperation UnwrapAssignmentOperation(IOperation operation)
+    {
+        while (operation is IConversionOperation conversion &&
+               conversion.OperatorMethod == null ||
+               operation is IParenthesizedOperation)
+        {
+            operation = operation switch
+            {
+                IConversionOperation { OperatorMethod: null } value => value.Operand,
+                IParenthesizedOperation parenthesized => parenthesized.Operand,
+                _ => operation
+            };
+        }
+
+        return operation;
+    }
+
+    private static void AnalyzeAssignmentTarget(
+        OperationAnalysisContext context,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols,
+        IOperation target,
+        IOperation value,
+        IOperation root)
+    {
+        var cacheType = target switch
         {
             IPropertyReferenceOperation property =>
                 property.Instance?.Type ?? property.Property.ContainingType,
@@ -47,15 +120,14 @@ internal static class CacheSoundnessRules
                 field.Instance?.Type ?? field.Field.ContainingType,
             _ => null
         };
-        if (!IsCacheType(cacheType, symbols) ||
-            !IsNonCacheableSemanticAnswer(
-                assignment.Value, Root(assignment),
+        if (IsCacheType(cacheType, symbols) &&
+            IsNonCacheableSemanticAnswer(
+                value,
+                root,
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
         {
-            return;
+            Report(context, target.Syntax.GetLocation());
         }
-
-        Report(context, assignment.Syntax.GetLocation());
     }
 
     private static void Report(OperationAnalysisContext context, Location? location)
@@ -335,6 +407,9 @@ internal static class CacheSoundnessRules
     {
         return name != null &&
                (string.Equals(name, "Unknown", StringComparison.Ordinal) ||
+                string.Equals(name, "Canceled", StringComparison.Ordinal) ||
+                string.Equals(name, "Cancelled", StringComparison.Ordinal) ||
+                string.Equals(name, "Interrupted", StringComparison.Ordinal) ||
                 name.IndexOf("Timeout", StringComparison.Ordinal) >= 0 ||
                 name.IndexOf("TimedOut", StringComparison.Ordinal) >= 0 ||
                 name.IndexOf("Error", StringComparison.Ordinal) >= 0 ||

@@ -108,7 +108,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 c => CacheSoundnessRules.AnalyzeAssignment(c, symbols),
                 OperationKind.SimpleAssignment,
                 OperationKind.CoalesceAssignment,
-                OperationKind.CompoundAssignment);
+                OperationKind.CompoundAssignment,
+                OperationKind.DeconstructionAssignment);
             startContext.RegisterOperationAction(
                 AnalyzeCompoundAssignmentExpressionText,
                 OperationKind.CompoundAssignment);
