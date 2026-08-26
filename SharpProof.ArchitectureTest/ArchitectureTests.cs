@@ -58,9 +58,14 @@ public sealed class ArchitectureTests
 
     // Release-evidence tooling is production code for dependency and native
     // package isolation, even though it is not part of the shipped libraries.
+    private static readonly string[] ReleaseSupportProjects = [
+        "SharpProof.Gates",
+        "SharpProof.Testing"
+    ];
+
     private static readonly string[] DependencyGovernedProjects = [
         .. ProductionProjects,
-        "SharpProof.Gates"
+        .. ReleaseSupportProjects
     ];
 
     private static readonly string[] AcceptanceTimingPhases = [
@@ -250,7 +255,8 @@ public sealed class ArchitectureTests
                 "SharpProof.ContractForGenerator",
                 "SharpProof.Worker",
                 "SharpProof.Worker.Launcher"
-            ]
+            ],
+            ["SharpProof.Testing"] = ["SharpProof.Ir"]
         };
 
         foreach (var project in DependencyGovernedProjects)
@@ -264,6 +270,26 @@ public sealed class ArchitectureTests
                     static value => value,
                     StringComparer.Ordinal)),
                 project);
+        }
+    }
+
+    [Test]
+    public void ReleaseSupportProjectsAreExplicitlyGoverned()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                ReleaseSupportProjects,
+                Is.EqualTo(["SharpProof.Gates", "SharpProof.Testing"]));
+            Assert.That(
+                DependencyGovernedProjects,
+                Does.Contain("SharpProof.Testing"));
+            Assert.That(
+                GetProjectReferences("SharpProof.Testing"),
+                Is.EqualTo(["SharpProof.Ir"]));
+            Assert.That(
+                GetProjectReferences("SharpProof.Fuzz"),
+                Does.Contain("SharpProof.Testing"));
         }
     }
 
