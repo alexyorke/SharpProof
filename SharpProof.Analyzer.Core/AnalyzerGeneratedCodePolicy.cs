@@ -87,15 +87,59 @@ internal static class AnalyzerGeneratedCodePolicy
                 continue;
             }
 
-            return trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) ||
-                trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)
-                    ? IsExactGeneratedHeader(trivia.ToString())
-                    : false;
+            if (trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) ||
+                trivia.IsKind(SyntaxKind.MultiLineCommentTrivia))
+            {
+                var comment = trivia.ToString();
+                if (IsExactGeneratedHeader(comment))
+                {
+                    return true;
+                }
+
+                if (IsDecorativeBanner(comment))
+                {
+                    continue;
+                }
+            }
+
+            return false;
         }
         return false;
     }
 
     private static bool IsExactGeneratedHeader(string comment)
+    {
+        var body = GetCommentBody(comment);
+        return GeneratedHeaderTokens.Any(token => string.Equals(
+            body,
+            token,
+            StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsDecorativeBanner(string comment)
+    {
+        var body = GetCommentBody(comment);
+        var hasSeparator = false;
+        foreach (var character in body)
+        {
+            if (char.IsWhiteSpace(character))
+            {
+                continue;
+            }
+
+            if (character is '-' or '=' or '*' or '/' or '#' or '_' or '~')
+            {
+                hasSeparator = true;
+                continue;
+            }
+
+            return false;
+        }
+
+        return hasSeparator;
+    }
+
+    private static string GetCommentBody(string comment)
     {
         var body = comment.StartsWith("//", StringComparison.Ordinal)
             ? comment.Substring(2)
@@ -103,11 +147,7 @@ internal static class AnalyzerGeneratedCodePolicy
               comment.EndsWith("*/", StringComparison.Ordinal)
                 ? comment.Substring(2, comment.Length - 4)
                 : string.Empty;
-        body = body.Trim();
-        return GeneratedHeaderTokens.Any(token => string.Equals(
-            body,
-            token,
-            StringComparison.OrdinalIgnoreCase));
+        return body.Trim();
     }
 
     private static bool HasGeneratedCodeAttribute(
