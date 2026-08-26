@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Effects;
@@ -64,11 +65,75 @@ internal sealed partial class OperationEffectScanner
         }
 
         var completes = _completionEvaluator.CanCompleteNormally(deconstruction);
+        var deconstructionCall = ScanDeconstructionCall(deconstruction);
         return value.Then(new EffectStep(
-            completes
-                ? EffectSummaryOperations.Unsupported()
-                : EffectSummaryOperations.MayDiverge(),
+            EffectSummaryOperations.Join(
+                deconstructionCall,
+                completes
+                    ? EffectSummaryOperations.Unsupported()
+                    : EffectSummaryOperations.MayDiverge()),
             completes)).Summary;
+    }
+
+    private EffectSummary ScanDeconstructionCall(
+        IDeconstructionAssignmentOperation deconstruction)
+    {
+        if (deconstruction.Syntax is not AssignmentExpressionSyntax syntax)
+        {
+            return EffectSummary.Empty;
+        }
+
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_session.Compilation, syntax.SyntaxTree);
+        var info = model.GetDeconstructionInfo(syntax);
+        if (info.Method is not { } method)
+        {
+            return EffectSummary.Empty;
+        }
+
+        var hasReceiver = method.ReducedFrom != null || !method.IsStatic;
+        var receiver = hasReceiver
+            ? _conversionOwnership.ClassifyRegion(
+                deconstruction.Value,
+                aliasSource: true)
+            : EffectRegionSet.Empty;
+        var targets = FlattenDeconstructionTargets(deconstruction.Target)
+            .Take(method.Parameters.Length)
+            .ToImmutableArray();
+        var argumentRegions = targets
+            .Select(target => _conversionOwnership.ClassifyRegion(
+                target,
+                aliasSource: true))
+            .Concat(Enumerable.Repeat(
+                EffectRegionSet.Unknown,
+                Math.Max(0, method.Parameters.Length - targets.Length)))
+            .ToImmutableArray();
+        var actualArguments = targets
+            .Cast<IOperation?>()
+            .Concat(Enumerable.Repeat<IOperation?>(
+                null,
+                Math.Max(0, method.Parameters.Length - targets.Length)))
+            .ToImmutableArray();
+        return _callResolver.Resolve(
+            method,
+            receiver,
+            receiver,
+            argumentRegions,
+            actualArguments,
+            method.IsVirtual || method.IsAbstract,
+            deconstruction,
+            hasReceiver ? deconstruction.Value : null);
+    }
+
+    private static IEnumerable<IOperation> FlattenDeconstructionTargets(
+        IOperation target)
+    {
+        if (target is ITupleOperation tuple)
+        {
+            return tuple.Elements.SelectMany(FlattenDeconstructionTargets);
+        }
+
+        return [target];
     }
 
     private EffectSummary ScanEventAssignment(

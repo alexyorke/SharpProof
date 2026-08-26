@@ -5844,6 +5844,52 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void DeconstructionCalleeEffectsAreRetained()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global
+            {
+                public static int State;
+            }
+
+            public sealed class MutatingDeconstruction
+            {
+                public void Deconstruct(out int left, out int right)
+                {
+                    Global.State = 1;
+                    left = 0;
+                    right = 0;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample
+            {
+                public static void Caller(MutatingDeconstruction value)
+                {
+                    try
+                    {
+                        var (left, right) = value;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                    }
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Caller"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void ExceptionFlowReportsOnlyExceptionsThatEscape()
     {
         var compilation = EffectTestHost.CreateCompilation(
