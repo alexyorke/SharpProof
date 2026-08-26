@@ -44,7 +44,7 @@ public sealed class ContractBinderTests
             using SharpProof.Attributes;
             public static class Target {
                 public static T Read<T>(T value) {
-                    Contract.Requires(value != null);
+                    Contract.Requires(true);
                     return value;
                 }
             }

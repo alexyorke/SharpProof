@@ -105,11 +105,17 @@ public sealed class ContractBinder(
         var source = resolution.Source;
         var inventory = resolution.Inventory;
         var usesCompanion = resolution.UsesCompanion;
+        var typeSpecializer = _canonicalization.CreateTypeSpecializer(source);
+        if (typeSpecializer == null)
+        {
+            return ContractBindingResult.Fail(
+                ContractBindingFailure.UnsupportedExpression);
+        }
         var expressionBinder = new ContractExpressionBinder(
             _factory,
             _api,
             source,
-            _canonicalization.CreateTypeSpecializer(source));
+            typeSpecializer);
         var invocationResult = BindInvocations(expressionBinder, inventory, usesCompanion, requiresOnly);
         if (invocationResult.Failure != ContractBindingFailure.None)
         {

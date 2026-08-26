@@ -8,49 +8,77 @@ internal sealed class ContractCanonicalization(
         ArgumentNullGuard.NotNull(compilation, nameof(compilation));
     private readonly RoslynOperationLowerer _types = new(factory);
 
-    internal Func<ITypeSymbol?, ITypeSymbol?> CreateTypeSpecializer(
+    internal Func<ITypeSymbol?, ITypeSymbol?>? CreateTypeSpecializer(
         IMethodSymbol source)
     {
         var substitutions = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(
             SymbolEqualityComparer.Default);
         var signatureTypes = new Dictionary<ITypeSymbol, ITypeSymbol>(
             SymbolEqualityComparer.IncludeNullability);
-        AddParameters(
+        if (!AddParameters(
             source.OriginalDefinition.TypeParameters,
-            source.TypeArguments);
+            source.TypeArguments))
+        {
+            return null;
+        }
         for (var type = source.ContainingType;
              type != null;
              type = type.ContainingType)
         {
-            AddParameters(
+            if (!AddParameters(
                 type.OriginalDefinition.TypeParameters,
-                type.TypeArguments);
+                type.TypeArguments))
+            {
+                return null;
+            }
         }
-        AddSignatureType(
+        if (!AddSignatureType(
             source.OriginalDefinition.ReturnType,
-            source.ReturnType);
+            source.ReturnType))
+        {
+            return null;
+        }
+        if (source.OriginalDefinition.Parameters.Length !=
+            source.Parameters.Length)
+        {
+            return null;
+        }
         for (var index = 0; index < source.Parameters.Length; index++)
         {
-            AddSignatureType(
+            if (!AddSignatureType(
                 source.OriginalDefinition.Parameters[index].Type,
-                source.Parameters[index].Type);
+                source.Parameters[index].Type))
+            {
+                return null;
+            }
         }
         var partialCounterpart =
             source.OriginalDefinition.PartialImplementationPart ??
             source.OriginalDefinition.PartialDefinitionPart;
         if (partialCounterpart != null)
         {
-            AddParameters(
+            if (!AddParameters(
                 partialCounterpart.TypeParameters,
-                source.TypeArguments);
-            AddSignatureType(
+                source.TypeArguments) ||
+                partialCounterpart.Parameters.Length !=
+                source.Parameters.Length)
+            {
+                return null;
+            }
+            if (!AddSignatureType(
                 partialCounterpart.ReturnType,
-                source.ReturnType);
+                source.ReturnType))
+            {
+                return null;
+            }
             for (var index = 0; index < source.Parameters.Length; index++)
             {
-                AddSignatureType(
+                if (!AddSignatureType(
                     partialCounterpart.Parameters[index].Type,
-                    source.Parameters[index].Type);
+                    source.Parameters[index].Type))
+                {
+                    return null;
+                }
             }
         }
 
@@ -189,23 +217,30 @@ internal sealed class ContractCanonicalization(
             }
         }
 
-        void AddParameters(
+        bool AddParameters(
             ImmutableArray<ITypeParameterSymbol> parameters,
             ImmutableArray<ITypeSymbol> arguments)
         {
+            if (parameters.Length != arguments.Length)
+            {
+                return false;
+            }
+
             for (var index = 0; index < parameters.Length; index++)
             {
                 substitutions[parameters[index]] = arguments[index];
             }
+
+            return true;
         }
 
-        void AddSignatureType(
+        bool AddSignatureType(
             ITypeSymbol original,
             ITypeSymbol constructed)
         {
             if (signatureTypes.ContainsKey(original))
             {
-                return;
+                return true;
             }
             signatureTypes.Add(original, constructed);
 
@@ -213,49 +248,69 @@ internal sealed class ContractCanonicalization(
             {
                 case (IArrayTypeSymbol originalArray,
                       IArrayTypeSymbol constructedArray):
-                    AddSignatureType(
+                    return AddSignatureType(
                         originalArray.ElementType,
                         constructedArray.ElementType);
-                    break;
                 case (IPointerTypeSymbol originalPointer,
                       IPointerTypeSymbol constructedPointer):
-                    AddSignatureType(
+                    return AddSignatureType(
                         originalPointer.PointedAtType,
                         constructedPointer.PointedAtType);
-                    break;
                 case (IFunctionPointerTypeSymbol originalFunction,
                       IFunctionPointerTypeSymbol constructedFunction):
-                    AddSignatureType(
-                        originalFunction.Signature.ReturnType,
-                        constructedFunction.Signature.ReturnType);
+                    var originalSignature = originalFunction.Signature;
+                    var constructedSignature = constructedFunction.Signature;
+                    if (originalSignature.Parameters.Length !=
+                        constructedSignature.Parameters.Length ||
+                        !AddSignatureType(
+                            originalSignature.ReturnType,
+                            constructedSignature.ReturnType))
+                    {
+                        return false;
+                    }
                     for (var index = 0;
-                         index < originalFunction.Signature.Parameters.Length;
+                         index < originalSignature.Parameters.Length;
                          index++)
                     {
-                        AddSignatureType(
-                            originalFunction.Signature.Parameters[index].Type,
-                            constructedFunction.Signature.Parameters[index].Type);
+                        if (!AddSignatureType(
+                                originalSignature.Parameters[index].Type,
+                                constructedSignature.Parameters[index].Type))
+                        {
+                            return false;
+                        }
                     }
                     break;
                 case (INamedTypeSymbol originalNamed,
                       INamedTypeSymbol constructedNamed):
-                    if (originalNamed.ContainingType != null &&
-                        constructedNamed.ContainingType != null)
+                    if (originalNamed.TypeArguments.Length !=
+                            constructedNamed.TypeArguments.Length ||
+                        (originalNamed.ContainingType == null) !=
+                        (constructedNamed.ContainingType == null))
                     {
-                        AddSignatureType(
+                        return false;
+                    }
+                    if (originalNamed.ContainingType != null &&
+                        !AddSignatureType(
                             originalNamed.ContainingType,
-                            constructedNamed.ContainingType);
+                            constructedNamed.ContainingType!))
+                    {
+                        return false;
                     }
                     for (var index = 0;
                          index < originalNamed.TypeArguments.Length;
                          index++)
                     {
-                        AddSignatureType(
-                            originalNamed.TypeArguments[index],
-                            constructedNamed.TypeArguments[index]);
+                        if (!AddSignatureType(
+                                originalNamed.TypeArguments[index],
+                                constructedNamed.TypeArguments[index]))
+                        {
+                            return false;
+                        }
                     }
                     break;
             }
+
+            return true;
         }
     }
 
