@@ -90,6 +90,8 @@ public sealed class ProtocolJsonTests
             Encoding.UTF8.GetByteCount(unboundedJson),
             Is.GreaterThan(WorkerProtocolJson.MaximumJsonBytes));
 
+        response.ClaimResults[0].Assumptions![0].Used = true;
+        response.Summary = CreateSummary(response);
         var compactJson = WorkerProtocolJson.SerializeResponse(response);
         Assert.That(
             Encoding.UTF8.GetByteCount(compactJson),
@@ -99,8 +101,9 @@ public sealed class ProtocolJsonTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(roundTrip.ClaimResults, Has.Length.EqualTo(claimCount));
-            Assert.That(roundTrip.ClaimResults.All(
-                static claim => claim.Assumptions == null), Is.True);
+            Assert.That(roundTrip.ClaimResults.Count(
+                static claim => claim.Assumptions is { Length: 1 } &&
+                    claim.Assumptions[0].Used), Is.EqualTo(1));
             Assert.That(WorkerProtocolJson.Validate(roundTrip).IsValid, Is.True);
         }
     }

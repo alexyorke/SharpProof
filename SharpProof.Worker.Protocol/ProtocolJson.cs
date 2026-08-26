@@ -632,7 +632,7 @@ public static partial class WorkerProtocolJson
         callablesById.TryGetValue(claim?.CallableId ?? string.Empty, out var owner);
         errors.Check(owner != null &&
                 (value.Assumptions == null ||
-                    SameAssumptionDeclarations(value.Assumptions, owner.Assumptions)),
+                    MatchesClaimAssumptions(value.Assumptions, owner.Assumptions)),
             "response.claim_assumption_set");
     }
 
@@ -656,7 +656,13 @@ public static partial class WorkerProtocolJson
                 callables.TryGetValue(manifestClaim.CallableId, out var callable) &&
                 callable.Assumptions is { Length: > 0 })
             {
-                result.Assumptions = null;
+                var compact = result.Assumptions
+                    .Where(static assumption => assumption != null &&
+                        (assumption.Kind ==
+                        WorkerAssumptionKind.TrustedBoundary || assumption.Used)
+                    )
+                    .ToArray();
+                result.Assumptions = compact.Length == 0 ? null : compact;
             }
         }
     }
@@ -949,6 +955,34 @@ public static partial class WorkerProtocolJson
         }
 
         return Normalize(actual).SequenceEqual(Normalize(expected));
+    }
+
+    private static bool MatchesClaimAssumptions(
+        WorkerAssumptionEvidence[] actual,
+        WorkerAssumptionEvidence[] expected)
+    {
+        if (SameAssumptionDeclarations(actual, expected))
+        {
+            return true;
+        }
+
+        var expectedById = expected
+            .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
+            .GroupBy(static value => value.Id, s_ordinal)
+            .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
+        var actualById = actual
+            .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
+            .GroupBy(static value => value.Id, s_ordinal)
+            .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
+        return actual.Length > 0 &&
+            actual.All(value => value != null &&
+                expectedById.TryGetValue(value.Id, out var declaration) &&
+                declaration.Kind == value.Kind &&
+                (value.Kind == WorkerAssumptionKind.TrustedBoundary || value.Used)) &&
+            expected.Where(static value => value != null &&
+                    value.Kind == WorkerAssumptionKind.TrustedBoundary)
+                .All(value => actualById.TryGetValue(value.Id, out var actualValue) &&
+                    actualValue.Kind == value.Kind);
     }
 
     private static string ManifestName<T>(T value) where T : struct, Enum
