@@ -97,10 +97,14 @@ public sealed class DependencyAutomationTests
         {
             Assert.That(start, Is.GreaterThanOrEqualTo(0));
             Assert.That(end, Is.GreaterThan(start));
-            Assert.That(section, Does.Contain("BaseIntermediateOutputPath"));
-            Assert.That(section, Does.Contain("BaseOutputPath"));
-            Assert.That(section, Does.Contain("RestorePackagesPath"));
-            Assert.That(section, Does.Contain("$packProperties"));
+            Assert.That(section, Does.Contain("$packRepository"));
+            Assert.That(section, Does.Contain("$packArchive"));
+            Assert.That(section, Does.Contain("/bin/tar"));
+            Assert.That(section, Does.Contain("$sourceOrigin"));
+            Assert.That(section, Does.Contain("remote set-url origin"));
+            Assert.That(section, Does.Contain("$temporaryRoot"));
+            Assert.That(section, Does.Contain("'--packages'"));
+            Assert.That(section, Does.Contain("$packageCache"));
         }
     }
 

@@ -234,6 +234,61 @@ function Test-SampleProjectInventory {
 function New-LocalPackageFeed {
     $feed = Join-Path $temporaryRoot 'nupkgs'
     [void](New-Item -ItemType Directory -Path $feed)
+    $packRepository = Join-Path $temporaryRoot 'pack-source'
+    $packParent = Split-Path -Parent $packRepository
+    [void](New-Item -ItemType Directory -Path $packParent -Force)
+    $gitDirectory = @(
+        & git -C $repositoryRoot rev-parse --git-dir 2>$null
+    ) -join ''
+    if ($LASTEXITCODE -eq 0 -and
+        -not [string]::IsNullOrWhiteSpace($gitDirectory)) {
+        $sourceOrigin = @(
+            & git -C $repositoryRoot remote get-url origin 2>$null
+        ) -join ''
+        & git clone --shared --no-checkout --quiet `
+            $repositoryRoot $packRepository
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not clone the repository for isolated package builds.'
+        }
+        if (-not [string]::IsNullOrWhiteSpace($sourceOrigin)) {
+            & git -C $packRepository remote set-url origin $sourceOrigin
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Could not preserve the package-build repository origin.'
+            }
+        }
+        & git -C $packRepository checkout --quiet HEAD
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not check out the isolated package-build repository.'
+        }
+    }
+    else {
+        [void](New-Item -ItemType Directory -Path $packRepository -Force)
+    }
+    $packArchive = Join-Path $temporaryRoot 'pack-source.tar'
+    $tarArguments = @(
+        '--exclude=./artifacts',
+        '--exclude=./.git',
+        '--exclude=*/bin',
+        '--exclude=*/bin/*',
+        '--exclude=*/obj',
+        '--exclude=*/obj/*',
+        '--exclude=./.vs',
+        '--exclude=./.baseline-check',
+        '--exclude=./agent_findings',
+        '-C',
+        $repositoryRoot,
+        '-cf',
+        $packArchive,
+        '.'
+    )
+    & /bin/tar @tarArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not stage the repository for isolated package builds.'
+    }
+    & /bin/tar '-C' $packRepository '-xf' $packArchive
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not unpack the isolated package-build repository.'
+    }
     $manifest = Get-Content -LiteralPath (
         Join-Path $repositoryRoot 'scripts\package-projects.json') -Raw |
         ConvertFrom-Json
@@ -241,17 +296,7 @@ function New-LocalPackageFeed {
         throw 'Unsupported package-project manifest schema.'
     }
     foreach ($project in @($manifest.projects)) {
-        $projectPath = Join-Path $repositoryRoot ([string]$project)
-        $projectName = [IO.Path]::GetFileNameWithoutExtension($projectPath)
-        $packRoot = Join-Path $temporaryRoot ('pack/' + $projectName)
-        [void](New-Item -ItemType Directory -Path $packRoot -Force)
-        $packObj = Get-ForwardSlashPath (Join-Path $packRoot 'obj')
-        $packBin = Get-ForwardSlashPath (Join-Path $packRoot 'bin')
-        $packProperties = @(
-            "-p:BaseIntermediateOutputPath=$packObj/",
-            "-p:BaseOutputPath=$packBin/",
-            "-p:RestorePackagesPath=$(Get-ForwardSlashPath $packageCache)"
-        )
+        $projectPath = Join-Path $packRepository ([string]$project)
         $pack = Invoke-CapturedDotNet -TimeoutSeconds 900 -Arguments (@(
                 'pack',
                 $projectPath,
@@ -259,8 +304,10 @@ function New-LocalPackageFeed {
                 $Configuration,
                 '--output',
                 $feed,
+                '--packages',
+                $packageCache,
                 '--nologo'
-            ) + $packProperties)
+            ))
         Assert-ExitCode $pack $true "Packing $projectPath"
     }
     return $feed
