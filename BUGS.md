@@ -1384,3 +1384,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 3. Contrast the neighboring claims of the same cell (branches, multiple returns, Old) which each verify true against the same files, isolating "locals" as the sole false enumeration.
 4. Optional: run `tooling samples -PackageSource nupkgs` - green, because the runner asserts only counts/outcomes/codes, never the Demonstrates column: nothing would catch a fixture silently contradicting the README here.
 **Confidence**: High (all three files and README read in full; history checked); severity explicitly Low (documentation accuracy of an executable-spec asset).
+
+### 426. [RESOLVED f691e311f] Default API-Spec Digest Pin Lagged the Canonical Hash-Writer Format
+
+**Status**: The generated API-spec table uses the current canonical hash-writer format, but `DefaultApiSpecCatalogGenerationTests` still pinned the pre-format-change digest. The stale assertion made the complete Specs suite fail even though generator output and the runtime table agreed. The pin now matches the current digest (`c0f4a6b09d7efdb66ac11457ae4d80345c9a977286118058ae67750961a3342e`); the full Specs project passes 55/55.
