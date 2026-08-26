@@ -610,6 +610,55 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsCatalogedSemanticStringMethodsAndIndirectConstants()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Frontend;
+            sealed class Lookalike {
+                internal bool StartsWith(string value) => true;
+                internal int Compare(string left, string right) => 0;
+            }
+            static class C {
+                private static readonly string Code = "ir_timeout";
+                private static readonly string OrdinaryCode = "ordinary";
+                private static string RuntimeCode() => "ir_runtime";
+
+                internal static bool StartsWithDirect(string reason) =>
+                    reason.StartsWith("ir_prefix", StringComparison.Ordinal);
+                internal static bool StartsWithIndirect(string reason) =>
+                    reason.StartsWith(Code, StringComparison.Ordinal);
+                internal static bool CompareDirect(string reason) =>
+                    string.Compare(reason, "ir_compare", StringComparison.Ordinal) == 0;
+                internal static bool CompareIndirect(string reason) =>
+                    string.Compare(reason, Code, StringComparison.Ordinal) == 0;
+                internal static bool EqualityIndirect(string reason) =>
+                    reason == Code;
+                internal static bool OrdinaryStartsWith(string reason) =>
+                    reason.StartsWith(OrdinaryCode, StringComparison.Ordinal);
+                internal static bool RuntimeStartsWith(string reason) =>
+                    reason.StartsWith(RuntimeCode(), StringComparison.Ordinal);
+                internal static bool UnsupportedMethods(string reason) =>
+                    reason.Contains("ir_contains", StringComparison.Ordinal) ||
+                    reason.EndsWith("ir_ends", StringComparison.Ordinal) ||
+                    reason.IndexOf("ir_index", StringComparison.Ordinal) >= 0;
+                internal static bool LookalikeMethods(string reason) {
+                    var lookalike = new Lookalike();
+                    return lookalike.StartsWith("ir_lookalike") ||
+                        lookalike.Compare(reason, "ir_lookalike") == 0;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA004"),
+            Is.EqualTo(5));
+    }
+
+    [Test]
     public async Task AllowsImmutableStateAndCancellationRethrow()
     {
         const string source =

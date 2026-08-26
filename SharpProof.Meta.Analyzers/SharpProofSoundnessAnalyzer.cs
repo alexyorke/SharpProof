@@ -68,6 +68,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
         [" is null", " is not null", " == ", " != ", " && ", " || ", "=>", "?."];
+    private static readonly ImmutableHashSet<string> SemanticStringMethodCatalog = Names(
+        "StartsWith",
+        "Compare");
     private static readonly ImmutableHashSet<string> DisplayTextMethods = Names(
         "ToDisplayString",
         "ToDisplayParts",
@@ -146,6 +149,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         AnalyzeSemanticEquals(context, invocation, symbols);
+        AnalyzeSemanticStringMethod(context, invocation, symbols);
         CacheSoundnessRules.AnalyzeWrite(context, invocation, symbols);
         AnalyzeStringConcatExpressionText(context, invocation);
     }
@@ -248,7 +252,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var literal = GetSemanticLiteral(binary.LeftOperand) ?? GetSemanticLiteral(binary.RightOperand);
+        var literal = GetSemanticLiteral(binary.LeftOperand, context.CancellationToken) ??
+            GetSemanticLiteral(binary.RightOperand, context.CancellationToken);
         if (literal != null)
         {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, binary.Syntax.GetLocation(), literal);
@@ -266,11 +271,42 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var literal = invocation.Instance == null ? null : GetSemanticLiteral(invocation.Instance);
-        literal ??= invocation.Arguments.Select(static a => GetSemanticLiteral(a.Value)).FirstOrDefault(value => value != null);
+        var literal = invocation.Instance == null
+            ? null
+            : GetSemanticLiteral(invocation.Instance, context.CancellationToken);
+        literal ??= invocation.Arguments
+            .Select(argument => GetSemanticLiteral(argument.Value, context.CancellationToken))
+            .FirstOrDefault(value => value != null);
         if (literal != null)
         {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, invocation.Syntax.GetLocation(), literal);
+        }
+    }
+
+    private static void AnalyzeSemanticStringMethod(
+        OperationAnalysisContext context,
+        IInvocationOperation invocation,
+        KnownSymbols symbols)
+    {
+        if (!IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.String]) ||
+            !SemanticStringMethodCatalog.Contains(invocation.TargetMethod.Name))
+        {
+            return;
+        }
+
+        foreach (var argument in invocation.Arguments)
+        {
+            if (!IsSameType(argument.Parameter?.Type, symbols[KnownType.String]))
+            {
+                continue;
+            }
+
+            var literal = GetSemanticLiteral(argument.Value, context.CancellationToken);
+            if (literal != null)
+            {
+                Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, invocation.Syntax.GetLocation(), literal);
+                return;
+            }
         }
     }
 
@@ -422,14 +458,68 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         return null;
     }
 
-    private static string? GetSemanticLiteral(IOperation operation)
+    private static string? GetSemanticLiteral(
+        IOperation operation,
+        CancellationToken cancellationToken)
     {
-        if (!operation.ConstantValue.HasValue)
+        if (operation.ConstantValue.HasValue)
+        {
+            return GetSemanticLiteral(operation.ConstantValue.Value);
+        }
+
+        return operation is IFieldReferenceOperation field
+            ? GetSemanticFieldLiteral(field.Field, cancellationToken)
+            : null;
+    }
+
+    private static string? GetSemanticFieldLiteral(
+        IFieldSymbol field,
+        CancellationToken cancellationToken)
+    {
+        if (!field.IsStatic || !field.IsReadOnly ||
+            field.Type.SpecialType != SpecialType.System_String)
         {
             return null;
         }
 
-        return GetSemanticLiteral(operation.ConstantValue.Value);
+        foreach (var reference in field.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax
+                {
+                    Initializer.Value: ExpressionSyntax initializer
+                } || !TryGetStringInitializer(initializer, out var value))
+            {
+                continue;
+            }
+
+            return GetSemanticLiteral(value);
+        }
+
+        return null;
+    }
+
+    private static bool TryGetStringInitializer(
+        ExpressionSyntax expression,
+        out string value)
+    {
+        switch (expression)
+        {
+            case LiteralExpressionSyntax literal
+                when literal.IsKind(SyntaxKind.StringLiteralExpression):
+                value = literal.Token.ValueText;
+                return true;
+            case ParenthesizedExpressionSyntax parenthesized:
+                return TryGetStringInitializer(parenthesized.Expression, out value);
+            case BinaryExpressionSyntax binary
+                when binary.IsKind(SyntaxKind.AddExpression) &&
+                     TryGetStringInitializer(binary.Left, out var left) &&
+                     TryGetStringInitializer(binary.Right, out var right):
+                value = left + right;
+                return true;
+            default:
+                value = string.Empty;
+                return false;
+        }
     }
 
     private static string? GetSemanticLiteral(object? value)
