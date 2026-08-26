@@ -1086,10 +1086,6 @@ internal static class CompilerImplementationIlSummaryLowerer
                 return false;
             }
 
-            var raw = _factory.Binary(
-                @operator,
-                left.Term,
-                right.Term);
             var overflowChecked = instruction.OpCode is
                 ILOpCode.Add_ovf or
                 ILOpCode.Sub_ovf or
@@ -1097,6 +1093,10 @@ internal static class CompilerImplementationIlSummaryLowerer
             if (overflowChecked || instruction.OpCode is
                     ILOpCode.Div or ILOpCode.Rem)
             {
+                var raw = _factory.Binary(
+                    @operator,
+                    left.Term,
+                    right.Term);
                 if (!TryIntegerRange(
                         left.SpecialType,
                         out var minimum,
@@ -1114,13 +1114,24 @@ internal static class CompilerImplementationIlSummaryLowerer
                 return true;
             }
 
+            if (left.SpecialType == SpecialType.System_Int64)
+            {
+                stack.Push(new IlValue(
+                    WrapInt64(@operator, left.Term, right.Term),
+                    SpecialType.System_Int64));
+                return true;
+            }
+
             if (left.SpecialType != SpecialType.System_Int32)
             {
                 return false;
             }
 
             stack.Push(new IlValue(
-                WrapInt32(raw),
+                WrapInt32(_factory.Binary(
+                    @operator,
+                    left.Term,
+                    right.Term)),
                 SpecialType.System_Int32));
             return true;
         }
@@ -1470,6 +1481,286 @@ internal static class CompilerImplementationIlSummaryLowerer
                     unsigned,
                     _factory.Integer(modulus)),
                 unsigned);
+        }
+
+        private IrTerm WrapInt64(
+            IrBinaryOperator @operator,
+            IrTerm left,
+            IrTerm right)
+        {
+            return @operator switch
+            {
+                IrBinaryOperator.Add => WrapInt64Add(left, right),
+                IrBinaryOperator.Subtract => WrapInt64Add(
+                    left,
+                    NegateModuloInt64(right)),
+                IrBinaryOperator.Multiply => WrapInt64Multiply(left, right),
+                _ => throw new ArgumentOutOfRangeException(nameof(@operator))
+            };
+        }
+
+        private IrTerm NegateModuloInt64(IrTerm value)
+        {
+            var minimum = _factory.Integer(long.MinValue);
+            return _factory.Conditional(
+                _factory.Binary(
+                    IrBinaryOperator.Equal,
+                    value,
+                    minimum),
+                minimum,
+                _factory.Unary(IrUnaryOperator.Negate, value));
+        }
+
+        private IrTerm WrapInt64Add(IrTerm left, IrTerm right)
+        {
+            var zero = _factory.Integer(0);
+            var minimum = _factory.Integer(long.MinValue);
+            var maximum = _factory.Integer(long.MaxValue);
+            var sum = _factory.Binary(
+                IrBinaryOperator.Add,
+                left,
+                right);
+            var leftNonnegative = _factory.Binary(
+                IrBinaryOperator.GreaterThanOrEqual,
+                left,
+                zero);
+            var rightNonnegative = _factory.Binary(
+                IrBinaryOperator.GreaterThanOrEqual,
+                right,
+                zero);
+            var positiveOverflow = _factory.Conditional(
+                _factory.Binary(
+                    IrBinaryOperator.GreaterThan,
+                    left,
+                    _factory.Binary(
+                        IrBinaryOperator.Subtract,
+                        maximum,
+                        right)),
+                _factory.Binary(
+                    IrBinaryOperator.Add,
+                    minimum,
+                    _factory.Binary(
+                        IrBinaryOperator.Subtract,
+                        _factory.Binary(
+                            IrBinaryOperator.Subtract,
+                            left,
+                            _factory.Binary(
+                                IrBinaryOperator.Subtract,
+                                maximum,
+                                right)),
+                        _factory.Integer(1))),
+                sum);
+            var negativeUnderflow = _factory.Conditional(
+                _factory.Binary(
+                    IrBinaryOperator.LessThan,
+                    left,
+                    _factory.Binary(
+                        IrBinaryOperator.Subtract,
+                        minimum,
+                        right)),
+                _factory.Binary(
+                    IrBinaryOperator.Subtract,
+                    maximum,
+                    _factory.Binary(
+                        IrBinaryOperator.Subtract,
+                        _factory.Binary(
+                            IrBinaryOperator.Subtract,
+                            minimum,
+                            right),
+                        _factory.Binary(
+                            IrBinaryOperator.Add,
+                            left,
+                            _factory.Integer(1)))),
+                sum);
+            return _factory.Conditional(
+                leftNonnegative,
+                _factory.Conditional(
+                    rightNonnegative,
+                    positiveOverflow,
+                    sum),
+                _factory.Conditional(
+                    rightNonnegative,
+                    sum,
+                    negativeUnderflow));
+        }
+
+        private IrTerm WrapInt64Multiply(IrTerm left, IrTerm right)
+        {
+            SplitUnsignedInt64(left, out var leftHigh, out var leftLow);
+            SplitUnsignedInt64(right, out var rightHigh, out var rightLow);
+            MultiplyUnsignedInt32(
+                leftLow,
+                rightLow,
+                out var low,
+                out var carry);
+            MultiplyUnsignedInt32(
+                leftHigh,
+                rightLow,
+                out var crossHighLow,
+                out _);
+            MultiplyUnsignedInt32(
+                leftLow,
+                rightHigh,
+                out var crossLowHigh,
+                out _);
+            var modulus = _factory.Integer(4294967296);
+            var high = _factory.Binary(
+                IrBinaryOperator.Remainder,
+                _factory.Binary(
+                    IrBinaryOperator.Add,
+                    _factory.Binary(
+                        IrBinaryOperator.Add,
+                        carry,
+                        crossHighLow),
+                    crossLowHigh),
+                modulus);
+            var positive = _factory.Binary(
+                IrBinaryOperator.Multiply,
+                high,
+                modulus);
+            positive = _factory.Binary(
+                IrBinaryOperator.Add,
+                positive,
+                low);
+            var negativeHigh = _factory.Binary(
+                IrBinaryOperator.Subtract,
+                high,
+                _factory.Integer(2147483648));
+            var magnitude = _factory.Binary(
+                IrBinaryOperator.Add,
+                _factory.Binary(
+                    IrBinaryOperator.Multiply,
+                    negativeHigh,
+                    modulus),
+                low);
+            var negative = _factory.Binary(
+                IrBinaryOperator.Add,
+                _factory.Integer(long.MinValue),
+                magnitude);
+            return _factory.Conditional(
+                _factory.Binary(
+                    IrBinaryOperator.LessThanOrEqual,
+                    high,
+                    _factory.Integer(2147483647)),
+                positive,
+                negative);
+        }
+
+        private void SplitUnsignedInt64(
+            IrTerm value,
+            out IrTerm high,
+            out IrTerm low)
+        {
+            var modulus = _factory.Integer(4294967296);
+            var remainder = _factory.Binary(
+                IrBinaryOperator.Remainder,
+                value,
+                modulus);
+            low = _factory.Conditional(
+                _factory.Binary(
+                    IrBinaryOperator.LessThan,
+                    remainder,
+                    _factory.Integer(0)),
+                _factory.Binary(
+                    IrBinaryOperator.Add,
+                    remainder,
+                    modulus),
+                remainder);
+            var quotient = _factory.Binary(
+                IrBinaryOperator.Divide,
+                value,
+                modulus);
+            high = _factory.Conditional(
+                _factory.Binary(
+                    IrBinaryOperator.LessThan,
+                    value,
+                    _factory.Integer(0)),
+                _factory.Conditional(
+                    _factory.Binary(
+                        IrBinaryOperator.LessThan,
+                        remainder,
+                        _factory.Integer(0)),
+                    _factory.Binary(
+                        IrBinaryOperator.Subtract,
+                        _factory.Binary(
+                            IrBinaryOperator.Add,
+                            quotient,
+                            modulus),
+                        _factory.Integer(1)),
+                    _factory.Binary(
+                        IrBinaryOperator.Add,
+                        quotient,
+                        modulus)),
+                quotient);
+        }
+
+        private void MultiplyUnsignedInt32(
+            IrTerm left,
+            IrTerm right,
+            out IrTerm low,
+            out IrTerm high)
+        {
+            var radix = _factory.Integer(65536);
+            var leftLow = _factory.Binary(
+                IrBinaryOperator.Remainder,
+                left,
+                radix);
+            var leftHigh = _factory.Binary(
+                IrBinaryOperator.Divide,
+                left,
+                radix);
+            var rightLow = _factory.Binary(
+                IrBinaryOperator.Remainder,
+                right,
+                radix);
+            var rightHigh = _factory.Binary(
+                IrBinaryOperator.Divide,
+                right,
+                radix);
+            var lowProduct = _factory.Binary(
+                IrBinaryOperator.Multiply,
+                leftLow,
+                rightLow);
+            var cross = _factory.Binary(
+                IrBinaryOperator.Add,
+                _factory.Binary(
+                    IrBinaryOperator.Multiply,
+                    leftLow,
+                    rightHigh),
+                _factory.Binary(
+                    IrBinaryOperator.Multiply,
+                    leftHigh,
+                    rightLow));
+            var middle = _factory.Binary(
+                IrBinaryOperator.Add,
+                cross,
+                _factory.Binary(
+                    IrBinaryOperator.Divide,
+                    lowProduct,
+                    radix));
+            low = _factory.Binary(
+                IrBinaryOperator.Add,
+                _factory.Binary(
+                    IrBinaryOperator.Remainder,
+                    lowProduct,
+                    radix),
+                _factory.Binary(
+                    IrBinaryOperator.Multiply,
+                    _factory.Binary(
+                        IrBinaryOperator.Remainder,
+                        middle,
+                        radix),
+                    radix));
+            high = _factory.Binary(
+                IrBinaryOperator.Add,
+                _factory.Binary(
+                    IrBinaryOperator.Multiply,
+                    leftHigh,
+                    rightHigh),
+                _factory.Binary(
+                    IrBinaryOperator.Divide,
+                    middle,
+                    radix));
         }
 
         private IrTerm InRange(

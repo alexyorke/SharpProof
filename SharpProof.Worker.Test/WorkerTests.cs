@@ -3068,6 +3068,8 @@ public sealed class WorkerTests
             ("int", "CheckedAdd", "int a, int b", "a, b"),
             ("long", "CheckedLongAdd", "long a, long b", "a, b"),
             ("long", "LongAdd", "long a, long b", "a, b"),
+            ("long", "LongSub", "long a, long b", "a, b"),
+            ("long", "LongMul", "long a, long b", "a, b"),
             ("int", "Neg32", "int value", "value"),
             ("long", "Neg64", "long value", "value"),
             ("bool", "And", "bool a, bool b", "a, b"),
@@ -3122,6 +3124,10 @@ public sealed class WorkerTests
                     checked(a + b);
                 public static long LongAdd(long a, long b) =>
                     unchecked(a + b);
+                public static long LongSub(long a, long b) =>
+                    unchecked(a - b);
+                public static long LongMul(long a, long b) =>
+                    unchecked(a * b);
                 public static int Neg32(int value) => unchecked(-value);
                 public static long Neg64(long value) => unchecked(-value);
                 public static bool And(bool a, bool b) => a & b;
@@ -3187,7 +3193,6 @@ public sealed class WorkerTests
         var unsupported = new Dictionary<string, CompilerImplementationIlAbstentionReason>(
             StringComparer.Ordinal)
         {
-            ["VerifyLongAdd"] = CompilerImplementationIlAbstentionReason.UnsupportedIl,
             ["VerifyNeg64"] = CompilerImplementationIlAbstentionReason.UnsupportedIl,
             ["VerifyInadmissibleCall"] =
                 CompilerImplementationIlAbstentionReason.InadmissibleCallTarget
@@ -3230,10 +3235,87 @@ public sealed class WorkerTests
                     Is.Empty,
                     targetName);
             }
+            if (signature.Name is "LongAdd" or "LongSub" or "LongMul")
+            {
+                AssertLongSummaryRelation(
+                    signature.Name,
+                    preparation,
+                    summary);
+            }
             successful++;
         }
 
         Assert.That(successful, Is.EqualTo(signatures.Length - unsupported.Count));
+    }
+
+    private static void AssertLongSummaryRelation(
+        string operation,
+        CompilerCallablePreparation preparation,
+        CompilerPreparedSummaryCall summary)
+    {
+        var call = preparation.Body!.Program!.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrCallInstruction>()
+            .Single(instruction => instruction.Id == summary.Instruction);
+        var arguments = call.Arguments
+            .Select(static argument => argument as IrVariableTerm)
+            .ToArray();
+        Assert.That(arguments, Has.Length.EqualTo(2), operation);
+        Assert.That(arguments, Has.All.Not.Null, operation);
+        (long Left, long Right)[] cases = operation switch
+        {
+            "LongAdd" => [
+                (long.MaxValue, 1L),
+                (long.MinValue, -1L),
+                (long.MinValue, long.MinValue),
+                (-1L, 1L),
+                (1234567890123456789L, -987654321098765432L)
+            ],
+            "LongSub" => [
+                (long.MinValue, 1L),
+                (long.MaxValue, -1L),
+                (long.MinValue, long.MinValue),
+                (-1L, long.MinValue),
+                (1234567890123456789L, -987654321098765432L)
+            ],
+            "LongMul" => [
+                (long.MinValue, 1L),
+                (long.MinValue, -1L),
+                (long.MaxValue, 2L),
+                (-1L, long.MinValue),
+                (3037000500L, 3037000500L),
+                (1234567890123456789L, -987654321098765432L)
+            ],
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+
+        foreach (var (left, right) in cases)
+        {
+            var expected = operation switch
+            {
+                "LongAdd" => unchecked(left + right),
+                "LongSub" => unchecked(left - right),
+                "LongMul" => unchecked(left * right),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+            };
+            var values = new Dictionary<IrVarId, IrValue>
+            {
+                [arguments[0]!.Variable] = preparation.Factory.CreateIntegerValue(left),
+                [arguments[1]!.Variable] = preparation.Factory.CreateIntegerValue(right),
+                [summary.Result] = preparation.Factory.CreateIntegerValue(expected)
+            };
+            var evaluation = new IrInterpreter(preparation.Factory).Evaluate(
+                summary.NormalRelation,
+                values);
+            Assert.That(
+                evaluation.Status,
+                Is.EqualTo(IrEvaluationStatus.Value),
+                operation + " (" + left + ", " + right + ")");
+            Assert.That(
+                evaluation.Value!.Boolean,
+                Is.True,
+                operation + " (" + left + ", " + right + ") expected " + expected);
+        }
     }
 
     [Test]
