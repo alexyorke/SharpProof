@@ -308,6 +308,19 @@ public sealed class ProofKernelTests
     }
 
     [Test]
+    public async Task NullBackendTaskBecomesMalformedResult()
+    {
+        var fixture = CreateFixture();
+        var outcome = await new ProofKernel(new NullTaskBackend())
+            .VerifyAsync(fixture.Query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.MalformedBackendResult));
+    }
+
+    [Test]
     public async Task MalformedUnsatCoreCannotCreateAProof()
     {
         var fixture = CreateFixture();
@@ -396,6 +409,17 @@ public sealed class ProofKernelTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromException<BackendCheckResult>(exception);
+        }
+    }
+
+    private sealed class NullTaskBackend : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return null!;
         }
     }
 

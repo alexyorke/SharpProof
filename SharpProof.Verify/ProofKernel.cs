@@ -14,7 +14,13 @@ public sealed class ProofKernel(ISmtBackend backend)
         BackendCheckResult? result;
         try
         {
-            result = await _backend.CheckAsync(query, cancellationToken)
+            var backendTask = _backend.CheckAsync(query, cancellationToken);
+            if (backendTask is null)
+            {
+                return Unknown(AbstentionReason.MalformedBackendResult);
+            }
+
+            result = await backendTask
                 .ConfigureAwait(false);
         }
         catch (ArgumentException)
