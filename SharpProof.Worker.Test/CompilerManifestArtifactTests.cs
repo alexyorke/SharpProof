@@ -425,8 +425,30 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void Sp034ReferenceModulesMustBeOrderedFromTheFirstPair()
+    public void Sp034ReferenceLinkedSiblingsMustBeOrdered()
     {
+        var valid = CreateArtifact();
+        var first = valid.Compilation.References[0].Modules[0];
+        first.Name = "zeta.dll";
+        first.Path += ".zeta";
+        valid.Compilation.References[0].Modules =
+        [
+            first,
+            new CompilerReferenceModuleSnapshot
+            {
+                Name = "alpha.dll",
+                Path = first.Path + ".alpha",
+                Mvid = first.Mvid,
+                Sha256 = first.Sha256,
+                SizeBytes = first.SizeBytes
+            }
+        ];
+        valid.CompilationSha256 = CompilationFingerprint.ComputeSha256(
+            valid.Compilation, []);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(valid))));
+
         AssertMalformedCapture(snapshot =>
         {
             var first = snapshot.References[0].Modules[0];
@@ -435,6 +457,14 @@ public sealed class CompilerManifestArtifactTests
             snapshot.References[0].Modules =
             [
                 first,
+                new CompilerReferenceModuleSnapshot
+                {
+                    Name = "beta.dll",
+                    Path = first.Path + ".beta",
+                    Mvid = first.Mvid,
+                    Sha256 = first.Sha256,
+                    SizeBytes = first.SizeBytes
+                },
                 new CompilerReferenceModuleSnapshot
                 {
                     Name = "alpha.dll",
