@@ -90,6 +90,40 @@ public static class ContainerContract
             RequireString(expected.GetProperty("dotnet"), "sdkVersion"));
         RequireString(
             actual,
+            "dotnetMinimumSdkVersion",
+            RequireString(expected.GetProperty("dotnet"), "minimumSdkVersion"));
+        RequireString(
+            actual,
+            "dotnetMinimumSdkFrameworkVersion",
+            RequireString(
+                expected.GetProperty("dotnet"),
+                "minimumSdkFrameworkVersion"));
+        RequireString(
+            actual,
+            "dotnetTestRuntimeVersion",
+            RequireString(expected.GetProperty("dotnet"), "testRuntimeVersion"));
+        RequireString(
+            actual,
+            "dotnetBaseImage",
+            RequireString(expected.GetProperty("dotnet"), "baseImage"));
+        RequireString(
+            actual,
+            "dotnetBaseImageDigest",
+            RequireString(
+                expected.GetProperty("dotnet"),
+                "baseImageDigest"));
+        RequireString(
+            actual,
+            "powershellVersionLine",
+            RequireString(expected.GetProperty("powershell"), "versionLine"));
+        RequireString(
+            actual,
+            "powershellImageDigest",
+            RequireString(
+                expected.GetProperty("powershell"),
+                "imageDigest"));
+        RequireString(
+            actual,
             "z3Version",
             RequireString(expected.GetProperty("z3"), "version"));
         RequireInteger64(

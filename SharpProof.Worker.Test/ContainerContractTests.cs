@@ -53,6 +53,16 @@ public sealed class ContainerContractTests
                 contract => contract["z3LibraryBytes"] = "invalid",
                 contract => contract["z3LibraryBytes"] =
                     contract["z3LibraryBytes"]!.GetValue<long>() + 1,
+                contract => contract["dotnetSdkVersion"] = "9.0.999",
+                contract => contract["dotnetMinimumSdkVersion"] = "9.0.999",
+                contract => contract["dotnetMinimumSdkFrameworkVersion"] = "8.0.999",
+                contract => contract["dotnetTestRuntimeVersion"] = "8.0.999",
+                contract => contract["dotnetBaseImage"] = "example.invalid/sdk",
+                contract => contract["dotnetBaseImageDigest"] =
+                    "sha256:" + new string('0', 64),
+                contract => contract["powershellVersionLine"] = "7.9",
+                contract => contract["powershellImageDigest"] =
+                    "sha256:" + new string('1', 64),
                 contract => contract["platform"] = " ",
                 contract => contract["platform"] = "linux/arm64"
             };
