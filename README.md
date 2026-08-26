@@ -83,7 +83,9 @@ The Release check performs one Release solution build and 3 Release pack command
 Both configurations also run duration-aware semantic, Worker, package, and
 performance smoke shards. Disposable `docker compose run --rm tooling ...`
 commands remain the clean qualification path and intentionally discard build
-outputs.
+outputs. This includes `tooling dev -lc ...`: it runs in a disposable staged
+workspace. Only the persistent `dev` service uses the named workspace volume
+directly.
 
 The default container budget is 16 CPUs and 40960 MiB.
 Test-project concurrency uses 8 lanes (one lane per 2 CPUs).

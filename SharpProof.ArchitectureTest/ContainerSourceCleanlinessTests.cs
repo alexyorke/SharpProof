@@ -143,6 +143,37 @@ public sealed class ContainerSourceCleanlinessTests
         }
     }
 
+    [Test]
+    public async Task DisposableToolingDevRunsInsideStagedWorkspace()
+    {
+        var repository = await CreateRepositoryAsync();
+        try
+        {
+            var result = await RunEntrypointAsync(
+                repository,
+                "dev",
+                commandArguments:
+                [
+                    "-lc",
+                    "printf 'PWD=%s\\nREPO=%s\\n' \"$PWD\" \"$SHARPPROOF_REPO_ROOT\""
+                ]);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Zero, result.Error);
+                Assert.That(result.Output, Does.Contain("/tmp/sharpproof-task."));
+                Assert.That(result.Output, Does.Not.Contain(repository));
+                Assert.That(
+                    result.Output,
+                    Does.Contain("REPO=/tmp/sharpproof-task."));
+            }
+        }
+        finally
+        {
+            Directory.Delete(repository, recursive: true);
+        }
+    }
+
     [TestCase("contract")]
     [TestCase("build")]
     public async Task FiniteCommandsRunFromAnArchiveWithoutGit(string command)
@@ -439,7 +470,8 @@ public sealed class ContainerSourceCleanlinessTests
         string repository,
         string command,
         bool assumeDifferentOwner = false,
-        string? gitWrapperDirectory = null)
+        string? gitWrapperDirectory = null,
+        params string[] commandArguments)
     {
         var environment = new Dictionary<string, string>
         {
@@ -457,16 +489,24 @@ public sealed class ContainerSourceCleanlinessTests
                 Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
         }
 
+        var invocationArguments = new string[commandArguments.Length + 1];
+        invocationArguments[0] = command;
+        commandArguments.CopyTo(invocationArguments, 1);
+
+        var scriptPath = Path.Combine(
+            RepositoryRoot(),
+            "eng",
+            "container",
+            "entrypoint.sh");
+        var bashArguments = new string[invocationArguments.Length + 1];
+        bashArguments[0] = scriptPath;
+        invocationArguments.CopyTo(bashArguments, 1);
+
         return RunAsync(
             repository,
             environment,
             "bash",
-            Path.Combine(
-                RepositoryRoot(),
-                "eng",
-                "container",
-                "entrypoint.sh"),
-            command);
+            bashArguments);
     }
 
     private static async Task RequireSuccessAsync(

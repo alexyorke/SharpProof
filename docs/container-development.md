@@ -66,7 +66,8 @@ The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
 Roslyn's compiler server. A no-change rebuild is therefore incremental.
 Finite `docker compose run --rm tooling ...` commands materialize the current
 source snapshot in a private temporary workspace and pay a cold build; use them
-for qualification, not for every edit. `contract`, `build`, and ordinary test
+for qualification, not for every edit. This includes `tooling dev -lc ...`;
+only the persistent `dev` service bypasses staging. `contract`, `build`, and ordinary test
 commands work when the source directory came from an archive without `.git`.
 Commands that compare revisions or certify exact-commit evidence (`test-changed`,
 acceptance, mutation, packaging, pilots, fuzz, coverage, and release commands)

@@ -47,7 +47,8 @@ if git_directory="$(git -c safe.directory="${repo_root}" -C "${repo_root}" \
   git config --global --add safe.directory "${git_directory}"
 fi
 
-if [[ "${command_name}" = "dev" ]]; then
+if [[ "${command_name}" = "dev" &&
+  "${SHARPPROOF_DEV_CONTAINER:-}" = "1" ]]; then
   exec /bin/bash "$@"
 fi
 
@@ -194,6 +195,9 @@ case "${command_name}" in
     fi
     export SHARPPROOF_REPO_ROOT="${task_root}"
     cd "${task_root}"
+    if [[ "${command_name}" = "dev" ]]; then
+      exec /bin/bash "$@"
+    fi
     exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofContainer.ps1 \
       -Command "${command_name}" "$@"
     ;;
