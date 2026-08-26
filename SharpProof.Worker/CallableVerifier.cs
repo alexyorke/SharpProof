@@ -166,7 +166,10 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 normalCompletionProofCore = CallableProofCore.Create(
                     proven,
                     assumptionLabels);
-                if (normalCompletionProofCore.IsDefaultOrEmpty)
+                if (normalCompletionProofCore.IsDefaultOrEmpty ||
+                    !normalCompletionProofCore.Contains(
+                        "body:normal-completion",
+                        StringComparer.Ordinal))
                 {
                     noModeledNormalReturn = false;
                     normalCompletionUnknown =

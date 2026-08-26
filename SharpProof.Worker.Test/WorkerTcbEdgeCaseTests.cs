@@ -567,6 +567,88 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task NormalCompletionProofRequiresItsDedicatedEvidenceLabel()
+    {
+        var factory = new IrFactory();
+        var callTarget = factory.CreateVariable(
+            "call-target",
+            factory.IntegerType);
+        var summaryResult = factory.CreateVariable(
+            "summary-result",
+            factory.IntegerType);
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Summary",
+            factory.IntegerType,
+            isStatic: true);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var call = builder.Call(
+            entry,
+            factory.CreateOperation(),
+            callTarget,
+            member,
+            null);
+        var quotient = factory.Binary(
+            IrBinaryOperator.Divide,
+            factory.Variable(callTarget),
+            factory.Integer(2));
+        builder.Return(
+            entry,
+            factory.CreateOperation(),
+            quotient);
+        var completionRelation = factory.Binary(
+            IrBinaryOperator.Equal,
+            quotient,
+            quotient);
+        var summaryCalls = ImmutableDictionary<
+            IrInstructionId,
+            CompilerPreparedSummaryCall>.Empty.Add(
+                call.Id,
+                new CompilerPreparedSummaryCall(
+                    call.Id,
+                    "M:Subject.Summary()",
+                    CompilerSummaryOrigin.Source,
+                    callTarget,
+                    [],
+                    completionRelation,
+                    new string('a', 64),
+                    string.Empty,
+                    []));
+        var target = CreateTarget(
+            factory,
+            factory.Boolean(true),
+            [],
+            CompilerPreparedBody.ProgramBody(
+                builder.Build(),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSpecCall>.Empty,
+                summaryCalls));
+        var backend = new ScriptedBackend(
+            BackendCheckResult.Unsatisfiable([0]),
+            BackendCheckResult.Unsatisfiable([]));
+
+        var result = (await new CallableVerifier(
+            backend,
+            WorkerBudgets.DefaultMaximumExpressionDepth).VerifyAsync(
+                target,
+                CreateResourceBudget(),
+                CancellationToken.None)).Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(WorkerClaimReason.MalformedBackendResult));
+            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
+        }
+    }
+
+    [Test]
     public async Task UnknownNormalCompletionSatisfiabilityCannotBecomeProof()
     {
         var backend = new SatisfiableUnknownProofBackend();
