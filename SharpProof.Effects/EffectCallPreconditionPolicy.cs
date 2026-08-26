@@ -201,7 +201,7 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         }
 
         foreach (var type in SharpProof.Frontend.ReferencedTypeSymbols
-                     .GetAll(compilation))
+                     .GetAll(compilation, contractFor))
         {
             foreach (var attribute in type.GetAttributes())
             {
