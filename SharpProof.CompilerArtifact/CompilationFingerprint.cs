@@ -317,10 +317,16 @@ internal static class CompilationFingerprint
                     row.MethodMetadataToken > 0 &&
                     (snapshot.References ?? []).SelectMany(
                         static reference => reference?.Modules ?? [])
-                    .Count(module => module != null &&
+                    .Where(module => module != null &&
+                        module.Name == row.OwningModuleName &&
+                        module.Sha256 == row.OwningModuleSha256)
+                    .All(module => module.Mvid == row.OwningModuleMvid) &&
+                    (snapshot.References ?? []).SelectMany(
+                        static reference => reference?.Modules ?? [])
+                    .Any(module => module != null &&
                         module.Name == row.OwningModuleName &&
                         module.Mvid == row.OwningModuleMvid &&
-                        module.Sha256 == row.OwningModuleSha256) == 1;
+                        module.Sha256 == row.OwningModuleSha256);
 
             case CompilerSummaryOrigin.SpecificationPack:
                 return row.SourcePath.Length == 0 &&

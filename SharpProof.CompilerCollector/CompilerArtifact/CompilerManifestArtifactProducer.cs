@@ -134,10 +134,11 @@ internal static class CompilerManifestArtifactProducer
                         module.Name == authority.OwningModuleName &&
                         module.Sha256 == authority.EvidenceSha256)
                     .ToArray();
-                if (module.Length != 1)
+                if (module.Length == 0 ||
+                    module.Any(candidate => candidate.Mvid != module[0].Mvid))
                 {
                     throw new InvalidOperationException(
-                        "An IL summary authority is not bound to one captured module.");
+                        "An IL summary authority is not bound to one consistent captured module.");
                 }
 
                 row.OwningModuleMvid = module[0].Mvid;

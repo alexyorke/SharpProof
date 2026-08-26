@@ -2660,6 +2660,71 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public void ByteIdenticalAliasedReferenceModulesShareIlSummaryAuthority()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static bool Call(bool value) {
+                    Contract.Ensures(
+                        Contract.Result<bool>() == value);
+                    return ExternalImplementation.ReadAgain(value);
+                }
+            }
+            """);
+        project.AddImplementationReference(
+            """
+            public static class ExternalImplementation {
+                private static bool Read(bool value) => value;
+                public static bool ReadAgain(bool value) => Read(value);
+            }
+            """);
+
+        var compilation = project.CreateCompilation();
+        var implementationReference = compilation.References
+            .OfType<PortableExecutableReference>()
+            .Single(reference => string.Equals(
+                Path.GetFileName(reference.FilePath),
+                Path.GetFileName(
+                    Directory.GetFiles(
+                        project.DirectoryPath,
+                        "implementation-*.dll").Single()),
+                StringComparison.Ordinal));
+        compilation = compilation.AddReferences(
+            implementationReference.WithAliases(["duplicate"]));
+        Assert.That(
+            compilation.GetDiagnostics()
+                .Where(static diagnostic =>
+                    diagnostic.Severity == DiagnosticSeverity.Error),
+            Is.Empty);
+
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+        var artifact = CompilerManifestArtifactProducer.Create(
+            compilation,
+            project.DirectoryPath,
+            "net8.0",
+            WorkerFeatureSet.All,
+            discovery,
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
+
+        var summary = artifact.Callables.Single()
+            .Body!.SummaryCalls.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(summary.Origin, Is.EqualTo(CompilerSummaryOrigin.ImplementationIl));
+            Assert.That(
+                summary.EvidenceSha256,
+                Has.Length.EqualTo(64));
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerManifestArtifactJson.Deserialize(
+                    CompilerManifestArtifactJson.Serialize(artifact))),
+                "byte-identical aliased reference modules should share one authority");
+        }
+    }
+
+    [Test]
     public async Task MixedSourceAndImplementationSummariesSealDependencyEvidence()
     {
         using var project = TestProject.Create(
@@ -2904,6 +2969,25 @@ public sealed class WorkerTests
                 module.Sha256 != ilAuthority.OwningModuleSha256);
         Assert.DoesNotThrow((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(validIl)));
+        var duplicateReferenceIl = ReadIl();
+        var ilReference = duplicateReferenceIl.Compilation.References
+            .Single(reference => reference.Modules.Any(module =>
+                module.Name == ilAuthority.OwningModuleName &&
+                module.Sha256 == ilAuthority.OwningModuleSha256));
+        duplicateReferenceIl.Compilation.References = [
+            .. duplicateReferenceIl.Compilation.References,
+            ilReference
+        ];
+        duplicateReferenceIl.CompilationSha256 =
+            CompilationFingerprint.ComputeSha256(
+                duplicateReferenceIl.Compilation,
+                duplicateReferenceIl.CompilerDiagnostics);
+        duplicateReferenceIl.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(duplicateReferenceIl);
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(duplicateReferenceIl))),
+            "byte-identical reference modules should share one authority");
         AssertHydrationRejects(
             ReadIl(),
             summary => summary.EvidenceSha256 = unusedModule.Sha256,
