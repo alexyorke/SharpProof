@@ -2535,6 +2535,42 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    [SupportedOSPlatform("linux")]
+    public async Task EarlyCacheAliasIsRejectedBeforePublicationInvalidation()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var request = await File.ReadAllBytesAsync(project.RequestPath);
+        var result = await File.ReadAllBytesAsync(project.ResultPath);
+        var manifest = await File.ReadAllBytesAsync(
+            project.CompilerManifestPath);
+        var failed = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyCacheDirectory", project.ResultPath));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failed.ExitCode, Is.Not.Zero, failed.Output);
+            Assert.That(
+                failed.Output,
+                Does.Contain(
+                    "SharpProof output, input, cache, and worker paths must be distinct."));
+            Assert.That(
+                await File.ReadAllBytesAsync(project.RequestPath),
+                Is.EqualTo(request));
+            Assert.That(
+                await File.ReadAllBytesAsync(project.ResultPath),
+                Is.EqualTo(result));
+            Assert.That(
+                await File.ReadAllBytesAsync(project.CompilerManifestPath),
+                Is.EqualTo(manifest));
+        }
+    }
+
+    [Test]
     public async Task DirectLauncherRejectsRelativeCacheAliasAfterManifestResolution()
     {
         RequireContainerWorker();

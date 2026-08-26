@@ -61,6 +61,11 @@
       <_SharpProofEarlyEffectiveSarifFile>$(SharpProofVerifySarifFile)</_SharpProofEarlyEffectiveSarifFile>
       <_SharpProofEarlyConfiguredSarifFullPath Condition="$(SharpProofVerifySarifFile) != '' AND $(TargetFrameworks) != ''">$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine("$(MSBuildProjectDirectory)", "$(SharpProofVerifySarifFile)"))))</_SharpProofEarlyConfiguredSarifFullPath>
       <_SharpProofEarlyEffectiveSarifFile Condition="$(SharpProofVerifySarifFile) != '' AND $(TargetFrameworks) != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName("$(_SharpProofEarlyConfiguredSarifFullPath)")), '$(TargetFramework)', $([System.IO.Path]::GetFileName("$(_SharpProofEarlyConfiguredSarifFullPath)"))))</_SharpProofEarlyEffectiveSarifFile>
+      <_SharpProofEarlyVerifyCacheDirectoryNormalized>$([System.String]::Copy("$(SharpProofVerifyCacheDirectory)").Trim())</_SharpProofEarlyVerifyCacheDirectoryNormalized>
+      <_SharpProofEarlyEffectiveCacheDirectory Condition="$(_SharpProofEarlyVerifyCacheDirectoryNormalized) == ''">$([System.IO.Path]::Combine("$(_SharpProofEarlyVerifyDirectory)", 'cache'))</_SharpProofEarlyEffectiveCacheDirectory>
+      <_SharpProofEarlyEffectiveCacheDirectory Condition="$(_SharpProofEarlyVerifyCacheDirectoryNormalized) != ''">$(SharpProofVerifyCacheDirectory)</_SharpProofEarlyEffectiveCacheDirectory>
+      <_SharpProofEarlyVerifyCacheEnabledNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheEnabled)').Trim().ToLowerInvariant())</_SharpProofEarlyVerifyCacheEnabledNormalized>
+      <_SharpProofEarlyActiveCacheDirectory Condition="'$(_SharpProofEarlyVerifyCacheEnabledNormalized)' == 'true'">$(_SharpProofEarlyEffectiveCacheDirectory)</_SharpProofEarlyActiveCacheDirectory>
     </PropertyGroup>
     <ItemGroup>
       <_SharpProofEarlyCompilerOwnedOutput Remove="@(_SharpProofEarlyCompilerOwnedOutput)" />
@@ -92,7 +97,7 @@
         LauncherPath="$(_SharpProofLauncherPath)"
         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
         CompilerOutputPaths="@(_SharpProofEarlyCompilerOwnedOutput)"
-        CachePath="$(_SharpProofActiveCacheDirectory)" />
+        CachePath="$(_SharpProofEarlyActiveCacheDirectory)" />
   </Target>
 
   <Target Name="_SharpProofInitializeVerify"
