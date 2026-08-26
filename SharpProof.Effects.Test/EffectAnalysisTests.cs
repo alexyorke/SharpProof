@@ -7588,6 +7588,65 @@ public sealed class EffectAnalysisTests
         }
     }
 
+    [Test]
+    public void UnknownEventReceiverStillIncludesAccessorEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global
+            {
+                public static int State;
+            }
+
+            public sealed class EventTarget
+            {
+                public event Action Changed
+                {
+                    add { Global.State++; }
+                    remove { Global.State++; }
+                }
+            }
+
+            public static class Sample
+            {
+                private static void Handler() { }
+
+                public static void Add(EventTarget target)
+                {
+                    target.Changed += Handler;
+                }
+
+                public static void Remove(EventTarget target)
+                {
+                    target.Changed -= Handler;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] { "Add", "Remove" })
+        {
+            var summary = session.Analyze(
+                EffectTestHost.RequireMethod(compilation, "Sample", methodName))
+                .Summary;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    summary.Writes.Contains(EffectRegionId.Static()),
+                    Is.True,
+                    methodName);
+                AssertContainsThrows(summary, "System.NullReferenceException");
+                Assert.That(
+                    summary.Completeness,
+                    Is.EqualTo(EffectCompleteness.Complete),
+                    methodName);
+            }
+        }
+    }
+
     private static EffectMethodResult Analyze(
         string source,
         string typeMetadataName,

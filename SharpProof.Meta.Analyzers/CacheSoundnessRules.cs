@@ -154,6 +154,9 @@ internal static class CacheSoundnessRules
                     ISimpleAssignmentOperation { Target: ILocalReferenceOperation local } assignment
                         when SymbolEqualityComparer.Default.Equals(
                             local.Local, reference.Local) => assignment.Value,
+                    ICompoundAssignmentOperation { Target: ILocalReferenceOperation local } assignment
+                        when SymbolEqualityComparer.Default.Equals(
+                            local.Local, reference.Local) => assignment.Value,
                     _ => null
                 })
                 .Where(static value => value != null)
@@ -165,6 +168,15 @@ internal static class CacheSoundnessRules
                 return IsSemanticAnswerType(reference.Type);
             }
             var last = writes[writes.Length - 1];
+            if (last.Parent is ICompoundAssignmentOperation)
+            {
+                var previous = writes.Length > 1
+                    ? IsNonCacheableSemanticAnswer(
+                        writes[writes.Length - 2], root, resolving)
+                    : IsSemanticAnswerType(reference.Type);
+                return previous ||
+                    IsNonCacheableSemanticAnswer(last, root, resolving);
+            }
             if (IsConditionallyExecuted(last, root) && writes.Length > 1)
             {
                 return IsNonCacheableSemanticAnswer(writes[writes.Length - 2], root, resolving) ||

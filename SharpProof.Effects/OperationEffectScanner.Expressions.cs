@@ -89,7 +89,7 @@ internal sealed partial class OperationEffectScanner
 
         var receiverCheck = new EffectStep(
             PotentialNullReceiver(reference.Instance, eventAssignment),
-            _nullnessEvaluator.IsProvenNonNull(
+            !_nullnessEvaluator.IsProvenNull(
                 reference.Instance,
                 eventAssignment));
         result = result.Then(receiverCheck);

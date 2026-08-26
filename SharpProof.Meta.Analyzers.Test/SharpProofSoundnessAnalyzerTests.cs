@@ -311,6 +311,20 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache.Optional ??= Answer.Unknown;
                 void Compound(ProofCache cache) =>
                     cache.Latest |= Answer.Unknown;
+                void CompoundAlias(ProofCache cache) {
+                    var answer = Answer.Proven;
+                    answer |= Answer.Unknown;
+                    cache.Write(answer);
+                }
+                void CompoundAliasUnknownPrior(ProofCache cache, Answer answer) {
+                    answer |= Answer.Proven;
+                    cache.Write(answer);
+                }
+                void CompoundAliasSafe(ProofCache cache) {
+                    var answer = Answer.Proven;
+                    answer |= Answer.Proven;
+                    cache.Write(answer);
+                }
                 void Overwrite(ProofCache cache) =>
                     cache.AddOrUpdate("key", Answer.TimedOut);
                 void Unresolved(ProofCache cache, Answer answer) =>
@@ -335,7 +349,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(10));
+            Is.EqualTo(12));
     }
 
     [Test]
