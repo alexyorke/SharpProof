@@ -2089,18 +2089,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             return false;
         }
 
-        if (SwitchExpressionFacts.HasReachableUnmatchedPath(
-                switchExpression,
-                MayCompleteNormally,
-                IsDefinitelyNonNull(switchExpression.Value)))
-        {
-            return false;
-        }
-
         return SwitchExpressionFacts.GetReachableArms(
-                switchExpression,
-                MayCompleteNormally,
-                IsDefinitelyNonNull(switchExpression.Value))
+            switchExpression,
+            MayCompleteNormally,
+            IsDefinitelyNonNull(switchExpression.Value))
             .Any(MayCompleteNormally);
     }
 

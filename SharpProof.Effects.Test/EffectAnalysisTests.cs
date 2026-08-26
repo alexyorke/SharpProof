@@ -8280,4 +8280,30 @@ public sealed class EffectAnalysisTests
 
         Assert.That(result.Projection.IsComplete, Is.False);
     }
+
+    [Test]
+    public void GuardedSwitchMayCompleteAndPreservesCallerEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int s_state;
+
+                private static int Pick(int value) => value switch {
+                    var candidate when value > 0 => candidate
+                };
+
+                public static void Caller(int value) {
+                    _ = Pick(value);
+                    s_state++;
+                }
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation)
+            .Analyze(Method(compilation, "Caller"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
 }
