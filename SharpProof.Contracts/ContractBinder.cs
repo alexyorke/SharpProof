@@ -223,7 +223,9 @@ public sealed class ContractBinder(
     {
         foreach (var violation in _intrinsics.Validate(source, body))
         {
-            if (!requiresOnly || violation.EnclosingClauseKind == BoundContractKind.Requires)
+            if (!requiresOnly ||
+                violation.EnclosingClauseKind is null ||
+                violation.EnclosingClauseKind == BoundContractKind.Requires)
             {
                 return violation.Failure;
             }

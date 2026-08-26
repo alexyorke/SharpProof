@@ -252,6 +252,9 @@ public sealed class ContractBinderTests
         Assert.That(
             subject.Bind("Target", "Read").Failure,
             Is.EqualTo(expected));
+        Assert.That(
+            subject.BindRequires("Target", "Read").Failure,
+            Is.EqualTo(expected));
     }
 
     [Test]
