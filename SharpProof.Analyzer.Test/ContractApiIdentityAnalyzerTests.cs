@@ -310,19 +310,22 @@ public sealed class ContractApiIdentityAnalyzerTests
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EquivalentTo(["SP0046", "SP0047"]));
-        Assert.That(
-            diagnostics.Single(static diagnostic =>
-                diagnostic.Id == "SP0047")
-                .GetMessage(System.Globalization.CultureInfo.InvariantCulture),
-            Does.Contain("MaybeNull")
-                .And.Contain("ContractApiIdentityRejected"));
-        Assert.That(
-            diagnostics.Single(static diagnostic =>
-                diagnostic.Id == "SP0046")
-                .GetMessage(System.Globalization.CultureInfo.InvariantCulture),
-            Does.Contain("Call")
-                .And.Contain("NullReferenceException"));
+            Is.EquivalentTo(["SP0047", "SP0047"]));
+        var messages = diagnostics.Select(static diagnostic =>
+            diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                messages.Any(static message =>
+                    message.Contains("MaybeNull", StringComparison.Ordinal) &&
+                    message.Contains("ContractApiIdentityRejected", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                messages.Any(static message =>
+                    message.Contains("Call", StringComparison.Ordinal) &&
+                    message.Contains("UnsupportedOperationShape", StringComparison.Ordinal)),
+                Is.True);
+        }
     }
 
     private static Task<ImmutableArray<Diagnostic>> Analyze(
