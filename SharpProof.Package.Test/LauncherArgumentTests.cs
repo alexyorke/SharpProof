@@ -278,6 +278,31 @@ public sealed class LauncherArgumentTests
         }
     }
 
+    [TestCase(2)]
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    [TestCase(6)]
+    public void ReservedNoResultExitCodesBecomeInfrastructureFailure(int exitCode)
+    {
+        Assert.That(
+            Program.NormalizeNoResultExitCode(exitCode),
+            Is.EqualTo(3));
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(124)]
+    [TestCase(125)]
+    [TestCase(137)]
+    [TestCase(139)]
+    public void NonReservedNoResultExitCodesRemainDistinct(int exitCode)
+    {
+        Assert.That(
+            Program.NormalizeNoResultExitCode(exitCode),
+            Is.EqualTo(exitCode));
+    }
+
     [Test]
     public void UnknownOptionIsRejected()
     {

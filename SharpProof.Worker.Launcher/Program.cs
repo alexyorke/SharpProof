@@ -168,6 +168,7 @@ internal static class Program
         }
         if (!File.Exists(arguments.ResultPath))
         {
+            exitCode = NormalizeNoResultExitCode(exitCode);
             LauncherFailure launcherFailure =
                 LauncherPresentation.NoResultFailure(exitCode);
             if (!await TryWriteLauncherFailureAsync(
@@ -185,6 +186,7 @@ internal static class Program
             responseAuthority);
         if (!validResponse)
         {
+            exitCode = NormalizeNoResultExitCode(exitCode);
             if (!await TryWriteLauncherFailureAsync(
                     arguments.ResultPath, request, artifact, expectedInputHash,
                     expectedVersions, WorkerRunStatus.Failed,
@@ -228,6 +230,11 @@ internal static class Program
                 exitCode.ToString(CultureInfo.InvariantCulture) + ".");
         }
         return exitCode;
+    }
+
+    internal static int NormalizeNoResultExitCode(int exitCode)
+    {
+        return exitCode is >= 2 and <= 6 ? 3 : exitCode;
     }
 
     private static LauncherFailure ClassifyLauncherFailure(Exception exception)
