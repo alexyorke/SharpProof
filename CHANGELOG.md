@@ -104,7 +104,7 @@ contain documented breaking changes.
 - Constructor postconditions report `UnsupportedBody` until constructor
   initialization semantics are represented.
 - Package-consumer CI restores the exact same packed bytes across Windows x64,
-  Linux x64, macOS x64, and macOS ARM64.
+  Linux x64, and the hosted macOS runner.
 - Package builds run SDK package validation, and GitHub Actions dependencies
   are pinned to immutable commits.
 - `System.Collections.Immutable` is updated to 9.0.18, and the verifier package
