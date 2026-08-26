@@ -366,6 +366,68 @@ public sealed class ProofKernelTests
     }
 
     [Test]
+    public async Task NegativeUnsatCoreIndexCannotCreateAProof()
+    {
+        var fixture = CreateFixture();
+        var outcome = await new ProofKernel(
+            new StubBackend(BackendCheckResult.Unsatisfiable([-1])))
+            .VerifyAsync(fixture.Query);
+
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.MalformedBackendResult));
+    }
+
+    [Test]
+    public async Task UnsatisfiableResultCannotCarryModelOrFailureReason()
+    {
+        var fixture = CreateFixture();
+        var model = new BackendModel([
+            KeyValuePair.Create(fixture.Variable, fixture.Factory.CreateIntegerValue(0))
+        ]);
+        var withModel = await new ProofKernel(new StubBackend(new BackendCheckResult(
+                BackendCheckStatus.Unsatisfiable,
+                [],
+                model,
+                BackendFailureReason.None,
+                new BackendCheckResult.StorageTag())))
+            .VerifyAsync(fixture.Query);
+        var withFailure = await new ProofKernel(new StubBackend(new BackendCheckResult(
+                BackendCheckStatus.Unsatisfiable,
+                [],
+                null,
+                BackendFailureReason.InfrastructureFailure,
+                new BackendCheckResult.StorageTag())))
+            .VerifyAsync(fixture.Query);
+
+        ProofOutcome[] outcomes = [withModel, withFailure];
+        Assert.That(
+            outcomes.Cast<UnknownOutcome>()
+                .Select(static outcome => outcome.Reason),
+            Has.All.EqualTo(AbstentionReason.MalformedBackendResult));
+    }
+
+    [Test]
+    public async Task SatisfiableResultCannotCarryUnsatCore()
+    {
+        var fixture = CreateFixture();
+        var model = new BackendModel([
+            KeyValuePair.Create(fixture.Variable, fixture.Factory.CreateIntegerValue(0))
+        ]);
+        var outcome = await new ProofKernel(new StubBackend(new BackendCheckResult(
+                BackendCheckStatus.Satisfiable,
+                [0],
+                model,
+                BackendFailureReason.None,
+                new BackendCheckResult.StorageTag())))
+            .VerifyAsync(fixture.Query);
+
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.MalformedBackendResult));
+    }
+
+    [Test]
     public void ApproximationIsNotAProofJustification()
     {
         Assert.That(
