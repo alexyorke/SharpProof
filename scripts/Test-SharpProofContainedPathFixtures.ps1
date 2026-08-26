@@ -10,12 +10,15 @@ $root = Join-Path $fixture 'Repo'
 [IO.Directory]::CreateDirectory((Join-Path $root 'artifacts')) | Out-Null
 
 function Require-Rejection([string]$Path, [string]$Name) {
+    $rejected = $false
     try {
         Resolve-SharpProofContainedPath -Root $root -Path $Path -ParameterName $Name | Out-Null
-        throw "Contained-path fixture '$Name' was accepted."
     }
-    catch {
-        if ($_.Exception.Message -eq "Contained-path fixture '$Name' was accepted.") { throw }
+    catch [System.Management.Automation.RuntimeException] {
+        $rejected = $true
+    }
+    if (-not $rejected) {
+        throw "Contained-path fixture '$Name' was accepted."
     }
 }
 
