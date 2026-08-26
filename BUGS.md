@@ -939,6 +939,7 @@ The entries below were produced by a third read-only hunter wave run later on th
 2. Per coverage-and-limits.md Lines 125-128 expect the companion's `x != 0` precondition to bind while the conditional clause yields only SP0024; actual: ContractBinder.Bind/BindRequires(Gate.Read) fails with InvalidClausePlacement (EffectiveContractSourceResolver.cs Lines 84-92) and zero clauses survive - pinned by InvalidTargetPlacementCannotBeHiddenByAValidCompanion.
 3. Delete the misplaced conditional clause only: binding succeeds with the identical companion clause, isolating the doc/code divergence to the misplaced-clause-plus-companion interaction the four documents describe with the opposite outcome.
 **Confidence**: High - code block, all four document passages, pinning test, and the fix commit's file scope each verified directly in the current worktree; the only judgment point (doc-defect classification) follows the ledger's own precedent for accepted entries.
+**Status**: Resolved by updating README.md, coverage-and-limits.md, public-api.md, and CHANGELOG.md to describe the current invalid-direct-clause precedence; the existing binder regression remains green.
 
 ### 385. [RESOLVED b8762ae4c] Uncapped File.ReadAllBytes(manifestPath) Survives the #310 Remediation - an Oversized Published Manifest Is Buffered Whole and Crashes the Validator Outside Its Catch Filter
 

@@ -178,8 +178,9 @@ contain documented breaking changes.
   exact reference-shaped IR; they abstain with `UnsupportedType`.
 - Analyzer, binder, and manifest discovery now share one effective contract
   source rule: valid direct clauses take precedence, otherwise a valid
-  `ContractFor` companion remains usable despite misplaced or nested target
-  clauses, and malformed companion intent stays visible.
+  `ContractFor` companion is used only when no invalid direct clause is
+  present; misplaced or nested target clauses remain visible, and malformed
+  companion intent stays visible.
 - Every selected body with entry contracts or assumptions is admitted through
   symbolic subset validation even when it has no postcondition claim.
 - Vacuity evidence now includes only source-level receiver, parameter, and

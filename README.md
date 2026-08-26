@@ -594,10 +594,10 @@ payload is loaded.
 Contract clauses are not merged across sources. If a target member declares
 any valid direct clause, all of its clauses come from that member; otherwise
 they may come from its matching companion. A recognized direct clause with
-invalid placement still produces SP0024, but it neither displaces a valid
-companion nor contributes executable argument effects: the whole
-compiler-elided invocation is omitted. Closed parameter and return attributes
-still apply in either case.
+invalid placement still produces SP0024 and prevents a companion from binding
+for that member; the invalid compiler-elided invocation contributes no
+executable argument effects. Closed parameter and return attributes still
+apply when the selected clause source is valid.
 
 Direct `Contract.Requires`, `Ensures`, and `Assume` clauses used by the worker
 must be direct expression statements in one contiguous method-body prologue.

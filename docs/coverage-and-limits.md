@@ -123,9 +123,9 @@ explicit first receiver parameter. The analyzer's final-compilation
 reconciliation validates exact symbol shape; see
 [Diagnostics](diagnostic-examples.md#contractfor-generator-diagnostics).
 Any valid direct target clause owns the complete clause source. When no valid
-direct clause exists, a valid companion remains usable even if the target has
-a misplaced clause. That misplaced clause is SP0024 and is omitted as a whole
-compiler-elided call, including its argument evaluation.
+direct clause exists, a misplaced direct clause produces SP0024 and prevents
+the companion from binding for that member. The invalid compiler-elided call
+and its argument evaluation are omitted.
 
 ## Resolved API specification inventory
 
