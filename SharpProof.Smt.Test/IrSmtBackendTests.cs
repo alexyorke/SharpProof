@@ -330,7 +330,7 @@ public sealed class IrSmtBackendTests
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
+            Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
     }
 
     [Test]

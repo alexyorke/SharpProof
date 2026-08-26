@@ -13,10 +13,6 @@ $ErrorActionPreference = 'Stop'
 
 $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
-Import-Module (Join-Path `
-    $repositoryRoot 'scripts\SharpProof.ContainerExecution.psm1') -Force
-$testProjectParallelism = Get-SharpProofTestProjectParallelism `
-    -RepositoryRoot $repositoryRoot
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = $null
@@ -239,6 +235,13 @@ trap {
 # Parse the contract only after the timing authority and trap are ready so a
 # malformed contract still produces a failed timing receipt.
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+# Load build helpers only after parsing the contract. A minimal fixture that
+# exercises malformed-contract handling need not carry the full scripts folder.
+Import-Module (Join-Path `
+    $repositoryRoot 'scripts\SharpProof.ContainerExecution.psm1') -Force
+$testProjectParallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
+
 . (Join-Path $repositoryRoot 'scripts\SharpProof.FuzzEvidenceLifecycle.ps1')
 $pullRequestCases = Assert-SharpProofFuzzCaseBudget `
     -Value $contract.fuzz.pullRequestCases `
