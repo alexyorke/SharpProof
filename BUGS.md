@@ -324,7 +324,7 @@ The numbered entries below were produced by the read-only hunter pass and vetted
 **Confidence**: High (producer pattern, in-process-only cleanup, non-matching sweeper glob, and sweeper call-site directories all verified); severity low.
 **Status**: Resolved by sweeping marker-scoped temporary files while the publication lock is held and synchronizing the metadata directory. The orphan-marker recovery regression passes.
 
-### 317. Per-Invocation GUID Leaks Through CompilerVisibleProperty Into GeneratedMSBuildEditorConfig.editorconfig, Defeating Incremental Compilation for Every Verification-Enabled Project
+### 317. [PARTIALLY RESOLVED 8127933fc] Per-Invocation GUID Leaks Through CompilerVisibleProperty Into GeneratedMSBuildEditorConfig.editorconfig, Defeating Incremental Compilation for Every Verification-Enabled Project
 
 **Location**: `SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets` (GUID mint at Line ~126: `_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''"` -> NewGuid; `_SharpProofExpectedInvocationDirectory`/`_SharpProofInvocationDirectory` = runs/<guid> at Lines ~128/131; `_SharpProofCompilerManifestPath` = Combine(invocation dir, 'compiler-manifest.json') at Line 146; hook at Line 92); `SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props` (Line 33: `<CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />`); consumer proof `SharpProof.CompilerCollector\FinalCompilationCollector.cs` (Line 7 reads analyzer-config key `build_property._SharpProofCompilerManifestPath`); SDK chain: Microsoft.Managed.Core.targets writes CompilerVisibleProperty values into `$(IntermediateOutputPath)$(MSBuildProjectName).GeneratedMSBuildEditorConfig.editorconfig` and adds it to @(EditorConfigFiles); Microsoft.CSharp.Core.targets lists @(EditorConfigFiles) among CoreCompile Inputs and passes them to Csc.
 **Description**: Every build that runs _SharpProofInitializeVerify mints a fresh _SharpProofInvocationId GUID (condition `'== ''` means new per project evaluation per msbuild invocation) and derives _SharpProofCompilerManifestPath under runs/<guid>/ - that property is registered as compiler-visible and read back by the collector through the generated editorconfig, proving the value travels there. Because the manifest path embeds a fresh GUID on every invocation, the generated editorconfig content differs on every build, the write-always target rewrites it, its timestamp bumps, and CoreCompile's Inputs check always fails: csc, all analyzers/generators, and then the entire verifier pipeline (launcher + worker + Z3) rerun on every no-op `dotnet build` of any project with SharpProofVerify=true (strict profile makes that opt-out-free via AnalyzerConsumer.props/portable targets). Secondary effect: during design-time builds the setting PropertyGroup condition excludes DesignTimeBuild, so the property flips empty and back around every F5, churning the same file. A stable path already exists ($(_SharpProofVerifyDirectory), computed identically without the invocation id). Verified mechanically against both repo files and installed SDK 9.0.317 targets.
@@ -333,6 +333,17 @@ The numbered entries below were produced by the read-only hunter pass and vetted
 2. After build 2, observe obj/Debug/net8.0/<Project>.GeneratedMSBuildEditorConfig.editorconfig contains a DIFFERENT build_property._sharpproofcompilermanifestpath (.../runs/<new-guid>/compiler-manifest.json) than after build 1.
 3. Observe CoreCompile/Csc re-executed on build 2 (-v:n shows no "Skipping target CoreCompile") followed by a fresh launcher spawn although no input changed. Delete only the GUID from that one line and rebuild: the file stops changing and CoreCompile skips again, isolating the GUID as the cause.
 **Confidence**: High (each link verified statically; blast radius is all verification-enabled projects).
+
+**Status**: The compiler-visible value now uses the stable, package-owned
+`_SharpProofCompilerManifestSourcePath` (`compiler-manifest.input.json`) while
+the GUID-bearing `_SharpProofCompilerManifestPath` remains a private
+per-invocation copy. The compiler collector writes the stable source, the
+verification target copies it into the isolated run directory, and the
+invalidation task protects both paths. The incremental regression confirms the
+generated editorconfig is byte-identical on an unchanged second build and no
+longer contains a `/runs/` path. The `SharpProofVerify` target still has no
+incremental `Inputs`/`Outputs`, so whether the verifier itself is skipped on a
+no-op remains a separate follow-up.
 
 ### 318. Retained Cleanup Anchors Invoke Environment.FailFast Asynchronously After RunVerifier Has Returned - Killing Reused MSBuild Nodes (and Unrelated Concurrent Builds) After the Task Reported Its Result
 
