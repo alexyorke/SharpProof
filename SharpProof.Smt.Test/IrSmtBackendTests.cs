@@ -697,6 +697,21 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public void ResourceAccountingAccumulatesFreshSolverSnapshots()
+    {
+        var consumed = 0L;
+        foreach (var observed in new[] { 10L, 500L, 2_900L })
+        {
+            consumed = IrSmtBackend.AddResourceCount(consumed, observed);
+        }
+
+        Assert.That(consumed, Is.EqualTo(3_410L));
+        Assert.That(
+            IrSmtBackend.AddResourceCount(500L, 10L),
+            Is.EqualTo(510L));
+    }
+
+    [Test]
     public void CancellationWhileQueuedAtTheBackendGateDoesNotRunTheQuery()
     {
         var factory = new IrFactory();

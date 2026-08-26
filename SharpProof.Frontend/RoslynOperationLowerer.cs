@@ -792,7 +792,7 @@ public sealed class RoslynOperationLowerer
             // minimum-value case are represented by the IR interpreter.
             return kind == BinaryOperatorKind.Divide &&
                 (left is IrIntegerTerm { Value: not long.MinValue } ||
-                 right is IrIntegerTerm);
+                 right is IrIntegerTerm { Value: not -1L });
         }
 
         public override LoweredExpression VisitConditional(

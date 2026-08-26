@@ -11,7 +11,16 @@ public sealed class ProofKernel(ISmtBackend backend)
         query = ArgumentNullGuard.NotNull(query, nameof(query));
 
         cancellationToken.ThrowIfCancellationRequested();
-        var result = await _backend.CheckAsync(query, cancellationToken).ConfigureAwait(false);
+        BackendCheckResult? result;
+        try
+        {
+            result = await _backend.CheckAsync(query, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (ArgumentException)
+        {
+            return Unknown(AbstentionReason.MalformedBackendResult);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         if (result == null)
         {

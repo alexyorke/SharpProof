@@ -8,7 +8,6 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
     private readonly IrSmtBackendOptions _options =
         ArgumentNullGuard.NotNull(options, nameof(options));
     private long _consumedResourceCount;
-    private long _lastObservedResourceCount;
     private int _activeCheckCount;
     private bool _interrupted;
     private bool _disposed;
@@ -191,13 +190,16 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 continue;
             }
 
-            long observed = entry.UIntValue;
-            _consumedResourceCount += observed >= _lastObservedResourceCount
-                ? observed - _lastObservedResourceCount
-                : observed;
-            _lastObservedResourceCount = observed;
+            _consumedResourceCount = AddResourceCount(
+                _consumedResourceCount,
+                entry.UIntValue);
             return;
         }
+    }
+
+    internal static long AddResourceCount(long consumed, long observed)
+    {
+        return checked(consumed + observed);
     }
 
     private static BackendCheckResult CreateUnsatisfiable(
