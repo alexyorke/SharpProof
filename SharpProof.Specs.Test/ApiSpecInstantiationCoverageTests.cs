@@ -316,6 +316,46 @@ public sealed class ApiSpecInstantiationCoverageTests
     }
 
     [Test]
+    public void SequenceNullUsesTheExactSubstitutedOperandType()
+    {
+        var variable = Variable(
+            SpecVariableRole.Parameter,
+            0,
+            IrTypeKind.Sequence);
+        var template = CreateTemplate(
+            isStatic: true,
+            receiverType: null,
+            parameterTypes: [IrTypeKind.Sequence],
+            resultType: null,
+            [Binary(
+                IrBinaryOperator.Equal,
+                new SpecNullDeclaration(IrTypeKind.Sequence),
+                variable,
+                IrTypeKind.Boolean)]);
+        var factory = new IrFactory();
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters.Single()] = factory.Variable(
+                    factory.CreateVariable("sequence", sequenceType))
+            });
+
+        Assert.That(
+            instantiated.Status,
+            Is.EqualTo(SpecInstantiationStatus.Succeeded));
+        var binary = instantiated.Postconditions.Single() as IrBinaryTerm;
+        Assert.That(binary, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(binary!.Left.Type, Is.EqualTo(sequenceType));
+            Assert.That(binary.Right.Type, Is.EqualTo(sequenceType));
+        }
+    }
+
+    [Test]
     public void ExactReferenceAndSequenceTypesMustAgreeBeforeIrConstruction()
     {
         var left = Variable(SpecVariableRole.Parameter, 0, IrTypeKind.Reference);
