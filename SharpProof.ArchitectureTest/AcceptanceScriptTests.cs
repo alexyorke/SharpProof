@@ -72,6 +72,66 @@ public sealed class AcceptanceScriptTests
             Does.Not.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
     }
 
+    [Test]
+    public async Task MalformedContractStillWritesFailedTimingEvidence()
+    {
+        var fixture = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-acceptance-malformed-contract-" +
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(fixture, "eng", "acceptance"));
+        try
+        {
+            var root = RepositoryRoot();
+            File.Copy(
+                Path.Combine(root, "eng", "acceptance", "Verify.ps1"),
+                Path.Combine(fixture, "eng", "acceptance", "Verify.ps1"));
+            await File.WriteAllTextAsync(
+                Path.Combine(fixture, "eng", "acceptance", "contract.json"),
+                "{");
+
+            var result = await RunAsync(
+                fixture,
+                "pwsh",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-File",
+                Path.Combine(fixture, "eng", "acceptance", "Verify.ps1"));
+            var evidence = Directory.EnumerateFiles(
+                    fixture,
+                    "acceptance-release.json",
+                    SearchOption.AllDirectories)
+                .Single();
+            using var document = JsonDocument.Parse(
+                await File.ReadAllTextAsync(evidence));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Not.Zero);
+                Assert.That(
+                    document.RootElement.GetProperty("failure").GetString(),
+                    Does.Contain("JSON").IgnoreCase);
+                Assert.That(
+                    result.Error + result.Output,
+                    Does.Not.Contain("activeTimingStopwatch"));
+                Assert.That(
+                    result.Error + result.Output,
+                    Does.Not.Contain("timing phases are invalid"));
+                Assert.That(
+                    document.RootElement.GetProperty("status").GetString(),
+                    Is.EqualTo("failed"));
+                Assert.That(
+                    document.RootElement.GetProperty("phases").GetArrayLength(),
+                    Is.Zero);
+            }
+        }
+        finally
+        {
+            DeleteDirectory(fixture);
+        }
+    }
+
     [TestCase(false, false, "passed", "SharpProof acceptance checks passed.")]
     [TestCase(true, false, "incomplete", "non-qualifying partial mode")]
     [TestCase(false, true, "incomplete", "non-qualifying partial mode")]

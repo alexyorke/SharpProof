@@ -16,11 +16,6 @@ $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = $null
-$contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
-. (Join-Path $repositoryRoot 'scripts\SharpProof.FuzzEvidenceLifecycle.ps1')
-$pullRequestCases = Assert-SharpProofFuzzCaseBudget `
-    -Value $contract.fuzz.pullRequestCases `
-    -Name 'contract.fuzz.pullRequestCases'
 
 # BEGIN ACCEPTANCE TIMELINE AUTHORITY
 function Test-AcceptanceTimingTimeline {
@@ -31,7 +26,9 @@ function Test-AcceptanceTimingTimeline {
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
         [object[]]$Phases,
-        [Parameter(Mandatory = $true)][string[]]$ExpectedPhaseNames,
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$ExpectedPhaseNames,
         [Parameter(Mandatory = $true)][bool]$RequireComplete
     )
 
@@ -234,6 +231,14 @@ trap {
         -Failure $_.Exception.Message
     throw
 }
+
+# Parse the contract only after the timing authority and trap are ready so a
+# malformed contract still produces a failed timing receipt.
+$contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+. (Join-Path $repositoryRoot 'scripts\SharpProof.FuzzEvidenceLifecycle.ps1')
+$pullRequestCases = Assert-SharpProofFuzzCaseBudget `
+    -Value $contract.fuzz.pullRequestCases `
+    -Name 'contract.fuzz.pullRequestCases'
 
 Start-AcceptanceTimingPhase -Name 'restore'
 Invoke-SharpProofDotnet -Arguments @(

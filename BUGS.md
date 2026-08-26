@@ -1260,6 +1260,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 2. Add an inline-versioned Microsoft.Z3 PackageReference to Gates and run --filter OnlyTheSmtLayerAndFuzzHarnessReferenceZ3InTheProductionGraph: green although a third direct referencer now exists.
 3. Grep ArchitectureTests.cs for "SharpProof.Gates": only ad-hoc .Append/.Concat arguments (Lines 467/511/587/2109) - never a ProductionProjects member or dictionary key.
 **Confidence**: High (inventories, iteration sources, csproj contents read directly).
+**Status**: Resolved by adding `SharpProof.Gates` to the shared dependency-governed project inventory used by the DAG and Z3-isolation scans; focused governance tests pass.
 
 ### 414. The "Required Inventory" Test Pins Only ~19 of BannedSymbols.txt's Entries - Deleting the GetSpeculativeSymbolInfo/GetSpeculativeAliasInfo Bans Passes Every Architecture Test While Silently Disabling the Compile-Time Speculative-Binding Ban Exactly Where No Other Layer Runs
 
@@ -1360,6 +1361,7 @@ The entries below were produced by a fourth read-only hunter wave run later on t
 3. Observe artifacts/timings/: no new or moved acceptance-release.json for the run (the Set-Content/Move-Item block was never reached), unlike failures after phase 1 which produce failed-status evidence.
 4. Control: introduce equivalent corruption AFTER Start-AcceptanceTimingPhase -Name 'restore': evidence IS written with status failed and the true message - isolating the empty-phase guard.
 **Confidence**: High on mechanism (trap scoping confirmed; code path line-verified including RequireComplete computation and the Count<1 rejection); Low-Medium reachability (pre-first-phase infrastructure damage).
+**Status**: Resolved by initializing the timing authority before contract parsing, allowing empty failed timelines, and adding a malformed-contract regression that verifies a failed timing receipt is still written.
 
 ### 423. Two Support Scripts Are Referenced by Nothing in the Repository - the Coverage-Authority Generator and the Dogfood Driver Are Unreachable Dead Weight Labeled "Required"
 
