@@ -11,6 +11,29 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractBinderTests
 {
+    [Test]
+    public void UnconstructedGenericMethodDefinitionReturnsTypedFailure()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static T Read<T>(T value) {
+                    Contract.Requires(value != null);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+    }
+
     [TestCase("-0.0", "0.0", false)]
     [TestCase("0.0", "-0.0", false)]
     [TestCase("-0.0", "-0.0", true)]

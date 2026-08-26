@@ -29,6 +29,42 @@ public sealed class ContractApiIdentityTests
         Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
     }
 
+    [Test]
+    public void DuplicateAliasedPackageReferencesRemainAdmitted()
+    {
+        var path = typeof(Contract).Assembly.Location;
+        var first = MetadataReference.CreateFromFile(path)
+            .WithAliases(["first"]);
+        var second = MetadataReference.CreateFromFile(path)
+            .WithAliases(["second"]);
+        var tree = CSharpSyntaxTree.ParseText(
+            """
+            extern alias first;
+            public static class Target {
+                public static int Read(int value) {
+                    first::SharpProof.Attributes.Contract.Ensures(value > 0);
+                    return value;
+                }
+            }
+            """,
+            ParseOptions,
+            "AliasedConsumer.cs");
+        var compilation = CSharpCompilation.Create(
+            "DuplicateContractIdentityConsumer",
+            [tree],
+            PlatformReferences.Add(first).Add(second),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        AssertNoErrors(compilation);
+
+        var inventory = CreateInventory(compilation);
+
+        Assert.That(inventory.ContractApiAvailable, Is.True);
+        Assert.That(inventory.HasRejectedContractApiUsage, Is.False);
+        Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
+    }
+
     [TestCase("1.0.0.0", true, true)]
     [TestCase("2.0.0.0", true, true)]
     [TestCase("1.0.0.0", false, true)]

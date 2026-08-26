@@ -31,12 +31,24 @@ internal sealed class ContractApiIdentityResolver
     private ContractApiIdentityResolver(Compilation compilation)
     {
         _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
-        _attribute = compilation.GetTypeByMetadataName(
-            ContractApiMetadata.Attribute);
-        _conditionalAttribute = compilation.GetTypeByMetadataName(
-            ContractApiMetadata.ConditionalAttribute);
-        var candidate = compilation.GetTypeByMetadataName(
+        var sourceCandidate = compilation.Assembly.GetTypeByMetadataName(
             ContractApiMetadata.Contract);
+        var candidate = sourceCandidate ??
+            compilation.GetTypeByMetadataName(ContractApiMetadata.Contract);
+        if (sourceCandidate == null &&
+            (candidate == null ||
+             !IsTrustedReferenceType(
+                 candidate,
+                 ContractApiMetadata.Contract)))
+        {
+            candidate = FindReferencedType(ContractApiMetadata.Contract);
+        }
+        _attribute = candidate?.ContainingAssembly.GetTypeByMetadataName(
+            ContractApiMetadata.Attribute) ??
+            compilation.GetTypeByMetadataName(ContractApiMetadata.Attribute);
+        _conditionalAttribute = candidate?.ContainingAssembly.GetTypeByMetadataName(
+            ContractApiMetadata.ConditionalAttribute) ??
+            compilation.GetTypeByMetadataName(ContractApiMetadata.ConditionalAttribute);
         Contract = IsTrustedReferenceType(
                 candidate,
                 ContractApiMetadata.Contract) &&
@@ -120,9 +132,12 @@ internal sealed class ContractApiIdentityResolver
 
     private AttributeResolution ResolveAttributeCore(string metadataName)
     {
-        var candidate = _compilation.GetTypeByMetadataName(metadataName);
+        var contract = Contract;
+        var candidate = contract?.ContainingAssembly.GetTypeByMetadataName(
+                metadataName) ??
+            _compilation.GetTypeByMetadataName(metadataName);
         return new AttributeResolution(
-            Contract is { } contract &&
+            contract is { } &&
             IsTrustedReferenceType(candidate, metadataName) &&
             SymbolEqualityComparer.Default.Equals(
                 candidate!.ContainingAssembly,
@@ -130,6 +145,22 @@ internal sealed class ContractApiIdentityResolver
             IsAttribute(candidate!)
                 ? candidate
                 : null);
+    }
+
+    private INamedTypeSymbol? FindReferencedType(string metadataName)
+    {
+        foreach (var reference in _compilation.References)
+        {
+            if (_compilation.GetAssemblyOrModuleSymbol(reference)
+                    is IAssemblySymbol assembly &&
+                assembly.GetTypeByMetadataName(metadataName) is { } candidate &&
+                IsTrustedReferenceType(candidate, metadataName))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     private bool IsTrustedReferenceType(
@@ -192,22 +223,33 @@ internal sealed class ContractApiIdentityResolver
                     _compilation.GetAssemblyOrModuleSymbol(
                         reference)))
             .ToImmutableArray();
-        if (matches.Length != 1 ||
-            matches[0] is not PortableExecutableReference
-            {
-                FilePath: { Length: > 0 } path
-            })
+        if (matches.IsDefaultOrEmpty)
         {
             return false;
         }
 
-        var trusted = HasExpectedPayloadHash(path, out var unreadableReason);
-        if (unreadableReason != null)
+        foreach (var match in matches)
         {
-            UnreadableContractApiReason = unreadableReason;
+            if (match is not PortableExecutableReference
+                {
+                    FilePath: { Length: > 0 } path
+                })
+            {
+                return false;
+            }
+
+            var trusted = HasExpectedPayloadHash(path, out var unreadableReason);
+            if (unreadableReason != null)
+            {
+                UnreadableContractApiReason = unreadableReason;
+            }
+            if (!trusted)
+            {
+                return false;
+            }
         }
 
-        return trusted;
+        return true;
     }
 
     /// <summary>
