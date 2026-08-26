@@ -337,12 +337,13 @@ internal static partial class AnalyzerFeaturePipeline
                     semanticModel,
                     session,
                     context.ReportDiagnostic,
-                    context.CancellationToken);
+                    context.CancellationToken,
+                    out var requiresUnknown);
             outcome = AnalyzerSemanticOutcomes.Combine(
                 outcome,
                 requiresOutcome);
             if (selection.Contracts &&
-                requiresOutcome == AnalyzerSemanticOutcome.Unknown &&
+                requiresUnknown &&
                 !subsetIncompleteReported &&
                 !hasInvalidContractClauses &&
                 !method.IsAbstract &&

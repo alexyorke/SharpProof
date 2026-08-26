@@ -10,6 +10,26 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        return Analyze(
+            caller,
+            declaration,
+            semanticModel,
+            session,
+            reportDiagnostic,
+            cancellationToken,
+            out _);
+    }
+
+    internal static AnalyzerSemanticOutcome Analyze(
+        IMethodSymbol caller,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken,
+        out bool hasUnknown)
+    {
+        hasUnknown = false;
         caller = ContractClauseInventoryBuilder
             .NormalizeCallable(caller);
         var discovery = new RequiresCallSiteDiscovery(
@@ -33,8 +53,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     graph: null,
                     operationRoot: null,
                     screenForPotentialCalls: false,
-                    cancellationToken:
-                        cancellationToken)
+                    cancellationToken,
+                    out hasUnknown)
                 : AnalyzerSemanticOutcome.NotApplicable;
         }
 
@@ -50,7 +70,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return RecordUnavailableOwners(
                 caller,
                 potentialOwners,
-                session);
+                session,
+                out hasUnknown);
         }
 
         return new TreeAnalysis(
@@ -61,15 +82,17 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 reportDiagnostic,
                 potentialOwners,
                 cancellationToken)
-            .Run(graph, operationRoot);
+            .Run(graph, operationRoot, out hasUnknown);
     }
 
     private static AnalyzerSemanticOutcome
         RecordUnavailableOwners(
             IMethodSymbol root,
             ImmutableHashSet<IMethodSymbol> owners,
-            AnalyzerSession session)
+            AnalyzerSession session,
+            out bool hasUnknown)
     {
+        hasUnknown = false;
         var rootOutcome =
             AnalyzerSemanticOutcome.NotApplicable;
         foreach (var owner in owners)
@@ -86,6 +109,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             {
                 rootOutcome =
                     AnalyzerSemanticOutcome.Unknown;
+                hasUnknown = true;
             }
             else
             {
@@ -112,11 +136,21 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 new(SymbolEqualityComparer.Default);
         private AnalyzerSemanticOutcome _rootOutcome =
             AnalyzerSemanticOutcome.NotApplicable;
+        private bool _rootHasUnknown;
 
         internal AnalyzerSemanticOutcome Run(
             ControlFlowGraph graph,
             IOperation? operationRoot)
         {
+            return Run(graph, operationRoot, out _);
+        }
+
+        internal AnalyzerSemanticOutcome Run(
+            ControlFlowGraph graph,
+            IOperation? operationRoot,
+            out bool hasUnknown)
+        {
+            _rootHasUnknown = false;
             AnalyzeGraph(
                 root,
                 rootDeclaration,
@@ -140,6 +174,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     AnalyzerSemanticOutcome.Unknown);
             }
 
+            hasUnknown = _rootHasUnknown;
             return _rootOutcome;
         }
 
@@ -162,6 +197,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             {
                 _visitedPotentialOwners.Add(caller);
                 var outcome = AnalyzerSemanticOutcome.NotApplicable;
+                var hasUnknown = false;
                 if (session.TryBeginRequiresCallSiteAnalysis(caller))
                 {
                     outcome = SharpProofControlAttributePolicy
@@ -180,12 +216,13 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                             graph,
                             operationRoot,
                             screenForPotentialCalls: false,
-                            cancellationToken:
-                                cancellationToken);
+                            cancellationToken,
+                            out hasUnknown);
                 }
                 if (isRoot)
                 {
                     _rootOutcome = outcome;
+                    _rootHasUnknown = hasUnknown;
                 }
                 else
                 {

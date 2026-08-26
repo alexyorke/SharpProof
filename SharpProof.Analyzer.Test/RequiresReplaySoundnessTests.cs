@@ -487,6 +487,14 @@ public sealed class RequiresReplaySoundnessTests
                     }
                 }
 
+                public static void MixedRefutedAndUnknown(bool condition) {
+                    Contract.Requires(condition);
+                    Positive(-1);
+                    if (condition) {
+                        Positive(-1);
+                    }
+                }
+
                 public static void BothBranches(bool condition) {
                     Contract.Requires(condition || !condition);
                     if (condition) {
@@ -525,7 +533,7 @@ public sealed class RequiresReplaySoundnessTests
             .ToArray();
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(diagnostics, Has.Length.EqualTo(3));
+            Assert.That(diagnostics, Has.Length.EqualTo(5));
             Assert.That(
                 incomplete.Count(static message =>
                     message.Contains(
@@ -545,6 +553,12 @@ public sealed class RequiresReplaySoundnessTests
                         StringComparison.Ordinal)),
                 Is.EqualTo(1));
             Assert.That(
+                incomplete.Count(static message =>
+                    message.Contains(
+                        "'MixedRefutedAndUnknown'",
+                        StringComparison.Ordinal)),
+                Is.EqualTo(1));
+            Assert.That(
                 incomplete,
                 Has.None.Contain("'UnselectedBranch'"));
             Assert.That(
@@ -555,13 +569,16 @@ public sealed class RequiresReplaySoundnessTests
                     message.Contains(
                         "RequiresCallSiteAnalysisUnknown",
                         StringComparison.Ordinal)),
-                Is.EqualTo(2));
+                Is.EqualTo(3));
             Assert.That(
                 factory.Outcomes["KnownBranch"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
             Assert.That(
                 factory.Outcomes["BothBranches"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["MixedRefutedAndUnknown"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
             Assert.That(
                 factory.Outcomes["UnselectedBranch"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));

@@ -10,13 +10,33 @@ internal static partial class RequiresCallSiteAnalyzer
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        return Analyze(
+            caller,
+            declaration,
+            semanticModel,
+            session,
+            reportDiagnostic,
+            cancellationToken,
+            out _);
+    }
+
+    internal static AnalyzerSemanticOutcome Analyze(
+        IMethodSymbol caller,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken,
+        out bool hasUnknown)
+    {
         return RequiresCallSiteTreeAnalyzer.Analyze(
             caller,
             declaration,
             semanticModel,
             session,
             reportDiagnostic,
-            cancellationToken);
+            cancellationToken,
+            out hasUnknown);
     }
 
     internal static AnalyzerSemanticOutcome AnalyzeCallable(
@@ -30,6 +50,31 @@ internal static partial class RequiresCallSiteAnalyzer
         bool screenForPotentialCalls,
         CancellationToken cancellationToken)
     {
+        return AnalyzeCallable(
+            caller,
+            declaration,
+            semanticModel,
+            session,
+            reportDiagnostic,
+            graph,
+            operationRoot,
+            screenForPotentialCalls,
+            cancellationToken,
+            out _);
+    }
+
+    internal static AnalyzerSemanticOutcome AnalyzeCallable(
+        IMethodSymbol caller,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        ControlFlowGraph? graph,
+        IOperation? operationRoot,
+        bool screenForPotentialCalls,
+        CancellationToken cancellationToken,
+        out bool hasUnknown)
+    {
         return new Analysis(
                 caller,
                 declaration,
@@ -39,7 +84,7 @@ internal static partial class RequiresCallSiteAnalyzer
                 graph,
                 operationRoot,
                 cancellationToken)
-            .Run(screenForPotentialCalls);
+            .Run(screenForPotentialCalls, out hasUnknown);
     }
 
     internal static AnalyzerSemanticOutcome AnalyzePrimaryConstructorInitializer(
@@ -205,6 +250,14 @@ internal static partial class RequiresCallSiteAnalyzer
         internal AnalyzerSemanticOutcome Run(
             bool screenForPotentialCalls)
         {
+            return Run(screenForPotentialCalls, out _);
+        }
+
+        internal AnalyzerSemanticOutcome Run(
+            bool screenForPotentialCalls,
+            out bool hasUnknown)
+        {
+            hasUnknown = false;
             if (screenForPotentialCalls &&
                 !_discovery.HasPotentialCallSite(
                     session.HasPotentialCallPreconditions))
@@ -217,6 +270,7 @@ internal static partial class RequiresCallSiteAnalyzer
                 binding.IsSuccess ? binding.Contracts : null);
             if (callSites == null)
             {
+                hasUnknown = true;
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
@@ -224,7 +278,11 @@ internal static partial class RequiresCallSiteAnalyzer
             foreach (var candidate in callSites)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                outcome = AnalyzerSemanticOutcomes.Combine(outcome, AnalyzeCallSite(candidate));
+                var candidateOutcome = AnalyzeCallSite(candidate);
+                hasUnknown |= candidateOutcome == AnalyzerSemanticOutcome.Unknown;
+                outcome = AnalyzerSemanticOutcomes.Combine(
+                    outcome,
+                    candidateOutcome);
             }
             return outcome;
         }
