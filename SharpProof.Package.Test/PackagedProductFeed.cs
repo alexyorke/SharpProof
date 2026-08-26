@@ -354,6 +354,19 @@ internal sealed class PackagedProductFeed : IDisposable
 
     internal static string FindRepositoryRoot()
     {
+        var configuredRoot = Environment.GetEnvironmentVariable(
+            "SHARPPROOF_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(configuredRoot))
+        {
+            var resolvedRoot = Path.GetFullPath(configuredRoot);
+            if (File.Exists(Path.Combine(
+                    resolvedRoot,
+                    "SharpProof.Release.props")))
+            {
+                return resolvedRoot;
+            }
+        }
+
         var directory = new DirectoryInfo(
             typeof(PackagedProductFeed).Assembly.Location);
         while (directory != null)

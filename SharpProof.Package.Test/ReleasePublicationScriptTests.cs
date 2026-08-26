@@ -957,22 +957,7 @@ public sealed class ReleasePublicationScriptTests
 
     private static string FindRepositoryRoot()
     {
-        var directory = new DirectoryInfo(
-            typeof(ReleasePublicationScriptTests).Assembly.Location);
-        while (directory != null)
-        {
-            if (File.Exists(
-                    Path.Combine(
-                        directory.FullName,
-                        "SharpProof.Release.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
+        return PackagedProductFeed.FindRepositoryRoot();
     }
 
     private sealed class PublicationWorkspace : IDisposable

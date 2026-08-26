@@ -51,17 +51,6 @@ internal static class ReferencedTypeSymbols
         {
             return true;
         }
-        // A direct assembly reference is the common case and avoids opening
-        // the metadata stream for the assembly at all. The metadata fallback
-        // below also handles a forwarded attribute constructor.
-        if (assembly.Modules.Any(module =>
-                module.ReferencedAssemblySymbols.Any(reference =>
-                    SymbolEqualityComparer.Default.Equals(
-                        reference,
-                        attributeType.ContainingAssembly))))
-        {
-            return true;
-        }
         var reference = compilation.GetMetadataReference(assembly)
             as PortableExecutableReference;
         if (reference == null)
@@ -111,22 +100,21 @@ internal static class ReferencedTypeSymbols
         string metadataName,
         CancellationToken cancellationToken)
     {
-        foreach (var typeHandle in reader.TypeDefinitions)
+        foreach (var attributeHandle in reader.CustomAttributes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var type = reader.GetTypeDefinition(typeHandle);
-            foreach (var attributeHandle in type.GetCustomAttributes())
+            var attribute = reader.GetCustomAttribute(attributeHandle);
+            if (attribute.Parent.Kind != HandleKind.TypeDefinition)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var attribute = reader.GetCustomAttribute(attributeHandle);
-                if (AttributeTypeMatches(
-                        reader,
-                        attribute.Constructor,
-                        namespaceName,
-                        metadataName))
-                {
-                    return true;
-                }
+                continue;
+            }
+            if (AttributeTypeMatches(
+                    reader,
+                    attribute.Constructor,
+                    namespaceName,
+                    metadataName))
+            {
+                return true;
             }
         }
         return false;

@@ -101,8 +101,40 @@ public sealed class ReferencedTypeSymbolsTests
             Is.True,
             string.Join(
                 ", ",
-                filtered.Select(static type => type.MetadataName)));
+            filtered.Select(static type => type.MetadataName)));
     }
+
+    [Test]
+    public void ContractAttributePrefilterFindsTypeAttributesWithoutWalkingEveryType()
+    {
+        var companion = EmitReference(
+            """
+            using SharpProof.Attributes;
+            namespace AttributeScanFixture {
+                [ContractFor(typeof(Service))]
+                public static class ServiceContracts { }
+                public interface Service { }
+                public sealed class UnrelatedOne { }
+                public sealed class UnrelatedTwo { }
+            }
+            """,
+            "AttributeScanFixture");
+        var compilation = CreateCompilation(
+            "public static class SourceType { }",
+            companion);
+        var attribute = compilation.GetTypeByMetadataName(
+            "SharpProof.Attributes.ContractForAttribute");
+        Assert.That(attribute, Is.Not.Null);
+
+        var filtered = ReferencedTypeSymbols.GetAll(compilation, attribute!)
+            .ToImmutableArray();
+
+        Assert.That(
+            filtered.Any(type => type.MetadataName == "ServiceContracts"),
+            Is.True,
+            string.Join(", ", filtered.Select(static type => type.MetadataName)));
+    }
+
     [Test]
     public void ContractAttributePrefilterPreservesTypeForwardedCompanions()
     {
