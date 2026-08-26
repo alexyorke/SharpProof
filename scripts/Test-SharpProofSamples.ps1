@@ -16,8 +16,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $samplesRoot = Join-Path $repositoryRoot 'samples'
+$parallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 $isSupportedWorkerHost = $IsLinux -and
     $env:SHARPPROOF_CONTAINER -ceq '1' -and
     [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
@@ -306,6 +309,7 @@ function New-LocalPackageFeed {
                 $feed,
                 '--packages',
                 $packageCache,
+                "/m:$parallelism",
                 '--nologo'
             ))
         Assert-ExitCode $pack $true "Packing $projectPath"
@@ -360,7 +364,8 @@ function Invoke-SampleBuild {
             '--no-restore',
             '--nologo',
             '--verbosity',
-            'minimal'
+            'minimal',
+            "/m:$parallelism"
         ) + $commonProperties)
 }
 

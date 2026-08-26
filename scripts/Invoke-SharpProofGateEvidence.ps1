@@ -16,8 +16,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Assert-SharpProofStandaloneGateResult.ps1')
+$parallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 $outputDirectory = Split-Path -Parent $resolvedOutput
@@ -47,7 +50,8 @@ $wrapper = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $project = Join-Path $repositoryRoot 'SharpProof.Gates\SharpProof.Gates.csproj'
 $buildArguments = @(
     'build', $project, '-c', 'Release', '--no-restore',
-    '-t:Rebuild', "-p:SharpProofSourceCommit=$sourceCommit")
+    '-t:Rebuild', "/m:$parallelism",
+    "-p:SharpProofSourceCommit=$sourceCommit")
 & $wrapper -TimeoutSeconds $TimeoutSeconds @buildArguments
 if ($LASTEXITCODE -ne 0) {
     throw "The standalone gate build failed with code $LASTEXITCODE."

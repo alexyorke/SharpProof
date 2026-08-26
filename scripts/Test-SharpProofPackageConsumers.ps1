@@ -24,6 +24,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 
 function Get-PackageIdentity {
@@ -509,7 +510,8 @@ function Test-SharpProofFrameworkConsumers {
                     '--configuration',
                     $Configuration,
                     '--no-restore',
-                    '--nologo') `
+                    '--nologo',
+                    "/m:$parallelism") `
                 -RepositoryRoot $RepositoryRoot | Out-Null
         }
     }
@@ -528,6 +530,8 @@ function Test-SharpProofFrameworkConsumers {
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$parallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 $testProject = Join-Path $repositoryRoot 'SharpProof.Package.Test/SharpProof.Package.Test.csproj'
 $isSupportedWorkerHost = $IsLinux -and
     $env:SHARPPROOF_CONTAINER -ceq '1' -and
@@ -594,7 +598,8 @@ try {
         '--configuration',
         $Configuration,
         '--logger',
-        'console;verbosity=minimal')
+        'console;verbosity=minimal',
+        "/m:$parallelism")
     if ($null -ne $resolvedPackageSource) {
         # Framework compatibility is exercised above. Re-run only the exact
         # package graph, analyzer discovery, and real verifier proof here;

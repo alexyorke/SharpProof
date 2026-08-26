@@ -51,7 +51,9 @@ switch ($Command) {
     }
     'build' {
         Invoke-DotNet @('restore', $Target, '--locked-mode')
-        Invoke-DotNet @('build', $Target, '--configuration', $Configuration, '--no-restore')
+        Invoke-DotNet @(
+            'build', $Target, '--configuration', $Configuration, '--no-restore',
+            "/m:$testProjectParallelism")
     }
     'check' {
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofDevCheck.ps1') `
@@ -67,7 +69,7 @@ switch ($Command) {
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         Invoke-DotNet @(
             'build', 'SharpProof.sln', '--configuration', $Configuration,
-            '--no-restore')
+            '--no-restore', "/m:$testProjectParallelism")
 
         $performanceOutput = Join-Path $repositoryRoot (
             'artifacts/ci/performance.json')
@@ -225,7 +227,7 @@ switch ($Command) {
             'restore', 'SharpProof.sln', '--locked-mode')
         Invoke-DotNet @(
             'build', 'SharpProof.sln', '--configuration', 'Release',
-            '--no-restore')
+            '--no-restore', "/m:$testProjectParallelism")
         $output = Join-Path $repositoryRoot 'artifacts/ci/performance.json'
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofGateEvidence.ps1') `
             -Gate performance `
@@ -252,7 +254,7 @@ switch ($Command) {
             'restore', 'SharpProof.sln', '--locked-mode')
         Invoke-DotNet @(
             'build', 'SharpProof.sln', '--configuration', 'Release',
-            '--no-restore')
+            '--no-restore', "/m:$testProjectParallelism")
         $coverageRoot = Join-Path $repositoryRoot (
             'artifacts/coverage/container-' + [Guid]::NewGuid().ToString('N'))
         $coverageCollectionArguments = @{
@@ -306,7 +308,7 @@ switch ($Command) {
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         Invoke-DotNet @(
             'build', 'SharpProof.sln', '--configuration', 'Release',
-            '--no-restore')
+            '--no-restore', "/m:$testProjectParallelism")
         & (Join-Path $repositoryRoot `
             'scripts/Invoke-SharpProofFuzzCampaign.ps1') `
             -OutputDirectory 'artifacts/fuzz/nightly'
@@ -369,7 +371,8 @@ switch ($Command) {
         $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
         Invoke-DotNet @(
             'build', 'SharpProof.sln', '--configuration', 'Release',
-            '--no-restore', '/p:GeneratePackageOnBuild=false',
+            '--no-restore', "/m:$testProjectParallelism",
+            '/p:GeneratePackageOnBuild=false',
             $repositoryCommitProperty)
         foreach ($project in @($manifest.projects)) {
             Invoke-DotNet @(

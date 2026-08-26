@@ -201,7 +201,8 @@ try {
         Invoke-RequiredDotnet @(
             'restore', 'SharpProof.sln', '--locked-mode')
         Invoke-RequiredDotnet @(
-            'build', $testProject, '-c', $Configuration, '--no-restore')
+            'build', $testProject, '-c', $Configuration, '--no-restore',
+            "/m:$parallelism")
     }
 
     if ([string]::IsNullOrWhiteSpace($PackageSource)) {

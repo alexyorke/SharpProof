@@ -16,6 +16,10 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'The developer check requires the canonical Linux container.'
 }
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+$parallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
 $commandPlanJson = & $planScript -Configuration $Configuration
@@ -59,7 +63,7 @@ Invoke-TimedPhase -Name 'restore' -Action {
 }
 Invoke-TimedPhase -Name 'build' -Action {
     & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
-        build SharpProof.sln -c $Configuration --no-restore
+        build SharpProof.sln -c $Configuration --no-restore "/m:$parallelism"
     if ($LASTEXITCODE -ne 0) {
         throw 'Developer-check build failed.'
     }

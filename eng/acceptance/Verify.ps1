@@ -13,6 +13,10 @@ $ErrorActionPreference = 'Stop'
 
 $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
+Import-Module (Join-Path `
+    $repositoryRoot 'scripts\SharpProof.ContainerExecution.psm1') -Force
+$testProjectParallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = $null
@@ -720,7 +724,9 @@ try {
     if (-not $SkipBuild) {
         Start-AcceptanceTimingPhase -Name 'build'
         Invoke-SharpProofDotnet `
-            -Arguments @('build', 'SharpProof.sln', '-c', $Configuration, '--no-restore') `
+            -Arguments @(
+                'build', 'SharpProof.sln', '-c', $Configuration, '--no-restore',
+                "/m:$testProjectParallelism") `
             -TimeoutSeconds ([int]$contract.automation.solutionBuildWallSeconds)
         Complete-AcceptanceTimingPhase
     }

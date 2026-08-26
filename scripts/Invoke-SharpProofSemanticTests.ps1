@@ -73,7 +73,8 @@ function Invoke-RequiredDotnet {
 if (-not $NoBuild) {
     Invoke-RequiredDotnet @('restore', 'SharpProof.sln', '--locked-mode')
     Invoke-RequiredDotnet @(
-        'build', 'SharpProof.sln', '-c', $Configuration, '--no-restore')
+        'build', 'SharpProof.sln', '-c', $Configuration, '--no-restore',
+        "/m:$parallelism")
 }
 
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'

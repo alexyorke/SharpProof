@@ -85,7 +85,7 @@ WORKDIR /src
 COPY --chown=sharpproof:sharpproof . .
 USER sharpproof
 RUN dotnet restore SharpProof.sln --locked-mode \
-    && dotnet build SharpProof.sln --configuration Debug --no-restore
+    && dotnet build SharpProof.sln --configuration Debug --no-restore /m
 ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
 CMD ["build"]
 

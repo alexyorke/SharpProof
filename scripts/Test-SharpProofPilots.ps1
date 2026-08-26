@@ -10,9 +10,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofPilotPackageAuthority.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
+$parallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 
 function Resolve-RepositoryPath([string]$Path) {
     if ([IO.Path]::IsPathRooted($Path)) {
@@ -224,6 +227,7 @@ foreach ($pilot in $catalog.pilots) {
         -LogPath $buildLog `
         -Arguments (@(
             'build', $project, '-c', 'Release', '--no-restore', '--nologo',
+            "/m:$parallelism",
             '-p:SharpProofVerify=true',
             "-p:SharpProofVerifySarifFile=$sarifPath",
             "-p:SharpProofVerifyCacheDirectory=$cachePath") + $common)
@@ -270,6 +274,7 @@ foreach ($pilot in $catalog.pilots) {
             -LogPath $negativeLog `
             -Arguments (@(
                 'build', $project, '-c', 'Release', '--no-restore', '--nologo',
+                "/m:$parallelism",
                 '-p:SharpProofVerify=false',
                 '-p:DefineConstants=SHARPPROOF_NEGATIVE_PROBE') + $common)
         $negativeText = Get-Content -LiteralPath $negativeLog -Raw
