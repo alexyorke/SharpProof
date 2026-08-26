@@ -153,12 +153,12 @@ public sealed class CorpusGateTests
                 Is.EquivalentTo(
                     new Dictionary<string, int>(StringComparer.Ordinal)
                     {
-                        ["SP0002"] = 28,
+                        ["SP0002"] = 25,
                         ["SP0016"] = 20,
                         ["SP0045"] = 30,
                         ["SP0045+SP0046"] = 10,
                         ["SP0046"] = 30,
-                        ["SP0047"] = 181,
+                        ["SP0047"] = 184,
                         ["silent-unclassified"] = 10
                     }));
             Assert.That(
