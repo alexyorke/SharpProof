@@ -9,6 +9,7 @@ using SharpProof.Ir;
 namespace SharpProof.Contracts.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class ContractBinderTests
 {
     [Test]

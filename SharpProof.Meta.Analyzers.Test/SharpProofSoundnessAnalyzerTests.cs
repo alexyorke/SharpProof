@@ -10,6 +10,7 @@ using SharpProof.Meta.Analyzers;
 namespace SharpProof.Meta.Analyzers.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class SharpProofSoundnessAnalyzerTests
 {
     [TestCase(

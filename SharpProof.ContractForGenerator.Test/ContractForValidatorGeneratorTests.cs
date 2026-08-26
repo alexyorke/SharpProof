@@ -1,6 +1,7 @@
 namespace SharpProof.ContractForGenerator.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class ContractForValidatorGeneratorTests
 {
     [TestCase("double", "-0.0", "0.0")]

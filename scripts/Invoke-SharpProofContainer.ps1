@@ -97,11 +97,8 @@ switch ($Command) {
     'test' {
         Invoke-DotNet @('restore', $Target, '--locked-mode')
         $arguments = @(
-            'test', $Target, '--configuration', $Configuration, '--no-restore')
-        if ($Target.EndsWith('.sln', [StringComparison]::OrdinalIgnoreCase) -or
-            $Target.EndsWith('.slnf', [StringComparison]::OrdinalIgnoreCase)) {
-            $arguments += "/m:$testProjectParallelism"
-        }
+            'test', $Target, '--configuration', $Configuration, '--no-restore',
+            "/m:$testProjectParallelism")
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $arguments += @('--filter', $TestFilter)
         }
@@ -133,7 +130,8 @@ switch ($Command) {
         $arguments = @(
             'test',
             'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',
-            '--configuration', $Configuration, '--no-restore')
+            '--configuration', $Configuration, '--no-restore',
+            "/m:$testProjectParallelism")
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $arguments += @('--filter', $TestFilter)
         }

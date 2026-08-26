@@ -12,6 +12,7 @@ using SharpProof.Ir;
 namespace SharpProof.Frontend.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class FrontendLoweringTests
 {
     private static readonly long[] ElementValues = [4L, 8L, 15L];

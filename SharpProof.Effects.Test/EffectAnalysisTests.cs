@@ -6,6 +6,7 @@ using SharpProof.Specs;
 namespace SharpProof.Effects.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class EffectAnalysisTests
 {
     [Test]
