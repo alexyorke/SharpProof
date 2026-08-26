@@ -450,7 +450,12 @@ public sealed class ArchitectureTests
         Assert.That(source, Does.Not.Contain("ParseExpression"));
         Assert.That(source, Does.Not.Contain("ParseStatement"));
         Assert.That(source, Does.Not.Contain("SpeculativeSemanticModel"));
-        Assert.That(source, Does.Not.Contain("ToDisplayString("));
+        Assert.That(
+            source,
+            Does.Not.Contain("ToDisplayString(")
+                .And.Not.Contain("ToDisplayParts(")
+                .And.Not.Contain("ToMinimalDisplayString(")
+                .And.Not.Contain("ToMinimalDisplayParts("));
         Assert.That(source, Does.Contain("IrOpaqueTerm").Or.Contain("PureOpaque("));
     }
 

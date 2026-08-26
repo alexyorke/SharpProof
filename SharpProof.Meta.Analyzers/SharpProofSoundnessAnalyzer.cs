@@ -68,6 +68,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
         [" is null", " is not null", " == ", " != ", " && ", " || ", "=>", "?."];
+    private static readonly ImmutableHashSet<string> DisplayTextMethods = Names(
+        "ToDisplayString",
+        "ToDisplayParts",
+        "ToMinimalDisplayString",
+        "ToMinimalDisplayParts");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => MetaDiagnosticDescriptors.All;
 
@@ -146,7 +151,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return !IsSameType(containingSymbol.ContainingType, symbols[KnownType.CompilationModelProvider]);
         }
 
-        if (method.Name != "ToDisplayString")
+        if (!DisplayTextMethods.Contains(method.Name))
         {
             return false;
         }

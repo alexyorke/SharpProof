@@ -46,3 +46,6 @@ M:Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTypeName(System.String,System
 # Display text is presentation only and must not become a semantic identity.
 M:Microsoft.CodeAnalysis.ISymbol.ToDisplayString();Do not use display text as a semantic identity.
 M:Microsoft.CodeAnalysis.ISymbol.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat);Use typed symbols or an explicit structural identity.
+M:Microsoft.CodeAnalysis.ISymbol.ToDisplayParts(Microsoft.CodeAnalysis.SymbolDisplayFormat);Do not use display text parts as a semantic identity.
+M:Microsoft.CodeAnalysis.ISymbol.ToMinimalDisplayString(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.SymbolDisplayFormat);Do not use minimal display text as a semantic identity.
+M:Microsoft.CodeAnalysis.ISymbol.ToMinimalDisplayParts(Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.SymbolDisplayFormat);Do not use minimal display text parts as a semantic identity.

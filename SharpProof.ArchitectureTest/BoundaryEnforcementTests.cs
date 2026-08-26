@@ -184,7 +184,10 @@ public sealed class BoundaryEnforcementTests
             "SyntaxFactory.ParseStatement",
             "SyntaxFactory.ParseExpression",
             "SyntaxFactory.ParseTypeName",
-            "ISymbol.ToDisplayString"
+            "ISymbol.ToDisplayString",
+            "ISymbol.ToDisplayParts",
+            "ISymbol.ToMinimalDisplayString",
+            "ISymbol.ToMinimalDisplayParts"
         };
 
         foreach (var member in required)
@@ -322,7 +325,10 @@ public sealed class BoundaryEnforcementTests
             Does.Not.Contain("SharpProof.Meta.Analyzers"));
         Assert.That(
             ReadProductionSources("SharpProof.Meta.Analyzers"),
-            Does.Not.Contain("ToDisplayString("));
+            Does.Not.Contain("ToDisplayString(")
+                .And.Not.Contain("ToDisplayParts(")
+                .And.Not.Contain("ToMinimalDisplayString(")
+                .And.Not.Contain("ToMinimalDisplayParts("));
     }
 
     [Test]
@@ -396,7 +402,10 @@ public sealed class BoundaryEnforcementTests
             var source = ReadProductionSources(project);
             Assert.That(
                 source,
-                Does.Not.Contain("ToDisplayString("),
+                Does.Not.Contain("ToDisplayString(")
+                    .And.Not.Contain("ToDisplayParts(")
+                    .And.Not.Contain("ToMinimalDisplayString(")
+                    .And.Not.Contain("ToMinimalDisplayParts("),
                 project);
         }
     }

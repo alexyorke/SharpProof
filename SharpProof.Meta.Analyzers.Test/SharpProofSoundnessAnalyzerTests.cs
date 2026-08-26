@@ -1471,6 +1471,30 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsAllSymbolDisplayTextFamilies()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Tooling;
+            static class C {
+                static string Minimal(ISymbol symbol, SemanticModel model) =>
+                    symbol.ToMinimalDisplayString(model, 0);
+                static int Parts(ISymbol symbol) =>
+                    symbol.ToDisplayParts().Length;
+                static int MinimalParts(ISymbol symbol, SemanticModel model) =>
+                    symbol.ToMinimalDisplayParts(model, 0).Length;
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(3));
+    }
+
+    [Test]
     public async Task RejectsStaticSymbolDisplayStrings()
     {
         const string source =
