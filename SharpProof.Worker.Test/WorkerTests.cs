@@ -4450,6 +4450,29 @@ public sealed class WorkerTests
                 manifest,
                 targets),
             Is.True);
+        var foreignFactory = new IrFactory();
+        var replayFaultTarget = targets[0] with
+        {
+            Clauses = [
+                new CompilerPreparedClause(
+                    CompilerContractKind.Requires,
+                    foreignFactory.Boolean(true),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    null,
+                    null),
+                .. targets[0].Clauses
+            ]
+        };
+        Assert.That(
+            VerificationCache.IsStorable(response, manifest),
+            Is.True);
+        Assert.That(
+            VerificationCache.IsCacheable(
+                response,
+                response.InputHash,
+                manifest,
+                [replayFaultTarget]),
+            Is.False);
 
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Unknown;
         Assert.That(

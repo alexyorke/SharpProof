@@ -366,37 +366,45 @@ public sealed class SharpProofWorker : IDisposable
                     malformed.SelectMany(static lane => lane.Claims),
                     WorkerCacheStatus.Rejected, responseValidation.Errors);
             }
-            if (cache != null && VerificationCache.IsCacheable(
-                    response,
-                    snapshot.InputHash,
-                    manifest,
-                    targets,
-                    projectBoundary.Token))
+            if (cache != null)
             {
-                var written = await cache.TryWriteAsync(
-                    response, snapshot.InputHash, manifest, projectBoundary.Token).ConfigureAwait(false);
-                if (written)
-                {
-                    interruptionCacheStatus = WorkerCacheStatus.Written;
-                    // A successful cache commit is the terminal winner for
-                    // this invocation. Do not let a cancellation racing the
-                    // commit turn the same run into a contradictory response.
-                    return WorkerResultAssembler.Create(
+                if (VerificationCache.IsCacheable(
+                        response,
                         snapshot.InputHash,
                         manifest,
-                        run.Status,
-                        run.Failure,
-                        callableResults,
-                        claimResults,
-                        request.Budgets,
-                        WorkerCacheStatus.Written,
-                        Elapsed(started),
-                        requestHash: requestHash,
-                        versions: Versions());
+                        targets,
+                        projectBoundary.Token))
+                {
+                    var written = await cache.TryWriteAsync(
+                        response, snapshot.InputHash, manifest, projectBoundary.Token).ConfigureAwait(false);
+                    if (written)
+                    {
+                        interruptionCacheStatus = WorkerCacheStatus.Written;
+                        // A successful cache commit is the terminal winner for
+                        // this invocation. Do not let a cancellation racing the
+                        // commit turn the same run into a contradictory response.
+                        return WorkerResultAssembler.Create(
+                            snapshot.InputHash,
+                            manifest,
+                            run.Status,
+                            run.Failure,
+                            callableResults,
+                            claimResults,
+                            request.Budgets,
+                            WorkerCacheStatus.Written,
+                            Elapsed(started),
+                            requestHash: requestHash,
+                            versions: Versions());
+                    }
+                    interruptionCacheStatus = WorkerCacheStatus.Unavailable;
+                    response = Assemble(run.Status, run.Failure, callableResults, claimResults,
+                        WorkerCacheStatus.Unavailable);
                 }
-                interruptionCacheStatus = WorkerCacheStatus.Unavailable;
-                response = Assemble(run.Status, run.Failure, callableResults, claimResults,
-                    WorkerCacheStatus.Unavailable);
+                else if (VerificationCache.IsStorable(response, manifest))
+                {
+                    response = Assemble(run.Status, run.Failure, callableResults, claimResults,
+                        WorkerCacheStatus.Rejected);
+                }
             }
             projectBoundary.Token.ThrowIfCancellationRequested();
             return response;

@@ -1355,6 +1355,7 @@ public sealed class ProtocolJsonTests
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Written, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Unavailable, true);
         AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Miss, false);
+        AssertCacheState(activeRequest, refuted, WorkerCacheStatus.Rejected, true);
 
         var unknown = CreateResponse(CreateManifest());
         SetUnknown(unknown, WorkerClaimReason.UnsupportedBody);

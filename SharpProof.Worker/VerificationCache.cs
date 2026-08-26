@@ -539,9 +539,38 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ImmutableArray<CompilerCallablePreparation> targets,
         CancellationToken cancellationToken = default)
     {
-        return WorkerProtocolJson.IsSha256(expectedInputHash) && response is
+        try
+        {
+            return WorkerProtocolJson.IsSha256(expectedInputHash) &&
+                IsStorable(response, expectedManifest) &&
+                WorkerProtocolJson.Validate(
+                    response,
+                    expectedInputHash,
+                    expectedManifest).IsValid &&
+                ReplayCachedClaims(
+                    response!.ClaimResults,
+                    expectedManifest,
+                    targets,
+                    cancellationToken);
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException or InvalidOperationException)
+        {
+            // A cache replay/admission fault must not become a worker-wide
+            // infrastructure failure. The caller recomputes the result and
+            // leaves the existing cache entry intact.
+            return false;
+        }
+    }
+
+    internal static bool IsStorable(
+        WorkerVerifyResponse? response,
+        WorkerClaimManifest? expectedManifest)
+    {
+        return response is
         {
             RunStatus: WorkerRunStatus.Complete,
+            FailureReason: WorkerRunFailureReason.None,
             Errors.Length: 0,
             CallableResults: { } callables,
             ClaimResults: { Length: > 0 } claims
@@ -557,9 +586,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         expectedManifest is { Claims: { Length: var claimCount } } &&
         claimCount == claims.Length &&
         expectedManifest.Claims.All(static claim =>
-            claim.Kind == WorkerClaimKind.Postcondition) &&
-        WorkerProtocolJson.Validate(response, expectedInputHash, expectedManifest).IsValid &&
-        ReplayCachedClaims(claims, expectedManifest, targets, cancellationToken);
+            claim?.Kind == WorkerClaimKind.Postcondition);
     }
 
     private static bool ReplayCachedClaims(

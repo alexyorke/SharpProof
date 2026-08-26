@@ -448,6 +448,7 @@ public static partial class WorkerProtocolJson
         {
             WorkerCacheStatus.Hit or WorkerCacheStatus.Written => storableShape,
             WorkerCacheStatus.Rejected =>
+                storableShape ||
                 response.RunStatus == WorkerRunStatus.Failed &&
                 response.FailureReason == WorkerRunFailureReason.MalformedResult,
             WorkerCacheStatus.Miss => !storableShape,
