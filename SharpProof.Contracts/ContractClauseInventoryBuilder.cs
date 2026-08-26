@@ -206,9 +206,14 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private bool IsDirectClause(SemanticModel model, StatementSyntax statement)
     {
+        if (statement is EmptyStatementSyntax or LocalFunctionStatementSyntax)
+        {
+            return true;
+        }
+
         return statement is ExpressionStatementSyntax expression &&
-        model.GetOperation(expression.Expression) is IInvocationOperation invocation &&
-        _api!.GetClauseKind(invocation.TargetMethod).HasValue;
+            model.GetOperation(expression.Expression) is IInvocationOperation invocation &&
+            _api!.GetClauseKind(invocation.TargetMethod).HasValue;
     }
 
     private static bool IsReachable(SyntaxNode syntax, SemanticModel model)
