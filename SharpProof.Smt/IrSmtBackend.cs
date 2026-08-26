@@ -292,7 +292,8 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             _context = context;
             _owner = owner;
             _factory = query.Factory;
-            _stringSort = (SeqSort)_context.MkSeqSort(_context.IntSort);
+            _stringSort = owner.OwnSort(
+                (SeqSort)_context.MkSeqSort(_context.IntSort));
             foreach (var assumption in query.Assumptions)
             {
                 ValidateDepth(assumption.Predicate, cancellationToken);

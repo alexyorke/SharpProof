@@ -601,6 +601,28 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public void QueryExpressionOwnerDisposesPinnedZ3SortsWithoutManagedGc()
+    {
+        using var context = new Z3Context();
+        using var owner = new Z3ExpressionOwner();
+        var sort = owner.OwnSort(
+            (Microsoft.Z3.SeqSort)context.MkSeqSort(context.IntSort));
+
+        Assert.That(owner.OwnedCount, Is.EqualTo(1));
+        Assert.That(NativeObject((Z3Ast)sort), Is.Not.EqualTo(IntPtr.Zero));
+
+        owner.Dispose();
+
+        Assert.Multiple((Action)(() =>
+        {
+            Assert.That(owner.OwnedCount, Is.Zero);
+            Assert.That(
+                NativeObject((Z3Ast)sort),
+                Is.EqualTo(IntPtr.Zero));
+        }));
+    }
+
+    [Test]
     public void QueryExpressionOwnerDisposesOnExceptionalAndCanceledExit()
     {
         using var context = new Z3Context();
@@ -860,7 +882,7 @@ public sealed class IrSmtBackendTests
         return NativeObject(expression) != IntPtr.Zero;
     }
 
-    private static IntPtr NativeObject(Z3Expr expression)
+    private static IntPtr NativeObject(Z3Ast expression)
     {
         var property = typeof(Z3Ast).GetProperty(
             "NativeObject",
