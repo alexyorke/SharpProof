@@ -941,6 +941,56 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
+    [Test]
+    public async Task DuplicateAdditionalFilesWithEqualContentAreCanonicalized()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("duplicate-additional-equal");
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(path),
+            [
+                new MemoryAdditionalText("duplicate.inputs", "same"),
+                new MemoryAdditionalText("duplicate.inputs", "same")
+            ]);
+
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(artifact.Compilation.AdditionalFiles, Has.Length.EqualTo(1));
+            Assert.That(
+                artifact.Compilation.AdditionalFiles[0].Path,
+                Does.EndWith("/duplicate.inputs"));
+        }
+    }
+
+    [Test]
+    public async Task DuplicateAdditionalFilesWithConflictingContentFailClosedWithPath()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("duplicate-additional-conflict");
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(path),
+            [
+                new MemoryAdditionalText("duplicate.inputs", "first"),
+                new MemoryAdditionalText("duplicate.inputs", "second")
+            ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(
+                diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("duplicate.inputs")
+                    .And.Contain("conflicting contents"));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
     [TestCase("advisory", "off", "all", false)]
     [TestCase("off", "advisory", "all", false)]
     [TestCase("invalid", "advisory", "all", false)]

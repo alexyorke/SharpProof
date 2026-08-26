@@ -110,10 +110,42 @@ internal static class CompilerCompilationCapture
                 compilation.References,
                 ReferenceCaptureLimits.Default,
                 cancellationToken),
-            AdditionalFiles = [.. additionalFiles.Select(file => CaptureAdditionalFile(
-                file, normalizedProject, cancellationToken)).OrderBy(static file => file.Path, StringComparer.Ordinal)
-                .ThenBy(static file => file.Sha256, StringComparer.Ordinal)]
+            AdditionalFiles = CaptureAdditionalFiles(
+                additionalFiles,
+                normalizedProject,
+                cancellationToken)
         };
+    }
+
+    private static CompilerAdditionalFileSnapshot[] CaptureAdditionalFiles(
+        IEnumerable<AdditionalText> additionalFiles,
+        string projectDirectory,
+        CancellationToken cancellationToken)
+    {
+        var captures = additionalFiles
+            .Select(file => CaptureAdditionalFile(
+                file,
+                projectDirectory,
+                cancellationToken))
+            .GroupBy(static file => file.Path, StringComparer.Ordinal)
+            .Select(group =>
+            {
+                var first = group.First();
+                if (group.Any(file => !string.Equals(
+                        file.Sha256,
+                        first.Sha256,
+                        StringComparison.Ordinal)))
+                {
+                    throw new InvalidDataException(
+                        $"Additional file '{group.Key}' has conflicting contents.");
+                }
+
+                return first;
+            });
+
+        return [.. captures
+            .OrderBy(static file => file.Path, StringComparer.Ordinal)
+            .ThenBy(static file => file.Sha256, StringComparer.Ordinal)];
     }
     internal static CompilerSyntaxTreeSnapshot CaptureTree(
         SyntaxTree tree,
