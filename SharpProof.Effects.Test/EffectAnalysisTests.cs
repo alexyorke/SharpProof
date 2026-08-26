@@ -107,6 +107,7 @@ public sealed class EffectAnalysisTests
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
+            using System.Collections.Generic;
 
             public static class Sample {
                 private static int s_state;
