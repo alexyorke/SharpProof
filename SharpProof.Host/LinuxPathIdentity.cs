@@ -1513,8 +1513,10 @@ public static partial class LinuxPathIdentity
         private ulong _blocksAvailable;
         private ulong _files;
         private ulong _filesFree;
-        private long _filesystemId0;
-        private long _filesystemId1;
+        // Linux __kernel_fsid_t is two 32-bit values (8 bytes total). Keep
+        // the native layout exact so fields after f_fsid remain aligned.
+        private int _filesystemId0;
+        private int _filesystemId1;
         private long _nameLength;
         private long _fragmentSize;
         private long _mountFlags;

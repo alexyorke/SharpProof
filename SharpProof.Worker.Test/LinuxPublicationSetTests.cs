@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
 using NUnit.Framework;
@@ -11,6 +13,17 @@ namespace SharpProof.Worker.Test;
 [SupportedOSPlatform("linux")]
 public sealed class LinuxPublicationSetTests
 {
+    [Test]
+    public void StatFsInteropLayoutMatchesLinuxAmd64Abi()
+    {
+        var statsType = typeof(LinuxPathIdentity).GetNestedType(
+            "LinuxFileSystemStats",
+            BindingFlags.NonPublic);
+
+        Assert.That(statsType, Is.Not.Null);
+        Assert.That(Marshal.SizeOf(statsType!), Is.EqualTo(120));
+    }
+
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(false, true)]
