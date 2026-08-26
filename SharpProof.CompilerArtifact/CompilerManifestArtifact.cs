@@ -306,6 +306,13 @@ internal static class CompilerManifestArtifactJson
 
     internal static string Serialize(CompilerManifestArtifact artifact)
     {
+        return Serialize(artifact, context: null);
+    }
+
+    private static string Serialize(
+        CompilerManifestArtifact artifact,
+        CompilerSourceLocationAuthority.ValidationContext? context)
+    {
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
 
         if (!HasValidDiagnosticShapes(artifact.CompilerDiagnostics))
@@ -325,7 +332,7 @@ internal static class CompilerManifestArtifactJson
                 .OrderBy(static item => item?.OwnerKind)
                 .ThenBy(static item => item?.OwnerId, StringComparer.Ordinal)
         ];
-        Validate(artifact);
+        Validate(artifact, validateFeatureScope: true, context);
         var json = JsonSerializer.Serialize(
                 artifact,
                 CreateJsonOptions()) +
@@ -349,8 +356,9 @@ internal static class CompilerManifestArtifactJson
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, CreateJsonOptions()) ??
             throw new JsonException("A compiler manifest artifact is required.");
-        Validate(artifact);
-        if (Serialize(artifact) != json)
+        var context = new CompilerSourceLocationAuthority.ValidationContext();
+        Validate(artifact, validateFeatureScope: true, context);
+        if (Serialize(artifact, context) != json)
         {
             throw new JsonException("The compiler manifest artifact is not canonical.");
         }
@@ -501,11 +509,13 @@ internal static class CompilerManifestArtifactJson
         // deliberately mutate lowered evidence after the wire seal. Let the
         // existing lowerer report those malformed-body cases; wire reads and
         // writes still enforce the feature-scope seal below.
-        Validate(artifact, validateFeatureScope: false);
+        var context = new CompilerSourceLocationAuthority.ValidationContext();
+        Validate(artifact, validateFeatureScope: false, context);
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
-            artifact.Compilation);
+            artifact.Compilation,
+            context);
     }
 
     internal static void Validate(CompilerManifestArtifact value)
@@ -515,22 +525,30 @@ internal static class CompilerManifestArtifactJson
 
     private static void Validate(
         CompilerManifestArtifact value,
-        bool validateFeatureScope)
+        bool validateFeatureScope,
+        CompilerSourceLocationAuthority.ValidationContext? context = null)
     {
-        if (!HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation) ||
+        context ??= new CompilerSourceLocationAuthority.ValidationContext();
+        if (!HasValidDiagnostics(
+                value.CompilerDiagnostics,
+                value.Compilation,
+                context) ||
             !HasValidEnvelope(value) ||
             (validateFeatureScope && !HasValidFeatureScope(value)) ||
-            !HasValidLocationAuthorities(value) ||
+            !HasValidLocationAuthorities(value, context) ||
             !HasMatchingCallables(value.Callables, value.Manifest) ||
             !HasValidCallableStates(
                 value.Callables,
                 value.CompilerDiagnostics.Length != 0) ||
-            !HasValidEffectReplayTrees(value.Callables, value.Compilation))
+            !HasValidEffectReplayTrees(
+                value.Callables,
+                value.Compilation,
+                context))
         {
             throw new JsonException("The compiler manifest artifact is invalid.");
         }
 
-        CompilationFingerprint.ValidateShape(value.Compilation);
+        CompilationFingerprint.ValidateShape(value.Compilation, context);
     }
 
     private static bool HasValidEnvelope(CompilerManifestArtifact? value)
@@ -774,11 +792,15 @@ internal static class CompilerManifestArtifactJson
 
     private static bool HasValidDiagnostics(
         CompilerDiagnosticArtifact[]? diagnostics,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CompilerSourceLocationAuthority.ValidationContext context)
     {
         return HasValidDiagnosticShapes(diagnostics) &&
             CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!) &&
-            diagnostics!.All(item => HasValidDiagnosticBinding(item, compilation));
+            diagnostics!.All(item => HasValidDiagnosticBinding(
+                item,
+                compilation,
+                context));
     }
 
     private static bool HasValidDiagnosticShapes(
@@ -794,7 +816,8 @@ internal static class CompilerManifestArtifactJson
 
     private static bool HasValidDiagnosticBinding(
         CompilerDiagnosticArtifact value,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CompilerSourceLocationAuthority.ValidationContext context)
     {
         if (value?.Location is not { } location)
         {
@@ -821,11 +844,13 @@ internal static class CompilerManifestArtifactJson
             value.SourceTreePath,
             value.SourceTreeSha256,
             value.SourceLineMapSha256,
-            compilation);
+            compilation,
+            context: context);
     }
 
     private static bool HasValidLocationAuthorities(
-        CompilerManifestArtifact? value)
+        CompilerManifestArtifact? value,
+        CompilerSourceLocationAuthority.ValidationContext context)
     {
         if (value?.LocationAuthorities is not { } authorities ||
             value.Manifest is not { } manifest ||
@@ -882,7 +907,8 @@ internal static class CompilerManifestArtifactJson
                     authority.SourceTreeSha256,
                     authority.SourceLineMapSha256,
                     compilation,
-                    allowNone: true))
+                    allowNone: true,
+                    context: context))
             {
                 return false;
             }
@@ -928,7 +954,8 @@ internal static class CompilerManifestArtifactJson
 
     private static bool HasValidEffectReplayTrees(
         CompilerCallableArtifact[]? callables,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CompilerSourceLocationAuthority.ValidationContext context)
     {
         if (callables is null || compilation is not { SyntaxTrees: not null })
         {
@@ -942,7 +969,8 @@ internal static class CompilerManifestArtifactJson
         {
             if (!CompilerEffectClaimArtifactCodec.HasValidReplayGeometry(
                     effectClaim,
-                    compilation))
+                    compilation,
+                    context))
             {
                 return false;
             }

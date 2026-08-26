@@ -18,12 +18,15 @@ internal static class CompilerEffectReplayLowerer
 
         replay = null;
         witnessDetail = string.Empty;
+        var locationValidation =
+            new CompilerSourceLocationAuthority.ValidationContext();
         if (!HasAllocationShape(witness) ||
             !TryCreateEvent(
                 compilation,
                 apiSpecs,
                 witness,
                 location,
+                locationValidation,
                 cancellationToken,
                 out var @event,
                 out witnessDetail))
@@ -57,6 +60,7 @@ internal static class CompilerEffectReplayLowerer
         ResolvedApiSpecTable apiSpecs,
         EffectDirectWitness witness,
         WorkerSourceLocation location,
+        CompilerSourceLocationAuthority.ValidationContext locationValidation,
         CancellationToken cancellationToken,
         out CompilerEffectReplayEventArtifact @event,
         out string witnessDetail)
@@ -67,6 +71,7 @@ internal static class CompilerEffectReplayLowerer
                 compilation,
                 witness.Origin,
                 location,
+                locationValidation,
                 cancellationToken,
                 out var treeOrdinal,
                 out var treeSha256,
@@ -191,6 +196,7 @@ internal static class CompilerEffectReplayLowerer
         CSharpCompilation compilation,
         IOperation operation,
         WorkerSourceLocation location,
+        CompilerSourceLocationAuthority.ValidationContext locationValidation,
         CancellationToken cancellationToken,
         out int treeOrdinal,
         out string treeSha256,
@@ -251,7 +257,8 @@ internal static class CompilerEffectReplayLowerer
                 cancellationToken);
             if (!CompilerSourceLocationAuthority.HasValidLocationGeometry(
                     location,
-                    candidate))
+                    candidate,
+                    locationValidation))
             {
                 continue;
             }

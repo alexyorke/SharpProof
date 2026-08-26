@@ -196,6 +196,8 @@ public sealed class CompilerSourceLocationAuthorityTests
         };
         var context = new CompilerSourceLocationAuthority.ValidationContext();
 
+        CompilationFingerprint.ValidateShape(artifact.Compilation, context);
+
         for (var index = 0; index < 8; index++)
         {
             Assert.That(

@@ -170,15 +170,19 @@ internal static class CompilationFingerprint
         }
     }
 
-    internal static void ValidateShape(CompilerCompilationSnapshot snapshot)
+    internal static void ValidateShape(
+        CompilerCompilationSnapshot snapshot,
+        CompilerSourceLocationAuthority.ValidationContext? context = null)
     {
-        if (!ValidSnapshot(snapshot))
+        if (!ValidSnapshot(snapshot, context))
         {
             throw new JsonException("The compiler compilation evidence is invalid.");
         }
     }
 
-    private static bool ValidSnapshot(CompilerCompilationSnapshot? value)
+    private static bool ValidSnapshot(
+        CompilerCompilationSnapshot? value,
+        CompilerSourceLocationAuthority.ValidationContext? context)
     {
         if (value is null)
         {
@@ -206,7 +210,7 @@ internal static class CompilationFingerprint
                 value.SpecificationPackCatalogVersion,
                 value.SpecificationPackCatalogSha256) &&
             ValidOptions(value.Options) &&
-            All(value.SyntaxTrees, ValidTree) &&
+            All(value.SyntaxTrees, tree => ValidTree(tree, context)) &&
             value.SyntaxTrees.Select(static tree => tree.Path)
                 .Distinct(StringComparer.Ordinal).Count() == value.SyntaxTrees.Length &&
             ValidReferences(value.References) &&
@@ -406,14 +410,16 @@ internal static class CompilationFingerprint
                 .All(static ordered => ordered);
     }
 
-    private static bool ValidTree(CompilerSyntaxTreeSnapshot? value)
+    private static bool ValidTree(
+        CompilerSyntaxTreeSnapshot? value,
+        CompilerSourceLocationAuthority.ValidationContext? context)
     {
         return value != null &&
         CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
         WorkerProtocolJson.IsSha256(value.LineMapSha256) &&
         value.TextLength >= 0 &&
-        CompilerSourceLocationAuthority.HasValidLineMap(value) &&
+        CompilerSourceLocationAuthority.HasValidLineMap(value, context) &&
         CompilerCaptureAuthority.IsCanonicalLanguageVersion(
             value.LanguageVersion) &&
         value.DocumentationMode is "None" or "Parse" or "Diagnose" &&

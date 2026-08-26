@@ -10,7 +10,12 @@ internal static class EffectCounterexampleReplayer
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(evidence);
         cancellationToken.ThrowIfCancellationRequested();
-        CompilerEffectClaimArtifactCodec.Validate(evidence, target.Compilation);
+        var locationValidation =
+            new CompilerSourceLocationAuthority.ValidationContext();
+        CompilerEffectClaimArtifactCodec.Validate(
+            evidence,
+            target.Compilation,
+            locationValidation);
 
         var replay = evidence.Replay ??
             throw Malformed("A refuted effect claim has no replay artifact.");
@@ -35,7 +40,11 @@ internal static class EffectCounterexampleReplayer
         {
             cancellationToken.ThrowIfCancellationRequested();
             var effectEvent = replay.Events[index];
-            ValidateEvent(target, effectEvent, index);
+            ValidateEvent(
+                target,
+                effectEvent,
+                index,
+                locationValidation);
             var observed = Interpret(effectEvent);
             if (observed == null)
             {
@@ -59,7 +68,8 @@ internal static class EffectCounterexampleReplayer
     private static void ValidateEvent(
         CompilerCallablePreparation target,
         CompilerEffectReplayEventArtifact effectEvent,
-        int ordinal)
+        int ordinal,
+        CompilerSourceLocationAuthority.ValidationContext locationValidation)
     {
         if (effectEvent == null ||
             effectEvent.Ordinal != ordinal ||
@@ -98,14 +108,16 @@ internal static class EffectCounterexampleReplayer
         var location = effectEvent.Location;
         if (CompilerSourceLocationAuthority.FindUniqueTree(
                 location,
-                target.Compilation) != effectEvent.SourceTreeOrdinal ||
+                target.Compilation,
+                locationValidation) != effectEvent.SourceTreeOrdinal ||
             !CompilerSourceLocationAuthority.IsBound(
                 location,
                 effectEvent.SourceTreeOrdinal,
                 effectEvent.SourceTreePath,
                 effectEvent.SourceTreeSha256,
                 effectEvent.SourceLineMapSha256,
-                target.Compilation) ||
+                target.Compilation,
+                context: locationValidation) ||
             location.Start != effectEvent.SyntaxStart ||
             location.Length != effectEvent.SyntaxLength)
         {

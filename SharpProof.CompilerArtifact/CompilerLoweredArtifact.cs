@@ -227,7 +227,8 @@ internal static class CompilerLoweredArtifact
     internal static ImmutableArray<CompilerCallablePreparation> Decode(
         CompilerCallableArtifact[] artifacts,
         WorkerClaimManifest manifest,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        CompilerSourceLocationAuthority.ValidationContext? context = null)
     {
         if (artifacts == null)
         {
@@ -261,7 +262,12 @@ internal static class CompilerLoweredArtifact
                 throw new InvalidDataException("A lowered callable claim list does not equal the manifest.");
             }
 
-            result.Add(Decode(artifact, entry, targetClaims, compilation));
+            result.Add(Decode(
+                artifact,
+                entry,
+                targetClaims,
+                compilation,
+                context));
         }
         return result.MoveToImmutable();
     }
@@ -269,7 +275,8 @@ internal static class CompilerLoweredArtifact
         CompilerCallableArtifact artifact,
         WorkerCallableManifestEntry entry,
         ImmutableArray<WorkerClaimManifestEntry> claims,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        CompilerSourceLocationAuthority.ValidationContext? context)
     {
         if (artifact.FailureReason !=
                 CompilerCallableArtifactReasonCatalog.SuccessReason &&
@@ -291,7 +298,11 @@ internal static class CompilerLoweredArtifact
             return new CompilerCallablePreparation(
                 new IrFactory(), entry, [], [], artifact.FailureReason, null)
             {
-                EffectClaims = DecodeEffects(artifact, claims, compilation),
+                EffectClaims = DecodeEffects(
+                    artifact,
+                    claims,
+                    compilation,
+                    context),
                 Compilation = compilation
             };
         }
@@ -397,7 +408,11 @@ internal static class CompilerLoweredArtifact
         return new CompilerCallablePreparation(
             decoded.Factory, entry, clauses, variables, WorkerClaimReason.None, body)
         {
-            EffectClaims = DecodeEffects(artifact, claims, compilation),
+            EffectClaims = DecodeEffects(
+                artifact,
+                claims,
+                compilation,
+                context),
             Compilation = compilation
         };
     }
@@ -447,7 +462,8 @@ internal static class CompilerLoweredArtifact
     private static ImmutableArray<CompilerEffectClaimArtifact> DecodeEffects(
         CompilerCallableArtifact artifact,
         ImmutableArray<WorkerClaimManifestEntry> claims,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        CompilerSourceLocationAuthority.ValidationContext? context)
     {
         if (artifact.EffectClaims == null)
         {
@@ -474,7 +490,10 @@ internal static class CompilerLoweredArtifact
         {
             var evidence = artifact.EffectClaims[index];
             var authority = artifact.EffectAuthorities[index];
-            CompilerEffectClaimArtifactCodec.Validate(evidence, compilation);
+            CompilerEffectClaimArtifactCodec.Validate(
+                evidence,
+                compilation,
+                context);
             if (evidence.ClaimId != expected[index].ClaimId || evidence.ContractKind != expected[index].EffectContractKind)
             {
                 throw new InvalidDataException("Compiler effect-claim evidence does not equal the manifest.");

@@ -22,7 +22,8 @@ internal static class CompilerEffectClaimArtifactCodec
 
     internal static void Validate(
         CompilerEffectClaimArtifact value,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CompilerSourceLocationAuthority.ValidationContext? context = null)
     {
         if (value == null || string.IsNullOrWhiteSpace(value.ClaimId) ||
             string.IsNullOrWhiteSpace(value.Evidence) ||
@@ -33,7 +34,10 @@ internal static class CompilerEffectClaimArtifactCodec
             !HasValidReplay(value) ||
             !HasValidOutcome(value) ||
             value.EvidenceSha256 != ComputeSha256(value) ||
-            (compilation != null && !HasValidReplayGeometry(value, compilation)))
+            (compilation != null && !HasValidReplayGeometry(
+                value,
+                compilation,
+                context)))
         {
             throw new InvalidDataException("Compiler effect-claim evidence is invalid.");
         }
@@ -41,7 +45,8 @@ internal static class CompilerEffectClaimArtifactCodec
 
     internal static bool HasValidReplayGeometry(
         CompilerEffectClaimArtifact? value,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CompilerSourceLocationAuthority.ValidationContext? context = null)
     {
         if (value?.Replay == null)
         {
@@ -79,14 +84,16 @@ internal static class CompilerEffectClaimArtifactCodec
 
             if (CompilerSourceLocationAuthority.FindUniqueTree(
                     effectEvent.Location,
-                    compilation) != effectEvent.SourceTreeOrdinal ||
+                    compilation,
+                    context) != effectEvent.SourceTreeOrdinal ||
                 !CompilerSourceLocationAuthority.IsBound(
                     effectEvent.Location,
                     effectEvent.SourceTreeOrdinal,
                     effectEvent.SourceTreePath,
                     effectEvent.SourceTreeSha256,
                     effectEvent.SourceLineMapSha256,
-                    compilation) ||
+                    compilation,
+                    context: context) ||
                 effectEvent.Location.Start != effectEvent.SyntaxStart ||
                 effectEvent.Location.Length != effectEvent.SyntaxLength)
             {
