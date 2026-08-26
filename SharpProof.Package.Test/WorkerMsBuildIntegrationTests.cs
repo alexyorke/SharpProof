@@ -27,7 +27,7 @@ public sealed class WorkerMsBuildIntegrationTests
         "SharpProofSpecificationPacks"
     ];
     private static readonly string[] s_compilerManifestProperties = [
-        "_SharpProofCompilerManifestPath",
+        "_SharpProofCompilerManifestSourcePath",
         "_SharpProofCompilationTargetFramework",
         "_SharpProofProjectDirectory"
     ];
@@ -2983,12 +2983,19 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(first.ExitCode, Is.Zero, first.Output);
         var firstJson = await File.ReadAllTextAsync(project.ResultPath);
         var firstWrite = File.GetLastWriteTimeUtc(project.ResultPath);
+        var editorConfigPath = project.CompilerOutputPath("generated-editorconfig");
+        var firstEditorConfig = await File.ReadAllTextAsync(editorConfigPath);
+        Assert.That(
+            firstEditorConfig,
+            Does.Contain("build_property._SharpProofCompilerManifestSourcePath"));
+        Assert.That(firstEditorConfig, Does.Not.Contain("/runs/"));
 
         await Task.Delay(1_100);
         var second = await project.BuildAsync(verify: true);
         Assert.That(second.ExitCode, Is.Zero, second.Output);
         var secondJson = await File.ReadAllTextAsync(project.ResultPath);
         var secondWrite = File.GetLastWriteTimeUtc(project.ResultPath);
+        var secondEditorConfig = await File.ReadAllTextAsync(editorConfigPath);
         var firstResponse = WorkerProtocolJson.DeserializeResponse(firstJson)!;
         var secondResponse =
             WorkerProtocolJson.DeserializeResponse(secondJson)!;
@@ -2997,6 +3004,7 @@ public sealed class WorkerMsBuildIntegrationTests
             SemanticPayload(secondResponse),
             Is.EqualTo(SemanticPayload(firstResponse)));
         Assert.That(secondWrite, Is.GreaterThan(firstWrite));
+        Assert.That(secondEditorConfig, Is.EqualTo(firstEditorConfig));
         Assert.That(second.Output, Does.Contain("SharpProof Proven"));
         using (Assert.EnterMultipleScope())
         {
@@ -3310,6 +3318,10 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.Not.Empty);
             Assert.That(
                 initialize.Descendants(
+                    "_SharpProofCompilerManifestSourcePath"),
+                Is.Not.Empty);
+            Assert.That(
+                initialize.Descendants(
                     "_SharpProofCompilationTargetFramework"),
                 Is.Not.Empty);
             Assert.That(
@@ -3321,7 +3333,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 Does.Contain("--compiler-manifest")
                     .And.Contain("$(_SharpProofCompilerManifestPath)")
                     .And.Contain("--publish-compiler-manifest")
-                    .And.Contain("$(SharpProofCompilerManifestFile)"));
+                    .And.Contain("$(_SharpProofEffectiveManifestFile)"));
             Assert.That(
                 s_reconstructionArguments.Where(arguments.Contains),
                 Is.Empty);
@@ -3397,9 +3409,13 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 verifyCore.Descendants("WriteLinesToFile"),
                 Is.Empty);
+            var manifestCopy = verifyCore.Descendants("Copy").Single();
             Assert.That(
-                verifyCore.Descendants("Copy"),
-                Is.Empty);
+                manifestCopy.Attribute("SourceFiles")?.Value,
+                Is.EqualTo("$(_SharpProofCompilerManifestSourcePath)"));
+            Assert.That(
+                manifestCopy.Attribute("DestinationFiles")?.Value,
+                Is.EqualTo("$(_SharpProofCompilerManifestPath)"));
         }
     }
 

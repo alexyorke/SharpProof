@@ -18,7 +18,7 @@
     <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
     <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
     <CompilerVisibleProperty Include="SharpProofSpecificationPacks" />
-    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
+    <CompilerVisibleProperty Include="_SharpProofCompilerManifestSourcePath" />
     <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
     <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
     <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />

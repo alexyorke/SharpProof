@@ -29,6 +29,8 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
 
     public string? InvocationManifestPath { get; set; }
 
+    public string? CompilerManifestSourcePath { get; set; }
+
     [Required]
     public string WorkerPath { get; set; } = string.Empty;
 
@@ -147,7 +149,8 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
                 ManifestPath,
                 InvocationRequestPath,
                 InvocationResultPath,
-                InvocationManifestPath)
+                InvocationManifestPath,
+                CompilerManifestSourcePath)
             .Select(ResolvePath)
             .ToArray();
         var resolvedToolPaths = toolPaths

@@ -70,11 +70,13 @@ Relative paths are resolved from the project directory before this projection;
 absolute paths retain their configured directory. Single-target behavior is
 unchanged.
 
-Container verification also initializes an internal, compiler-visible
-`_SharpProofCompilerManifestPath` beneath the isolated invocation directory.
-The final analyzer compilation atomically writes the manifest there. The
-launcher snapshots that file by absolute path and SHA-256 before starting the
-worker, and a successful invocation publishes the same artifact to
+Container verification initializes a stable, compiler-visible
+`_SharpProofCompilerManifestSourcePath` beneath the project intermediate
+directory (`compiler-manifest.input.json`). The final analyzer compilation
+atomically writes the manifest there. Before each verification, the build
+copies that source into a private invocation directory; the launcher snapshots
+the copy by absolute path and SHA-256 before starting the worker, and a
+successful invocation publishes the same artifact to
 `SharpProofCompilerManifestFile`, normally
 `obj/<Configuration>/<TargetFramework>/SharpProof/compiler-manifest.json`.
 Missing compiler evidence fails the build as SP0049 before worker launch.

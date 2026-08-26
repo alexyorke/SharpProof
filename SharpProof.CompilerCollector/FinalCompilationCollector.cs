@@ -4,7 +4,7 @@ namespace SharpProof.Analyzer;
 // Compiler artifact emission is isolated from the live analyzer entry point.
 internal static class FinalCompilationCollector
 {
-    private const string OutputOption = "build_property._SharpProofCompilerManifestPath",
+    private const string OutputOption = "build_property._SharpProofCompilerManifestSourcePath",
         TargetFrameworkOption = "build_property._SharpProofCompilationTargetFramework",
         ProjectDirectoryOption = "build_property._SharpProofProjectDirectory",
         SpecificationPacksOption =

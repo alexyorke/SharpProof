@@ -269,7 +269,7 @@ public sealed class FinalCompilationCollectorTests
     }
 
     private const string OutputKey =
-        "build_property._SharpProofCompilerManifestPath";
+        "build_property._SharpProofCompilerManifestSourcePath";
     private const string TargetFrameworkKey =
         "build_property._SharpProofCompilationTargetFramework",
         ProjectDirectoryKey = "build_property._SharpProofProjectDirectory";
