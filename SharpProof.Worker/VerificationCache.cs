@@ -10,6 +10,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         maximumBytes, nameof(maximumBytes));
     internal static Action<string, string>? PathValidationOverride;
     internal static Action? TransactionRollbackOverride;
+    internal static Func<CancellationToken, Task>? BeforeCacheReadReplayOverride;
     internal bool LastReadUnavailable { get; private set; }
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
@@ -24,6 +25,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         var staged = new List<StagedEntry>();
         var committed = false;
         FileStream? cacheLock = null;
+        string? snapshotJson = null;
+        WorkerVerifyResponse? response = null;
         try
         {
             cacheLock = await AcquireLockAsync(
@@ -49,14 +52,9 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 committed = true;
                 return null;
             }
-            if (!TryStageCapacity(path, staged, cancellationToken))
-            {
-                RestoreStaged(staged);
-                return null;
-            }
-            var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
+            snapshotJson = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
                 .ConfigureAwait(false);
-            var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
+            var envelope = JsonSerializer.Deserialize<CacheEnvelope>(snapshotJson, WorkerProtocolJson.Options);
             if (envelope is not
                 {
                     SchemaVersion: WorkerCacheVersions.Current,
@@ -67,7 +65,6 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 !string.Equals(envelopeInputHash, inputHash, StringComparison.Ordinal) ||
                 !string.Equals(payloadHash, HashText(envelopePayload), StringComparison.Ordinal))
             {
-                RestoreStaged(staged);
                 TryDeleteCorruptEntry(path);
                 committed = true;
                 return null;
@@ -84,15 +81,24 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 callables.Any(static result => result == null) ||
                 claims.Any(static result => result == null))
             {
-                RestoreStaged(staged);
                 TryDeleteCorruptEntry(path);
                 committed = true;
                 return null;
             }
 
-            var response = WorkerResultAssembler.Create(inputHash, manifest,
+            response = WorkerResultAssembler.Create(inputHash, manifest,
                 WorkerRunStatus.Complete, WorkerRunFailureReason.None, callables,
                 claims, budgets, WorkerCacheStatus.Hit, 0);
+
+            // Replay can execute arbitrary compiler-derived expressions. Do not
+            // hold the directory-wide cache lock while that work runs.
+            await cacheLock.DisposeAsync().ConfigureAwait(false);
+            cacheLock = null;
+            if (BeforeCacheReadReplayOverride is { } beforeReplay)
+            {
+                await beforeReplay(cancellationToken).ConfigureAwait(false);
+            }
+
             var cacheable = TryIsCacheable(
                 response,
                 inputHash,
@@ -100,18 +106,53 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 targets,
                 cancellationToken,
                 out var admissionFault);
+
+            cacheLock = await AcquireLockAsync(
+                    _directory,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            RecoverTransactionDebris(cancellationToken);
+            ValidatePath(path);
+            file = new FileInfo(path);
+            if (!file.Exists || file.Length > Math.Min(
+                    _maximumBytes,
+                    WorkerProtocolJson.MaximumJsonBytes))
+            {
+                committed = true;
+                return null;
+            }
+
+            var currentJson = await WorkerProtocolJson.ReadUtf8FileAsync(
+                    path,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (!string.Equals(
+                    currentJson,
+                    snapshotJson,
+                    StringComparison.Ordinal))
+            {
+                // A writer replaced the candidate while replay was running.
+                // Never return or delete that replacement using stale evidence.
+                committed = true;
+                return null;
+            }
+
             if (admissionFault)
             {
-                RestoreStaged(staged);
                 committed = true;
                 return null;
             }
 
             if (!cacheable)
             {
-                RestoreStaged(staged);
                 TryDeleteCorruptEntry(path);
                 committed = true;
+                return null;
+            }
+
+            if (!TryStageCapacity(path, staged, cancellationToken))
+            {
+                RestoreStaged(staged);
                 return null;
             }
 

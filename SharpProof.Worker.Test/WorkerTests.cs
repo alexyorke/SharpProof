@@ -4997,6 +4997,69 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task CacheReadReleasesDirectoryLockDuringReplay()
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var firstBackend = new SpuriousModelBackend();
+        var secondBackend = new SpuriousModelBackend();
+        using var firstWorker = new SharpProofWorker(firstBackend);
+        using var secondWorker = new SharpProofWorker(secondBackend);
+        var written = await firstWorker.VerifyAsync(request);
+        Assert.That(
+            written.Summary.CacheStatus,
+            Is.EqualTo(WorkerCacheStatus.Written));
+
+        using var replayEntered = new ManualResetEventSlim();
+        var releaseReplay = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var replayCalls = 0;
+        VerificationCache.BeforeCacheReadReplayOverride = _ =>
+        {
+            if (Interlocked.Increment(ref replayCalls) == 1)
+            {
+                replayEntered.Set();
+                return releaseReplay.Task;
+            }
+
+            return Task.CompletedTask;
+        };
+        try
+        {
+            var firstHitTask = firstWorker.VerifyAsync(request);
+            Assert.That(
+                replayEntered.Wait(TimeSpan.FromSeconds(10)),
+                Is.True,
+                "The first cache read did not reach replay.");
+
+            var secondHitTask = secondWorker.VerifyAsync(request);
+            var completed = await Task.WhenAny(
+                secondHitTask,
+                Task.Delay(TimeSpan.FromSeconds(3)));
+            Assert.That(
+                completed,
+                Is.SameAs(secondHitTask),
+                "A cache replay must not hold the directory lock.");
+            var secondHit = await secondHitTask;
+            Assert.That(
+                secondHit.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Hit));
+
+            releaseReplay.SetResult(null);
+            var firstHit = await firstHitTask;
+            Assert.That(
+                firstHit.Summary.CacheStatus,
+                Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(secondBackend.CallCount, Is.Zero);
+        }
+        finally
+        {
+            releaseReplay.TrySetResult(null);
+            VerificationCache.BeforeCacheReadReplayOverride = null;
+        }
+    }
+
+    [Test]
     public async Task ReparsePointCacheEntryFailsClosedWithoutTouchingTarget()
     {
         using var project = TestProject.Create(RefutationSource);
