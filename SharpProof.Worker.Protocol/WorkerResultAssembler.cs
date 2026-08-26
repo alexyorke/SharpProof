@@ -277,11 +277,12 @@ internal static class WorkerResultAssembler
         {
             return (WorkerRunStatus.Failed, WorkerRunFailureReason.BackendUnavailable);
         }
-        if (code is "worker.infrastructure" or "launcher.infrastructure")
+        if (code is "worker.infrastructure" or "launcher.infrastructure" or
+            "worker.no_result")
         {
             return (WorkerRunStatus.Failed, WorkerRunFailureReason.InfrastructureFailure);
         }
-        if (code is "worker.malformed_result" or "worker.no_result" ||
+        if (code is "worker.malformed_result" ||
             HasPrefix(code, "response.") || HasPrefix(code, "summary.") ||
             HasPrefix(code, "manifest."))
         {

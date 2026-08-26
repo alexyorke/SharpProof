@@ -1291,7 +1291,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo(WorkerRunStatus.Failed));
             Assert.That(
                 response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.MalformedResult));
+                Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
             Assert.That(response.Errors, Has.Length.EqualTo(1));
             Assert.That(
                 response.Errors[0].Code,
