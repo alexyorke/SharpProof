@@ -251,6 +251,87 @@ public sealed class ContainerSourceCleanlinessTests
         }
     }
 
+    [Test]
+    public async Task ExactCommitCommandRejectsGitUntrackedScanFailure()
+    {
+        var repository = await CreateRepositoryAsync();
+        var wrapperDirectory = await CreateGitFailureWrapperAsync(
+            repository,
+            "[[ \"$*\" == *\"ls-files\"* && \"$*\" == *\"--others\"* ]]",
+            73);
+        try
+        {
+            var result = await RunEntrypointAsync(
+                repository,
+                "pack",
+                gitWrapperDirectory: wrapperDirectory);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+                Assert.That(
+                    result.Error,
+                    Does.Contain("could not inspect Git untracked paths"));
+                Assert.That(result.Output, Does.Not.Contain("executed:pack"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(repository, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task DevelopmentCommandRejectsGitDeletedScanFailure()
+    {
+        var repository = await CreateRepositoryAsync();
+        var wrapperDirectory = await CreateGitFailureWrapperAsync(
+            repository,
+            "[[ \"$*\" == *\"--diff-filter=D\"* ]]",
+            74);
+        try
+        {
+            File.Delete(Path.Combine(repository, "Project", "Deleted.cs"));
+            var result = await RunEntrypointAsync(
+                repository,
+                "build",
+                gitWrapperDirectory: wrapperDirectory);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+                Assert.That(
+                    result.Error,
+                    Does.Contain("could not inspect Git deleted paths"));
+                Assert.That(result.Output, Does.Not.Contain("executed:build"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(repository, recursive: true);
+        }
+    }
+
+    private static async Task<string> CreateGitFailureWrapperAsync(
+        string repository,
+        string condition,
+        int exitCode)
+    {
+        var directory = Path.Combine(repository, "fake-git");
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "git"),
+            "#!/usr/bin/env bash\n" +
+            $"if {condition}; then exit {exitCode}; fi\n" +
+            "exec /usr/bin/git \"$@\"\n");
+        await RequireSuccessAsync(
+            repository,
+            "chmod",
+            "+x",
+            "fake-git/git");
+        return directory;
+    }
+
     private static async Task<string> CreateRepositoryAsync()
     {
         var repository = Path.Combine(
@@ -357,7 +438,8 @@ public sealed class ContainerSourceCleanlinessTests
     private static Task<ProcessResult> RunEntrypointAsync(
         string repository,
         string command,
-        bool assumeDifferentOwner = false)
+        bool assumeDifferentOwner = false,
+        string? gitWrapperDirectory = null)
     {
         var environment = new Dictionary<string, string>
         {
@@ -366,6 +448,13 @@ public sealed class ContainerSourceCleanlinessTests
         if (assumeDifferentOwner)
         {
             environment["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1";
+        }
+        if (gitWrapperDirectory != null)
+        {
+            environment["PATH"] = string.Join(
+                Path.PathSeparator,
+                gitWrapperDirectory,
+                Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
         }
 
         return RunAsync(

@@ -94,6 +94,14 @@ assert_clean_exact_commit_source() {
     exit 2
   fi
 
+  local untracked_file
+  untracked_file="$(mktemp /tmp/sharpproof-untracked.XXXXXXXX)"
+  if ! git -C "${repo_root}" ls-files \
+    --others --exclude-standard -z -- > "${untracked_file}"; then
+    rm -f -- "${untracked_file}"
+    echo "SharpProof ${command_name} could not inspect Git untracked paths." >&2
+    exit 2
+  fi
   local untracked_path
   while IFS= read -r -d '' untracked_path; do
     case "${untracked_path}" in
@@ -101,12 +109,13 @@ assert_clean_exact_commit_source() {
         # Release commands receive the exact package-job artifacts here.
         ;;
       *)
+        rm -f -- "${untracked_file}"
         echo "SharpProof ${command_name} requires clean exact-commit source; an untracked source path was found." >&2
         exit 2
         ;;
     esac
-  done < <(git -C "${repo_root}" ls-files \
-    --others --exclude-standard -z --)
+  done < "${untracked_file}"
+  rm -f -- "${untracked_file}"
 }
 
 if requires_git_source "${command_name}" &&
@@ -134,22 +143,36 @@ case "${command_name}" in
       # release base only as a remote-tracking ref. A local shared clone does
       # not copy those refs, so preserve the source ref namespace explicitly
       # without fetching from the network.
+      refs_file="$(mktemp /tmp/sharpproof-refs.XXXXXXXX)"
+      if ! git -C "${repo_root}" for-each-ref \
+        --format='%(refname) %(objectname)' refs/remotes/ > "${refs_file}"; then
+        rm -f -- "${refs_file}"
+        echo "SharpProof ${command_name} could not inspect Git remote refs." >&2
+        exit 2
+      fi
       while IFS=' ' read -r ref object; do
         if [[ -n "${ref}" && -n "${object}" ]]; then
           git -C "${task_root}" update-ref "${ref}" "${object}"
         fi
-      done < <(git -C "${repo_root}" for-each-ref \
-        --format='%(refname) %(objectname)' refs/remotes/)
+      done < "${refs_file}"
+      rm -f -- "${refs_file}"
       git -C "${task_root}" checkout --quiet --detach \
         "$(git -C "${repo_root}" rev-parse HEAD)"
       # Docker Desktop bind mounts do not preserve meaningful Git executable
       # bits. Ignore their synthetic working-tree modes in the disposable clone;
       # real mode changes committed between Git trees remain part of comparisons.
       git -C "${task_root}" config core.filemode false
+      deleted_file="$(mktemp /tmp/sharpproof-deleted.XXXXXXXX)"
+      if ! git -C "${repo_root}" diff \
+        --no-renames --name-only --diff-filter=D -z HEAD -- > "${deleted_file}"; then
+        rm -f -- "${deleted_file}"
+        echo "SharpProof ${command_name} could not inspect Git deleted paths." >&2
+        exit 2
+      fi
       while IFS= read -r -d '' deleted_path; do
         rm -f -- "${task_root}/${deleted_path}"
-      done < <(git -C "${repo_root}" diff \
-        --no-renames --name-only --diff-filter=D -z HEAD --)
+      done < "${deleted_file}"
+      rm -f -- "${deleted_file}"
     fi
     tar \
       --exclude='./artifacts' \
