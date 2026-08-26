@@ -55,10 +55,10 @@ The detailed reports below were removed after reproduction, implementation, regr
 | 285 | `8d166cad1` (semantic Roslyn outcome-construction architecture scan) |
 | 202 | `0a2c179f9` (runtime companion path validation and generated launcher coverage) |
 | 257-262 | `68afb8ca1`, `c3ab72290`, `8bd08c6e0` |
-| 263-270 | `0c9e0ec0d`, `0a2c179f9`, `a7b99ca24` |
+| 263-270 | `0c9e0ec0d`, `0c95dad38`, `0a2c179f9`, `a7b99ca24` |
 | 274, 276 | `549c76510` |
-| 277 | `549c76510` (bounded summary dependency regression) |
-| 278 | `a7b99ca24` |
+| 277 | `68afb8ca1` (bounded summary dependency regression) |
+| 278 | `68afb8ca1` |
 | 281-283 | `68afb8ca1`, `0a2c179f9`, `a7b99ca24` |
 | 286-287 | `a7b99ca24` |
 | 288 | `4d2749126` (unknown event receivers retain add/remove accessor effects) |
