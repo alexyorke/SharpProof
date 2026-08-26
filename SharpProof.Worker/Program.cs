@@ -22,7 +22,7 @@ internal static class Program
         {
             ContainerContract.ValidateRequired();
             LinuxWorkerProcess.EnterChildBoundaryRequired(parentProcessId);
-            if (!await WaitForStartAsync(TimeSpan.FromSeconds(30))
+            if (!await WaitForStartAsync(Console.In, TimeSpan.FromSeconds(30))
                     .ConfigureAwait(false))
             {
                 return 125;
@@ -249,19 +249,29 @@ internal static class Program
         return !string.Equals(request, result, StringComparison.Ordinal);
     }
 
-    private static async Task<bool> WaitForStartAsync(TimeSpan timeout)
+    internal static async Task<bool> WaitForStartAsync(
+        TextReader input,
+        TimeSpan timeout)
     {
-        using var timeoutBoundary = new CancellationTokenSource(timeout);
-        var read = Console.In.ReadLineAsync(timeoutBoundary.Token).AsTask();
-        var line = await read.ContinueWith(
-                static completed =>
-                    completed.Status == TaskStatus.RanToCompletion
-                        ? completed.Result
-                        : null,
-                CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default)
+        ArgumentNullException.ThrowIfNull(input);
+        if (timeout <= TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        // Console.In can execute ReadLineAsync synchronously before returning
+        // its task. Run the synchronous read on a background thread so a
+        // wedged redirected stdin cannot defeat the startup deadline.
+        var read = Task.Run(input.ReadLine);
+        var completed = await Task.WhenAny(read, Task.Delay(timeout))
             .ConfigureAwait(false);
+        if (!ReferenceEquals(completed, read) ||
+            read.Status != TaskStatus.RanToCompletion)
+        {
+            return false;
+        }
+
+        var line = read.Result;
         return string.Equals(
             line,
             LinuxWorkerProcess.StartMessage,

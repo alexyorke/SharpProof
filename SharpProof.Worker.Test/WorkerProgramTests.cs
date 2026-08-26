@@ -222,6 +222,25 @@ public sealed class WorkerProgramTests
     }
 
     [Test]
+    public async Task StartupBarrierTimesOutWhenReaderBlocksSynchronously()
+    {
+        using var reader = new BlockingReadLineReader();
+        var stopwatch = Stopwatch.StartNew();
+
+        var accepted = await Program.WaitForStartAsync(
+            reader,
+            TimeSpan.FromMilliseconds(100));
+
+        stopwatch.Stop();
+        reader.Release();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(accepted, Is.False);
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(2)));
+        }
+    }
+
+    [Test]
     [NonParallelizable]
     public async Task InvalidProjectedRequestDisposesRuntimeSnapshotBeforeReturning()
     {
@@ -322,5 +341,32 @@ public sealed class WorkerProgramTests
             "Main",
             BindingFlags.Static | BindingFlags.NonPublic)!;
         return await (Task<int>)main.Invoke(null, [arguments])!;
+    }
+
+    private sealed class BlockingReadLineReader : TextReader
+    {
+        private readonly ManualResetEventSlim _release = new();
+
+        public override string? ReadLine()
+        {
+            _release.Wait();
+            return LinuxWorkerProcess.StartMessage;
+        }
+
+        public void Release()
+        {
+            _release.Set();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _release.Set();
+                _release.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
     }
 }
