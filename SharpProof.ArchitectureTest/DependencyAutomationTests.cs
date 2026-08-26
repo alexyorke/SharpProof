@@ -76,6 +76,27 @@ public sealed class DependencyAutomationTests
     }
 
     [Test]
+    public void FuzzCampaignPublishesFailedSummaryBeforeThrowing()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofFuzzCampaign.ps1"));
+        var failure = script.IndexOf(
+            "if (-not $summary.passed)",
+            StringComparison.Ordinal);
+        var publish = script.LastIndexOf(
+            "Publish-SharpProofFuzzEvidence",
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(failure, Is.GreaterThanOrEqualTo(0));
+            Assert.That(publish, Is.LessThan(failure));
+        }
+    }
+
+    [Test]
     public void NightlyFailsClosedOnRetainedDependencyAuditEvidence()
     {
         var workflow = File.ReadAllText(Path.Combine(
