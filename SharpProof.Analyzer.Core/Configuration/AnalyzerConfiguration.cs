@@ -90,18 +90,7 @@ internal sealed class AnalyzerConfiguration
             builder.Add(new(option.Key, value.Trim(),
                 "expected one of: " + string.Join(", ", option.AllowedValues)));
         }
-        if (builder.Count != 0)
-        {
-            return builder.ToImmutable();
-        }
-
-        if (TryGetRetiredMode(options, out var retiredMode))
-        {
-            builder.Add(new(
-                "sharpproof_mode",
-                retiredMode.Trim(),
-                "option was removed; use sharpproof_profile and sharpproof_features"));
-        }
+        AddRetiredMode(options, builder);
 
         return builder.ToImmutable();
     }
@@ -170,7 +159,10 @@ internal sealed class AnalyzerConfiguration
             builder.Add(new InvalidAnalyzerConfigurationValue(option.Key, value.Trim(),
                 "option is compilation-global; set it in a global AnalyzerConfig or MSBuild property"));
         }
-        if (TryGetRetiredMode(options, out var retiredMode))
+        if (TryGetRetiredMode(options, out var retiredMode) &&
+            (globalOptions == null ||
+             !TryGetRetiredMode(globalOptions, out var globalRetiredMode) ||
+             !Is(globalRetiredMode, retiredMode)))
         {
             builder.Add(new InvalidAnalyzerConfigurationValue(
                 "sharpproof_mode",
@@ -178,6 +170,19 @@ internal sealed class AnalyzerConfiguration
                 "option was removed; use sharpproof_profile and sharpproof_features"));
         }
         return builder.ToImmutable();
+    }
+
+    private static void AddRetiredMode(
+        AnalyzerConfigOptions options,
+        ImmutableArray<InvalidAnalyzerConfigurationValue>.Builder builder)
+    {
+        if (TryGetRetiredMode(options, out var retiredMode))
+        {
+            builder.Add(new(
+                "sharpproof_mode",
+                retiredMode.Trim(),
+                "option was removed; use sharpproof_profile and sharpproof_features"));
+        }
     }
 
     private static bool TryGetRetiredMode(

@@ -75,6 +75,34 @@ public sealed class AnalyzerConfigurationUnitTests
     }
 
     [Test]
+    public void MatchingRetiredTreeValueIsRedundantWithTheGlobalValue()
+    {
+        var tree = new DictionaryOptions(("sharpproof_mode", "strict"));
+        var global = new DictionaryOptions(("sharpproof_mode", "STRICT"));
+
+        Assert.That(
+            AnalyzerConfiguration.GetInvalidTreeConfigurationValues(tree, global),
+            Is.Empty);
+    }
+
+    [Test]
+    public void RetiredModeIsReportedAlongsideAnotherInvalidGlobalValue()
+    {
+        var configuration = AnalyzerConfiguration.FromOptions(
+            new DictionaryProvider(new DictionaryOptions(
+                ("sharpproof_profile", "bogus"),
+                ("sharpproof_mode", "strict"))));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(configuration.InvalidConfigurationValues, Has.Length.EqualTo(2));
+            Assert.That(
+                configuration.InvalidConfigurationValues.Select(static value => value.Key),
+                Is.EqualTo(["sharpproof_profile", "sharpproof_mode"]));
+        }
+    }
+
+    [Test]
     public void SemanticOutcomeOrderingIsExhaustiveAndValidated()
     {
         Assert.That(
