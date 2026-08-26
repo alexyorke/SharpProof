@@ -39,10 +39,11 @@ public sealed class FrontendSemanticEdgeCaseTests
             Exact("string?", "object? value", "(string)value", (object?)null),
             Exact("string?", "object? value", "(string)value", "proof"),
             Exact("string?", "object? value", "(string)value", new object()),
-            Exact(
+            Closed(
                 "long",
                 "long[,] value",
                 "value.LongLength",
+                FrontendAbstention.UnsupportedMemberAccess,
                 MultidimensionalSequenceValue),
             Closed(
                 "long",

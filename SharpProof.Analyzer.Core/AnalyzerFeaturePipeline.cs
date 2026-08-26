@@ -144,7 +144,9 @@ internal static partial class AnalyzerFeaturePipeline
         if ((!method.IsAbstract &&
              !method.IsExtern &&
              !InvocationEmissionPolicy.IsUnimplementedPartial(method)) ||
-            !selection.Any)
+            !selection.Any ||
+            (InvocationEmissionPolicy.IsUnimplementedPartial(method) &&
+             !selection.Effects))
         {
             return;
         }

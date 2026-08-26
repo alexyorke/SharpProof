@@ -865,7 +865,11 @@ public sealed class RoslynOperationLowerer
             var operandInfo = _owner._factory.GetTypeInfo(operand.Term.Type);
             var targetInfo = _owner._factory.GetTypeInfo(target);
             if (targetInfo.Kind == IrTypeKind.String &&
-                operandInfo.Kind == IrTypeKind.Reference)
+                operandInfo.Kind == IrTypeKind.Reference &&
+                operation.Syntax is not Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax
+                {
+                    RawKind: (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.AsExpression
+                })
             {
                 return LoweredExpression.Exact(
                     _owner._factory.Cast(target, operand.Term));
