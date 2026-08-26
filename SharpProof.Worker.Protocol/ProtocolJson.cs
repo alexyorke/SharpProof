@@ -662,7 +662,9 @@ public static partial class WorkerProtocolJson
                         WorkerAssumptionKind.TrustedBoundary || assumption.Used)
                     )
                     .ToArray();
-                result.Assumptions = compact.Length == 0 ? null : compact;
+                result.Assumptions = compact.Any(static assumption => assumption.Used)
+                    ? compact
+                    : null;
             }
         }
     }
@@ -975,6 +977,7 @@ public static partial class WorkerProtocolJson
             .GroupBy(static value => value.Id, s_ordinal)
             .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
         return actual.Length > 0 &&
+            actual.Any(static value => value != null && value.Used) &&
             actual.All(value => value != null &&
                 expectedById.TryGetValue(value.Id, out var declaration) &&
                 declaration.Kind == value.Kind &&
