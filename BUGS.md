@@ -3705,6 +3705,643 @@ pin protocol ordering if later edges are modeled.
 **Confidence**: High; executable analyzer/runtime probes isolated the missing
 compiler-hidden call and matched the repository's existing Effects inventory.
 
+### 506. [CONFIRMED] Null claim identities crash public protocol validators
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 514-520,
+717-721, and 753-756.
+
+**Description**: Manifest validation records null/blank identity errors but then
+continues into GroupBy/ToDictionary indexes keyed by nullable CallableId or
+ClaimId. `Dictionary<string,...>` rejects null keys. ValidateManifest therefore
+throws for a null CallableId; a null ClaimId is initially rejected gracefully,
+but embedding that manifest in WorkerVerifyResponse makes response validation
+throw later.
+
+**Reproduction**: An executable reflection probe bypassed PowerShell's property
+coercion and produced:
+
+    CallableId=null: ValidateManifest threw ArgumentNullException, Param=key
+    CallableId="":   ValidateManifest returned Valid=False,
+                     error=manifest.claim_callable
+    ClaimId=null:    ValidateManifest returned Valid=False
+                     Validate(response) threw ArgumentNullException, Param=key
+
+**Impact**: A malformed in-memory compiler or assembler state escapes the public
+validation boundary as an exception/infrastructure failure instead of stable
+WorkerProtocolValidationResult codes, potentially masking the original failure.
+Strict wire JSON already rejects null strings, but failure-recovery paths can
+construct malformed models directly and CreateIncomplete explicitly tolerates
+such inputs.
+
+**Root cause**: Validation and dependent indexing are not separated. Invalid
+identity fields are diagnosed but still materialized as dictionary keys.
+
+**Recommended fix**: Centralize valid-key indexing and filter null/blank
+CallableId and ClaimId values before GroupBy/ToDictionary. Retain the primary
+identity errors and skip only dependent lookup checks that require an invalid
+key. Do not weaken strict deserialization.
+
+**Regression coverage**: Construct claims with `CallableId = null!` and
+`ClaimId = null!`; both ValidateManifest and Validate(response) must return
+invalid results without throwing and include manifest.claim_callable or
+manifest.claim_id. Retain empty-string and strict JSON-null controls.
+
+**Confidence**: High; exact public validators deterministically threw on null
+keys while empty controls followed the intended error-result path.
+
+### 507. [CONFIRMED] Decimal optional defaults are not matched by representation
+
+**Location**: SharpProof.Contracts/ContractForSymbolMatcher.cs,
+ExplicitDefaultValuesMatch around lines 420-439.
+
+**Description**: Companion signature matching compares float and double default
+values by their bit representation, but decimal values fall through to
+`object.Equals`. Decimal equality ignores scale and signed-zero representation,
+so metadata-distinct optional defaults are accepted as the same signature.
+
+**Reproduction**: A target parameter defaulted to `-0.0m` and its companion to
+`0.00m`. Canonical Roslyn plus the actual matcher/binder reported:
+
+    target-bits=0,0,0,-2147418112
+    companion-bits=0,0,0,131072
+    member-signatures-match=True
+    binding-success=True
+    binding-failure=None
+    uses-companion=True
+
+The existing double-default regression establishes that optional defaults are
+intended to match by representation, not merely numeric equality.
+
+**Impact**: Validation and binding attach companion contracts despite a
+metadata-observably different optional default. Callers omitting the argument
+can therefore be analyzed against a companion signature that is not exact.
+
+**Root cause**: Decimal has multiple bit representations for equal numeric
+values, but the fallback comparer applies its value-equality semantics.
+
+**Recommended fix**: Add a decimal branch comparing all four words returned by
+`decimal.GetBits`; do not use decimal.Equals for signature identity.
+
+**Regression coverage**: Require `-0.0m` vs `0.0m` and `0.0m` vs `0.00m` to
+produce CompanionSignatureMismatch, while identical decimal bits bind. Retain
+float/double bit controls.
+
+**Confidence**: High; the actual binder accepted two defaults whose four-word
+representations differ.
+
+### 508. [CONFIRMED] Open-generic companions reject identical caller-owned type parameters after specialization
+
+**Location**: SharpProof.Contracts/ContractForSymbolMatcher.cs, definition match
+around lines 218-234, specialization/recheck around lines 288-316,
+type-parameter matching around lines 558-564, and OwnersMatch around lines
+743-764. Declaration validation occurs in
+SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs
+around lines 30-47.
+
+**Description**: An open-generic companion validates against its target
+definition and specializes correctly for a generic caller. The post-
+specialization recheck then routes identical caller-owned type parameters to
+OwnersMatch. That routine handles mapped target/companion owners but has no
+exact-symbol/equal-owner fast path; a type parameter owned by the external
+caller lies outside both scopes and is falsely rejected.
+
+**Reproduction**: For `IRepository<T>.Read(T,bool)`, an open
+`RepositoryContracts<T>` companion, and a generic forwarding caller, the
+canonical probe reported:
+
+    SPCF_IDS=<none>
+    CALL_TARGET=IRepository<T>.Read(T, bool)
+    MATCH_ORIGINAL=True
+    SPECIALIZED_COMPANION=RepositoryContracts<T>.Read(IRepository<T>, T, bool)
+    VALUE_TYPE_SYMBOL_EQUAL=True
+    MATCH_SPECIALIZED=False
+    RESOLUTION_FAILURE=CompanionSignatureMismatch
+    BIND_SUCCESS=False
+    CLAUSES=-1
+
+The concrete IRepository<string> control matched, bound, used the companion,
+and returned one Requires clause. An open-containing plus generic-member case
+failed the same way.
+
+**Impact**: Valid companion contracts disappear for invocations inside generic
+forwarding code, even though analyzer declaration validation accepts the
+companion and the specialized symbols are identical. The failure is fail-closed
+but source-shape dependent.
+
+**Root cause**: Structural owner mapping is applied before recognizing exact
+type-parameter symbol identity.
+
+**Recommended fix**: In the type-parameter branch, accept
+SymbolEqualityComparer.Default exact identity before ordinal/owner mapping. A
+narrow exact-symbol check avoids weakening structural comparison between target
+and companion parameters.
+
+**Regression coverage**: Bind the generic forwarding invocation and require
+success, UsesCompanion, and one Requires clause. Retain concrete specialization,
+generic-member, mismatched-owner, and ordinal-mismatch controls.
+
+**Confidence**: High; a canonical Linux probe showed symbol equality true at
+the exact point where OwnersMatch returned false.
+
+### 509. [CONFIRMED] Renewal-disposal cancellation is fabricated into ProjectTimeout
+
+**Location**: SharpProof.Worker/SharpProofWorker.cs around lines 298-308,
+597-599, 617-618, 412, and interruption mapping around lines 83-104.
+
+**Description**: After a genuine method timeout, a verification lane renews its
+backend and synchronously disposes the old owner. Dispose receives no
+CancellationToken, yet the renewal catch filter excludes
+OperationCanceledException. Such an unrelated OCE escapes to the worker's
+unconditional outer cancellation catch. With caller and project tokens both
+live, Interrupted() fabricates TimedOut/ProjectTimeout for the whole manifest.
+
+**Reproduction**: An exact-production reflection probe gave the lane an owned
+backend whose Dispose throws a fresh OCE, then invoked Renew:
+
+    ESCAPED_EXCEPTION=OperationCanceledException
+    EXCEPTION_TOKEN_CANCELED=False
+
+The deterministic outer path sees no registered cancellation source and maps
+that exception to ProjectTimeout. The sibling InvalidOperationException test
+already expects InfrastructureFailure from the same disposal point.
+
+**Impact**: One method timeout followed by a backend cleanup failure erases the
+truthful MethodTimeout plus InfrastructureFailure history and mislabels the
+entire project as budget-expired. Retry, telemetry, and evidence attribution
+operate on the wrong terminal cause.
+
+**Root cause**: A tokenless lifecycle callback is allowed to use OCE as an
+untrusted exception type, but the catch filters treat the type alone as proof of
+caller/project cancellation.
+
+**Recommended fix**: Catch OCE from renewal Dispose as InfrastructureFailure,
+retaining only OOM/StackOverflow exclusions. More generally, map an outer OCE to
+Interrupted only when a registered caller/project boundary is actually
+canceled; otherwise return typed InfrastructureFailure.
+
+**Regression coverage**: Extend InvalidRenewalStateFailsClosedWithTypedEvidence
+with an OCE-throwing Dispose after a short method timeout and long live project
+budget. Require RunStatus Failed, reason InfrastructureFailure, evidence reasons
+MethodTimeout plus InfrastructureFailure, and specifically no ProjectTimeout.
+
+**Confidence**: High; the exact private renewal method leaked an OCE carrying an
+uncanceled token, and the outer classification has no alternate branch.
+
+### 510. [CONFIRMED] Large string-literal encoding ignores cancellation before solver execution
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 109-145, 286-301, and
+EncodeStringLiteral around lines 694-702.
+
+**Description**: A query token is checked during depth validation and after goal
+encoding/assertion, but it is not retained by QueryEncoder. EncodeStringLiteral
+creates two native AST wrappers per UTF-16 code unit and one giant MkConcat
+without a checkpoint. The literal is one IR leaf, so depth validation completes
+immediately and Context.Interrupt cannot stop this pre-solver construction.
+
+**Reproduction**: A public CheckAsync probe compared a string variable to a
+100,000-character literal, canceled after the backend gate was acquired, and
+reported:
+
+    gate-entered=True
+    cancel-request-ms=33
+    cancel-observed-ms=19386
+    cancel-overshoot-ms=19352
+    reuse-status=Unsatisfiable failure=None
+
+No solver Check occurred before the long encoding/unwind completed.
+
+**Impact**: Cancellation can overshoot by roughly 19 seconds while monopolizing
+the serialized backend gate and consuming CPU/native memory. The failure is
+fail-closed and the backend remains reusable, but public ProofKernel/backend
+callers cannot enforce timely cancellation.
+
+**Root cause**: Encoding is modeled as an indivisible operation. The token is
+not threaded through wide-term construction, and the LINQ-shaped literal build
+has no bounded interruption points.
+
+**Recommended fix**: Retain/pass the token through QueryEncoder and all recursive
+encoders. Use an imperative string-unit loop with bounded checks, check before
+large concatenation, and preferably chunk/balance concat construction so no
+single native call is unbounded.
+
+**Regression coverage**: With a deterministic encoder-progress hook, cancel
+after N units and require prompt OCE before solver.Check, bounded owned-object
+growth and cleanup, then successful reuse. Cover other wide expression forms.
+
+**Confidence**: High; the exact public backend delayed observed cancellation by
+19.3 seconds and then passed its reuse control.
+
+### 511. [CONFIRMED] Recorded fuzz failure seeds cannot replay their own cases
+
+**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs, FuzzFailure around lines 7-15,
+case generation around lines 149-155 and 191-198, failure construction around
+lines 262-349, and CreateCaseSeed around lines 562-572; CLI options in
+Tools/SharpProof.Fuzz/Program.cs and FuzzOptions.cs.
+
+**Description**: FuzzFailure.Seed stores the derived case seed
+`CreateCaseSeed(campaignSeed,index)`. The only CLI seed option is interpreted as
+a campaign seed and is always hashed again with a fresh index. Therefore the
+obvious replay command `--seed <failure.Seed> --cases 1` generates a different
+case. The CLI exposes no case index, case-seed, or replay mode.
+
+**Reproduction**: The production assembly probe reported:
+
+    campaign --seed=20260523 failure Case=123
+    recorded FuzzFailure.Seed=-736518015
+    natural replay derives caseSeed=545807135
+    recorded seed equals replay-derived seed=False
+    original frontend SHA=ce3e6ed441f8588af4dbcbcdcaae8626d46bb590a906c957bdcfc098cb16a7a6
+    replay frontend SHA=321dec8c3a17dd36ae3194b651f9a698c011052a9736f96a794ea00625a79f4a
+    frontend bundles identical=False
+    --case-index accepted=false
+
+**Impact**: A deterministic retained mismatch appears unreproducible when its
+own Seed is used. The only workaround is the enclosing campaign seed plus
+rerunning every case from index zero; a late millionth case requires replaying
+the full prefix, and direct finite-SMT replay is unavailable.
+
+**Root cause**: Evidence names an internal derived value `Seed` without
+preserving its campaign mapping or a CLI mode that consumes it directly.
+
+**Recommended fix**: Record explicit CampaignSeed, CaseIndex, and CaseSeed, and
+emit an exact replay descriptor/command. Add a mutually exclusive replay-case
+mode using campaign seed/index or a case-seed mode that bypasses derivation. A
+public single-case runner should execute all three oracle bundles directly.
+
+**Regression coverage**: For campaign 20260523/index 123, replay mode must match
+normal RunAsync's effective seed and frontend/finite/partial fingerprints. Cover
+index zero, maximum index, CLI validation, and ensure ordinary `--seed
+<CaseSeed>` is never advertised as replay.
+
+**Confidence**: High; the production derivation, CLI parser, and generated
+bundle hashes demonstrated that recorded-seed replay changes the case.
+
+### 512. [CONFIRMED] Relational specification packs accept ill-typed authoritative terms
+
+**Location**: SharpProof.CompilerCollector/CompilerArtifact/
+CompilerSpecificationPackProvider.cs, TryBuild around lines 165-175,
+Instantiate around lines 257-292, ParseMethod around lines 544-560, and ParseTerm
+around lines 616-667; typed rejection in SharpProof.Ir/IrFactory.cs around lines
+448-467.
+
+**Description**: Pack parsing validates JSON shape, literals, operator names,
+and only the outer result type. It does not recursively validate parameter
+ordinals/types, operator operand signatures, equality types, or conditional
+guard/branch types. Provider construction therefore accepts an unusable audited
+pack. At the first matching call, IrFactory throws ArgumentException and
+TryBuild silently converts it to false, making the selected relation disappear.
+
+**Reproduction**: A complete pack declared an Integer conditional whose
+condition was also Integer. The exact private parser and instantiator reported:
+
+    PARSE_PACK=ACCEPTED
+    TERM_TYPE=ConditionalTerm
+    DECLARED_TYPE=Integer
+    INSTANTIATE=REJECTED
+    INNER_TYPE=System.ArgumentException
+    MESSAGE=The conditional guard must be boolean.
+
+**Impact**: A maintainer can update and correctly pin an embedded pack whose
+catalog loads successfully but whose advertised relation always abstains at
+use. Dependent verification degrades to Unknown without a configuration or
+catalog error. This is fail-closed but violates strict-authority guarantees.
+
+**Root cause**: Semantic type checking is deferred from authority loading to
+per-call IR construction, and the latter's exception is intentionally treated
+as an ordinary unsupported relation.
+
+**Recommended fix**: During ParseMethod, recursively infer and validate every
+term against method parameter types and IrOperatorCatalog. Require in-range
+ordinals, exact declared parameter types, valid unary/binary signatures,
+same-type supported equality, Boolean conditional guards, and equal branch/
+declared types. Throw path-qualified InvalidDataException eagerly; retain the
+runtime catch as defense in depth.
+
+**Regression coverage**: Reject integer guard, unequal branches, wrong unary/
+binary operands/results, out-of-range ordinal, and parameter-type mismatch at
+parse/load time. Retain positive coverage for all scalar operators and an
+integration proof that a valid enabled pack produces its summary.
+
+**Confidence**: High; the exact parser accepted and exact instantiator rejected
+the same authoritative term for a deterministic type error.
+
+### 513. [CONFIRMED] One acceptance result can mint both Debug and Release receipts
+
+**Location**: producer eng/acceptance/Verify.ps1 around lines 209-219; consumer
+scripts/Write-SharpProofQualificationReceipt.ps1 around lines 62-67; matrix
+eng/acceptance/preview-evidence.v1.json rows 13-14; final qualification in
+scripts/Invoke-SharpProofReleaseContainer.ps1 around lines 169-210.
+
+**Description**: Acceptance evidence records `command` and `configuration`, but
+the receipt writer validates only schema version, passed status, and commit for
+both acceptance-debug and acceptance-release. It trusts the caller-supplied gate
+label instead of matching it to the evidence's configuration. Final
+qualification trusts the receipt label/hash and does not reopen this dimension.
+
+**Reproduction**: One canonical-Docker temp fixture generated Release evidence
+and invoked the unchanged writer twice:
+
+    EvidenceConfiguration=Release
+    ReleaseRun.ExitCode=0
+    DebugRun.ExitCode=0
+    ReleaseReceiptGate=acceptance-release
+    DebugReceiptGate=acceptance-debug
+    SameEvidencePath=true
+    SameEvidenceSha=true
+
+**Impact**: Qualification can claim both required matrix rows without executing
+Debug acceptance at all. A wiring or manual receipt-regeneration error is
+silently certified rather than rejected.
+
+**Root cause**: The receipt's gate identity is derived from an argument, not
+from the producer identity already present in the hashed evidence.
+
+**Recommended fix**: For each acceptance gate, require
+`command -ceq 'acceptance'` and exact configuration Debug or Release. Include the
+verified configuration in the receipt and recheck it during final qualification.
+Prefer a shared full timing-schema validator.
+
+**Regression coverage**: Debug->debug and Release->release pass; both cross
+pairs fail. Reject missing/wrong command or configuration. Final qualification
+must reject two receipts that hash the same Release evidence for both rows.
+
+**Confidence**: High; both receipt types were produced from one identical
+Release file and SHA in the canonical image.
+
+### 514. [CONFIRMED] Collection-initializer Add calls are found but marked unreplayable
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
+188-208, 425-471, and 538-575; early Unknown mapping in
+RequiresCallSiteAnalyzer.cs around lines 339-342.
+
+**Description**: Roslyn exposes collection-initializer Add as an implicit
+IInvocationOperation and discovery finds it with complete flow state. Candidate
+replayability nevertheless requires the call syntax span to equal the whole
+expression body or top-level statement expression. The hidden Add invocation's
+syntax is only the collection element, nested under object creation, so exact-
+span validation fails and analysis returns Unknown before evaluating Requires.
+
+**Reproduction**: `new Bag { -1 }` uses Bag.Add(int) with
+`Contract.Requires(value > 0)`. Probe output:
+
+    OP/CFG Invocation implicit=True syntax=-1 target=Bag.Add(int)
+    FLOW implicit-add-has-state=True
+    CANDIDATE can-replay=False flow=Complete
+    SP0027 emitted only for explicit bag.Add(-1) control
+    runtime generated=1 explicit=1
+
+Compiler errors and other analyzer diagnostics were zero.
+
+**Impact**: A deterministic hidden Add precondition violation is silently
+missed with no SP0047 fallback, while the equivalent explicit call is reported.
+
+**Root cause**: Replay-prefix logic recognizes only top-level source spans and
+has no collection-initializer evaluation-order model.
+
+**Recommended fix**: Add collection-initializer-aware prefix replayability.
+Walk the owning initializer/object creation in language order and require
+constructor/arguments, all prior elements, receiver, and current arguments to
+complete before admitting the candidate. Reuse DefiniteOperationFacts; do not
+blanket-admit nested invocations.
+
+**Regression coverage**: Invalid Add under collection initializer must emit one
+SP0027 at the element, matching direct call. Cover valid elements, throwing
+constructor/argument, non-completing prior Add, and multiple completing elements
+in left-to-right order.
+
+**Confidence**: High; operation, CFG, flow, candidate, analyzer, and runtime
+probes all isolate the exact false replayability decision.
+
+### 515. [CONFIRMED] Release regular-file validation accepts FIFOs and hashing can hang
+
+**Location**: scripts/SharpProof.ReleaseChecksums.ps1,
+Test-SharpProofExactRegularFileSet around lines 115-137 and topology delegation
+around lines 184-187; hashing in scripts/Publish-SharpProofRelease.ps1 around
+lines 322-360.
+
+**Description**: The release topology validator rejects directories, reparse
+points, nesting, and duplicate device/inode identities but never checks Linux
+inode mode. PowerShell reports a FIFO as File, Leaf, non-container, and Normal;
+`stat %d:%i` also succeeds. An exact-name bundle containing a FIFO therefore
+passes topology, then Get-FileHash blocks waiting for a writer.
+
+**Reproduction**: A canonical Linux fixture replaced one of the exact nine
+expected artifact names with mkfifo:
+
+    BundleTopologyAcceptedFifo=true
+    ValidationError=""
+    FifoStatType=fifo
+    EntryCount=9 ExpectedEntryCount=9
+    PathTypeLeaf=true GetChildItemFileCount=1
+    GetFileHashExit=137 ElapsedMs=2012
+
+The last probe killed the blocked hash after two seconds.
+
+**Impact**: An accidental non-regular artifact is certified by topology and can
+hang release publication indefinitely instead of failing with an attributable
+validation error.
+
+**Root cause**: Cross-platform PowerShell leaf/file attributes are treated as a
+regular-file guarantee, while device/inode identity is collected without file
+type.
+
+**Recommended fix**: Collect numeric stat mode (for example `%f`) and require
+`(mode & 0xF000) == 0x8000` before accepting identity. Emit a dedicated
+non-regular-member error before any content read/hash.
+
+**Regression coverage**: Create an exact valid nine-name bundle with one FIFO;
+topology must throw before hashing. Retain regular-file positive, directory,
+symlink/reparse, duplicate identity, and cleanup-in-finally controls.
+
+**Confidence**: High; topology accepted a real FIFO and the next production hash
+blocked until killed.
+
+### 516. [CONFIRMED] Congruence-implied Int64 endpoints are treated as infinities
+
+**Location**: SharpProof.Dataflow/IntervalDomain.cs, construction around lines
+61-96, LessThanOrEqual around lines 111-118, and Add overflow handling around
+lines 277-287.
+
+**Description**: Create computes the first and last signed-Int64 values matching
+a congruence but retains null when the caller supplied an unbounded marker.
+Ordering compares those raw nullable bounds, and arithmetic substitutes
+Int64.MinValue/MaxValue for null. For nontrivial congruences those extremes may
+not be members, so semantically identical domains behave differently depending
+on whether effective endpoints were written explicitly.
+
+**Reproduction**:
+
+    implicit = Create(null, null, 10, 0)
+    explicit = Create(-9223372036854775800,
+                       9223372036854775800, 10, 0)
+
+Fresh-source container output:
+
+    boundary-witnesses=9 membership-mismatches=0
+    implicit<=explicit=False explicit<=implicit=True equivalent=False
+    implicit+1=[-inf, +inf]
+    explicit+1=[-9223372036854775799, 9223372036854775801] mod 10 = 1
+    bug-reproduced=True
+
+Both inputs denote exactly all representable multiples of ten.
+
+**Impact**: Lattice ordering and transfer precision depend on representation.
+Equivalent states can trigger needless dataflow changes, and safe arithmetic
+widens to Top, losing proofs and creating avoidable warnings/abstentions.
+
+**Root cause**: Nullable storage serves both as a widening marker and as semantic
+infinity. LessThanOrEqual and overflow analysis ignore the congruence's already-
+known effective signed endpoints.
+
+**Recommended fix**: Add helpers returning effective first/last congruent Int64
+endpoints and use them for semantic ordering and TryAddBounds. Retain nullable
+storage only as representation/widening metadata. Alternatively canonicalize
+all nontrivial congruence bounds in Create after auditing widening behavior.
+
+**Regression coverage**: Require bidirectional LessThanOrEqual and equivalence
+for the pair above; AddConstant(...,1) must yield equivalent, non-Top results
+with the exact two shifted endpoints. Cover negative residues, modulus one,
+near-boundary overflow, and widening controls.
+
+**Confidence**: High; a source-compiled container probe proved equal membership
+and divergent lattice/arithmetic results against the exact baseline blob.
+
+### 517. [CONFIRMED] Manifest hashing materializes multiple full payload copies
+
+**Location**: SharpProof.Worker.Protocol/ProtocolManifest.cs around lines 44-50
+and 67-75; canonical payload construction in
+SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around lines 208-267.
+
+**Description**: ComputeManifestHash builds the complete framed payload in a
+growing StringBuilder, copies it to one full UTF-16 string, allocates a full
+UTF-8 byte array, and only then computes SHA-256. ManifestsEqual additionally
+materializes both complete canonical payload strings. This is separate from the
+quadratic claim lookup in finding 497 and occurs even on already-canonical input.
+
+**Reproduction**: Warmed direct hashing probes measured:
+
+    10,000 claims, 3,309,011-byte payload: 18,022,992 bytes allocated
+    20,000 claims, 6,629,011-byte payload: 36,013,416 bytes allocated
+     5,000 fully valid claims:             9,810,992 bytes allocated
+
+The valid manifest subsequently passed ValidateManifest, and every hash had the
+expected 64-character shape.
+
+**Impact**: SealManifest, validation rehashing, strict expected-manifest checks,
+and equality can create tens or hundreds of megabytes of transient
+StringBuilder chunks, LOH strings, and byte arrays for representable manifests.
+GC pressure consumes verification time and increases peak memory before response
+serialization.
+
+**Root cause**: The canonical hash API accepts only a completed byte array, and
+the framing writer is string-backed rather than incremental.
+
+**Recommended fix**: Preserve the exact framing/hash identity while streaming
+frames into IncrementalHash through a small reusable buffer or IBufferWriter.
+Write the ASCII UTF-16-code-unit length, colon, strict UTF-8 value, and semicolon
+incrementally; use Utf8Formatter for numbers. Compare canonical fields/sequences
+or incremental streams in ManifestsEqual instead of building both strings.
+
+**Regression coverage**: Retain the pinned known hash and add non-ASCII and
+ill-formed-UTF16 compatibility cases. Warm a fully valid 5k-claim hash and set a
+generous allocation ceiling far below 9.8 MB. Cover equality true and one-field
+differences without payload materialization.
+
+**Confidence**: High; public hash allocation scales at about 5.4 times payload
+size on already-constructed, valid manifests.
+
+### 518. [CONFIRMED] Backend-reported timeouts become malformed worker results
+
+**Location**: SharpProof.Worker/CallableVerificationPolicy.cs around lines 43-55;
+lane-renewal decision in SharpProof.Worker/SharpProofWorker.cs around lines
+302-325; malformed fallback around lines 350-367; projection authority in
+SharpProof.Worker.Protocol/WorkerResultAssembler.cs around lines 208-233.
+
+**Description**: BackendCheckResult.Unknown(Timeout) is an explicitly supported
+normal result and maps to an Unknown claim with MethodTimeout. Callable policy
+then labels every set containing an Unknown claim as SemanticUnknown, ignoring
+the typed claim reason. Protocol projection requires callable MethodTimeout when
+an owned unknown claim has MethodTimeout, so the assembled response is rejected
+and replaced with Failed/MalformedResult. The lane also is not renewed because
+renewal looks for callable MethodTimeout.
+
+**Reproduction**: A no-file probe against the built production protocol
+assembly reported:
+
+    classificationStatus=TimedOut
+    classificationFailure=None
+    semanticUnknownProjectionAccepted=False
+    methodTimeoutProjectionAccepted=True
+
+Existing executable coverage independently confirms backend Timeout -> claim
+MethodTimeout; the probe proves the exact producer pair is invalid while the
+correctly typed pair is accepted.
+
+**Impact**: A legitimate backend timeout is laundered into infrastructure-style
+MalformedResult, corrupting cause attribution. A factory-backed timed-out lane
+is reused instead of renewed before remaining targets.
+
+**Root cause**: Producer and validator implement different claim-to-callable
+projection rules; the producer collapses typed unknown reasons too early.
+
+**Recommended fix**: Derive callable reason through one shared projection
+function using validator precedence: at minimum MethodTimeout, ProjectTimeout,
+Canceled, and UnsupportedCallable before generic SemanticUnknown. Use the same
+result for classification and lane renewal.
+
+**Regression coverage**: End-to-end backend Unknown(Timeout) with an unexpired
+wall budget must yield RunStatus TimedOut, FailureReason None, matching callable
+and claim MethodTimeout, and a protocol-valid response. With a factory and more
+work, require backend renewal before the next target.
+
+**Confidence**: High; exact policy output fails the protocol authority while its
+typed correction passes, and the upstream timeout mapping is already executable
+coverage.
+
+### 519. [CONFIRMED] Conditional encoding leaks two Z3 Sort wrappers until finalization
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 650-658, especially
+`whenTrue.Value.Sort.Equals(whenFalse.Value.Sort)`; ownership contract in
+SharpProof.Smt/Z3ExpressionOwner.cs around lines 3-23.
+
+**Description**: Each Z3 Expr.Sort property access constructs a fresh,
+independently disposable managed wrapper over the native sort. Conditional
+encoding obtains two wrappers for equality comparison but neither disposes them
+or registers them with Z3ExpressionOwner. Every conditional therefore retains
+two native references until finalization.
+
+**Reproduction**: Pinned Microsoft.Z3 4.12.2 probes reported:
+
+    sort-is-disposable=True
+    same-wrapper=False
+    same-native=True
+    first-live-after-dispose=False
+    second-live-after-first-dispose=True
+    finalization-pending-after-collect=50002
+
+A public production query with 1,000 integer conditionals returned
+Unsatisfiable/None but left `production-finalization-pending=2006`, matching
+approximately two wrappers per conditional plus fixed baseline.
+
+**Impact**: Wide or repeated conditional queries retain native references until
+GC and create a proportional finalizer backlog. Verdicts remain correct, but
+native memory, GC cadence, and query latency become nondeterministic under load.
+
+**Root cause**: Property-result ownership is overlooked; Equals neither
+transfers nor disposes wrappers, and the query owner never sees them.
+
+**Recommended fix**: Prefer comparing already-validated IR branch types without
+creating native Sort wrappers. Otherwise acquire both into `using` variables or
+register both with OwnSort and dispose deterministically with the query owner.
+
+**Regression coverage**: Encode N conditionals and compare forced-GC pending
+finalizers against a no-conditional control; the delta must not scale as 2N.
+Add an ownership observer/helper assertion that acquired native handles are
+released when query encoding ends, without requiring GC.
+
+**Confidence**: High; wrapper/native-handle probes and the production 1,000-
+conditional query independently show two undisposed Sort objects per term.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
@@ -3872,17 +4509,46 @@ rechecks unchanged refuted, missing, corrupt, and infrastructure results. An
 3. Use an explicit interface implementation as a control: the same selected EII body remains in the verifier-supported callable set and is covered by `ClaimManifestBuilderTests.ExplicitInterfaceImplementationUsesTheSupportedCallableSet`.
 **Confidence**: High for the original explicit-interface divergence, which is resolved by `fa58c7533`; static-constructor admission remains intentionally fail-closed because constructor initialization and replay semantics need a separate design.
 
-### 370. [INTENTIONAL FAIL-CLOSED] The Collector-Only HasStaticStateMutation Gate Voids Effect Evidence for Every Selected Member of a Type Whose Static Constructor Contains Any Assignment - Analyzer Proves Pure, Verifier Fails the Strict Build Opaquely
+### 370. [CONFIRMED] HasStaticStateMutation treats static-constructor local assignments as static-state writes
 
-**Status**: The apparent analyzer/collector difference is an intentional fail-closed boundary. The analyzer's effect model joins an explicit static-constructor body with an `UnknownBoundary` outcome, and existing tests/documentation preserve that conservative treatment; the collector gate prevents replaying unsupported static state. No soundness-preserving production simplification was identified.
+**Status**: A conservative gate for actual or unknown static-state writes may be
+intentional, but the current syntactic implementation has a separately verified
+false-positive slice: local-only assignments and increments in a static
+constructor are classified as static-state mutation. This rejects a member even
+when the analyzer proves its effect claim and no static storage is written.
 
 **Location**: `SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs` (Conjunct at Line 105: `!(analyzerEffectsSelected && HasStaticStateMutation(target))` inside `supported`; predicate Lines 186-207 scanning ALL statements of explicitly declared static constructors for any assignment/increment; unavailable-routing Lines 463-472 `MarkUnavailable(evidence, WorkerClaimReason.UnsupportedContract)`); no analyzer counterpart `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 192-360; the only `StaticConstructors` uses in Analyzer.Core are member-initializer reachability at scattered lines).
-**Description**: When any effect attribute selects a method, the collector additionally demands that the containing type's declared static constructors contain NO assignment whatsoever - any field, any statement. If one exists (`Threshold = 0;`), `supported=false` routes EVERY effect evaluation of EVERY member of that type through unavailable evidence (Outcome Unknown, Certainty Unavailable, witness/replay wiped), while the analyzer pipeline applies no such gate and records Proven normally. Cross-check-triangle divergence: under require-proven the launcher's incomplete check fails the build with the generic aggregate message naming neither the static constructor nor the reason - an opaque kill for code the analyzer certified; under advisory, effect verification silently vanishes for those callables. The gate is over-broad even as a soundness measure (a benign cctor write poisons unrelated statics forever). Fail direction safe (never false Proven). Distinct from #277 (recursion depth), #298 (trusted mirroring), #369 (callable-KIND axis): this is the static-state WRITE gate, a selection predicate with no analyzer mirror.
+**Description**: When any effect attribute selects a method, the collector
+rejects it if the containing type's explicit static constructor contains any
+IAssignmentOperation or IIncrementOrDecrementOperation. The helper never
+examines the destination. Thus `int local = 0; local++;` sets `supported=false`
+and routes the member's effect evidence to Unknown/UnsupportedContract/
+Unavailable even though it mutates no static state. CompilerCallableLowerer
+then emits UnsupportedCallable. The analyzer's effect evaluator independently
+returns Proven for the selected member. Actual static-field writes remain a
+sound conservative control; the confirmed defect is the destination-blind
+classification.
 **Reproduction Steps**:
-1. Strict-profile project; add `internal static class Config { internal static int Threshold; static Config() { Threshold = 1; } [SharpProof.EnforcePure] internal static int Square(int x) => x * x; }`.
-2. Build in-container: expected per analyzer - `Square` selected, Supported, purity Proven, silent; actual - `HasStaticStateMutation` sees the cctor write, `supported=false`, the EnforcePure claim becomes Unknown(UnsupportedContract), coverage Incomplete, require-proven exits 6/SP0047 with no explanation referencing the cctor.
-3. Remove only the `Threshold = 1;` statement and rebuild - green, isolating the collector-only gate.
-**Confidence**: Medium (divergence certain from code; a type-initializer soundness rationale could justify collector strictness, but nothing documents it and no analyzer counterpart exists).
+1. Analyze `sealed class Subject { static Subject() { int local = 0; local++; }
+   [EnforcePure] public int Identity(int value) => value; }`.
+2. The isolated canonical-container probe reports analyzer effect evaluation
+   Proven, but ClaimManifestBuilder returns IsVerifierSupported=false and
+   Unknown/UnsupportedContract/Unavailable; the targeted assertion fails only
+   on compiler support/evidence.
+3. Replace the local with `static int state; static Subject() { state++; }` as a
+   control; that real static-state case must remain rejected.
+
+**Recommended fix**: Reuse the effect engine's static-constructor write-region
+summary and reject only unknown writes or EffectRegionId.Static(). A smaller
+fix may classify assignment/increment targets and ignore local/parameter
+destinations, but it must preserve conservative handling for complex aliases.
+
+**Regression coverage**: The local-only static constructor must retain
+verifier-supported Proven evidence and lowerable IR. Pair it with an actual
+static-field write that remains UnsupportedContract.
+
+**Confidence**: High; a canonical targeted probe independently produced
+analyzer Proven and collector Unknown for the local-only trigger.
 
 ### 371. [INTENTIONAL POLICY] [SharpProofSuppress] Silences the In-Process Analyzer but Is Never Consulted by the Collector - Suppression Meaning Flips When Moving Advisory->Strict With Zero Surfacing
 
