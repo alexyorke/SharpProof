@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -206,6 +207,43 @@ public sealed class AcceptanceScriptTests
         }
     }
 
+    [Test]
+    public void AcceptanceHarnessCarriesEveryRetainedPrefixModule()
+    {
+        var fixture = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-acceptance-modules-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(fixture);
+        try
+        {
+            WriteHarness(fixture);
+            var source = File.ReadAllText(Path.Combine(
+                RepositoryRoot(),
+                "eng",
+                "acceptance",
+                "Verify.ps1"));
+            var prefixEnd = source.IndexOf(
+                "Start-AcceptanceTimingPhase -Name 'restore'",
+                StringComparison.Ordinal);
+            Assert.That(prefixEnd, Is.GreaterThan(0));
+
+            var modules = RetainedPrefixModules(source[..prefixEnd]);
+            Assert.That(
+                modules,
+                Does.Contain("scripts/SharpProof.ContainerExecution.psm1"));
+            Assert.That(
+                modules.Where(module => !File.Exists(
+                    FixturePath(fixture, module))),
+                Is.Empty,
+                "Every module imported by the retained Verify.ps1 prefix " +
+                "must be present in the acceptance fixture.");
+        }
+        finally
+        {
+            DeleteDirectory(fixture);
+        }
+    }
+
     private static string WriteHarness(string fixture)
     {
         var root = RepositoryRoot();
@@ -236,6 +274,12 @@ public sealed class AcceptanceScriptTests
             Path.Combine(acceptance, "contract.json"));
         var fixtureScripts = Path.Combine(fixture, "scripts");
         Directory.CreateDirectory(fixtureScripts);
+        foreach (var module in RetainedPrefixModules(source[..prefixEnd]))
+        {
+            var destination = FixturePath(fixture, module);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(FixturePath(root, module), destination);
+        }
         File.Copy(
             Path.Combine(
                 root, "scripts", "SharpProof.FuzzEvidenceLifecycle.ps1"),
@@ -270,6 +314,26 @@ public sealed class AcceptanceScriptTests
             source[..prefixEnd] + setup + source[completionStart..],
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         return harnessPath;
+    }
+
+    private static string[] RetainedPrefixModules(string prefix)
+    {
+        return Regex.Matches(
+                prefix,
+                "['\"](?<path>scripts[\\\\/][^'\"]+\\.psm1)['\"]",
+                RegexOptions.CultureInvariant)
+            .Select(match => match.Groups["path"].Value.Replace('\\', '/'))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string FixturePath(string root, string relativePath)
+    {
+        var segments = relativePath.Split(
+            '/',
+            StringSplitOptions.RemoveEmptyEntries);
+        return Path.Combine(
+            [root, .. segments]);
     }
 
     private static async Task InitializeRepositoryAsync(string repository)
