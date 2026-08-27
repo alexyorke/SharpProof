@@ -4,7 +4,596 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 ## Open and accepted findings
 
-No additional non-security findings remain unresolved for this pass. The remaining entries are deferred, partial, policy, rejected, or not reproduced; cybersecurity and integrity work remains explicitly out of scope.
+The current audit wave is running against exact baseline
+ffe74fff1c852d073610cfbebc54c141521a25fb. Twenty read-only agents are
+reviewing non-overlapping subsystems. Agents may build or execute disposable
+probes, but they do not modify the repository and do not write this ledger.
+The main agent is the sole BUGS.md writer.
+
+The following non-security findings were reproduced by their reporting agents
+before being added here. No production, test, build, or configuration changes
+are included in this audit-only wave.
+
+### 424. [CONFIRMED] Explicitly selected local functions are silently ignored instead of receiving SP0047
+
+**Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around
+lines 116-122; SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
+lines 5-34 and 383-387; SharpProof.Analyzer.Core/LanguageSubsetGate.cs around
+lines 51-57 and 120-145.
+
+**Description**: The analyzer registers a syntax action for local functions and
+lambdas, but ValidateNestedCallableDeclaration only validates trusted and
+suppression control attributes. It never applies feature selection or the
+language-subset gate. Roslyn does not send local functions through the ordinary
+method analysis path used here, and AnalyzeUnselectedOperationBlock explicitly
+returns for MethodKind.LocalFunction and MethodKind.AnonymousFunction.
+Consequently, a local function explicitly marked EnforcePure or otherwise
+selected can receive no SharpProof diagnostic at all. The equivalent ordinary
+method is analyzed, while LanguageSubsetGate itself classifies local functions
+as UnsupportedCallable. This conflicts with the documented rule that an
+explicitly selected unsupported callable receives SP0047 rather than silently
+losing coverage.
+
+**Reproduction**:
+
+1. Compile a method containing
+   [EnforcePure] static void SelectedLocal() { state = 1; }.
+2. Include an equivalent ordinary EnforcePure method as an analyzer-activation
+   control.
+3. Run the built analyzer. The control produces SP0002, compiler diagnostics
+   are empty, and the selected local function produces no diagnostic.
+
+The reporting agent's disposable harness at
+C:/w/audit-local-selected produced only:
+
+    SP0002|19|Method 'SelectedOrdinary' is marked [EnforcePure], but its effects do not prove observable purity
+
+**Impact**: Users can explicitly request proof or effect analysis for a local
+callable and receive silence instead of either evidence or a fail-closed
+unsupported-callable diagnostic. This creates an analyzer coverage blind spot
+and makes selection appear to have succeeded.
+
+**Root cause**: Nested-callable syntax handling is limited to control-attribute
+validation, while every operation-block path intentionally excludes nested
+callables. No reconciliation path owns selected nested callables.
+
+**Recommended fix**: Resolve the nested callable IMethodSymbol in the syntax
+action, reuse the ordinary feature-selection and suppression policy, and for
+each selected unsuppressed nested callable report
+SelectedAnalysisIncompleteRule with UnsupportedCallable. Record the semantic
+outcome as Abstained so reconciliation and telemetry remain consistent. Keep
+the existing control-attribute validation in the same path.
+
+**Regression coverage**: Add cases for an impure selected local function and an
+attributed lambda expecting exactly SP0047, an unannotated nested callable
+expecting silence, and a selected plus suppressed nested callable retaining the
+documented suppression behavior.
+
+**Confidence**: High; reproduced with an exact analyzer harness outside the
+repository and traced through all registered nested-callable analysis paths.
+
+### 425. [CONFIRMED] Nullable string concatenation ignores null tags and produces spurious SMT counterexamples
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 329-335, 548-549,
+603-610, and model decoding around lines 469-471.
+
+**Description**: A nullable string variable is encoded as an unconstrained
+sequence payload plus an independent Boolean null tag. StringConcat passes the
+raw sequence payloads directly to Z3 MkConcat and ignores the null tags. The IR
+interpreter follows C# concatenation semantics and treats a null string operand
+as the empty string. When a variable is null, Z3 can therefore choose an
+arbitrary nonempty hidden payload and refute a property that is universally
+true under interpreter semantics. Model decoding discards that hidden payload
+and returns Null, so replay rejects the spurious counterexample.
+
+**Reproduction**: Verify the tautology:
+
+    text != null || text + "x" == "x"
+
+The canonical Linux-amd64 probe reported:
+
+    interpreter null-case goal=Value/True
+    backend=Satisfiable failure=None text=Null
+    kernel=UnknownOutcome reason=CounterexampleReplayFailed
+
+The raw backend result is satisfiable even though the decoded null model
+satisfies the property in the interpreter.
+
+**Impact**: The public SMT backend returns false SAT and ProofKernel degrades a
+provable query to Unknown/CounterexampleReplayFailed. Replay prevents a false
+refutation, and the current worker proof-domain gate rejects string
+concatenation, so this is a precision and backend-correctness defect rather than
+a present false worker verdict.
+
+**Root cause**: Nullness is modeled separately, but StringConcat consumes only
+EncodedValue.Value. Existing coverage checks a different null case and does not
+constrain the hidden payload.
+
+**Recommended fix**: Normalize each concatenation operand to
+ITE(IsNull, EmptySeq, Value) before MkConcat, or globally assert the invariant
+IsNull implies Value equals EmptySeq for every nullable string symbol. Preserve
+the existing Defined and non-null result semantics.
+
+**Regression coverage**: Add left-null and right-null variable tautologies and
+require backend Unsatisfiable plus kernel Proven. Retain a non-null variable
+control and the existing interpreter/model replay checks.
+
+**Confidence**: High; independently reproduced by two audit agents with
+canonical probes and confirmed against the encoder and decoder paths.
+
+### 426. [CONFIRMED] Acceptance skip-mode tests abort before exercising status semantics because their fixture omits a required module
+
+**Location**: SharpProof.ArchitectureTest/AcceptanceScriptTests.cs around
+lines 139-180 and WriteHarness around line 237; eng/acceptance/Verify.ps1 around
+line 240.
+
+**Description**: WriteHarness constructs a temporary repository and copies
+SharpProof.FuzzEvidenceLifecycle.ps1, but it does not copy
+scripts/SharpProof.ContainerExecution.psm1. The retained preflight prefix of
+Verify.ps1 imports that module and calls Get-SharpProofTestProjectParallelism.
+Every SkipModesCannotProduceQualifyingAcceptanceEvidence case therefore exits
+during preflight, before the test can distinguish passed from incomplete
+evidence. The catch path rethrows a generic ScriptHalted exception, obscuring
+the missing fixture dependency.
+
+**Reproduction**: Run the four parameterizations of
+SkipModesCannotProduceQualifyingAcceptanceEvidence in the canonical container.
+All four exit 1 at VerifyHarness.ps1 instead of returning the expected evidence.
+In a disposable copy, adding only SharpProof.ContainerExecution.psm1 to the
+fixture made all AcceptanceScriptTests pass: 19 passed, 0 failed.
+
+**Impact**: The Architecture suite is red and the intended release-evidence
+invariant is not tested. A real regression in acceptance passed/incomplete
+classification could be hidden behind the fixture's earlier module failure.
+
+**Root cause**: Commit 785c64391 added a new Verify.ps1 module dependency
+without updating the source-slicing fixture. Later preflight refactoring kept
+the dependency in the retained prefix.
+
+**Recommended fix**: Copy SharpProof.ContainerExecution.psm1 into the fixture's
+scripts directory beside SharpProof.FuzzEvidenceLifecycle.ps1. Longer term,
+make the harness dependency list explicit or introduce a test seam after
+preflight so source slicing cannot silently omit imported modules.
+
+**Regression coverage**: Keep all four skip-mode cases, assert exit 0 and exact
+passed/incomplete evidence, and add a fixture-integrity assertion that every
+module imported by the retained prefix exists before execution.
+
+**Confidence**: High; reproduced red at HEAD and green in a disposable
+one-change probe.
+
+### 427. [CONFIRMED] Structural complexity ratchets are stale and make the canonical Architecture suite fail
+
+**Location**: eng/acceptance/algorithm-size-ratchets.json and
+SharpProof.ArchitectureTest/ArchitectureTests.cs, with violations in
+SharpProof.Frontend/RoslynOperationLowerer.cs,
+SharpProof.Frontend/RoslynProgramLowerer.cs,
+SharpProof.Dataflow/ForwardDataflowAnalysis.cs,
+SharpProof.Dataflow/IntervalDomain.cs,
+SharpProof.Effects/OperationEffectScanner.cs, and
+SharpProof.Effects/OperationEffectScanner.Assignments.cs.
+
+**Description**: AlgorithmLayersStayWithinStructuralComplexityCaps fails with
+nine deterministic violations:
+
+- RoslynOperationLowerer.cs: 2960 expressions over 2792 and 155 decisions over
+  150.
+- VisitBinaryOperator: 353 expressions over 340.
+- RoslynProgramLowerer.cs: 1956 expressions over 1920.
+- ForwardDataflowAnalysis.cs: 512 expressions over 495.
+- ForwardDataflowAnalysis.AnalyzeCore: 353 expressions over 350.
+- IntervalDomain.Create: 173 expressions over 150.
+- OperationEffectScanner.cs: 265 decisions over 256.
+- OperationEffectScanner.Assignments.cs: 437 expressions over 435.
+
+The ratchet manifest was last updated by 3a04e6c8b, while all six measured
+sources changed afterward. The production-ceiling rationale test still passes,
+so the failure is not a Roslyn measurement or inventory anomaly.
+
+**Impact**: The canonical test suite cannot pass, preventing the architecture
+gate from distinguishing new complexity growth from already-landed growth.
+Simply leaving the suite red also removes the practical enforcement value of
+the ratchet for subsequent changes.
+
+**Root cause**: Recent correctness work increased measured expressions and
+decisions without decomposing affected members or reviewing the corresponding
+ratchets.
+
+**Recommended fix**: First extract and simplify the three member-level
+violations, especially VisitBinaryOperator, AnalyzeCore, and IntervalDomain.Create.
+Split file-level responsibilities where that materially reduces complexity.
+Only after review, update unavoidable file-level ceilings to the measured
+values with a recorded rationale. Do not raise the separate aggregate
+production contract and do not delete assertions.
+
+**Regression coverage**: Run the focused
+AlgorithmLayersStayWithinStructuralComplexityCaps test plus Frontend, Dataflow,
+and Effects suites after decomposition. Require the ratchet to pass from a clean
+canonical build.
+
+**Confidence**: High; reproduced by two agents and by the canonical full test
+run with identical metrics.
+
+### 428. [CONFIRMED] Fuzz case-seed truncation silently repeats cases within supported campaigns
+
+**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 152, 197, 263,
+and 562-572; existing coverage in
+SharpProof.Fuzz.Test/FuzzRunnerTests.cs around lines 88-105.
+
+**Description**: CreateCaseSeed hashes the 64-bit seed/index pair through a
+bijective SplitMix64 transform, then returns only the low signed 32 bits.
+Truncation destroys injectivity. Equal case seeds drive the frontend, finite
+SMT, and partial SMT generators, so a collision repeats the entire semantic
+case bundle while both entries are counted as distinct cases and agreements.
+
+**Reproduction evidence**:
+
+- Seed 20260523, 10,000 requested cases: 9,999 unique; indices 5055 and 6447
+  both produce 81445770.
+- Seed 20260605, 10,000 requested cases: 9,999 unique; indices 3773 and 7592
+  both produce 1860187170.
+- Retained seed 23063 at MaximumCases 1,000,000: 999,890 unique; 110
+  duplicates. The first collision is indices 28670 and 48952 producing
+  -1505345985.
+
+The frontend generator uses caseSeed xor 0x35A1D7, the finite SMT generator
+uses caseSeed xor 0x6C8E9CF5, and the partial SMT generator uses caseSeed xor
+0x243F6A88. Each downstream generator is otherwise deterministic, so a
+collision repeats the observable generated case. The current regression checks
+only 1,000 indices and misses scheduled nightly collisions.
+
+**Impact**: Fuzz evidence overstates unique semantic coverage. The scheduled
+10,000-case campaign already has a known duplicate, and maximum-size campaigns
+can count many repeated bundles as independent agreements.
+
+**Root cause**: A 64-bit permutation is projected into a 32-bit seed without a
+within-campaign uniqueness guarantee.
+
+**Recommended fix**: Use a seed-keyed bijective 32-bit permutation of the case
+index. A keyed multi-round Feistel permutation or another explicitly invertible
+32-bit construction preserves uniqueness for every fixed base seed. Inject the
+base-seed key between rounds so different campaign seeds do not become simple
+shifted streams.
+
+**Regression coverage**: Pin both known collision pairs, assert one million
+indices for retained seed 23063 are distinct, and retain the existing
+cross-seed shifted-stream test.
+
+**Confidence**: High; exact unchecked UInt64 arithmetic was reproduced outside
+the repository and every downstream entropy path was traced.
+
+### 429. [CONFIRMED] SPMETA010 drops earlier reaching values after two conditional assignments
+
+**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
+lines 253-294.
+
+**Description**: ResolveLocal gathers all preceding writes to a local, but if
+the last write is conditionally executed it analyzes only writes[-2] and
+writes[-1]. Earlier reaching values are discarded. This leaves a normal
+control-flow bypass:
+
+    var answer = Answer.Unknown;
+    if (first) answer = Answer.Proven;
+    if (second) answer = Answer.Proven;
+    cache.Write(answer);
+
+When both conditions are false, Answer.Unknown reaches the semantic cache. The
+analyzer inspects only the two Proven right-hand sides and emits no SPMETA010.
+
+**Reproduction**: A canonical exact-source probe using ProofCache :
+ISemanticCache reported:
+
+    COMPILER_ERROR_COUNT=0
+    SPMETA010_COUNT=0
+    CONTROL_SPMETA010_COUNT=1
+
+The control writes the direct Unknown value and proves the analyzer was active
+and recognized the vocabulary. This is distinct from the older two-write loop
+case: the current implementation handles its previous and last writes, but
+still drops the third predecessor.
+
+**Impact**: The static guard against caching transient, unknown, or abstaining
+semantic answers can be bypassed with ordinary sibling conditionals. Runtime
+validation may still protect current production caches, but the soundness
+analyzer does not enforce the policy it claims to enforce.
+
+**Root cause**: A last-two-write syntax heuristic substitutes for a
+control-flow reaching-definition join.
+
+**Recommended fix**: Replace the heuristic with CFG-based may-be-noncacheable
+state analysis. Join all feasible predecessor states at conditionals and loops,
+and clear a noncacheable state only when an unconditional assignment dominates
+the cache write. Preserve nested-callable and alias handling.
+
+**Regression coverage**: Add the three-write sibling-conditional case expecting
+exactly one SPMETA010 and an unconditional final Answer.Proven assignment
+control expecting none. Add a four-predecessor switch or nested-conditional
+case to prevent another fixed-depth heuristic.
+
+**Confidence**: High; reproduced with zero compiler errors against the exact
+Meta analyzer sources and a positive direct-write control.
+
+### 430. [CONFIRMED] Failed performance-gate preflight can leave stale passing evidence for CI upload
+
+**Location**: scripts/Invoke-SharpProofGateEvidence.ps1 around lines 23-40;
+scripts/Invoke-SharpProofContainer.ps1 around lines 43-44, 80-90, and 237-245;
+eng/container/entrypoint.sh around lines 178-188; .github/workflows/ci.yml
+around lines 37-52.
+
+**Description**: Invoke-SharpProofGateEvidence computes test-project
+parallelism before it resolves and purges its output, raw-output, and stderr
+files. Its pr-gates and performance callers perform additional failure-prone
+parallelism, restore, and build work before invoking that producer. Container
+entry preserves the artifacts directory, and CI uploads it with an
+always-running artifact step. A failed rerun can therefore retain and upload a
+previous successful performance.json.
+
+**Reproduction**: In a disposable minimal repository, seed all three owned
+evidence files and use a contract with CPU divisor 0 so
+Get-SharpProofTestProjectParallelism fails. The script exits 1 with "The
+test-project CPU divisor must be positive", while output, raw output, and stderr
+sentinels all remain present.
+
+**Impact**: A later failed gate can expose stale passing evidence to CI,
+operators, or downstream automation. Embedded identity may let a careful
+consumer detect staleness, but the artifact lifecycle itself incorrectly
+preserves a prior success.
+
+**Root cause**: Evidence invalidation is nested inside a producer reached only
+after caller preflight/build work, and a later parallelism preflight was placed
+above even the producer's own purge.
+
+**Recommended fix**: Centralize owned performance-evidence invalidation or a
+failure tombstone at command entry before parallelism, restore, and build.
+Also move the producer's parallelism lookup below that purge. Ensure every
+entrypoint that owns these paths uses the same lifecycle helper.
+
+**Regression coverage**: Seed all owned outputs in a persistent-artifacts
+fixture, independently force producer-parallelism failure and outer-build
+failure, and assert no prior success survives. Replace the current
+contains-only architecture assertion with an executable ordering fixture.
+
+**Confidence**: High; the agent reproduced the stale files in a temp fixture
+and traced the complete persistent-artifact and always-upload path.
+
+### 431. [CONFIRMED] API-spec generators accept ambiguous duplicate JSON properties
+
+**Location**: scripts/Generate-ApiSpecCatalog.ps1 around line 584;
+SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1 around line 62;
+SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs around line 18;
+consumer identity in SharpProof.Worker/WorkerInputSnapshot.cs around line 63.
+
+**Description**: The API-spec catalog is the human-reviewed source of truth,
+but its generators parse it with ConvertFrom-Json and parity tests read it with
+JsonDocument.GetProperty. Neither path recursively rejects duplicate object
+property names. Both select a last-wins value, so contradictory reviewed
+properties can generate code and still pass parity.
+
+**Reproduction**: In an isolated canonical container, duplicate the root
+property:
+
+    "tableVersion": "5",
+    "tableVersion": "shadow",
+
+The generator exits 0 and emits:
+
+    public const string DefaultTableVersion = "shadow";
+
+JsonDocument.GetProperty also returns shadow, so the parity test agrees with
+the ambiguous generator input and remains green.
+
+**Impact**: Contradictory root or nested catalog values can silently change
+generated claims, protocol summaries, and cache/input identity while the
+review-source parity tests pass.
+
+**Root cause**: The catalog has no strict duplicate-property preflight before
+PowerShell or .NET JSON conversion. Sibling generators already implement this
+class of validation, but the API-spec paths do not share it.
+
+**Recommended fix**: Add a shared strict catalog reader that recursively walks
+every JsonDocument object with an ordinal property-name set and rejects
+duplicates before conversion. Use it in both API-spec generators and in parity
+source loading, with path-qualified errors.
+
+**Regression coverage**: Require nonzero generation for duplicate root
+tableVersion and a nested duplicate such as facets.nullness.result. Add a
+parity-reader test proving rejection occurs before value comparison.
+
+**Confidence**: High; reproduced in the canonical container, including the
+green last-wins parity behavior.
+
+### 432. [CONFIRMED] Protocol response compaction materializes the full expanded JSON before enforcing the size limit
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 137-151;
+existing large-shape coverage in
+SharpProof.Worker.Test/ProtocolJsonTests.cs around line 86.
+
+**Description**: SerializeResponse first calls JsonSerializer.Serialize for the
+fully expanded response, then measures its UTF-8 size, and only afterward calls
+CompactClaimAssumptions. Claim evidence can grow as
+O(assumptions multiplied by claims), while the manifest itself grows only
+linearly. The nominal 16 MiB protocol cap is therefore a post-allocation check,
+not a memory bound.
+
+**Reproduction**: A disposable probe against the built protocol-11 assembly
+created a valid 400-assumption, 100-claim response. The compact result was
+488,056 UTF-8 bytes and round-tripped as valid, but the initial serialization
+allocated 115,969,504 bytes before compaction. It retained 99 compact claim rows
+with one used assumption.
+
+**Impact**: A valid sub-limit input can exhaust worker memory before compaction
+or the typed response-too-large path runs. An allocation failure can terminate
+the worker without publishing worker.response_too_large.
+
+**Root cause**: The output-size limit is evaluated only after materializing an
+unbounded expanded string.
+
+**Recommended fix**: Serialize the first pass into a capped UTF-8
+IBufferWriter<byte> or stream that stops at MaximumJsonBytes plus one. On
+overflow, compact assumptions and serialize again through the same bounded
+writer. Never materialize the full expanded string.
+
+**Regression coverage**: Reuse the valid 400 by 100 fixture, prove validation
+before serialization and after compact round-trip, assert the first writer
+cannot retain or write beyond the cap, and add an allocation regression showing
+memory remains proportional to MaximumJsonBytes rather than expanded payload
+size.
+
+**Confidence**: High; the reporting agent measured the allocation and validated
+both expanded input and compact round-trip.
+
+### 433. [CONFIRMED] Non-completing member initializers do not suppress unreachable constructor call-site diagnostics
+
+**Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around
+lines 153-185; SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
+lines 330-358, 409-444, 503-510, and 555-627;
+SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines 111-145;
+SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs around lines 90-196.
+
+**Description**: C# executes instance field and property initializers before an
+explicit constructor initializer, a primary-constructor base initializer, and
+the constructor body. AnalyzerFeaturePipeline tracks non-completion only when
+deciding whether a later member initializer is reachable. Ordinary constructor
+call-site analysis, injected base/this initializer calls, and primary
+constructor base analysis do not consume that prefix reachability. If an
+earlier initializer definitely does not complete, SharpProof still analyzes
+calls that the runtime cannot execute and emits SP0027.
+
+**Reproduction**: The reporting agent used two types:
+
+- Explicit has private readonly int stop = Guard.Fail(), then an explicit
+  base(-1) initializer and Guard.Positive(-2) in its constructor body.
+- Primary(int marker) has the same throwing field initializer and Base(-3) as
+  its primary-constructor base call.
+
+The analyzer emitted three SP0027 diagnostics: explicit base, explicit body
+call, and primary base. A separate runtime-order control emitted only
+explicit-field and primary-field; no base-argument, base-body, or
+constructor-body event executed.
+
+**Impact**: The analyzer produces deterministic false precondition-violation
+diagnostics and disproven semantic outcomes for unreachable code. Warnings as
+errors can reject valid builds solely because an earlier initializer prevents
+constructor entry.
+
+**Root cause**: Member-initializer reachability is implemented as a private
+ordering check used only by AnalyzeMemberInitializer. Constructor and primary
+constructor Requires discovery build independent roots without joining the
+applicable initializer prefix.
+
+**Recommended fix**: Factor initializer ordering from
+CanReachMemberInitializer into a shared
+AllApplicableMemberInitializersMayComplete helper keyed by containing type and
+static/instance context. Gate ordinary and static constructor call-site
+analysis and AnalyzePrimaryConstructorInitializer on that prefix. Preserve
+contract placement and intrinsic validation; classify unreachable constructor
+call sites as NotApplicable rather than Proven.
+
+**Regression coverage**: Add a throwing instance initializer before explicit
+base and body calls, a throwing initializer before a primary base call, and a
+static-initializer/static-constructor equivalent. Completing-initializer
+controls must retain the existing SP0027 diagnostics.
+
+**Confidence**: High; the agent reproduced all three diagnostics and verified
+the actual runtime event order in independent disposable projects.
+
+### 434. [CONFIRMED] Every bounded protocol-file read allocates the full 16 MiB limit even for tiny files
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 40,
+70, and 118-134; amplified consumers in
+SharpProof.Worker/VerificationCache.cs around lines 55 and 125 and
+SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs around line 48.
+
+**Description**: The synchronous reader allocates a new
+byte[MaximumJsonBytes], and the asynchronous reader allocates
+byte[MaximumJsonBytes + 1], for every input. OpenJsonStream already checks the
+actual stream length against the limit, so using the upper bound as the initial
+buffer size is unnecessary.
+
+**Reproduction**: After warmup, the agent read a 1,042-byte protocol project
+file through the built protocol assembly and measured:
+
+    ReadBytesFileAllocated    = 16,873,664 bytes
+    ReadUtf8FileAllocated     = 16,866,192 bytes
+    ReadUtf8FileAsync total   = 16,828,136 bytes
+    FileReadAllBytesAllocated = 3,328 bytes
+    ReadBytesAmplification    = 16,193.5x
+
+**Impact**: Every tiny request, result, cache entry, or publication read creates
+a large-object-heap allocation. A small cache hit reads the candidate twice and
+can allocate roughly 32 MiB; validation paths with four reads can transiently
+allocate roughly 64 MiB. Repeated verification adds avoidable GC pressure,
+timing-envelope failures, and memory-failure risk.
+
+**Root cause**: MaximumJsonBytes is used as buffer capacity rather than solely
+as a validated upper bound.
+
+**Recommended fix**: Have OpenJsonStream return the checked file length,
+allocate exactly that many bytes, read exactly the expected length, and then
+perform one additional byte read to detect post-open growth. Apply the same
+pattern asynchronously. Continue rejecting shrink/growth inconsistencies,
+oversized data, invalid UTF-8, and cancellation.
+
+**Regression coverage**: Add warmed allocation tests for synchronous bytes,
+synchronous UTF-8, and asynchronous UTF-8 with a small fixture and a generous
+sub-1-MiB ceiling. Retain exact-limit, oversized, growth, cancellation, BOM, and
+invalid-UTF-8 cases.
+
+**Confidence**: High; measured against the HEAD protocol assembly with a
+standard-library allocation control.
+
+### 435. [CONFIRMED] SMT string variables admit malformed UTF-16 values that the IR domain rejects
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 117-126, 295-296,
+329-334, and 496-513; SharpProof.Ir/Utf16WellFormedness.cs around lines 11-28.
+
+**Description**: SMT strings are unconstrained Seq<Int> payloads plus null
+tags. Solver constraints do not require code units to be in the UTF-16 range or
+surrogates to form valid pairs. IrFactory and the interpreter reject lone
+surrogates, and model decoding later enforces that restriction. The solver can
+therefore refute a theorem with a value that does not exist in the IR domain,
+then fail while decoding its own model.
+
+**Reproduction theorem**:
+
+    left == null ||
+    right == null ||
+    left.Length != 1 ||
+    right.Length != 1 ||
+    left + right != "\uD83D\uDE00"
+
+No well-formed one-code-unit strings can hold the two isolated halves of the
+emoji surrogate pair, so the theorem is universally true in the IR domain. Z3
+uses left = [0xD83D] and right = [0xDE00], both non-null and length one, then
+concatenates them into the emoji. The canonical probe reported:
+
+    IR rejects isolated surrogate=True
+    backend=Unknown failure=MalformedResult
+    kernel=UnknownOutcome reason=MalformedBackendResult
+
+**Impact**: Supported theorems can become fatal malformed-backend outcomes
+instead of Proven. This is fail-closed, not a false green, but it is a direct
+domain mismatch between the public SMT backend and the IR interpreter.
+
+**Root cause**: String literals and decoded models are validated, but symbolic
+string variables receive no well-formed UTF-16 invariant.
+
+**Recommended fix**: Constrain each non-null symbolic string to the regular
+language:
+
+    ([0000-D7FF] | [E000-FFFF] | [D800-DBFF][DC00-DFFF])*
+
+A Seq<Int> regex-membership assertion guarded by the inverse null tag enforces
+both the 16-bit range and surrogate pairing without quantifiers. Retain decoder
+validation as defense in depth.
+
+**Regression coverage**: Add the theorem above beside the non-BMP UTF-16 length
+tests and require direct backend Unsatisfiable plus kernel Proven. Retain a
+valid emoji literal/model control.
+
+**Confidence**: High; the agent reproduced IR rejection, backend malformed
+result, and kernel outcome in a bounded canonical probe. This is distinct from
+the null-concatenation defect because both null tags are false.
 
 ## Deferred by explicit scope
 
