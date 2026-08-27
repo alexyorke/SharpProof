@@ -8555,6 +8555,308 @@ SPMETA catalog and replace/add the seven exact static BannedSymbols IDs. Generat
 inventory coverage from pinned Roslyn symbols. Test extension/static syntax,
 TryGet controls, lookalikes, deletion, and RS0030-as-error behavior.
 
+### 689. [CONFIRMED] Inline method-group delegate calls omit the exact target contract
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
+lines 44-75 and 591-624; `RequiresCallSiteTreeAnalyzer.cs`, around lines 35-64;
+`RequiresCallSiteAnalyzer.cs`, around lines 302-337.
+
+**Description**: For `((Action<int>)Positive)(-1)`, discovery records only
+`Action<int>.Invoke`. It ignores the child DelegateCreation/MethodReference that
+statically identifies `Positive`, so potential-owner screening drops the caller
+and the target's Requires is never bound.
+
+**Reproduction**: Roslyn exposed exact `MethodReference=Fixture.Positive(int)`;
+the candidate remained `Action<int>.Invoke`, potential owners excluded the caller,
+and no SP0027 appeared. Runtime invoked Positive with -1. A direct-call control
+produced one replayable candidate and SP0027.
+
+**Impact**: A definite precondition violation disappears solely because the
+exact method group is invoked through an inline delegate conversion.
+
+**Recommended fix**: When DelegateInvoke's instance is an inline delegate creation
+with an exact static method reference, add a second target and map arguments by
+ordinal/ref-kind. Preserve ordinary DelegateInvoke and fail closed for locals,
+parameters, multicast, lambdas, and uncertain closed-instance receivers. Test
+positive/negative/direct/unknown/null-receiver controls.
+
+### 690. [CONFIRMED] Custom interpolated-handler calls are discovered but never replayed
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
+lines 178-208, 425-471, and 538-624; `RequiresCallSiteAnalyzer.cs`, around lines
+339-342.
+
+**Description**: Compiler-generated handler construction, AppendLiteral, and
+AppendFormatted calls are discovered with exact targets, arguments, and Complete
+flow, but exact-span replay ownership rejects every nested protocol call.
+
+**Reproduction**: `Consume($"literal{1}")` executed handler ctor, literal append,
+and formatted append once each. All three false Requires candidates had
+`CanReplay=False HasFlow=True Status=Complete` and emitted nothing; direct controls
+emitted three SP0027 diagnostics.
+
+**Impact**: Contracts on custom logging/interpolation handlers are silently
+unenforced at their primary compiler-generated call sites.
+
+**Recommended fix**: Add handler-protocol-aware ordering: admit ungated ctor and
+append calls only after proving all earlier phases complete, while failing closed
+for out-bool construction gates and bool-returning short-circuit append methods
+unless their branches are proven. Test throwing/short-circuit/order, alignment,
+format overloads, and direct controls.
+
+### 691. [CONFIRMED] Redundant user Assume eclipses authoritative source-domain evidence
+
+**Location**: `SharpProof.Worker/CallableEvidenceBuilder.cs`, around lines 26-76
+and 153-160; `PostconditionObligationBuilder.cs`, around lines 14 and 51-55;
+`CallableClaimResultAssembler.cs`, around lines 39-70.
+
+**Description**: User clauses are interned before source-domain predicates.
+Predicate-ID dedup keeps the first evidence row regardless of provenance, so an
+identical user Assume removes stronger compiler-derived range evidence and is
+then marked Used.
+
+**Reproduction**: A narrow integral source-domain proof had core
+`domain:parameter:0` and no user row. Adding an identical range Assume changed
+the same theorem to core `assume:0` with the user row `Used=true`; both used one
+SMT query and proved.
+
+**Impact**: Public proof provenance falsely claims dependence on user evidence
+when language type semantics alone establish the result.
+
+**Recommended fix**: Make predicate dedup provenance-aware and prefer source
+LoweredJustification over identical UserAssumedJustification, retaining the user
+declaration as unused. Test redundant/nonredundant/mixed evidence controls.
+
+### 692. [CONFIRMED] Plan output inside PackageSource invalidates the certified bundle
+
+**Location**: `scripts/SharpProof.PublicationPlanTopology.ps1`, around lines
+46-176; `Publish-SharpProofRelease.ps1`, around lines 841-850 and 963-970;
+`SharpProof.ReleaseChecksums.ps1`, around lines 95-187.
+
+**Description**: Topology rejects reserved names and aliases of existing inputs,
+but permits a new ordinary PlanOutputPath inside PackageSource. Its filtered
+snapshot ignores that JSON file, while the release-bundle authority requires
+exactly nine top-level files.
+
+**Reproduction**: A valid nine-file bundle accepted and wrote
+`PackageSource/publication-plan.json`, returned success, then contained ten files
+and immediately failed exact-bundle validation.
+
+**Impact**: A natural plan-only output location self-invalidates qualified release
+bytes until manually removed.
+
+**Recommended fix**: Reject any canonically resolved plan output contained under
+PackageSource or the remote fixture directory before writing. Test new paths,
+case/symlink-resolved containment, disjoint output, and bundle preservation.
+
+### 693. [CONFIRMED] Discarded supported non-void calls become UnsupportedBody
+
+**Location**: `SharpProof.Frontend/RoslynProgramLowerer.cs`, around lines 142-152
+and 300-305; `CompilerCallableLowerer.cs`, around lines 202, 274, and 304;
+`AcyclicBlockPredicateExecutor.cs`, around lines 165-167.
+
+**Description**: Invocation statements pass `wantsResult=false`, so non-void calls
+receive no target variable. Compiler preparation requires a target for source
+summaries and API-spec calls and rejects the otherwise exact body.
+
+**Reproduction**: Discarded `Identity(value);` and `Math.Abs(value);` calls each
+made preparation fail `UnsupportedBody`. Assigning the unused result made both
+prepare successfully with one summary/spec call. Runtime results were identical.
+
+**Impact**: Ordinary statement-call syntax downgrades verifiable bodies to
+Unknown and prevents reusable summaries.
+
+**Recommended fix**: Allocate a sink temporary for every supported non-void call;
+omit targets only for void/unsupported returns. Test source-summary, API-spec,
+worker outcome parity, and void controls.
+
+### 694. [CONFIRMED] Async Task result allocation is omitted from complete effects
+
+**Location**: `SharpProof.Effects/EffectMethodNodeBuilder.cs`, around lines 22-102.
+
+**Description**: Source/CFG scanning never models compiler-generated async method
+builder/result allocation. An async Task/Task<T> method with no explicit creation
+can therefore remain Complete with Allocation=None.
+
+**Reproduction**: Sixty-four calls to `async Task<int>` returning noncached 1729
+allocated 4,608 bytes and returned distinct tasks; Effects reported None/Complete
+and a complete no-allocation projection. A non-async Task identity control
+allocated zero and correctly stayed None.
+
+**Impact**: ZeroAllocations/purity contracts can accept ordinary async methods
+that allocate fresh result objects.
+
+**Recommended fix**: Add method-level async lowering effects for canonical Task/
+Task<T>, conservatively Managed unless a proven cache-only case applies. Cover
+suspension, cached constants, ValueTask/custom task-like, async void, and witnesses.
+
+### 695. [CONFIRMED] Direct capturing local functions falsely report heap allocation
+
+**Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines 20-29
+and 102-153; `ConversionEffectClassifier.cs`, around lines 70-75.
+
+**Description**: Any captured symbol/receiver unconditionally adds Managed
+allocation, conflating captured-state tracking with delegate/closure
+materialization. A local function invoked directly can be stack-lowered with no
+heap object; actual delegate conversion already has separate allocation logic.
+
+**Reproduction**: 256 direct calls to a capturing local function allocated exactly
+zero bytes, but summary was Managed/Complete with Allocates. Returning the local
+function as Func allocated 5,632 bytes and correctly remained Managed.
+
+**Impact**: Complete summaries reject allocation-free code and produce false
+Allocates contracts.
+
+**Recommended fix**: Retain captured read/write regions but charge allocation only
+at actual anonymous-function/method-group materialization. Correct the stale
+direct-call test and add receiver/parameter plus escaping controls.
+
+### 696. [CONFIRMED] SP0048 points at the first assumption of any kind
+
+**Location**: `SharpProof.Worker.Launcher/Program.cs`, around lines 553-592;
+`SarifProjection.cs`, around lines 43-54.
+
+**Description**: Policy triggering counts only UserAssume/TrustedBoundary, but
+location selection chooses the first callable with any assumption. Launcher and
+SARIF independently repeat the broad predicate.
+
+**Reproduction**: In a fully valid response, an earlier callable contained only
+a Precondition and a later callable contained the used UserAssume. Both console
+SP0048 and SARIF notification pointed to `precondition.cs` instead of `user.cs`.
+
+**Impact**: Diagnostics navigate to unrelated code while reporting user/trusted
+evidence policy failures.
+
+**Recommended fix**: Centralize selection of the first callable/result containing
+UserAssume or TrustedBoundary only. Test earlier preconditions, both policy kinds,
+console structure, and SARIF URI.
+
+### 697. [CONFIRMED] Filesystem-root projects produce malformed SARIF base URIs
+
+**Location**: `SharpProof.Worker.Launcher/SarifProjection.cs`, around lines
+107-114 and 172-234.
+
+**Description**: ProjectRootUri unconditionally appends a directory separator.
+For `/`, it creates `//` and serializes `file:////`; relative artifact locations
+then resolve as URI authorities/hosts.
+
+**Reproduction**: With canonical project directory `/`, relative `user.cs`
+resolved from emitted `file:////` to `file://user.cs/` instead of
+`file:///user.cs`. Non-root already-terminated paths also gain a duplicate slash.
+
+**Impact**: SARIF navigation, artifact correlation, and baselining break for
+valid root-located projects.
+
+**Recommended fix**: Append a separator only when `Path.EndsInDirectorySeparator`
+is false, preserving root exactly. Parameterize root, terminated, and unterminated
+project paths with resolved-artifact assertions.
+
+### 698. [CONFIRMED] Banned-symbol inventory test uses overlapping substring matches
+
+**Location**: `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs`, around
+lines 168-201; example exact ID in `BannedSymbols.txt`, around line 13.
+
+**Description**: The architecture test treats BannedSymbols as arbitrary text and
+checks broad substrings. Sibling type/overload entries can satisfy a deleted exact
+documentation ID even though BannedApi matching is exact.
+
+**Reproduction**: Deleting only
+`Compilation.GetSemanticModel(SyntaxTree,bool)` left the inventory test passing.
+A direct compiler probe then built clean; restoring that line produced RS0030.
+
+**Impact**: Exact enforcement can disappear while the claimed inventory backstop
+remains green, particularly in BannedApi-only production projects.
+
+**Recommended fix**: Parse each noncomment line's exact documentation ID into a
+set, reject malformed/duplicate rows, and assert fully qualified IDs. Mutation-
+delete every overload independently and retain compiler probes.
+
+### 699. [CONFIRMED] Release needs test accepts commented-out dependencies
+
+**Location**: `SharpProof.ArchitectureTest/ReleaseCoverageBaselineTests.cs`,
+around lines 12-39; workflow dependency block in
+`.github/workflows/package-consumers.yml`, around lines 197-208.
+
+**Description**: The test searches the entire YAML text for dependency strings
+instead of parsing `jobs.release-qualification.needs`. Comments or unrelated job
+text satisfy it.
+
+**Reproduction**: Replacing active `- security` with `#      - security` left the
+test passing, while scoped parsing showed security absent from active needs. A
+job-scoped assertion failed the mutation and passed after restoration.
+
+**Impact**: Required qualification jobs can be disabled without the architecture
+backstop noticing, allowing publication jobs to bypass the omitted dependency.
+
+**Recommended fix**: Parse YAML and require the exact needs set, plus separate
+publisher-to-qualification dependencies. Test comment, move, misspell, duplicate,
+removal, and valid reorderings.
+
+### 700. [CONFIRMED] IrStructuralShrinker expands shared DAG occurrences exponentially
+
+**Location**: `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs`, around lines
+430-559.
+
+**Description**: Candidate generation creates a fresh local seen set on every
+recursive call and traverses shared children once per occurrence. Duplicate
+filtering happens only after repeated recursive rebuilding; cancellation cannot
+interrupt GetCandidates.
+
+**Reproduction**: Shared `Add(term,term)` DAGs with 9/13/17 unique nodes returned
+only three candidates but allocated 1.26/20.13/322.13 MB. Every four added unique
+nodes multiplied allocation by 16.
+
+**Impact**: Minimization can consume hundreds of MB or more on tiny valid terms
+and fail before emitting fuzz evidence.
+
+**Recommended fix**: Memoize candidate arrays by IrId for the full traversal (or
+visit unique DAG nodes/parent edges once), preserve deterministic order, and
+thread cancellation through enumeration. Add shared-depth allocation/visit-count
+and cancellation tests.
+
+### 701. [CONFIRMED] Generated frontend model admits unsupported sequence equality
+
+**Location**: `Tools/SharpProof.Fuzz/FrontendFuzzing.cs`, around lines 329-362
+and 1078-1086; `SharpProof.Frontend/RoslynOperationLowerer.cs`, around lines
+694-712.
+
+**Description**: GeneratedCSharpExpression accepts Equal/NotEqual over Sequence,
+but the frontend scalar subset rejects C# array equality as UnsupportedType. The
+oracle labels any non-exact lowering Mismatch.
+
+**Reproduction**: Benign `(values == values)` over `long[]` returned Mismatch with
+`Generated supported C# closed the frontend subset: UnsupportedType`; an
+otherwise same reference-equality control agreed.
+
+**Impact**: Public generator/test infrastructure false-reds model-valid cases and
+future sequence-coverage expansion.
+
+**Recommended fix**: Remove Sequence from supported equality operands unless
+array identity is implemented end-to-end, or return explicit Abstained. Add a
+model-vs-lowerer support matrix and integer/string/reference controls.
+
+### 702. [CONFIRMED] SPMETA008 misses EffectSummary record with-expressions
+
+**Location**: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around
+lines 120 and 190-221; `SharpProof.Effects/EffectSummary.cs`.
+
+**Description**: Construction enforcement registers only ObjectCreation and casts
+to `IObjectCreationOperation`. C# record cloning is `IWithOperation`, so
+`source with { }` creates a distinct EffectSummary outside the authority allowlist
+without SPMETA008.
+
+**Reproduction**: Direct `new` emitted one SPMETA008. A synthetic record and the
+real repository EffectSummary both compiled a With operation with zero
+diagnostics; runtime confirmed a distinct but equal instance.
+
+**Impact**: Consumers bypass the stated construction/identity boundary, and any
+future init member would also bypass constructor validation.
+
+**Recommended fix**: Register OperationKind.With, compare its type/operand to the
+known EffectSummary symbol, and apply the identical containing-type allowlist.
+Test rejected consumers, allowed EffectSummary/operations authorities, and direct
+new preservation.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
