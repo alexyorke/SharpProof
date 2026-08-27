@@ -604,8 +604,10 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 left.Value is SeqExpr leftString &&
                 right.Value is SeqExpr rightString)
             {
+                var leftOperand = StringConcatenationOperand(left, leftString);
+                var rightOperand = StringConcatenationOperand(right, rightString);
                 return new EncodedValue(
-                    Own(_context.MkConcat(leftString, rightString)),
+                    Own(_context.MkConcat(leftOperand, rightOperand)),
                     Own(_context.MkAnd(left.Defined, right.Defined)),
                     Own(_context.MkFalse()));
             }
@@ -626,6 +628,18 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 IrBinaryOperator.GreaterThanOrEqual => Comparison(Own(_context.MkGe(Integer(left), Integer(right))), defined),
                 _ => throw new UnsupportedIrEncodingException()
             };
+        }
+
+        private SeqExpr StringConcatenationOperand(
+            EncodedValue value,
+            SeqExpr sequence)
+        {
+            return value.IsNull == null
+                ? sequence
+                : (SeqExpr)Own(_context.MkITE(
+                    value.IsNull,
+                    Own(_context.MkEmptySeq(_stringSort)),
+                    sequence));
         }
 
         private EncodedValue EncodeDivision(

@@ -364,6 +364,58 @@ public sealed class IrSmtBackendTests
             Is.EqualTo(IrValueKind.Null));
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task NullableStringConcatUsesEmptyStringForNullOperand(
+        bool variableOnLeft)
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("text", factory.StringType);
+        var variableTerm = factory.Variable(variable);
+        var suffix = factory.String("x");
+        var concatenated = factory.Binary(
+            IrBinaryOperator.StringConcat,
+            variableOnLeft ? variableTerm : suffix,
+            variableOnLeft ? suffix : variableTerm);
+        var nonNull = factory.Binary(
+            IrBinaryOperator.NotEqual,
+            variableTerm,
+            factory.Null(factory.StringType));
+        var goal = factory.Binary(
+            IrBinaryOperator.OrElse,
+            nonNull,
+            factory.Binary(
+                IrBinaryOperator.Equal,
+                concatenated,
+                suffix));
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)));
+
+        using (var backend = new IrSmtBackend())
+        {
+            var result = await backend.CheckAsync(
+                query,
+                CancellationToken.None);
+
+            Assert.That(
+                result.Status,
+                Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+        }
+
+        using (var backend = new IrSmtBackend())
+        {
+            var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+            Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
+        }
+    }
+
     [Test]
     public async Task DynamicStringConcatFindsTheUnselectedBranchCounterexample()
     {
