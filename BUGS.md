@@ -72,52 +72,6 @@ documented suppression behavior.
 **Confidence**: High; reproduced with an exact analyzer harness outside the
 repository and traced through all registered nested-callable analysis paths.
 
-### 431. [CONFIRMED] API-spec generators accept ambiguous duplicate JSON properties
-
-**Location**: scripts/Generate-ApiSpecCatalog.ps1 around line 584;
-SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1 around line 62;
-SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs around line 18;
-consumer identity in SharpProof.Worker/WorkerInputSnapshot.cs around line 63.
-
-**Description**: The API-spec catalog is the human-reviewed source of truth,
-but its generators parse it with ConvertFrom-Json and parity tests read it with
-JsonDocument.GetProperty. Neither path recursively rejects duplicate object
-property names. Both select a last-wins value, so contradictory reviewed
-properties can generate code and still pass parity.
-
-**Reproduction**: In an isolated canonical container, duplicate the root
-property:
-
-    "tableVersion": "5",
-    "tableVersion": "shadow",
-
-The generator exits 0 and emits:
-
-    public const string DefaultTableVersion = "shadow";
-
-JsonDocument.GetProperty also returns shadow, so the parity test agrees with
-the ambiguous generator input and remains green.
-
-**Impact**: Contradictory root or nested catalog values can silently change
-generated claims, protocol summaries, and cache/input identity while the
-review-source parity tests pass.
-
-**Root cause**: The catalog has no strict duplicate-property preflight before
-PowerShell or .NET JSON conversion. Sibling generators already implement this
-class of validation, but the API-spec paths do not share it.
-
-**Recommended fix**: Add a shared strict catalog reader that recursively walks
-every JsonDocument object with an ordinal property-name set and rejects
-duplicates before conversion. Use it in both API-spec generators and in parity
-source loading, with path-qualified errors.
-
-**Regression coverage**: Require nonzero generation for duplicate root
-tableVersion and a nested duplicate such as facets.nullness.result. Add a
-parity-reader test proving rejection occurs before value comparison.
-
-**Confidence**: High; reproduced in the canonical container, including the
-green last-wins parity behavior.
-
 ### 432. [CONFIRMED] Protocol response compaction materializes the full expanded JSON before enforcing the size limit
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 137-151;
