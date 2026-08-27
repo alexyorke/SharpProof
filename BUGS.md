@@ -8363,6 +8363,198 @@ pressure on every query, including trivial Boolean checks.
 or cache one backend-owned symbol disposed before Context. Test N-query finalizer
 growth, correct resource limits, cancellation, and exceptional exits.
 
+### 681. [CONFIRMED] Debug mutation campaigns can satisfy Release qualification
+
+**Location**: `scripts/Invoke-SharpProofContainer.ps1`, around lines 7-8 and
+298-313; `Test-SharpProofMutationCatalog.ps1`, around lines 44-55 and 108-112;
+`Write-SharpProofQualificationReceipt.ps1`, around lines 84-90;
+`Invoke-SharpProofReleaseContainer.ps1`, around lines 184-209.
+
+**Description**: Mutation evidence serializes its configuration but validators
+derive identities from that value and never require Release. Receipt generation
+and final qualification likewise ignore it. The dispatcher default is Debug;
+only current workflow wiring happens to pass Release explicitly.
+
+**Reproduction**: Exact authorities accepted a complete 2/2 Debug campaign,
+minted a passed mutation receipt, and accepted that receipt in a ten-gate final
+qualification with `status=passed`.
+
+**Impact**: A default/manual mutation run or workflow drift can certify Debug-only
+mutation kills for Release artifacts.
+
+**Recommended fix**: Require exact Release configuration in catalog validation,
+receipt minting, and final qualification, and bind the expected configuration in
+receipt semantics. Test fully valid Debug rejection at all three layers and
+explicit Release success.
+
+### 682. [CONFIRMED] BannedSymbols omits eight nullable-aware SymbolDisplay overloads
+
+**Location**: `BannedSymbols.txt`, around lines 48-53; policy catalog in
+`SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around lines 75-79
+and 179-187.
+
+**Description**: The inventory bans reduced ISymbol display APIs but omits all
+public CSharp `SymbolDisplay` overloads taking `ITypeSymbol` plus
+`NullableFlowState` or `NullableAnnotation` across ToDisplayString,
+ToDisplayParts, ToMinimalDisplayString, and ToMinimalDisplayParts.
+
+**Reproduction**: The real BannedApi analyzer emitted RS0030 for ordinary
+ISymbol.ToDisplayString and AddSyntaxTrees controls but zero diagnostics for all
+eight exact candidates. Adding their static documentation IDs produced exactly
+eight warnings, one per call.
+
+**Impact**: Production projects outside the Meta-analyzer subset can use nullable-
+aware presentation strings as semantic identities while the repo-wide banned-API
+layer stays green.
+
+**Recommended fix**: Add the eight exact
+`Microsoft.CodeAnalysis.CSharp.SymbolDisplay.*` documentation IDs. Add a compile
+fixture/inventory test that enumerates every public pinned-Roslyn overload in the
+four policy families, plus lookalike and warnings-as-errors controls.
+
+### 683. [CONFIRMED] SARIF treats colon-bearing relative source paths as URI schemes
+
+**Location**: `SharpProof.Worker.Launcher/SarifProjection.cs`, around lines
+172-255; source-location validation in
+`SharpProof.Worker.Protocol/ProtocolModel.generated.cs`, around lines 839-844.
+
+**Description**: `LocationUri` first tries absolute generic URI parsing. A legal
+relative Linux/compiler-mapped path such as `generated:Subject.cs` is therefore
+interpreted as an absolute `generated:` scheme, bypassing relative segment
+escaping even though the SARIF location carries `uriBaseId=PROJECTROOT`.
+
+**Reproduction**: A protocol-valid completed response emitted
+`uri=generated:Subject.cs`; resolving it against `file:///tmp/project/` still
+returned the custom scheme. The expected project file was
+`file:///tmp/project/generated%3ASubject.cs`.
+
+**Impact**: Editor/code-scanning navigation, artifact correlation, and baselining
+can fail or split for claim, incomplete-callable, witness, and notification
+locations sharing this helper.
+
+**Recommended fix**: Classify filesystem paths before URI construction: recognize
+Unix-rooted, Windows drive-rooted, and supported UNC forms as absolute file paths;
+otherwise always escape relative segments. Represent intentional non-file URIs
+explicitly. Test first/nested colons and Unix/Windows absolute controls.
+
+### 684. [CONFIRMED] IrPrinter exponentially expands tiny shared DAGs until OOM
+
+**Location**: `SharpProof.Ir/IrPrinter.cs`, around lines 5-26;
+`IrPrinterProjections.generated.cs`, around lines 24-29; consumers include
+`RequiresCallSiteAnalyzer.cs`, around lines 537-545, and `FuzzRunner.cs`, around
+lines 309-329.
+
+**Description**: The printer guards only maximum depth, then recursively expands
+both child references as if the hash-consed DAG were a tree. A small repeated-
+child DAG can have shallow depth but exponential rendered length; no output/node/
+character budget exists.
+
+**Reproduction**: Repeatedly setting `term = AndAlso(term, term)` produced only 24
+unique nodes and depth 24. Printing under a 256 MiB heap cap threw
+OutOfMemoryException after about 3.96 GB cumulative allocations. Depth 21 already
+rendered 8.39 MB and allocated 470 MB.
+
+**Impact**: Valid compact IR can replace expected diagnostics/fuzz evidence with
+OOM despite being far below the advertised depth limit.
+
+**Recommended fix**: Compute expanded length iteratively with saturating arithmetic
+or format into a capped builder, returning an attributable bounded result before
+large allocation. Preserve canonical text below the cap. Test shared-DAG boundary,
+linear-depth guard, low allocations, and analyzer/fuzz graceful degradation.
+
+### 685. [CONFIRMED] A transient symbol push failure makes release publication non-retryable
+
+**Location**: `scripts/Publish-SharpProofRelease.ps1`, around lines 690-727,
+883-945, and 982-1009; `scripts/SharpProof.PublicationDestination.ps1`, around
+lines 359-389.
+
+**Description**: Publication pushes each main nupkg before its snupkg. If the
+symbol push fails transiently, a retry sees the already-published main, and
+preflight throws on every HTTP 200 without comparing bytes. Although the planner
+computes main/symbol actions, the execution loop ignores them.
+
+**Reproduction**: Exact preflight returned Absent initially. The inspected loop
+proved main-before-symbol ordering and no action use or skip-duplicate behavior.
+On retry, byte-identical present-main state was rejected as
+`Remote main package already exists`, before reaching the missing symbol.
+
+**Impact**: One ordinary transient feed failure can leave an immutable public
+version permanently missing symbols with no supported automated repair.
+
+**Recommended fix**: Download/compare present main bytes, classify exact identity
+as ExactPresent/Skip and mismatch as Collision, and make execution honor both
+planned actions so missing symbols retry independently. Test main success plus
+symbol failure then successful retry, collision, fresh publish, and complete no-op.
+
+### 686. [CONFIRMED] Unsupported IR cast pairs become false differential mismatches
+
+**Location**: `SharpProof.Ir/IrTermServices.cs`, around lines 206-214;
+`SharpProof.Testing/IrCSharpDifferentialOracle.cs`, around lines 55-68, 255-265,
+and 302-318.
+
+**Description**: IrFactory accepts broad nullable/reference-like cast pairs, but
+the differential renderer emits every pair as a C# explicit cast without checking
+the common interpreter/C# conversion subset. A generated compiler error is then
+classified as Mismatch.
+
+**Reproduction**: A valid IR `Cast(string, Variable(long[]))` with benign sequence
+data returned interpreter `UnsupportedCast`; the oracle generated `(string)long[]`,
+hit CS0030, and reported Mismatch rather than Abstained.
+
+**Impact**: The public differential oracle produces false reds for factory-valid
+terms where neither implementation semantically disagrees.
+
+**Recommended fix**: Preflight cast source/target pairs and abstain unless both
+the interpreter and C# implement the conversion. Do not blanket-abstain all
+compiler errors. Test sequence/string directions, supported object-to-string
+values/null/failure, and folded identity/null cases.
+
+### 687. [CONFIRMED] Finite-SMT term generation materializes unused environments
+
+**Location**: `SharpProof.Testing/WellSortedIrGenerator.cs`, around lines 77-121;
+`Tools/SharpProof.Fuzz/FuzzRunner.cs`, around lines 526-559.
+
+**Description**: The finite-SMT candidate loop needs only `generated.Term`, but
+`NextArithmeticOrBoolean` always creates a full GeneratedIrCase, six concrete
+bindings, a dictionary, and unrelated random values before returning the term.
+
+**Reproduction**: 100,000 fixed-term calls materialized 600,000 bindings and
+allocated 123,775,944 bytes, about 1,238 bytes per discarded case. Replaying the
+term-only path with the same seed changed the next term because discarded
+environment draws also consume the shared RNG stream.
+
+**Impact**: Up to roughly 79 KB per 64-attempt case is irrelevant allocation, and
+environment refactors perturb formula coverage for the same seed.
+
+**Recommended fix**: Split term generation from environment materialization and
+use independent/versioned deterministic PRNG streams. Test no binding allocations,
+stable term fingerprints across environment-only changes, and full-case controls.
+
+### 688. [CONFIRMED] Seven CSharp speculative-binding APIs bypass both enforcement layers
+
+**Location**: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around
+lines 51-66; `BannedSymbols.txt`, around lines 18-20.
+
+**Description**: GetSpeculativeSymbolInfo, GetSpeculativeTypeInfo, and
+GetSpeculativeAliasInfo are catalogued under SemanticModel/internal
+CSharpSemanticModel, while all seven public C# overloads bind to static
+`Microsoft.CodeAnalysis.CSharp.CSharpExtensions`. The banned IDs likewise use
+nonmatching reduced-looking SemanticModel signatures.
+
+**Reproduction**: Exact Roslyn operation binding showed all seven calls with
+ContainingType=CSharpExtensions and `ReducedFrom=null`. A GetDiagnostics control
+emitted SPMETA001/RS0030; all seven candidates emitted neither. Adding the seven
+exact static documentation IDs produced exactly seven RS0030 warnings.
+
+**Impact**: Analyzer-attached code can perform speculative expression, cref,
+attribute, constructor-initializer, primary-base, type, and alias binding while
+both claimed compile-time safeguards remain green.
+
+**Recommended fix**: Add all three method families to the CSharpExtensions
+SPMETA catalog and replace/add the seven exact static BannedSymbols IDs. Generate
+inventory coverage from pinned Roslyn symbols. Test extension/static syntax,
+TryGet controls, lookalikes, deletion, and RS0030-as-error behavior.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
