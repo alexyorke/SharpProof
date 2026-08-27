@@ -7937,6 +7937,98 @@ build an exact post-getter/RHS replay state when definitely null. Test block and
 expression getters, RHS failure, indexers, nullable values, and single-evaluation
 ordering.
 
+### 662. [CONFIRMED] Supervisor control records leak into user-visible verifier output
+
+**Location**: `SharpProof.BuildTasks/VerifierProcessSupervisor.cs`, around lines
+94-105 and 218-225; `RunVerifier.cs`, around lines 342-353 and 607-705.
+
+**Description**: Output draining appends raw chunks before recognizing
+`SharpProof.Armed/1 <nonce>` and `SharpProof.Cleanup/1 <nonce>`. Authentication
+signals are set, but the same internal records remain in returned text and are
+logged at high importance. They also consume the verifier diagnostic-size budget.
+
+**Reproduction**: The exact parser consumed Armed, ordinary output, separator,
+and Cleanup. Both authentication flags were true, while returned log text still
+contained both full nonce records.
+
+**Impact**: Every normal verified build emits random internal protocol frames,
+making logs noisy and nondeterministic; large solutions multiply the noise and
+protocol overhead can prematurely exhaust diagnostic capture.
+
+**Recommended fix**: Parse control-plane lines separately and suppress exact
+authenticated frames plus their inserted separator from visible output. Apply
+the cap to verifier diagnostics only while preserving byte/line-ending behavior.
+Test split chunks, final unterminated lines, near-limit output, and build-engine
+logging.
+
+### 663. [CONFIRMED] Parameterized array range slices omit mandatory allocation
+
+**Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines
+544-596.
+
+**Description**: Array-element scanning treats a single `System.Range` index as
+ordinary element access. It evaluates receiver/index and exceptions but never
+records that a successful array slice allocates a new managed array.
+
+**Reproduction**: `int[] Slice(int[] values, Range range) => values[range]`
+returned a distinct array; mutation did not affect the source, and 64 escaping
+calls allocated 2,048 bytes. Effects reported `Allocation=None`, Complete, and a
+complete projection. Ordinary int-index and jagged-array selection controls
+correctly allocated nothing.
+
+**Impact**: No-allocation and purity contracts can accept a method that allocates
+on every successful call.
+
+**Recommended fix**: Recognize the semantic `System.Range` index identity and
+join a Managed allocation/direct witness after receiver/index/null gating. Do
+not infer from array result type alone. Test range, int index, jagged selection,
+and invalid receiver controls.
+
+### 664. [CONFIRMED] Array range slices report the wrong exception type
+
+**Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines
+544-596.
+
+**Description**: Every unproven array access is assigned
+`IndexOutOfRangeException`. Range slicing instead validates offsets through
+Range/GetOffsetAndLength and throws `ArgumentOutOfRangeException` for invalid
+ranges.
+
+**Reproduction**: `values[new Range(new Index(10), ^0)]` threw
+ArgumentOutOfRangeException at runtime, while the Complete summary listed
+IndexOutOfRangeException and omitted the actual type. Ordinary `values[10]`
+correctly threw/listed IndexOutOfRangeException.
+
+**Impact**: AllowedExceptions, DoesNotThrow, and exception-handler reachability
+can prove the wrong contract for array slicing.
+
+**Recommended fix**: For the exact System.Range index form, add canonical
+ArgumentOutOfRangeException and retain IndexOutOfRangeException for integer
+indices. Add valid/invalid range and ordinary-index controls.
+
+### 665. [CONFIRMED] Constant conditionals select a non-returning arm but still cause SP0027
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
+lines 450-460; `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
+2127-2130; `OperationCompletionEvaluator.cs`, around lines 1088-1105.
+
+**Description**: Definite-operation completion combines both conditional arms
+with OR even when the condition has a constant Boolean value. A returning
+unselected arm therefore makes a definitely non-returning selected expression
+appear to complete before a contracted call.
+
+**Reproduction**: Both `true ? Never() : 0` and `false ? 0 : Never()` in the
+first unused argument produced SP0027 for the later invalid call. Runtime recorded
+zero target calls and the selected-arm exception. The two live-arm mirrors
+reached the call and correctly diagnosed.
+
+**Impact**: Literal conditional syntax can create deterministic false Refuted
+diagnostics and warnings-as-errors failures for unreachable calls.
+
+**Recommended fix**: If the condition is a constant bool, recurse only into the
+selected arm; otherwise preserve permissive OR. Share the already-correct strict
+completion logic and test true/false, nonconstant, and nested controls.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
