@@ -54,61 +54,6 @@ size.
 **Confidence**: High; the reporting agent measured the allocation and validated
 both expanded input and compact round-trip.
 
-### 433. [CONFIRMED] Non-completing member initializers do not suppress unreachable constructor call-site diagnostics
-
-**Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around
-lines 153-185; SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
-lines 330-358, 409-444, 503-510, and 555-627;
-SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines 111-145;
-SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs around lines 90-196.
-
-**Description**: C# executes instance field and property initializers before an
-explicit constructor initializer, a primary-constructor base initializer, and
-the constructor body. AnalyzerFeaturePipeline tracks non-completion only when
-deciding whether a later member initializer is reachable. Ordinary constructor
-call-site analysis, injected base/this initializer calls, and primary
-constructor base analysis do not consume that prefix reachability. If an
-earlier initializer definitely does not complete, SharpProof still analyzes
-calls that the runtime cannot execute and emits SP0027.
-
-**Reproduction**: The reporting agent used two types:
-
-- Explicit has private readonly int stop = Guard.Fail(), then an explicit
-  base(-1) initializer and Guard.Positive(-2) in its constructor body.
-- Primary(int marker) has the same throwing field initializer and Base(-3) as
-  its primary-constructor base call.
-
-The analyzer emitted three SP0027 diagnostics: explicit base, explicit body
-call, and primary base. A separate runtime-order control emitted only
-explicit-field and primary-field; no base-argument, base-body, or
-constructor-body event executed.
-
-**Impact**: The analyzer produces deterministic false precondition-violation
-diagnostics and disproven semantic outcomes for unreachable code. Warnings as
-errors can reject valid builds solely because an earlier initializer prevents
-constructor entry.
-
-**Root cause**: Member-initializer reachability is implemented as a private
-ordering check used only by AnalyzeMemberInitializer. Constructor and primary
-constructor Requires discovery build independent roots without joining the
-applicable initializer prefix.
-
-**Recommended fix**: Factor initializer ordering from
-CanReachMemberInitializer into a shared
-AllApplicableMemberInitializersMayComplete helper keyed by containing type and
-static/instance context. Gate ordinary and static constructor call-site
-analysis and AnalyzePrimaryConstructorInitializer on that prefix. Preserve
-contract placement and intrinsic validation; classify unreachable constructor
-call sites as NotApplicable rather than Proven.
-
-**Regression coverage**: Add a throwing instance initializer before explicit
-base and body calls, a throwing initializer before a primary base call, and a
-static-initializer/static-constructor equivalent. Completing-initializer
-controls must retain the existing SP0027 diagnostics.
-
-**Confidence**: High; the agent reproduced all three diagnostics and verified
-the actual runtime event order in independent disposable projects.
-
 ### 434. [CONFIRMED] Every bounded protocol-file read allocates the full 16 MiB limit even for tiny files
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 40,
