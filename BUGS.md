@@ -4342,6 +4342,965 @@ released when query encoding ends, without requiring GC.
 **Confidence**: High; wrapper/native-handle probes and the production 1,000-
 conditional query independently show two undisposed Sort objects per term.
 
+### 520. [CONFIRMED] Architecture-test process harnesses can deadlock on redirected output
+
+**Location**: SharpProof.ArchitectureTest/StandaloneGateEvidenceTests.cs around
+lines 29-31 and SharpProof.ArchitectureTest/FuzzRunnerEvidenceTests.cs around
+lines 31-33 and 72-74.
+
+**Description**: Three PowerShell fixture harnesses redirect stdout and stderr,
+then synchronously read stdout to EOF before reading stderr. If the child fills
+the stderr pipe, it blocks waiting for the parent while the parent waits for
+stdout EOF from a child that cannot exit. WaitForExit is reached only after both
+reads, and no timeout exists.
+
+**Reproduction**: The clean targeted architecture test passed in one second. A
+temporary fixture was changed only to write a large stderr payload. The same
+canonical Linux test reached test execution and then exceeded a 20-second bound
+without an NUnit summary. Changing only the harness to start both ReadToEndAsync
+operations before WaitForExitAsync made the large-stderr case pass in two
+seconds.
+
+**Impact**: A verbose PowerShell error or growing fixture output can hang the
+targeted test and the full architecture suite indefinitely instead of returning
+an attributable assertion failure.
+
+**Root cause**: Redirected process streams are drained sequentially, violating
+the requirement that both bounded pipes be consumed concurrently.
+
+**Recommended fix**: Move all three call sites to a shared async process-fixture
+helper that starts stdout/stderr drains concurrently, waits with a bounded
+token/deadline, kills the full child tree on timeout, performs a final wait, and
+returns complete output plus exit code.
+
+**Regression coverage**: Launch a child that writes more than pipe capacity to
+stderr and a stdout sentinel. Require completion within a short bound, exit zero,
+and complete capture of both streams. Add nonzero-exit, timeout, and child-tree
+cleanup controls.
+
+**Confidence**: High; the exact sequential harness hung under a bounded
+large-stderr fixture, while concurrent draining alone made it pass.
+
+### 521. [CONFIRMED] SPMETA002 ignores mutable get-only static auto-properties
+
+**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs,
+AnalyzeProperty around lines 573-585; corresponding field logic around lines
+552-564.
+
+**Description**: Static auto-property analysis requires a setter, so every
+get-only property is skipped regardless of storage type. A get-only static
+List<T> or array cannot be rebound but remains process-wide mutable state through
+its members. The equivalent static readonly mutable-reference field is already
+reported by SPMETA002.
+
+**Reproduction**:
+
+    static List<int> Values { get; } = new();
+
+Analyzer controls produced:
+
+    readonly List field:       SPMETA002 count=1
+    get-only List property:    SPMETA002 count=0
+    settable List property:    SPMETA002 count=1
+
+All compiler-error counts were zero.
+
+**Impact**: Soundness-critical analyzer code can retain mutable process-wide
+state in a property and evade the rule, allowing cross-compilation leakage or
+concurrent-analysis nondeterminism.
+
+**Root cause**: Rebindability (`SetMethod != null`) is used as a proxy for value
+mutability, unlike the field path's mutable-reference classification.
+
+**Recommended fix**: For static auto-properties, report when a setter exists or
+`IsMutableReferenceStorage(property.Type)` is true. Preserve immutable get-only
+properties.
+
+**Regression coverage**: Get-only List<T> and array properties must report;
+get-only int and ImmutableArray<T> controls remain clean. Retain field and
+settable-property controls.
+
+**Confidence**: High; the exact analyzer distinguished only the property setter
+across otherwise equivalent mutable storage.
+
+### 522. [CONFIRMED] Flow nullability falsely invalidates Contract.Result<T> for class? parameters
+
+**Location**: SharpProof.Contracts/ContractIntrinsicValidator.cs around lines
+60-69, surfaced by SharpProof.Analyzer.Core/ContractForValidation/
+ContractForCompanionValidator.cs around lines 170-185.
+
+**Description**: Result intrinsic validation compares
+`IInvocationOperation.Type` to the owning callable's return type. For an open
+`T where T : class?`, Roslyn flow-projects the invocation expression as
+T/Annotated even though the constructed intrinsic method and owner both declare
+T/NotAnnotated. The valid signature is rejected and the binder drops all
+companion clauses.
+
+**Reproduction**: An open ContractFor companion for `ITarget<T>.Read` used
+`Contract.Result<T>()` and was called as `ITarget<string?>`. Canonical output:
+
+    SP0024 expected a result type matching the callable return type
+    DECLARED_OWNER_RETURN=T/NotAnnotated
+    RESULT_METHOD_RETURN=T/NotAnnotated
+    RESULT_OPERATION_TYPE=T/Annotated
+    DECLARED_SIGNATURE_TYPES_EQUAL=True
+    FLOW_TYPE_EQUAL=False
+    BIND_SUCCESS=False
+    BIND_FAILURE=InvalidIntrinsicSignature
+    CLAUSES=-1
+
+Open nonnullable `where T:class` and closed `string?` controls both bound with
+two clauses.
+
+**Impact**: Users cannot express a valid non-null postcondition over a nullable
+generic return in an open companion, and otherwise valid Requires/Ensures clauses
+are silently lost after the diagnostic.
+
+**Root cause**: Flow-annotated expression type is mistaken for declared generic
+signature identity.
+
+**Recommended fix**: Compare `invocation.TargetMethod.ReturnType` to
+`owner.ReturnType` with IncludeNullability. Retain exact declared-nullability
+checks so genuinely mismatched Result<string> versus string? remains invalid.
+
+**Regression coverage**: Add binder and analyzer cases for `where T:class?`
+requiring success, companion source, two clauses, and no SP0024. Retain the open
+nonnullable, closed nullable, and declared-type-mismatch controls.
+
+**Confidence**: High; the probe shows declared types equal exactly while only
+the flow projection differs.
+
+### 523. [CONFIRMED] Primary constructors omit their implicit parameterless base call
+
+**Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around lines
+157-165; AnalyzerFeaturePipeline.cs around lines 409-444;
+RequiresCallSiteAnalyzer.cs around lines 98-104; implicit-base discovery in
+RequiresCallSiteDiscovery.cs around lines 382-399.
+
+**Description**: Dedicated primary-constructor analysis handles only
+`PrimaryConstructorBaseTypeSyntax`, meaning an explicit `: Base(...)`. When a
+class primary constructor names a non-object base with simple `: Base`, the
+compiler still invokes parameterless Base(), but the dedicated path returns
+NotApplicable. Generic implicit-base discovery accepts only
+ConstructorDeclarationSyntax, not the primary constructor's TypeDeclarationSyntax.
+
+**Reproduction**: Base() contains `Contract.Requires(false)` and
+`sealed class Derived(int marker) : Base`. Canonical controls:
+
+    ordinary source ctor implicit base:  1 SP0027
+    primary ctor explicit : Base():      1 SP0027
+    primary ctor implicit : Base:        0 SP0027 (expected 1)
+    wholly synthesized derived ctor:     0 SP0027 (current policy)
+
+Every source compiled without diagnostics.
+
+**Impact**: A base-constructor precondition is silently unenforced for a user-
+declared primary constructor. Semantically equivalent `: Base()` syntax makes
+the diagnostic appear.
+
+**Root cause**: Primary and ordinary constructor paths partition syntax shapes
+without covering the implicit-call combination; the session is claimed before
+the dedicated path returns NotApplicable.
+
+**Recommended fix**: When a class primary constructor lacks an explicit base
+invocation and has a non-object base, resolve the unique parameterless base
+instance constructor and analyze an empty-argument replay candidate once. Exclude
+structs, record copy constructors, explicit calls, and wholly synthesized
+constructors; retain session deduplication.
+
+**Regression coverage**: Add the exact implicit-primary case plus ordinary
+implicit, explicit primary, Requires(true), object-base/no-custom-base, and
+synthesized-constructor controls.
+
+**Confidence**: High; the analyzer/runtime-equivalent matrix failed only the
+simple-base primary-constructor form.
+
+### 524. [CONFIRMED] Compiler response authority performs quadratic claim-to-clause matching
+
+**Location**: SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs,
+outer claim iteration around lines 57-72 and per-claim FirstOrDefault scans
+around lines 100-104.
+
+**Description**: Every target claim invokes ValidateClaim, which linearly scans
+the target's effect claims and postcondition clauses to resolve its evidence.
+A callable with N Ensures claims therefore performs N full clause scans before
+label/evidence checks.
+
+**Reproduction**: Ordinary protocol-valid and authority-valid responses measured:
+
+    claims    minimum run  independent rerun
+     3,000       64 ms           81 ms
+     6,000      192 ms          241 ms
+    12,000      740 ms        1,272 ms
+
+The 12k response was 5.26 MiB, below the 16 MiB cap, and had zero authority
+errors. Unknown results isolated the base lookup cost from Proven-label work.
+
+**Impact**: Large valid contract sets spend seconds in each authority pass after
+verification, consuming budgets and adding latency independently of protocol
+canonicalization finding 497.
+
+**Root cause**: Claim IDs are resolved by repeated linear FirstOrDefault rather
+than a target-local index.
+
+**Recommended fix**: Build `effectByClaimId` and `postconditionByClaimId` once per
+target, rejecting duplicate IDs with the existing authority error, and pass
+resolved entries into ValidateClaim. Preindex labels/assumptions if profiling
+shows further repeated scans.
+
+**Regression coverage**: Validate a dense large callable with zero errors and
+add deterministic enumeration-count/index tests plus missing and duplicate-ID
+controls. A generous warmed scaling check may supplement functional coverage.
+
+**Confidence**: High; two independent valid-response timing series show
+quadratic growth.
+
+### 525. [CONFIRMED] API-spec totality analysis treats lazy branches as eagerly evaluated
+
+**Location**: SharpProof.Specs/ApiSpecTermValidator.cs around lines 127-193;
+rejection in SharpProof.Specs/ApiSpecTable.cs around lines 131-145; canonical lazy
+semantics in SharpProof.Ir/IrInterpreter.cs around lines 127-129, 251-278, and
+374-387.
+
+**Description**: Totality validation requires both operands of AndAlso/OrElse
+and both conditional branches to be total, regardless of a constant condition
+that makes one side unreachable. The IR interpreter evaluates only the selected
+side. Consequently a type-correct, semantically total guarded partial term is
+rejected from an audited API spec.
+
+**Reproduction**: A valid declaration used the postcondition
+`true || ((1 / 0) == 0)`. Exact paths reported:
+
+    API_SPEC_TABLE=REJECTED
+    ArgumentException: Trusted postconditions must be total...
+    IR_RUNTIME=VALUE
+    TERM_TYPE=IrBooleanTerm
+    STATUS=Value BOOLEAN=True
+
+**Impact**: Legitimate specs cannot guard division, overflow, length, or other
+partial terms with lazy Boolean/conditional control. A catalog update can break
+table initialization despite matching runtime semantics.
+
+**Root cause**: TermFacts tracks integer constants but not Boolean constants or
+selected-path reachability, so definedness is folded eagerly.
+
+**Recommended fix**: Track `bool? Boolean` in TermFacts. For AndAlso/OrElse,
+require right totality only when the known left value evaluates it. For
+conditionals, require only the known selected branch; require both when unknown.
+Continue type-checking unreachable children without counting their definedness.
+
+**Regression coverage**: Accept true-or-partial, false-and-partial, and constant
+conditional with unselected partial branch. Reject false-or-partial,
+true-and-partial, selected partial branch, and unknown condition with partial
+branch. Evaluate accepted instances through IrInterpreter.
+
+**Confidence**: High; the same typed term is rejected as non-total by Specs and
+evaluated to a defined true value by the canonical interpreter.
+
+### 526. [CONFIRMED] Enhanced #line character offsets are lost from compiler artifacts
+
+**Location**: SharpProof.CompilerCollector/CompilerArtifact/
+CompilerCompilationCapture.cs around lines 157-169; model
+SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs around lines
+73-80; replay in CompilerSourceLocationAuthority.cs around lines 313-351.
+
+**Description**: Capture samples GetMappedLineSpan only at each physical line
+start and stores no enhanced-line CharacterOffset. Replay assumes mapped columns
+are `MappedColumn + delta`. C# enhanced mappings require subtracting/clamping the
+first-line character offset. Callable and diagnostic authorities therefore
+reconstruct the wrong column and reject otherwise valid generated/Razor-style
+source.
+
+**Reproduction**:
+
+    #line (2,8)-(2,70) 15 "page.razor"
+                   [EnforcePure] static int Identity(int value) => value;
+
+Compilation had zero errors. Roslyn/manifest mapped the callable to zero-based
+1:7, authority replay produced 1:22, and artifact creation threw:
+
+    InvalidDataException: A compiler source location is not bound to one
+    physical tree.
+
+A mapped CS0103 diagnostic failed through the same Bind/CreateDiagnostic path.
+
+**Impact**: Compiler mode rejects selected members in valid enhanced-line source,
+and mapped compiler diagnostics crash artifact production instead of preserving
+evidence.
+
+**Root cause**: The snapshot format assumes every mapping is affine from column
+zero and omits Roslyn LineMapping.CharacterOffset.
+
+**Recommended fix**: Capture SyntaxTree.GetLineMappings(), persist/validate/hash
+the offset in a schema/fingerprint update, and replay the first mapped line with
+`MappedColumn + max(delta - offset, 0)`; later lines use offset zero.
+
+**Regression coverage**: A clean mapped claim and mapped CS0103 diagnostic must
+produce/round-trip an artifact with exact Roslyn start coordinates. Cover
+ordinary directives and multi-line enhanced mappings.
+
+**Confidence**: High; both claim and diagnostic artifact paths reproduced the
+same exact 15-column authority error.
+
+### 527. [CONFIRMED] Changed-TCB coverage accepts HEAD as its own comparison baseline
+
+**Location**: scripts/Test-SharpProofCoverage.ps1, comparison resolution around
+lines 110-157, diff around lines 649-676, zero-line scoring around lines 814-840,
+and overall pass around lines 844-869; orchestration in
+scripts/Invoke-SharpProofContainer.ps1 around lines 256-296.
+
+**Description**: The resolver rejects textual `HEAD` and `@` but accepts the
+exact current 40/64-hex commit without requiring it to precede HEAD. Three-dot
+diff against the same commit is empty; zero coverable changed lines are assigned
+100%, feeding a passed coverage receipt.
+
+**Reproduction**: A two-commit canonical fixture changed one trusted, uncovered
+line. With the real ancestor SHA, changed files=1, coverable=1, percent=0, pass
+false. With exact HEAD SHA:
+
+    ChangedFiles=0 CoverableLines=0 LinePercent=100.0
+    SummaryPassed=true CoverageExit=0
+    ReceiptStatus=passed ReceiptGate=coverage
+
+The receipt was exact-commit and hashed the passing summary.
+
+**Impact**: A stale or miswired baseline can certify 100% changed trusted-code
+coverage while examining none of the release/PR delta. Aggregate floors remain,
+but the dedicated changed-TCB guarantee and release matrix row false-green.
+
+**Root cause**: Durable commit identity is mistaken for a valid temporal/
+topological baseline; equality/descendant checks are absent.
+
+**Recommended fix**: Resolve HEAD and merge-base once. Reject comparison equal
+to HEAD or any comparison whose merge-base is HEAD; for release require a strict
+ancestor and bind the chosen tag/baseline tuple into evidence. Reuse the
+validated merge-base for diff.
+
+**Regression coverage**: Exact ancestor with uncovered change fails coverage;
+exact HEAD and descendant refs fail validation rather than yield 100%; valid
+divergent/base semantics remain. Orchestration must not mint a receipt from a
+HEAD comparison SHA.
+
+**Confidence**: High; canonical A/B execution turned the same uncovered change
+from failed 0% to passed 100% solely by supplying current HEAD's hex identity.
+
+### 528. [CONFIRMED] A null manifest Claims collection crashes response validation
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs, sanitized manifest
+validation around lines 497-520 and raw response projection around lines
+751-756.
+
+**Description**: ValidateManifestCore records `manifest.claims` for a null
+collection and substitutes a safe empty local. ValidateRun later ignores that
+sanitized value and directly calls `response.Manifest.Claims.Where(...)`, which
+throws ArgumentNullException(source). This differs from finding 506's null
+element identity keys; the collection itself is absent.
+
+**Reproduction**: Starting from a fully valid empty Complete response:
+
+    control: Validate returned IsValid=True
+    after Manifest.Claims=null!:
+      ArgumentNullException: Value cannot be null. (Parameter 'source')
+      at Enumerable.Where
+      at WorkerProtocolJson.ValidateRun line 753
+
+**Impact**: Malformed in-memory failure models escape the public validation
+boundary as infrastructure exceptions and mask the stable `manifest.claims`
+error that the earlier stage already attempted to return. Strict JSON null
+remains a separate parse rejection.
+
+**Root cause**: Sanitized collection state is local to one validation phase and
+dependent validation dereferences the raw object graph.
+
+**Recommended fix**: Gate projection on nonnull claims or use
+`response.Manifest?.Claims ?? []`, combined with valid-key filtering from 506.
+Preserve the primary error and skip only checks requiring absent declarations.
+
+**Regression coverage**: Claims=null! must not throw, must return invalid, and
+must include manifest.claims. Retain valid empty and strict JSON-null controls,
+including expected-hash/manifest overloads.
+
+**Confidence**: High; changing only the collection from empty to null moves the
+public validator from valid result to a deterministic LINQ exception.
+
+### 529. [CONFIRMED] semantic-tests silently drops its TestFilter argument
+
+**Location**: scripts/Invoke-SharpProofContainer.ps1 semantic-tests dispatch
+around lines 125-128; implemented parameter in
+scripts/Invoke-SharpProofSemanticTests.ps1 around lines 11 and 127-132.
+
+**Description**: The container wrapper accepts `-TestFilter`, and the semantic
+runner implements it, but the dispatch branch forwards only Configuration.
+Targeted commands therefore run the broad default filter. Requests for
+Performance, Coverage, or Corpus categories can instead execute the default
+suite that explicitly excludes those tests.
+
+**Reproduction**: A canonical isolated dispatcher probe ran:
+
+    tooling semantic-tests -TestFilter FullyQualifiedName~SentinelProbe
+
+The runner observed `SEMANTIC_FILTER_PROBE=<>`. Adding only
+`-TestFilter $TestFilter` to the temporary dispatch produced
+`SEMANTIC_FILTER_PROBE=<FullyQualifiedName~SentinelProbe>`. Both exited zero
+without running the broad suite.
+
+**Impact**: Developers and automation can receive success for a targeted
+semantic test command that never runs the requested tests, while also wasting
+time on unrelated defaults.
+
+**Root cause**: Parameter plumbing terminates at the top-level switch case.
+
+**Recommended fix**: Forward `-TestFilter $TestFilter` in the semantic-tests
+branch, preserving null/empty default behavior.
+
+**Regression coverage**: Add a branch-scoped architecture assertion and trusted
+mutation that removes forwarding. Prefer a behavioral dispatcher fixture that
+captures the bound parameter for empty and nonempty filters.
+
+**Confidence**: High; the exact dispatch lost the value and a one-argument
+forwarding change delivered it unchanged.
+
+### 530. [CONFIRMED] Explicit Requires calls in nested blocks are marked unreplayable
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
+194-206, 425-471, and 538-575; Unknown mapping in
+RequiresCallSiteAnalyzer.cs around lines 339-342.
+
+**Description**: Ordinary call candidates require HasReplayablePrefix. That
+logic climbs to the statement directly under the callable's outer body and
+accepts only a small set of top-level expression/return/local shapes with exact
+span ownership. A reachable call inside an if or nested block therefore has
+complete flow state but is rejected because its outer ancestor is
+IfStatementSyntax or BlockSyntax.
+
+**Reproduction**: Positive(-1) has a positive Requires clause. Probe output:
+
+    Direct:       can-replay=True  flow=Complete
+    IfTrue:       can-replay=False flow=Complete
+    IfParameter:  can-replay=False flow=Complete
+    NestedBlock:  can-replay=False flow=Complete
+
+Only the direct top-level call emitted SP0027. Runtime executed direct, if-true,
+if-parameter-true, and nested-block once each; false branches were correctly
+unreached. Compiler errors were zero.
+
+**Impact**: Explicit ordinary precondition violations disappear merely because
+they are nested in reachable control flow, with no SP0047 fallback.
+
+**Root cause**: Prefix replayability is defined by one outer syntax-span shape
+instead of evaluation order along the reachable CFG path.
+
+**Recommended fix**: Walk evaluation-order ancestors from the call, validating
+preceding operands/siblings/statements at each enclosing block/control construct
+with DefiniteOperationFacts. Retain reachable CFG and complete-flow requirements;
+do not admit calls after throwing conditions, arguments, receivers, or earlier
+statements.
+
+**Regression coverage**: Invalid calls inside if(true), if(parameter), and an
+unconditional nested block must report. Cover valid arguments, if(false),
+throwing condition, non-completing prior statement, and representative else/
+switch/try nesting.
+
+**Confidence**: High; candidate-flow, analyzer, and runtime probes isolate the
+outer-syntax replayability gate.
+
+### 531. [CONFIRMED] Worker creation and request verification use different QueryRlimit authorities
+
+**Location**: SharpProof.Worker/SharpProofWorker.cs around lines 28-38;
+request accounting in CallableVerificationPolicy.cs around lines 27-30; actual
+solver option in SharpProof.Smt/IrSmtBackend.cs around lines 108-115; hashed
+request identity in CompilerManifestArtifact.cs around lines 24-36.
+
+**Description**: SharpProofWorker.Create closes over the caller-supplied mutable
+budgets DTO and reads its QueryRlimit later when a backend is created.
+VerifyAsync accepts requests with a separate budgets object and never binds or
+compares the two. Accounting and input/cache identity use the request value,
+while Z3 enforces the captured creation value.
+
+**Reproduction**:
+
+    distinct.creationQueryRlimit=11
+    distinct.requestQueryRlimit=29
+    distinct.factoryBackendQueryRlimit=11
+    distinct.mismatch=True
+    mutation.valueAtCreate=11
+    mutation.valueBeforeLaneCreation=17
+    mutation.factoryBackendQueryRlimit=17
+    mutation.deferredCapture=True
+
+**Impact**: Z3 can abstain prematurely under a hidden smaller cap or accept and
+cache a proof/refutation after work exceeds the request's attested cap. Response
+and cache identity still claim the request value.
+
+**Root cause**: Two unsynchronized configuration authorities plus a deferred
+closure over mutable request-shaped data.
+
+**Recommended fix**: Make backend creation request-scoped and pass the validated
+current QueryRlimit, or snapshot the creation limit and reject every mismatched
+request explicitly. Never retain a mutable DTO as long-lived configuration.
+
+**Regression coverage**: Create with A and verify request B, then mutate A after
+Create. Require backend option B or an explicit invalid-request result, and
+assert enforced limit equals response/hash budget.
+
+**Confidence**: High; the exact factory read two values different from both its
+creation-time and verified-request authorities.
+
+### 532. [CONFIRMED] Null SMT options allocate a native Context before validation
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs field initialization around lines
+3 and 6-9.
+
+**Description**: `_context = new()` executes before `_options =
+ArgumentNullGuard.NotNull(...)`. When null options throw, no backend instance is
+returned, so the already-created native Context cannot be explicitly disposed
+and survives until finalization.
+
+**Reproduction**: After draining finalizers, 100 invalid constructions and 100
+valid disposed controls produced:
+
+    invalid-caught=100
+    pending-initial=3
+    pending-before-collect=3
+    pending-after-invalid-collect=102
+    pending-after-disposed-control=3
+
+**Impact**: Repeated invalid DI/configuration calls retain full native contexts
+until GC, creating unmanaged-memory and finalizer latency. Native initialization
+failure can also preempt the promised options ArgumentNullException.
+
+**Root cause**: Resource acquisition occurs in an earlier field initializer than
+argument validation.
+
+**Recommended fix**: Use a conventional constructor body that validates/stores
+options first, then creates Context, or reorder through a safe factory. Ensure
+partial construction disposes any acquired resource.
+
+**Regression coverage**: With an injected/counting context factory, null options
+must throw `options` and create zero contexts; valid construction creates and
+disposes exactly one. Cover native-unavailable ordering.
+
+**Confidence**: High; failed construction added one pending native-context
+finalizer per call while disposed controls did not.
+
+### 533. [CONFIRMED] Matching timeout/cancel errors legitimize completed proven responses
+
+**Location**: SharpProof.Worker.Protocol/WorkerResultAssembler.cs,
+TryProjectRunState around lines 148-168, MatchesCallableProjection around lines
+189-207, and error mapping around lines 248-254; enforced by ProtocolJson.cs
+around lines 741-770.
+
+**Description**: Mapped `worker.timeout` or `worker.canceled` errors
+unconditionally replace result-derived run evidence. Callable projection then
+accepts Complete/None rows for interrupted statuses. Adding the matching error
+therefore makes strict validation accept a fabricated TimedOut/Canceled response
+whose callable and claims are fully completed and Proven.
+
+**Reproduction**:
+
+    COMPLETE_CONTROL IsValid=True
+    TIMED_OUT_NO_ERROR IsValid=False Codes=response.run_projection
+    TIMED_OUT_WITH_ERROR IsValid=True Codes=
+    ROWS Callable=Complete/None Claim=Proven/None
+
+Actual worker behavior emits interruption errors only before manifest load with
+empty results; after loading, it emits incomplete/unknown rows without such an
+error.
+
+**Impact**: A malformed assembled/persisted response can convert completed
+verification into a false timeout/cancel artifact and launcher exit, misleading
+summaries and downstream retry behavior.
+
+**Root cause**: Self-reported errors override evidence instead of being
+reconciled with the producer's permitted result shape.
+
+**Recommended fix**: Permit error-based timeout/cancel only with empty manifest
+and result sets, matching producer behavior. Alternatively require every
+nonempty row to project to the same interruption with appropriate unknown/
+incomplete reasons; never admit resolved claims.
+
+**Regression coverage**: Extend the fabricated-interrupted-status test with
+matching timeout and cancel errors and require response.run_projection. Retain
+empty-manifest interruption positives and legitimate nonempty interrupted rows.
+
+**Confidence**: High; adding one mapped error changes the same completed proven
+response from invalid to valid.
+
+### 534. [CONFIRMED] SPMETA003 rejects an exhaustive cancellation type guard
+
+**Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs,
+RethrowsCancellationImmediately around lines 311-315.
+
+**Description**: The analyzer recognizes immediate cancellation propagation only
+when a catch's first statement is a bare `throw;`. It rejects the ordinary safe
+pattern `if (exception is OperationCanceledException) throw;` even though every
+cancellation exception, including derived types, is rethrown before handling
+continues.
+
+**Reproduction**:
+
+    bare rethrow control:       SPMETA003 count=0
+    cancellation type guard:   SPMETA003 count=1
+    unrelated type guard:      SPMETA003 count=1
+
+All compiler-error counts were zero; SPMETA003 is Error-level.
+
+**Impact**: Safe broad-catch code cannot compile under the repository's analyzer
+without a source-shape rewrite, producing an ordinary false positive.
+
+**Root cause**: Cancellation propagation is recognized by a one-statement syntax
+shape rather than semantic/CFG proof.
+
+**Recommended fix**: Accept a side-effect-free first guard proving the caught
+local is OCE (or a subtype-exhaustive pattern) whose taken branch immediately
+bare-rethrows. Keep arbitrary boolean and unrelated-type guards diagnostic.
+
+**Regression coverage**: OCE type guard and bare rethrow are clean; bool and
+ArgumentException guards report. Add negated/else forms only when semantically
+proven equivalent.
+
+**Confidence**: High; the exact analyzer reports only the semantically safe guard
+relative to its bare-rethrow control.
+
+### 535. [CONFIRMED] Invalid ContractFor surfaces still contribute partial companion facts
+
+**Location**: whole-surface validation in
+SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs
+around lines 30-132; per-member resolution in
+SharpProof.Contracts/ContractForSymbolMatcher.cs around lines 187-241 and
+HasUniqueTarget around lines 390-394.
+
+**Description**: The validator requires a global one-to-one target/companion
+member surface and emits SPCF0004/0005 for missing or extra members. The binder
+filters to only the requested target name and checks uniqueness for that pair,
+never the rest of the surface. It therefore trusts the matching member of a
+companion already declared invalid.
+
+**Reproduction**: A companion added unmatched Ghost beside a matching Read:
+
+    SPCF=SPCF0005 ... Ghost does not exactly match a target overload
+    UNMATCHED_CANDIDATES=Ghost
+    RESOLUTION_FAILURE=None
+    BIND_SUCCESS=True USES_COMPANION=True CLAUSES=1
+
+A missing target-member variant emitted SPCF0004 yet Read still bound; a complete
+surface control validated and bound normally.
+
+**Impact**: Suppressed/skipped validator diagnostics or direct public binder use
+can consume proof/precondition facts from a malformed companion, breaking
+validator/binder fail-closed parity.
+
+**Root cause**: Global surface bijection and per-member resolution are separate
+algorithms with different acceptance criteria.
+
+**Recommended fix**: Share the validator's full surface-bijection calculation
+with ResolveCompanion and reject every member when any target/candidate lacks
+exactly one match, before specialization.
+
+**Regression coverage**: Binder tests for extra Ghost and missing target member
+must refuse the otherwise matching Read; complete surface succeeds. Pair them
+with existing SPCF diagnostics.
+
+**Confidence**: High; two different globally invalid surfaces both supplied a
+successful companion clause.
+
+### 536. [CONFIRMED] FuzzSummary.Passed accepts an impossible case count
+
+**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 93-110 and
+127-133; authoritative maximum in FuzzOptions.cs around lines 7-8.
+
+**Description**: FuzzSummary.Passed checks only `Cases > 0`, whereas options and
+RunAsync cap cases at 1,000,000. A deserialized/constructed summary with
+1,000,001 cases, matching agreement counters, complete coverage, and no failures
+self-certifies even though the runner refuses to execute that domain.
+
+**Reproduction**:
+
+    MaximumCases=1000000
+    Summary.Cases=1000001
+    Summary.Passed=True
+    Runner accepted out-of-domain cases=False
+    Runner exception=ArgumentOutOfRangeException
+
+**Impact**: Callers or evidence tests trusting Passed can accept impossible fuzz
+evidence that no conforming runner could have produced.
+
+**Root cause**: The upper-domain invariant is duplicated in parsing/execution but
+omitted from result self-validation.
+
+**Recommended fix**: Require `Cases <= FuzzOptions.MaximumCases` in Passed and
+mirror it in the PowerShell result authority if that authority also accepts only
+positive counts.
+
+**Regression coverage**: MaximumCases+1 must fail; exactly MaximumCases can pass
+when all other invariants hold. Retain zero, parallelism, counter, and coverage
+invalid cases.
+
+**Confidence**: High; production summary and runner disagree on the same exact
+case count under an executable probe.
+
+### 537. [CONFIRMED] Deconstruction property targets are analyzed as getters, not setters
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
+GetPropertyCalls around lines 1544-1595.
+
+**Description**: A property reference is classified as a setter only when its
+immediate parent is a recognized assignment/compound/increment operation. In a
+deconstruction assignment the property is nested under the target ITupleOperation,
+so it falls through to the getter branch. The runtime invokes only the setter.
+
+**Reproduction**, with zero compiler diagnostics:
+
+    simple invalid write:                 one set_Value SP0027
+    simple invalid read:                  one get_Value SP0027
+    deconstruction invalid setter value:  zero (expected one)
+    deconstruction safe setter,
+      getter Requires(false):             one false get_Value SP0027
+
+**Impact**: Property/indexer setter preconditions are missed while getter
+preconditions can be reported for accessors that never execute, producing both
+false negatives and false positives.
+
+**Root cause**: Accessor role is inferred only from the immediate parent, with no
+IDeconstructionAssignmentOperation target-subtree handling.
+
+**Recommended fix**: Walk transparent/tuple parents to detect property/indexer
+references in the deconstruction Target. Classify them setter-only and map the
+tuple path to the corresponding RHS element when replayable. If mapping is
+unknown, emit an unreplayable setter candidate, never a getter.
+
+**Regression coverage**: Invalid and safe setter cases, nested tuples, indexer
+targets, and an RHS property read that remains a getter; require no duplicates.
+
+**Confidence**: High; runtime accessor identity and analyzer diagnostics are
+inverted only for the tuple target shape.
+
+### 538. [CONFIRMED] Conditional API-spec terms cannot infer exact sequence-null types
+
+**Location**: SharpProof.Specs/ApiSpecInstantiation.cs, context-free Null around
+lines 136-183, equality peer inference around lines 193-263, and Conditional
+around lines 266-284; validator in ApiSpecTermValidator.cs around lines 59-73.
+
+**Description**: The validator admits a Sequence null in a conditional whose
+other branch has the same declared kind. Instantiation handles exact null type
+inference only as an equality special case. Conditional instantiates each branch
+independently, so the null fails before the concrete sibling can provide its
+exact IrTypeId.
+
+**Reproduction**: A valid sequence-result API spec used a Boolean conditional
+with Sequence null and Result branches:
+
+    TABLE_VALIDATION=ACCEPTED POSTCONDITIONS=1 RESULT_KIND=Sequence
+    INSTANTIATION_STATUS=Failed FAILURE_KIND=UnsupportedValueType
+    DIRECT_TYPED_IR=ACCEPTED CONDITIONAL_TYPE=Sequence
+    EXACT_SEQUENCE_TYPE_MATCH=True
+
+**Impact**: A well-typed, validator-accepted spec loses its entire call
+application in the worker and degrades verification to Unknown. Concrete
+Reference subtypes have the analogous exact-type risk.
+
+**Root cause**: Contextual nullable-type inference is an equality-only syntactic
+special case instead of a bidirectional term rule.
+
+**Recommended fix**: In Conditional, instantiate the non-null branch first and
+use it as peer context for a direct null branch, symmetrically. More robustly,
+thread an optional expected IrTypeId through terms so nested null expressions
+inherit exact context. Preserve UnsupportedValueType only when context is absent.
+
+**Regression coverage**: Sequence null on either branch with exact peer must
+succeed; add custom Reference peers, incompatible exact peers -> TypeMismatch,
+and peerless null/null -> UnsupportedValueType. Verify worker predicates survive.
+
+**Confidence**: High; validator and typed IR accept the term while only the
+context-free instantiator rejects it.
+
+### 539. [CONFIRMED] Canonical release tooling rejects Windows linked worktrees
+
+**Location**: compose.yaml source mount around lines 20-24 and
+eng/container/entrypoint.sh Git detection around lines 42-48, command
+classification around lines 65-88, and rejection around lines 122-125.
+
+**Description**: Docker mounts only the linked worktree directory. Its `.git`
+file points to an absolute Windows path outside that mount. Linux Git interprets
+`C:/...` relative to the container worktree and cannot reach the common metadata,
+so every Git-required release command exits before execution.
+
+**Reproduction**:
+
+    GitPointer=gitdir: C:/w/PurelySharp/.git/worktrees/PurelySharp-bug-hunt
+    git exit=128
+    fatal: not a git repository: /workspace/SharpProof/C:/w/...
+
+The exact baseline entrypoint then returned exit 2:
+
+    SharpProof release-tag requires a Git checkout with an exact commit...
+
+**Impact**: pack, acceptance, pilots, release commands, and other Git-bound gates
+cannot run through canonical Docker Desktop from a Windows linked worktree,
+although normal in-tree CI clones work.
+
+**Root cause**: Host Git indirection is neither resolved nor mounted into fixed
+container-visible paths.
+
+**Recommended fix**: Add a cross-platform tooling launcher that resolves host
+worktree Git dir/common dir, mounts both at fixed paths, and supplies GIT_DIR,
+GIT_COMMON_DIR, and GIT_WORK_TREE. Preserve in-tree checkout/archive behavior
+and emit a specific diagnostic when required mounts are absent.
+
+**Regression coverage**: Create a Windows linked worktree with an annotated
+release tag and external common metadata; canonical release-tag must succeed
+with matching identities. Retain normal checkout and archive controls.
+
+**Confidence**: High; exact entrypoint execution against the real worktree mount
+failed solely on its translated Git pointer.
+
+### 540. [CONFIRMED] Direct field loads bypass the supported value-domain gate
+
+**Location**: SharpProof.Frontend/RoslynProgramLowerer.cs around lines 242-255
+and 359-362; unsupported scalar mapping in RoslynOperationLowerer.cs around lines
+101-110; domain authority in CompilerIdentityBridge.cs around lines 97-118.
+
+**Description**: Program lowering special-cases field/array loads, constructs a
+location, emits Load, and returns without Observe or supported-value checking.
+An unsupported scalar field such as double is mapped to IR Reference and the
+whole program is marked Exact.
+
+**Reproduction**: `static double Value; static double Target() => Value;`
+produced:
+
+    expression-exact=False reason=UnsupportedOperationKind
+    program-exact=True program-abstentions=0
+    instructions=Goto,Load,Return,Return
+    field-special-type=System_Double load-ir-type=Reference
+
+**Impact**: The closed Frontend subset is bypassed and downstream consumers
+receive an Exact program with invalid reference/value-domain assumptions.
+
+**Root cause**: Successful location construction is conflated with support for
+the value loaded from that location.
+
+**Recommended fix**: Gate loaded value.Type through IsSupportedValueDomain.
+For unsupported values, preserve receiver/index evaluation, record UnsupportedType,
+and return havoc/opaque rather than an exact load. Keep supported bool/integer/
+reference loads unchanged.
+
+**Regression coverage**: Static-double return must be non-exact with
+UnsupportedType and no accepted reference-typed exact load; supported long field
+remains exact. Add unsupported instance/array element controls.
+
+**Confidence**: High; expression lowering rejected the same double that program
+lowering emitted as an exact Reference.
+
+### 541. [CONFIRMED] Changed-test planning omits newly added untracked test projects
+
+**Location**: scripts/Invoke-SharpProofChangedTests.ps1 around line 77.
+
+**Description**: Changed paths include untracked files, but project inventory
+uses `git ls-files '*.csproj'`, which lists only indexed projects. A new
+untracked Test.csproj already added to the solution never enters the project or
+test-project set, so test-changed can green without running it.
+
+**Reproduction**: A fixture showed modified solution plus untracked test project.
+`dotnet sln list` contained it, baseline PlanOnly selected 18 projects and omitted
+it, while direct execution failed one test. Changing only discovery to
+`git ls-files --cached --others --exclude-standard -- '*.csproj'` selected 19
+including the failing project.
+
+**Impact**: During normal pre-commit development, newly added failing test
+assemblies can be completely skipped by the changed-test command.
+
+**Root cause**: The changed-file and project-inventory authorities have different
+tracked/untracked scopes.
+
+**Recommended fix**: Inventory cached plus untracked nonignored project files,
+deduplicate, and exclude cached paths deleted from the worktree.
+
+**Regression coverage**: In a fixture repository, add an untracked test project
+and modify the solution; PlanOnly must select it. A mutation restoring cached-
+only discovery must fail.
+
+**Confidence**: High; the plan omitted a solution-listed project whose direct
+test failed, and the broadened inventory selected it.
+
+### 542. [CONFIRMED] Successful mutation-result reuse preserves stale timing evidence
+
+**Location**: scripts/Invoke-SharpProofTrustedMutationsParallel.ps1, reuse fast
+path around lines 51-61 and timing derivation/write around lines 370-397.
+
+**Description**: A valid complete mutation result causes immediate successful
+return before the timing path is derived or owned. A canonical
+mutation-release.json from another commit therefore survives unchanged while
+the command reports the current commit's evidence already complete.
+
+**Reproduction**: Canonical fixture output:
+
+    exit_code=0
+    AUDIT_EVIDENCE_COMMIT=a7200d525bef268af1a34560288f555579b04e46
+    AUDIT_TIMING_COMMIT=0000000000000000000000000000000000000000
+    AUDIT_TIMING_HASH_UNCHANGED=True
+    Mutation evidence behavioral fixtures passed.
+
+**Impact**: Operators following documented timing records can attribute duration,
+parallelism, shard reuse, and lanes to the current mutation command when they
+describe an older campaign. Qualification uses separate result evidence, so the
+impact is performance evidence correctness rather than release acceptance.
+
+**Root cause**: Result completeness is treated as completeness of both canonical
+outputs, while timing lifecycle starts only after the reuse branch.
+
+**Recommended fix**: Own the timing path before reuse. On reuse, atomically write
+a current-commit envelope explicitly marked `reused=true` and zero work, or
+remove prior timing. If timing itself is reused, validate commit/config/schema.
+
+**Regression coverage**: Seed old timing and current valid result; success must
+produce current reused timing or no timing. Cover missing/malformed timing and
+normal execution.
+
+**Confidence**: High; a successful current-commit command left a byte-identical
+older-commit timing artifact.
+
+### 543. [CONFIRMED] A completing local coalesce assignment suppresses later Requires diagnostics
+
+**Location**: SharpProof.Effects/ManagedAbstractFlow.cs,
+DefiniteOperationFacts.CompletesNormally around lines 1842-1917; prefix use in
+SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines 461-471;
+Unknown mapping in RequiresCallSiteAnalyzer.cs around lines 339-342.
+
+**Description**: The strict completion allowlist has no
+ICoalesceAssignmentOperation case. Every preceding `??=` is considered
+non-completing, so a later reachable ordinary call becomes unreplayable even
+when local coalesce assignment definitely completes. Effects has a separate
+completion evaluator that already models the operation.
+
+**Reproduction**:
+
+    string? value = null;
+    value ??= "ok";
+    Positive(-1);
+
+Candidate output was `can-replay=False flow=Complete`; no SP0027 appeared. The
+direct control reported SP0027. Runtime reached the call once. A definitely
+throwing RHS correctly prevented the later call, showing blanket admission would
+be wrong.
+
+**Impact**: One ordinary prior statement silences all later concrete
+precondition refutations in that path without a fallback diagnostic.
+
+**Root cause**: Operation completion semantics are duplicated and the analyzer's
+allowlist omits coalesce assignment entirely.
+
+**Recommended fix**: Add sound coalesce-assignment evaluation order for local,
+parameter, and discard targets when target/RHS/write definitely complete. Keep
+property/index/field shapes conservative until getter/setter/receiver effects
+are modeled, or share the existing completion evaluator if its contract aligns.
+
+**Regression coverage**: Completing local ??= followed by invalid call reports;
+throwing RHS suppresses. Add dependent nonnull/null state, direct control, and
+unknown property target fail-closed cases.
+
+**Confidence**: High; candidate flow was complete and runtime reached the call,
+with the missing operation-kind case isolating replay rejection.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
