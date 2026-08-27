@@ -6233,6 +6233,383 @@ projection, reject cross-project reuse with SP0054, or implement locked
 multi-run aggregation. Test App/Lib shared-path behavior and retain same-project
 cooperative publication.
 
+### 582. [CONFIRMED] Property-assignment arguments ignore non-returning setters
+
+**Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184
+and 1872-1886; consumer RequiresCallSiteAnalyzer.cs around lines 450-460.
+
+**Description**: MayCompleteNormally handles ISimpleAssignmentOperation through
+generic child traversal. For a property target that observes the read/getter
+shape and never checks the setter actually invoked by assignment.
+
+**Reproduction**: Positive(new ThrowingTarget().Value = 1, -1) emitted SP0027,
+but the setter threw before invocation and runtime call count was zero. A
+completing setter and direct call executed and correctly emitted SP0027.
+
+**Impact**: Deterministic false refutations and warnings-as-errors failures are
+reported for unreachable calls.
+
+**Recommended fix**: Classify assignment write targets explicitly. Property and
+indexer assignments must check receiver/index/RHS completion, nullness, static
+initialization, and setter normal exit without consulting the getter. Preserve
+permissiveness for unknown metadata setters; treat compound assignment
+separately because it invokes both accessors. Add setter/getter, set-only,
+static, indexer, null-receiver, and argument-position controls.
+
+### 583. [CONFIRMED] Callable projection validation is quadratic
+
+**Location**: Worker.Protocol/ProtocolJson.cs around lines 751-773;
+WorkerResultAssembler.cs around lines 171-187.
+
+**Description**: ValidateRun loops every callable result, and each
+MatchesCallableProjection call linearly scans manifest.Callables from the start
+with FirstOrDefault despite already building claim indexes.
+
+**Reproduction**: Valid empty-claim responses took 18.9 ms at 1,000 callables,
+123 ms at 4,000, 506 ms at 8,000, and 1,487 ms at 16,000. The 16,000-row
+response validated and was only 4.87 MB.
+
+**Impact**: Large ordinary projects spend seconds in repeated validation at
+worker, launcher, and publication boundaries after verification is complete.
+
+**Recommended fix**: Build one ordinal CallableId index beside claimsByCallable
+and pass resolved declarations into projection validation. Preserve malformed
+duplicate/null behavior and add deterministic lookup-count or warmed scaling
+coverage.
+
+### 584. [CONFIRMED] SPMETA002 whitelists mutable immutable-collection builders
+
+**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs around
+lines 608-640.
+
+**Description**: IsMutableReferenceStorage returns false for every type in
+System.Collections.Immutable before checking mutable collection interfaces.
+Nested Builder types therefore bypass the Error-level state-isolation rule.
+
+**Reproduction**: Static readonly ImmutableArray<int>.Builder emitted zero
+SPMETA002 and runtime Add changed Count from zero to one. A readonly List<int>
+control emitted one diagnostic; an ImmutableArray value emitted zero.
+
+**Impact**: Analyzer/frontend/verifier code can retain mutable process-global
+builder state across compilations without detection.
+
+**Recommended fix**: Recognize exact nested Builder types before the immutable
+namespace exemption, preserving real immutable values. Test Array/List/Dictionary/
+HashSet and sorted builders plus immutable and ordinary mutable controls.
+
+### 585. [CONFIRMED] WellSortedIrGenerator maximumDepth forces exponential full-depth trees
+
+**Location**: SharpProof.Testing/WellSortedIrGenerator.cs around lines 55-79,
+124-147, and 150-179.
+
+**Description**: Positive depth has no leaf production. Integer and Boolean
+generators always recurse with expected two children, so maximumDepth behaves as
+required full depth, with no node budget or upper bound.
+
+**Reproduction**: Fixed-seed generation retained about 81.8 MB at depth 20 in
+1.07 s and 945.4 MB at depth 24 in 13.3 s for one case.
+
+**Impact**: Raising the public testing depth can stall or exhaust the test
+process before any differential oracle runs.
+
+**Recommended fix**: Add a bounded node budget and allow leaves at every depth,
+using maximumDepth only as a ceiling; optionally enforce a documented hard cap.
+Test depth/size bounds, fixed-seed determinism, and budget exhaustion.
+
+### 586. [CONFIRMED] An all-break switch suppresses later SP0027 diagnostics
+
+**Location**: RequiresCallSiteDiscovery.cs around lines 188-208 and 425-471;
+ManagedAbstractFlow.cs around lines 1842-1917.
+
+**Description**: Strict replay-prefix completion recognizes neither
+ISwitchOperation nor a break that normally exits that switch.
+
+**Reproduction**: Direct and empty-block controls had CanReplay=true and one
+SP0027. A constant/default switch whose every branch broke had Complete flow,
+runtime reached the target once, CanReplay=false, and zero diagnostics.
+All-abrupt and safe controls stayed quiet.
+
+**Impact**: A documented ordinary switch before a contracted call erases a
+definite violation even when every selector continues.
+
+**Recommended fix**: Add conservative constant/default switch completion and
+treat a break owned by that exact switch as normal exit. Reject patterns, guards,
+gotos, nested breaks, and abrupt sections. Add no-default and no-duplicate tests.
+
+### 587. [CONFIRMED] Literal-true postconditions consume a redundant query reservation
+
+**Location**: CallableEntryFeasibility.cs around lines 110-140;
+CallableVerifier.cs around lines 186-237; IrSemanticTerms.cs around lines 44-62.
+
+**Description**: A feasible entry query can use the final method reservation.
+Even when the folded postcondition obligation is literal true, CallableVerifier
+requires another reservation and returns Unknown(ResourceLimit).
+
+**Reproduction**: With Requires(value > 0), Ensures(true), and method limit one,
+entry was Feasible and outcome Unknown/ResourceLimit. Raising only the method
+limit to two produced Proven and consumed additional SMT resources.
+
+**Impact**: A logically unconditional claim is downgraded and strict builds can
+fail; with capacity, an unnecessary solver call is charged.
+
+**Recommended fix**: Discharge literal true before TryStartQuery as Proven with
+an empty nonvacuous core. Add one-call tight-budget, nonliteral control, and
+backend-test fixture adjustments.
+
+### 588. [CONFIRMED] Disabling analyzers republishes stale Proven evidence
+
+**Location**: CompilerCollector/FinalCompilationCollectorAnalyzer.cs around
+lines 3-31; SharpProof.Package/buildTransitive/SharpProof.targets around lines
+47-50; SharpProof.Verifier.targets around lines 232-234 and 320-323.
+
+**Description**: The collector is a DiagnosticAnalyzer. When the SDK sets
+_SkipAnalyzers, Csc emits the changed assembly but leaves the prior stable
+manifest, and verification consumes it.
+
+**Reproduction**: Identity first built Proven; source changed to negation.
+RunAnalyzersDuringBuild=false exited zero, kept manifest unchanged, changed the
+assembly, and republished Proven. A normal build regenerated the manifest,
+returned Refuted, and failed SP0051.
+
+**Impact**: A strict build can certify a previous source while shipping the
+changed refuted assembly.
+
+**Recommended fix**: When verification is enabled, force analyzer execution
+before _ComputeSkipAnalyzers or fail explicitly with SP0054; do not merely skip
+verification. Test RunAnalyzersDuringBuild, RunAnalyzers, implicit skip, and
+normal controls.
+
+### 589. [CONFIRMED] ConstrainSuccessfulEvaluation bypasses sort and ownership checks
+
+**Location**: SharpProof.Ir/IrSemanticTerms.cs around lines 21-32.
+
+**Description**: When evaluated is atomic and needs no definedness witness, the
+fast path returns predicate directly without validating Boolean sort, factory
+ownership, or evaluated ownership.
+
+**Reproduction**: A foreign Boolean predicate returned the same instance, an
+Integer predicate was accepted, and a later consumer rejected the foreign term.
+The composite evaluated control rejected immediately because factory.Binary
+incidentally performed validation.
+
+**Impact**: A public canonical-term helper can leak wrong-sort or foreign-factory
+terms and move failure to a distant interpreter/query boundary.
+
+**Recommended fix**: Validate predicate ownership and Boolean type plus evaluated
+ownership before the fast path. Test integer, foreign predicate/evaluated,
+same-factory atomic identity, and composite behavior.
+
+### 590. [CONFIRMED] Zero-claim unsupported callables are rewritten as MalformedResult
+
+**Location**: Worker.Protocol/WorkerResultAssembler.cs around lines 195-202;
+SharpProof.Worker/SharpProofWorker.cs around lines 350-367;
+ClaimManifestBuilder.cs around lines 61-64 and 146-147.
+
+**Description**: A precondition-only callable can legitimately fail preparation
+as UnsupportedBody and produce Incomplete/SemanticUnknown with zero claim rows.
+Projection hard-codes every zero-claim complete-run callable to Complete/None.
+
+**Reproduction**: Manifest and preparation were valid, callable was
+Incomplete/SemanticUnknown with zero claims, but response validation emitted
+response.callable_projection; Worker then replaced it with
+Failed/MalformedResult.
+
+**Impact**: Ordinary typed semantic incompleteness is misreported as malformed
+worker output and the true UnsupportedBody reason is lost.
+
+**Recommended fix**: Preserve verifiable callable-level authority for zero-claim
+entries or admit the finite claimless incomplete reasons against compiler
+preparation authority. Add end-to-end Requires-only unsupported and supported
+controls.
+
+### 591. [CONFIRMED] Void return closed attributes are selected then discarded
+
+**Location**: ContractSelectionInventory.cs around lines 141-146;
+ClosedContractDiagnostics.cs around lines 18-26; ContractBinder.cs around lines
+260-270.
+
+**Description**: Return attributes select contracts, but analyzer and binder
+skip all return validation when ReturnsVoid and construct zero clauses.
+
+**Reproduction**: Return-target NotNull, Positive, and InRange on void compiled
+cleanly, were retained by Roslyn and selected, emitted no SP0024, and bound
+successfully with zero clauses. Invalid and valid nonvoid controls behaved
+correctly.
+
+**Impact**: Malformed selected declarations are silently accepted and mislead
+authors into believing a contract is active.
+
+**Recommended fix**: Always validate return attributes against ReturnType,
+including System.Void; gate only clause construction on a result term. Test all
+closed attributes on void plus no-attribute and nonvoid controls.
+
+### 592. [CONFIRMED] Targeted package tests depend on default Worker shard inventory
+
+**Location**: scripts/Invoke-SharpProofPackageTests.ps1 around lines 220-246 and
+281-293.
+
+**Description**: The script always performs WorkerMsBuildIntegrationTests
+list-tests discovery and enforces at least 40 methods before checking whether an
+explicit TestFilter requested a single selected shard.
+
+**Reproduction**: A project with one passing requested LauncherArgument test and
+no Worker fixture passed direct dotnet test, but the wrapper failed because
+Worker discovery returned zero. Moving discovery into default mode made the
+same wrapper pass one test.
+
+**Impact**: Healthy targeted diagnosis is blocked by unrelated Worker fixture
+renames/topology and always pays irrelevant discovery overhead.
+
+**Recommended fix**: Execute Worker inventory/bucketing only for empty-filter
+default mode; selected mode should enqueue its filter directly. Test zero-Worker
+selected success and default-mode floor failure.
+
+### 593. [CONFIRMED] Invalid closed attributes in referenced metadata are silent
+
+**Location**: ContractBinder.cs around lines 249-301; AnalyzerSession.cs around
+lines 154-185; RequiresCallSiteAnalyzer.cs around lines 314-326;
+AnalyzerFeaturePipeline.cs around lines 345-356.
+
+**Description**: A genuine metadata attribute that is recognized but
+semantically invalid makes binding fail. Only identity-rejected metadata gets an
+unconditional call-site diagnostic; other failures become Unknown and are
+reported only when the caller is independently selected.
+
+**Reproduction**: External Read([Positive] string) was recognized invalid and
+bound InvalidClosedAttribute, yet an unannotated consumer call emitted nothing.
+Positive int emitted SP0027; selecting the caller produced only vague SP0047.
+
+**Impact**: Dependencies built without the analyzer can ship malformed
+preconditions that consumers neither enforce nor diagnose.
+
+**Recommended fix**: Validate genuine metadata attributes at call targets and
+emit SP0024 with type/reason, or an unconditional typed SP0047. Retain identity
+rejection, valid external, no-attribute, and selected-caller controls.
+
+### 594. [CONFIRMED] SMT depth prevalidation re-walks shared DAGs per assumption
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 297-301 and 346-364.
+
+**Description**: Query construction calls ValidateDepth separately for every
+assumption and goal, and each call creates a fresh depth memo although actual
+encoding shares its cache.
+
+**Reproduction**: Sixty-four roots shared one 8,191-node DAG. Direct validation
+allocation grew from 746,600 to 47,677,064 bytes, a 63.9x ratio; public backend
+latency grew from 58 to 193 ms. Both results were valid Unsatisfiable.
+
+**Impact**: O(shared nodes + assumptions) query data causes O(assumptions *
+shared nodes) work before Z3.Check and outside solver accounting.
+
+**Recommended fix**: Share the maximum-depth memo across roots while resetting
+root depth and revisiting a node reached later at greater depth. Add linear
+scaling, depth-256 ordering, and cancellation tests.
+
+### 595. [CONFIRMED] Launcher snapshots the Worker closure twice before startup
+
+**Location**: Worker.Launcher/Program.cs around lines 21-23, 57-58, and 115-119;
+CompilerManifestArtifact.cs around lines 49-124 and 178-187.
+
+**Description**: Outer CreateSnapshot stages the closure, then its prelaunch hash
+delegate calls ComputeSha256, which creates another full snapshot. Each snapshot
+also materializes multiple full component arrays.
+
+**Reproduction**: A normal 16-component 2.09 MB closure allocated 15.16 MB, read
+16.75 MB, and took 122 ms before launch. A one-snapshot control halved both
+ratios; hashes matched and cleanup completed.
+
+**Impact**: Every project pays roughly 7.25x allocation and 8x reads before
+Worker/Z3; supported large closures multiply this into hundreds of MB.
+
+**Recommended fix**: Hash the retained first snapshot directly; stream copy,
+comparison, and canonical hashing with pooled buffers. Test one snapshot,
+identical bytes/hash, cleanup, bounded I/O/allocation, and mutation/size limits.
+
+### 596. [CONFIRMED] Non-completing object initializers lose reached effects
+
+**Location**: EffectMethodNodeBuilder.cs around lines 138-158;
+OperationEffectScanner.cs around lines 838-879;
+OperationCompletionEvaluator.cs around lines 889-902.
+
+**Description**: Direct member-initializer scanning asks whether the whole object
+creation, including initializer, completes while modeling only constructor
+completion. If an initializer setter/RHS fails, it skips the initializer
+entirely, including reached prefix effects.
+
+**Reproduction**: new Value { Property = Mark() } ran Mark, wrote static 1729,
+then setter threw InvalidOperationException. Analysis returned Complete and
+nonunknown but omitted both static write and throw. A constructor-prefix
+completion fix passed the oracle and three nearby tests.
+
+**Impact**: Constructor summaries and callers can be falsely pure/nonthrowing.
+
+**Recommended fix**: Separate constructor-invocation completion from whole
+construction, then scan initializer sequencing independently. Add one- and
+two-member throwing initializer runtime oracles plus a completing control.
+
+### 597. [CONFIRMED] Canonical container dotnet commands have no internal deadline
+
+**Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 1-40 and
+ordinary test/build/gate call sites; bounded wrapper exists in
+Invoke-SharpProofDotnet.ps1 around lines 21-59.
+
+**Description**: Invoke-DotNet calls raw dotnet with no timeout, tree kill, or
+exit-124 attribution, bypassing the repository's existing bounded runner.
+
+**Reproduction**: A benign fake dotnet slept for 30 seconds. Baseline required an
+external two-second watchdog. Routing through the existing wrapper with a
+one-second bound failed attributably in 1.61 s and left no child alive.
+
+**Impact**: Hung restore, build, analyzer, testhost, gate, pack, or fuzz setup can
+block developer/CI tasks indefinitely until external cancellation.
+
+**Recommended fix**: Route every dispatcher dotnet invocation through the
+bounded wrapper using contract-owned build/test deadlines and an optional
+validated override. Test timeout attribution, child cleanup, short-circuit, and
+fast restore+test.
+
+### 598. [CONFIRMED] Legal 513-character source call identity causes fatal SP0049
+
+**Location**: CompilerRelationalSummaryProvider.cs around lines 136-149,
+278-286, and 340-354; CompilerManifestArtifactProducer.cs around lines 69-119;
+CompilationFingerprint.cs around lines 173-180 and 230-254.
+
+**Description**: Summary authority accepts unbounded Roslyn documentation IDs,
+but final compilation evidence rejects identities longer than 512 characters
+and the collector converts the exception to error SP0049.
+
+**Reproduction**: A helper name yielding identity length 512 lowered and emitted
+successfully. One extra character produced compiler errors zero, lowering
+success and one summary authority, then JsonException and no manifest.
+
+**Impact**: Valid source fails verification rather than yielding typed
+UnsupportedBody.
+
+**Recommended fix**: Apply one shared identity validator before summary caching
+and abstain at 513, or consistently raise/remove the schema limit. Do not
+truncate/hash authority identity. Test 512, 513, nested dependency, and no-SP0049.
+
+### 599. [CONFIRMED] Exact-commit release tasks compile Git-ignored source files
+
+**Location**: .gitignore entry for Generated Files; eng/container/entrypoint.sh
+around lines 90-130 and 137-187.
+
+**Description**: Clean-source validation uses git ls-files --others
+--exclude-standard, hiding ignored paths. The later live-worktree tar overlay
+does not honor Git ignores and copies them into the detached HEAD task clone.
+
+**Reproduction**: An ignored Generated Files/IgnoredCompileBreak.cs was absent
+from ordinary status, passed the clean gate, then compiled inside canonical pack
+with RepositoryCommit fixed to HEAD and failed on its #error.
+
+**Impact**: Exact-commit release commands can fail or produce different package
+assemblies from ignored local leftovers while provenance still names HEAD.
+
+**Recommended fix**: Execute clean-required commands directly from detached HEAD
+and copy only explicitly authorized external inputs, or reject every overlaid
+path outside that allowlist. Test ignored Compile source, allowed nupkgs, and
+excluded artifacts/bin/obj.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
