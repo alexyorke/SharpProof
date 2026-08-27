@@ -17,6 +17,7 @@ must remain visible as a typed incomplete result, never silent success.
    ```text
    sp test-changed
    sp check
+   sp self-application
    sp acceptance -Configuration Release
    ```
 

@@ -8,6 +8,8 @@ using SharpProof.Attributes;
 using SharpProof.Ir;
 using SharpProof.Specs;
 
+#pragma warning disable SP0024 // This oracle intentionally exercises invalid contract placements.
+
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
@@ -1819,3 +1821,4 @@ public sealed partial class ApiSpecRuntimeOracleTests
         }
     }
 }
+#pragma warning restore SP0024

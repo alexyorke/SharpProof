@@ -71,6 +71,7 @@ Compose workspace volume:
 sp test-changed
 sp check
 sp build
+sp self-application
 sp portable-tests
 sp worker-tests
 sp package-tests

@@ -5,6 +5,9 @@
     <Error Text="SharpProof repository restore, build, test, pack, and release commands must run through the canonical Docker Compose tooling container. See docs/container-development.md." />
   </Target>
 
+  <Import Project="$(MSBuildThisFileDirectory)SharpProof.SelfApply.targets"
+          Condition="'$(SharpProofSelfApply)' == 'true'" />
+
   <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
     <!-- Test frameworks discover fixtures through reflection; test awaits do not
          expose a reusable library synchronization-context contract. -->

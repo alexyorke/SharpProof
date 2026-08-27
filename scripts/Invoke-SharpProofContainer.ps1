@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'self-application', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -11,7 +11,9 @@ param(
 
     [string]$PackageSource = '',
 
-    [string]$TestFilter = ''
+    [string]$TestFilter = '',
+
+    [switch]$IncludeMetaAnalyzers
 )
 
 $ErrorActionPreference = 'Stop'
@@ -58,6 +60,15 @@ switch ($Command) {
     'check' {
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofDevCheck.ps1') `
             -Configuration $Configuration
+    }
+    'self-application' {
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofSelfApplication.ps1') `
+            -Configuration $Configuration `
+            -IncludeMetaAnalyzers:$IncludeMetaAnalyzers
+        if ($LASTEXITCODE -ne 0) {
+            throw 'SharpProof self-application failed.'
+        }
     }
     'pr-gates' {
         if ($Configuration -ne 'Release') {

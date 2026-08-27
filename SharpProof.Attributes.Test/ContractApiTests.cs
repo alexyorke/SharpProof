@@ -31,6 +31,7 @@ internal sealed class ContractApiTests
             Is.EqualTo(Contract.ConditionalSymbol));
     }
 
+#pragma warning disable SP0024 // This test intentionally probes an invalid runtime placement.
     [Test]
     public void ContractValuePlaceholdersRejectRuntimeUse()
     {
@@ -46,6 +47,7 @@ internal sealed class ContractApiTests
             oldException.Message,
             Does.Contain("Contract.Ensures"));
     }
+#pragma warning restore SP0024
 
     [Test]
     public void TrustAndSuppressionReasonsAreRequired()

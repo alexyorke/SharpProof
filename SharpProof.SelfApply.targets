@@ -1,0 +1,70 @@
+<Project>
+  <!--
+    This target deliberately consumes built analyzer payloads instead of
+    importing SharpProof.AnalyzerConsumer.props. The consumer props add
+    project references, which would introduce cycles when every repository
+    project is self-applied in one solution build.
+  -->
+  <PropertyGroup>
+    <SharpProofSelfApplyIncludeMetaAnalyzers
+        Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == ''">false</SharpProofSelfApplyIncludeMetaAnalyzers>
+    <_SharpProofSelfApplyCoreDirectory>$(MSBuildThisFileDirectory)SharpProof.Analyzer.Core\bin\$(Configuration)\netstandard2.0</_SharpProofSelfApplyCoreDirectory>
+    <_SharpProofSelfApplyAnalyzerPath>$(MSBuildThisFileDirectory)SharpProof.Analyzer\bin\$(Configuration)\netstandard2.0\SharpProof.Analyzer.dll</_SharpProofSelfApplyAnalyzerPath>
+    <_SharpProofSelfApplyGeneratorPath>$(MSBuildThisFileDirectory)SharpProof.ContractForGenerator\bin\$(Configuration)\netstandard2.0\SharpProof.ContractForGenerator.dll</_SharpProofSelfApplyGeneratorPath>
+    <_SharpProofSelfApplyMetaAnalyzerPath>$(MSBuildThisFileDirectory)SharpProof.Meta.Analyzers\bin\$(Configuration)\netstandard2.0\SharpProof.Meta.Analyzers.dll</_SharpProofSelfApplyMetaAnalyzerPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(SharpProofSelfApply)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
+    <!-- Remove consumer-props entries so a project never loads a payload twice. -->
+    <Analyzer Remove="$(_SharpProofSelfApplyAnalyzerPath)" />
+    <Analyzer Remove="$(_SharpProofSelfApplyGeneratorPath)" />
+    <Analyzer Remove="$(_SharpProofSelfApplyMetaAnalyzerPath)"
+              Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == 'true'" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Analyzer.Core.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Contracts.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Dataflow.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Effects.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Frontend.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Ir.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Specs.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\System.Buffers.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\System.Collections.Immutable.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\System.Memory.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\System.Numerics.Vectors.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\System.Reflection.Metadata.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\System.Runtime.CompilerServices.Unsafe.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\System.Text.Encoding.CodePages.dll" />
+    <Analyzer Remove="$(_SharpProofSelfApplyCoreDirectory)\System.Threading.Tasks.Extensions.dll" />
+
+    <Analyzer Include="$(_SharpProofSelfApplyAnalyzerPath)" />
+    <Analyzer Include="$(_SharpProofSelfApplyGeneratorPath)" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Analyzer.Core.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Contracts.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Dataflow.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Effects.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Frontend.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Ir.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Specs.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\System.Buffers.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\System.Collections.Immutable.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\System.Memory.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\System.Numerics.Vectors.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\System.Reflection.Metadata.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\System.Runtime.CompilerServices.Unsafe.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\System.Text.Encoding.CodePages.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyCoreDirectory)\System.Threading.Tasks.Extensions.dll" />
+    <Analyzer Include="$(_SharpProofSelfApplyMetaAnalyzerPath)"
+              Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == 'true'" />
+  </ItemGroup>
+
+  <Target Name="_SharpProofValidateSelfApplyArtifacts"
+          BeforeTargets="CoreCompile"
+          Condition="'$(SharpProofSelfApply)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(_SharpProofSelfApplyAnalyzerPath)')"
+           Text="SharpProofSelfApply requires a baseline build. Missing $(_SharpProofSelfApplyAnalyzerPath); run the self-application command instead of setting SharpProofSelfApply on a first build." />
+    <Error Condition="!Exists('$(_SharpProofSelfApplyGeneratorPath)')"
+           Text="SharpProofSelfApply requires a baseline build. Missing $(_SharpProofSelfApplyGeneratorPath); run the self-application command instead of setting SharpProofSelfApply on a first build." />
+    <Error Condition="!Exists('$(_SharpProofSelfApplyCoreDirectory)\SharpProof.Analyzer.Core.dll')"
+           Text="SharpProofSelfApply requires the baseline analyzer dependency closure under $(_SharpProofSelfApplyCoreDirectory)." />
+  </Target>
+</Project>

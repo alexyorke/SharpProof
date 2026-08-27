@@ -42,6 +42,7 @@ Use the short `sp` command inside the container:
 sp test-changed
 sp check
 sp build
+sp self-application
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj
 sp semantic-tests
 sp portable-tests
@@ -55,6 +56,16 @@ sp acceptance -Configuration Release
 
 Use `sp test-changed` during an edit loop. It derives the affected test-project
 closure from Git and project references.
+Use `sp self-application` when changing SharpProof's own analyzers or their
+supporting libraries. It restores once, builds a clean baseline, then rebuilds
+the complete solution with the baseline analyzer and ContractFor generator
+payloads loaded into every project. The command uses the container-visible CPU
+count and disables the shared Roslyn compiler server for this two-pass check;
+this avoids a single VBCS compiler process becoming the bottleneck. It fails on
+SharpProof diagnostics or analyzer-load diagnostics. Most analyzer-bearing
+production projects already load the Meta analyzer through their project
+references; pass `-IncludeMetaAnalyzers` only when deliberately auditing every
+test fixture too.
 The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
 The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
 Both run
