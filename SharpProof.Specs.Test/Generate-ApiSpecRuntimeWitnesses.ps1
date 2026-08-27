@@ -15,6 +15,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $repositoryRoot 'scripts\GeneratedFileHelpers.ps1')
+. (Join-Path $repositoryRoot 'scripts\Assert-SharpProofUniqueJsonProperties.ps1')
 
 if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
     $CatalogPath = Join-Path `
@@ -59,8 +60,17 @@ function ConvertTo-FactoryName {
     return 'Create' + ($suffix -join '') + 'Witness'
 }
 
-$catalog = [IO.File]::ReadAllText($CatalogPath) |
-    ConvertFrom-Json -Depth 100
+$catalogText = [IO.File]::ReadAllText($CatalogPath)
+$catalogDocument = [System.Text.Json.JsonDocument]::Parse($catalogText)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $catalogDocument.RootElement `
+        -Context 'API-spec catalog'
+}
+finally {
+    $catalogDocument.Dispose()
+}
+$catalog = $catalogText | ConvertFrom-Json -Depth 100
 if ($catalog.schema -ne 'SharpProof.ApiSpecCatalog' -or
     [int]$catalog.schemaVersion -ne 1) {
     throw 'The API-spec catalog schema must be SharpProof.ApiSpecCatalog v1.'

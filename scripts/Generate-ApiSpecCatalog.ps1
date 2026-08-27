@@ -21,6 +21,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
@@ -582,6 +583,15 @@ function Assert-ExactGeneratedFile {
 }
 
 $catalogText = [IO.File]::ReadAllText($CatalogPath)
+$catalogDocument = [System.Text.Json.JsonDocument]::Parse($catalogText)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $catalogDocument.RootElement `
+        -Context 'API-spec catalog'
+}
+finally {
+    $catalogDocument.Dispose()
+}
 $catalog = $catalogText | ConvertFrom-Json -Depth 100
 $schemaVersion = Assert-JsonInt32 `
     -Value (Get-RequiredProperty $catalog 'schemaVersion' 'catalog') `

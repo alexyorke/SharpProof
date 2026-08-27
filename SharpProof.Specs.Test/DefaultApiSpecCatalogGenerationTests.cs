@@ -204,6 +204,50 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
     }
 
+    [Test]
+    public async Task GeneratorRejectsDuplicateJsonProperties()
+    {
+        using var workspace = GenerationWorkspace.Create();
+        var catalog = await File.ReadAllTextAsync(CatalogPath());
+        var variants = new[]
+        {
+            catalog.Replace(
+                "  \"tableVersion\": \"5\",",
+                "  \"tableVersion\": \"5\",\n  \"tableVersion\": \"shadow\",",
+                StringComparison.Ordinal),
+            catalog.Replace(
+                "        \"nullness\": {\n          \"result\": \"NonNull\",",
+                "        \"nullness\": {\n          \"result\": \"NonNull\",\n          \"result\": \"Null\",",
+                StringComparison.Ordinal)
+        };
+
+        foreach (var variant in variants)
+        {
+            await File.WriteAllTextAsync(
+                workspace.CatalogInputPath,
+                variant,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            var result = await RunGeneratorAsync(
+                "-CatalogPath",
+                workspace.CatalogInputPath,
+                "-SourceOutputPath",
+                workspace.FirstSourcePath,
+                "-DocumentationOutputPath",
+                workspace.FirstDocumentationPath,
+                "-RuntimeWitnessOutputPath",
+                workspace.FirstRuntimeWitnessPath);
+
+            Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+
+            var runtimeResult = await RunRuntimeWitnessGeneratorAsync(
+                "-CatalogPath",
+                workspace.CatalogInputPath,
+                "-OutputPath",
+                workspace.FirstRuntimeWitnessPath);
+            Assert.That(runtimeResult.ExitCode, Is.Not.Zero, runtimeResult.Output);
+        }
+    }
+
     private static void AssertDeclaration(
         JsonElement declaration,
         ApiSpecTemplate template,
@@ -609,6 +653,19 @@ public sealed class DefaultApiSpecCatalogGenerationTests
     private static async Task<GeneratorResult> RunGeneratorAsync(
         params string[] arguments)
     {
+        return await RunScriptAsync(GeneratorPath(), arguments);
+    }
+
+    private static async Task<GeneratorResult> RunRuntimeWitnessGeneratorAsync(
+        params string[] arguments)
+    {
+        return await RunScriptAsync(RuntimeGeneratorPath(), arguments);
+    }
+
+    private static async Task<GeneratorResult> RunScriptAsync(
+        string scriptPath,
+        params string[] arguments)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -621,7 +678,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         startInfo.ArgumentList.Add("-NoLogo");
         startInfo.ArgumentList.Add("-NoProfile");
         startInfo.ArgumentList.Add("-File");
-        startInfo.ArgumentList.Add(GeneratorPath());
+        startInfo.ArgumentList.Add(scriptPath);
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
@@ -652,6 +709,14 @@ public sealed class DefaultApiSpecCatalogGenerationTests
             RepositoryRoot(),
             "scripts",
             "Generate-ApiSpecCatalog.ps1");
+    }
+
+    private static string RuntimeGeneratorPath()
+    {
+        return Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Specs.Test",
+            "Generate-ApiSpecRuntimeWitnesses.ps1");
     }
 
     private static string RepositoryRoot()
