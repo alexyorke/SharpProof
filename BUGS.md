@@ -940,6 +940,328 @@ successfully on the same backend.
 **Confidence**: High; self-verified in the canonical Linux-amd64 image against
 an immutable ffe74fff1 snapshot with timed cancellation evidence.
 
+### 443. [CONFIRMED] Signed System.Random seed aliases repeat downstream fuzz cases even when raw case seeds differ
+
+**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 152-155 and
+526-559; Tools/SharpProof.Fuzz/FrontendFuzzing.cs around lines 702-716;
+Tools/SharpProof.Fuzz/WellSortedIrGenerator.cs around lines 43-44; existing
+coverage in SharpProof.Fuzz.Test/FuzzRunnerTests.cs around lines 88-105.
+
+**Description**: The frontend and finite-SMT fuzz generators XOR each raw case
+seed with an oracle salt, cast the result to signed int, and pass it to
+System.Random(int). In the supported .NET 9 runtime, new Random(n) and
+new Random(-n) produce identical streams. Distinct raw case seeds can therefore
+alias after salting and generate the same oracle input. This remains after any
+fix that merely makes CreateCaseSeed itself injective.
+
+**Reproduction evidence**:
+
+- Nightly campaign seed 20260424, frontend indices 6787 and 7525:
+  raw seeds 2135852073 and -2135852075 become salted seeds
+  2138777086 and -2138777086.
+- Nightly campaign seed 20260830, finite-SMT indices 3580 and 7042:
+  raw seeds 1138160897 and -1138160903 become salted seeds
+  794323444 and -794323444.
+
+The canonical .NET 9.0.1 container produced identical first-eight
+Random.Next() streams for both opposite-sign pairs. The finite-SMT pair also
+has the same target index and fallback parity, so it produces structurally
+identical formulas. Frontend generation is likewise deterministic from the
+aliased Random stream.
+
+**Impact**: FrontendAgreements and SmtAgreements can count repeated oracle
+inputs as independent cases even when raw case-seed uniqueness is enforced.
+The existing test checks only distinct CreateCaseSeed integers and cannot see
+effective generator-state aliases.
+
+**Root cause**: System.Random(int) seed initialization does not preserve all
+32 signed seed bit patterns, but the campaign treats those patterns as distinct
+entropy.
+
+**Recommended fix**: Replace System.Random(int) in fuzz generators with a
+deterministic PRNG whose initialization preserves every uint or ulong seed bit.
+Seed it directly from campaign seed, case index, and oracle identifier rather
+than converting through a signed int. Keep the algorithm/version explicit so
+retained-seed reproduction remains stable.
+
+**Regression coverage**: Pin both opposite-sign pairs at the PRNG stream and
+generated-case levels, assert distinct effective generator states for the
+supported campaign range, and retain raw CreateCaseSeed uniqueness and
+cross-seed tests.
+
+**Confidence**: High; exact mappings and runtime streams were reproduced in the
+canonical .NET image and downstream deterministic inputs were traced.
+
+### 444. [CONFIRMED] Strict protocol deserialization parses every document twice
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around
+lines 27-35 and SharpProof.Worker.Protocol/ProtocolJson.cs around
+lines 1029-1033.
+
+**Description**: Strict deserialization first parses the entire input into a
+JsonDocument to validate property order, duplicates, token kinds, enums, and
+depth. It disposes that document, then JsonSerializer.Deserialize<T> reparses
+the same full string to materialize the model. This is separate from the
+fixed-size file-read allocation: even an exactly sized input pays for two full
+JSON parses.
+
+**Reproduction**: A protocol-valid request with a 4 MiB nullable
+cache-directory value measured:
+
+    JsonUtf8Bytes         = 4,194,731
+    DirectFirstAllocated  = 67,140,936
+    StrictSecondAllocated = 83,922,360
+    StrictExtraBytes      = 16,781,424
+
+An 8 MiB run allocated 167,817,008 bytes strictly versus 134,240,696 bytes
+directly, an extra 33,576,312 bytes. The strict pre-pass adds approximately
+four allocated bytes per input byte.
+
+**Impact**: A valid document near the 16 MiB limit incurs roughly another
+64 MiB solely for a discarded validation DOM, in addition to file decoding,
+model creation, and the actual deserialization. Worker, launcher, and
+publication validation all use these APIs, increasing GC, timing, and memory
+failure risk.
+
+**Root cause**: Shape validation and model materialization own separate parses
+instead of sharing one parsed representation.
+
+**Recommended fix**: Parse once, validate document.RootElement, and deserialize
+from that same JsonElement while the document remains alive with
+RootElement.Deserialize<T>(options). A single streaming Utf8JsonReader path is
+an alternative, but DOM reuse is the smallest change. Preserve every strict
+duplicate, ordering, token-kind, enum, and depth check.
+
+**Regression coverage**: Add a warmed allocation regression with a large
+sub-limit valid request. Compare strict allocation with deserialization from an
+already parsed root and permit only a small fixed margin. Retain all strict
+shape rejection and canonical round-trip tests.
+
+**Confidence**: High; self-verified with 4 MiB and 8 MiB valid inputs and
+linear allocation measurements.
+
+### 445. [CONFIRMED] Strict verification silently succeeds for non-C# projects
+
+**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
+around lines 4-5, 110, 225, 323, and 364;
+SharpProof.Package/buildTransitive/SharpProof.targets around lines 15-16 and
+85-89; C#-only analyzer, generator, and collector registrations.
+
+**Description**: The verifier targets mark every project extension except
+.csproj as language-unsupported. Verification initialization, the public
+SharpProofVerify target, verifier execution, and even the unsupported-host
+rejection target are gated on language support. Strict profile still sets
+SharpProofVerify=true, but its package check validates only that the verifier
+package is present. Roslyn ignores the C#-only analyzer, generator, and
+collector in VB or F# projects. The complete pipeline therefore skips silently.
+
+**Canonical executable probe**:
+
+    CASE=vb-strict EXIT=0
+    Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+    request/result/compiler-manifest/SARIF: all absent
+
+    CASE=cs-strict EXIT=1
+    error SP0054 at SharpProof.Verifier.targets(365,5)
+
+    CASE=vb-forced-language-supported EXIT=1
+    error SP0054 at SharpProof.Verifier.targets(365,5)
+
+The C# and forced-VB controls used identical verification inputs, isolating the
+language-support guard.
+
+**Impact**: A .vbproj or .fsproj can opt into strict or explicit verification,
+exit green, and produce no analyzer diagnostic or proof evidence. A
+mixed-language solution can therefore appear fully strict while some projects
+were never analyzed.
+
+**Root cause**: Unsupported language is used as a condition for both execution
+and rejection, converting an explicit strict request into a no-op.
+
+**Recommended fix**: Add a language-specific SP0054 rejection target before
+CoreCompile and direct SharpProofVerify whenever verification is enabled and
+the profile is not off. Keep advisory/off behavior explicit rather than
+implicitly skipping.
+
+**Regression coverage**: Add isolated-feed VB and F# consumers. Strict and
+explicit SharpProofVerify=true must fail with the language SP0054 and create no
+evidence; profile off should remain a successful control.
+
+**Confidence**: High; self-verified with executable canonical MSBuild target
+graphs and two controls that activate the existing rejection path.
+
+### 446. [CONFIRMED] SPMETA010 loses semantic-cache identity through ref and out storage aliases
+
+**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
+lines 108-129.
+
+**Description**: Assignment-target analysis recognizes only immediate field or
+property targets. A ref local that aliases a semantic-cache field appears as an
+ILocalReferenceOperation at the write, and an out helper writes through an
+IParameterReferenceOperation. Neither target is traced back to the cache
+storage.
+
+**Reproduction**:
+
+    ref var slot = ref cache.Latest;
+    slot = Answer.Unknown;
+
+and:
+
+    AssignUnknown(out cache.Latest);
+
+where ProofCache implements ISemanticCache and Latest has recognized
+SharpProof.Verify.Answer type. The exact-source probe reported:
+
+    DIRECT_FIELD_CONTROL_SPMETA010_COUNT=1
+    REF_LOCAL_ALIAS_SPMETA010_COUNT=0
+    OUT_ARGUMENT_ALIAS_SPMETA010_COUNT=0
+
+All compiler error counts were zero.
+
+**Impact**: Transient semantic answers can be written to marked cache storage
+without SPMETA010 by using standard ref aliases or out parameters. This is
+distinct from value-flow and tuple-deconstruction blind spots.
+
+**Root cause**: The rule resolves value aliases but not storage-location
+aliases.
+
+**Recommended fix**: Resolve ref local declarations and ref reassignments back
+to their underlying field/property storage before classifying writes.
+Supporting arbitrary out/ref helpers additionally needs a callee storage-write
+summary or a documented conservative policy for marked cache destinations.
+
+**Regression coverage**: Extend direct-field tests with ref-local Unknown and
+Proven controls. Add the out-helper case if interprocedural storage writes are
+within the rule's contract, plus ref reassignment and ref-return controls.
+
+**Confidence**: High; exact-source canonical probe included direct, ref-local,
+and out-argument cases with compiler-clean inputs.
+
+### 447. [CONFIRMED] Scalar-semantics generation accepts duplicate semantic properties
+
+**Location**: scripts/Generate-CSharpScalarSemantics.ps1 around line 195;
+owned outputs SharpProof.Frontend/CSharpScalarSemantics.generated.cs and
+SharpProof.Ir/IrOperatorCatalog.generated.cs.
+
+**Description**: The shared scalar-semantics catalog is parsed with
+ConvertFrom-Json before Assert-Properties and Assert-Boolean run. Duplicate
+properties have already collapsed to their last values, so structural
+validators see an apparently valid single property. Both frontend integer
+semantics and IR operator vocabulary can be generated from an ambiguous review
+source.
+
+**Reproduction**: In an ephemeral canonical container, insert:
+
+    "signed": false,
+    "signed": true,
+
+into the first integer entry. Verification against copied checked-in outputs
+reports NESTED_DUPLICATE_VERIFY_EXIT=0. A duplicate root schemaVersion 999
+followed by schemaVersion 2 also passes -Verify.
+
+**Impact**: Contradictory root or nested semantics can remain in the
+authoritative catalog while both generated outputs and acceptance verification
+stay green. Hard-coded runtime tests cannot detect ambiguity when the last
+value matches current output.
+
+**Root cause**: Property validation occurs after a last-wins JSON conversion and
+there is no raw recursive duplicate-name preflight.
+
+**Recommended fix**: Parse the raw catalog through the shared strict ordinal
+duplicate-property loader before ConvertFrom-Json. Keep current type and
+allowed-property validation after the strict preflight.
+
+**Regression coverage**: Add malformed catalogs with duplicate root
+schemaVersion and nested integers[0].signed, require nonzero exit with
+path-qualified errors, and preserve byte-identical valid output.
+
+**Confidence**: High; both root and nested duplicates were self-verified
+against the generator's -Verify path in the canonical container.
+
+### 448. [CONFIRMED] Initial solver-lane factory faults are always mislabeled as backend unavailable
+
+**Location**: SharpProof.Worker/SharpProofWorker.cs around lines 251-256,
+538-556, and renewal handling around lines 617-623; authoritative exception
+classification in SharpProof.Worker/Program.cs around lines 280-291.
+
+**Description**: TryCreateLanes catches every non-OOM, non-cancellation
+exception from the initial backend factory and returns only false plus an error
+string. Its sole caller unconditionally maps false to BackendUnavailable,
+backend.unavailable, and claim reason BackendUnavailable. Program's
+authoritative classifier explicitly says InvalidOperationException is not
+backend-unavailable, and lane renewal already preserves that distinction.
+
+**Reproduction**: A canonical reflection probe against the built worker
+reported:
+
+    created=False
+    error=ordinary factory failure
+    invalidOperationIsBackendUnavailable=False
+    dllNotFoundIsBackendUnavailable=True
+
+**Impact**: Configuration, implementation, or other ordinary infrastructure
+faults during initial lane creation are reported as missing native backend
+availability. Diagnostics, claim reasons, telemetry, and operator remediation
+all point to the wrong failure class.
+
+**Root cause**: TryCreateLanes erases exception category and the caller assumes
+all creation failures are native-load failures.
+
+**Recommended fix**: Return a typed lane-creation failure or preserve the
+caught exception for Program.IsBackendUnavailable classification. Map ordinary
+faults to worker.infrastructure plus InfrastructureFailure at run and claim
+levels; reserve backend.unavailable and BackendUnavailable for classified
+native availability failures.
+
+**Regression coverage**: Initial InvalidOperationException must produce
+InfrastructureFailure and worker.infrastructure. DllNotFoundException must
+remain BackendUnavailable and backend.unavailable. Both responses should
+retain authoritative manifest shape and pass protocol validation.
+
+**Confidence**: High; self-verified in the canonical container with classifier
+controls and matched against the already-distinct renewal path.
+
+### 449. [CONFIRMED] ProofKernel also swallows cancellation when a backend throws ArgumentException
+
+**Location**: SharpProof.Verify/ProofKernel.cs around lines 26-30.
+
+**Description**: The catch (ArgumentException) branch returns
+Unknown(MalformedBackendResult) before the shared post-backend cancellation
+checkpoint. A backend that cancels during CheckAsync and then throws
+ArgumentException converts cancellation into a semantic outcome. This is a
+separate early-return branch from the null-task defect.
+
+**Reproduction**: A compiled probe compared an ArgumentException backend with
+a backend that cancels identically but returns a completed result:
+
+    ARGUMENT_EXCEPTION:RETURNED=UnknownOutcome
+    ARGUMENT_EXCEPTION:REASON=MalformedBackendResult
+    ARGUMENT_EXCEPTION:TOKEN_CANCELED=True
+    COMPLETED_RESULT:THREW=OperationCanceledException
+
+**Impact**: Public ProofKernel/ISmtBackend consumers lose cancellation and
+receive misleading malformed evidence. Worker callers add later cancellation
+checks and the outcome is not cacheable, but the kernel contract is violated.
+
+**Root cause**: ArgumentException mapping is an early semantic return rather
+than a value routed through the common cancellation checkpoint.
+
+**Recommended fix**: In the catch, assign a null or typed malformed result,
+then execute ThrowIfCancellationRequested before mapping it to
+Unknown(MalformedBackendResult). Apply the same control-flow shape to the
+null-task case so no malformed backend branch bypasses cancellation.
+
+**Regression coverage**: Add CancellationDuringBackendArgumentFailurePropagates
+with a backend that cancels its source then throws ArgumentException. Retain an
+uncanceled ArgumentException control expecting MalformedBackendResult and
+parameterize both malformed branches.
+
+**Confidence**: High; self-verified with a compiled probe and a completed-result
+control differing only in backend termination shape.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
