@@ -5301,6 +5301,938 @@ unknown property target fail-closed cases.
 **Confidence**: High; candidate flow was complete and runtime reached the call,
 with the missing operation-kind case isolating replay rejection.
 
+### 544. [CONFIRMED] Release-authority closure skips ordinary relative psm1 imports
+
+**Location**: scripts/Get-SharpProofReleaseAuthorityClosure.ps1 around lines
+51-70; a manual module root around line 28 masks one instance.
+
+**Description**: The closure walker can parse queued psm1 files, but its
+path-qualified extension list excludes psm1 and its sibling-literal branch
+recognizes only ps1. A normal `Import-Module (Join-Path $PSScriptRoot
+'Module.psm1')` therefore executes code that the independently derived closure
+omits. One publication module appears only because it is manually rooted.
+
+**Reproduction**: Current omitted imports include ContainerExecution,
+MutationBaselines, MutationEvidence, and MutationScheduling modules. A canonical
+fixture reported:
+
+    ImporterInClosure=true
+    ImportedPsm1InClosure=false
+    ImportedPsm1Tracked=true
+    ModuleChanged=true
+    ClosureDigestUnchangedAfterModuleEdit=true
+
+**Impact**: The closure-specific validator can pass while an executed release
+module changes, disappears, or remains undeclared without affecting its path set
+or digest. Current broader TCB inventory happens to list these examples, but the
+closure invariant does not guarantee that redundancy for future modules.
+
+**Root cause**: Both literal dependency grammars omit `.psm1`; fixture coverage
+uses only ps1 dependencies and an explicit module root.
+
+**Recommended fix**: Recognize canonical psm1 paths in both branches, preferably
+by resolving literal dot-source and Import-Module AST commands rather than regex.
+Queue the module so missing/moved paths use existing validation.
+
+**Regression coverage**: Import a tracked sibling module from a closure member;
+require inclusion, digest change on edit, and failure on move/delete. Retain an
+unimported module decoy.
+
+**Confidence**: High; real and fixture modules are tracked, executed, absent
+from closure, and digest-invisible.
+
+### 545. [CONFIRMED] Conditional truth-operator exceptions do not make catches reachable
+
+**Location**: SharpProof.Effects/ExceptionHandlerReachability.cs around lines
+575-599; the correct semantic lookup exists in OperationCompletionEvaluator.cs
+around lines 1042-1053.
+
+**Description**: For user-defined `a && b`/`a || b`, Roslyn's binary
+OperatorMethod is op_BitwiseAnd/op_BitwiseOr, but runtime first invokes
+op_False/op_True on the left operand. Handler reachability models only the binary
+operator, so an exception from the truth operator does not make a matching catch
+reachable even though completion evaluation knows that call.
+
+**Reproduction**: op_False threw TruthOperatorException and a matching catch
+wrote static state 1729. The baseline oracle failed only the missing static write:
+
+    runtime exception=TruthOperatorException
+    runtime state=1729
+    uncaught summary contains exception=True
+    caught Writes.IsUnknown=false Completeness=Complete
+    caught Writes.Static=False (expected True)
+
+A temporary fix resolving the truth operator made the oracle and an existing
+throwing-operator regression pass 1/1 each.
+
+**Impact**: Analysis can return a Complete, non-unknown write summary that omits
+a runtime-reachable catch's static mutation.
+
+**Root cause**: Exception reachability models the visible binary method but not
+the earlier compiler-selected truth protocol call.
+
+**Recommended fix**: Resolve op_False for ConditionalAnd and op_True for
+ConditionalOr after the left operand completes; add its initialization/throw
+potential and permit RHS/binary operator only if it completes. Share the
+completion evaluator's lookup.
+
+**Regression coverage**: Runtime/analyzer caught and uncaught cases for both
+op_False/&& and op_True/||, requiring exact static write, complete known summary,
+and correct escaping throw behavior.
+
+**Confidence**: High; runtime and analyzer disagree on one hidden call, and the
+minimal semantic insertion fixes both focused tests.
+
+### 546. [CONFIRMED] Direct SharpProofVerify verifies a stale compiler manifest
+
+**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets,
+_SharpProofVerifyCore around lines 223-224 and public SharpProofVerify around
+lines 320-323.
+
+**Description**: `AfterTargets="CoreCompile"` schedules verification after a
+normal build but does not make direct target invocation depend on compilation.
+The public target depends only on initialization and VerifyCore; VerifyCore
+depends on ResolveReferences. A previous compiler-manifest.input.json is reused
+after source edits.
+
+**Reproduction**: A supported-host consumer first proved Boolean identity, then
+changed it to `return !value`:
+
+    initial Build: CoreCompile=1, manifest SHA A, outcome Proven
+    direct -t:SharpProofVerify:
+      exit=0 CoreCompile=0 manifest SHA A outcome Proven
+    full Build control:
+      exit=1 CoreCompile=1 manifest SHA B outcome Refuted, SP0051
+
+**Impact**: The advertised public target can publish successful proof evidence
+for prior source state while current source is refuted.
+
+**Root cause**: Automatic after-compile hook and callable public entrypoint share
+one target graph whose direct path lacks CoreCompile/freshness.
+
+**Recommended fix**: Separate the automatic AfterTargets hook from the public
+entrypoint and make explicit SharpProofVerify depend on CoreCompile before
+VerifyCore. Alternatively prove manifest freshness against all current compiler
+inputs, though compiling matches public target expectations.
+
+**Regression coverage**: Build identity, edit to negation, invoke direct target;
+require CoreCompile, changed manifest hash, nonzero Refuted outcome and SP0051.
+Retain ordinary Build parity.
+
+**Confidence**: High; the direct target preserved the exact stale manifest and
+verdict while a full build immediately refuted current source.
+
+### 547. [CONFIRMED] SPMETA009 classifies ordinary prose as synthesized C# expressions
+
+**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs, fragment
+catalog around lines 70-71, concatenation analysis around lines 343-367, and
+fragment extraction around lines 446-471.
+
+**Description**: Every string concatenation is scanned without sink context, and
+any occurrence of a short fragment such as `" is null"`, `" is not null"`, or
+`"=>"` is treated as C# expression generation. Human-facing exception,
+diagnostic, or log prose therefore triggers Error-level SPMETA009.
+
+**Reproduction**:
+
+    new InvalidOperationException(
+        "Metadata is null for member " + member)
+
+produced one SPMETA009 with zero compiler errors. An actual expression-shaped
+control also reported; benign prose without the fragment did not.
+
+**Impact**: Ordinary dynamic messages are build-blocked and require wording or
+construction workarounds unrelated to source-synthesis soundness.
+
+**Root cause**: Substring presence is accepted as expression identity without
+structural template or destination evidence.
+
+**Recommended fix**: Require evidence that the complete constructed template is
+expression-shaped or flows to a typed source-expression sink/builder. Preserve
+actual expression cases while excluding arbitrary prose.
+
+**Regression coverage**: The exception prose above and `Missing metadata for
+member` remain clean; `"(" + name + ") is null"` reports. Add diagnostic/log
+sinks and common fragment controls.
+
+**Confidence**: High; one common-English substring is the only difference
+between accepted and rejected prose.
+
+### 548. [CONFIRMED] Production fuzz JSON emits coverage properties the strict parser rejects
+
+**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs, FrontendFuzzCoverage around
+lines 38-66; serialization in Tools/SharpProof.Fuzz/Program.cs around lines
+33-60; strict property set in scripts/Assert-SharpProofFuzzRunnerResult.ps1
+around lines 142-149; campaign use around lines 145-149.
+
+**Description**: FrontendFuzzCoverage exposes public read-only derived getters
+HasValidCounts and HasExpandedCategories. Default System.Text.Json serialization
+emits both. The strict schema parser permits exactly the 13 counters and rejects
+those two fields. Fixture JSON is hand-built without the computed properties,
+so tests validate a shape the producer never emits.
+
+**Reproduction**: A real passing FuzzSummary serialized with production options:
+
+    producer Passed=True bytes=749
+    coverage keys=13 counters,HasValidCounts,HasExpandedCategories
+    serialized HasValidCounts=True HasExpandedCategories=True
+    Invalid fuzz runner result: Frontend coverage has an unexpected property set.
+
+**Impact**: Every genuinely passing exit-zero runner result is marked
+validationPassed=false; the campaign becomes failed and throws, so the normal
+campaign cannot succeed.
+
+**Root cause**: Public computed API properties unintentionally became wire
+schema fields while parser fixtures manually encode a narrower schema.
+
+**Recommended fix**: Prefer `[JsonIgnore]` on both derived getters to preserve
+the current 13-counter schema. If they are intentionally serialized, update the
+schema version and verify their consistency instead of trusting them.
+
+**Regression coverage**: Serialize an actual passing FuzzSummary with production
+options and feed the bytes to the PowerShell authority; require acceptance and
+an exact intended property set. Retain malformed/extra-field controls.
+
+**Confidence**: High; production types/options emitted a passing result that the
+production parser deterministically rejected.
+
+### 549. [CONFIRMED] Definitely nonnull conditional property access remains unreplayable
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
+188-208 and HasReplayableAccessorEvaluation around lines 483-492;
+SharpProof.Effects/ManagedAbstractFlow.cs, completion facts around lines
+1842-1917; early Unknown in RequiresCallSiteAnalyzer.cs around lines 339-342.
+
+**Description**: For `receiver?.Value`, the accessor candidate instance is an
+IConditionalAccessInstanceOperation placeholder, not the source receiver.
+CompletesNormally does not recognize that placeholder, so replay is disabled
+before flow can prove the outer receiver nonnull. This occurs even for a fresh
+object or an explicit preceding `receiver != null` guard.
+
+**Reproduction**, all with zero compiler diagnostics and getter
+`Contract.Requires(false)`:
+
+    direct receiver.Value:       one get_Value SP0027
+    unknown nullable receiver:   zero (fail-closed control)
+    definitely null receiver:    zero (getter not executed)
+    new Subject()?.Value:        zero (expected one)
+    guarded subject?.Value:      zero (expected one)
+
+**Impact**: Common guarded nullable code can hide an unconditional getter
+precondition violation; changing only `.` to `?.` changes coverage after
+nonnullness is already proven.
+
+**Root cause**: Replay checks the conditional branch placeholder in isolation
+instead of the outer receiver and pre-split flow state.
+
+**Recommended fix**: Resolve the enclosing IConditionalAccessOperation and prove
+its outer receiver completes and is definitely nonnull at conditional-access
+entry. Only then canonicalize/mark the accessor as definitely executing. Keep
+unknown, null, and non-completing receivers fail-closed; do not use WhenNotNull
+state alone.
+
+**Regression coverage**: Direct, fresh, and branch-refined receivers each report
+exactly one; unknown/null receivers do not. Add a non-completing receiver and
+conditional method-call follow-up only after its semantics are verified.
+
+**Confidence**: High; two independent nonnull forms are missed while direct,
+unknown, and null controls behave as predicted by the placeholder gate.
+
+### 550. [CONFIRMED] SPMETA006 skips const string fields in SharpProof.Ir
+
+**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs,
+AnalyzeField around lines 552-570.
+
+**Description**: AnalyzeField returns immediately for every const field before
+the independent SharpProof.Ir string-field prohibition. The const exemption is
+appropriate for SPMETA002 mutable-state analysis but unintentionally suppresses
+SPMETA006's typed-identity boundary.
+
+**Reproduction**:
+
+    const string in SharpProof.Ir:      SPMETA006 count=0
+    static readonly string in Ir:      SPMETA006 count=1
+    const string outside Ir:           SPMETA006 count=0
+
+Compiler error counts were zero.
+
+**Impact**: IR code can encode semantic identity/provenance as embedded raw
+strings and evade the Error-level boundary merely by changing static readonly to
+const.
+
+**Root cause**: One global const early return conflates the mutable-state and
+string-identity rules.
+
+**Recommended fix**: Keep early return for enum members, but apply
+`!field.IsConst` only to the SPMETA002 branch. Always execute SPMETA006
+type/namespace analysis.
+
+**Regression coverage**: Const and readonly strings in SharpProof.Ir each report
+once; const string outside Ir stays clean; const scalar in mutable-state
+namespaces remains exempt from SPMETA002; enum members remain clean.
+
+**Confidence**: High; const is the only semantic difference between the missed
+field and reporting control.
+
+### 551. [CONFIRMED] Valid closed attributes on ContractFor companion members are silently discarded
+
+**Location**: SharpProof.Contracts/ContractBinder.cs around lines 154 and
+243-271; AnalyzerFeaturePipeline.cs around lines 207-210;
+ContractForCompanionValidator.cs around lines 134-201.
+
+**Description**: A matched companion parameter or return value can carry a
+recognized and valid closed attribute such as Positive. Validation emits no
+diagnostic, but binding produces no clause because only executable companion
+clauses are imported.
+
+**Reproduction**: A companion parameter Positive was recognized and valid,
+analyzer diagnostics were empty, resolver/binder succeeded, and clause count was
+zero. The same attribute on the target produced one ClosedAttribute clause; a
+companion Contract.Requires produced one Companion clause.
+
+**Impact**: A declaration that appears to strengthen the generated contract is
+accepted but has no effect, allowing callers and implementation analysis to
+silently disagree with author intent.
+
+**Recommended fix**: Bind companion attributes with receiver-offset parameter
+mapping. If that surface is unsupported, reject it with an enabled placement
+diagnostic rather than accepting it. Add parameter and return Positive controls.
+
+### 552. [CONFIRMED] JSON exponent overflow disables performance-contract thresholds
+
+**Location**: SharpProof.Gates/Performance/AcceptancePerformanceContract.cs
+around lines 23-49; PerformanceGate.cs around lines 63-72 and 1152-1174.
+
+**Description**: JSON numbers are read with GetDouble and positive thresholds
+are checked only with value > 0. The valid JSON number 1e400 becomes positive
+infinity and is accepted.
+
+**Reproduction**:
+
+    finite control=accepted
+    negative control=rejected
+    1e400=Infinity, IsFinite=false, contract=accepted
+
+**Impact**: Any affected smoke, median, p95, retained-memory, IDE, cancellation,
+or forced-termination threshold becomes impossible for a finite observation to
+exceed, so the corresponding gate can false-pass.
+
+**Recommended fix**: Require double.IsFinite(value) and value > 0 for every
+positive metric. Add NaN/infinity/exponent-overflow, zero, negative, and finite
+boundary tests.
+
+### 553. [CONFIRMED] Effect replay reserializes and hashes one syntax tree per event
+
+**Location**: CompilerEffectClaimArtifactCodec.cs around lines 61-74;
+CompilerManifestArtifact.cs around lines 955-999;
+EffectCounterexampleReplayer.cs around lines 15-18 and 92-96;
+CompilationFingerprint.cs around lines 32-43.
+
+**Description**: Each replay event serializes the complete immutable syntax-tree
+snapshot and computes SHA-256. Manifest validation and replay repeat the same
+work after codec validation.
+
+**Reproduction**: Codec validation of one valid 10,000-line tree with 128 events
+allocated 269-300 MB and took 238-324 ms; the one-event control allocated about
+6.3 MB. All events referenced the same snapshot and validation returned true.
+
+**Impact**: Generated-code projects can spend hundreds of MB, and potentially
+over a GB across Worker boundaries, revalidating one identity, causing avoidable
+timeouts and memory pressure.
+
+**Recommended fix**: Cache snapshot hashes by tree in the per-operation
+ValidationContext and remove redundant geometry loops. Test 256 same-tree events
+compute one hash, two trees compute two, and changed/hash-mismatch evidence fails.
+
+### 554. [CONFIRMED] Fuzz evidence attributes dirty working-tree execution to clean HEAD
+
+**Location**: scripts/Invoke-SharpProofFuzzCampaign.ps1 around lines 29-31 and
+193-205; Invoke-SharpProofContainer.ps1 around lines 319-325.
+
+**Description**: Campaign identity uses only git rev-parse HEAD. The supported
+tooling path restores and builds live working files without requiring a clean
+tree, then publishes the unchanged commit as exact source identity.
+
+**Reproduction**: In an isolated repository a tracked source blob differed from
+HEAD while campaign identity remained accepted and a passing schema-3 result
+published the unchanged commit.
+
+**Impact**: Passing evidence can conceal uncommitted fixes or regressions and is
+not reproducible from its declared commit.
+
+**Recommended fix**: Reject relevant staged, unstaged, and untracked inputs
+before build/publication, or explicitly bind a dirty-source digest. Test clean,
+tracked-dirty, SDK-included untracked source, and ignored-artifact controls.
+
+### 555. [CONFIRMED] Exact Worker result-set validation sorts sets after uniqueness work
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 918-937;
+callable and claim consumers around lines 573-601.
+
+**Description**: ValidateResultSet materializes and uniqueness-checks identities,
+then ValidateExactIds independently sorts both actual and expected streams for
+set equality.
+
+**Reproduction**: The isolated exact-membership stage allocated 1,072,512 bytes
+for 25,000 IDs, 2,003,128 for 50,000, and 4,003,032 for 100,000: roughly 40
+bytes per ID after inputs were already materialized.
+
+**Impact**: Large valid responses pay O(N log N) comparison and multi-megabyte
+temporary allocations at several validation boundaries.
+
+**Recommended fix**: Combine uniqueness and exact membership into one ordinal
+HashSet pass while preserving collection, identity, and set errors. Retain
+reordered, duplicate, blank, missing, extra, and invalid-manifest tests plus a
+warmed allocation bound.
+
+### 556. [CONFIRMED] API-spec resolution ignores declared parameter and result types
+
+**Location**: SharpProof.Effects/ApiSpecResolution.cs, MatchesTarget around line
+193; downstream CompilerCallableLowerer.cs around lines 270 and 400-421.
+
+**Description**: Member resolution checks kind, staticness, name, arity, and
+parameter count, but not receiver, parameter, or result IrTypeKind.
+
+**Reproduction**: A Math.Abs(int) spec declaring Boolean result resolved
+complete with one spec and zero failures although Roslyn returned Int32.
+Instantiation of the actual integer result then failed TypeMismatch.
+
+**Impact**: Catalog typos evade cross-TFM resolution, expose incorrect effect
+facets, and later degrade otherwise supported verification bodies to
+UnsupportedBody.
+
+**Recommended fix**: Classify Roslyn receiver, parameters, and return into the
+shared IR type domain during resolution and emit a typed incompatible-shape
+failure. Test wrong/missing/extra result and wrong parameter kinds across TFMs.
+
+### 557. [CONFIRMED] Known-pure ref/out calls omit havoc for memory locations
+
+**Location**: SharpProof.Frontend/RoslynProgramLowerer.cs around lines 310-321;
+RoslynOperationLowerer.cs around lines 155-175.
+
+**Description**: Ref/out mutation discovery retains only locals, parameters,
+and captures. Array elements, fields, and ref-return locations disappear, and an
+empty variable list is incorrectly treated as no mutation.
+
+**Reproduction**: Change(ref value) emitted VariablesAndMemory havoc; the same
+known-pure callee invoked as Change(ref values[0]) emitted a load and call but
+zero havoc while lowering stayed Exact.
+
+**Impact**: The exact program preserves stale memory across a byref call and can
+support reasoning over an unmodeled mutation.
+
+**Recommended fix**: Classify variable targets, memory locations, and discards
+separately. Any writable non-variable location must force Memory havoc. Add
+local, element, field, ref-return, and out-discard tests.
+
+### 558. [CONFIRMED] Dynamic dispatch bypasses SPMETA001 Roslyn API enforcement
+
+**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs around
+lines 42-50 and 107-150; BannedSymbols.txt includes the static API.
+
+**Description**: The analyzer registers only OperationKind.Invocation. Casting
+a statically known Compilation receiver to dynamic produces DynamicInvocation,
+and RS0030 has no target symbol to ban.
+
+**Reproduction**: Direct Compilation.RemoveAllSyntaxTrees produced one
+SPMETA001. ((dynamic)compilation).RemoveAllSyntaxTrees produced zero diagnostics,
+compiled, and reduced the runtime tree count from one to zero. A dynamic
+lookalike remained clean.
+
+**Impact**: An ordinary language construct bypasses the Error-level compiler API
+boundary for cataloged compilation mutation.
+
+**Recommended fix**: Analyze dynamic invocations and conservatively match
+cataloged member names when the receiver originates from a protected Roslyn
+type, including simple aliases. Test direct, dynamic cast, alias, and lookalike.
+
+### 559. [CONFIRMED] Package-test shards can execute zero tests and report success
+
+**Location**: scripts/Invoke-SharpProofPackageTests.ps1 around lines 295-313,
+421-425, and 491-496.
+
+**Description**: Fixture classes are hard-coded. VSTest exits zero when a filter
+matches nothing, and the scheduler checks only process exit codes, not TRX
+executed counts or discovered-test coverage.
+
+**Reproduction**: A renamed failing fixture yielded No test matches the filter,
+then Package tests passed. Directly targeting the renamed fixture failed 1/1. A
+temporary TRX executed-count guard correctly rejected the empty shard.
+
+**Impact**: Added or renamed package fixtures can be omitted entirely while
+developer and qualification commands remain green.
+
+**Recommended fix**: Discover the complete inventory, partition every identity
+exactly once, and reconcile TRX execution. At minimum reject missing TRX and
+zero-test default shards. Test rename/add/remove mutations.
+
+### 560. [CONFIRMED] SkipCompilerExecution can republish stale Proven evidence
+
+**Location**: SharpProof.Package/buildTransitive/SharpProof.targets around lines
+47-50; SharpProof.Verifier.targets around lines 148, 232-234, and 320-323.
+
+**Description**: With SkipCompilerExecution=true and ProvideCommandLineArgs=true,
+Csc and the collector do not run, but SharpProofVerify still consumes the
+previous stable compiler manifest after CoreCompile.
+
+**Reproduction**: Identity first built Proven. Source changed to negation.
+Compiler-suppressed Build exited zero, left the manifest unchanged, and
+republished Proven. A normal Build changed the manifest, returned Refuted, and
+failed with SP0051.
+
+**Impact**: An ordinary Build can certify prior source state under require-proven.
+
+**Recommended fix**: In compiler-suppression mode invalidate prior publication
+but do not invoke the verifier; emit an explicit diagnostic when verification is
+requested outside design-time. Add stale-proven and normal-regeneration tests.
+
+### 561. [CONFIRMED] Conditional member initializers lose viable-arm effects
+
+**Location**: SharpProof.Effects/EffectMethodNodeBuilder.cs around lines 134-162;
+OperationEffectScanner.Expressions.cs around lines 548-598;
+OperationEffectScanner.cs around lines 1080-1101.
+
+**Description**: Member initializers are scanned outside the constructor CFG.
+IConditionalOperation falls through to sequential child scanning, which stops
+when the first arm cannot complete instead of joining alternatives.
+
+**Reproduction**: Runtime selected Mutate in chooseFailure ? Fail() : Mutate(),
+wrote static state 1729, and completed construction. Analysis returned Complete,
+Writes.IsUnknown=false, but omitted the static write. A temporary independent-arm
+join fixed the oracle and existing initializer tests.
+
+**Impact**: Complete constructor/static-constructor summaries can omit writes,
+calls, or allocations from a runtime-viable alternative.
+
+**Recommended fix**: Scan the condition once; choose a constant arm when known,
+otherwise scan arms independently and join. Add instance and static initializer
+runtime oracles.
+
+### 562. [CONFIRMED] SP0027 misses implicit synchronous Dispose calls
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
+33-77, 131-228, and 591-624; existing compensation is in
+SharpProof.Effects/UsingDisposalEffectResolver.cs.
+
+**Description**: Roslyn lowers synchronous disposal to IDisposable.Dispose and
+loses the concrete implementation contract. Requires discovery has no source
+using resolution although Effects already reconstructs the actual Dispose.
+
+**Reproduction**: A sealed Resource.Dispose with Requires(false) produced one
+SP0027 when explicit, but zero for using statement and using declaration.
+Runtime executed Dispose once in both using forms; a null resource executed zero.
+
+**Impact**: Concrete disposal preconditions are unenforced for common using
+syntax.
+
+**Recommended fix**: Share source-side disposal target resolution with potential
+and actual call discovery, preserving null guards, exit-time flow, reverse order,
+and uncertain-dispatch fail-closed behavior. Add no-duplicate and multi-resource
+tests.
+
+### 563. [CONFIRMED] Release-configuration validation ignores rulesets after page one
+
+**Location**: scripts/Test-SharpProofReleaseConfiguration.ps1 around lines
+24-31 and 175-179; fixture around lines 145-160 and 228.
+
+**Description**: The rulesets endpoint is called once without pagination, then
+the exact-one active tag rule is checked only over the default first page.
+
+**Reproduction**: With 30 first-page rows and a second active tag ruleset on page
+two, the script exited zero, wrote evidence, certified ruleset 7, and made one
+non-paginated API call although full state contained two active tag rulesets.
+
+**Impact**: Passing qualification evidence can certify an incomplete and
+contradictory GitHub release configuration.
+
+**Recommended fix**: Use gh api --paginate --slurp, flatten all pages, and check
+the complete list. Extend fixtures with a page-two active-tag failure and a
+branch-only page-two passing control.
+
+### 564. [CONFIRMED] Definitely-null instance field reads are treated as completing
+
+**Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184;
+consumer SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs around lines
+450-460.
+
+**Description**: MayCompleteNormally groups IFieldReferenceOperation with
+generic child completion and omits the null-receiver check already used for
+properties and method references.
+
+**Reproduction**: Positive(((Box)null!).Field, -1) emitted SP0027 although
+runtime threw before the call and the call count was zero. Equivalent null
+property access stayed quiet; live-field and direct controls executed and
+reported.
+
+**Impact**: Deterministic false refutations can fail warnings-as-errors builds
+for unreachable calls.
+
+**Recommended fix**: Split field references out and require a completing,
+non-definitely-null instance for nonstatic fields. Preserve permissiveness for
+unknown receivers and test argument-order positions.
+
+### 565. [CONFIRMED] Request serialization replaces lone UTF-16 surrogates in paths
+
+**Location**: Worker.Protocol/ProtocolModel.generated.cs around lines 816-821;
+ProtocolJson.cs around lines 108-115; ProtocolJsonSupport.cs around lines
+192-205.
+
+**Description**: Request validation accepts any nonblank path. System.Text.Json
+silently replaces an unmatched surrogate with U+FFFD before strict UTF-8 hashing.
+
+**Reproduction**: Windows created and found a path containing code unit 55296.
+Both original and round-tripped requests validated; round trip contained 65533,
+paths differed, only the original existed, and request hashes were equal.
+
+**Impact**: A valid request can be serialized into a different nonexistent path
+and fail verification; malformed input can also collapse onto a legitimate
+literal-U+FFFD path.
+
+**Recommended fix**: Reject ill-formed UTF-16 in every request string before
+serialization while preserving valid surrogate pairs and literal U+FFFD. Add
+high/low-surrogate, non-BMP, and U+FFFD path tests.
+
+### 566. [CONFIRMED] SPMETA003 rejects safe cancellation-excluding conjunctions
+
+**Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs around
+lines 169-209 and 229-265.
+
+**Description**: A catch filter is accepted only when its entire top-level
+operation is one is-pattern. A Boolean conjunction containing a proven
+OperationCanceledException exclusion is therefore rejected.
+
+**Reproduction**: exception is not OperationCanceledException && ShouldHandle
+produced one Error-level SPMETA003; the bare exclusion produced zero; the unsafe
+disjunction correctly produced one.
+
+**Impact**: Safe ordinary selective handlers are build-blocked and require
+awkward rewrites.
+
+**Recommended fix**: Recursively prove exclusion: A && B excludes when either
+operand does; A || B excludes only when both do. Preserve symbol-sensitive
+patterns and add both operand orders plus disjunction controls.
+
+### 567. [CONFIRMED] Contradictory entry proof is discarded at the query-budget boundary
+
+**Location**: SharpProof.Worker/CallableEntryFeasibility.cs around lines 115-152;
+CallableVerifier.cs around lines 91-102, 145-160, 223-237, and 254-276.
+
+**Description**: Entry analysis can spend the final query proving preconditions
+contradictory. CallableVerifier then requires another postcondition query and
+returns Unknown(ResourceLimit), although contradiction already proves every
+postcondition vacuously. Effects short-circuit correctly.
+
+**Reproduction**: With method limit one, the backend was called once, entry was
+Contradictory, and outcome became Unknown/ResourceLimit. Limit two made a
+redundant second call and returned Proven/ContradictoryPreconditions.
+
+**Impact**: A conclusive proof is downgraded, strict builds fail, and effect and
+postcondition claims disagree for identical entry evidence.
+
+**Recommended fix**: After claim alignment, immediately assemble all
+postconditions as proven vacuity with the entry core and used assumptions. Test
+one-call multiple Ensures and a feasible-entry resource-limit control.
+
+### 568. [CONFIRMED] Conditional assignments write a flow-capture temporary instead of the lvalue
+
+**Location**: SharpProof.Frontend/RoslynProgramLowerer.cs around lines 197-220;
+RoslynOperationLowerer.cs around lines 155-175.
+
+**Description**: Every flow capture is represented as a value temporary. When
+Roslyn captures assignment-target storage across conditional evaluation, the
+write targets that temporary rather than the original local/location.
+
+**Reproduction**: For value = choose ? 1L : 2L; return value, lowering was Exact
+with zero abstentions, yet execution returned 0 for both choose values.
+
+**Impact**: Exact acyclic scalar IR and reusable relational summaries can encode
+wrong results.
+
+**Recommended fix**: Track storage captures separately from value snapshots and
+resolve assignment-target capture references to the original variable or
+once-evaluated location. Add local, member, and array target oracles.
+
+### 569. [CONFIRMED] Proven-failing explicit casts are treated as completing
+
+**Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184,
+1910-1912, and 2583-2592; RequiresCallSiteAnalyzer.cs around lines 450-460.
+
+**Description**: MayCompleteNormally treats conversions as completing children
+and ignores a statically certain InvalidCastException.
+
+**Reproduction**: Positive((string)new object(), -1) emitted SP0027, but runtime
+threw before invocation and call count stayed zero. Null and valid reference
+casts executed and reported as controls.
+
+**Impact**: Unreachable calls receive deterministic false refutations.
+
+**Recommended fix**: Give conversions a permissive but exception-aware
+classifier: reject proven bad explicit casts/unboxes and checked overflows, keep
+unknown runtime casts possible, and account for user-defined conversion calls.
+
+### 570. [CONFIRMED] A completed lock statement suppresses later SP0027 diagnostics
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
+188-208 and 425-471; ManagedAbstractFlow.cs around lines 1842-1917;
+lock-aware logic already exists in OperationCompletionEvaluator.cs around
+992-997.
+
+**Description**: Replay-prefix validation requires CompletesNormally for every
+prior statement, but that strict switch has no ILockOperation arm.
+
+**Reproduction**: Direct and empty-block controls had CanReplay=true and one
+SP0027. After lock(new object()){} or a known nonnull local lock, flow was
+Complete, runtime reached the call once, CanReplay=false, and diagnostics were
+zero. Null lock stayed quiet.
+
+**Impact**: A common lock-then-call shape loses all later concrete precondition
+refutations.
+
+**Recommended fix**: Share lock completion: completing acquisition, proven
+nonnull receiver, and completing body. Keep null/unknown, throwing acquisition,
+and abrupt body fail-closed. Add discovery/analyzer parity tests.
+
+### 571. [CONFIRMED] Event handler expressions are skipped before null receiver failure
+
+**Location**: SharpProof.Effects/OperationEffectScanner.Expressions.cs around
+lines 139-195; correct ordering exists in ExceptionHandlerReachability.cs around
+lines 313-328.
+
+**Description**: Event assignment scans the receiver and performs its null check
+before scanning HandlerValue. Runtime evaluates receiver expression, then
+handler expression, then invokes the accessor.
+
+**Reproduction**: For nullTarget.Changed += MakeHandler(), MakeHandler wrote
+static state 1729 before the runtime null failure. Analysis returned Complete
+and Writes.IsUnknown=false but omitted the static write. Reordering the scan
+fixed the oracle and retained the unknown-receiver control.
+
+**Impact**: Complete effect summaries can omit arbitrary handler-factory calls,
+writes, allocations, and throws.
+
+**Recommended fix**: Scan HandlerValue after receiver-expression evaluation but
+before the null check; resolve/invoke the accessor afterward. Test add, remove,
+throwing factory, and unknown receiver.
+
+### 572. [CONFIRMED] Release digests mix committed Git blobs with dirty checkout bytes
+
+**Location**: scripts/Get-SharpProofReleaseDigests.ps1 around lines 365-435;
+Get-SharpProofProductionInventory.ps1 around lines 58-62 and 287-396.
+
+**Description**: Canonical production/TCB digests use commit-tree blobs, while
+productionSourceUniverseSha256 uses the live filesystem. Matching rev-parse HEAD
+to the requested commit does not establish clean bytes.
+
+**Reproduction**: An uncommitted source edit left declared commit, production
+digest, and TCB digest unchanged, changed the source-universe digest, and was
+accepted.
+
+**Impact**: One release-digest record straddles two source states and is not
+reproducible from its declared commit.
+
+**Recommended fix**: Evaluate inventory in a detached worktree at the requested
+commit, or reject staged, unstaged, and relevant untracked inputs. Test clean,
+dirty, staged, untracked Compile, and newly committed controls.
+
+### 573. [CONFIRMED] Differential oracle throws on wrong-typed variable bindings
+
+**Location**: SharpProof.Testing/IrCSharpDifferentialOracle.cs around lines
+38-41, 81-91, and 115-123; IrInterpreter.cs around lines 174-187.
+
+**Description**: The oracle checks binding-key presence but not IrValue type.
+Reflection then throws ArgumentException when a Boolean is passed to a generated
+long parameter, while the interpreter returns Unsupported(InvalidVariableValue).
+
+**Reproduction**: Missing binding returned Abstained; the same program with a
+wrong-typed binding made the interpreter return Unsupported but the oracle
+escaped Object of type Boolean cannot be converted to Int64.
+
+**Impact**: One malformed generated environment aborts the differential run and
+prevents structured evidence for later cases.
+
+**Recommended fix**: Validate nonnull binding values and exact declared types
+before CLR conversion, returning a typed Abstained detail. Retain a defensive
+reflection-shape catch. Add wrong type, null, missing, and correct controls.
+
+### 574. [CONFIRMED] Explicit-interface implementation preconditions are unreachable from calls
+
+**Location**: SharpProof.Contracts/ContractBinder.cs around lines 74-82 and
+243-254; RequiresCallSiteDiscovery.cs around lines 59-63;
+RequiresCallSiteAnalyzer.cs around lines 302-324.
+
+**Description**: A closed precondition on an explicit implementation binds to
+that implementation, but every source invocation targets the interface symbol.
+No contract projection or placement diagnostic joins them.
+
+**Reproduction**: Positive on the explicit implementation parameter was valid
+and bound one clause there; interface/call-target binding had zero clauses and a
+literal bad call emitted nothing. Moving Positive to the interface emitted
+SP0027.
+
+**Impact**: Implementation analysis can assume a condition that no source caller
+can be checked against.
+
+**Recommended fix**: Reject implementation-only strengthening unless all
+implemented interface members declare an equivalent contract, and import
+interface preconditions into implementation analysis. Test multiple-interface
+agreement/conflict.
+
+### 575. [CONFIRMED] Advisory performance validation accepts an effective off profile
+
+**Location**: SharpProof.Gates/Performance/PerformanceGate.cs around lines 101,
+273, 1218-1259, and 1389-1402; package targets around lines 11-20.
+
+**Description**: ValidateAdvisoryPackagePolicy checks that expected XML nodes and
+literal conditions exist, but not assignment uniqueness/order or evaluated
+MSBuild properties/items.
+
+**Reproduction**: Adding an unconditional SharpProofProfile=off after the
+expected default left the validator accepted. MSBuild evaluated baseline as
+advisory with analyzers and mutant as off with an empty Analyzer list.
+
+**Impact**: The performance gate can time two analyzer-free builds, measure
+deceptively low overhead, and publish passing advisory evidence.
+
+**Recommended fix**: Evaluate a minimal imported project and assert effective
+profile/normalized profile plus exact analyzer roles before timing. Also reject
+override assignments. Add the off-override mutation test.
+
+### 576. [CONFIRMED] Mapped-location collisions prevent compiler-manifest emission
+
+**Location**: CompilerCollector/ClaimManifestBuilder.cs around lines 670-688;
+CompilerManifestArtifactProducer.cs around lines 184-253;
+CompilerArtifact/CompilerSourceLocationAuthority.cs around lines 139-170 and
+214-249; FinalCompilationCollector.cs around lines 42-50.
+
+**Description**: Producer discovery drops Roslyn Location.SourceTree and later
+reconstructs authority from mapped geometry. Two physical trees with identical
+#line path, line/column, and physical offset are declared ambiguous.
+
+**Reproduction**: Two clean selected methods mapped to shared.g.cs:102:5 at
+offset 83 caused InvalidDataException, then SP0049/no manifest. Changing only the
+second virtual path yielded four authorities.
+
+**Impact**: Valid generated/Razor-style compilations can fail verification
+solely due to ordinary virtual-coordinate collision.
+
+**Recommended fix**: Carry producer-known SourceTree/ordinal sidecars for
+callables, claims, and diagnostics and geometry-check that exact tree. Retain
+unique rediscovery only when identity is unavailable. Add collision round-trip
+and tamper tests.
+
+### 577. [CONFIRMED] Contract intrinsics in constructor initializers bypass validation
+
+**Location**: SharpProof.Contracts/ContractClauseInventoryBuilder.cs around
+lines 250-315; ContractIntrinsicValidator.cs around lines 12-45;
+ContractBinder.cs around lines 166-240; AnalyzerSession.cs around lines 204-210.
+
+**Description**: GetBody returns only a constructor block/expression body and
+drops ConstructorDeclarationSyntax.Initializer, although base/this arguments are
+executable.
+
+**Reproduction**: base(Contract.Result<int>()) compiled with zero errors,
+produced no initializer SP0024 or intrinsic violation, bound successfully with
+zero clauses, emitted, then construction threw InvalidOperationException. A
+body misuse control produced SP0024 and binder failure.
+
+**Impact**: Compiler-valid Result/Old misuse is accepted as an empty contract and
+crashes every affected construction before the body.
+
+**Recommended fix**: Keep body-only prologue placement, but validate constructor
+initializer operations as additional executable roots. Test base(Result),
+this(Old), valid body prologue, and no duplicate diagnostics.
+
+### 578. [CONFIRMED] A completed try statement suppresses later SP0027 diagnostics
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
+188-208 and 425-471; SharpProof.Effects/ManagedAbstractFlow.cs around lines
+1842-1917; OperationCompletionEvaluator.cs already recognizes ITryOperation.
+
+**Description**: Strict replay-prefix completion has no ITryOperation arm, so
+any preceding try makes a later direct call unreplayable even when flow, body,
+and finally are all complete.
+
+**Reproduction**: Direct and empty-block controls emitted SP0027. Empty
+try/finally, empty try/catch, and a completing try/finally all reached the target
+at runtime with Complete flow but CanReplay=false and zero diagnostics. Abrupt
+try did not reach the call and stayed quiet.
+
+**Impact**: Moving a direct call after an admitted try/catch/finally statement
+silences concrete precondition refutations.
+
+**Recommended fix**: Add a conservative structural try case: definitely
+completing/no-throw body and completing optional finally. Keep recovered throws,
+filters, abrupt body/finally, and unknown calls fail-closed until shared
+exception semantics are available.
+
+### 579. [CONFIRMED] ICancelableTask exempts every helper from SPMETA003
+
+**Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs around
+lines 317-339.
+
+**Description**: The cancellation-translation exemption checks only whether a
+method's containing type implements ICancelableTask. It does not restrict the
+exemption to the actual ITask.Execute protocol boundary.
+
+**Reproduction**: A real Execute translation emitted zero diagnostics, as
+intended. A private static helper in the same task type swallowed
+OperationCanceledException and also emitted zero, while the identical helper on
+an unrelated type emitted one Error-level SPMETA003.
+
+**Impact**: Private, static, or asynchronous helpers in shipped MSBuild tasks can
+turn cancellation into ordinary success without the soundness boundary noticing.
+
+**Recommended fix**: Exempt only the exact instance bool Execute()
+implementation/override of Microsoft.Build.Framework.ITask.Execute. Test Execute,
+static/instance helpers, Cancel, unrelated Execute, and immediate bare rethrow.
+
+### 580. [CONFIRMED] Counterexample replay discards DAG memoization between assumptions
+
+**Location**: SharpProof.Verify/ProofKernel.cs around lines 79-91;
+SharpProof.Ir/IrInterpreter.cs around lines 107-170 and 540-547.
+
+**Description**: ProofKernel reuses one interpreter object but calls Evaluate for
+each assumption and the goal. Every call creates a fresh EvaluationState and
+dictionary, so shared sub-DAGs are re-walked per root.
+
+**Reproduction**: One 8,191-node shared Boolean DAG with one assumption allocated
+1,269,824 bytes in 3 ms. Sixty-four distinct outer assumptions allocated
+81,181,456 bytes in 140 ms, a 63.9x ratio. Both and the real backend returned a
+correct Refuted outcome.
+
+**Impact**: Valid refutations can incur O(assumptions * shared DAG) managed work
+after the solver answers, outside Z3 rlimit accounting, causing avoidable memory
+pressure and timeout/cancellation.
+
+**Recommended fix**: Add a model-bound batch/session evaluator whose memo is
+shared across replay roots, while preserving per-root depth and cancellation and
+never reusing across environments. Add node-count, changed-model, and cached-root
+cancellation tests.
+
+### 581. [CONFIRMED] A global SARIF path loses earlier projects' evidence
+
+**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
+around lines 64-66 and 128-130; Worker.Launcher/Program.cs around lines 632-670;
+SarifProjection.cs around lines 74-102.
+
+**Description**: Configured SARIF is projected only by target framework, not by
+project identity. Command-line properties propagate through ProjectReference,
+so every project publishes its one-run document to the same destination and the
+last cooperative writer replaces the earlier one.
+
+**Reproduction**: App -> Lib with distinct SARIF paths produced two documents;
+Lib contained SP0047 and each root matched its project. One shared absolute path
+made the successful build leave a single App document with no Lib subject or
+SP0047, although both projects reported using the path.
+
+**Impact**: Multi-project advisory builds silently lose warnings, informational
+evidence, and proven claims from all but the last project.
+
+**Recommended fix**: Add a stable project-full-path hash plus TFM to configured
+projection, reject cross-project reuse with SP0054, or implement locked
+multi-run aggregation. Test App/Lib shared-path behavior and retain same-project
+cooperative publication.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
