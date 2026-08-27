@@ -1292,6 +1292,10 @@ source shape.
 3. A base record override of GetHashCode has Contract.Requires(false). The
    generated derived GetHashCode calls it but is silent; an explicit override
    produces SP0027. Runtime counters again show both paths call the base once.
+4. A positional record has an explicit property getter with
+   Contract.Requires(false). Its generated Deconstruct invokes that getter but
+   is silent; an explicit Deconstruct body produces SP0027. Runtime counters
+   show both deconstruction paths invoke the getter once.
 
 **Impact**: Real precondition violations on always-emitted record calls are
 missed, semantic reconciliation has no outcome for those synthesized methods,
@@ -1310,6 +1314,8 @@ its compiler-specified base target, then analyze synthetic calls for:
 - copy constructor to base copy constructor, mapping parameter ordinal 0;
 - PrintMembers to base PrintMembers, mapping the builder parameter;
 - GetHashCode to base GetHashCode, with no arguments.
+- positional Deconstruct to each associated property getter in compiler order,
+  preserving left-to-right completion before assigning out parameters.
 
 Use the derived record declaration as diagnostic location, honor generated-code
 and type/assembly suppression, and record each synthesized method outcome once.
@@ -1321,7 +1327,7 @@ derived records against a base member with Requires(false); require equivalent
 SP0027 results. Add derived-type suppression controls and satisfiable/no-contract
 controls.
 
-**Confidence**: High; all three edges were independently tested with analyzer
+**Confidence**: High; all four edges were independently tested with analyzer
 differentials and runtime counters.
 
 ### 451. [CONFIRMED] Failed release-qualification reruns preserve the previous passing qualification.json
@@ -1548,6 +1554,369 @@ output and crash controls.
 
 **Confidence**: High; the agent self-verified the valid failure fixture against
 the current validator and traced the exact campaign branches.
+
+### 456. [CONFIRMED] ProofKernel propagates foreign backend cancellation as caller cancellation
+
+**Location**: SharpProof.Verify/ProofKernel.cs around lines 17-30; downstream
+classification in SharpProof.Worker/SharpProofWorker.cs around lines 96-104
+and 412.
+
+**Description**: ProofKernel propagates every OperationCanceledException or
+TaskCanceledException from a backend task without checking whether the caller's
+supplied token was canceled. A backend can return a task canceled with an
+unrelated token while the caller token remains live. This is the inverse of the
+null-task and ArgumentException defects: those swallow genuine cancellation,
+while this path invents cancellation.
+
+**Reproduction**: A compiled probe used
+Task.FromCanceled<BackendCheckResult> with a distinct canceled token:
+
+    THREW=TaskCanceledException
+    CALLER_TOKEN_CANCELED=False
+    EXCEPTION_TOKEN_IS_CALLER=False
+
+**Impact**: Direct ProofKernel callers receive false cancellation. The worker
+catches every OperationCanceledException, then interprets an uncanceled caller
+token as timeout/project-timeout state. An injected backend can therefore
+produce a protocol-valid but factually false timeout response before any
+deadline fires.
+
+**Root cause**: Backend cancellation provenance is trusted implicitly rather
+than correlated with the supplied token.
+
+**Recommended fix**: Catch OperationCanceledException when the supplied token
+is not canceled and route it through malformed-backend handling. Preserve
+propagation only when cancellationToken.IsCancellationRequested is true, then
+execute the common cancellation checkpoint.
+
+**Regression coverage**: Add a live caller token plus a backend task canceled
+with a foreign token, expecting Unknown(MalformedBackendResult), not an
+exception. Retain genuine caller-cancellation coverage and add a worker
+integration control proving the response is not TimedOut/ProjectTimeout.
+
+**Confidence**: High; self-verified with a compiled foreign-token probe and
+traced through worker timeout classification.
+
+### 457. [CONFIRMED] Failed package-consumers reruns preserve the prior report and qualification receipt
+
+**Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 43-44 and
+161-218; scripts/Write-SharpProofQualificationReceipt.ps1 around
+lines 91-149; scripts/Invoke-SharpProofReleaseContainer.ps1 around
+lines 175-210; persistent artifacts in eng/container/entrypoint.sh around
+lines 76-87 and 178-188.
+
+**Description**: The package-consumers command performs parallelism,
+PackageSource validation, restore, full consumer validation, and minimum-SDK
+validation before it owns package-consumers.json. It writes the report and
+receipt only after both validations succeed. Neither prior artifact is
+invalidated at attempt start, and release qualification validates commit,
+evidence bytes/hash, and package identities without a run-attempt identity.
+
+**Reproduction**: In a temporary canonical fixture, seed both evidence paths
+and invoke the unchanged command without PackageSource:
+
+    EXIT_CODE=1
+    REPORT_SURVIVED=True
+    REPORT_HASH_UNCHANGED=True
+    RECEIPT_SURVIVED=True
+    RECEIPT_HASH_UNCHANGED=True
+
+The failure occurs before either consumer validation runs.
+
+**Impact**: The command correctly fails, but on persistent/self-hosted/local
+workspaces a same-SHA/package retry leaves a passing pair that release
+qualification can still accept. Always-upload steps can misattribute the pair
+to the failed current attempt.
+
+**Root cause**: Report and receipt ownership begins only after all
+failure-prone work, despite persistent artifact storage and no attempt identity.
+
+**Recommended fix**: Initialize or invalidate both paths at package-consumers
+entry before parallelism, restore, and validation. Publish the passing report
+and receipt as an atomic pair only after both runs succeed. Direct receipt
+writes should independently tombstone the old gate receipt before validation.
+
+**Regression coverage**: Seed a valid same-commit/package pair, then fail on
+missing PackageSource, restore, first consumer, and minimum-SDK consumer.
+Require the old pair absent or nonpassing and prove qualification rejects it.
+
+**Confidence**: High; self-verified byte-for-byte in a temp canonical fixture
+and traced through qualification consumption.
+
+### 458. [CONFIRMED] Distinct unsupported folded constants collapse to one pure opaque IR term
+
+**Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
+lines 319, 332, and 469; SharpProof.Frontend/CompilerIdentityBridge.cs around
+line 124.
+
+**Description**: Representable folded constants are classified as pure, but
+unsupported-operation child structure is discarded and OperationSemanticIdentity
+does not include ConstantValue. Pure opaque interning therefore assigns the
+same identity to semantically distinct folded constants such as nameof(First)
+and nameof(Second).
+
+**Reproduction**:
+
+    first constant=First  exact=False abstention=UnsupportedOperationKind term=IrOpaqueTerm id=0
+    second constant=Second exact=False abstention=UnsupportedOperationKind term=IrOpaqueTerm id=0
+    same-term=True
+
+**Impact**: The outer classification remains a closed abstention, but retained
+IR falsely correlates distinct unknown values. Program lowering reuses one
+expression lowerer across nodes, so downstream partial analysis can treat
+different constants as one deterministic value. This violates the existing
+UnsupportedConstantsDoNotSharePureOpaqueTerms invariant.
+
+**Root cause**: Pure-operation semantic identity distinguishes operation shape
+and type but not constant presence, nullness, or value.
+
+**Recommended fix**: Add a type-tagged constant discriminator to
+OperationSemanticIdentity, distinguishing no constant, null, and concrete
+values. Preserve interning only for semantically identical constants.
+
+**Regression coverage**: Lower nameof(First) == nameof(Second), inspect the
+outer opaque term's arguments, and require distinct pure opaque terms. Add a
+same-value control proving identical nameof(First) occurrences may still share.
+
+**Confidence**: High; self-verified through the exact lowerer/factory with
+distinct constants and term IDs.
+
+### 459. [CONFIRMED] SPMETA010 loses cache ownership for mutation methods on owned child objects
+
+**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
+lines 20-26.
+
+**Description**: AnalyzeWrite recognizes method names such as Add and Write but
+checks only invocation.Instance.Type for ISemanticCache. For
+cache.Items.Add(...) the immediate type is List<Answer>; for
+cache.Partition.Write(...) it is the child helper type. The outer cache owner
+is discarded, including through local aliases.
+
+**Reproduction**:
+
+    cache.Items.Add(Answer.Unknown);
+    cache.Partition.Write(Answer.Unknown);
+
+The exact-source probe reported:
+
+    DIRECT_METHOD_CONTROL_SPMETA010_COUNT=1
+    OWNED_LIST_ADD_SPMETA010_COUNT=0
+    ALIASED_LIST_ADD_SPMETA010_COUNT=0
+    OWNED_CHILD_WRITE_SPMETA010_COUNT=0
+
+All compiler errors were zero, and Add/Write are already in WriteMethods.
+
+**Impact**: Noncacheable answers can be stored through ordinary mutation APIs
+on cache-owned state while the direct equivalent is diagnosed.
+
+**Root cause**: Invocation-side ownership classification uses only the
+receiver's immediate type instead of receiver-operation provenance.
+
+**Recommended fix**: Resolve invocation receiver ownership recursively through
+cache fields/properties and local aliases. Treat mutation on a child rooted at
+an ISemanticCache as cache storage when a recognized answer flows into a
+cataloged write method.
+
+**Regression coverage**: Add owned-list Add, aliased-list Add, and owned-child
+Write cases expecting SPMETA010, with unrelated collections and Answer.Proven
+as negative controls.
+
+**Confidence**: High; canonical exact-source probe included direct and owned
+receiver controls.
+
+### 460. [CONFIRMED] Compiler-artifact schema generation and parity accept duplicate properties
+
+**Location**: scripts/Generate-CompilerArtifactModel.ps1 around line 371 and
+SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs around line 82.
+
+**Description**: ConvertFrom-Json drops earlier duplicate properties before
+envelope and mapping validation, while parity tests use last-wins
+JsonDocument.GetProperty. The generator owns compiler-artifact, portable IR,
+compilation, and collector wire models, so contradictory schema declarations
+can pass every authority.
+
+**Reproduction**: Change artifactEnvelope to:
+
+    "version": 999,
+    "version": 15
+
+Full verification of all four copied outputs exits 0:
+
+    Verified deterministic compiler-artifact model.
+
+The parity lookup independently returns PARITY_VALUE=15.
+
+**Impact**: Envelope versions and nested wire/IR/effect mappings can be
+ambiguous while generation, acceptance, and parity remain green.
+
+**Root cause**: Generator and parity consumer share last-wins JSON behavior with
+no raw duplicate-name preflight.
+
+**Recommended fix**: Recursively reject duplicate names before conversion and
+reuse the same strict reader in schema parity tests.
+
+**Regression coverage**: Add duplicate root schemaVersion,
+artifactEnvelope.version, and nested portable-IR/collector mapping cases.
+Require path-qualified rejection before any output verification.
+
+**Confidence**: High; self-verified with full generator verification and an
+independent parity primitive.
+
+### 461. [CONFIRMED] The intentional SMT string materialization ceiling is mislabeled as malformed backend output
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 260-269 and
+478-485; mapping in
+SharpProof.Verify/VerificationProjections.generated.cs around lines 18-23.
+
+**Description**: DecodeString intentionally refuses non-null model strings
+longer than 1,000,000 code units by returning null. CreateSatisfiable maps every
+decode failure, including that explicit resource ceiling, to
+BackendFailureReason.MalformedResult. The projection then escalates it to fatal
+MalformedBackendResult even though ResourceLimit already exists.
+
+**Reproduction**: The agent supplied a well-formed 1,000,001-character string
+and compact ground Z3 sequence:
+
+    IR value length=1000001
+    compact Z3 sequence length=1000001
+    DecodeString returned null=True
+
+IrFactory accepts the same all-'a' value. A public query
+s == null || s.Length <= 1_000_000 has such a valid counterexample; inability
+to materialize it is a backend resource limit, not malformed solver data.
+
+**Impact**: A bounded model policy is reported as backend corruption and can
+turn an otherwise valid unknown result into a fatal worker run. The direction
+is fail-closed, but failure taxonomy and operator remediation are wrong.
+
+**Root cause**: DecodeString returns one untyped null for structural
+malformation and intentional size limits.
+
+**Recommended fix**: Return a typed decode result such as Success,
+ResourceLimit, or Malformed. Map length above MaximumDecodedStringLength to
+ResourceLimit and preserve MalformedResult for invalid native/model structure.
+Do not constrain symbolic strings to the decoder cap, which could exclude real
+counterexamples and create false proofs.
+
+**Regression coverage**: Add a configurable small decoder limit, query a model
+one unit above it, and require backend/kernel ResourceLimit. Add an at-limit
+control that decodes and replays and retain true malformed-value tests.
+
+**Confidence**: High; the exact cap branch was exercised with valid IR and
+compact Z3 values.
+
+### 462. [CONFIRMED] Strict protocol enum validation allocates hundreds of bytes per token
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around
+lines 151-178.
+
+**Description**: EnsureCanonicalEnum constructs namespace/type-name strings,
+calls Assembly.GetType, materializes JsonElement.GetString, runs reflection
+Enum.Parse with boxing, and calls ToString for every enum token. The same enum
+metadata is rediscovered repeatedly during one shape walk.
+
+**Reproduction**:
+
+- 100,000 WorkerClaimOutcome tokens: 37,601,168 bytes allocated.
+- 50,000-token rerun: 18,800,584 bytes, the same 376 bytes/token.
+- 100,000 WorkerSelectedFeature tokens: 39,201,072 bytes.
+- Full pre-parsed 1,001,137-byte response with 100,000 Effects tokens:
+  39,221,776 shape-walk bytes.
+
+A 100,000-iteration JsonElement.ValueEquals control allocated zero bytes.
+
+**Impact**: A near-16-MiB canonical enum array can drive hundreds of MiB of
+ephemeral allocation before semantic duplicate checks, causing severe GC,
+latency, or memory failure despite the protocol size cap.
+
+**Root cause**: Canonical enum metadata and spelling are resolved through
+reflection and strings per token rather than generated/cached metadata.
+
+**Recommended fix**: Generate or cache canonical enum spellings by declared
+type and validate non-flags tokens with JsonElement.ValueEquals. Use dedicated
+generated flag metadata or a raw-token parser for canonical flags, avoiding
+per-token Enum.Parse/boxing/string round trips.
+
+**Regression coverage**: Shape-walk a pre-parsed large selectedFeatures array
+after warmup and require a small constant allocation ceiling. Retain lowercase,
+numeric, unknown, and flags-canonicalization cases.
+
+**Confidence**: High; isolated method and full traversal measurements agree,
+with a zero-allocation primitive control.
+
+### 463. [CONFIRMED] Bound-contract schema generation accepts duplicate properties
+
+**Location**: scripts/Generate-BoundContractModel.ps1 around line 21.
+
+**Description**: The documented authoritative bound-contract schema is passed
+directly to ConvertFrom-Json. Earlier duplicate properties are discarded before
+any model validation, so contradictory constructor accessibility, enum
+vocabulary, property types, or projections can pass verification.
+
+**Reproduction**: Change the first class constructor to:
+
+    "access": "public",
+    "access": "internal"
+
+Full verification against copied output exits 0:
+
+    Verified deterministic bound-contract model.
+
+The generator parser reports GENERATOR_PARSE_VALUE=internal.
+
+**Impact**: Public-surface declarations can be ambiguous while acceptance and
+generated-output verification remain green.
+
+**Root cause**: No strict raw JSON duplicate-property check precedes
+ConvertFrom-Json.
+
+**Recommended fix**: Use the shared recursive ordinal duplicate-name loader
+before conversion.
+
+**Regression coverage**: Add duplicate root schemaVersion and nested
+classes[0].constructor.access cases, require nonzero generation with
+path-qualified errors before output writes, and retain byte-identical valid
+output.
+
+**Confidence**: High; nested duplicate verification and selected parse value
+were self-verified.
+
+### 464. [CONFIRMED] Sample validation accepts timeout parameters but never enforces them
+
+**Location**: scripts/Test-SharpProofSamples.ps1 around lines 43-50, 72,
+304, 345, and 359.
+
+**Description**: Invoke-CapturedDotNet accepts TimeoutSeconds, with call sites
+requesting 900 seconds for package creation and 300 seconds for restore/build.
+The value is never read. The helper invokes dotnet synchronously and has no
+bounded wait or process-tree termination.
+
+**Reproduction**: In the canonical Linux image, extract the unchanged helper,
+substitute a fake dotnet that runs for two seconds, and request one second:
+
+    {"RequestedTimeoutSeconds":1,"ElapsedMilliseconds":2111,"ExitCode":0}
+
+The helper waits for normal completion and returns success.
+
+**Impact**: tooling samples and package-consumers sample validation can hang
+until a much broader workflow timeout when restore, build, pack, an analyzer,
+or MSBuild deadlocks, defeating documented per-command budgets.
+
+**Root cause**: TimeoutSeconds is dead API surface; direct synchronous
+invocation bypasses the repository's established bounded process runner.
+
+**Recommended fix**: Execute dotnet with a bounded ProcessStartInfo runner,
+asynchronously drain stdout/stderr, and on expiry Kill(true), wait for full
+process-tree exit, and return or throw a typed timeout such as exit code 124.
+Factor the established Invoke-SharpProofDotnet.ps1 logic for reuse.
+
+**Regression coverage**: Use a fake dotnet that spawns a long-lived child,
+request a one-second timeout, and require prompt exit 124 with no surviving
+child. Add fast success and ordinary nonzero controls preserving captured
+output and exit codes.
+
+**Confidence**: High; self-verified with exact helper logic in the canonical
+container.
 
 ## Deferred by explicit scope
 
