@@ -8029,6 +8029,340 @@ diagnostics and warnings-as-errors failures for unreachable calls.
 selected arm; otherwise preserve permissive OR. Share the already-correct strict
 completion logic and test true/false, nonconstant, and nested controls.
 
+### 666. [CONFIRMED] SPMETA003 trusts CallerCancellationWon by name, not behavior
+
+**Location**: `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs`, around
+lines 490-603; production helper in `SharpProof.Worker/SharpProofWorker.cs`,
+around lines 83-113.
+
+**Description**: The exact Worker cancellation rule accepts any zero-parameter
+Boolean local function named `CallerCancellationWon`. It never inspects the
+helper body, captured token, returned values, or interruption cause.
+
+**Reproduction**: `CallerCancellationWon() => false` and a same-named helper
+checking `CancellationToken.None` both emitted zero SPMETA003. Renaming only the
+false helper emitted the error. Executing the false-helper version with a
+canceled caller returned `TimedOut` instead of `Canceled`.
+
+**Impact**: A name-preserving typo/refactor can misclassify every caller
+cancellation while SharpProof's self-application remains green.
+
+**Recommended fix**: Prefer an inline, symbol-bound exact caller-token predicate.
+If helper support remains, analyze all normal returns and require derivation from
+the exact token and audited interruption/deadline state. Test constants, wrong
+tokens, early returns, correct latch formulas, and runtime Canceled/TimedOut
+projection.
+
+### 667. [CONFIRMED] Unsupported finite-domain formulas fabricate Expected=Unsatisfiable
+
+**Location**: `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs`, around lines
+15-20 and 139-166.
+
+**Description**: Expected is nonnullable, so the early unsupported-domain
+abstention stamps Unsatisfiable before any enumeration. The value is a placeholder
+but is exposed as an actual oracle verdict.
+
+**Reproduction**: A well-typed string equality was true under a concrete binding,
+yet the finite result was
+`Status=Abstained Expected=Unsatisfiable Actual=null Assumptions=0`.
+
+**Impact**: Reports, tests, or minimizers consuming Expected receive a false
+semantic assertion on ordinary abstentions.
+
+**Recommended fix**: Make Expected nullable or add an explicit not-computed
+state, returning no expectation until enumeration completes. Test satisfying and
+false unsupported formulas plus supported SAT/UNSAT controls.
+
+### 668. [CONFIRMED] Accepted finite-domain formulas are enumerated twice
+
+**Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, around lines 534-556;
+`FiniteDomainSmtFuzzing.cs`, around lines 30-106, 168-174, and 223-285.
+
+**Description**: Candidate acceptance traverses every assignment to prove
+totality, discards satisfiability, then the oracle traverses the same Cartesian
+domain again to compute the expected verdict.
+
+**Reproduction**: A production-shaped total UNSAT formula with two integer and
+one Boolean variables performed 50 leaf evaluations for definedness and another
+50 for satisfiability. Repeated timing was 475 ms plus 413 ms for 20,000 runs.
+
+**Impact**: Accepted UNSAT campaigns do exactly twice the necessary interpreter
+work; large campaign ceilings allow tens of millions of redundant evaluations.
+
+**Recommended fix**: Return `{AllDefined, AnyTrue}` from one enumeration and
+carry the expected verdict into comparison. Retain a standalone one-pass public
+oracle. Add deterministic leaf-count, early-SAT, partial, and cancellation tests.
+
+### 669. [CONFIRMED] Package configuration failures have no stable diagnostic code
+
+**Location**: `SharpProof.Package/buildTransitive/SharpProof.targets`, around
+lines 64-89.
+
+**Description**: All nine MSBuild `<Error>` tasks omit `Code=`. Because the
+configuration target runs before CoreCompile, the analyzer cannot emit its
+documented SP0025 replacement; users receive bare `error :` messages.
+
+**Reproduction**: Building with `SharpProofProfile=invalid` exited 1 with
+`error : SharpProofProfile must be advisory, strict, or off` and zero SharpProof
+codes. An invalid verifier policy correctly emitted SP0054.
+
+**Impact**: IDEs, CI parsers, documentation links, and support tooling cannot
+classify or group nine public configuration failures.
+
+**Recommended fix**: Assign SP0025 to analyzer profile/features/mode/runtime
+configuration errors and SP0054 to verifier/package integration errors. Require
+allowed codes on every Error element in both target files and add consumer
+integration tests.
+
+### 670. [CONFIRMED] NuGet package archives are not byte reproducible
+
+**Location**: `scripts/Invoke-SharpProofContainer.ps1`, around lines 383-393;
+`New-SharpProofReleaseEvidence.ps1`, around lines 732-748, 927-958, and 977.
+
+**Description**: Compiler determinism is enabled, but raw `dotnet pack` OPC/ZIP
+output is hashed without canonicalization. NuGet injects a random core-properties
+part name and pack-time ZIP timestamps.
+
+**Reproduction**: Packing the exact same already-built Attributes DLL/PDB twice
+with `--no-build --no-restore` produced different nupkg and snupkg sizes/hashes.
+Only GUID-named `.psmdcp` paths, their relationship, and timestamps differed.
+
+**Impact**: Retrying a release from the same commit and payload changes packages,
+SHA256SUMS, SBOM hashes, manifests, provenance, and attestations; published bytes
+cannot be reconstructed from recorded inputs.
+
+**Recommended fix**: Canonicalize packages before validation/evidence (stable
+core-properties identity, entry order, timestamps, compression, and ZIP metadata)
+or adopt a tested reproducible pack mode. Pack every project twice from one build
+and require byte-identical packages and evidence; perturb real payload as control.
+
+### 671. [CONFIRMED] yield break-only iterators omit state-machine allocation
+
+**Location**: `SharpProof.Effects/EffectMethodNodeBuilder.cs`, around lines
+22-101.
+
+**Description**: Method effects are built from source/CFG operations and never
+recognize iterator lowering. A body containing only `yield break` has no explicit
+creation or unsupported operation, so the hidden iterator object disappears and
+the summary remains Complete/Allocation=None.
+
+**Reproduction**: Repeated `EmptyIterator()` calls returned distinct reference
+objects and 64 calls allocated measurable bytes. Effects reported None/Complete.
+A `yield return` control already abstained Unknown/Incomplete; explicit array
+allocation reported Managed.
+
+**Impact**: ZeroAllocations and effect contracts can accept a method allocating
+a new compiler-generated object on every call.
+
+**Recommended fix**: Detect the method's own iterator semantics (excluding nested
+local/lambda yields) and join Managed allocation with a direct witness. Test
+yield-break, yield-return conservative behavior, explicit allocation, and nested
+iterators.
+
+### 672. [CONFIRMED] Implicit base calls miss optional-only base constructors
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
+lines 79-126 and 382-412; `RequiresCallSiteAnalyzer.cs`, around lines 570-593.
+
+**Description**: Implicit base-call discovery equates an empty argument list with
+a constructor declaring zero parameters. C# can select a constructor whose every
+parameter is optional, and compiler-synthesized default actuals are also missing.
+
+**Reproduction**: `Base(int value=-1)` with `Requires(value>0)` was invoked by an
+ordinary derived constructor with no initializer, but discovery returned zero
+candidates and zero SP0027. Writing explicit `: base()` produced one default-
+argument candidate and SP0027. Runtime values were identical.
+
+**Impact**: Adding or omitting syntactically redundant `: base()` changes
+precondition coverage across ordinary and record constructors.
+
+**Recommended fix**: Resolve the compiler-selected empty-argument base overload
+and carry typed synthesized defaults, rather than choosing any all-optional
+member. Test overload preference, multiple defaults, enums/null, this-chains,
+records, metadata, and inaccessible/error cases.
+
+### 673. [CONFIRMED] Any explicit static constructor suppresses member SP0027 diagnostics
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
+lines 290-312; reusable completion logic in
+`SharpProof.Effects/OperationCompletionEvaluator.cs`, around lines 576-639 and
+889-966.
+
+**Description**: Call-site analysis returns Unknown for every static target or
+instance constructor whenever the containing type has any static constructor.
+It never asks whether initialization can complete or is already complete.
+
+**Reproduction**: An empty, completing static constructor suppressed SP0027 for
+both a static method call and `new Target(-1)`, although candidates were Complete
+and runtime reached each target. No-cctor controls warned; throwing-cctor controls
+correctly stayed quiet and never reached the target.
+
+**Impact**: Common initialized types lose all call-site precondition diagnostics
+for static members and instance construction.
+
+**Recommended fix**: Replace the syntactic gate with shared static-initialization
+reachability/completion, proceeding only when initialization is complete or can
+complete and retaining Unknown otherwise. Test empty/throwing/mixed initializers,
+same-type contexts, accessors, constructor chains, metadata, and state effects.
+
+### 674. [CONFIRMED] Compact assumption validation rebuilds owner indexes per claim
+
+**Location**: `SharpProof.Worker.Protocol/ProtocolJson.cs`, around lines 595-663
+and 975-1015.
+
+**Description**: For every claim result, validation sorts the same callable's
+full declaration array and, for compact rows, rebuilds declaration and actual
+dictionaries. The expected declaration set is invariant per callable.
+
+**Reproduction**: A valid 1.22 MB response with 2,000 declarations/claims took
+845 ms and allocated 943 MB during public validation. A real serializer compacted
+a valid 25.27 MB response to 534 KB, but validating it still allocated 80.1 MB.
+An indexed control allocated about 386 KB at 2,000.
+
+**Impact**: The size-saving protocol form causes O(claims * declarations log
+declarations) work and extreme transient GC pressure after verification.
+
+**Recommended fix**: Build one duplicate-safe per-callable descriptor containing
+declaration count, ordinal ID/kind map, and trusted IDs, then validate all rows
+against it. Test full/compact/null inheritance, trusted rows, malformed shapes,
+and one-index-build/allocation scaling.
+
+### 675. [CONFIRMED] Reported suppressed compiler errors poison every callable
+
+**Location**: `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs`,
+around lines 26-48; `CompilerWireMappings.generated.cs`, around line 314.
+
+**Description**: Compiler artifact production filters diagnostics only by
+`Severity == Error`. With `ReportSuppressedDiagnostics=true`, a pragma-suppressed
+warning promoted to Error is retained despite `IsSuppressed=true`, then assigned
+to every callable as UnsupportedCallable.
+
+**Reproduction**: Suppressed CS0168 promoted to Error yielded zero normal Roslyn
+errors, but reporting mode returned one suppressed Error, one artifact error, and
+UnsupportedCallable for the target. The otherwise identical baseline artifact
+had no errors/failure.
+
+**Impact**: Requesting suppressed diagnostics for reporting can downgrade all
+claims to Unknown and fail strict verification without changing compilation
+semantics.
+
+**Recommended fix**: Retain only Error diagnostics with `!IsSuppressed`. Compare
+reporting false/true artifacts and fingerprints, and keep an unsuppressed promoted
+error as the poisoning control.
+
+### 676. [CONFIRMED] Delegate signature contracts are selected but silently ignored
+
+**Location**: `SharpProof.Attributes/ClosedContractAttributes.cs`, around lines
+3-16; `ContractSelectionInventory.cs`, around lines 135-146;
+`ContractBinder.cs`, around lines 74-84; `SharpProofAnalyzerEngine.cs`, around
+lines 125-131.
+
+**Description**: Closed-contract attributes legally target delegate parameters
+and returns, and selection sees the synthesized DelegateInvoke method. The binder
+rejects DelegateInvoke, while Roslyn method symbol actions do not visit synthesized
+Invoke methods, so neither validation nor the documented unsupported SP0047 runs.
+
+**Reproduction**: Calls violating `[Positive]` and `[NotNull]` delegate
+signatures emitted nothing. A malformed `[Positive] string` delegate also emitted
+no SP0024. Binder reported `selection=Contracts` then `UnsupportedTarget`; an
+ordinary method control emitted SP0027.
+
+**Impact**: Valid delegate contracts appear supported but are unenforced, and
+malformed attributes are silent.
+
+**Recommended fix**: Analyze delegate declarations/named types explicitly,
+validate DelegateInvoke closed attributes, and under current policy emit SP0047
+at the declaration. Alternatively implement full binder/call-site delegate
+support. Test valid/malformed parameter/return attributes and exactly-once output.
+
+### 677. [CONFIRMED] Release mutation catalog maps a mutation to an unrelated test
+
+**Location**: `scripts/Test-SharpProofTrustedMutations.ps1`, around lines 880-886
+and 2826-2864; mutation target in
+`scripts/Invoke-SharpProofReleaseContainer.ps1`, around lines 165-173.
+
+**Description**: The `release-qualification-matrix-receipt-projection` mutation
+removes `$requiredGates` from the release writer, but its focused filter selects
+a workflow/catalog test that never reads that file. The mutation runner treats
+the resulting green test as a survivor.
+
+**Reproduction**: The catalog's exact mutation left the mapped test passing 1/1.
+The existing `QualificationWriterRevalidatesArtifactsAndGateReceipts` test failed
+on the same mutation and passed again after restoration.
+
+**Impact**: Any mutation shard containing this row fails falsely despite an
+existing test that kills the production mutation, wasting and misattributing the
+release mutation gate.
+
+**Recommended fix**: Map the row to the writer test (and refresh receipts), or
+add a focused behavioral projection test. Regression should require the selected
+test to pass baseline and fail the exact catalog mutation.
+
+### 678. [CONFIRMED] Meta-analyzer enrollment gate trusts unevaluated project XML
+
+**Location**: `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs`, around
+lines 295-315.
+
+**Description**: Enrollment is checked by raw XDocument element presence and
+metadata. MSBuild conditions, ItemGroup conditions, imports, Choose, and Update
+can remove or alter the analyzer reference after evaluation while XML still looks
+correct.
+
+**Reproduction**: Adding `Condition="'$(Configuration)' == 'Disabled'"` to the
+Effects meta-analyzer ProjectReference left the architecture test passing. Actual
+Debug and Release `-getItem:ProjectReference` evaluation omitted the analyzer.
+
+**Impact**: A soundness-critical project can stop running every SPMETA rule while
+the test named `RunsTheMetaAnalyzer` remains green.
+
+**Recommended fix**: Reuse evaluated-MSBuild inspection for every critical project
+in Debug and Release, requiring exactly one evaluated analyzer reference with
+the exact metadata. Test element/ItemGroup conditions, configuration-only items,
+imports/Update, and valid unconditional enrollment.
+
+### 679. [CONFIRMED] Verifier-only policies force full C# recompilation
+
+**Location**: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props`,
+around lines 31-32; `SharpProof.AnalyzerConsumer.props`, around lines 18-19;
+consumption in `SharpProof.Verifier.targets`, around lines 262-265.
+
+**Description**: VerifyPolicy and AssumptionPolicy are registered as
+CompilerVisibleProperty even though no analyzer/collector reads them. Changing
+either rewrites generated editorconfig and invalidates CoreCompile.
+
+**Reproduction**: Changing only `require-proven` to `advisory` ran Csc once and
+changed editorconfig, while assembly and compiler manifest hashes stayed
+identical; the request policy correctly changed. Same-policy and worker-query-
+budget controls skipped CoreCompile.
+
+**Impact**: Solution-wide policy changes needlessly rerun Csc, analyzers, and
+generators for every affected project.
+
+**Recommended fix**: Remove both compiler-visible registrations in package and
+self-apply props while continuing direct target normalization/forwarding. Test
+both policy changes skip Csc but update request/result behavior; retain real
+compiler-semantic property controls.
+
+### 680. [CONFIRMED] Z3 rlimit setup leaves one StringSymbol finalizer per query
+
+**Location**: `SharpProof.Smt/IrSmtBackend.cs`, around lines 112-115.
+
+**Description**: `parameters.Add("rlimit", value)` uses a convenience overload
+that creates a disposable native-backed StringSymbol wrapper the caller cannot
+dispose. Params disposal does not own it.
+
+**Reproduction**: 128 real queries produced 128 proportional pending finalizers
+(129 including a measured one-object Task.Run baseline). The explicit
+`MkSymbol("rlimit")` plus `Add(Symbol, uint)` and disposal control produced zero
+while preserving UNSAT/resource behavior.
+
+**Impact**: Long-lived solver lanes accumulate native references and finalizer/GC
+pressure on every query, including trivial Boolean checks.
+
+**Recommended fix**: Create and explicitly dispose the rlimit symbol per setup,
+or cache one backend-owned symbol disposed before Context. Test N-query finalizer
+growth, correct resource limits, cancellation, and exceptional exits.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
