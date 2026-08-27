@@ -6610,6 +6610,684 @@ and copy only explicitly authorized external inputs, or reject every overlaid
 path outside that allowlist. Test ignored Compile source, allowed nupkgs, and
 excluded artifacts/bin/obj.
 
+### 600. [CONFIRMED] Expanded params arrays are discarded before Requires evaluation
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
+lines 642-669 (`GetArgument`).
+
+**Description**: Roslyn represents an expanded `params` call as one implicit
+`IArrayCreationOperation`, but `GetArgument` returns null for
+`ArgumentKind.ParamArray`. Contracts over the array therefore become Unknown
+even when zero or several expanded elements create a definitely non-null array.
+
+**Reproduction**: Temp analyzer/runtime controls compared `MustBeNull()` and
+`MustBeNull(1, 2)` against explicit null and explicit non-null arrays. Expanded
+calls ran with non-null arrays but emitted no definite violation; explicit
+controls emitted SP0027.
+
+**Impact**: Definite call-site contract violations disappear solely because C#
+uses expanded `params` syntax.
+
+**Recommended fix**: Admit the implicit params aggregate, snapshot its array
+value, and preserve element evaluation/completion. Test zero/two elements,
+throwing elements, explicit null, and named/optional controls.
+
+### 601. [CONFIRMED] Direct-break loops suppress diagnostics on later reachable calls
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
+lines 188-208 and 425-471; `SharpProof.Effects/ManagedAbstractFlow.cs`, around
+lines 1842-1917.
+
+**Description**: Strict prefix completion has no loop/branch model. A direct
+`break` leaves managed flow Complete but makes the following candidate
+unreplayable.
+
+**Reproduction**: `for (;;) { break; }` and `while (selector) { break; }`
+followed by a known-invalid direct call both reached the call at runtime and
+emitted zero SP0027. Direct and empty-block controls emitted one; a throwing
+condition correctly did not reach the call.
+
+**Impact**: Harmless finite loop syntax erases definite precondition failures.
+
+**Recommended fix**: Conservatively model direct-break `for` and top-tested
+`while` completion, retaining rejection for nested/conditional/goto/do shapes.
+
+### 602. [CONFIRMED] Supported claimless callables unnecessarily require an SMT backend
+
+**Location**: `SharpProof.Worker/SharpProofWorker.cs`, around lines 251-256 and
+504-536; `SharpProof.Worker/CallableVerifier.cs`, around lines 34-52.
+
+**Description**: Lane creation is based on target count, even though a supported
+Requires-only target has zero claims and `CallableVerifier` completes it without
+using a backend.
+
+**Reproduction**: The policy returned Complete/None with zero claims/resources,
+but one such target still invoked a throwing backend factory and failed. A
+zero-target control did not invoke it.
+
+**Impact**: Solver-free valid projects can fail as BackendUnavailable and pay
+backend startup costs.
+
+**Recommended fix**: Prepopulate solver-free callable results and create lanes
+only for targets with solver work. Coordinate with #590 so unsupported
+claimless callables remain typed incomplete.
+
+### 603. [CONFIRMED] Failure-response claim projection is quadratic
+
+**Location**: `SharpProof.Worker.Protocol/WorkerResultAssembler.cs`, around
+lines 59-71 (`CreateIncomplete`).
+
+**Description**: Every manifest claim performs `Callables.FirstOrDefault` to
+find its owner, making failure/cancellation projection O(callables * claims).
+
+**Reproduction**: Valid 1k/2k/4k/8k fixtures measured 8.9/35.5/143.9/563.2 ms;
+an ordinal dictionary control stayed below 0.1 ms. The full 8k response was
+valid and 6.56 MB.
+
+**Impact**: Recovery after timeout/cancellation can consume remaining launcher
+grace on large ordinary manifests.
+
+**Recommended fix**: Build one first-match ordinal callable-ID dictionary,
+preserving duplicate-first and missing-owner behavior. Test exact assumption
+propagation and near-linear scaling.
+
+### 604. [CONFIRMED] Non-completing deconstruction conversion phases lose reached effects
+
+**Location**: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, around
+lines 58-75; `OperationCompletionEvaluator.cs`, around lines 768-834;
+`EffectSummaryOperations.cs`, lines 117-119.
+
+**Description**: `ScanDeconstruction` scans only the RHS/root Deconstruct call.
+When completion says a nested call, conversion, or target write cannot complete,
+the scanner substitutes Complete `MayDiverge` and skips the reached phase.
+
+**Reproduction**: A conversion wrote static state 1729 then threw
+`InvalidOperationException`. Runtime observed both. The summary was Complete and
+nonunknown but had no static write, no throw, and `MayDiverge`. A phase-ordered
+temp fix passed the oracle and an existing deconstruction-effects control.
+
+**Impact**: Purity, exception, handler-reachability, and termination consumers
+can receive false results.
+
+**Recommended fix**: Share a language-ordered deconstruction phase traversal
+between completion and effects: RHS, root/nested calls, conversions, then target
+writes; record each reached phase before stopping.
+
+### 605. [CONFIRMED] Rejected contract API usage is silently accepted in companion bodies
+
+**Location**: `SharpProof.Contracts/ContractClauseInventoryBuilder.cs`, around
+lines 65-73; `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs`,
+around lines 152-195; `EffectiveContractSourceResolver.cs`, around lines 109-122.
+
+**Description**: Companion inventories set `HasRejectedContractApiUsage`, but
+companion validation/resolution/binding never consume it. Ordinary operation
+analysis cannot compensate because companion operation blocks are skipped.
+
+**Reproduction**: An aliased fake exact-metadata-name `Contract.Requires` set
+`companion-rejected=True`, yet emitted no diagnostic and bound successfully with
+zero clauses. A direct fake control emitted SP0047; a genuine companion imported
+one clause.
+
+**Impact**: A companion can appear to contain contracts while rejected clauses
+are silently dropped; mixed bodies can bind only a subset.
+
+**Recommended fix**: Report rejected occurrences at their calls and reject the
+entire selected companion inventory. Test fake, mixed, genuine, direct, and
+unrelated-lookalike controls.
+
+### 606. [CONFIRMED] Null and out-of-range array arguments cause false SP0027 reports
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
+lines 450-460; `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
+2178-2184; `OperationCompletionEvaluator.cs`, around lines 721-725.
+
+**Description**: Array element completion checks only child evaluation, not a
+definitely null receiver or proven bounds failure. Analysis then evaluates a
+later independent argument and reports a violation for a call never invoked.
+
+**Reproduction**: `Positive(((int[])null!)[0], -1)` and
+`Positive((new int[0])[0], -1)` each emitted SP0027, while runtime call count was
+zero and the first argument threw. Live-array/direct controls executed and were
+correctly diagnosed.
+
+**Impact**: Deterministic false diagnostics and warnings-as-errors failures.
+
+**Recommended fix**: Split array-element completion from generic child
+completion, reject definitely null and definitely out-of-range accesses, and
+share the rule between the two completion engines. Preserve permissive Unknown.
+
+### 607. [CONFIRMED] A transient custom SARIF path makes a later plain clean fail
+
+**Location**: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,
+around lines 327-359; `SharpProof.BuildTasks/ResetPublishedVerification.cs`,
+around lines 38-48; `SharpProof.Host/LinuxPathIdentity.cs`, around lines 296-403.
+
+**Description**: Clean reconstructs the publication set only from current
+properties. It cannot authenticate a prior set created with a one-off command
+line SARIF path.
+
+**Reproduction**: Build with an absolute custom SARIF succeeded. A subsequent
+plain `dotnet clean` exited 1 with SP0053 and left outputs/markers. Repeating the
+old SARIF property made clean exit 0 and remove them.
+
+**Impact**: Ordinary CI/developer clean becomes configuration-history dependent.
+
+**Recommended fix**: Persist the exact successful publication topology in
+project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
+Test transient request/result/manifest/SARIF paths and multi-target builds.
+
+### 608. [CONFIRMED] Deep well-formed API-spec terms can terminate the process
+
+**Location**: `SharpProof.Specs/ApiSpecTermValidator.cs`, around lines 9-12,
+68-75, 96-102, 127-133, and 172-179; recursive siblings in
+`ApiSpecContentDigest.cs` and `ApiSpecInstantiation.cs`.
+
+**Description**: Public `ApiSpecTable.Create` and its validators/digesters use
+unbounded recursive term walks with no depth or node budget.
+
+**Reproduction**: A well-formed nested Boolean Not term at depth 1,000 created
+and digested successfully; depth 2,000 terminated the child process with
+`Stack overflow` after 1,106 repeated validator frames.
+
+**Impact**: Bespoke programmatic specs can kill a normal host instead of
+returning an attributable validation error.
+
+**Recommended fix**: Add iterative structure/depth/node prevalidation and make
+validator, digest, and instantiation iterative or consistently bounded. Use a
+child-process boundary/over-limit regression.
+
+### 609. [CONFIRMED] Harmless array creation suppresses later SP0027 diagnostics
+
+**Location**: `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
+1842-1917 and 2501-2507; `RequiresCallSiteDiscovery.cs`, around lines 425-471.
+
+**Description**: Strict prefix completion lacks an `IArrayCreationOperation`
+arm even though the same class has a conservative direct-array predicate.
+
+**Reproduction**: Fixed-size, literal-initialized, and rectangular arrays all
+had Complete flow and `IsDirectArrayCreationComplete=True`, runtime reached the
+invalid call, but `CanReplay=False` and SP0027=0. Negative-length and throwing
+element controls did not reach it.
+
+**Impact**: An irrelevant safe allocation erases later definite violations.
+
+**Recommended fix**: Route `IArrayCreationOperation` through
+`IsDirectArrayCreationComplete`. Test safe forms and negative/nonconstant/
+throwing controls.
+
+### 610. [CONFIRMED] Default self-application excludes Meta.Analyzers from itself
+
+**Location**: `SharpProof.SelfApply.targets`, around lines 9-10, 31-32, and
+91-92; `scripts/Invoke-SharpProofSelfApplication.ps1`, around lines 76 and
+144-146.
+
+**Description**: Default self-application loads the baseline Meta analyzer for
+other production projects but excludes the project named
+`SharpProof.Meta.Analyzers`. One property conflates production self-analysis
+with opt-in analysis of intentionally invalid test fixtures.
+
+**Reproduction**: An imported-target probe showed no Meta analyzer item by
+default and one when opting in. A production-named compile containing a manual
+DiagnosticDescriptor passed by default, then failed with SPMETA005 under the
+opt-in flag.
+
+**Impact**: The documented analyzer-change workflow can false-green on defects
+in the Meta analyzer itself.
+
+**Recommended fix**: Load the frozen baseline Meta analyzer for every production
+project, including itself; reserve opt-in only for non-production/test fixtures.
+
+### 611. [CONFIRMED] Partial-SMT fuzzing repeats only 32 exact bundles
+
+**Location**: `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs`, around lines
+45-68; `FuzzRunner.cs`, around lines 223-236 and 363.
+
+**Description**: The generator uses only low seed bits, with two conditionally
+dead bits, yielding 32 formula/scenario bundles across the full Int32 space.
+FuzzRunner nevertheless executes/counts one per case.
+
+**Reproduction**: A 1,000-case production-seed campaign had 1,000 distinct raw
+case seeds but only 32 partial bundles and 968 duplicate executions. Seed 0
+equaled 16 and seed 8 equaled 12.
+
+**Impact**: Larger budgets pay linear Z3 cost without increasing semantic
+coverage, while the agreement count overstates breadth.
+
+**Recommended fix**: Either schedule an explicit 32-row matrix once and report
+it separately, or use a deterministic full-width generator. Test uniqueness and
+separate accounting.
+
+### 612. [CONFIRMED] Call-site contract evaluation cannot evaluate IrLengthTerm
+
+**Location**: `SharpProof.Analyzer.Core/ManagedContractFacts.cs`, around lines
+59-102; `RequiresCallSiteAnalyzer.cs`, around lines 355-433.
+
+**Description**: The frontend lowers array/string Length exactly and managed
+flow tracks exact cardinality, but the contract evaluator has no `IrLengthTerm`
+arm and returns Unknown.
+
+**Reproduction**: A valid ContractFor clause `Requires(values.Length > 0)` bound
+as `(len(v2) > 0)`. Passing `new int[0]` produced no SP0027 (selected caller only
+got SP0047). Direct evaluator input was nonnull with cardinality [0,0] yet
+returned Unknown. Scalar companion control emitted SP0027.
+
+**Impact**: Definite array/string length violations are missed for direct and
+companion contracts.
+
+**Recommended fix**: Evaluate `IrLengthTerm` by projecting known operand
+cardinality to an integer abstract value; otherwise retain Unknown. Test empty,
+nonempty, unknown, selected, and companion cases.
+
+### 613. [CONFIRMED] Expression-bodied property getters become worker-incomplete
+
+**Location**: `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs`,
+around lines 94-107 and 520-584; `CompilerCallableLowerer.cs`, around lines 46-57.
+
+**Description**: Roslyn gives an expression-bodied property getter an
+`ArrowExpressionClauseSyntax`. The collector admits property getter method kinds
+but rejects that declaration shape and rewrites Proven effect evidence to
+Unknown/UnsupportedContract; the lowerer returns UnsupportedCallable.
+
+**Reproduction**: `[DoesNotThrow] public long Value => 1` produced
+`analyzer=Proven supported=False artifact=Unknown/UnsupportedContract
+preparation=UnsupportedCallable`; an explicit `get => 1` control was fully
+supported and Proven.
+
+**Impact**: A formatting-only syntax choice causes SP0047/strict exit 6.
+
+**Recommended fix**: Centralize callable declaration/operation-root resolution
+and map arrow clauses to their property/indexer owner throughout manifest and
+lowering paths.
+
+### 614. [CONFIRMED] Rejected API identity detection omits Contract.Result and Contract.Old
+
+**Location**: `SharpProof.Frontend/ContractApiIdentityResolver.cs`, around lines
+117-131; `ContractApiMetadata.generated.cs`, around lines 66-70.
+
+**Description**: The rejected-name classifier includes Requires/Ensures/Assume
+but not Old/Result. Non-authoritative exact-name intrinsics therefore fall
+through both rejection and genuine intrinsic validation.
+
+**Reproduction**: Aliased fake Result/Old calls set no rejection flag, emitted
+no diagnostic, and bound successfully with zero clauses. Genuine misplaced
+Result/Old emitted SP0024; fake Requires emitted SP0047.
+
+**Impact**: Exact-name ghost intrinsics silently supply no contract semantics and
+identity enforcement is inconsistent.
+
+**Recommended fix**: Extend the authoritative-exclusion classifier to all five
+API names. Test fake/genuine Result, Old, Requires, and unrelated lookalikes.
+
+### 615. [CONFIRMED] Case-drifted nuspec dependency IDs create accepted dangling SPDX edges
+
+**Location**: `scripts/Test-SharpProofPackageDependencies.ps1`, around lines
+384-412 and 443-446.
+
+**Description**: PowerShell `-notin` validates expected dependency IDs
+case-insensitively, then preserves the untrusted spelling when deriving the
+case-sensitive SPDX relationship target.
+
+**Reproduction**: Changing only `SharpProof.Attributes` to
+`sharpproof.attributes` passed graph/topology validation. The relationship used
+`SPDXRef-Package-sharpproof.attributes`, while the package row remained
+`SPDXRef-Package-SharpProof.Attributes`; the endpoint was dangling. A temp
+`-cnotin` fix rejected it and preserved the canonical control.
+
+**Impact**: Release generation, validation, and publication can accept a
+contradictory package/SBOM graph.
+
+**Recommended fix**: Use ordinal ID membership and require every relationship
+endpoint to exist in the ordinal SPDX-ID set. Add dependency-case fixtures.
+
+### 616. [CONFIRMED] Canonical pack output depends on its random checkout path
+
+**Location**: `Directory.Build.props`, line 4; `compose.yaml`, around lines
+16-19; `eng/container/entrypoint.sh`, around line 134; container pack invocation
+around `scripts/Invoke-SharpProofContainer.ps1` lines 383-393.
+
+**Description**: `ContinuousIntegrationBuild` is enabled only through ambient
+`GITHUB_ACTIONS`, which canonical task containers do not forward. Each release
+task builds under a different random `/tmp/sharpproof-task.*` path.
+
+**Reproduction**: Two clean exact-commit builds under different paths produced
+different Attributes DLL/PDB hashes. Adding only
+`ContinuousIntegrationBuild=true` made both DLL and PDB hashes identical.
+
+**Impact**: Same-commit package/SBOM/provenance bytes change across retries,
+preventing byte-for-byte reconstruction.
+
+**Recommended fix**: Explicitly enable CI/deterministic source-path normalization
+for canonical release build and pack, independent of ambient GitHub variables.
+Test two detached clones under distinct absolute paths.
+
+### 617. [CONFIRMED] Acceptance receipts can certify a failed required phase
+
+**Location**: `scripts/Write-SharpProofQualificationReceipt.ps1`, around lines
+62-67; `eng/acceptance/Verify.ps1`, around lines 178-198; final trust in
+`Invoke-SharpProofReleaseContainer.ps1`, around lines 184-197.
+
+**Description**: Receipt minting checks schema version, outer status, and commit,
+but never correlates outer `passed` with the required inner phase statuses.
+
+**Reproduction**: Correct Release evidence with outer `passed` and
+`static-validation.status=failed` exited 0 and minted a passed receipt whose hash
+matched the evidence. Outer `failed` control exited 1.
+
+**Impact**: Producer or evidence-assembly regressions can falsely qualify a
+release despite a failed required phase.
+
+**Recommended fix**: Share a strict acceptance evidence validator and require
+every exact phase to pass for outer passed; validate at receipt mint and final
+qualification. Test failed/skipped/missing/duplicate/reordered phases.
+
+### 618. [CONFIRMED] Proven checked overflow in an earlier argument causes false SP0027
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
+lines 450-460; `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
+2175-2177 and 1898-1901.
+
+**Description**: Permissive binary completion checks children/divide-by-zero but
+ignores `IsChecked` and proven overflow. The analyzer evaluates a later invalid
+argument even though the invocation never occurs.
+
+**Reproduction**: `Positive(checked(int.MaxValue + 1), -1)` emitted SP0027 while
+runtime call count was zero and overflow threw. Checked-safe, unchecked-overflow,
+and direct controls executed and were diagnosed.
+
+**Impact**: Deterministic false diagnostics and warnings-as-errors failures.
+
+**Recommended fix**: Add a flow-aware proven-overflow predicate for checked
+operations; return non-completing only when all evaluations overflow, preserving
+mixed/unknown and unchecked cases.
+
+### 619. [CONFIRMED] Record with-clones misattribute receiver effects and omit allocation
+
+**Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines
+663-679; `OperationEffectScanner.Expressions.cs`, around lines 318-345.
+
+**Description**: Both clone paths call the record copy constructor with the
+original object as receiver and no source argument. Runtime instead allocates a
+fresh receiver and passes the original as parameter 0.
+
+**Reproduction**: A sealed record copy constructor read the source into its fresh
+receiver. Runtime returned a distinct record. The Complete summary reported no
+managed allocation, unknown reads, and a write to caller parameter 0. A temp
+fresh-receiver/source-argument fix passed the oracle.
+
+**Impact**: Allocation contracts get a false negative and ownership/purity gets
+an invented caller-state mutation.
+
+**Recommended fix**: Model a Fresh receiver, original operand as argument 0, and
+Managed allocation in both lowered/direct paths. Test throwing constructors,
+initializers, structs, and open dispatch.
+
+### 620. [CONFIRMED] Cached refutation replay is quadratic per callable
+
+**Location**: `SharpProof.Worker/VerificationCache.cs`, around lines 661-809;
+`CallableCounterexampleReplayer.cs`, around lines 4-22.
+
+**Description**: For every cached claim, replay rematerializes/scans all Ensures
+clauses, rebuilds variable-label maps, and re-enumerates entry assumptions. The
+replayer then rematerializes Ensures again.
+
+**Reproduction**: Valid 250/500/1000/2000-claim fixtures allocated
+1.54/4.77/17.25/66.22 MB; 2,000 replayed successfully in 72.8 ms. Allocation
+approached 4x for each 2x input.
+
+**Impact**: A cache hit can allocate tens/hundreds of MB and consume substantial
+time despite avoiding SMT work.
+
+**Recommended fix**: Precompute claim-to-clause, per-target label, and entry
+assumption indexes, and pass resolved clauses to the replayer. Test linear
+allocation plus shuffled/malformed/cancellation controls.
+
+### 621. [CONFIRMED] Exact nuspec validation accepts duplicate identity nodes
+
+**Location**: `scripts/Test-SharpProofPackageDependencies.ps1`, around lines
+203-217.
+
+**Description**: The parser uses `SelectSingleNode` for package id/version and
+checks only null, silently selecting the first of contradictory duplicates even
+though adjacent metadata uses exact node counts.
+
+**Reproduction**: Adding a second `<id>Fabricated.Package</id>` or
+`<version>9.9.9</version>` left `GRAPH_ACCEPTED=true`. Requiring exactly one node
+preserved canonical input and rejected both mutations.
+
+**Impact**: Malformed packages can satisfy release graph, final validation, and
+publication preflight under only their first identity.
+
+**Recommended fix**: Require one metadata/id/version node with canonical text
+shape. Add duplicate-order, missing, attributed, nested, whitespace, and symbol
+package fixtures.
+
+### 622. [CONFIRMED] Provably in-bounds array writes suppress later SP0027
+
+**Location**: `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
+1872-1887 and 1319-1328; `RequiresCallSiteDiscovery.cs`, around lines 425-471.
+
+**Description**: Strict assignment completion omits array-element targets and
+cannot consume the already-computed `ManagedFlowResult.ProvesArrayAccess` fact.
+
+**Reproduction**: `(new int[1])[0] = 1` before a known-invalid call had Complete
+flow and `FlowProvesAccess=True`, runtime reached the call, but `CanReplay=False`
+and no SP0027. Out-of-bounds/null/throwing-RHS controls did not reach it.
+
+**Impact**: A safe ordinary array store erases later definite violations. This
+remains after fixing #609's separate allocation arm.
+
+**Recommended fix**: Make prefix completion flow-aware for array writes,
+requiring completing receiver/index/RHS and proven bounds. Preserve unknown,
+multidimensional, null, and OOB fail-closed cases.
+
+### 623. [CONFIRMED] Oversized-response assumption compaction is quadratic
+
+**Location**: `SharpProof.Worker.Protocol/ProtocolJson.cs`, around lines 666-695.
+
+**Description**: `CompactClaimAssumptions` indexes callables but linearly searches
+all manifest claims for every result, making the size-saving fallback O(claims^2).
+
+**Reproduction**: Valid 1k/2k/4k/8k inputs measured
+5.4/18.9/77.1/348.7 ms; indexed control measured
+0.38/0.56/1.03/1.48 ms. Public serialization compacted a valid 20.33 MB expanded
+response to a valid 1.79 MB round trip.
+
+**Impact**: The path used under greatest protocol pressure adds avoidable delay
+and allocation during publication/recovery.
+
+**Recommended fix**: Build one first-match ordinal ClaimId index beside the
+callable index, preserving malformed/duplicate fallback behavior. Add compact
+semantic and near-linear scaling tests.
+
+### 624. [CONFIRMED] Ordinary proofs underreport used preconditions
+
+**Location**: `SharpProof.Worker/CallableEvidenceBuilder.cs`, around lines 23-24
+and 64-68; `CallableClaimResultAssembler.cs`, around lines 39-70;
+`CompilerResponseEvidenceAuthority.cs`, around lines 123-127 and 535-549.
+
+**Description**: Justification-to-assumption mapping and `Used` marking include
+only Assume, not Requires, for ordinary proven postconditions. The authority
+reconstructs and accepts the same omission.
+
+**Reproduction**: Real SMT proof of Requires(value>0) => Ensures(value>0)
+returned `proofCore=requires:0`, but the Precondition row had `used=False`,
+summary used=0, and response validation passed.
+
+**Impact**: JSON/SARIF/provenance contradict the proof core and underreport the
+assumptions required for a proof.
+
+**Recommended fix**: Map both Requires and Assume labels for ordinary proofs,
+retaining Requires-only contradictory-entry handling. Test used/unused/mixed,
+vacuity, and trusted controls.
+
+### 625. [CONFIRMED] Shared SyntaxTree ownership is reference-order dependent
+
+**Location**: `SharpProof.Frontend/CompilationModelProvider.cs`, around lines
+16-59.
+
+**Description**: `FindOwningCompilation` returns the first DFS match in a LIFO
+reference traversal. If one exact tree instance is legally owned by two source
+compilations, reference order silently chooses the semantic owner.
+
+**Reproduction**: Two owners bound `Dependency.Value` as int versus string.
+Reversing only root compilation-reference order flipped the returned type from
+string to int; direct/unique-owner controls had zero compiler errors.
+
+**Impact**: Collector/analyzer/effects consumers can lower against the wrong
+semantic owner without an ambiguity signal.
+
+**Recommended fix**: Traverse the closure, collect distinct owners by reference,
+return only one, and reject multiple owners consistently. Preserve diamonds
+reaching the same compilation instance.
+
+### 626. [CONFIRMED] Launcher reparses mount information 36 times per SARIF run
+
+**Location**: `SharpProof.Worker.Launcher/Program.cs`, around lines 55, 59,
+620-640, 864-880, and 1220-1254; `SharpProof.Host/LinuxPathIdentity.cs`, around
+lines 152-243 and 1282-1371.
+
+**Description**: The same four publication paths are requalified nine times
+through validation, invalidation, and acquisition. Each local classification
+opens/parses `/proc/self/mountinfo`.
+
+**Reproduction**: Exact flow instrumentation counted 36 RequireLocalPath calls,
+36 mount scans, 36 statfs calls, and 144 parent probes. Real warm run cost 27.9
+ms, 2.04 MB allocated, and 195.6 KB read on a 5.35 KB mount table.
+
+**Impact**: Unconditional per-project overhead scales to seconds/large GC load
+on solutions and larger mount tables.
+
+**Recommended fix**: Carry one invocation-scoped prequalified publication set
+through all phases and bulk-parse mountinfo once per batch. Add deterministic
+counter tests with/without SARIF.
+
+### 627. [CONFIRMED] Proof-core labels collapse distinct IL-summary authorities
+
+**Location**: `SharpProof.Worker/CallableEvidenceBuilder.cs`, around lines
+129-150; `CallableClaimResultAssembler.cs`, around lines 16-28;
+`CompilerResponseEvidenceAuthority.cs`, around lines 436-500 and 605-618.
+
+**Description**: Direct summary labels include origin/call identity but omit the
+evidence digest. The SortedSet merges different modules exposing the same
+documentation ID, and authority validation reconstructs the same lossy label.
+
+**Reproduction**: Two extern-aliased assemblies exposed the same call identity
+with two module SHA-256 values. Both relations were necessary for Proven, yet
+two summary assumptions collapsed to one public core label and validation
+accepted it.
+
+**Impact**: Verdict remains sound, but proof/SARIF/cache provenance cannot name
+the actual two-authority closure.
+
+**Recommended fix**: Include the direct summary digest in one shared canonical
+label builder and reject unexpected full-authority label collisions. Test two
+different and one identical authority tuple.
+
+### 628. [CONFIRMED] Same-named file-local types collide in callable identity
+
+**Location**: `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs`,
+around lines 82-91; `ClaimManifestBuilder.cs`, around lines 37-46 and 587-639.
+
+**Description**: Documentation IDs erase file-local ownership. Two legal
+same-named file-local types in different files receive identical callable and
+claim IDs despite distinct Roslyn MetadataName values.
+
+**Reproduction**: Two files each declared the same selected `file static class
+Subject.Value(int)`. Both IDs were `M:Subject.Value(System.Int32)~System.Int32`;
+full artifact creation threw JsonException and collector surfaces fatal SP0049.
+
+**Impact**: Legal file-local naming makes verification-enabled builds fail before
+worker launch.
+
+**Recommended fix**: Use a shared bounded source-method identity incorporating
+the containing file-local metadata identity for callable and source-summary
+paths. Test two files, nested file-local owners, order stability, and public-ID
+compatibility.
+
+### 629. [CONFIRMED] Interpolation analyzes the wrong ToString overload
+
+**Location**: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, around
+lines 421-487; `StringConcatenationEffectResolver.cs`, around lines 50-203.
+
+**Description**: Ordinary interpolation reuses concatenation resolution and
+always analyzes parameterless `ToString()`. Runtime can invoke
+`IFormattable.ToString(format, provider)` instead.
+
+**Reproduction**: A sealed type's parameterless override was pure, while its
+IFormattable implementation wrote state 1729 and threw InvalidOperationException.
+Runtime observed both; the analyzer returned Complete/nonunknown with no static
+write and empty throws. A temp target-selection fix passed the oracle and five
+existing controls.
+
+**Impact**: Interpolation can be falsely certified pure/nonthrowing and later
+reachability is based on the wrong method.
+
+**Recommended fix**: Model framework formatting precedence separately from
+concatenation, including IFormattable/ISpanFormattable/custom handlers, and fail
+closed for unresolved dispatch.
+
+### 630. [CONFIRMED] Any host OS can mint another OS's portable receipt
+
+**Location**: `scripts/Test-SharpProofPortableConsumer.ps1`, around lines 6-18
+and 34-43; receipt checks around `Write-SharpProofQualificationReceipt.ps1`
+lines 68-74.
+
+**Description**: Caller-supplied `OsFamily` controls evidence filename,
+osFamily, and receipt gate. Neither producer nor downstream authority compares
+it with the actual runtime OS.
+
+**Reproduction**: Canonical Linux amd64 invoked with `-OsFamily windows`, exited
+0, and minted passed `portable-windows` evidence/receipt. Matching Linux control
+also passed.
+
+**Impact**: Matrix/wiring mistakes can satisfy Windows or macOS release rows
+using Linux; all three portability rows can come from one host.
+
+**Recommended fix**: Derive the OS family from runtime APIs or reject mismatch
+before work/output; record OS/architecture provenance. Test all cross-OS pairs.
+
+### 631. [CONFIRMED] Omitted optional in arguments miss definite violations
+
+**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
+lines 385-447 and 623-639; `CallArgumentAliasPolicy.cs`, around lines 30-32.
+
+**Description**: Roslyn represents an omitted optional `in` argument as implicit
+`ArgumentKind.DefaultValue` with invocation syntax. Alias policy rejects every
+non-ArgumentSyntax alias before recognizing that this is a compiler-created
+snapshot.
+
+**Reproduction**: `[Positive] in int value = -1; Take()` bound successfully and
+runtime received -1, but no SP0027. Explicit `-1` and omitted by-value controls
+emitted SP0027; satisfying optional-in stayed clean.
+
+**Impact**: Optional defaults and `in` work separately, but their intersection
+creates a definite call-site false negative.
+
+**Recommended fix**: Classify `ArgumentKind.DefaultValue` as Snapshot before the
+syntax guard, preserving explicit `in local` call-entry semantics. Extend the
+alias/default matrix.
+
+### 632. [CONFIRMED] Partial-SMT outcome coverage is computed then discarded
+
+**Location**: `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs`, around lines
+16-22; `FuzzRunner.cs`, around lines 82-110, 223-236, and 354-365.
+
+**Description**: The oracle exposes defined-true, defined-false, and undefined
+counts, but FuzzRunner retains only one Agreement counter. Passed/Coverage cannot
+establish that the undefined path ran.
+
+**Reproduction**: Production seed/case reconstruction produced two defined-true
+scenarios and zero undefined, yet a one-case campaign returned
+`PartialSmtAgreements=1 Passed=True`; the summary had no other partial fields.
+
+**Impact**: Accepted campaign evidence can be green with zero partiality
+coverage, and future generator regressions eliminating undefined scenarios stay
+invisible.
+
+**Recommended fix**: Aggregate/serialize exact scenario outcome counts, validate
+their sum, and require at least one defined and one undefined outcome wherever
+coverage is claimed. Add malformed/round-trip/default-seed tests.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
