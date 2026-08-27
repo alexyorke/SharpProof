@@ -162,57 +162,6 @@ module imported by the retained prefix exists before execution.
 **Confidence**: High; reproduced red at HEAD and green in a disposable
 one-change probe.
 
-### 429. [CONFIRMED] SPMETA010 drops earlier reaching values after two conditional assignments
-
-**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
-lines 253-294.
-
-**Description**: ResolveLocal gathers all preceding writes to a local, but if
-the last write is conditionally executed it analyzes only writes[-2] and
-writes[-1]. Earlier reaching values are discarded. This leaves a normal
-control-flow bypass:
-
-    var answer = Answer.Unknown;
-    if (first) answer = Answer.Proven;
-    if (second) answer = Answer.Proven;
-    cache.Write(answer);
-
-When both conditions are false, Answer.Unknown reaches the semantic cache. The
-analyzer inspects only the two Proven right-hand sides and emits no SPMETA010.
-
-**Reproduction**: A canonical exact-source probe using ProofCache :
-ISemanticCache reported:
-
-    COMPILER_ERROR_COUNT=0
-    SPMETA010_COUNT=0
-    CONTROL_SPMETA010_COUNT=1
-
-The control writes the direct Unknown value and proves the analyzer was active
-and recognized the vocabulary. This is distinct from the older two-write loop
-case: the current implementation handles its previous and last writes, but
-still drops the third predecessor.
-
-**Impact**: The static guard against caching transient, unknown, or abstaining
-semantic answers can be bypassed with ordinary sibling conditionals. Runtime
-validation may still protect current production caches, but the soundness
-analyzer does not enforce the policy it claims to enforce.
-
-**Root cause**: A last-two-write syntax heuristic substitutes for a
-control-flow reaching-definition join.
-
-**Recommended fix**: Replace the heuristic with CFG-based may-be-noncacheable
-state analysis. Join all feasible predecessor states at conditionals and loops,
-and clear a noncacheable state only when an unconditional assignment dominates
-the cache write. Preserve nested-callable and alias handling.
-
-**Regression coverage**: Add the three-write sibling-conditional case expecting
-exactly one SPMETA010 and an unconditional final Answer.Proven assignment
-control expecting none. Add a four-predecessor switch or nested-conditional
-case to prevent another fixed-depth heuristic.
-
-**Confidence**: High; reproduced with zero compiler errors against the exact
-Meta analyzer sources and a positive direct-write control.
-
 ### 430. [CONFIRMED] Failed performance-gate preflight can leave stale passing evidence for CI upload
 
 **Location**: scripts/Invoke-SharpProofGateEvidence.ps1 around lines 23-40;
