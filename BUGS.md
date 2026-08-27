@@ -162,54 +162,6 @@ module imported by the retained prefix exists before execution.
 **Confidence**: High; reproduced red at HEAD and green in a disposable
 one-change probe.
 
-### 428. [CONFIRMED] Fuzz case-seed truncation silently repeats cases within supported campaigns
-
-**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 152, 197, 263,
-and 562-572; existing coverage in
-SharpProof.Fuzz.Test/FuzzRunnerTests.cs around lines 88-105.
-
-**Description**: CreateCaseSeed hashes the 64-bit seed/index pair through a
-bijective SplitMix64 transform, then returns only the low signed 32 bits.
-Truncation destroys injectivity. Equal case seeds drive the frontend, finite
-SMT, and partial SMT generators, so a collision repeats the entire semantic
-case bundle while both entries are counted as distinct cases and agreements.
-
-**Reproduction evidence**:
-
-- Seed 20260523, 10,000 requested cases: 9,999 unique; indices 5055 and 6447
-  both produce 81445770.
-- Seed 20260605, 10,000 requested cases: 9,999 unique; indices 3773 and 7592
-  both produce 1860187170.
-- Retained seed 23063 at MaximumCases 1,000,000: 999,890 unique; 110
-  duplicates. The first collision is indices 28670 and 48952 producing
-  -1505345985.
-
-The frontend generator uses caseSeed xor 0x35A1D7, the finite SMT generator
-uses caseSeed xor 0x6C8E9CF5, and the partial SMT generator uses caseSeed xor
-0x243F6A88. Each downstream generator is otherwise deterministic, so a
-collision repeats the observable generated case. The current regression checks
-only 1,000 indices and misses scheduled nightly collisions.
-
-**Impact**: Fuzz evidence overstates unique semantic coverage. The scheduled
-10,000-case campaign already has a known duplicate, and maximum-size campaigns
-can count many repeated bundles as independent agreements.
-
-**Root cause**: A 64-bit permutation is projected into a 32-bit seed without a
-within-campaign uniqueness guarantee.
-
-**Recommended fix**: Use a seed-keyed bijective 32-bit permutation of the case
-index. A keyed multi-round Feistel permutation or another explicitly invertible
-32-bit construction preserves uniqueness for every fixed base seed. Inject the
-base-seed key between rounds so different campaign seeds do not become simple
-shifted streams.
-
-**Regression coverage**: Pin both known collision pairs, assert one million
-indices for retained seed 23063 are distinct, and retain the existing
-cross-seed shifted-stream test.
-
-**Confidence**: High; exact unchecked UInt64 arithmetic was reproduced outside
-the repository and every downstream entropy path was traced.
-
 ### 429. [CONFIRMED] SPMETA010 drops earlier reaching values after two conditional assignments
 
 **Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
