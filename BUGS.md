@@ -2945,6 +2945,766 @@ contract control.
 **Confidence**: High; the full production verification command accepted the
 duplicate fixture and the parser control showed the selected last value.
 
+### 489. [CONFIRMED] Ordinary test fixtures require checkout Git metadata despite the archive-test contract
+
+**Location**: SharpProof.ArchitectureTest release-authority, qualification-
+receipt, resolver, and SBOM fixtures; representative task-root Git reads occur
+around lines 181, 265, and 394 in their test sources. The production inventory
+script reached by Test-SharpProofReleaseAuthorityClosure.ps1 also queries Git.
+
+**Description**: The canonical `tooling test` contract intentionally supports a
+source archive without `.git`, and `test` is absent from the container
+entrypoint's Git-required command list. Several ordinary test fixtures
+nevertheless query the task checkout's HEAD or historical ancestry rather than
+creating self-contained repositories. Some negative SBOM cases then pass
+vacuously because the missing-Git setup error supplies the expected nonzero
+exit before the intended mutation is evaluated.
+
+**Reproduction**: A canonical Gitless run of the four affected classes produced
+29 passes and six failures. Failures were the canonical release-authority
+closure invocation, two malformed qualification-receipt tests, the release
+resolver test, and the canonical SBOM identity case. Thirteen negative SBOM
+mutation cases still passed even though their fixture failed first at
+`git rev-parse HEAD`, demonstrating the false-positive oracle.
+
+**Impact**: Ordinary archive-based test runs are red for environmental reasons,
+while multiple negative release tests can be green without exercising their
+claimed mutation. This weakens both developer feedback and release-governance
+evidence.
+
+**Root cause**: Tests mix production checkout state with fixture authority.
+They neither declare a Git requirement nor build the small deterministic commit
+graphs needed by their assertions.
+
+**Recommended fix**: Move the canonical current-checkout closure invocation to
+the existing Git-bound acceptance command, or supply a synthetic repository.
+Convert qualification and SBOM tests to temporary Git repositories with fixed
+identity/timestamps. Build a synthetic tagged ancestry for the resolver test.
+For every negative case, assert a mutation-specific rejection sentinel so setup
+failure cannot satisfy the oracle.
+
+**Regression coverage**: Add a Gitless/archive targeted run containing these
+fixtures. Require both the intended negative reason and proof that fixture setup
+completed; retain the Git-bound canonical release check separately.
+
+**Confidence**: High; the canonical Gitless run isolated six checkout-metadata
+dependencies and exposed the vacuous negative-test behavior.
+
+### 490. [CONFIRMED] Human-reviewed pilot receipts are rejected by PowerShell operator precedence
+
+**Location**: scripts/Write-SharpProofQualificationReceipt.ps1 around line 98;
+the human-reviewed caller is eng/container/Invoke-SharpProofContainer.ps1 around
+lines 424-433.
+
+**Description**: The receipt writer admits reviewed human evidence or
+unreviewed automated evidence using an unparenthesized mixture of `-and` and
+`-or`. PowerShell evaluates the chain left-to-right, so the final
+`-and $Automated` applies to the intermediate result. Valid Reviewed plus
+non-automated input therefore evaluates false.
+
+**Reproduction**: `ReceiptWriterRequiresReviewedPilotEvidence` creates its own
+valid repository and fails independently of the Gitless fixture issue. In a
+temporary baseline copy, adding only explicit grouping made the canonical
+targeted test pass 1/1.
+
+**Impact**: `tooling pilot-review` cannot write the reviewed receipt required by
+release qualification, even when the human review and evidence are valid.
+Automated/unreviewed behavior is not a substitute for the required reviewed
+gate.
+
+**Root cause**: The intended two-branch truth table is encoded without grouping:
+
+    Reviewed -and -not Automated -or Unreviewed -and Automated
+
+**Recommended fix**: Group each allowed branch explicitly:
+
+    ((Reviewed -and (-not Automated)) -or
+     (Unreviewed -and Automated))
+
+Prefer named booleans for the two cases to prevent future precedence drift.
+
+**Regression coverage**: Exercise the complete truth table: reviewed/human and
+unreviewed/automated pass; reviewed/automated and unreviewed/human reject.
+Include the real `tooling pilot-review` receipt path.
+
+**Confidence**: High; the current fixture reproduces the rejection and the
+one-expression grouping change makes it pass.
+
+### 491. [CONFIRMED] Separate object-initializer receivers collapse to one exact IR variable
+
+**Location**: SharpProof.Frontend/RoslynOperationLowerer.cs, `_instances` near
+line 10, GetInstance near line 248, and VisitInstanceReference near line 537.
+
+**Description**: RoslynOperationLowerer caches instance variables only by
+`ITypeSymbol`. It ignores `InstanceReferenceKind` and the owning initializer or
+allocation. Reusing the public lowerer for two implicit receivers of the same
+type therefore returns one variable and labels both mappings Exact even though
+the receivers are different objects.
+
+**Reproduction**: Lowering the implicit receivers in two allocations:
+
+    var first  = new Box { Value = 1 };
+    var second = new Box { Value = 2 };
+
+produced:
+
+    implicit-receivers=2
+    receiver[0] span=162 exact=True term=0
+    receiver[1] span=206 exact=True term=0
+    same-receiver-term=True
+
+**Impact**: Clients that reuse the public lowerer across operation subtrees can
+equate state belonging to separate allocations. Because the result is Exact,
+downstream reasoning receives no abstention or uncertainty signal.
+
+**Root cause**: Type identity is used as receiver identity. That is sufficient
+for one containing instance but not for implicit object/collection initializer
+receivers or other semantic receiver scopes.
+
+**Recommended fix**: Key instances by a semantic receiver scope. For
+ImplicitReceiver, anchor identity to the owning object/collection initializer or
+allocation; for containing-instance references, use the enclosing receiver
+context. Include reference kind and retain sharing within one initializer.
+
+**Regression coverage**: Two separate same-type initializers must yield distinct
+exact receiver variables; two member assignments inside one initializer must
+share its variable. Add a containing-instance control and lowerer-reuse test.
+
+**Confidence**: High; the exact production lowerer returned one term for two
+separately allocated runtime objects.
+
+### 492. [CONFIRMED] Constrained exception type-parameter throws disappear from handler reachability
+
+**Location**: SharpProof.Effects/ExceptionHandlerReachability.cs, the
+IThrowOperation branch around lines 174-204; related throw classification in
+SharpProof.Effects/EffectAnalysisSession.cs around line 251.
+
+**Description**: Catch reachability adds a potential thrown exception only when
+the unwrapped throw operand type is an INamedTypeSymbol. A type parameter such
+as `TException where TException : Exception` is an ITypeParameterSymbol, so the
+throw contributes no potential exception and a matching catch body is skipped.
+Separately, the escaping-throw analysis records an unknown throw and the
+catch-all removes it, producing no escaping throw and no handler effects.
+
+**Reproduction**:
+
+    static int s_state;
+    static void Probe<TException>(TException error)
+        where TException : Exception
+    {
+        try { throw error; }
+        catch (Exception) { s_state++; }
+    }
+
+Runtime always reaches the catch, including null (which throws
+NullReferenceException). Baseline analysis reported:
+
+    Writes.IsUnknown = false
+    Writes = []
+    Throws = []
+    Completeness = Incomplete
+    Termination = Terminates
+    Uncertainty = None
+
+**Impact**: A reachable catch's writes and other effects vanish from the summary
+without making Writes unknown. Consumers can observe an exact empty write set
+for code that deterministically mutates static state.
+
+**Root cause**: The reachability inventory silently drops non-named operand
+types instead of adding an unknown potential exception or resolving effective
+exception constraints.
+
+**Recommended fix**: Minimally add UnknownPotential whenever a completing throw
+operand has no named type. For precision, resolve exception-class constraints in
+both reachability and ResolveThrownException so `TException : Exception` is
+known to match catch(Exception).
+
+**Regression coverage**: The generic example must retain the exact static write
+and no escaping throw. Cover nonnull and null runtime controls, nested/multiple
+constraints, an unconstrained invalid-source control, and the existing
+definitely-null thrown-expression test.
+
+**Confidence**: High; a temporary minimal conservative fix restored the write
+while retaining incompleteness, and the existing null test remained green.
+
+### 493. [CONFIRMED] Pattern-based foreach omits the hidden GetEnumerator precondition call
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
+GetCalls around lines 591-624. The analogous semantic inventory exists in
+SharpProof.Effects/ExceptionHandlerReachability.cs around lines 2269-2385.
+
+**Description**: Requires discovery handles explicit invocation, object
+creation, property, event, and list-pattern calls but has no IForEachLoopOperation
+path. Roslyn does not expose pattern-based foreach lowering as child
+IInvocationOperations, so the compiler-emitted GetEnumerator call is absent
+from precondition checking.
+
+**Reproduction**: A custom `Sequence.GetEnumerator()` contains
+`Contract.Requires(false)`. Runtime counters showed:
+
+    generated foreach GetEnumerator calls = 1
+    explicit GetEnumerator calls          = 1
+
+Analyzer output contained one SP0027 only for the explicit call; the foreach
+site produced none. The source compiled without errors in both cases.
+
+**Impact**: A custom enumerator can hide an always-false Requires clause behind
+foreach. Spelling the semantically identical call explicitly changes the
+diagnostic, violating the repository's rule that unsupported foreach effect
+syntax must not suppress concrete precondition violations.
+
+**Root cause**: Call-site discovery relies on the ordinary operation tree and
+does not consult `SemanticModel.GetForEachStatementInfo` for hidden pattern
+methods.
+
+**Recommended fix**: Add a synchronous foreach semantic-call path using
+GetForEachStatementInfo. Materialize the GetEnumerator candidate with the
+collection receiver or mapped reduced-extension argument, after proving the
+collection expression can complete. Report at the foreach collection/location
+through existing replay and flow rules. Share method selection with the Effects
+inventory where practical.
+
+**Regression coverage**: A pattern GetEnumerator with Requires(false) must emit
+one SP0027 from foreach, matching the direct-call control. Add valid-requires,
+non-completing collection-expression, and supported reduced-extension controls.
+Extend MoveNext/Current/Dispose only when synthetic receiver sequencing is
+modeled explicitly.
+
+**Confidence**: High; executable analyzer and runtime differentials isolate the
+missing compiler-hidden call.
+
+### 494. [CONFIRMED] Cancellation during malformed SAT-model validation returns semantic Unknown
+
+**Location**: SharpProof.Verify/ProofKernel.cs, last common token check around
+line 30, ReplayCounterexample around lines 74-90, and tokenless
+ValidateAssignments around lines 111-117.
+
+**Description**: After a SAT backend result, ProofKernel scans the expected
+variables and model assignments without a cancellation token. If the malformed
+model is detected, ReplayCounterexample immediately returns
+Unknown(CounterexampleReplayFailed) before the next cancellation checkpoint.
+Cancellation during either full-model pass is therefore swallowed as ordinary
+semantic evidence.
+
+**Reproduction**: A completed fake backend returned a 500,000-variable model
+that omitted the final expected key and added one extra key. Cancellation was
+scheduled after backend return and fired during the last-key membership scan.
+Two canonical runs reported:
+
+    tokenCanceled=True; postCancelWorkMs=138
+    outcome=UnknownOutcome; reason=CounterexampleReplayFailed
+    control=OperationCanceledException
+
+**Impact**: The public ProofKernel can perform substantial post-cancellation
+work and return a non-canceled outcome. Current Worker callers add a later
+check, but direct/kernel consumers and custom backends observe incorrect
+cancellation semantics.
+
+**Root cause**: ValidateAssignments has no token checkpoints, and its false
+return is an early semantic branch before the shared post-replay check.
+
+**Recommended fix**: Pass the token through model validation, check before and
+during both expected-key and assignment-value scans, and add a final common
+ThrowIfCancellationRequested before every mapped outcome or malformed-result
+return.
+
+**Regression coverage**: Deterministically cancel during expected-key
+enumeration and require OperationCanceledException. Retain uncanceled malformed
+model -> CounterexampleReplayFailed, cancel-before-backend-return, and valid SAT
+replay controls.
+
+**Confidence**: High; two exact repeat runs returned semantic Unknown more than
+100 ms after their tokens were canceled while the control threw.
+
+### 495. [CONFIRMED] Package-test setup failures leave earlier parallel shards running
+
+**Location**: scripts/Invoke-SharpProofPackageTests.ps1, process creation and
+tracking around lines 337-393, timeout cleanup around lines 396-402, and the
+outer finally around lines 499-506.
+
+**Description**: Parallel package-test processes are cleaned up only on normal
+completion. If a later shard throws during coverage-output setup, Process.Start,
+or stream/metadata initialization, the outer finally deletes directories but
+never terminates, waits for, or disposes processes already in `$running`. A
+process that starts and throws before `$running.Add(...)` is not tracked at all.
+
+**Reproduction**: A canonical-container probe executed the exact baseline
+finalizer after starting a disposable first child and injecting a later-shard
+setup failure:
+
+    {"FinalizerStartLine":499,
+     "InjectedError":"injected-later-shard-setup-failure",
+     "ProcessAliveAfterFinalizer":true,
+     "RunningCountAfterFinalizer":1,
+     "RootExistsAfterFinalizer":false}
+
+**Impact**: The script exits while prior `dotnet test` shards continue consuming
+CPU and memory and accessing result/feed paths that have already been deleted.
+They can contaminate subsequent commands in persistent tooling containers.
+
+**Root cause**: Process lifecycle cleanup lives in the success/timeout loop,
+whereas the exception finalizer owns only filesystem cleanup and runs it in the
+wrong order.
+
+**Recommended fix**: Initialize `$running` before the outer try. Guard or
+register each process immediately after successful start. In finally, kill the
+entire tree, WaitForExit, and dispose every live process before deleting paths;
+have timeout cleanup delegate to the same idempotent routine. Preserve the
+original exception.
+
+**Regression coverage**: Start a long-lived fake first shard and fail second-
+shard preparation; require the original exception, all child PIDs gone before
+return, and directories deleted afterward. Also throw immediately after
+Process.Start to cover the not-yet-registered child.
+
+**Confidence**: High; the exact finalizer left the child alive while deleting
+its root, and the probed blob matched the baseline.
+
+### 496. [CONFIRMED] Direct SharpProofVerify invocation false-greens on unsupported hosts
+
+**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets,
+public SharpProofVerify target around lines 320-323, intended core rejection
+around line 226, and AfterTargets rejection around lines 362-365.
+
+**Description**: The public target's own Condition requires
+`_SharpProofVerifierHostSupported == true`. MSBuild evaluates that condition
+before DependsOnTargets, so on an unsupported host it skips both the public
+target and `_SharpProofVerifyCore`, even though the core target contains the
+intended SP0054 error. The alternative rejection is scheduled only after
+CoreCompile and does not run for direct target invocation.
+
+**Reproduction**: A packed ephemeral C# consumer used identical strict,
+verify=true, host=false properties:
+
+    TARGET=SharpProofVerify EXIT=0
+    Target "SharpProofVerify" skipped, due to false condition
+    Build succeeded; 0 errors
+    request/result/compiler-manifest/SARIF: all absent
+
+Controls:
+
+    TARGET=_SharpProofVerifyCore EXIT=1; SP0054 at line 226
+    TARGET=Build                 EXIT=1; SP0054 at line 365
+
+**Impact**: Automation explicitly invoking the advertised public verification
+target on Windows, macOS, ARM64, or another unsupported host can record success
+although no verifier ran and no evidence was produced.
+
+**Root cause**: Unsupported-host rejection is placed behind the same condition
+that prevents the rejection dependency from executing.
+
+**Recommended fix**: Remove only the host-supported conjunct from the public
+target condition so direct invocation reaches `_SharpProofVerifyCore` and its
+existing SP0054. Preserve verification, profile, design-time, and
+building-project gates.
+
+**Regression coverage**: Directly invoke SharpProofVerify in a packed C#
+consumer with host support forced false; require nonzero exit, SP0054, and no
+evidence. Retain private-core and ordinary Build controls.
+
+**Confidence**: High; the canonical probe isolated target scheduling with two
+failing controls under identical properties.
+
+### 497. [CONFIRMED] Claim canonicalization performs quadratic manifest scans
+
+**Location**: SharpProof.Worker.Protocol/ProtocolManifest.cs around lines 31-37;
+SharpProof.Worker.Protocol/ProtocolJson.cs around lines 283-286 and helper
+lookups around lines 1035-1044.
+
+**Description**: Callable ClaimIds are sorted by FindClaimOrdinal, and response
+results are sorted by both FindClaimCallableId and FindClaimOrdinal. Each helper
+uses `manifest.Claims.FirstOrDefault(...)`, so every sort-key evaluation scans
+the entire claim array. Canonicalizing N claims plus N IDs/results performs
+quadratic string comparisons before JSON serialization or hashing.
+
+**Reproduction**: Warmed public Canonicalize measurements for reversed IDs:
+
+    manifest: 3,000 =   71.799 ms
+              6,000 =  248.747 ms
+             12,000 = 1,115.070 ms
+
+    response: 3,000 =  141.751 ms
+              6,000 =  553.243 ms
+             12,000 = 1,987.112 ms
+
+The 12,000-result response serialized to 4,849,870 bytes, comfortably below the
+16 MiB protocol cap. A fully valid 3,000-claim manifest reproduced the cost and
+passed ValidateManifest, so malformed input is not required.
+
+**Impact**: SealManifest and every SerializeResponse can consume seconds or
+tens of seconds on representable claim sets, reducing project time available
+for actual verification and amplifying cancellation latency.
+
+**Root cause**: Linear claim-ID lookup is nested inside sorting key selectors,
+and the same manifest index is rebuilt implicitly for every element.
+
+**Recommended fix**: After canonicalizing claims, construct one ordinal
+Dictionary from claim ID to `(CallableId, Ordinal)` and reuse it for callable
+IDs and response results. Preserve existing first-match/null semantics for
+malformed manifests using TryAdd and an explicit missing fallback. Complexity
+then becomes O(N + N log N).
+
+**Regression coverage**: Canonicalize a large valid reversed-order manifest and
+response; assert order, hash, and validation. Add a warmed size-doubling guard
+or generous 12k ceiling that rejects quadratic growth without making ordinary
+unit tests timing-fragile.
+
+**Confidence**: High; two independent public-path timing series show near-
+quadratic growth on valid inputs.
+
+### 498. [CONFIRMED] Same-seed fuzz runs duplicate a prefix while campaign totals count it twice
+
+**Location**: scripts/Invoke-SharpProofFuzzCampaign.ps1 around lines 65-73 and
+182-206; Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 149-155 and 191-198.
+
+**Description**: The campaign skips a retained seed only when the rotating run
+has at least as many cases. When the retained run is larger, it schedules both
+roles. Every runner starts at index zero and derives cases from the same
+`(seed,index)` pair, so the smaller rotating run is a byte-for-byte prefix of
+the retained run. Requested and observed totals nevertheless sum both runs.
+
+**Reproduction**: Checked-in retained seed 23063 has 1,000 cases. The supported
+arguments `-RotatingSeed 23063 -RotatingCases 10` produced:
+
+    scheduled runs=rotating-23063:10,retained-23063:1000
+    reported requested/observed-on-pass=1010
+    unique seed:index coordinates=1000
+    duplicated scheduled coordinates=10
+    prefix identical=true
+
+With 999 rotating cases, the campaign would claim 1,999 executions while
+covering only 1,000 distinct case coordinates.
+
+**Impact**: Campaign evidence overstates distinct fuzz coverage and wastes a
+large fraction of its time budget. A seed collision can satisfy or approach
+case-count targets with nearly half of the claimed diversity.
+
+**Root cause**: Seed deduplication is asymmetric and aggregation counts run
+observations rather than unique planned coordinates.
+
+**Recommended fix**: Group the plan by seed and run each seed once with the
+maximum requested count, or reject rotating/retained collisions. If provenance
+matters, annotate the merged run as satisfying both roles. Compute reported
+totals from the unique plan.
+
+**Regression coverage**: Same-seed rotating counts smaller than, equal to, and
+larger than retained must each yield one max-count run; distinct seeds yield two
+and sum. Assert unique `(seed,index)` coordinates and matching requested/actual
+totals.
+
+**Confidence**: High; generated case-seed prefixes were identical and the
+production planning arithmetic reported the duplicated work as additional
+coverage.
+
+### 499. [CONFIRMED] Developer-check planning accepts duplicate package-project graphs
+
+**Location**: scripts/Get-SharpProofDevCheckPlan.ps1 around line 11 and its
+documentation consumer scripts/Generate-Readme.ps1 around line 886; authority
+file scripts/package-projects.json.
+
+**Description**: The developer-check planner parses the package-project
+authority with bare ConvertFrom-Json and validates only schema version and the
+collapsed retained array. Duplicate `projects` properties can present two
+contradictory package graphs while the plan, its exact-ID regression, and README
+verification certify only the last one.
+
+**Reproduction**: A fixture declared a three-project Ghost graph followed by
+the real three-project graph under a second `projects` key. Both consumers
+succeeded:
+
+    PLAN_EXIT=0
+    PACK_IDS=package-pack:SharpProof.Attributes,package-pack:SharpProof.Package,
+             package-pack:SharpProof.Verifier
+    DOCUMENTATION_VERIFY_EXIT=0
+    SharpProof documentation matches ...
+
+**Impact**: The checked-in package authority can be ambiguous while developer
+and documentation gates remain green. Reviewers and parsers may act on different
+graphs, undermining claims that the exact package set was audited.
+
+**Root cause**: Last-property-wins parsing occurs before schema/count checks,
+and documentation trusts the resulting plan instead of independently validating
+the authority's structure.
+
+**Recommended fix**: Introduce one strict package-manifest loader that
+recursively rejects duplicate properties and validates the exact ordered
+project set. Use it in every PowerShell and C# consumer.
+
+**Regression coverage**: Run Debug and Release plan generation plus
+documentation verification against duplicate-array fixtures; require a
+path-qualified duplicate error before plan emission. Cover case variants and a
+valid control.
+
+**Confidence**: High; both production consumers accepted the contradictory
+fixture and emitted the final graph.
+
+### 500. [CONFIRMED] Synchronous using omits the hidden concrete Dispose precondition call
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
+GetCalls around lines 591-624. Source-aware disposal resolution exists in
+SharpProof.Effects/UsingDisposalEffectResolver.cs around lines 5-9, 38-89,
+237-312, and 452-508.
+
+**Description**: Requires discovery has no IUsingOperation or
+IUsingDeclarationOperation disposal model. Source operation trees expose no
+ordinary concrete Dispose invocation. The lowered CFG may expose an implicit
+IDisposable.Dispose call, but it loses the concrete receiver implementation;
+Effects compensates with a source-aware resolver while Requires does not.
+
+**Reproduction**: A sealed Resource implements IDisposable and its concrete
+Dispose contains `Contract.Requires(false)`. Runtime counters showed generated
+using disposal and a direct Dispose call each execute once. Analyzer output was:
+
+    SP0027 at direct Dispose call only
+    no diagnostic at using statement
+
+**Impact**: An admitted synchronous using statement can silently invoke an
+always-invalid concrete precondition at scope exit. Spelling the same call
+directly changes the verdict.
+
+**Root cause**: Potential-owner screening and call discovery omit source-level
+disposal semantics, and the generic lowered operation cannot recover the
+concrete method.
+
+**Recommended fix**: Reuse or factor the Effects resource inventory and concrete
+Dispose resolution. For each reachable, acquired, nonnull resource, create a
+receiver-only Requires candidate at the resource/declaration location, preserve
+acquisition completion and reverse disposal order, and stop later candidates
+when an earlier reverse-order Dispose cannot complete. Keep async disposal
+separate until modeled.
+
+**Regression coverage**: Cover using statement and declaration parity,
+Requires(false) concrete Dispose, direct-call parity, definitely-null resource,
+non-completing acquisition, multiple-resource reverse order, and
+interface-typed/concrete initializer resolution.
+
+**Confidence**: High; executable analyzer/runtime differentials isolate the
+missing hidden call, and the repository's Effects code documents the exact
+lowered-CFG information loss.
+
+### 501. [CONFIRMED] Escaping lambdas in field and property initializers skip Requires analysis
+
+**Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around lines
+113-123 and 166-171; AnalyzerFeaturePipeline.cs around lines 5-24, 447-552;
+RequiresCallSiteDiscovery.cs around lines 815-823; ordinary callable policy in
+RequiresCallSiteTreeAnalyzer.cs around lines 252-280, 370-395, and 537-559.
+
+**Description**: Member-initializer analysis enumerates executable unflowed
+descendants, but that enumeration immediately stops at anonymous and local
+functions. Nested-callable syntax registration validates only control
+attributes. Thus a lambda stored by a field or auto-property initializer is
+never analyzed, even though ordinary method-body policy deliberately analyzes
+anonymous functions that escape rather than remain in a local.
+
+**Reproduction**: An explicit-constructor sealed class initialized:
+
+    readonly Func<int> Field = () => Positive(-3);
+    Func<int> Property { get; } = () => Positive(-4);
+
+where Positive Requires value > 0. Canonical analyzer results:
+
+    direct initializer control:        1 SP0027
+    method-returned lambda control:    1 SP0027
+    uninvoked local lambda control:    0 SP0027
+    field/property initializer lambdas:0 SP0027 (expected 2)
+
+Compiler diagnostics were zero in every case.
+
+**Impact**: Requires violations in common callback/factory fields and properties
+are silently missed, while the same escaping lambda returned from a method is
+reported. Multiple constructors do not repair the omission.
+
+**Root cause**: Initializer traversal treats callable boundaries as terminal but
+does not hand escaped callables to their own CFG-based analysis path.
+
+**Recommended fix**: Add callable-aware initializer discovery. Analyze top-level
+non-expression-tree anonymous functions stored by member initializers as escaped
+callables using their normalized symbol and own CFG, reusing
+RequiresCallSiteTreeAnalyzer policy. Gate on applicable unsuppressed constructor
+activation and use existing session/location deduplication so multiple
+constructors do not duplicate findings. Do not model the lambda body as running
+during initialization.
+
+**Regression coverage**: Field and auto-property lambdas with two constructors
+must emit exactly two diagnostics at invocation spans. Retain direct initializer,
+valid lambda, unreachable lambda branch, uninvoked local lambda, and
+Expression<Func<T>> controls. Add field-like event coverage if supported.
+
+**Confidence**: High; exact-baseline canonical execution held activation and
+configuration constant and failed only the two initializer-lambda sites.
+
+### 502. [CONFIRMED] Coverage receipts accept JSON string false as a passing result
+
+**Location**: scripts/Write-SharpProofQualificationReceipt.ps1 around lines
+79-82; trusted downstream by scripts/Invoke-SharpProofReleaseContainer.ps1
+around lines 184-197.
+
+**Description**: Coverage evidence is admitted using
+`[bool]$evidence.passed`. PowerShell converts every nonempty string, including
+the JSON string `"false"`, to true. The receipt writer then emits
+`status:"passed"`, and final release qualification trusts the receipt and its
+evidence hash without rechecking the original property's JSON type.
+
+**Reproduction**: A full-script canonical-container fixture supplied otherwise
+valid evidence with `"passed":"false"` and reported:
+
+    EvidencePassedJsonType = System.String
+    EvidencePassedValue    = false
+    PowerShellBooleanCast  = true
+    ReceiptWritten         = true
+    ReceiptStatus          = passed
+    ReceiptGate            = coverage
+
+**Impact**: Malformed failed coverage can satisfy the release qualification
+gate and produce a durable passed receipt.
+
+**Root cause**: Truthiness coercion is used where the evidence schema requires
+an exact JSON Boolean.
+
+**Recommended fix**: Require the property to exist, require its runtime value to
+be System.Boolean, and require that Boolean to equal true. Reject without
+creating or replacing a receipt; never coerce the value.
+
+**Regression coverage**: Accept JSON Boolean true. Reject Boolean false,
+strings `"true"` and `"false"`, numbers, null, and a missing property. Prove
+rejection cannot replace a last-known-good receipt and final qualification
+cannot accept one derived from malformed coverage.
+
+**Confidence**: High; the exact baseline script wrote a passed receipt from a
+string false value in a disposable canonical Git fixture.
+
+### 503. [CONFIRMED] Reused SMT contexts double-count cumulative Z3 resource snapshots
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 176-196;
+SharpProof.Worker/MethodResourceBudget.cs around lines 12-18, 31, and 40-46;
+lane reuse in SharpProof.Worker/SharpProofWorker.cs around lines 298-300 and
+568-581.
+
+**Description**: Each query creates a new solver on a reused Z3 Context.
+IrSmtBackend treats that solver's `rlimit count` statistic as a fresh per-query
+delta and adds the entire value to its cumulative total. Z3 actually reports a
+context-cumulative snapshot, so successive snapshots are counted repeatedly.
+MethodResourceBudget consumes differences from the inflated backend total.
+
+**Reproduction**: With QueryRlimit=10 and a method limit of 100, identical
+trivial UNSAT queries produced backend totals:
+
+    10, 30, 60, 100
+
+The exact production budget admitted queries 1-4 and refused query 5. Raw Z3
+solvers on one Context reported snapshots `3, 6, 9, 12`, confirming cumulative
+semantics. Correct totals would be `10, 20, 30, 40`, and ten 10-unit queries
+should fit.
+
+**Impact**: ResourceLimit/Unknown results and skipped later claims begin after
+only the second query. A late method on an aged lane can have its first query
+charged for much of the backend's previous lifetime, reducing verification
+coverage nondeterministically by lane history.
+
+**Root cause**: AccountResources assumes fresh-solver statistics are fresh
+deltas, while the native counter belongs to the shared Context. Existing tests
+assert only monotonicity and therefore bless triangular growth.
+
+**Recommended fix**: Retain the previous native context snapshot and add only
+`observed - lastObserved`, or expose the absolute context count directly. Define
+reset, wrap, and backend-renewal behavior explicitly, and compose this with the
+overflow handling in finding 485.
+
+**Regression coverage**: Feed cumulative snapshots 10/20/30 and require public
+total 30. Reused identical queries must grow linearly; a 100-unit method budget
+must admit ten 10-unit queries. Start a new method on an aged lane and charge
+only its new work. Cover context renewal/reset.
+
+**Confidence**: High; raw native statistics and the exact production budget
+reproduced premature exhaustion.
+
+### 504. [CONFIRMED] Failed pack preflights leave the prior canonical release bundle live
+
+**Location**: scripts/Invoke-SharpProofContainer.ps1 pack branch around lines
+361-401; default pilots consumer around lines 411-415. Staging/publication occurs
+later in scripts/New-SharpProofReleaseEvidence.ps1 around lines 561-570,
+751-810, and 927-973.
+
+**Description**: `pack` runs README verification and solution restore before it
+invalidates or recreates `artifacts/container-packages`. If either preflight
+fails, the prior package/SBOM/checksum bundle remains at the canonical path.
+The atomic publisher is never entered, so it cannot retire or mark the previous
+success. Default pilots and external collectors continue to see the old bundle
+as current.
+
+**Reproduction**: A canonical-image fixture seeded the three canonical evidence
+files, then forced README verification to fail before publication. `pack`
+exited 1, but SharpProof.spdx.json, SharpProof.release.json, and SHA256SUMS all
+survived byte-for-byte with identical pre/post SHA-256:
+
+    19814A92D86A085823D90234A89C3C2C528493D30F2364614FE852B4D7A7441A
+
+**Impact**: The command itself correctly fails, but a reused local/CI workspace
+continues advertising stale package evidence as the canonical latest result.
+A later default pilots invocation can consume it. Same-commit retries are not
+distinguishable because release identity and SBOM timestamps are commit-based,
+not attempt-based.
+
+**Root cause**: Caller-owned canonical output is invalidated only after two
+failure-prone preflights. Publication has no current-attempt marker outside its
+eventual staging transaction.
+
+**Recommended fix**: Make pack output attempt-scoped. Before any pack preflight,
+atomically clear the canonical `current` marker or archive the old bundle as
+explicitly historical. Build into a fresh attempt directory and publish current
+only after all checks succeed. If prior output is retained, write a failed
+current-attempt status and make default consumers refuse it.
+
+**Regression coverage**: Seed a valid same-commit bundle, force README and
+restore failures independently, and require nonzero pack plus absent/failed
+current output; default pilots must refuse it. A successful retry must atomically
+publish a new current bundle. Distinguish this ordinary preflight path from the
+interrupted directory-swap case in deferred finding 337.
+
+**Confidence**: High; an unchanged production script failed normally while all
+canonical old evidence survived unchanged.
+
+### 505. [CONFIRMED] Custom await omits the hidden GetAwaiter precondition call
+
+**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
+GetCalls around lines 591-624. The equivalent semantic protocol is implemented
+in SharpProof.Effects/OperationEffectScanner.Expressions.cs around lines
+216-284 and ExceptionHandlerReachability.cs around lines 856-959.
+
+**Description**: Requires discovery has no IAwaitOperation protocol path, and
+Roslyn does not expose await lowering as ordinary child IInvocationOperations.
+The compiler-selected GetAwaiter method is therefore absent from precondition
+checking, although Effects resolves it through GetAwaitExpressionInfo and
+models the protocol order.
+
+**Reproduction**: A custom Awaitable.GetAwaiter contains
+`Contract.Requires(false)`, with an already-completed awaiter. Runtime counters
+showed generated await and direct invocation each call GetAwaiter exactly once.
+Analyzer output contained one SP0027 only at the explicit call; the await
+expression produced none.
+
+**Impact**: A custom awaitable can hide an always-false precondition behind an
+admitted language construct. Spelling the semantically identical GetAwaiter
+call directly changes the analyzer verdict.
+
+**Root cause**: Hidden await-protocol methods are not included in Requires
+call-site discovery, and the existing Effects semantic inventory is not shared.
+
+**Recommended fix**: Resolve GetAwaitExpressionInfo.GetAwaiterMethod, map the
+await operand as receiver or reduced/static extension argument, and create a
+candidate after operand evaluation can complete. Use the await expression as
+the diagnostic location and existing flow/replay rules. Factor the symbol
+selection with Effects. Add IsCompleted/GetResult only with an explicit
+synthetic awaiter receiver and completion sequence.
+
+**Regression coverage**: Custom GetAwaiter with Requires(false) under await must
+emit one SP0027, matching a direct-call control. Add non-completing operand,
+valid method, reduced extension, and synchronous-completion controls; separately
+pin protocol ordering if later edges are modeled.
+
+**Confidence**: High; executable analyzer/runtime probes isolated the missing
+compiler-hidden call and matched the repository's existing Effects inventory.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
