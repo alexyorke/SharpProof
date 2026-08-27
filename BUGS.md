@@ -72,49 +72,6 @@ documented suppression behavior.
 **Confidence**: High; reproduced with an exact analyzer harness outside the
 repository and traced through all registered nested-callable analysis paths.
 
-### 430. [CONFIRMED] Failed performance-gate preflight can leave stale passing evidence for CI upload
-
-**Location**: scripts/Invoke-SharpProofGateEvidence.ps1 around lines 23-40;
-scripts/Invoke-SharpProofContainer.ps1 around lines 43-44, 80-90, and 237-245;
-eng/container/entrypoint.sh around lines 178-188; .github/workflows/ci.yml
-around lines 37-52.
-
-**Description**: Invoke-SharpProofGateEvidence computes test-project
-parallelism before it resolves and purges its output, raw-output, and stderr
-files. Its pr-gates and performance callers perform additional failure-prone
-parallelism, restore, and build work before invoking that producer. Container
-entry preserves the artifacts directory, and CI uploads it with an
-always-running artifact step. A failed rerun can therefore retain and upload a
-previous successful performance.json.
-
-**Reproduction**: In a disposable minimal repository, seed all three owned
-evidence files and use a contract with CPU divisor 0 so
-Get-SharpProofTestProjectParallelism fails. The script exits 1 with "The
-test-project CPU divisor must be positive", while output, raw output, and stderr
-sentinels all remain present.
-
-**Impact**: A later failed gate can expose stale passing evidence to CI,
-operators, or downstream automation. Embedded identity may let a careful
-consumer detect staleness, but the artifact lifecycle itself incorrectly
-preserves a prior success.
-
-**Root cause**: Evidence invalidation is nested inside a producer reached only
-after caller preflight/build work, and a later parallelism preflight was placed
-above even the producer's own purge.
-
-**Recommended fix**: Centralize owned performance-evidence invalidation or a
-failure tombstone at command entry before parallelism, restore, and build.
-Also move the producer's parallelism lookup below that purge. Ensure every
-entrypoint that owns these paths uses the same lifecycle helper.
-
-**Regression coverage**: Seed all owned outputs in a persistent-artifacts
-fixture, independently force producer-parallelism failure and outer-build
-failure, and assert no prior success survives. Replace the current
-contains-only architecture assertion with an executable ordering fixture.
-
-**Confidence**: High; the agent reproduced the stale files in a temp fixture
-and traced the complete persistent-artifact and always-upload path.
-
 ### 431. [CONFIRMED] API-spec generators accept ambiguous duplicate JSON properties
 
 **Location**: scripts/Generate-ApiSpecCatalog.ps1 around line 584;
