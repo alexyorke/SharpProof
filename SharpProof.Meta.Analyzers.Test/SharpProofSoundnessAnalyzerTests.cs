@@ -383,6 +383,41 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesTrackAllConditionalReachingValues()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache : ISemanticCache {
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                void Siblings(ProofCache cache, bool first, bool second) {
+                    var answer = Answer.Unknown;
+                    if (first) answer = Answer.Proven;
+                    if (second) answer = Answer.Proven;
+                    cache.Write(answer);
+                }
+                void Switch(ProofCache cache, int choice) {
+                    var answer = Answer.Proven;
+                    switch (choice) {
+                        case 0: answer = Answer.Unknown; break;
+                        case 1: answer = Answer.Proven; break;
+                        case 2: answer = Answer.Proven; break;
+                    }
+                    cache.Write(answer);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task SemanticCacheMarkerIsRequiredForNameIndependentDetection()
     {
         var diagnostics = await Analyze(

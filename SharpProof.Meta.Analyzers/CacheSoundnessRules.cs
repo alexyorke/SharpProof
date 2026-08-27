@@ -288,8 +288,24 @@ internal static class CacheSoundnessRules
             }
             if (IsConditionallyExecuted(last, root) && writes.Length > 1)
             {
-                return IsNonCacheableSemanticAnswer(writes[writes.Length - 2], root, resolving) ||
-                       IsNonCacheableSemanticAnswer(last, root, resolving);
+                for (var index = writes.Length - 2; index >= 0; index--)
+                {
+                    if (IsNonCacheableSemanticAnswer(
+                            writes[index], root, resolving))
+                    {
+                        return true;
+                    }
+
+                    // Once an unconditional write is reached it dominates
+                    // the later conditional chain; older writes cannot reach
+                    // the cache without passing through that value.
+                    if (!IsConditionallyExecuted(writes[index], root))
+                    {
+                        break;
+                    }
+                }
+
+                return IsNonCacheableSemanticAnswer(last, root, resolving);
             }
             return IsNonCacheableSemanticAnswer(last, root, resolving);
         }
