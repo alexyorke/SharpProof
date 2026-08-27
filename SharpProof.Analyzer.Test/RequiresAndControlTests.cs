@@ -346,6 +346,42 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task NonCompletingInitializersSuppressUnreachableConstructorCalls()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Fail() =>
+                    throw new InvalidOperationException();
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base {
+                protected Base(int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+            public sealed class Explicit : Base {
+                private int stop = Guard.Fail();
+                public Explicit() : base(-1) {
+                    Guard.Positive(-2);
+                }
+            }
+            public sealed class Primary(int marker) : Base(-3) {
+                private int stop = Guard.Fail();
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task PartialTypeInitializersRespectCompilationOrder()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(

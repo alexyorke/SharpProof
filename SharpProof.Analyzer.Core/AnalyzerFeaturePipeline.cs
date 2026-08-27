@@ -103,6 +103,17 @@ internal static partial class AnalyzerFeaturePipeline
 
         var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(context.Compilation, declaration.SyntaxTree);
+        if (method.MethodKind == MethodKind.Constructor &&
+            !CanReachConstructorEntry(
+                method,
+                semanticModel,
+                context.CancellationToken))
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.NotApplicable);
+            return;
+        }
         var outcome = RequiresCallSiteAnalyzer.Analyze(
             method,
             declaration,
@@ -330,6 +341,12 @@ internal static partial class AnalyzerFeaturePipeline
 
         var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
             context.Compilation, declaration.SyntaxTree);
+        var constructorEntryReachable =
+            method.MethodKind != MethodKind.Constructor ||
+            CanReachConstructorEntry(
+                method,
+                semanticModel,
+                context.CancellationToken);
         var outcome = AnalyzerSemanticOutcome.NotApplicable;
         var subsetIncompleteReported = false;
         var classifySubset = selection.Any;
@@ -372,7 +389,8 @@ internal static partial class AnalyzerFeaturePipeline
         }
 
         if (session.Configuration.ContractsEnabled &&
-            !IsNestedCallable(method))
+            !IsNestedCallable(method) &&
+            constructorEntryReachable)
         {
             var requiresOutcome =
                 RequiresCallSiteAnalyzer.Analyze(
@@ -468,6 +486,17 @@ internal static partial class AnalyzerFeaturePipeline
                 context.CancellationToken) ||
             !session.TryBeginRequiresCallSiteAnalysis(constructor))
         {
+            return;
+        }
+
+        if (!CanReachConstructorEntry(
+                constructor,
+                context.SemanticModel,
+                context.CancellationToken))
+        {
+            session.RecordSemanticOutcome(
+                constructor,
+                AnalyzerSemanticOutcome.NotApplicable);
             return;
         }
 
@@ -664,6 +693,63 @@ internal static partial class AnalyzerFeaturePipeline
                     member.Span == targetMember.Span)
                 {
                     return true;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static bool CanReachConstructorEntry(
+        IMethodSymbol constructor,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (constructor.MethodKind != MethodKind.Constructor ||
+            constructor.ContainingType is not { } containingType)
+        {
+            return true;
+        }
+
+        var syntaxTrees = semanticModel.Compilation.SyntaxTrees.ToImmutableArray();
+        var operationFacts = new DefiniteOperationFacts(
+            semanticModel.Compilation,
+            cancellationToken);
+        var declarations = containingType.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<TypeDeclarationSyntax>()
+            .OrderBy(typeDeclaration => Array.IndexOf(
+                syntaxTrees.ToArray(), typeDeclaration.SyntaxTree))
+            .ThenBy(static typeDeclaration => typeDeclaration.SpanStart);
+        foreach (var typeDeclaration in declarations)
+        {
+            foreach (var member in typeDeclaration.Members)
+            {
+                foreach (var initializer in GetMemberInitializers(member))
+                {
+                    var initializerModel = initializer.SyntaxTree ==
+                        semanticModel.SyntaxTree
+                        ? semanticModel
+                        : SharpProof.Frontend.Host.CompilationModelProvider
+                            .GetSemanticModel(
+                                semanticModel.Compilation,
+                                initializer.SyntaxTree);
+                    if (!HasMatchingInitializationKind(
+                            initializer,
+                            constructor.IsStatic,
+                            initializerModel,
+                            cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    var operation = initializerModel.GetOperation(
+                        initializer.Value,
+                        cancellationToken);
+                    if (operation != null &&
+                        !operationFacts.MayCompleteNormally(operation))
+                    {
+                        return false;
+                    }
                 }
             }
         }
