@@ -1303,6 +1303,14 @@ source shape.
 6. A record has a user-declared PrintMembers with Contract.Requires(false).
    Generated ToString invokes it but is silent; an explicit ToString body
    produces SP0027. Runtime counters show both paths invoke PrintMembers once.
+7. A record has a user-declared copy constructor with
+   Contract.Requires(false). Generated clone code reached by a with expression
+   invokes it but is silent; explicit construction produces SP0027. Runtime
+   counters show both clone and explicit paths invoke the copy constructor.
+8. A record has a user-declared typed Equals with Contract.Requires(false).
+   Generated operator == invokes it for distinct non-null operands but is
+   silent; an explicit Equals call produces SP0027. Runtime counters show both
+   paths invoke Equals once.
 
 **Impact**: Real precondition violations on always-emitted record calls are
 missed, semantic reconciliation has no outcome for those synthesized methods,
@@ -1327,6 +1335,11 @@ its compiler-specified base target, then analyze synthetic calls for:
   generated order, preserving completion before subsequent reads/base calls.
 - synthesized ToString to the effective PrintMembers, modeling the generated
   fresh StringBuilder argument or failing closed when its facts are unknown.
+- generated clone to the effective record copy constructor, mapping clone
+  receiver this to copy-constructor parameter 0.
+- generated equality operator to effective typed Equals, preserving generated
+  null/reference-equality short circuits and mapping right as the argument;
+  operator != should reuse this edge without duplicate diagnostics.
 
 Use the derived record declaration as diagnostic location, honor generated-code
 and type/assembly suppression, and record each synthesized method outcome once.
@@ -1338,7 +1351,7 @@ derived records against a base member with Requires(false); require equivalent
 SP0027 results. Add derived-type suppression controls and satisfiable/no-contract
 controls.
 
-**Confidence**: High; all six edges were independently tested with analyzer
+**Confidence**: High; all eight edges were independently tested with analyzer
 differentials and runtime counters.
 
 ### 451. [CONFIRMED] Failed release-qualification reruns preserve the previous passing qualification.json
@@ -2367,6 +2380,570 @@ IsDefined remains unchanged.
 
 **Confidence**: High; self-verified with exact linear allocation counts and a
 zero-allocation type-specific control.
+
+### 475. [CONFIRMED] Diagnostic-descriptor generation and parity accept duplicate properties
+
+**Location**: scripts/Generate-DiagnosticDescriptors.ps1 around line 77 and
+eng/testing/DiagnosticDescriptorCatalogAssertions.cs around line 208.
+
+**Description**: ConvertFrom-Json collapses duplicate diagnostic properties
+before Assert-ExactMembers runs. The shared parity helper independently reads
+with JsonDocument.GetProperty, selecting the same last value. IDs, severity,
+enabled defaults, messages, and help links can therefore be contradictory while
+all three generated descriptor suites agree.
+
+**Reproduction**: Change the first descriptor to:
+
+    "defaultSeverity": "Error",
+    "defaultSeverity": "Info"
+
+Verification of all three copied outputs exits 0:
+
+    Verified deterministic diagnostic descriptors.
+
+The parity helper independently reports PARITY_VALUE=Info.
+
+**Impact**: A checked-in diagnostic catalog can be ambiguous while generation,
+acceptance, and every descriptor parity suite remain green.
+
+**Root cause**: Generator and parity authority share last-wins JSON behavior
+without a raw duplicate-name check.
+
+**Recommended fix**: Recursively reject duplicate names before conversion and
+reuse the strict reader in DiagnosticDescriptorCatalogAssertions.
+
+**Regression coverage**: Duplicate root schemaVersion, output property, and
+diagnostics[0].defaultSeverity; require path-qualified rejection before
+generated output checks.
+
+**Confidence**: High; self-verified across generator and parity paths.
+
+### 476. [CONFIRMED] Distinct unsupported parameters and locals collapse to one opaque value
+
+**Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
+lines 339, 492, and 503; SharpProof.Frontend/CompilerIdentityBridge.cs around
+line 38.
+
+**Description**: Unsupported parameter and local reads call Opaque without
+passing the referenced symbol. They are classified pure, and semantic identity
+then contains only operation kind and type. Distinct symbols of the same
+unsupported type are structurally interned as one PureOpaque term.
+
+**Reproduction**:
+
+    public static bool Target(double left, double right) => left == right;
+
+The probe reported:
+
+    runtime=False
+    exact=False abstention=UnsupportedType
+    left purity=Pure id=0
+    right purity=Pure id=0
+    same-parameter-term=True
+
+**Impact**: Partial IR loses independence between unrelated double, decimal,
+enum, custom-struct, and other unsupported values. Downstream analysis can
+propagate false equality/correlation.
+
+**Root cause**: Opaque identity omits IParameterSymbol or ILocalSymbol even
+though repeated reads of one symbol should share and reads of different symbols
+should not.
+
+**Recommended fix**: Pass operation.Parameter or operation.Local as the symbol
+argument for unsupported references.
+
+**Regression coverage**: For double left == right require distinct child terms;
+for left == left require shared child terms.
+
+**Confidence**: High; runtime and lowerer term identities were self-verified.
+
+### 477. [CONFIRMED] Generated enum-array uniqueness validation allocates on every call
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 874-879
+and generated calls in
+SharpProof.Worker.Protocol/ProtocolModel.generated.cs around lines 845-850.
+
+**Description**: AreDefinedUnique<T> uses a captured All predicate followed by
+Distinct().Count(). This creates closure/LINQ/iterator/hash-set allocations on
+every call and performs two passes. Generated callable validation invokes it
+twice for SelectedFeatures and SelectionReasons.
+
+**Reproduction**:
+
+    100,000 valid two-value checks = 40,000,000 bytes allocated
+    50,000 checks = 20,000,000 bytes allocated
+
+After subtracting the separately reported enum-boxing cost, this pipeline adds
+352 bytes per call. An explicit uniqueness comparison control allocates zero.
+
+**Impact**: Every valid callable pays twice; large manifests create tens of MiB
+of avoidable Gen0 churn. Invalid duplicate arrays are fully scanned before
+rejection.
+
+**Root cause**: General-purpose LINQ is used for tiny generated enum sets.
+
+**Recommended fix**: Replace with one explicit early-exit loop or generated
+bitmask checks that validate definition and uniqueness together. After the
+IsKnown boxing fix this path should be allocation-free.
+
+**Regression coverage**: Cover null/empty, required-nonempty, Unspecified,
+unknown, duplicate, and valid arrays, then require near-zero allocation for
+100,000 warmed two-value checks.
+
+**Confidence**: High; exact linear measurements and a zero-allocation control
+were self-verified.
+
+### 478. [CONFIRMED] Abrupt launcher termination strands worker-runtime snapshots in /tmp
+
+**Location**: SharpProof.Worker.Launcher/Program.cs around lines 57 and
+115-130; SharpProof.CompilerArtifact/CompilerManifestArtifact.cs around
+lines 53-104, 257-274, and 292-299;
+SharpProof.BuildTasks/VerifierProcessSupervisor.cs around lines 324-338.
+
+**Description**: The launcher creates a WorkerRuntimeClosureSnapshot before
+starting the worker. Snapshot creation copies up to 64 MiB into a random
+/tmp/SharpProof.Worker.Runtime.* directory, and the only deletion path is
+Dispose. Supervisor cleanup uses SIGSTOP then uncatchable SIGKILL. Abrupt
+launcher death bypasses the using/finally path, and repository-wide search finds
+no sweep or recovery for orphan snapshot directories.
+
+**Impact**: Cancellation, output-limit cleanup, OOM, or other abrupt launcher
+termination can strand one full runtime closure per invocation. Reused
+development containers can accumulate these until /tmp or Docker storage is
+exhausted.
+
+**Root cause**: Crash recovery relies solely on process-local Dispose even
+though the supported containment path deliberately uses SIGKILL.
+
+**Recommended fix**: Add owner leases and bounded startup reclamation for
+SharpProof.Worker.Runtime.* directories. Delete only snapshots whose owner is
+provably dead; keep Dispose as the normal fast path.
+
+**Regression coverage**: A helper creates a real snapshot, reports its path,
+then self-SIGKILLs. Confirm current debris, start a new snapshot and require
+reclamation, and prove a concurrently live helper's snapshot is never removed.
+Add a supervisor-cancellation integration case.
+
+**Confidence**: High source-closure evidence: the random directory has one
+normal deletion path, no scavenger, and production cleanup uses SIGKILL.
+
+### 479. [CONFIRMED] Unattributed backend cancellation is fabricated into MethodTimeout
+
+**Location**: SharpProof.Worker/CallableVerificationPolicy.cs around
+lines 57-68 and SharpProof.Worker/SharpProofWorker.cs around lines 302-323.
+
+**Description**: CallableVerificationPolicy catches every
+OperationCanceledException. After checking caller and project cancellation, it
+defaults every remaining exception to MethodTimeout without checking
+methodBoundary.IsCancellationRequested. SharpProofWorker then treats that
+fabricated timeout as an expired lane and disposes/renews or retires it.
+
+**Reproduction**: A backend returned a faulted task with
+OperationCanceledException while all supplied tokens remained live:
+
+    projectCanceled=False
+    callableReason=MethodTimeout
+    claimReason=MethodTimeout
+
+**Impact**: Backend/library bugs or internal cancellation are reported as
+timeouts, healthy lanes can be needlessly replaced, and factoryless lanes can
+retire remaining work as timed out. Run status and remediation are false.
+
+**Root cause**: The catch assumes every otherwise-unattributed cancellation
+came from CancelAfter.
+
+**Recommended fix**: Require methodBoundary.IsCancellationRequested before
+assigning MethodTimeout. Route unattributed OCE through ordinary
+InfrastructureFailure handling.
+
+**Regression coverage**: Faulted backend OCE plus all-live tokens must yield
+InfrastructureFailure and no renewal. Retain genuine caller, project, and
+method timeout cases.
+
+**Confidence**: High; self-verified in a canonical reflection probe with live
+tokens.
+
+### 480. [CONFIRMED] Analyzer diagnostic-wording generation accepts duplicate properties
+
+**Location**: scripts/Generate-AnalyzerDiagnosticCatalog.ps1 around line 21.
+
+**Description**: The catalog owning intrinsic and clause-placement wording is
+parsed directly with ConvertFrom-Json. Duplicate arguments or reasons disappear
+before mapping validation.
+
+**Reproduction**: Change the first intrinsic entry to:
+
+    "reason": "shadow intrinsic wording",
+    "reason": "Contract.Old cannot be nested inside Contract.Old"
+
+Verification exits 0:
+
+    Verified deterministic analyzer-diagnostic catalog.
+
+The parser selects the second wording.
+
+**Impact**: Contradictory diagnostic explanations can remain in the review
+source while generated runtime tests exercise only the last value.
+
+**Root cause**: No strict duplicate-property preflight precedes conversion.
+
+**Recommended fix**: Apply the shared recursive ordinal strict JSON loader.
+
+**Regression coverage**: Duplicate schemaVersion,
+intrinsicDescriptions[0].reason, placementDescriptions[0].description, and
+fallback properties; require path-qualified rejection before generation.
+
+**Confidence**: High; nested duplicate -Verify and parser selection were
+self-verified.
+
+### 481. [CONFIRMED] Dependency-audit restore failures preserve stale passing evidence with no freshness identity
+
+**Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 43-44 and
+330-338; scripts/Test-SharpProofDependencyAudit.ps1 around lines 193-362 and
+559-582; persistent artifacts in eng/container/entrypoint.sh around
+lines 178-188; .github/workflows/nightly.yml around lines 35-54.
+
+**Description**: Global parallelism and locked solution restore occur before
+the dependency-audit producer is invoked. Even inside the producer, inputs are
+resolved before old output deletion. A newly published NuGet advisory can make
+restore fail before deletion. Passing JSON contains no commit, audit timestamp,
+attempt ID, or feed-as-of identity.
+
+**Reproduction**: Seed dependency-audit.json in a temp persistent-artifact
+fixture and invoke the unchanged command without its solution, forcing outer
+restore failure:
+
+    EXIT_CODE=1
+    EVIDENCE_SURVIVED=True
+    HASH_UNCHANGED=True
+
+**Impact**: A later refresh can fail while the artifact directory still says
+the audit passed. Because the report has no commit or time, even a careful
+detached consumer cannot identify it as an earlier attempt. The job still
+fails, so this is stale attribution rather than automatic CI false green.
+
+**Root cause**: Invalidation is nested after caller restore and producer input
+validation; the schema omits freshness despite mutable advisory data.
+
+**Recommended fix**: Tombstone dependency-audit.json at command entry before
+parallelism/restore and at direct producer entry before input validation. Emit
+commit, checkedAtUtc, and attempt identity in pass/failure records and require
+them in consumers.
+
+**Regression coverage**: Seed a pass, then force outer restore, missing
+solution/config, and audit-wrapper/feed failures. Require no surviving pass and
+schema validation of commit/time/attempt identity.
+
+**Confidence**: High; self-verified byte-for-byte with unchanged scripts.
+
+### 482. [CONFIRMED] ProofKernel can return Proven after cancellation during UNSAT-core processing
+
+**Location**: SharpProof.Verify/ProofKernel.cs around lines 30, 36-60.
+
+**Description**: The last cancellation check occurs before status dispatch.
+CreateProven then performs full-core validation and projection passes with no
+token and no final checkpoint. Cancellation arriving during a large valid core
+is ignored and a semantic proof is returned.
+
+**Reproduction**: A completed fake backend returned a valid 20,000,000-entry
+core and canceled 10-15 ms after return, after the line-30 check:
+
+    outcome=ProvenOutcome; tokenCanceled=True; postCancelWorkMs=322
+    outcome=ProvenOutcome; tokenCanceled=True; postCancelWorkMs=553
+    control=OperationCanceledException
+
+**Impact**: Public ProofKernel violates cancellation and can return proof
+evidence hundreds of milliseconds after cancellation. Worker callers currently
+perform another check, mitigating the shipped worker path.
+
+**Root cause**: Cancellation is not threaded through post-solver proof
+construction.
+
+**Recommended fix**: Pass the token into CreateProven, combine core validation
+and projection into one token-aware pass, and add a final cancellation check
+immediately before returning every outcome branch.
+
+**Regression coverage**: Deterministically cancel during core enumeration and
+require OperationCanceledException with no ProvenOutcome. Retain cancel-before
+backend return and uncanceled duplicate/core semantics.
+
+**Confidence**: High; two canonical runs reproduced post-cancel proof returns
+with a working cancellation control.
+
+### 483. [CONFIRMED] Shared protocol collection validation allocates even for empty arrays
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 869-943
+and generated consumers in
+SharpProof.Worker.Protocol/ProtocolModel.generated.cs around lines 850-890.
+
+**Description**: CompleteUnique<T> combines a captured All predicate with
+Select(key).Distinct(s_ordinal).Count(). It backs distinct-nonblank, model,
+assumption, proof-core, claim-ID, and exception-hierarchy checks. The captured
+predicate allocates even for empty arrays, while nonempty arrays also allocate
+the LINQ iterator/hash-set pipeline.
+
+**Reproduction**:
+
+    two-string array: 376 bytes allocated per call
+    empty array:       88 bytes allocated per call
+    explicit loop:      0 bytes allocated per call
+
+Thus each otherwise-valid claim with default empty ProofCore and Model pays at
+least 176 bytes before broader model validation. At 100,000 claims that is
+17.6 MiB for empty checks alone.
+
+**Impact**: Common valid protocol shapes incur repeated Gen0 churn after
+parsing/deserialization, and large collections allocate iterator stacks and
+sets before duplicate rejection.
+
+**Root cause**: A generic captured LINQ pipeline is used for hot structural
+validation, including trivial empty/small cases.
+
+**Recommended fix**: Implement one explicit completeness/uniqueness pass.
+Return allocation-free for empty, directly compare one/small arrays, and lazily
+create one capacity-sized HashSet<string> only for larger inputs. Reject
+invalid/duplicate entries immediately.
+
+**Regression coverage**: Functional cases for null, empty, blank, duplicate,
+distinct, duplicate model variable, and duplicate assumption ID. Warm and run
+100,000 empty calls with a near-zero allocation requirement and bound two-item
+allocation.
+
+**Confidence**: High; exact empty and two-item allocation measurements matched
+zero-allocation explicit controls.
+
+### 484. [CONFIRMED] Abrupt MSBuild termination permanently strands per-invocation run directories
+
+**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
+around lines 136-147, 202-220, 239-243, and 316-317.
+
+**Description**: Every verification invocation creates a private
+`runs/<32-hex-guid>` directory and copies its compiler manifest into that
+directory. Normal target cleanup removes only the current invocation ID. There
+is no initialization-time, next-run, or Clean-time sweep for older run
+directories whose owning MSBuild process disappeared.
+
+**Reproduction**: The production target contains one removal of the current
+invocation directory and no removal or recovery reference for the runs root:
+
+    CurrentInvocationRemoveCount: 1
+    RunsRootRemoveCount:          0
+    RecoveryOrSweepReferences:   0
+
+The existing interrupted-cleanup package fixture demonstrates that a run
+directory persists when the current cleanup hook is prevented, but no later
+production target knows that abandoned GUID. Terminating MSBuild after run
+creation and starting another build leaves the old directory byte-for-byte
+unchanged while a new sibling is created and later removed.
+
+**Impact**: Repeated CI cancellation, host termination, or machine restart can
+grow `obj/.../SharpProof/runs` without bound. Each orphan may contain the
+compiler manifest and up to three protocol/evidence files whose individual
+limits reach 16 MiB, so ordinary interrupted builds can consume substantial
+workspace or cache storage.
+
+**Root cause**: Cleanup ownership is represented only by the in-memory current
+GUID. The on-disk directory has no lease, owner liveness record, age policy, or
+recovery authority that a later process can safely use.
+
+**Recommended fix**: Publish an invocation lease containing the authenticated
+owner/process identity and creation time. During initialization and Clean,
+perform a bounded scan of well-formed 32-hex child directories, reclaim only
+leases proven inactive, and preserve current concurrent invocations. Keep the
+normal exact-current-ID cleanup fast path.
+
+**Regression coverage**: Kill an owner after private files are published, run a
+new initialization, and require the inactive directory to be removed. Run two
+concurrent owners and prove neither reclaims the other. Cover malformed names,
+fresh leases, expired inactive leases, and Clean.
+
+**Confidence**: High; target inventory and an interrupted-cleanup fixture both
+confirm persistence, and the complete target has no stale-run recovery path.
+
+### 485. [CONFIRMED] Cumulative SMT resource accounting overflows after a valid solver result
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 67-74, 146-147, and
+193-202.
+
+**Description**: Resource accounting adds each fresh solver's `rlimit count` to
+a backend-lifetime signed Int64 with checked arithmetic. If the accumulated
+counter is near Int64.MaxValue, a later query can finish SAT or UNSAT and then
+throw ArithmeticException while recording its statistics. The general backend
+exception path converts that accounting overflow to Unknown /
+InfrastructureFailure and leaves the backend permanently unable to account for
+subsequent work.
+
+**Reproduction**: A reflection probe preloaded the backend counter and ran the
+same trivial unsatisfiable query:
+
+    control:               Unsatisfiable / None, counter=10
+    counter=Int64.MaxValue: Unknown / InfrastructureFailure,
+                            counter=9223372036854775807
+    ProofKernel outcome:    UnknownOutcome / InfrastructureFailure
+
+The solver had already returned the same valid UNSAT answer in both cases; only
+the post-query cumulative addition changed the verdict.
+
+**Impact**: A sufficiently long-lived or heavily reused backend can discard a
+completed proof/refutation as an infrastructure failure. Once the boundary is
+reached, trivial later queries also fail, turning accounting telemetry into an
+availability failure unrelated to solver correctness.
+
+**Root cause**: An unbounded lifetime statistic is stored in a bounded signed
+counter, and overflow is allowed to escape through the query-result exception
+mapping. Simple saturation is insufficient because future per-query deltas
+would become zero and could bypass budgets.
+
+**Recommended fix**: Track fresh-solver deltas with nonthrowing arithmetic and
+an explicit exhausted/overflow state, or use a wider accumulator. Preserve the
+completed solver status for the current query where its own resource budget was
+satisfied, then renew or reject later work with the typed ResourceLimit result.
+Never classify accounting overflow as InfrastructureFailure.
+
+**Regression coverage**: Exercise exact-boundary and one-past-boundary deltas,
+a near-cap trivial SAT and UNSAT query, renewal after exhaustion, and subsequent
+budget enforcement. Assert no wrapped or zero delta and no poisoned backend.
+
+**Confidence**: High; the boundary probe deterministically changed a completed
+UNSAT result solely through the checked accumulator.
+
+### 486. [CONFIRMED] The fuzz evidence cap can starve every later oracle
+
+**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around line 117 and
+SelectFailureKeys around lines 369-405.
+
+**Description**: Failure evidence is capped at 64 entries by scanning cases in
+ascending order, and each case's oracles in fixed finite-domain-SMT, frontend,
+then partial-SMT order. Selection stops globally as soon as 64 keys have been
+retained. There is no reservation or fairness rule per active oracle.
+
+**Reproduction**: An exact production-method probe supplied 64 early
+finite-domain mismatches followed by one independent frontend mismatch:
+
+    input finite mismatches=64 frontend mismatches=1 partial mismatches=0
+    retained total=64
+    retained finite=64
+    retained frontend=0
+    retained partial=0
+    last retained case=63 oracle=finite-domain-smt
+    omitted distinct failure case=64 oracle=frontend
+
+The frontend failure is reproducible and has a distinct key, but the selector
+emits neither its case evidence nor a count showing that it was omitted.
+
+**Impact**: One frequent early defect can make independent frontend or
+partial-SMT defects invisible in campaign artifacts. The campaign still records
+failures, but downstream triage lacks the input, oracle, and minimized evidence
+needed to reproduce the starved defect.
+
+**Root cause**: A single deterministic prefix cap is applied across heterogeneous
+oracles without stratification or omission accounting.
+
+**Recommended fix**: First reserve the earliest mismatch for every active
+oracle, then fill the remaining capacity with a deterministic round-robin or
+stratified selection. Publish total and omitted distinct-failure counts per
+oracle so the cap cannot silently erase a failure class.
+
+**Regression coverage**: Use the exact 65-case shape and require the retained
+set to contain the late frontend case plus at most 63 finite-domain cases. Add a
+late partial-SMT mismatch, deterministic ordering checks, fewer-than-cap and
+over-cap controls, and per-oracle omitted counts.
+
+**Confidence**: High; the production selector itself produced the raw starvation
+trace above.
+
+### 487. [CONFIRMED] Package-consumer validation bypasses all command timeouts
+
+**Location**: scripts/Test-SharpProofPackageConsumers.ps1, especially
+Invoke-ConsumerDotNet around lines 245-280, restore/query/build calls around
+lines 484-516, and the final package-test invocation around line 615.
+
+**Description**: The package-consumer helper invokes `dotnet` synchronously
+through PowerShell's call operator. It has no timeout parameter, deadline,
+process-tree kill path, or cancellation token. The final package test bypasses
+the helper and invokes raw `dotnet` too. Dead capture-output variables and an
+unused RepositoryRoot parameter are remnants of bounded-runner plumbing but do
+not constrain any process.
+
+**Reproduction**: In the canonical Linux image, the exact helper was extracted
+and its `dotnet` command was replaced by a blocking native program. The helper
+remained blocked until that program voluntarily completed, then returned
+success; no timer, signal, or child cleanup path ran. Workflow inspection found
+no enclosing step or job timeout for `package-consumers`.
+
+**Impact**: A stalled restore, MSBuild/analyzer invocation, package build, or
+test can hang Linux qualification and the portable Windows/macOS/Linux consumer
+gates until the CI service's external cancellation. The qualification receipt
+is never written, and any descendant process can remain alive after a shallow
+runner termination.
+
+**Root cause**: This script family did not adopt the repository's bounded
+cross-platform process runner. The separate samples timeout defect does not
+cover these consumer commands.
+
+**Recommended fix**: Add a validated timeout parameter and route every consumer
+command, including the final test, through a cross-platform ProcessStartInfo
+runner with asynchronous stdout/stderr draining, bounded WaitForExit,
+Kill(entireProcessTree: true), a final wait, and disposal. Preserve each
+command's exit code and output attribution.
+
+**Regression coverage**: Inject a fake dotnet that spawns a long-lived child.
+Exercise both the helper and final-test paths with a one-second budget and
+require prompt exit 124/failure, captured output, restored working directory,
+and no surviving process tree. Add fast success and nonzero-exit controls on
+Linux, Windows, and macOS runners.
+
+**Confidence**: High; the exact helper blocked under an executable probe, its
+blob matched the assigned baseline, and no outer workflow timeout exists.
+
+### 488. [CONFIRMED] Documentation verification accepts duplicate acceptance-contract properties
+
+**Location**: scripts/Generate-Readme.ps1 around line 725 while reading
+eng/acceptance/contract.json.
+
+**Description**: README generation and its verification mode parse the
+checked-in acceptance contract directly with ConvertFrom-Json. PowerShell keeps
+the last occurrence of a duplicate property, so a contradictory resource or
+concurrency authority can still produce documentation that the verifier
+certifies as current.
+
+**Reproduction**: In an isolated tracked-file copy, the acceptance contract was
+changed to contain:
+
+    "mutationParallelism": 99,
+    "mutationParallelism": 4
+
+The full documentation verification returned success:
+
+    DUPLICATE_AUTHORITY_VERIFY_EXIT=0
+    SharpProof documentation matches ... acceptance-contract versions ...
+    DOCUMENTATION_PARSE_VALUE=4
+
+The generated claim therefore described four deterministic lanes while the
+same authoritative object also declared 99.
+
+**Impact**: Documentation and container-documentation gates can publish a green
+receipt for an ambiguous acceptance authority. Operators cannot know which
+duplicate value reviewers intended, and future parsers with different duplicate
+handling can enforce a different resource contract than the README states.
+
+**Root cause**: The documentation generator trusts ConvertFrom-Json's
+last-property-wins behavior and performs claim comparison only after the
+ambiguous object has already been collapsed.
+
+**Recommended fix**: Parse every checked-in JSON authority consumed by the
+documentation validator with the repository's recursive duplicate-property
+detector before materialization. Include the JSON path and both property
+locations in the failure.
+
+**Regression coverage**: Run documentation verification against fixtures that
+duplicate `automation.mutationParallelism` and
+`container.defaultMemoryMiB`, including case variants, and require
+path-qualified rejection before any README claim comparison. Retain a valid
+contract control.
+
+**Confidence**: High; the full production verification command accepted the
+duplicate fixture and the parser control showed the selected last value.
 
 ## Deferred by explicit scope
 
