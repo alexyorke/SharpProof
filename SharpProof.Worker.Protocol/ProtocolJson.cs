@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -14,6 +15,8 @@ public static partial class WorkerProtocolJson
     private static readonly UTF8Encoding s_strictUtf8 = new(false, true);
     private static readonly StringComparer s_ordinal = StringComparer.Ordinal;
     private static readonly JsonSerializerOptions s_options = CreateOptions();
+    private const string ResponseTooLargeMessage =
+        "The serialized worker response exceeds the configured byte limit.";
 
     public static JsonSerializerOptions Options => new(s_options);
 
@@ -39,15 +42,16 @@ public static partial class WorkerProtocolJson
 
     internal static byte[] ReadBytesFile(string path)
     {
-        using var stream = OpenJsonStream(path);
-        var bytes = new byte[MaximumJsonBytes];
+        using var stream = OpenJsonStream(path, out var expectedLength);
+        var bytes = new byte[expectedLength];
         var length = 0;
         while (length < bytes.Length)
         {
             var read = stream.Read(bytes, length, bytes.Length - length);
             if (read == 0)
             {
-                break;
+                throw new InvalidDataException(
+                    "The JSON file changed while it was being read.");
             }
 
             length += read;
@@ -58,12 +62,6 @@ public static partial class WorkerProtocolJson
                 $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
         }
 
-        if (length == bytes.Length)
-        {
-            return bytes;
-        }
-
-        Array.Resize(ref bytes, length);
         return bytes;
     }
 
@@ -71,8 +69,8 @@ public static partial class WorkerProtocolJson
         string path, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var stream = OpenJsonStream(path);
-        var bytes = new byte[MaximumJsonBytes + 1];
+        using var stream = OpenJsonStream(path, out var expectedLength);
+        var bytes = new byte[expectedLength];
         var length = 0;
         while (length < bytes.Length)
         {
@@ -81,12 +79,16 @@ public static partial class WorkerProtocolJson
                 .ConfigureAwait(false);
             if (read == 0)
             {
-                break;
+                throw new InvalidDataException(
+                    "The JSON file changed while it was being read.");
             }
 
             length += read;
         }
-        if (length > MaximumJsonBytes)
+
+        var extra = new byte[1];
+        if (await stream.ReadAsync(extra, 0, 1, cancellationToken)
+                .ConfigureAwait(false) != 0)
         {
             throw new InvalidDataException(
                 $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
@@ -115,7 +117,9 @@ public static partial class WorkerProtocolJson
         return ComputeSha256(s_strictUtf8.GetBytes(SerializeRequest(request)));
     }
 
-    private static FileStream OpenJsonStream(string path)
+    private static FileStream OpenJsonStream(
+        string path,
+        out int expectedLength)
     {
         var stream = new FileStream(
             path,
@@ -131,14 +135,14 @@ public static partial class WorkerProtocolJson
                 $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
         }
 
+        expectedLength = checked((int)stream.Length);
         return stream;
     }
 
     public static string SerializeResponse(WorkerVerifyResponse response)
     {
         Canonicalize(response ?? throw new ArgumentNullException(nameof(response)));
-        var json = JsonSerializer.Serialize(response, s_options);
-        if (Encoding.UTF8.GetByteCount(json) <= MaximumJsonBytes)
+        if (TrySerializeResponse(response, out var json))
         {
             return json;
         }
@@ -149,14 +153,37 @@ public static partial class WorkerProtocolJson
         // an explicit null inheritance marker for the compact wire form before
         // refusing to publish an otherwise unrepresentable response.
         CompactClaimAssumptions(response);
-        json = JsonSerializer.Serialize(response, s_options);
-        if (Encoding.UTF8.GetByteCount(json) > MaximumJsonBytes)
+        if (!TrySerializeResponse(response, out json))
         {
             throw new InvalidDataException(
-                $"The serialized worker response exceeds the {MaximumJsonBytes} byte limit.");
+                $"{ResponseTooLargeMessage} ({MaximumJsonBytes} bytes).");
         }
 
         return json;
+    }
+
+    private static bool TrySerializeResponse(
+        WorkerVerifyResponse response,
+        out string json)
+    {
+        using var buffer = new BoundedJsonBufferWriter(MaximumJsonBytes);
+        try
+        {
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                JsonSerializer.Serialize(writer, response, s_options);
+                writer.Flush();
+            }
+
+            json = buffer.GetString();
+            return true;
+        }
+        catch (InvalidDataException exception) when (
+            exception.Message == ResponseTooLargeMessage)
+        {
+            json = string.Empty;
+            return false;
+        }
     }
 
     public static WorkerProtocolValidationResult Validate(WorkerVerifyRequest? request)
@@ -1069,4 +1096,72 @@ public static partial class WorkerProtocolJson
             throw new ArgumentException($"A lowercase SHA-256 {kind} hash is required.", parameter);
         }
     }
+
+    private sealed class BoundedJsonBufferWriter : IBufferWriter<byte>, IDisposable
+    {
+        private readonly byte[] _buffer;
+        private readonly int _maximumBytes;
+        private int _written;
+
+        internal BoundedJsonBufferWriter(int maximumBytes)
+        {
+            _maximumBytes = maximumBytes;
+            _buffer = ArrayPool<byte>.Shared.Rent(maximumBytes);
+        }
+
+        public void Advance(int count)
+        {
+            if (count < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+            if (count > _maximumBytes - _written)
+            {
+                throw new InvalidDataException(ResponseTooLargeMessage);
+            }
+
+            _written += count;
+        }
+
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            return GetMemoryCore(sizeHint);
+        }
+
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            return GetMemoryCore(sizeHint).Span;
+        }
+
+        internal string GetString()
+        {
+            return s_strictUtf8.GetString(_buffer, 0, _written);
+        }
+
+        public void Dispose()
+        {
+            ArrayPool<byte>.Shared.Return(_buffer);
+        }
+
+        private Memory<byte> GetMemoryCore(int sizeHint)
+        {
+            if (sizeHint < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sizeHint));
+            }
+            if (_written == _maximumBytes)
+            {
+                throw new InvalidDataException(ResponseTooLargeMessage);
+            }
+
+            var remaining = _maximumBytes - _written;
+            if (sizeHint > remaining)
+            {
+                throw new InvalidDataException(ResponseTooLargeMessage);
+            }
+
+            return _buffer.AsMemory(_written, remaining);
+        }
+    }
+
 }

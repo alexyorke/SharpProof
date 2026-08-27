@@ -83,6 +83,52 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public async Task BoundedReadersAllocateInProportionToSmallFiles()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "protocol-small-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, "{\"value\":1}", Encoding.UTF8);
+
+            _ = WorkerProtocolJson.ReadBytesFile(path);
+            _ = WorkerProtocolJson.ReadUtf8File(path);
+            _ = await WorkerProtocolJson.ReadUtf8FileAsync(path);
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            _ = WorkerProtocolJson.ReadBytesFile(path);
+            var bytesAllocated =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+            before = GC.GetAllocatedBytesForCurrentThread();
+            _ = WorkerProtocolJson.ReadUtf8File(path);
+            var textAllocated =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+            before = GC.GetAllocatedBytesForCurrentThread();
+            _ = await WorkerProtocolJson.ReadUtf8FileAsync(path);
+            var asyncAllocated =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(bytesAllocated, Is.LessThan(1_000_000));
+                Assert.That(textAllocated, Is.LessThan(1_000_000));
+                Assert.That(asyncAllocated, Is.LessThan(1_000_000));
+            }
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Test]
     public void OversizedAssumptionExpansionUsesAValidatedCompactClaimForm()
     {
         const int assumptionCount = 400;
@@ -122,10 +168,16 @@ public sealed class ProtocolJsonTests
 
         response.ClaimResults[0].Assumptions![0].Used = true;
         response.Summary = CreateSummary(response);
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var compactJson = WorkerProtocolJson.SerializeResponse(response);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
         Assert.That(
             Encoding.UTF8.GetByteCount(compactJson),
             Is.LessThanOrEqualTo(WorkerProtocolJson.MaximumJsonBytes));
+        Assert.That(
+            allocated,
+            Is.LessThan(64L * 1024 * 1024),
+            "Response serialization must not materialize the expanded payload.");
         var roundTrip = WorkerProtocolJson.DeserializeResponse(compactJson)!;
 
         using (Assert.EnterMultipleScope())
