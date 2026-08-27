@@ -595,6 +595,351 @@ valid emoji literal/model control.
 result, and kernel outcome in a bounded canonical probe. This is distinct from
 the null-concatenation defect because both null tags are false.
 
+### 436. [CONFIRMED] Failed pilots reruns preserve a stale passing report and qualification receipt
+
+**Location**: scripts/Test-SharpProofPilots.ps1 around lines 6, 12-19,
+92-106, and 371-377; scripts/Invoke-SharpProofContainer.ps1 around
+lines 411-422; scripts/Write-SharpProofQualificationReceipt.ps1 around
+lines 24-27, 97-106, and 120-149; persistent artifact setup in
+eng/container/entrypoint.sh around lines 178-188; release consumption in
+scripts/Invoke-SharpProofReleaseContainer.ps1 around lines 175-210.
+
+**Description**: Test-SharpProofPilots owns its report only at the end of a
+successful run. Imports, parallelism, catalog loading, package-source
+validation, clean-tree checks, and all pilot work can fail before the old report
+is touched. The container wrapper invokes the receipt writer only after the
+pilot script succeeds, and the receipt writer validates before overwriting.
+Consequently, a failed retry leaves both the previous passing pilot report and
+its qualification receipt intact.
+
+**Reproduction**: In a disposable fixture, seed the pilot report with
+stale-passing-report and the pilots qualification receipt with
+stale-passing-receipt, then invoke Test-SharpProofPilots.ps1 with a missing
+package source. The reporting agent observed:
+
+    EXIT_CODE=1
+    REPORT_SURVIVED=True
+    REPORT_CONTENT=stale-passing-report
+    RECEIPT_SURVIVED=True
+
+The failure occurred at package-source validation before either evidence file
+was owned by the new attempt.
+
+**Impact**: The retry correctly exits nonzero, but artifact presence and
+content still describe the previous passing attempt. On the same commit and
+package set, release qualification accepts a receipt whose commit, evidence
+hash, and package identity match; it has no attempt-recency field. A later or
+manual qualification can therefore accept the stale pair as if it represented
+the latest pilots attempt. Persistent container artifacts and always-upload CI
+steps expose the stale evidence even when fresh hosted runners reduce
+cross-workflow frequency.
+
+**Root cause**: Pilot report and receipt ownership is split across scripts, and
+both use publish-only-on-success without command-entry invalidation or an
+attempt-bound pending/failure state.
+
+**Recommended fix**: At pilots command entry, before parallelism, package, and
+clean-tree checks, atomically remove or replace both the report and receipt with
+pending/failure tombstones bound to the current commit and attempt identifier.
+Publish the passing report/receipt pair atomically only after all pilots
+succeed. Direct Test-SharpProofPilots.ps1 invocation must apply equivalent
+report invalidation.
+
+**Regression coverage**: In a persistent-artifacts fixture, create a valid
+same-commit report and receipt, rerun with a missing package source and
+separately with a child-pilot failure, require the old pair to be absent or
+failure-tombstoned, and prove release qualification rejects it.
+
+**Confidence**: High; reproduced in a temp-only fixture and traced through
+report production, receipt production, persistent storage, and release
+consumption.
+
+### 437. [CONFIRMED] The verifier supervisor outlives an abruptly terminated MSBuild host
+
+**Location**: SharpProof.BuildTasks/RunVerifier.cs around lines 205-225 and
+269-271; SharpProof.BuildTasks/VerifierProcessSupervisor.cs around lines 77-91
+and 140-143; contrast with worker-only parent protection in
+SharpProof.Host/LinuxWorkerProcess.cs around lines 146-166.
+
+**Description**: RunVerifier starts the supervisor under setsid but passes no
+expected parent PID. After sending the nonce gate it deliberately closes
+stdin, so later pipe EOF cannot represent MSBuild host death. The supervisor
+handles explicit SIGTERM and SIGINT, then waits for its direct child
+indefinitely. It neither installs PR_SET_PDEATHSIG nor checks getppid. Existing
+parent-death protection covers the worker when the launcher dies, not the full
+supervisor tree when MSBuild itself disappears.
+
+**Reproduction evidence**: A bounded canonical Linux lifecycle probe launched
+setsid sleep 15 from a short-lived parent shell. After the parent exited, the
+child remained alive:
+
+    setsid_child_survived_parent_exit=1
+
+This confirms that setsid supplies session isolation rather than
+parent-lifetime coupling, matching the supervisor's source path.
+
+**Impact**: An MSBuild crash, OOM, or forced termination can leave the
+supervisor, wrapper, launcher, and worker alive. They may continue consuming
+CPU and memory for the remaining project budget, or longer if the launcher
+wedges, after the owning build no longer exists.
+
+**Root cause**: The containment protocol authenticates and cleans descendants
+after task-directed termination but has no authenticated parent-liveness
+contract for abrupt host death.
+
+**Recommended fix**: Pass Environment.ProcessId to the supervisor separately
+from verifier arguments. Before arming, install prctl(PR_SET_PDEATHSIG,
+SIGTERM), register termination handling, then verify getppid still equals the
+supplied expected parent to close the setup race. If the parent is already
+gone, enter the existing cancellation/descendant-cleanup path without spawning
+the verifier child.
+
+**Regression coverage**: Add a Linux integration fixture whose short-lived
+parent arms a supervisor around a long-running helper, records supervisor and
+descendant PIDs, and exits abruptly. Require both PIDs to disappear within the
+cleanup bound. Add a parent-already-gone race case expecting exit 125 and no
+SharpProof.Armed/1 record.
+
+**Confidence**: High; the agent traced every lifecycle edge and reproduced the
+underlying setsid behavior in the canonical environment.
+
+### 438. [CONFIRMED] IR schema generation and parity accept duplicate JSON properties
+
+**Location**: scripts/Generate-IrModel.ps1 around line 168 and
+SharpProof.Ir.Test/IrModelSchemaTests.cs around line 71.
+
+**Description**: The authoritative IR vocabulary schema is parsed with
+ConvertFrom-Json, and the runtime parity test reads properties with
+JsonDocument.GetProperty. Both silently select the last duplicate object
+property. A contradictory schema can therefore pass both generated-source
+verification and runtime-shape parity.
+
+**Reproduction**: In an ephemeral canonical container, change the schema root
+to:
+
+    "schemaVersion": 999,
+    "schemaVersion": 1,
+
+Generate-IrModel.ps1 -Verify exits 0 and reports:
+
+    Verified SharpProof.Ir/IrModel.generated.cs and IR identifier aliases.
+
+The parity primitive independently returns PARITY_VALUE=1 for the same input.
+Because the last value matches generated output, neither authority detects the
+contradictory review source.
+
+**Impact**: Root or nested IR declarations can be ambiguous while all
+generation and parity gates remain green. Reviewers cannot know which duplicate
+was intended, and a last-wins edit can silently change the generated semantic
+vocabulary.
+
+**Root cause**: Neither PowerShell conversion nor .NET parity loading performs
+a recursive duplicate-property preflight.
+
+**Recommended fix**: Reuse a strict, ordinal JSON reader that walks every
+object and rejects duplicate names before conversion or GetProperty lookup.
+The declarative-model generator already provides a suitable implementation
+pattern.
+
+**Regression coverage**: Run the generator on temporary schemas with duplicate
+root schemaVersion and nested declaration name properties, require nonzero exit
+with path-qualified errors, and add a strict schema-reader parity test that
+fails before value comparison.
+
+**Confidence**: High; the reporting agent reproduced both the green generator
+verify and the green last-wins parity primitive in the canonical container.
+
+### 439. [CONFIRMED] Record copy constructors are treated as owners of instance member initializers
+
+**Location**: SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
+lines 472-487 and 524-552; existing record-copy identification in
+SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines 382-422.
+
+**Description**: AnalyzeMemberInitializer builds its candidate owners from
+every type.InstanceConstructor. That includes record copy constructors, but C#
+copy construction does not execute instance field or property initializers.
+The repository already encodes this semantic distinction when discovering
+implicit base-constructor calls, but member-initializer analysis does not reuse
+it.
+
+**Reproduction**: A record has an initializer calling Guard.Positive(-1), a
+suppressed ordinary constructor, and an unsuppressed user-declared protected
+copy constructor. The analyzer still emits:
+
+    SP0027|14|Call to 'Positive' violates precondition 'false'
+
+Since the only actual initializer-running constructor is suppressed, the
+diagnostic can only be attributed to the copy constructor. A runtime control
+prints:
+
+    ordinary=1
+    copy=0
+
+confirming that ordinary construction executes the initializer and with/copy
+construction does not.
+
+**Impact**: Records receive false SP0027 diagnostics and incorrect semantic
+outcomes for copy constructors. Constructor-level suppression or selection on
+the constructors that really execute initializers is defeated by a callable
+that never owns that initialization.
+
+**Root cause**: InstanceConstructors is consumed without filtering the special
+record-copy constructor, despite an existing IsRecordCopyConstructor predicate
+elsewhere in the analyzer.
+
+**Recommended fix**: Factor or reuse the existing record-copy predicate and
+exclude copy constructors only from AnalyzeMemberInitializer's owner list.
+Continue ordinary callable analysis of the copy-constructor body itself.
+
+**Regression coverage**: Add
+RecordCopyConstructorDoesNotOwnMemberInitializers with an invalid Requires call
+in a record field initializer, suppressed ordinary constructor, and
+unsuppressed explicit copy constructor, expecting no SP0027. Add an unsuppressed
+ordinary-constructor control expecting one SP0027.
+
+**Confidence**: High; the agent reproduced the diagnostic and separately
+verified the runtime initialization counts.
+
+### 440. [CONFIRMED] SPMETA010 misses semantic-cache writes through tuple deconstruction aliases
+
+**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
+lines 61-88 and 115-122.
+
+**Description**: Deconstruction analysis recurses element-by-element only when
+both the assignment target and right-hand side are ITupleOperation. When the
+right-hand side is a tuple-typed local reference or an invocation, the rule
+falls through with the whole tuple target. AnalyzeAssignmentTarget recognizes
+only property and field targets, so it never identifies the semantic-cache
+element inside the tuple.
+
+**Reproduction**: Assign a tuple containing Answer.TimedOut through either a
+local alias or factory:
+
+    (cache.Latest, stamp) = pair;
+    (cache.Latest, stamp) = Create();
+
+The receiver is ProofCache : ISemanticCache and Latest has the recognized
+SharpProof.Verify.Answer type. The canonical exact-source probe reported:
+
+    INLINE_TUPLE_CONTROL_SPMETA010_COUNT=1
+    LOCAL_TUPLE_ALIAS_SPMETA010_COUNT=0
+    FACTORY_TUPLE_ALIAS_SPMETA010_COUNT=0
+
+Compiler error counts were zero in all three cases. The inline tuple control
+proves the rule and vocabulary were active.
+
+**Impact**: A transient or abstaining answer can be stored in a semantic cache
+with no SPMETA010 by introducing a tuple local or tuple-returning factory. This
+is independent of the local reaching-write defect and survives a fix to the
+answer vocabulary.
+
+**Root cause**: Tuple target decomposition is coupled to one syntactic shape of
+the source value instead of the target's conversion/deconstruction mapping.
+
+**Recommended fix**: Decompose tuple targets regardless of whether the source
+is an inline tuple. Map source tuple elements through conversions, locals, and
+invocation return types; when an element value cannot be resolved, conservatively
+classify recognized semantic-answer storage as potentially noncacheable.
+
+**Regression coverage**: Add inline tuple, tuple-local alias, and factory-return
+cases with the same Answer.TimedOut element. Require one SPMETA010 for every
+unsafe cache property target and retain a fully cacheable tuple control.
+
+**Confidence**: High; self-verified in a canonical exact-source probe with
+positive inline and negative alias/factory controls.
+
+### 441. [CONFIRMED] ProofKernel swallows cancellation when a backend returns a null task
+
+**Location**: SharpProof.Verify/ProofKernel.cs around lines 13-30; existing
+tests in SharpProof.Verify.Test/ProofKernelTests.cs around lines 343 and 465.
+
+**Description**: The null-task guard returns
+Unknown(MalformedBackendResult) immediately, before the common
+cancellationToken.ThrowIfCancellationRequested checkpoint. If a backend
+cancels the supplied token during CheckAsync and then returns null, ProofKernel
+reports an ordinary semantic outcome after cancellation has already been
+requested.
+
+**Reproduction**: A disposable compiled probe used two backends that cancel the
+captured CancellationTokenSource during CheckAsync. The null-task backend
+returned null; the control returned a completed result:
+
+    NULL_TASK:RETURNED=UnknownOutcome
+    NULL_TASK:REASON=MalformedBackendResult
+    NULL_TASK:TOKEN_CANCELED=True
+    COMPLETED_TASK:THREW=OperationCanceledException
+
+**Impact**: Public ISmtBackend and ProofKernel callers can receive malformed
+semantic evidence instead of OperationCanceledException, violating the
+kernel's cancellation invariant. Current worker callers add cancellation
+checks, reducing the shipped worker impact, but the public kernel behavior is
+wrong.
+
+**Root cause**: Null-task mapping was implemented as an early return instead of
+flowing through the shared post-backend cancellation checkpoint.
+
+**Recommended fix**: Assign a null result when CheckAsync returns a null task,
+then execute the existing cancellation check and common null-result mapping.
+For example, await only when backendTask is non-null, call
+ThrowIfCancellationRequested, then map result == null to
+MalformedBackendResult.
+
+**Regression coverage**: Add a backend that cancels its source and returns
+null, expecting OperationCanceledException. Retain uncanceled-null-task
+coverage expecting Unknown(MalformedBackendResult) and pre-canceled-token
+coverage expecting cancellation.
+
+**Confidence**: High; reproduced with a compiled throwaway probe and a
+completed-task control that differs only in the return shape.
+
+### 442. [CONFIRMED] SAT string-model decoding does not observe cancellation
+
+**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 59, 247-273,
+422-455, and 457-515.
+
+**Description**: CreateSatisfiable, TryCreateValue, and DecodeString do not
+receive a CancellationToken. DecodeString accepts models with up to 1,000,000
+UTF-16 code units and evaluates every sequence element without a cancellation
+checkpoint. CheckAsync observes the token only after all of CheckCore,
+including model materialization, returns. Solver Context.Interrupt does not
+bound this post-solver managed decoding loop.
+
+**Reproduction**: A canonical immutable-snapshot probe forced a non-null
+1,000,000-code-unit satisfiable model with:
+
+    s == null || s.Length != 1_000_000
+
+Negating this goal requires a non-null string of exactly that length. With
+CancelAfter(10,000), the probe reported:
+
+    canceled; elapsedMs=13315; requested=True
+
+Cancellation overshot by 3.315 seconds while model work continued. A separate
+100,000-unit run under host contention remained active beyond its 60-second
+scheduled cancellation and had to be terminated.
+
+**Impact**: Cancellation of a public IrSmtBackend query is not prompt or
+bounded after SAT. Large symbolic string models can continue consuming CPU
+after the caller's budget expires. Current worker policy rejects string
+variables, so the present reachability is the public backend and direct
+clients, not a worker false verdict.
+
+**Root cause**: Cancellation is threaded through solving but stops at the
+model-construction boundary.
+
+**Recommended fix**: Pass the token through CreateSatisfiable, TryCreateValue,
+and DecodeString. Check it before evaluating length and inside every element
+iteration. Ensure cancellation disposes or abandons model work without
+poisoning the reusable backend/context.
+
+**Regression coverage**: Use a forced exact-length non-null string model and a
+deterministic decoder-entry hook. Cancel after the first decoded element,
+require OperationCanceledException before the second, then run a fresh query
+successfully on the same backend.
+
+**Confidence**: High; self-verified in the canonical Linux-amd64 image against
+an immutable ffe74fff1 snapshot with timed cancellation evidence.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
