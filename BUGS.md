@@ -72,47 +72,6 @@ documented suppression behavior.
 **Confidence**: High; reproduced with an exact analyzer harness outside the
 repository and traced through all registered nested-callable analysis paths.
 
-### 426. [CONFIRMED] Acceptance skip-mode tests abort before exercising status semantics because their fixture omits a required module
-
-**Location**: SharpProof.ArchitectureTest/AcceptanceScriptTests.cs around
-lines 139-180 and WriteHarness around line 237; eng/acceptance/Verify.ps1 around
-line 240.
-
-**Description**: WriteHarness constructs a temporary repository and copies
-SharpProof.FuzzEvidenceLifecycle.ps1, but it does not copy
-scripts/SharpProof.ContainerExecution.psm1. The retained preflight prefix of
-Verify.ps1 imports that module and calls Get-SharpProofTestProjectParallelism.
-Every SkipModesCannotProduceQualifyingAcceptanceEvidence case therefore exits
-during preflight, before the test can distinguish passed from incomplete
-evidence. The catch path rethrows a generic ScriptHalted exception, obscuring
-the missing fixture dependency.
-
-**Reproduction**: Run the four parameterizations of
-SkipModesCannotProduceQualifyingAcceptanceEvidence in the canonical container.
-All four exit 1 at VerifyHarness.ps1 instead of returning the expected evidence.
-In a disposable copy, adding only SharpProof.ContainerExecution.psm1 to the
-fixture made all AcceptanceScriptTests pass: 19 passed, 0 failed.
-
-**Impact**: The Architecture suite is red and the intended release-evidence
-invariant is not tested. A real regression in acceptance passed/incomplete
-classification could be hidden behind the fixture's earlier module failure.
-
-**Root cause**: Commit 785c64391 added a new Verify.ps1 module dependency
-without updating the source-slicing fixture. Later preflight refactoring kept
-the dependency in the retained prefix.
-
-**Recommended fix**: Copy SharpProof.ContainerExecution.psm1 into the fixture's
-scripts directory beside SharpProof.FuzzEvidenceLifecycle.ps1. Longer term,
-make the harness dependency list explicit or introduce a test seam after
-preflight so source slicing cannot silently omit imported modules.
-
-**Regression coverage**: Keep all four skip-mode cases, assert exit 0 and exact
-passed/incomplete evidence, and add a fixture-integrity assertion that every
-module imported by the retained prefix exists before execution.
-
-**Confidence**: High; reproduced red at HEAD and green in a disposable
-one-change probe.
-
 ### 430. [CONFIRMED] Failed performance-gate preflight can leave stale passing evidence for CI upload
 
 **Location**: scripts/Invoke-SharpProofGateEvidence.ps1 around lines 23-40;
