@@ -26,6 +26,7 @@ $temporaryDirectory = Join-Path (
     [IO.Path]::GetTempPath()) (
         'sharpproof-self-application-' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($temporaryDirectory) | Out-Null
+$payloadDirectory = Join-Path $temporaryDirectory 'payload'
 $baselineLog = Join-Path $temporaryDirectory 'baseline.log'
 $selfApplicationLog = Join-Path $temporaryDirectory 'self-application.log'
 
@@ -87,11 +88,64 @@ try {
         -Arguments $baselineArguments `
         -LogPath $baselineLog
 
+    [IO.Directory]::CreateDirectory($payloadDirectory) | Out-Null
+    $payloadSources = @(
+        [pscustomobject]@{
+            Source = Join-Path $repositoryRoot (
+                "SharpProof.Analyzer/bin/$Configuration/netstandard2.0/SharpProof.Analyzer.dll")
+            Name = 'SharpProof.Analyzer.dll'
+        },
+        [pscustomobject]@{
+            Source = Join-Path $repositoryRoot (
+                "SharpProof.ContractForGenerator/bin/$Configuration/netstandard2.0/SharpProof.ContractForGenerator.dll")
+            Name = 'SharpProof.ContractForGenerator.dll'
+        }
+    )
+    $corePayloadNames = @(
+        'SharpProof.Analyzer.Core.dll',
+        'SharpProof.Contracts.dll',
+        'SharpProof.Dataflow.dll',
+        'SharpProof.Effects.dll',
+        'SharpProof.Frontend.dll',
+        'SharpProof.Ir.dll',
+        'SharpProof.Specs.dll',
+        'System.Buffers.dll',
+        'System.Collections.Immutable.dll',
+        'System.Memory.dll',
+        'System.Numerics.Vectors.dll',
+        'System.Reflection.Metadata.dll',
+        'System.Runtime.CompilerServices.Unsafe.dll',
+        'System.Text.Encoding.CodePages.dll',
+        'System.Threading.Tasks.Extensions.dll'
+    )
+    foreach ($name in $corePayloadNames) {
+        $payloadSources += [pscustomobject]@{
+            Source = Join-Path $repositoryRoot (
+                "SharpProof.Analyzer.Core/bin/$Configuration/netstandard2.0/$name")
+            Name = $name
+        }
+    }
+    if ($IncludeMetaAnalyzers) {
+        $payloadSources += [pscustomobject]@{
+            Source = Join-Path $repositoryRoot (
+                "SharpProof.Meta.Analyzers/bin/$Configuration/netstandard2.0/SharpProof.Meta.Analyzers.dll")
+            Name = 'SharpProof.Meta.Analyzers.dll'
+        }
+    }
+    foreach ($payload in $payloadSources) {
+        if (-not (Test-Path -LiteralPath $payload.Source -PathType Leaf)) {
+            throw "Baseline build did not produce the self-application payload: $($payload.Source)"
+        }
+        Copy-Item -LiteralPath $payload.Source -Destination (
+            Join-Path $payloadDirectory $payload.Name)
+    }
+
     Write-Host 'Self-application analyzer/generator build: loading baseline payloads.'
     $selfApplicationArguments = @(
         $buildArguments +
         '/p:SharpProofSelfApply=true' +
-        "/p:SharpProofSelfApplyIncludeMetaAnalyzers=$includeMetaValue")
+        "/p:SharpProofSelfApplyIncludeMetaAnalyzers=$includeMetaValue" +
+        "/p:SharpProofSelfApplyPayloadDirectory=$payloadDirectory")
     Invoke-RequiredDotnet `
         -Arguments $selfApplicationArguments `
         -LogPath $selfApplicationLog
