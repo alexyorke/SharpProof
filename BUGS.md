@@ -162,58 +162,6 @@ module imported by the retained prefix exists before execution.
 **Confidence**: High; reproduced red at HEAD and green in a disposable
 one-change probe.
 
-### 427. [CONFIRMED] Structural complexity ratchets are stale and make the canonical Architecture suite fail
-
-**Location**: eng/acceptance/algorithm-size-ratchets.json and
-SharpProof.ArchitectureTest/ArchitectureTests.cs, with violations in
-SharpProof.Frontend/RoslynOperationLowerer.cs,
-SharpProof.Frontend/RoslynProgramLowerer.cs,
-SharpProof.Dataflow/ForwardDataflowAnalysis.cs,
-SharpProof.Dataflow/IntervalDomain.cs,
-SharpProof.Effects/OperationEffectScanner.cs, and
-SharpProof.Effects/OperationEffectScanner.Assignments.cs.
-
-**Description**: AlgorithmLayersStayWithinStructuralComplexityCaps fails with
-nine deterministic violations:
-
-- RoslynOperationLowerer.cs: 2960 expressions over 2792 and 155 decisions over
-  150.
-- VisitBinaryOperator: 353 expressions over 340.
-- RoslynProgramLowerer.cs: 1956 expressions over 1920.
-- ForwardDataflowAnalysis.cs: 512 expressions over 495.
-- ForwardDataflowAnalysis.AnalyzeCore: 353 expressions over 350.
-- IntervalDomain.Create: 173 expressions over 150.
-- OperationEffectScanner.cs: 265 decisions over 256.
-- OperationEffectScanner.Assignments.cs: 437 expressions over 435.
-
-The ratchet manifest was last updated by 3a04e6c8b, while all six measured
-sources changed afterward. The production-ceiling rationale test still passes,
-so the failure is not a Roslyn measurement or inventory anomaly.
-
-**Impact**: The canonical test suite cannot pass, preventing the architecture
-gate from distinguishing new complexity growth from already-landed growth.
-Simply leaving the suite red also removes the practical enforcement value of
-the ratchet for subsequent changes.
-
-**Root cause**: Recent correctness work increased measured expressions and
-decisions without decomposing affected members or reviewing the corresponding
-ratchets.
-
-**Recommended fix**: First extract and simplify the three member-level
-violations, especially VisitBinaryOperator, AnalyzeCore, and IntervalDomain.Create.
-Split file-level responsibilities where that materially reduces complexity.
-Only after review, update unavoidable file-level ceilings to the measured
-values with a recorded rationale. Do not raise the separate aggregate
-production contract and do not delete assertions.
-
-**Regression coverage**: Run the focused
-AlgorithmLayersStayWithinStructuralComplexityCaps test plus Frontend, Dataflow,
-and Effects suites after decomposition. Require the ratchet to pass from a clean
-canonical build.
-
-**Confidence**: High; reproduced by two agents and by the canonical full test
-run with identical metrics.
-
 ### 428. [CONFIRMED] Fuzz case-seed truncation silently repeats cases within supported campaigns
 
 **Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 152, 197, 263,
