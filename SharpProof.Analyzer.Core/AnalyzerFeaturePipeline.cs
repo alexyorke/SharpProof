@@ -21,6 +21,50 @@ internal static partial class AnalyzerFeaturePipeline
             session,
             context.ReportDiagnostic,
             context.CancellationToken);
+
+        var method = context.Node switch
+        {
+            LocalFunctionStatementSyntax localFunction =>
+                context.SemanticModel.GetDeclaredSymbol(
+                    localFunction,
+                    context.CancellationToken),
+            LambdaExpressionSyntax lambda =>
+                (context.SemanticModel.GetOperation(
+                    lambda,
+                    context.CancellationToken) as IAnonymousFunctionOperation)?.Symbol,
+            _ => null
+        };
+        if (method == null)
+        {
+            return;
+        }
+
+        var selection = GetSelection(
+            method,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
+        if (!selection.Any)
+        {
+            return;
+        }
+
+        if (selection.IsSuppressed)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Suppressed);
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+            AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+            method.Name,
+            LanguageSubsetAbstentionReason.UnsupportedCallable));
+        session.RecordSemanticOutcome(
+            method,
+            AnalyzerSemanticOutcome.Abstained);
     }
 
     internal static void AnalyzeUnselectedOperationBlock(

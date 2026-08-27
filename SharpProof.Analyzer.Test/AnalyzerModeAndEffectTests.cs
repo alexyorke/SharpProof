@@ -2182,6 +2182,66 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task SelectedNestedCallablesAbstainWhileUnselectedAndSuppressedStayQuiet()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int state;
+
+                public static void Outer() {
+                    [EnforcePure]
+                    static void SelectedLocal() { state = 1; }
+                    Action selectedLambda =
+                        [EnforcePure]
+                        () => state = 2;
+
+                    static void UnselectedLocal() { state = 3; }
+                    Action unselectedLambda = () => state = 4;
+
+                    [EnforcePure]
+                    [SharpProofSuppress("Reviewed nested callable.")]
+                    static void SuppressedLocal() { state = 5; }
+                    Action suppressedLambda =
+                        [EnforcePure, SharpProofSuppress("Reviewed nested callable.")]
+                        () => state = 6;
+
+                    SelectedLocal();
+                    selectedLambda();
+                    UnselectedLocal();
+                    unselectedLambda();
+                    SuppressedLocal();
+                    suppressedLambda();
+                }
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047", "SP0047"]));
+            Assert.That(
+                diagnostics.Select(diagnostic => diagnostic.GetMessage(
+                    CultureInfo.InvariantCulture)),
+                Has.All.Contain("UnsupportedCallable"));
+            Assert.That(
+                factory.Outcomes["SelectedLocal"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
+            Assert.That(
+                factory.Outcomes["SuppressedLocal"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Suppressed));
+        }
+    }
+
+    [Test]
     public async Task ConcreteSelectedAutoAccessorsAbstainExactlyOnce()
     {
         var factory = new RecordingSessionFactory();

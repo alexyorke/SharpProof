@@ -110,8 +110,7 @@ internal sealed partial class SharpProofAnalyzerEngine
             context.Compilation,
             configuration,
             context.CancellationToken);
-        if (configuration.ContractsEnabled &&
-            activation.RequiresOperationAnalysis)
+        if (activation.RequiresOperationAnalysis)
         {
             context.RegisterSyntaxNodeAction(
                 syntaxContext =>
