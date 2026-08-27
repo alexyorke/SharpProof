@@ -14,64 +14,6 @@ The following non-security findings were reproduced by their reporting agents
 before being added here. No production, test, build, or configuration changes
 are included in this audit-only wave.
 
-### 424. [CONFIRMED] Explicitly selected local functions are silently ignored instead of receiving SP0047
-
-**Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around
-lines 116-122; SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
-lines 5-34 and 383-387; SharpProof.Analyzer.Core/LanguageSubsetGate.cs around
-lines 51-57 and 120-145.
-
-**Description**: The analyzer registers a syntax action for local functions and
-lambdas, but ValidateNestedCallableDeclaration only validates trusted and
-suppression control attributes. It never applies feature selection or the
-language-subset gate. Roslyn does not send local functions through the ordinary
-method analysis path used here, and AnalyzeUnselectedOperationBlock explicitly
-returns for MethodKind.LocalFunction and MethodKind.AnonymousFunction.
-Consequently, a local function explicitly marked EnforcePure or otherwise
-selected can receive no SharpProof diagnostic at all. The equivalent ordinary
-method is analyzed, while LanguageSubsetGate itself classifies local functions
-as UnsupportedCallable. This conflicts with the documented rule that an
-explicitly selected unsupported callable receives SP0047 rather than silently
-losing coverage.
-
-**Reproduction**:
-
-1. Compile a method containing
-   [EnforcePure] static void SelectedLocal() { state = 1; }.
-2. Include an equivalent ordinary EnforcePure method as an analyzer-activation
-   control.
-3. Run the built analyzer. The control produces SP0002, compiler diagnostics
-   are empty, and the selected local function produces no diagnostic.
-
-The reporting agent's disposable harness at
-C:/w/audit-local-selected produced only:
-
-    SP0002|19|Method 'SelectedOrdinary' is marked [EnforcePure], but its effects do not prove observable purity
-
-**Impact**: Users can explicitly request proof or effect analysis for a local
-callable and receive silence instead of either evidence or a fail-closed
-unsupported-callable diagnostic. This creates an analyzer coverage blind spot
-and makes selection appear to have succeeded.
-
-**Root cause**: Nested-callable syntax handling is limited to control-attribute
-validation, while every operation-block path intentionally excludes nested
-callables. No reconciliation path owns selected nested callables.
-
-**Recommended fix**: Resolve the nested callable IMethodSymbol in the syntax
-action, reuse the ordinary feature-selection and suppression policy, and for
-each selected unsuppressed nested callable report
-SelectedAnalysisIncompleteRule with UnsupportedCallable. Record the semantic
-outcome as Abstained so reconciliation and telemetry remain consistent. Keep
-the existing control-attribute validation in the same path.
-
-**Regression coverage**: Add cases for an impure selected local function and an
-attributed lambda expecting exactly SP0047, an unannotated nested callable
-expecting silence, and a selected plus suppressed nested callable retaining the
-documented suppression behavior.
-
-**Confidence**: High; reproduced with an exact analyzer harness outside the
-repository and traced through all registered nested-callable analysis paths.
-
 ### 432. [CONFIRMED] Protocol response compaction materializes the full expanded JSON before enforcing the size limit
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 137-151;
