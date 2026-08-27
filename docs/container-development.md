@@ -62,10 +62,9 @@ the complete solution with the baseline analyzer and ContractFor generator
 payloads loaded into every project. The command uses the container-visible CPU
 count and disables the shared Roslyn compiler server for this two-pass check;
 this avoids a single VBCS compiler process becoming the bottleneck. It fails on
-SharpProof diagnostics or analyzer-load diagnostics. Most analyzer-bearing
-production projects already load the Meta analyzer through their project
-references; pass `-IncludeMetaAnalyzers` only when deliberately auditing every
-test fixture too.
+SharpProof diagnostics or analyzer-load diagnostics. Declared production
+projects also load the Meta analyzer during this pass; pass
+`-IncludeMetaAnalyzers` only when deliberately auditing every test fixture too.
 The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
 The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
 Both run

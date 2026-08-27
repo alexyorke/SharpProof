@@ -28,6 +28,8 @@
         Condition="'$(SharpProofSelfApplyPayloadDirectory)' != ''">$(_SharpProofSelfApplyPayloadDirectory)\SharpProof.Meta.Analyzers.dll</_SharpProofSelfApplyMetaAnalyzerPath>
     <_SharpProofSelfApplyMetaAnalyzerPath
         Condition="'$(SharpProofSelfApplyPayloadDirectory)' == ''">$(_SharpProofSelfApplySourceMetaAnalyzerPath)</_SharpProofSelfApplyMetaAnalyzerPath>
+    <_SharpProofSelfApplyUseMetaAnalyzer
+        Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == 'true' OR ('$(SharpProofProductionProject)' == 'true' AND '$(MSBuildProjectName)' != 'SharpProof.Meta.Analyzers')">true</_SharpProofSelfApplyUseMetaAnalyzer>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(SharpProofSelfApply)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
@@ -37,7 +39,7 @@
     <Analyzer Remove="$(_SharpProofSelfApplyGeneratorPath)" />
     <Analyzer Remove="$(_SharpProofSelfApplySourceGeneratorPath)" />
     <Analyzer Remove="$(_SharpProofSelfApplyMetaAnalyzerPath)"
-              Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == 'true'" />
+              Condition="'$(_SharpProofSelfApplyUseMetaAnalyzer)' == 'true'" />
     <Analyzer Remove="$(_SharpProofSelfApplyPayloadDirectory)\SharpProof.Analyzer.Core.dll" />
     <Analyzer Remove="$(_SharpProofSelfApplySourceCoreDirectory)\SharpProof.Analyzer.Core.dll" />
     <Analyzer Remove="$(_SharpProofSelfApplyPayloadDirectory)\SharpProof.Contracts.dll" />
@@ -87,7 +89,7 @@
     <Analyzer Include="$(_SharpProofSelfApplyPayloadDirectory)\System.Text.Encoding.CodePages.dll" />
     <Analyzer Include="$(_SharpProofSelfApplyPayloadDirectory)\System.Threading.Tasks.Extensions.dll" />
     <Analyzer Include="$(_SharpProofSelfApplyMetaAnalyzerPath)"
-              Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == 'true'" />
+              Condition="'$(_SharpProofSelfApplyUseMetaAnalyzer)' == 'true'" />
   </ItemGroup>
 
   <Target Name="_SharpProofValidateSelfApplyArtifacts"
@@ -99,7 +101,7 @@
            Text="SharpProofSelfApply requires a baseline build. Missing $(_SharpProofSelfApplyGeneratorPath); run the self-application command instead of setting SharpProofSelfApply on a first build." />
     <Error Condition="!Exists('$(_SharpProofSelfApplyPayloadDirectory)\SharpProof.Analyzer.Core.dll')"
            Text="SharpProofSelfApply requires the baseline analyzer dependency closure under $(_SharpProofSelfApplyPayloadDirectory)." />
-    <Error Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == 'true' AND !Exists('$(_SharpProofSelfApplyMetaAnalyzerPath)')"
-           Text="SharpProofSelfApplyIncludeMetaAnalyzers requires SharpProof.Meta.Analyzers.dll in $(_SharpProofSelfApplyPayloadDirectory)." />
+    <Error Condition="'$(_SharpProofSelfApplyUseMetaAnalyzer)' == 'true' AND !Exists('$(_SharpProofSelfApplyMetaAnalyzerPath)')"
+           Text="SharpProofSelfApply requires SharpProof.Meta.Analyzers.dll in $(_SharpProofSelfApplyPayloadDirectory) for this project." />
   </Target>
 </Project>

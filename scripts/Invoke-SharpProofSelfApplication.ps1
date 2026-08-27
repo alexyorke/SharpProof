@@ -99,6 +99,11 @@ try {
             Source = Join-Path $repositoryRoot (
                 "SharpProof.ContractForGenerator/bin/$Configuration/netstandard2.0/SharpProof.ContractForGenerator.dll")
             Name = 'SharpProof.ContractForGenerator.dll'
+        },
+        [pscustomobject]@{
+            Source = Join-Path $repositoryRoot (
+                "SharpProof.Meta.Analyzers/bin/$Configuration/netstandard2.0/SharpProof.Meta.Analyzers.dll")
+            Name = 'SharpProof.Meta.Analyzers.dll'
         }
     )
     $corePayloadNames = @(
@@ -123,13 +128,6 @@ try {
             Source = Join-Path $repositoryRoot (
                 "SharpProof.Analyzer.Core/bin/$Configuration/netstandard2.0/$name")
             Name = $name
-        }
-    }
-    if ($IncludeMetaAnalyzers) {
-        $payloadSources += [pscustomobject]@{
-            Source = Join-Path $repositoryRoot (
-                "SharpProof.Meta.Analyzers/bin/$Configuration/netstandard2.0/SharpProof.Meta.Analyzers.dll")
-            Name = 'SharpProof.Meta.Analyzers.dll'
         }
     }
     foreach ($payload in $payloadSources) {
