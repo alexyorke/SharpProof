@@ -1262,6 +1262,293 @@ parameterize both malformed branches.
 **Confidence**: High; self-verified with a compiled probe and a completed-result
 control differing only in backend termination shape.
 
+### 450. [CONFIRMED] Compiler-synthesized record members omit executable base calls from Requires analysis
+
+**Location**: SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
+lines 77-80; record syntax registration in
+SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around lines 157-165;
+record-copy handling in
+SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines 382-422.
+
+**Description**: Compiler-synthesized record methods have no declaring syntax
+or operation block, so ValidateMethodAttributes returns immediately. The record
+syntax action models only primary constructors. SharpProof therefore omits
+compiler-mandated base calls from synthesized record copy constructors,
+PrintMembers overrides, and GetHashCode overrides. Explicitly spelling the
+compiler-equivalent member is analyzed, making SP0027 behavior depend only on
+source shape.
+
+**Self-verified variants**:
+
+1. A base record copy constructor has Contract.Requires(false). Copying a
+   derived record with a synthesized copy constructor executes the base copy
+   constructor but produces no SP0027. An explicit derived copy constructor
+   calling base(original) produces SP0027. Runtime copy increments the base-copy
+   counter.
+2. A base record's user-defined PrintMembers(StringBuilder) has
+   Contract.Requires(false). The generated derived PrintMembers calls it during
+   ToString but is silent; an explicit override calling base.PrintMembers
+   produces SP0027. Runtime counters show both paths call the base once.
+3. A base record override of GetHashCode has Contract.Requires(false). The
+   generated derived GetHashCode calls it but is silent; an explicit override
+   produces SP0027. Runtime counters again show both paths call the base once.
+
+**Impact**: Real precondition violations on always-emitted record calls are
+missed, semantic reconciliation has no outcome for those synthesized methods,
+and spelling out compiler-generated code changes diagnostics without changing
+runtime behavior.
+
+**Root cause**: The analyzer has no closed inventory of synthesized record
+call edges. Its existing record-copy predicate only prevents modeling the wrong
+parameterless base call; it does not model the actual copy call or other
+generated overrides.
+
+**Recommended fix**: Add a SynthesizedRecordCallAnalyzer to the existing record
+declaration syntax path. Resolve each implicitly declared derived member and
+its compiler-specified base target, then analyze synthetic calls for:
+
+- copy constructor to base copy constructor, mapping parameter ordinal 0;
+- PrintMembers to base PrintMembers, mapping the builder parameter;
+- GetHashCode to base GetHashCode, with no arguments.
+
+Use the derived record declaration as diagnostic location, honor generated-code
+and type/assembly suppression, and record each synthesized method outcome once.
+Keep the inventory closed to compiler-specified edges rather than guessing by
+name.
+
+**Regression coverage**: For each edge, compare synthesized and explicit
+derived records against a base member with Requires(false); require equivalent
+SP0027 results. Add derived-type suppression controls and satisfiable/no-contract
+controls.
+
+**Confidence**: High; all three edges were independently tested with analyzer
+differentials and runtime counters.
+
+### 451. [CONFIRMED] Failed release-qualification reruns preserve the previous passing qualification.json
+
+**Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 458-463;
+scripts/Invoke-SharpProofReleaseContainer.ps1 around lines 17-24, 92-232;
+persistent artifact handling in eng/container/entrypoint.sh around
+lines 65-130 and 178-188; always-upload workflow path in
+.github/workflows/package-consumers.yml around lines 300-313.
+
+**Description**: WriteQualificationEvidence performs platform, environment,
+checkout, tag, package, SBOM, and ten-receipt preflights before it owns
+qualification.json. The outer release-qualification command also verifies
+README generation first. Neither path invalidates the prior final record at
+attempt start. The passed record binds commit, tag, inputs, and receipt hashes
+but has no run-attempt identity. A same-commit/tag retry that fails before the
+final write leaves the prior pass indistinguishable from current evidence.
+
+**Reproduction**: In a temporary canonical fixture, seed a known
+qualification.json and invoke WriteQualificationEvidence without GITHUB_SHA.
+The script exits 1 with "The GITHUB_SHA environment variable is required", but:
+
+    QUALIFICATION_SURVIVED=True
+    HASH_UNCHANGED=True
+
+The SHA-256 remains exactly the seeded value.
+
+**Impact**: Command and job status remain failed, so this is not an automatic CI
+false green. However, persistent/self-hosted/local workspaces and always-upload
+steps can publish a previous passing record under the failed attempt. Operators
+and artifact consumers cannot attribute the surviving record to the current
+run.
+
+**Root cause**: qualification.json uses publish-only-on-success in persistent
+artifact storage with no pending/failure lifecycle state.
+
+**Recommended fix**: At both outer release-qualification entry and
+WriteQualificationEvidence mode entry, resolve the final path before any
+failure-prone preflight and atomically remove it or replace it with a nonpassing
+tombstone containing commit, tag, and run-attempt identity when available.
+Atomically replace it with status passed only after all checks.
+
+**Regression coverage**: Seed a valid same-commit/tag record, then fail on
+missing GITHUB_SHA, corrupt/missing receipt, and release-artifact validation.
+Require the old pass to be absent or failure-tombstoned and the evidence
+validator to reject it.
+
+**Confidence**: High; reproduced with unchanged production scripts in the
+canonical Linux image and traced through persistence and upload paths.
+
+### 452. [CONFIRMED] SPMETA010 ignores writes into cache-owned arrays and collections
+
+**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
+lines 115-122.
+
+**Description**: Array assignments use IArrayElementReferenceOperation, which
+assignment-target analysis does not handle. Collection indexers appear as
+IPropertyReferenceOperation, but their immediate receiver is the array or
+Dictionary rather than the outer ISemanticCache. Cache ownership is discarded
+instead of being traced through a cache member and optional local alias.
+
+**Reproduction**:
+
+    cache.Slots[0] = Answer.Unknown;
+    var slots = cache.Slots;
+    slots[0] = Answer.Unknown;
+    cache.Slots["answer"] = Answer.Unknown;
+
+with ProofCache : ISemanticCache. The canonical probe reported:
+
+    CACHE_INDEXER_CONTROL_SPMETA010_COUNT=1
+    OWNED_ARRAY_ELEMENT_SPMETA010_COUNT=0
+    ALIASED_ARRAY_ELEMENT_SPMETA010_COUNT=0
+    OWNED_DICTIONARY_INDEXER_SPMETA010_COUNT=0
+
+All compiler-error counts were zero.
+
+**Impact**: Noncacheable answers can be stored in aggregates owned by a marked
+semantic cache without SPMETA010. The direct cache indexer control is detected,
+so equivalent policy depends on storage shape.
+
+**Root cause**: Storage ownership resolution stops at the immediate assignment
+operation and immediate receiver type.
+
+**Recommended fix**: Resolve ownership recursively through array element
+references, collection indexer receivers, cache field/property accesses, and
+local aliases to those members. Diagnose when the root owner implements
+ISemanticCache and the stored value is noncacheable.
+
+**Regression coverage**: Add cache-owned array, aliased array, and dictionary
+writes expecting SPMETA010, with unrelated aggregates and Answer.Proven as
+negative controls.
+
+**Confidence**: High; all variants and a direct-indexer positive control were
+self-verified in a compiler-clean canonical probe.
+
+### 453. [CONFIRMED] Strict protocol shape validation allocates property arrays and strings for every object
+
+**Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around
+lines 50-77, especially EnumerateObject().ToArray() near line 58 and
+property.Name access near line 69.
+
+**Description**: The recursive strict-shape walker materializes every object's
+properties into an array, then materializes each property name as a string.
+This happens after the JsonDocument already exists and is separate from both
+the double-parse and file-buffer findings.
+
+**Reproduction**: The agent isolated the private shape walker after parsing:
+
+- 100,000 two-property error objects, 2,500,981-byte JSON:
+  20,820,768 bytes allocated.
+- 50,000 semantically valid two-property error objects, 1,350,981-byte JSON:
+  10,420,648 bytes allocated.
+
+Allocation scales at roughly 208 bytes per object, or 7.7-8.3 times the input
+size. A near-limit payload can add about 129 MiB solely during shape walking.
+
+**Impact**: Valid large protocol artifacts incur avoidable LOH/Gen0 pressure
+and possible OOM in addition to DOM, typed model, and file-decoding costs,
+despite a nominal 16 MiB protocol limit.
+
+**Root cause**: LINQ array materialization and property-name string extraction
+are used where streaming JsonElement enumeration can enforce identical rules.
+
+**Recommended fix**: Use GetPropertyCount() for exact-count validation, iterate
+EnumerateObject() directly with an index, and compare with
+JsonProperty.NameEquals(expected.Name) before recursively checking Value.
+
+**Regression coverage**: Expose or split an internal EnsureJsonShape helper,
+parse a large error array before allocation measurement, warm it, and require a
+small fixed allocation ceiling. Retain count, order, duplicate-property, and
+token-kind rejection tests.
+
+**Confidence**: High; two self-verified sizes demonstrate linear amplification
+with parsing and deserialization excluded.
+
+### 454. [CONFIRMED] Protocol model generation and schema parity accept duplicate properties
+
+**Location**: scripts/Generate-ProtocolModel.ps1 around line 358 and
+SharpProof.Worker.Test/ProtocolModelSchemaTests.cs around line 25.
+
+**Description**: ConvertFrom-Json collapses duplicate protocol-schema
+properties before validation, while schema parity independently uses
+JsonDocument.GetProperty and selects the same last value. The authoritative
+source for protocol, manifest, cache versions, model declarations, and
+validation tables can therefore be contradictory while generation,
+acceptance, and parity all pass.
+
+**Reproduction**: Change versionMembers to:
+
+    "protocol": "RetiredProtocolVersion.Current",
+    "protocol": "WorkerProtocolVersions.Current"
+
+Full verification against copied checked-in outputs exits 0:
+
+    Verified deterministic worker protocol model.
+
+The parity primitive returns WorkerProtocolVersions.Current.
+
+**Impact**: Generated protocol code and analyzer effect-certainty tables can
+silently follow a last duplicate property while the review source remains
+ambiguous and every authority gate is green.
+
+**Root cause**: Both generator and parity consumer share last-wins JSON
+semantics without a raw recursive duplicate-name check.
+
+**Recommended fix**: Apply the shared strict ordinal duplicate-property reader
+before conversion and reuse it in ReadSchema and every other consumer of
+ProtocolModel.schema.json.
+
+**Regression coverage**: Add duplicate root schemaVersion, nested
+versionMembers.protocol, and validation-table property cases. Require nonzero
+generation and path-qualified errors; parity must reject before GetProperty.
+
+**Confidence**: High; generator verification and parity last-wins behavior were
+self-verified independently.
+
+### 455. [CONFIRMED] Fuzz campaigns discard valid semantic-failure JSON before parsing and accounting
+
+**Location**: Tools/SharpProof.Fuzz/Program.cs around lines 31-37;
+scripts/Invoke-SharpProofFuzzCampaign.ps1 around lines 131-179 and 193-206;
+scripts/Assert-SharpProofFuzzRunnerResult.ps1 around lines 130-189.
+
+**Description**: The fuzz runner writes a complete FuzzSummary and returns 1
+when it finds a semantic mismatch. The campaign script throws immediately on
+any nonzero exit before parsing, hashing, or populating that JSON. Its catch
+leaves observedCases and agreement counts at zero and schema/hash null. The
+only validator combines structural validation with a pass-only policy, so it
+also rejects internally consistent failing summaries.
+
+**Reproduction**: A one-case fixture models a frontend mismatch with finite and
+partial SMT agreement, zero abstentions, and Passed=false. The self-verification
+reported:
+
+    validator=rejected message=Invalid fuzz runner result:
+      The fuzz runner counts do not form a complete agreement partition.
+    campaign branch for ExitCode=1:
+      throws before Assert-SharpProofFuzzRunnerResult
+
+FuzzRunner's actual control flow can produce exactly this shape: per-oracle
+agreements are recorded, the mismatch is retained, overall agreement and
+abstention are not incremented, JSON is written, and exit 1 follows.
+
+**Impact**: The first real bug found by fuzzing is collapsed into the same path
+as a crash or tool failure. Campaign evidence undercounts completed work, drops
+schema and structured failure details, omits resultSha256 binding, and forces
+operators to inspect an unvalidated stdout file manually.
+
+**Root cause**: Process success is treated as a prerequisite for decoding
+output, and schema/integrity validation is inseparable from require-pass policy.
+
+**Recommended fix**: Split a structural FuzzSummary decoder from the
+require-pass policy. Always parse and hash available stdout for expected exits.
+Classify valid exit 1 plus Passed=false as semantic failure while preserving
+observed counts, schema, failures, and hash. Reserve malformed or missing JSON
+and unexpected exits for infrastructure failure. Compute campaign pass only
+after structured classification.
+
+**Regression coverage**: Use a fake runner that emits a valid mismatch summary
+and exits 1. Require the campaign to fail while its run record has structural
+validation passed, schema 4, observedCases equal requested, non-null result
+hash, preserved failures, and totalCases including the run. Retain malformed
+output and crash controls.
+
+**Confidence**: High; the agent self-verified the valid failure fixture against
+the current validator and traced the exact campaign branches.
+
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
