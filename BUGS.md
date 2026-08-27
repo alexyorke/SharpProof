@@ -72,55 +72,6 @@ documented suppression behavior.
 **Confidence**: High; reproduced with an exact analyzer harness outside the
 repository and traced through all registered nested-callable analysis paths.
 
-### 425. [CONFIRMED] Nullable string concatenation ignores null tags and produces spurious SMT counterexamples
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 329-335, 548-549,
-603-610, and model decoding around lines 469-471.
-
-**Description**: A nullable string variable is encoded as an unconstrained
-sequence payload plus an independent Boolean null tag. StringConcat passes the
-raw sequence payloads directly to Z3 MkConcat and ignores the null tags. The IR
-interpreter follows C# concatenation semantics and treats a null string operand
-as the empty string. When a variable is null, Z3 can therefore choose an
-arbitrary nonempty hidden payload and refute a property that is universally
-true under interpreter semantics. Model decoding discards that hidden payload
-and returns Null, so replay rejects the spurious counterexample.
-
-**Reproduction**: Verify the tautology:
-
-    text != null || text + "x" == "x"
-
-The canonical Linux-amd64 probe reported:
-
-    interpreter null-case goal=Value/True
-    backend=Satisfiable failure=None text=Null
-    kernel=UnknownOutcome reason=CounterexampleReplayFailed
-
-The raw backend result is satisfiable even though the decoded null model
-satisfies the property in the interpreter.
-
-**Impact**: The public SMT backend returns false SAT and ProofKernel degrades a
-provable query to Unknown/CounterexampleReplayFailed. Replay prevents a false
-refutation, and the current worker proof-domain gate rejects string
-concatenation, so this is a precision and backend-correctness defect rather than
-a present false worker verdict.
-
-**Root cause**: Nullness is modeled separately, but StringConcat consumes only
-EncodedValue.Value. Existing coverage checks a different null case and does not
-constrain the hidden payload.
-
-**Recommended fix**: Normalize each concatenation operand to
-ITE(IsNull, EmptySeq, Value) before MkConcat, or globally assert the invariant
-IsNull implies Value equals EmptySeq for every nullable string symbol. Preserve
-the existing Defined and non-null result semantics.
-
-**Regression coverage**: Add left-null and right-null variable tautologies and
-require backend Unsatisfiable plus kernel Proven. Retain a non-null variable
-control and the existing interpreter/model replay checks.
-
-**Confidence**: High; independently reproduced by two audit agents with
-canonical probes and confirmed against the encoder and decoder paths.
-
 ### 426. [CONFIRMED] Acceptance skip-mode tests abort before exercising status semantics because their fixture omits a required module
 
 **Location**: SharpProof.ArchitectureTest/AcceptanceScriptTests.cs around
