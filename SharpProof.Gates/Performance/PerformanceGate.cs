@@ -646,7 +646,7 @@ internal static class PerformanceGate
             await process.WaitForExitAsync(cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch
+        finally
         {
             if (!process.HasExited)
             {
@@ -661,7 +661,6 @@ internal static class PerformanceGate
 
             await process.WaitForExitAsync(CancellationToken.None)
                 .ConfigureAwait(false);
-            throw;
         }
         stopwatch.Stop();
         var output = (await standardOutput.ConfigureAwait(false)) +

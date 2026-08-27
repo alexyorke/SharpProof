@@ -36,11 +36,13 @@ try
         FuzzJson.Indented));
     return summary.Passed ? 0 : 1;
 }
+#pragma warning disable SPMETA003 // The CLI translates cancellation into its documented process exit code.
 catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
 {
     Console.Error.WriteLine("SharpProof fuzz run cancelled.");
     return 130;
 }
+#pragma warning restore SPMETA003
 finally
 {
     Console.CancelKeyPress -= cancelHandler;

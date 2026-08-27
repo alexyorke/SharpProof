@@ -100,7 +100,7 @@ internal static class Program
                 "performance-smoke]");
             return GateUsageExitCode;
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             Console.Error.WriteLine(exception);
             return GateInfrastructureFailureExitCode;
@@ -137,7 +137,7 @@ internal static class Program
         {
             corpus = await runCorpus(repositoryRoot).ConfigureAwait(false);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             WriteGateFailure("corpus", exception);
             WritePartialResult(null, null, "corpus", exception);
@@ -149,7 +149,7 @@ internal static class Program
         {
             performance = await runPerformance(repositoryRoot).ConfigureAwait(false);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             WriteGateFailure("performance", exception);
             WritePartialResult(corpus, null, "performance", exception);

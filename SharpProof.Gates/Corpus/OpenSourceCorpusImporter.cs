@@ -402,25 +402,24 @@ internal static class OpenSourceCorpusImporter
         {
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        finally
         {
-            try
+            if (cancellationToken.IsCancellationRequested && !process.HasExited)
             {
-                if (!process.HasExited)
+                try
                 {
                     process.Kill(entireProcessTree: true);
                 }
+                catch (InvalidOperationException) { }
+                catch (NotSupportedException) { }
+                try
+                {
+                    await process.WaitForExitAsync(CancellationToken.None)
+                        .ConfigureAwait(false);
+                }
+                catch (InvalidOperationException) { }
+                await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);
             }
-            catch (InvalidOperationException) { }
-            catch (NotSupportedException) { }
-            try
-            {
-                await process.WaitForExitAsync(CancellationToken.None)
-                    .ConfigureAwait(false);
-            }
-            catch (InvalidOperationException) { }
-            await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);
-            throw;
         }
         var output = (await outputTask.ConfigureAwait(false)).Trim();
         var error = (await errorTask.ConfigureAwait(false)).Trim();

@@ -265,10 +265,9 @@ internal static class WorkerPerformanceProbe
 
             return stopwatch.Elapsed.TotalMilliseconds;
         }
-        catch
+        finally
         {
             TryKill(process);
-            throw;
         }
     }
 
@@ -352,16 +351,15 @@ internal static class WorkerPerformanceProbe
         {
             await process.WaitForExitAsync(boundary.Token)
                 .ConfigureAwait(false);
+            return new ProcessResult(
+                process.ExitCode,
+                await standardOutput.ConfigureAwait(false),
+                await standardError.ConfigureAwait(false));
         }
-        catch
+        finally
         {
             TryKill(process);
-            throw;
         }
-        return new ProcessResult(
-            process.ExitCode,
-            await standardOutput.ConfigureAwait(false),
-            await standardError.ConfigureAwait(false));
     }
 
     private static async Task<int> WaitForWorkerReadyAsync(

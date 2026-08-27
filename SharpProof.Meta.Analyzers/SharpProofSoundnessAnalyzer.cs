@@ -18,7 +18,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.ISymbol",
         "Microsoft.CodeAnalysis.CSharp.SymbolDisplay",
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
-        "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
+        "System.Threading.CancellationToken", "Microsoft.Build.Framework.ICancelableTask",
+        "SharpProof.Frontend.Host.CompilationModelProvider",
         "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForValidation.ContractForDiagnosticDescriptors",
         "SharpProof.Meta.Analyzers.MetaDiagnosticDescriptors",
         "System.String", "SharpProof.Verify.Assumption", "SharpProof.Verify.ProofKernel",
@@ -347,6 +348,18 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // A chained concatenation produces one operation for every `+`. Report
+        // the outer expression only so a single source construction does not
+        // become a cascade of duplicate diagnostics at the same location.
+        if (binary.Parent is IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.Add,
+                Type.SpecialType: SpecialType.System_String
+            })
+        {
+            return;
+        }
+
         var fragment = GetCSharpExpressionFragment(binary.LeftOperand) ?? GetCSharpExpressionFragment(binary.RightOperand);
         if (fragment != null)
         {
@@ -526,11 +539,14 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     private static string? GetSemanticLiteral(object? value)
     {
-        return value is string text &&
-            (text.StartsWith("ir.", StringComparison.Ordinal) ||
-             text.StartsWith("ir_", StringComparison.Ordinal))
-                ? text
-                : null;
+        if (value is not string text || text.Length < 3 ||
+            text[0] != 'i' || text[1] != 'r' ||
+            (text[2] != '.' && text[2] != '_'))
+        {
+            return null;
+        }
+
+        return text;
     }
 
     private static void AnalyzeField(SymbolAnalysisContext context)
@@ -717,7 +733,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         Compilation, SemanticModel, CSharpCompilation, CSharpSemanticModel,
         CSharpExtensions, SyntaxFactory, Symbol, SymbolDisplay, DiagnosticDescriptor,
-        OperationCanceledException, CancellationToken, CompilationModelProvider,
+        OperationCanceledException, CancellationToken, MsBuildCancelableTask,
+        CompilationModelProvider,
         AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, MetaDiagnosticDescriptors, String,
         Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,
         PostconditionObligationBuilder,

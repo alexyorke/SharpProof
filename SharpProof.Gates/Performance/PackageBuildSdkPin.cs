@@ -125,7 +125,7 @@ internal static class PackageBuildSdkPin
             await process.WaitForExitAsync(cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch
+        finally
         {
             if (!process.HasExited)
             {
@@ -140,7 +140,6 @@ internal static class PackageBuildSdkPin
 
             await process.WaitForExitAsync(CancellationToken.None)
                 .ConfigureAwait(false);
-            throw;
         }
 
         var output = (await standardOutput.ConfigureAwait(false)).Trim();

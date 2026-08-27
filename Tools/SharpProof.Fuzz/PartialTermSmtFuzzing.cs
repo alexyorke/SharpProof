@@ -104,6 +104,10 @@ public sealed class PartialTermSmtDifferentialOracle
         "Performance",
         "CA1822:Mark members as static",
         Justification = "Oracle methods intentionally share an instance-shaped test API.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA007",
+        Justification = "The differential oracle intentionally constructs synthetic assumptions for backend comparison.")]
     public async Task<PartialTermSmtDifferentialResult> CompareAsync(
         IrFactory factory,
         PartialTermSmtCase generated,
@@ -230,6 +234,10 @@ public sealed class PartialTermSmtDifferentialOracle
             "");
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA007",
+        Justification = "The differential oracle intentionally constructs synthetic assumptions for backend comparison.")]
     private static Assumption CreateAssignmentAssumption(
         IrFactory factory,
         IrVarId variable,

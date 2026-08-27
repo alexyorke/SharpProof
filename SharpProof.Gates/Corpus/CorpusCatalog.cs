@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace SharpProof.Gates.Corpus;
@@ -25,6 +26,10 @@ internal static class CorpusCatalog
         ];
     }
 
+    [SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA009",
+        Justification = "The corpus catalog deliberately stores source snippets for the executable corpus oracle.")]
     internal static ImmutableArray<CorpusSeed> Seeds
     {
         get;
@@ -350,6 +355,10 @@ internal static class CorpusCatalog
             builder.ToString());
     }
 
+    [SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA009",
+        Justification = "The corpus catalog deliberately emits C# source snippets for metamorphic cases.")]
     private static string CreatePrelude(
         CorpusVariant variant,
         string helper,
@@ -374,6 +383,10 @@ internal static class CorpusCatalog
         };
     }
 
+    [SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA009",
+        Justification = "The corpus catalog deliberately rewrites C# contract source snippets.")]
     private static string AlphaRenameContractFormals(string members)
     {
         return members

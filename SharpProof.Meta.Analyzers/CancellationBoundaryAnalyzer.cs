@@ -325,6 +325,19 @@ internal static class CancellationBoundaryAnalyzer
             return false;
         }
 
+        // MSBuild task implementations translate cancellation into the task
+        // protocol (a Boolean result or a classified build failure). These
+        // catches are not semantic proof answers, so they are audited at the
+        // build-protocol boundary rather than reported as swallowed
+        // cancellation.
+        if (method.ContainingType?.AllInterfaces.Any(interfaceType =>
+                IsSameType(
+                    interfaceType,
+                    symbols[SharpProofSoundnessAnalyzer.KnownType.MsBuildCancelableTask])) == true)
+        {
+            return true;
+        }
+
         if (IsAuditedWorkerMain(
                 method,
                 symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerProgram],

@@ -532,6 +532,23 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsChainedCSharpExpressionTextConstructionOnce()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                static string M(string name) =>
+                    "prefix " + name + " => " + "suffix";
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA009"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task AllowsOrdinaryInterpolatedFormattingAndValueDecoys()
     {
         const string source =
@@ -817,6 +834,45 @@ public sealed class SharpProofSoundnessAnalyzerTests
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
             Is.EqualTo(6));
+    }
+
+    [Test]
+    public async Task AllowsCancellationTranslationAtMsBuildTaskBoundary()
+    {
+        const string source =
+            """
+            using System;
+            namespace Microsoft.Build.Framework
+            {
+                interface ICancelableTask { void Cancel(); }
+            }
+            namespace SharpProof.BuildTasks
+            {
+                sealed class TaskBoundary : Microsoft.Build.Framework.ICancelableTask
+                {
+                    public void Cancel() { }
+                    public void Execute()
+                    {
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) { return; }
+                    }
+                }
+
+                sealed class UnrelatedBoundary
+                {
+                    public void Execute()
+                    {
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) { return; }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
     }
 
     [Test]

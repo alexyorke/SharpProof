@@ -673,6 +673,10 @@ public sealed record GeneratedCSharpCase(
         get; init;
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "SharpProof.Soundness",
+        "SPMETA009",
+        Justification = "This fuzz oracle deliberately emits C# source text containing expression syntax.")]
     public string Source =>
         "#nullable enable\n" +
         "public static class SharpProofGeneratedFrontend {\n" +
