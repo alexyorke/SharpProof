@@ -218,11 +218,17 @@ internal sealed partial class SharpProofAnalyzerEngine
                 continue;
             }
 
-            foreach (var node in tree.GetRoot(cancellationToken)
-                         .DescendantNodes())
+            var root = tree.GetRoot(cancellationToken);
+            SemanticModel? semanticModel = null;
+            foreach (var node in root.DescendantNodes())
             {
                 if (node is AttributeSyntax attribute &&
-                    !IsAssemblyOrModuleAttribute(attribute))
+                    !IsAssemblyOrModuleAttribute(attribute) &&
+                    IsSharpProofAttribute(
+                        compilation,
+                        attribute,
+                        ref semanticModel,
+                        cancellationToken))
                 {
                     hasFullAttribute = true;
                 }
@@ -260,6 +266,107 @@ internal sealed partial class SharpProofAnalyzerEngine
                     cancellationToken)
                 ? AdvisoryActivation.Lightweight
                 : AdvisoryActivation.None;
+    }
+
+    // Ordinary attributes are common in framework code. Bind each source
+    // candidate once so aliases and same-name source shadows remain visible,
+    // while unrelated attributes do not force full operation analysis.
+    private static bool IsSharpProofAttribute(
+        Compilation compilation,
+        AttributeSyntax attribute,
+        ref SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
+    {
+        semanticModel ??= SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, attribute.SyntaxTree);
+        var type = semanticModel.GetTypeInfo(
+                attribute.Name,
+                cancellationToken)
+            .Type as INamedTypeSymbol;
+        if (IsSharpProofAttributeType(type))
+        {
+            return true;
+        }
+
+        var symbolInfo = semanticModel.GetSymbolInfo(
+            attribute.Name,
+            cancellationToken);
+        if (IsSharpProofAttributeSymbol(symbolInfo.Symbol) ||
+            symbolInfo.CandidateSymbols.Any(IsSharpProofAttributeSymbol))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsSharpProofAttributeSymbol(ISymbol? symbol)
+    {
+        if (symbol is IAliasSymbol alias)
+        {
+            return IsSharpProofAttributeSymbol(alias.Target);
+        }
+
+        var type = symbol switch
+        {
+            IMethodSymbol method => method.ContainingType,
+            INamedTypeSymbol namedType => namedType,
+            _ => null
+        };
+        return IsSharpProofAttributeType(type);
+    }
+
+    private static bool IsSharpProofAttributeType(INamedTypeSymbol? type)
+    {
+        type = type?.OriginalDefinition;
+        if (type == null || type.ContainingType != null)
+        {
+            return false;
+        }
+
+        foreach (var metadataName in ContractApiMetadata.AttributeMetadataNames)
+        {
+            var separator = metadataName.LastIndexOf('.');
+            if (separator <= 0 ||
+                !string.Equals(
+                    type.MetadataName,
+                    metadataName.Substring(separator + 1),
+                    StringComparison.Ordinal) ||
+                !IsNamespace(
+                    type.ContainingNamespace,
+                    metadataName.Substring(0, separator)))
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsNamespace(
+        INamespaceSymbol @namespace,
+        string expected)
+    {
+        var segments = expected.Split('.');
+        for (var index = segments.Length - 1;
+             index >= 0;
+             index--)
+        {
+            if (@namespace.IsGlobalNamespace ||
+                !string.Equals(
+                    @namespace.Name,
+                    segments[index],
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            @namespace = @namespace.ContainingNamespace;
+        }
+
+        return @namespace.IsGlobalNamespace;
     }
 
     private static bool MayContainAdvisoryActivationSyntax(SourceText text)

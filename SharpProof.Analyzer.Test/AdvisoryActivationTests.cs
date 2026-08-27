@@ -95,6 +95,66 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
+    public async Task UnrelatedSourceAttributesDoNotActivateCallAnalysis()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+
+            [Flags]
+            internal enum Options
+            {
+                None = 0,
+                Enabled = 1
+            }
+
+            internal static class Plain {
+                internal static int Identity(int value) => value;
+            }
+            """,
+            ["SP0027"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(factory.CreateCount, Is.Zero);
+        }
+    }
+
+    [Test]
+    public async Task AliasedSharpProofAttributesActivateCallAnalysis()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using Pure = SharpProof.Attributes.EnforcePureAttribute;
+
+            internal static class Selected {
+                [Pure]
+                internal static int Identity(int value) => value;
+            }
+            """,
+            ["SP0002"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(factory.CreateCount, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public async Task AdvisoryActivationAggregatesAttributesAcrossSyntaxTrees()
     {
         const string contractTree = """

@@ -327,10 +327,13 @@ never takes the fast path. The activation probe is part of the declared
 discovery trusted computing base; new selection or implicit-call syntax must
 extend the probe and its regressions in the same change.
 
-The advisory activation probe distinguishes contract/attribute candidates
-from ordinary call-bearing code. A candidate compilation retains method
-attribute, clause-placement, intrinsic, rejection, suppression, subset, and
-effect processing. For otherwise contract-free source, the probe reads
+The advisory activation probe distinguishes catalog-bound contract/attribute
+candidates from ordinary attributes and call-bearing code. It resolves source
+attributes through the audited semantic-model provider, so aliases and
+source-shadowed catalog identities remain candidates while unrelated attributes
+do not create a session. A candidate compilation retains method attribute,
+clause-placement, intrinsic, rejection, suppression, subset, and effect
+processing. For otherwise contract-free source, the probe reads
 portable-executable custom-attribute metadata without populating Roslyn symbol
 caches. It registers operation-block precondition screening only when a
 referenced assembly contains a closed SharpProof parameter or return contract;
