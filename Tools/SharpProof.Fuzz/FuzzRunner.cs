@@ -561,14 +561,16 @@ public static class FuzzRunner
 
     internal static int CreateCaseSeed(int seed, int index)
     {
-        // Hash the seed/index pair as a unit. An additive case stride makes
-        // streams for seeds separated by that stride exact shifted copies,
-        // even when the subsequent mixer is a strong bijection.
-        var value = unchecked(((ulong)(uint)seed << 32) | (uint)index);
-        value = unchecked(value + 0x9E3779B97F4A7C15UL);
-        value = unchecked((value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL);
-        value = unchecked((value ^ (value >> 27)) * 0x94D049BB133111EBUL);
-        value ^= value >> 31;
+        // Mix a 32-bit case index with a seed-derived key. Every operation is
+        // invertible modulo 2^32 (odd multiplication, addition, or an
+        // xor-shift), so distinct indices remain distinct for a campaign.
+        var value = unchecked(
+            (uint)index + (uint)seed * 0x9E3779B9u);
+        value ^= value >> 16;
+        value = unchecked(value * 0x7FEB352Du);
+        value ^= value >> 15;
+        value = unchecked(value * 0x846CA68Bu);
+        value ^= value >> 16;
         return unchecked((int)value);
     }
 

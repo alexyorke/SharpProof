@@ -106,6 +106,30 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void CaseSeedHashIsInjectiveWithinLargeCampaigns()
+    {
+        var seeds = new HashSet<int>();
+        for (var index = 0; index < 1_000_000; index++)
+        {
+            Assert.That(
+                seeds.Add(FuzzRunner.CreateCaseSeed(23063, index)),
+                Is.True,
+                $"case seed collision at index {index}");
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(seeds.Count, Is.EqualTo(1_000_000));
+            Assert.That(
+                FuzzRunner.CreateCaseSeed(20260523, 5055),
+                Is.Not.EqualTo(FuzzRunner.CreateCaseSeed(20260523, 6447)));
+            Assert.That(
+                FuzzRunner.CreateCaseSeed(20260605, 3773),
+                Is.Not.EqualTo(FuzzRunner.CreateCaseSeed(20260605, 7592)));
+        }
+    }
+
+    [Test]
     public async Task ParallelismDoesNotChangeDeterministicOutcomes()
     {
         var serial = await FuzzRunner.RunAsync(
