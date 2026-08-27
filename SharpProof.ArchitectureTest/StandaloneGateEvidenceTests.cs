@@ -77,6 +77,48 @@ public sealed class StandaloneGateEvidenceTests
         }
     }
 
+    [Test]
+    public void StandaloneGateProducerInvalidatesEvidenceBeforePreflight()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofGateEvidence.ps1"));
+        var invalidation = script.IndexOf(
+            "foreach ($stalePath in @($resolvedOutput, $rawOutput, $standardError))",
+            StringComparison.Ordinal);
+        var parallelism = script.IndexOf(
+            "$parallelism = Get-SharpProofTestProjectParallelism",
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(invalidation, Is.GreaterThanOrEqualTo(0));
+            Assert.That(parallelism, Is.GreaterThan(invalidation));
+        }
+    }
+
+    [Test]
+    public void PerformanceDispatcherInvalidatesEvidenceBeforePreflight()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var invalidation = script.IndexOf(
+            "Remove-SharpProofPerformanceEvidence",
+            StringComparison.Ordinal);
+        var parallelism = script.IndexOf(
+            "$testProjectParallelism = Get-SharpProofTestProjectParallelism",
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(invalidation, Is.GreaterThanOrEqualTo(0));
+            Assert.That(parallelism, Is.GreaterThan(invalidation));
+        }
+    }
+
     private static string RepositoryRoot()
     {
         var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);

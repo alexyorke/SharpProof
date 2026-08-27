@@ -20,8 +20,6 @@ Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Assert-SharpProofStandaloneGateResult.ps1')
-$parallelism = Get-SharpProofTestProjectParallelism `
-    -RepositoryRoot $repositoryRoot
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 $outputDirectory = Split-Path -Parent $resolvedOutput
@@ -38,6 +36,8 @@ foreach ($stalePath in @($resolvedOutput, $rawOutput, $standardError)) {
         Remove-Item -LiteralPath $stalePath -Force
     }
 }
+$parallelism = Get-SharpProofTestProjectParallelism `
+    -RepositoryRoot $repositoryRoot
 $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'Unable to bind gate evidence to the exact source commit.'

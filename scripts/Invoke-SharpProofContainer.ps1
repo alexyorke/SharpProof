@@ -40,6 +40,22 @@ function Invoke-DotNet([string[]]$Arguments) {
     }
 }
 
+function Remove-SharpProofPerformanceEvidence {
+    $output = Join-Path $repositoryRoot 'artifacts/ci/performance.json'
+    foreach ($path in @(
+            $output,
+            [IO.Path]::ChangeExtension($output, '.gate.json'),
+            [IO.Path]::ChangeExtension($output, '.stderr.txt'))) {
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            Remove-Item -LiteralPath $path -Force
+        }
+    }
+}
+
+if ($Command -in @('pr-gates', 'performance')) {
+    Remove-SharpProofPerformanceEvidence
+}
+
 $testProjectParallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
 
