@@ -1296,6 +1296,13 @@ source shape.
    Contract.Requires(false). Its generated Deconstruct invokes that getter but
    is silent; an explicit Deconstruct body produces SP0027. Runtime counters
    show both deconstruction paths invoke the getter once.
+5. A positional record has an explicit property getter with
+   Contract.Requires(false). Generated PrintMembers invokes that getter while
+   formatting but is silent; an explicit PrintMembers body produces SP0027.
+   Runtime counters show both formatting paths invoke the getter once.
+6. A record has a user-declared PrintMembers with Contract.Requires(false).
+   Generated ToString invokes it but is silent; an explicit ToString body
+   produces SP0027. Runtime counters show both paths invoke PrintMembers once.
 
 **Impact**: Real precondition violations on always-emitted record calls are
 missed, semantic reconciliation has no outcome for those synthesized methods,
@@ -1316,6 +1323,10 @@ its compiler-specified base target, then analyze synthetic calls for:
 - GetHashCode to base GetHashCode, with no arguments.
 - positional Deconstruct to each associated property getter in compiler order,
   preserving left-to-right completion before assigning out parameters.
+- synthesized PrintMembers to each compiler-selected printed-member getter in
+  generated order, preserving completion before subsequent reads/base calls.
+- synthesized ToString to the effective PrintMembers, modeling the generated
+  fresh StringBuilder argument or failing closed when its facts are unknown.
 
 Use the derived record declaration as diagnostic location, honor generated-code
 and type/assembly suppression, and record each synthesized method outcome once.
@@ -1327,7 +1338,7 @@ derived records against a base member with Requires(false); require equivalent
 SP0027 results. Add derived-type suppression controls and satisfiable/no-contract
 controls.
 
-**Confidence**: High; all four edges were independently tested with analyzer
+**Confidence**: High; all six edges were independently tested with analyzer
 differentials and runtime counters.
 
 ### 451. [CONFIRMED] Failed release-qualification reruns preserve the previous passing qualification.json
@@ -1917,6 +1928,445 @@ output and exit codes.
 
 **Confidence**: High; self-verified with exact helper logic in the canonical
 container.
+
+### 465. [CONFIRMED] Derived catch handlers are marked unreachable for base-typed throw expressions
+
+**Location**: SharpProof.Effects/ExceptionHandlerReachability.cs around
+lines 2742 and 2786-2797; related overlap logic in
+SharpProof.Effects/EffectExceptionFlow.cs around line 225.
+
+**Description**: CatchesKnownType returns true only when the static thrown type
+is assignable to the caught type. A throw expression statically typed Exception
+can hold InvalidOperationException and reach catch (InvalidOperationException),
+but Exception is not assignable to InvalidOperationException, so the handler
+is excluded. EffectExceptionFlow already recognizes the reverse subtype
+relation as Maybe, exposing an internal semantic disagreement.
+
+**Reproduction**:
+
+    Exception error = new InvalidOperationException();
+    try { throw error; }
+    catch (InvalidOperationException) { s_state++; }
+
+Runtime always executes the catch. The Effects summary reported:
+
+    Writes.IsUnknown = false
+    Writes = [Fresh]
+    Throws = [System.Exception]
+    Completeness = Complete
+    Termination = Terminates
+
+The reachable static write is absent from a supposedly complete exact set.
+
+**Impact**: This is not merely lost precision: a complete effect summary omits
+a real reachable static mutation. Purity/effect contracts can consume that
+summary as stronger evidence than the program permits.
+
+**Root cause**: Catch matching is represented as a Boolean one-way subtype test
+instead of overlap certainty.
+
+**Recommended fix**: Replace it with a tri-state catch selection:
+
+- thrown type assignable to caught type => Always;
+- caught type assignable to thrown type => Maybe;
+- otherwise => Never.
+
+Treat Maybe and Always target handlers as reachable. An earlier catch should
+block later handlers only when both its type selection and filter are Always.
+
+**Regression coverage**: Add the base-typed throw/derived-catch case and require
+a complete summary containing Static. Retain exact escaping-exception tests.
+Split the existing broad exception-handler test so widened Writes.Unknown cases
+assert fail-closed unknown rather than querying Contains(false) on top.
+
+**Confidence**: High; reproduced in a pinned temp checkout, and a temporary
+tri-state implementation passed the new regression plus existing exception
+escape coverage.
+
+### 466. [CONFIRMED] Operation-support catalog generation accepts duplicate stage tables
+
+**Location**: scripts/Generate-OperationSupportCatalog.ps1 around line 21.
+
+**Description**: The authoritative admission policy for contract-expression
+lowering and effect discovery is parsed directly with ConvertFrom-Json.
+Duplicate stage names collapse to the last array before nonempty and uniqueness
+validation, so contradictory supported-operation sets pass verification.
+
+**Reproduction**: Add an initial:
+
+    "contractExpression": ["Literal"],
+
+followed by the original full contractExpression table. Full verification
+exits 0:
+
+    Verified deterministic operation-support catalog.
+
+A direct parser control confirms the second array replaces the first.
+
+**Impact**: Review source can declare conflicting operation admission policy
+while generated code, stage-specific tests, and acceptance all follow the
+last-wins table and remain green.
+
+**Root cause**: Structural validation occurs after duplicate-destroying JSON
+conversion.
+
+**Recommended fix**: Run the shared recursive ordinal duplicate-property check
+before ConvertFrom-Json.
+
+**Regression coverage**: Duplicate schemaVersion, contractExpression, and
+effectDiscovery in malformed catalog fixtures; require path-qualified rejection
+before output generation and preserve valid byte identity.
+
+**Confidence**: High; duplicate-array -Verify and parser selection were
+self-verified.
+
+### 467. [CONFIRMED] SPMETA010 treats ConcurrentDictionary.TryUpdate comparisonValue as a stored value
+
+**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
+lines 20-26.
+
+**Description**: AnalyzeWrite scans every invocation argument for a
+noncacheable answer without considering parameter roles. For TryUpdate,
+newValue is the only value that can be stored; comparisonValue is read-only
+expected-state input. A safe update can therefore receive SPMETA010 solely
+because it compares against Unknown.
+
+**Reproduction**:
+
+    cache.TryUpdate(
+        key: "answer",
+        newValue: Answer.Proven,
+        comparisonValue: Answer.Unknown);
+
+with ProofCache : ConcurrentDictionary<string, Answer>, ISemanticCache:
+
+    SAFE_CONTROL_SPMETA010_COUNT=0
+    UNSAFE_NEW_VALUE_CONTROL_SPMETA010_COUNT=1
+    UNKNOWN_COMPARISON_ONLY_SPMETA010_COUNT=1
+
+All compiler-error counts were zero.
+
+**Impact**: The soundness analyzer produces a false positive for a standard
+conditional cache update that can only store a cacheable value. Warnings as
+errors can block legitimate cache code and encourage suppressing the broader
+rule.
+
+**Root cause**: Write-method recognition is name-based and all arguments are
+treated as potential stored values.
+
+**Recommended fix**: Resolve the method symbol/signature and select only
+stored-value parameters. For TryUpdate inspect newValue and never
+comparisonValue. Define roles for every cataloged write method rather than a
+single Any(argument) rule.
+
+**Regression coverage**: Unknown newValue plus Proven comparison must report;
+Proven newValue plus Unknown comparison must not. Include named and positional
+arguments and a different overload/lookalike control.
+
+**Confidence**: High; self-verified with safe, unsafe, and comparison-only
+controls.
+
+### 468. [CONFIRMED] Boxing conversions are interned as pure and collapse fresh object identities
+
+**Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
+lines 319, 346, and 889.
+
+**Description**: IsDemonstrablyPure treats every built-in conversion with a
+pure operand as pure. Unsupported boxing conversions then use pure opaque
+structural interning. Two identical boxing operations are interned as one term,
+even though C# allocates a fresh box for each conversion.
+
+**Reproduction**:
+
+    public static bool Target(long value) =>
+        (object)value == (object)value;
+
+The compiled result is false. Lowering reports:
+
+    runtime=False
+    exact=False abstention=ConversionMayChangeValue
+    left purity=Pure id=1
+    right purity=Pure id=1
+    same-box-term=True
+
+**Impact**: Although classification stays a closed abstention, retained IR
+falsely correlates separately allocated objects as the same reference.
+Downstream partial analysis can inherit an impossible identity equality.
+
+**Root cause**: Built-in conversion is treated as synonymous with
+allocation-free/deterministic purity; boxing allocation identity is ignored.
+
+**Recommended fix**: Exclude value-type-to-reference-type boxing conversions
+from IsDemonstrablyPure and emit occurrence-specific impure opaque terms.
+
+**Regression coverage**: Lower the expression above, assert runtime false,
+both child conversions impure, and distinct term identities. Retain
+allocation-free numeric conversion interning controls.
+
+**Confidence**: High; runtime and lowerer identities were self-verified in one
+probe.
+
+### 469. [CONFIRMED] Closed generic ContractFor companions cannot bind generic member invocations
+
+**Location**: SharpProof.Contracts/ContractForSymbolMatcher.cs around
+lines 218-229 and 288-316; validator path in
+SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs
+around lines 30-42.
+
+**Description**: For a closed containing type, ResolveCompanion uses the fully
+constructed call symbol as signatureTarget. For
+IRepository<int>.Select<string>, the companion candidate is still the generic
+definition RepositoryContracts.Select<U>. The initial match compares string
+against method type parameter U and rejects the candidate before
+SpecializeCompanion can apply target.TypeArguments. The validator enumerates
+the definition-shaped member and reports no SPCF diagnostic.
+
+**Reproduction**: Closed target and generic method:
+
+    CASE=closed-containing-plus-generic-method
+    SPCF_IDS=<none>
+    TARGET=IRepository<int>.Select<string>(string)
+    CONSTRUCTED_FROM=IRepository<int>.Select<U>(U)
+    MATCH_TARGET=False
+    MATCH_CONSTRUCTED_FROM=True
+    BIND_SUCCESS=False
+    BIND_FAILURE=CompanionSignatureMismatch
+    CLAUSES=-1
+
+Controls for closed containing plus nongeneric method and nongeneric containing
+plus generic method both bind successfully with one clause.
+
+**Impact**: Constructed generic-member calls using a closed-generic
+ContractFor companion lose all companion clauses despite validation accepting
+the declaration. This fails closed but can break strict builds and discard
+valid requires/ensures.
+
+**Root cause**: Containing-type and method construction are normalized as one
+decision; the later method specialization is unreachable after the premature
+signature mismatch.
+
+**Recommended fix**: In the closed-target branch, use
+target.ConstructedFrom for generic methods during initial matching while
+retaining the constructed containing type. Continue applying target type
+arguments in SpecializeCompanion.
+
+**Regression coverage**: Add the closed IRepository<int> plus Select<U>
+intersection, requiring successful binding, one clause, and a string-specialized
+source method. Add matching validator coverage with no SPCF diagnostics and
+retain both single-axis controls.
+
+**Confidence**: High; executable canonical matrix isolated the exact
+intersection and both controls.
+
+### 470. [CONFIRMED] Release-configuration evidence can remain stale and its receipt validates only schema plus commit
+
+**Location**: scripts/Test-SharpProofReleaseConfiguration.ps1 around
+lines 9-21 and 151-311;
+.github/workflows/package-consumers.yml around lines 253-264 and 300-313;
+scripts/Write-SharpProofQualificationReceipt.ps1 around lines 75-78 and
+120-149; scripts/Invoke-SharpProofReleaseContainer.ps1 around lines 175-210.
+
+**Description**: Live release-configuration checks can fail before owning the
+old report, and the receipt writer runs only after success. More seriously, the
+receipt authority accepts release-configuration evidence using only
+schemaVersion == 1 and commit == HEAD. It ignores checkedAtUtc, repository,
+rulesets, jobs, environments, and all live-check content. Final qualification
+checks the receipt/evidence hash but never reparses those semantics.
+
+**Self-verification**:
+
+1. Seed report and receipt, remove gh from PATH, and rerun the unchanged live
+   check. It exits 1 while both artifacts survive byte-for-byte.
+2. Supply the receipt writer with only
+   schemaVersion 1, matching commit, and checkedAtUtc in year 2000. It emits a
+   status-passed receipt:
+
+       MINIMAL_STALE_EVIDENCE_ACCEPTED=True
+
+**Impact**: GitHub rulesets, environments, variables, and secrets can change
+without repository SHA changes. A failed rerun or ancient same-commit snapshot
+can remain accepted as current passing evidence. Normal job failure still
+blocks automatic publish, but resumed/manual/persistent workflows can consume
+stale mutable-state authority.
+
+**Root cause**: Split publish-only-on-success lifecycle is compounded by an
+under-specified receipt arm that treats commit identity as sufficient for
+mutable external state.
+
+**Recommended fix**: Tombstone report and receipt before any live check and
+publish atomically after success. Define an exact report schema with status,
+required configuration fields, checkedAtUtc bound, and an attempt identity such
+as GITHUB_RUN_ID/GITHUB_RUN_ATTEMPT or a local nonce. Require all of these in
+receipt and final qualification validation.
+
+**Regression coverage**: Persistent fixture failures for missing gh, API error,
+and detected drift must invalidate old evidence. Receipt fixtures must reject
+schema-plus-commit-only, ancient, missing-field, and wrong-attempt evidence and
+accept one complete current report.
+
+**Confidence**: High; both producer lifecycle and weak receipt authority were
+self-verified with unchanged scripts.
+
+### 471. [CONFIRMED] Lane renewal disposes a backend still owned by another live lane
+
+**Location**: SharpProof.Worker/SharpProofWorker.cs around lines 591-607,
+especially duplicate detection near 602-604 and disposal near 606; concurrent
+caller around lines 298-328.
+
+**Description**: With multiple lanes, a renewal factory can return the backend
+already owned by another lane. Renew correctly detects the duplicate and
+returns BackendUnavailable, but then unconditionally disposes the returned
+instance. The other lane retains the now-disposed backend, may be actively
+using it, and later disposes it again during owner cleanup.
+
+**Canonical probe**:
+
+    renewal=BackendUnavailable
+    firstDisposeCount=1
+    borrowedDisposeCountBeforeOwnerCleanup=1
+    secondStillReferencesBorrowed=True
+    borrowedDisposeCountAfterOwnerCleanup=2
+
+**Impact**: One invalid renewal corrupts a different live solver lane, causing
+mid-check failures, subsequent use-after-dispose behavior, and double disposal.
+
+**Root cause**: The same cleanup branch handles a newly created rejected
+replacement and an instance whose ownership never left another lane.
+
+**Recommended fix**: Split duplicate cases. If replacement is reference-equal
+to any existing lane backend, return the typed renewal failure without
+disposing it. Dispose only a newly acquired replacement owned by the renewal
+attempt. Prefer explicit acquisition/ownership tracking.
+
+**Regression coverage**: Two lanes own A and B; A's renewal factory returns B.
+Require typed failure, B disposal count zero and usability retained until B's
+own cleanup, then exactly one disposal. Add a concurrency variant with B held
+inside CheckAsync during A renewal.
+
+**Confidence**: High; self-verified through the private lifecycle in the
+canonical container with reference and disposal-count inspection.
+
+### 472. [CONFIRMED] Effect-contract mapping generation accepts duplicate semantic properties
+
+**Location**: scripts/Generate-EffectContractMappings.ps1 around line 21.
+
+**Description**: The authoritative effect-contract vocabulary is parsed
+directly with ConvertFrom-Json. Duplicate enum metadata, numeric values, region
+mappings, or evidence rules collapse before validation.
+
+**Reproduction**: Change the first enum to:
+
+    "flags": false,
+    "flags": true
+
+Full verification exits 0:
+
+    Verified deterministic effect-contract mappings.
+
+The parser control returns GENERATOR_PARSE_VALUE=True.
+
+**Impact**: Contradictory effect semantics can remain in review source while
+generated models and acceptance stay green.
+
+**Root cause**: No strict raw duplicate-property preflight precedes conversion.
+
+**Recommended fix**: Use the shared recursive ordinal duplicate-name loader
+before ConvertFrom-Json.
+
+**Regression coverage**: Duplicate enums, enums[0].flags,
+enums[0].members[0].value, and mapping-entry properties; require path-qualified
+rejection and preserve valid byte identity.
+
+**Confidence**: High; nested duplicate -Verify and parse result were
+self-verified.
+
+### 473. [CONFIRMED] Campaign-fatal fuzz abstentions retain no case-level evidence
+
+**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 239-366 and
+369-405; detailed oracle results in
+Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs around lines 195-205 and
+Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs around lines 160-209.
+
+**Description**: Any no-mismatch case with an abstained oracle increments the
+aggregate Abstentions count and makes FuzzSummary.Passed false. However,
+SelectFailureKeys retains only Mismatch statuses. An abstained case produces no
+FuzzFailure, and the detailed reason already returned by the oracle is
+discarded after status counting.
+
+**Verification**: Existing focused tests prove both halves:
+
+- Agreement/Agreement/Abstained has HasAbstention true and no failure key.
+- SupportedDomainAbstentionFailsTheCampaign requires the summary to fail.
+
+The canonical filtered run passed both tests, confirming the current
+contradictory contract.
+
+**Impact**: Nightly/release fuzzing can fail with only Abstentions: N. JSON
+contains no case, effective seed, oracle, source/formula/scenarios, or reason.
+Operators must rerun the full campaign, and resource-sensitive abstentions may
+not reproduce. This persists even if valid exit-1 JSON is later parsed.
+
+**Root cause**: Retained evidence is modeled as mismatch-only even though pass
+policy treats mismatch and abstention as fatal.
+
+**Recommended fix**: Add a bounded, schema-owned AbstentionEvidence collection
+with Case, effective seed, oracle, unminimized input/scenarios, and original
+Detail. Keep Failures for semantic mismatches and retain at least one
+representative per abstaining oracle before applying global caps.
+
+**Regression coverage**: Inject Agreement/Agreement/Abstained with a known
+detail into aggregation. Require Passed=false, Abstentions=1, Failures empty,
+and one serialized abstention record with case/oracle/seed/input/detail.
+Cover finite-SMT Unknown and partial-backend unrecognized paths.
+
+**Confidence**: High; self-verified through focused canonical tests and exact
+result-retention flow.
+
+### 474. [CONFIRMED] Generated protocol enum membership boxes every validated value
+
+**Location**: SharpProof.Worker.Protocol/ProtocolModel.generated.cs around
+lines 620-652 and generated validation calls around lines 826-870;
+SharpProof.Worker.Protocol/ProtocolJson.cs around lines 1059-1062.
+
+**Description**: WorkerProtocolMetadata stores every value from every protocol
+enum in one HashSet<Enum>. Generic IsKnown<T> executes
+s_knownValues.Contains((Enum)(object)value), boxing each enum on every semantic
+validation. Request, manifest, callable, and claim rules call IsDefined/IsKnown
+for each relevant field after parsing and deserialization have already
+allocated their models.
+
+**Reproduction**:
+
+    100,000 IsKnown<WorkerSelectedFeature> checks:
+      2,400,000 bytes allocated
+    50,000 checks:
+      1,200,000 bytes allocated
+    type-specific HashSet<WorkerSelectedFeature> control:
+      0 bytes allocated
+
+The exact 24 bytes per lookup demonstrate boxing rather than test harness
+noise. The shared set also places equal underlying numbers from different enum
+types into colliding buckets, adding comparisons even though Enum.Equals
+preserves type correctness.
+
+**Impact**: Large claim and manifest arrays incur needless Gen0 allocation
+after strict shape walking and typed deserialization. Duplicate-filled arrays
+pay the boxing cost before later uniqueness rejection.
+
+**Root cause**: Generator convenience uses a nongeneric Enum collection for
+type-specific membership.
+
+**Recommended fix**: Generate type-specific switches, overloads, or
+HashSet<T>/generic static caches and dispatch IsKnown without boxing. Preserve
+current unknown and Unspecified semantics.
+
+**Regression coverage**: Warm IsKnown(WorkerSelectedFeature.Effects), perform
+100,000 accumulated checks, and require near-zero allocation. Verify all known
+generated values remain accepted and cast 999 plus Unspecified behavior through
+IsDefined remains unchanged.
+
+**Confidence**: High; self-verified with exact linear allocation counts and a
+zero-allocation type-specific control.
 
 ## Deferred by explicit scope
 
