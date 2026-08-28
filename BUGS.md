@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 558. [CONFIRMED] Dynamic dispatch bypasses SPMETA001 Roslyn API enforcement
-
-**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs around
-lines 42-50 and 107-150; BannedSymbols.txt includes the static API.
-
-**Description**: The analyzer registers only OperationKind.Invocation. Casting
-a statically known Compilation receiver to dynamic produces DynamicInvocation,
-and RS0030 has no target symbol to ban.
-
-**Reproduction**: Direct Compilation.RemoveAllSyntaxTrees produced one
-SPMETA001. ((dynamic)compilation).RemoveAllSyntaxTrees produced zero diagnostics,
-compiled, and reduced the runtime tree count from one to zero. A dynamic
-lookalike remained clean.
-
-**Impact**: An ordinary language construct bypasses the Error-level compiler API
-boundary for cataloged compilation mutation.
-
-**Recommended fix**: Analyze dynamic invocations and conservatively match
-cataloged member names when the receiver originates from a protected Roslyn
-type, including simple aliases. Test direct, dynamic cast, alias, and lookalike.
-
 ### 559. [CONFIRMED] Package-test shards can execute zero tests and report success
 
 **Location**: scripts/Invoke-SharpProofPackageTests.ps1 around lines 295-313,
