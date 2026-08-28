@@ -155,46 +155,6 @@ controls.
 **Confidence**: High; all eight edges were independently tested with analyzer
 differentials and runtime counters.
 
-### 481. [CONFIRMED] Dependency-audit restore failures preserve stale passing evidence with no freshness identity
-
-**Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 43-44 and
-330-338; scripts/Test-SharpProofDependencyAudit.ps1 around lines 193-362 and
-559-582; persistent artifacts in eng/container/entrypoint.sh around
-lines 178-188; .github/workflows/nightly.yml around lines 35-54.
-
-**Description**: Global parallelism and locked solution restore occur before
-the dependency-audit producer is invoked. Even inside the producer, inputs are
-resolved before old output deletion. A newly published NuGet advisory can make
-restore fail before deletion. Passing JSON contains no commit, audit timestamp,
-attempt ID, or feed-as-of identity.
-
-**Reproduction**: Seed dependency-audit.json in a temp persistent-artifact
-fixture and invoke the unchanged command without its solution, forcing outer
-restore failure:
-
-    EXIT_CODE=1
-    EVIDENCE_SURVIVED=True
-    HASH_UNCHANGED=True
-
-**Impact**: A later refresh can fail while the artifact directory still says
-the audit passed. Because the report has no commit or time, even a careful
-detached consumer cannot identify it as an earlier attempt. The job still
-fails, so this is stale attribution rather than automatic CI false green.
-
-**Root cause**: Invalidation is nested after caller restore and producer input
-validation; the schema omits freshness despite mutable advisory data.
-
-**Recommended fix**: Tombstone dependency-audit.json at command entry before
-parallelism/restore and at direct producer entry before input validation. Emit
-commit, checkedAtUtc, and attempt identity in pass/failure records and require
-them in consumers.
-
-**Regression coverage**: Seed a pass, then force outer restore, missing
-solution/config, and audit-wrapper/feed failures. Require no surviving pass and
-schema validation of commit/time/attempt identity.
-
-**Confidence**: High; self-verified byte-for-byte with unchanged scripts.
-
 ### 484. [CONFIRMED] Abrupt MSBuild termination permanently strands per-invocation run directories
 
 **Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets

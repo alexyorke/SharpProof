@@ -21,6 +21,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
 
 function Resolve-InputPath {
     param(
@@ -53,6 +55,22 @@ function Resolve-OutputPath {
         return [IO.Path]::GetFullPath($Path)
     }
     return [IO.Path]::GetFullPath((Join-Path $repositoryRoot $Path))
+}
+
+$earlyOutput = Resolve-OutputPath -Path $OutputPath
+$repositoryPrefix = $repositoryRoot.TrimEnd(
+    [IO.Path]::DirectorySeparatorChar,
+    [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+if (-not $earlyOutput.StartsWith(
+        $repositoryPrefix,
+        [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'OutputPath must remain inside the repository.'
+}
+if (Test-Path -LiteralPath $earlyOutput -PathType Container) {
+    throw "OutputPath is a directory: '$OutputPath'."
+}
+if ([IO.File]::Exists($earlyOutput)) {
+    [IO.File]::Delete($earlyOutput)
 }
 
 function Get-ExactProperty {
@@ -310,7 +328,7 @@ $resolvedReport = if ($null -ne $reportCandidate) {
 else {
     $null
 }
-$resolvedOutput = Resolve-OutputPath -Path $OutputPath
+$resolvedOutput = $earlyOutput
 $outputDirectory = [IO.Path]::GetDirectoryName($resolvedOutput)
 if ([string]::IsNullOrWhiteSpace($outputDirectory)) {
     throw "OutputPath has no parent directory: '$OutputPath'."
@@ -340,9 +358,6 @@ if ([StringComparer]::OrdinalIgnoreCase.Equals(
 }
 [IO.Directory]::CreateDirectory($outputDirectory) |
     Out-Null
-if ([IO.File]::Exists($resolvedOutput)) {
-    [IO.File]::Delete($resolvedOutput)
-}
 
 [string[]]$expectedSources = @(
     Get-ExpectedAuditSources `
@@ -556,10 +571,23 @@ if ($vulnerablePackages.Count -ne 0) {
         ForEach-Object { [string]$_.relative }
 )
 [Array]::Sort($projectPaths, [StringComparer]::Ordinal)
+$sourceCommitOutput = & git -C $repositoryRoot rev-parse HEAD 2>$null
+$sourceCommit = if ($null -eq $sourceCommitOutput) {
+    ''
+}
+else {
+    ([string]$sourceCommitOutput).Trim()
+}
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
+    $sourceCommit = 'local-' + [Guid]::NewGuid().ToString('N')
+}
 $evidence = [pscustomobject][ordered]@{
     schemaVersion = 1
     gate = 'dependencyAudit'
     passed = $true
+    commit = $sourceCommit
+    checkedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+    attemptId = Get-SharpProofReleaseAttemptId
     parameters = $parameters
     auditSources = $observedSourceArray
     projects = $projectPaths

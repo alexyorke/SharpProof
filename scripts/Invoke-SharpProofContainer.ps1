@@ -393,6 +393,8 @@ switch ($Command) {
         }
     }
     'dependency-audit' {
+        Remove-SharpProofEvidencePath `
+            'artifacts/dependency-audit/dependency-audit.json'
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         $output = Join-Path $repositoryRoot (
             'artifacts/dependency-audit/dependency-audit.json')
