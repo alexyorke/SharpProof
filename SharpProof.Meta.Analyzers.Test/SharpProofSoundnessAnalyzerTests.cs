@@ -2134,6 +2134,54 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsForbiddenRoslynMethodGroups()
+    {
+        const string source =
+            """
+            using System;
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Tooling;
+            static class C {
+                static void M(Compilation compilation) {
+                    Func<Compilation> removeAll = compilation.RemoveAllSyntaxTrees;
+                    Func<SyntaxTree[], Compilation> add = compilation.AddSyntaxTrees;
+                    _ = removeAll;
+                    _ = add;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task DoesNotDuplicateMethodGroupDiagnosticsAtDelegateInvocation()
+    {
+        const string source =
+            """
+            using System;
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Tooling;
+            static class C {
+                static void M(Compilation compilation) {
+                    Func<Compilation> removeAll = compilation.RemoveAllSyntaxTrees;
+                    removeAll();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task RejectsStaticSymbolDisplayStrings()
     {
         const string source =

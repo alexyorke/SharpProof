@@ -3054,29 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 649. [CONFIRMED] SPMETA001 misses forbidden Roslyn method-group delegates
-
-**Location**: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around
-lines 42-68, 107-150.
-
-**Description**: The analyzer registers only Invocation operations. A forbidden
-method converted to a delegate is exposed as `IMethodReferenceOperation`, and
-the later call targets `Func.Invoke`, so the exact forbidden symbol never reaches
-the rule.
-
-**Reproduction**: Direct `Compilation.AddSyntaxTrees` and
-`RemoveAllSyntaxTrees` calls each produced one SPMETA001. Equivalent method-group
-conversions retained the exact Roslyn method symbols, executed successfully, and
-produced zero diagnostics.
-
-**Impact**: Analyzer-attached code can store, pass, and invoke delegates to every
-catalogued forbidden API while SPMETA001 remains green.
-
-**Recommended fix**: Register MethodReference operations and run their original
-method symbol through the shared forbidden/allowlist predicate. Test direct and
-delegate forms, no duplicate at `Func.Invoke`, allowlisted adapter references,
-and same-named lookalikes.
-
 ### 650. [CONFIRMED] API-spec exception sets hash as ordered multisets
 
 **Location**: `SharpProof.Specs/ApiSpecContentDigest.cs`, around lines 33-37;

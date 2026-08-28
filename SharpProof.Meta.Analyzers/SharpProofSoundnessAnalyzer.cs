@@ -108,6 +108,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             var symbols = new KnownSymbols(startContext.Compilation);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
+            startContext.RegisterOperationAction(c => AnalyzeMethodReference(c, symbols), OperationKind.MethodReference);
             startContext.RegisterOperationAction(
                 c => AnalyzeDynamicInvocation(c, symbols),
                 OperationKind.DynamicInvocation);
@@ -148,7 +149,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         var invocation = (IInvocationOperation)context.Operation;
         var method = invocation.TargetMethod.OriginalDefinition;
-        if (IsForbidden(method, invocation, context.ContainingSymbol, symbols))
+        if (IsForbidden(method, invocation.Instance, context.ContainingSymbol, symbols))
         {
             Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, invocation.Syntax.GetLocation(), method.Name);
         }
@@ -157,6 +158,18 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         AnalyzeSemanticStringMethod(context, invocation, symbols);
         CacheSoundnessRules.AnalyzeWrite(context, invocation, symbols);
         AnalyzeStringConcatExpressionText(context, invocation);
+    }
+
+    private static void AnalyzeMethodReference(
+        OperationAnalysisContext context,
+        KnownSymbols symbols)
+    {
+        var reference = (IMethodReferenceOperation)context.Operation;
+        var method = reference.Method.OriginalDefinition;
+        if (IsForbidden(method, reference.Instance, context.ContainingSymbol, symbols))
+        {
+            Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, reference.Syntax.GetLocation(), method.Name);
+        }
     }
 
     private static void AnalyzeDynamicInvocation(
@@ -321,7 +334,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     private static bool IsForbidden(
         IMethodSymbol method,
-        IInvocationOperation invocation,
+        IOperation? receiver,
         ISymbol containingSymbol,
         KnownSymbols symbols)
     {
@@ -345,7 +358,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        var receiverType = invocation.Instance?.Type ?? method.ContainingType;
+        var receiverType = receiver?.Type ?? method.ContainingType;
         return IsSameType(method.ContainingType, symbols[KnownType.SymbolDisplay]) ||
                IsSameType(receiverType, symbols[KnownType.Symbol]) ||
                receiverType?.AllInterfaces.Any(value => IsSameType(value, symbols[KnownType.Symbol])) == true;
