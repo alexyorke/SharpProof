@@ -2619,48 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 545. [CONFIRMED] Conditional truth-operator exceptions do not make catches reachable
-
-**Location**: SharpProof.Effects/ExceptionHandlerReachability.cs around lines
-575-599; the correct semantic lookup exists in OperationCompletionEvaluator.cs
-around lines 1042-1053.
-
-**Description**: For user-defined `a && b`/`a || b`, Roslyn's binary
-OperatorMethod is op_BitwiseAnd/op_BitwiseOr, but runtime first invokes
-op_False/op_True on the left operand. Handler reachability models only the binary
-operator, so an exception from the truth operator does not make a matching catch
-reachable even though completion evaluation knows that call.
-
-**Reproduction**: op_False threw TruthOperatorException and a matching catch
-wrote static state 1729. The baseline oracle failed only the missing static write:
-
-    runtime exception=TruthOperatorException
-    runtime state=1729
-    uncaught summary contains exception=True
-    caught Writes.IsUnknown=false Completeness=Complete
-    caught Writes.Static=False (expected True)
-
-A temporary fix resolving the truth operator made the oracle and an existing
-throwing-operator regression pass 1/1 each.
-
-**Impact**: Analysis can return a Complete, non-unknown write summary that omits
-a runtime-reachable catch's static mutation.
-
-**Root cause**: Exception reachability models the visible binary method but not
-the earlier compiler-selected truth protocol call.
-
-**Recommended fix**: Resolve op_False for ConditionalAnd and op_True for
-ConditionalOr after the left operand completes; add its initialization/throw
-potential and permit RHS/binary operator only if it completes. Share the
-completion evaluator's lookup.
-
-**Regression coverage**: Runtime/analyzer caught and uncaught cases for both
-op_False/&& and op_True/||, requiring exact static write, complete known summary,
-and correct escaping throw behavior.
-
-**Confidence**: High; runtime and analyzer disagree on one hidden call, and the
-minimal semantic insertion fixes both focused tests.
-
 ### 546. [CONFIRMED] Direct SharpProofVerify verifies a stale compiler manifest
 
 **Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets,
