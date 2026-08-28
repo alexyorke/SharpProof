@@ -546,46 +546,6 @@ negative controls.
 **Confidence**: High; all variants and a direct-indexer positive control were
 self-verified in a compiler-clean canonical probe.
 
-### 453. [CONFIRMED] Strict protocol shape validation allocates property arrays and strings for every object
-
-**Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around
-lines 50-77, especially EnumerateObject().ToArray() near line 58 and
-property.Name access near line 69.
-
-**Description**: The recursive strict-shape walker materializes every object's
-properties into an array, then materializes each property name as a string.
-This happens after the JsonDocument already exists and is separate from both
-the double-parse and file-buffer findings.
-
-**Reproduction**: The agent isolated the private shape walker after parsing:
-
-- 100,000 two-property error objects, 2,500,981-byte JSON:
-  20,820,768 bytes allocated.
-- 50,000 semantically valid two-property error objects, 1,350,981-byte JSON:
-  10,420,648 bytes allocated.
-
-Allocation scales at roughly 208 bytes per object, or 7.7-8.3 times the input
-size. A near-limit payload can add about 129 MiB solely during shape walking.
-
-**Impact**: Valid large protocol artifacts incur avoidable LOH/Gen0 pressure
-and possible OOM in addition to DOM, typed model, and file-decoding costs,
-despite a nominal 16 MiB protocol limit.
-
-**Root cause**: LINQ array materialization and property-name string extraction
-are used where streaming JsonElement enumeration can enforce identical rules.
-
-**Recommended fix**: Use GetPropertyCount() for exact-count validation, iterate
-EnumerateObject() directly with an index, and compare with
-JsonProperty.NameEquals(expected.Name) before recursively checking Value.
-
-**Regression coverage**: Expose or split an internal EnsureJsonShape helper,
-parse a large error array before allocation measurement, warm it, and require a
-small fixed allocation ceiling. Retain count, order, duplicate-property, and
-token-kind rejection tests.
-
-**Confidence**: High; two self-verified sizes demonstrate linear amplification
-with parsing and deserialization excluded.
-
 ### 454. [CONFIRMED] Protocol model generation and schema parity accept duplicate properties
 
 **Location**: scripts/Generate-ProtocolModel.ps1 around line 358 and
