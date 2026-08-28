@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 566. [CONFIRMED] SPMETA003 rejects safe cancellation-excluding conjunctions
-
-**Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs around
-lines 169-209 and 229-265.
-
-**Description**: A catch filter is accepted only when its entire top-level
-operation is one is-pattern. A Boolean conjunction containing a proven
-OperationCanceledException exclusion is therefore rejected.
-
-**Reproduction**: exception is not OperationCanceledException && ShouldHandle
-produced one Error-level SPMETA003; the bare exclusion produced zero; the unsafe
-disjunction correctly produced one.
-
-**Impact**: Safe ordinary selective handlers are build-blocked and require
-awkward rewrites.
-
-**Recommended fix**: Recursively prove exclusion: A && B excludes when either
-operand does; A || B excludes only when both do. Preserve symbol-sensitive
-patterns and add both operand orders plus disjunction controls.
-
 ### 567. [CONFIRMED] Contradictory entry proof is discarded at the query-budget boundary
 
 **Location**: SharpProof.Worker/CallableEntryFeasibility.cs around lines 115-152;
