@@ -5980,26 +5980,6 @@ Allocates contracts.
 at actual anonymous-function/method-group materialization. Correct the stale
 direct-call test and add receiver/parameter plus escaping controls.
 
-### 696. [CONFIRMED] SP0048 points at the first assumption of any kind
-
-**Location**: `SharpProof.Worker.Launcher/Program.cs`, around lines 553-592;
-`SarifProjection.cs`, around lines 43-54.
-
-**Description**: Policy triggering counts only UserAssume/TrustedBoundary, but
-location selection chooses the first callable with any assumption. Launcher and
-SARIF independently repeat the broad predicate.
-
-**Reproduction**: In a fully valid response, an earlier callable contained only
-a Precondition and a later callable contained the used UserAssume. Both console
-SP0048 and SARIF notification pointed to `precondition.cs` instead of `user.cs`.
-
-**Impact**: Diagnostics navigate to unrelated code while reporting user/trusted
-evidence policy failures.
-
-**Recommended fix**: Centralize selection of the first callable/result containing
-UserAssume or TrustedBoundary only. Test earlier preconditions, both policy kinds,
-console structure, and SARIF URI.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
