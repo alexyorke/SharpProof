@@ -677,48 +677,6 @@ output and crash controls.
 **Confidence**: High; the agent self-verified the valid failure fixture against
 the current validator and traced the exact campaign branches.
 
-### 456. [CONFIRMED] ProofKernel propagates foreign backend cancellation as caller cancellation
-
-**Location**: SharpProof.Verify/ProofKernel.cs around lines 17-30; downstream
-classification in SharpProof.Worker/SharpProofWorker.cs around lines 96-104
-and 412.
-
-**Description**: ProofKernel propagates every OperationCanceledException or
-TaskCanceledException from a backend task without checking whether the caller's
-supplied token was canceled. A backend can return a task canceled with an
-unrelated token while the caller token remains live. This is the inverse of the
-null-task and ArgumentException defects: those swallow genuine cancellation,
-while this path invents cancellation.
-
-**Reproduction**: A compiled probe used
-Task.FromCanceled<BackendCheckResult> with a distinct canceled token:
-
-    THREW=TaskCanceledException
-    CALLER_TOKEN_CANCELED=False
-    EXCEPTION_TOKEN_IS_CALLER=False
-
-**Impact**: Direct ProofKernel callers receive false cancellation. The worker
-catches every OperationCanceledException, then interprets an uncanceled caller
-token as timeout/project-timeout state. An injected backend can therefore
-produce a protocol-valid but factually false timeout response before any
-deadline fires.
-
-**Root cause**: Backend cancellation provenance is trusted implicitly rather
-than correlated with the supplied token.
-
-**Recommended fix**: Catch OperationCanceledException when the supplied token
-is not canceled and route it through malformed-backend handling. Preserve
-propagation only when cancellationToken.IsCancellationRequested is true, then
-execute the common cancellation checkpoint.
-
-**Regression coverage**: Add a live caller token plus a backend task canceled
-with a foreign token, expecting Unknown(MalformedBackendResult), not an
-exception. Retain genuine caller-cancellation coverage and add a worker
-integration control proving the response is not TimedOut/ProjectTimeout.
-
-**Confidence**: High; self-verified with a compiled foreign-token probe and
-traced through worker timeout classification.
-
 ### 457. [CONFIRMED] Failed package-consumers reruns preserve the prior report and qualification receipt
 
 **Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 43-44 and
