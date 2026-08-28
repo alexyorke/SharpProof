@@ -1,4 +1,4 @@
-<Project TreatAsLocalProperty="_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestPathConfigured;_SharpProofCompilerManifestSourcePath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained">
+<Project TreatAsLocalProperty="_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestPathConfigured;_SharpProofCompilerManifestSourcePath;_SharpProofPublicationTopologyPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained">
   <PropertyGroup>
     <_SharpProofCompilerManifestPathConfigured>$([System.String]::Copy("$(_SharpProofCompilerManifestPath)"))</_SharpProofCompilerManifestPathConfigured>
     <_SharpProofProjectLanguageSupported Condition="'$(MSBuildProjectExtension)' == '.csproj'">true</_SharpProofProjectLanguageSupported>
@@ -22,6 +22,8 @@
   <UsingTask TaskName="SharpProof.BuildTasks.ValidatePublishedVerificationResult"
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
   <UsingTask TaskName="SharpProof.BuildTasks.ResetPublishedVerification"
+             AssemblyFile="$(_SharpProofBuildTasksPath)" />
+  <UsingTask TaskName="SharpProof.BuildTasks.PersistPublishedVerification"
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
 
   <PropertyGroup>
@@ -138,6 +140,7 @@
       <_SharpProofConfiguredResultFile>$([System.String]::Copy("$(SharpProofVerifyResultFile)"))</_SharpProofConfiguredResultFile>
       <_SharpProofConfiguredManifestFile>$([System.String]::Copy("$(SharpProofCompilerManifestFile)"))</_SharpProofConfiguredManifestFile>
       <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine("$(MSBuildProjectDirectory)", "$(IntermediateOutputPath)SharpProof"))))</_SharpProofVerifyDirectory>
+      <_SharpProofPublicationTopologyPath>$([System.IO.Path]::Combine("$(_SharpProofVerifyDirectory)", 'publication-topology.json'))</_SharpProofPublicationTopologyPath>
       <SharpProofVerifyRequestFile Condition="$(SharpProofVerifyRequestFile) == ''">$([System.IO.Path]::Combine("$(_SharpProofVerifyDirectory)", 'request.json'))</SharpProofVerifyRequestFile>
       <SharpProofVerifyResultFile Condition="$(SharpProofVerifyResultFile) == ''">$([System.IO.Path]::Combine("$(_SharpProofVerifyDirectory)", 'result.json'))</SharpProofVerifyResultFile>
       <SharpProofCompilerManifestFile Condition="$(SharpProofCompilerManifestFile) == ''">$([System.IO.Path]::Combine("$(_SharpProofVerifyDirectory)", 'compiler-manifest.json'))</SharpProofCompilerManifestFile>
@@ -206,6 +209,7 @@
       <_SharpProofCompilerOwnedOutput Include="$(ProjectRuntimeConfigDevFilePath)" Condition="'$(ProjectRuntimeConfigDevFilePath)' != ''" />
       <CustomAdditionalCompileOutputs Include="$(_SharpProofCompilerManifestSourcePath)" />
       <FileWrites Include="$(_SharpProofCompilerManifestSourcePath)" />
+      <FileWrites Include="$(_SharpProofPublicationTopologyPath)" />
     </ItemGroup>
     <SharpProof.BuildTasks.InvalidatePublishedResult
         Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
@@ -335,6 +339,13 @@
         ProjectDirectory="$(MSBuildProjectDirectory)"
         InvocationResultPath="$(_SharpProofInvocationResultFile)"
         SarifPath="$(_SharpProofEffectiveSarifFile)" />
+    <SharpProof.BuildTasks.PersistPublishedVerification
+        MetadataPath="$(_SharpProofPublicationTopologyPath)"
+        ProjectDirectory="$(MSBuildProjectDirectory)"
+        RequestPath="$(_SharpProofEffectiveRequestFile)"
+        ResultPath="$(_SharpProofEffectiveResultFile)"
+        ManifestPath="$(_SharpProofEffectiveManifestFile)"
+        SarifPath="$(_SharpProofEffectiveSarifFile)" />
     <Message Importance="High"
              Text="SharpProof verifier result: $(_SharpProofEffectiveResultFile)" />
     <Message Condition="$(_SharpProofEffectiveSarifFile) != ''"
@@ -359,6 +370,7 @@
       <_SharpProofCleanConfiguredResultFile>$([System.String]::Copy("$(SharpProofVerifyResultFile)"))</_SharpProofCleanConfiguredResultFile>
       <_SharpProofCleanConfiguredManifestFile>$([System.String]::Copy("$(SharpProofCompilerManifestFile)"))</_SharpProofCleanConfiguredManifestFile>
       <_SharpProofCleanVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine("$(MSBuildProjectDirectory)", "$(IntermediateOutputPath)SharpProof"))))</_SharpProofCleanVerifyDirectory>
+      <_SharpProofCleanPublicationTopologyPath>$([System.IO.Path]::Combine("$(_SharpProofCleanVerifyDirectory)", 'publication-topology.json'))</_SharpProofCleanPublicationTopologyPath>
       <_SharpProofCleanRequestFile Condition="$(SharpProofVerifyRequestFile) == ''">$([System.IO.Path]::Combine("$(_SharpProofCleanVerifyDirectory)", 'request.json'))</_SharpProofCleanRequestFile>
       <_SharpProofCleanRequestFile Condition="$(SharpProofVerifyRequestFile) != ''">$(SharpProofVerifyRequestFile)</_SharpProofCleanRequestFile>
       <_SharpProofCleanResultFile Condition="$(SharpProofVerifyResultFile) == ''">$([System.IO.Path]::Combine("$(_SharpProofCleanVerifyDirectory)", 'result.json'))</_SharpProofCleanResultFile>
@@ -386,6 +398,7 @@
         ManifestPath="$(_SharpProofCleanEffectiveManifestFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
         SarifPath="$(_SharpProofCleanSarifFile)"
+        PublicationTopologyPath="$(_SharpProofCleanPublicationTopologyPath)"
         CompilerManifestSourcePath="$(_SharpProofCleanCompilerManifestSourceFile)" />
   </Target>
 

@@ -243,26 +243,6 @@ with matching identities. Retain normal checkout and archive controls.
 **Confidence**: High; exact entrypoint execution against the real worktree mount
 failed solely on its translated Git pointer.
 
-### 607. [CONFIRMED] A transient custom SARIF path makes a later plain clean fail
-
-**Location**: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,
-around lines 327-359; `SharpProof.BuildTasks/ResetPublishedVerification.cs`,
-around lines 38-48; `SharpProof.Host/LinuxPathIdentity.cs`, around lines 296-403.
-
-**Description**: Clean reconstructs the publication set only from current
-properties. It cannot authenticate a prior set created with a one-off command
-line SARIF path.
-
-**Reproduction**: Build with an absolute custom SARIF succeeded. A subsequent
-plain `dotnet clean` exited 1 with SP0053 and left outputs/markers. Repeating the
-old SARIF property made clean exit 0 and remove them.
-
-**Impact**: Ordinary CI/developer clean becomes configuration-history dependent.
-
-**Recommended fix**: Persist the exact successful publication topology in
-project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
-Test transient request/result/manifest/SARIF paths and multi-target builds.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.

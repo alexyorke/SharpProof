@@ -1041,6 +1041,37 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task PlainCleanUsesTheLastSuccessfulCustomSarifTopology()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var configuredSarif = Path.Combine(
+            project.Root,
+            "transient-evidence",
+            "verification.sarif");
+
+        var build = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifySarifFile", configuredSarif));
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        Assert.That(File.Exists(configuredSarif), Is.True, build.Output);
+
+        var clean = await project.CleanAsync();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(clean.ExitCode, Is.Zero, clean.Output);
+            Assert.That(File.Exists(configuredSarif), Is.False, clean.Output);
+            Assert.That(File.Exists(project.RequestPath), Is.False, clean.Output);
+            Assert.That(File.Exists(project.ResultPath), Is.False, clean.Output);
+            Assert.That(
+                File.Exists(project.CompilerManifestPath),
+                Is.False,
+                clean.Output);
+        }
+    }
+
+    [Test]
     public async Task MissingCompilerManifestFailsBeforeWorkerLaunch()
     {
         RequireContainerWorker();
@@ -3426,6 +3457,9 @@ public sealed class WorkerMsBuildIntegrationTests
         var cleanReset = clean
             .Descendants("SharpProof.BuildTasks.ResetPublishedVerification")
             .Single();
+        var persistTopology = verifyCore
+            .Descendants("SharpProof.BuildTasks.PersistPublishedVerification")
+            .Single();
         var cleanupElements = cleanup.Elements().ToList();
         var cleanupRemove = cleanup.Elements("RemoveDir").Single();
         var cleanupSafetyErrors = cleanup.Elements("Error").ToArray();
@@ -3485,6 +3519,12 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 cleanReset.Attribute("CompilerManifestSourcePath")?.Value,
                 Is.EqualTo("$(_SharpProofCleanCompilerManifestSourceFile)"));
+            Assert.That(
+                cleanReset.Attribute("PublicationTopologyPath")?.Value,
+                Is.EqualTo("$(_SharpProofCleanPublicationTopologyPath)"));
+            Assert.That(
+                persistTopology.Attribute("MetadataPath")?.Value,
+                Is.EqualTo("$(_SharpProofPublicationTopologyPath)"));
             Assert.That(
                 initialize.Descendants(
                     "_SharpProofCompilationTargetFramework"),
@@ -3560,6 +3600,14 @@ public sealed class WorkerMsBuildIntegrationTests
                         .Select(element => verifyCoreElements.IndexOf(element))
                         .Single()),
                 "Cleanup must run after result validation and diagnostics.");
+            Assert.That(
+                verifyCoreElements.IndexOf(persistTopology),
+                Is.GreaterThan(
+                    verifyCore.Elements(
+                            "SharpProof.BuildTasks.ValidatePublishedVerificationResult")
+                        .Select(element => verifyCoreElements.IndexOf(element))
+                        .Single()),
+                "The successful publication topology must be recorded after validation.");
             Assert.That(
                 verifierExitError.Attribute("Condition")?.Value,
                 Does.Contain(

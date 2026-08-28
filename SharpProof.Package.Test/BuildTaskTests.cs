@@ -2303,6 +2303,73 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    public void PublicationResetUsesThePersistedTopologyForTransientSarif()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-topology-");
+        try
+        {
+            var request = Path.Combine(directory.FullName, "request.json");
+            var result = Path.Combine(directory.FullName, "result.json");
+            var manifest = Path.Combine(directory.FullName, "manifest.json");
+            var sarif = Path.Combine(directory.FullName, "custom.sarif");
+            var metadata = Path.Combine(
+                directory.FullName,
+                "obj",
+                "SharpProof",
+                "publication-topology.json");
+            var publication = new[] { request, result, manifest, sarif };
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       publication,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in publication)
+            {
+                File.WriteAllText(path, path);
+            }
+
+            var persist = new PersistPublishedVerification
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                MetadataPath = metadata,
+                ProjectDirectory = directory.FullName,
+                RequestPath = request,
+                ResultPath = result,
+                ManifestPath = manifest,
+                SarifPath = sarif
+            };
+            Assert.That(persist.Execute(), Is.True);
+
+            var reset = new ResetPublishedVerification
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                RequestPath = request,
+                ResultPath = result,
+                ManifestPath = manifest,
+                PublicationTopologyPath = metadata,
+                ProjectDirectory = directory.FullName
+            };
+
+            Assert.That(reset.Execute(), Is.True);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(publication.All(path => !File.Exists(path)), Is.True);
+                Assert.That(
+                    publication.All(path =>
+                        !File.Exists(LinuxPathIdentity.PublicationMarkerPath(path))),
+                    Is.True);
+                Assert.That(File.Exists(metadata), Is.False);
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public void PublicationResetRemovesCompilerManifestSource()
     {
         var directory = Directory.CreateTempSubdirectory(

@@ -19,6 +19,8 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
 
     public string? SarifPath { get; set; }
 
+    public string? PublicationTopologyPath { get; set; }
+
     public string? CompilerManifestSourcePath { get; set; }
 
     public string? ProjectDirectory { get; set; }
@@ -40,14 +42,38 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
             var projectDirectory = string.IsNullOrWhiteSpace(ProjectDirectory)
                 ? Directory.GetCurrentDirectory()
                 : Path.GetFullPath(ProjectDirectory);
-            var paths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
+            var currentPaths = Present(RequestPath, ResultPath, ManifestPath, SarifPath)
                 .Select(path => Path.GetFullPath(Path.IsPathRooted(path)
                     ? path
-                    : Path.Combine(projectDirectory, path)));
-            LinuxPathIdentity.ResetPublicationSet(
-                paths,
-                TimeSpan.FromSeconds(30),
-                cancellation.Token);
+                    : Path.Combine(projectDirectory, path)))
+                .ToArray();
+            var topologyPath = string.IsNullOrWhiteSpace(PublicationTopologyPath)
+                ? null
+                : Path.GetFullPath(Path.IsPathRooted(PublicationTopologyPath)
+                    ? PublicationTopologyPath
+                    : Path.Combine(projectDirectory, PublicationTopologyPath));
+            var persistedPaths = topologyPath == null
+                ? null
+                : PublicationTopologyStore.Read(topologyPath);
+            if (persistedPaths is not null)
+            {
+                LinuxPathIdentity.ResetPublicationSet(
+                    persistedPaths,
+                    TimeSpan.FromSeconds(30),
+                    cancellation.Token);
+            }
+            if (persistedPaths is null ||
+                !SamePaths(persistedPaths, currentPaths))
+            {
+                LinuxPathIdentity.ResetPublicationSet(
+                    currentPaths,
+                    TimeSpan.FromSeconds(30),
+                    cancellation.Token);
+            }
+            if (topologyPath != null)
+            {
+                PublicationTopologyStore.Delete(topologyPath);
+            }
             if (!string.IsNullOrWhiteSpace(CompilerManifestSourcePath))
             {
                 var sourcePath = Path.GetFullPath(Path.IsPathRooted(
@@ -100,5 +126,13 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
     private static IEnumerable<string> Present(params string?[] paths)
     {
         return paths.Where(static path => !string.IsNullOrWhiteSpace(path))!;
+    }
+
+    private static bool SamePaths(
+        string[] left,
+        string[] right)
+    {
+        return left.Length == right.Length &&
+            left.All(path => right.Contains(path, StringComparer.Ordinal));
     }
 }
