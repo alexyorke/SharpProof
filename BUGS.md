@@ -6113,27 +6113,6 @@ visit unique DAG nodes/parent edges once), preserve deterministic order, and
 thread cancellation through enumeration. Add shared-depth allocation/visit-count
 and cancellation tests.
 
-### 701. [CONFIRMED] Generated frontend model admits unsupported sequence equality
-
-**Location**: `Tools/SharpProof.Fuzz/FrontendFuzzing.cs`, around lines 329-362
-and 1078-1086; `SharpProof.Frontend/RoslynOperationLowerer.cs`, around lines
-694-712.
-
-**Description**: GeneratedCSharpExpression accepts Equal/NotEqual over Sequence,
-but the frontend scalar subset rejects C# array equality as UnsupportedType. The
-oracle labels any non-exact lowering Mismatch.
-
-**Reproduction**: Benign `(values == values)` over `long[]` returned Mismatch with
-`Generated supported C# closed the frontend subset: UnsupportedType`; an
-otherwise same reference-equality control agreed.
-
-**Impact**: Public generator/test infrastructure false-reds model-valid cases and
-future sequence-coverage expansion.
-
-**Recommended fix**: Remove Sequence from supported equality operands unless
-array identity is implemented end-to-end, or return explicit Abstained. Add a
-model-vs-lowerer support matrix and integer/string/reference controls.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
