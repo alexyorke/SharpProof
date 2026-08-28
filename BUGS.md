@@ -2549,45 +2549,6 @@ targets, and an RHS property read that remains a getter; require no duplicates.
 **Confidence**: High; runtime accessor identity and analyzer diagnostics are
 inverted only for the tuple target shape.
 
-### 538. [CONFIRMED] Conditional API-spec terms cannot infer exact sequence-null types
-
-**Location**: SharpProof.Specs/ApiSpecInstantiation.cs, context-free Null around
-lines 136-183, equality peer inference around lines 193-263, and Conditional
-around lines 266-284; validator in ApiSpecTermValidator.cs around lines 59-73.
-
-**Description**: The validator admits a Sequence null in a conditional whose
-other branch has the same declared kind. Instantiation handles exact null type
-inference only as an equality special case. Conditional instantiates each branch
-independently, so the null fails before the concrete sibling can provide its
-exact IrTypeId.
-
-**Reproduction**: A valid sequence-result API spec used a Boolean conditional
-with Sequence null and Result branches:
-
-    TABLE_VALIDATION=ACCEPTED POSTCONDITIONS=1 RESULT_KIND=Sequence
-    INSTANTIATION_STATUS=Failed FAILURE_KIND=UnsupportedValueType
-    DIRECT_TYPED_IR=ACCEPTED CONDITIONAL_TYPE=Sequence
-    EXACT_SEQUENCE_TYPE_MATCH=True
-
-**Impact**: A well-typed, validator-accepted spec loses its entire call
-application in the worker and degrades verification to Unknown. Concrete
-Reference subtypes have the analogous exact-type risk.
-
-**Root cause**: Contextual nullable-type inference is an equality-only syntactic
-special case instead of a bidirectional term rule.
-
-**Recommended fix**: In Conditional, instantiate the non-null branch first and
-use it as peer context for a direct null branch, symmetrically. More robustly,
-thread an optional expected IrTypeId through terms so nested null expressions
-inherit exact context. Preserve UnsupportedValueType only when context is absent.
-
-**Regression coverage**: Sequence null on either branch with exact peer must
-succeed; add custom Reference peers, incompatible exact peers -> TypeMismatch,
-and peerless null/null -> UnsupportedValueType. Verify worker predicates survive.
-
-**Confidence**: High; validator and typed IR accept the term while only the
-context-free instantiator rejects it.
-
 ### 539. [CONFIRMED] Canonical release tooling rejects Windows linked worktrees
 
 **Location**: compose.yaml source mount around lines 20-24 and
