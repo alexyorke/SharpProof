@@ -6140,27 +6140,6 @@ bytes until manually removed.
 PackageSource or the remote fixture directory before writing. Test new paths,
 case/symlink-resolved containment, disjoint output, and bundle preservation.
 
-### 693. [CONFIRMED] Discarded supported non-void calls become UnsupportedBody
-
-**Location**: `SharpProof.Frontend/RoslynProgramLowerer.cs`, around lines 142-152
-and 300-305; `CompilerCallableLowerer.cs`, around lines 202, 274, and 304;
-`AcyclicBlockPredicateExecutor.cs`, around lines 165-167.
-
-**Description**: Invocation statements pass `wantsResult=false`, so non-void calls
-receive no target variable. Compiler preparation requires a target for source
-summaries and API-spec calls and rejects the otherwise exact body.
-
-**Reproduction**: Discarded `Identity(value);` and `Math.Abs(value);` calls each
-made preparation fail `UnsupportedBody`. Assigning the unused result made both
-prepare successfully with one summary/spec call. Runtime results were identical.
-
-**Impact**: Ordinary statement-call syntax downgrades verifiable bodies to
-Unknown and prevents reusable summaries.
-
-**Recommended fix**: Allocate a sink temporary for every supported non-void call;
-omit targets only for void/unsupported returns. Test source-summary, API-spec,
-worker outcome parity, and void controls.
-
 ### 694. [CONFIRMED] Async Task result allocation is omitted from complete effects
 
 **Location**: `SharpProof.Effects/EffectMethodNodeBuilder.cs`, around lines 22-102.
