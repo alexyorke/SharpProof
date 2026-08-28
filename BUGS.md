@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 572. [CONFIRMED] Release digests mix committed Git blobs with dirty checkout bytes
-
-**Location**: scripts/Get-SharpProofReleaseDigests.ps1 around lines 365-435;
-Get-SharpProofProductionInventory.ps1 around lines 58-62 and 287-396.
-
-**Description**: Canonical production/TCB digests use commit-tree blobs, while
-productionSourceUniverseSha256 uses the live filesystem. Matching rev-parse HEAD
-to the requested commit does not establish clean bytes.
-
-**Reproduction**: An uncommitted source edit left declared commit, production
-digest, and TCB digest unchanged, changed the source-universe digest, and was
-accepted.
-
-**Impact**: One release-digest record straddles two source states and is not
-reproducible from its declared commit.
-
-**Recommended fix**: Evaluate inventory in a detached worktree at the requested
-commit, or reject staged, unstaged, and relevant untracked inputs. Test clean,
-dirty, staged, untracked Compile, and newly committed controls.
-
 ### 573. [CONFIRMED] Differential oracle throws on wrong-typed variable bindings
 
 **Location**: SharpProof.Testing/IrCSharpDifferentialOracle.cs around lines
