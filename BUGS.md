@@ -203,49 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 513. [CONFIRMED] One acceptance result can mint both Debug and Release receipts
-
-**Location**: producer eng/acceptance/Verify.ps1 around lines 209-219; consumer
-scripts/Write-SharpProofQualificationReceipt.ps1 around lines 62-67; matrix
-eng/acceptance/preview-evidence.v1.json rows 13-14; final qualification in
-scripts/Invoke-SharpProofReleaseContainer.ps1 around lines 169-210.
-
-**Description**: Acceptance evidence records `command` and `configuration`, but
-the receipt writer validates only schema version, passed status, and commit for
-both acceptance-debug and acceptance-release. It trusts the caller-supplied gate
-label instead of matching it to the evidence's configuration. Final
-qualification trusts the receipt label/hash and does not reopen this dimension.
-
-**Reproduction**: One canonical-Docker temp fixture generated Release evidence
-and invoked the unchanged writer twice:
-
-    EvidenceConfiguration=Release
-    ReleaseRun.ExitCode=0
-    DebugRun.ExitCode=0
-    ReleaseReceiptGate=acceptance-release
-    DebugReceiptGate=acceptance-debug
-    SameEvidencePath=true
-    SameEvidenceSha=true
-
-**Impact**: Qualification can claim both required matrix rows without executing
-Debug acceptance at all. A wiring or manual receipt-regeneration error is
-silently certified rather than rejected.
-
-**Root cause**: The receipt's gate identity is derived from an argument, not
-from the producer identity already present in the hashed evidence.
-
-**Recommended fix**: For each acceptance gate, require
-`command -ceq 'acceptance'` and exact configuration Debug or Release. Include the
-verified configuration in the receipt and recheck it during final qualification.
-Prefer a shared full timing-schema validator.
-
-**Regression coverage**: Debug->debug and Release->release pass; both cross
-pairs fail. Reject missing/wrong command or configuration. Final qualification
-must reject two receipts that hash the same Release evidence for both rows.
-
-**Confidence**: High; both receipt types were produced from one identical
-Release file and SHA in the canonical image.
-
 ### 514. [CONFIRMED] Collection-initializer Add calls are found but marked unreplayable
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines

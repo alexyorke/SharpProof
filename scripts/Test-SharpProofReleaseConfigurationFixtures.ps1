@@ -169,6 +169,49 @@ function Invoke-ReceiptCase {
     }
 }
 
+function Invoke-AcceptanceReceiptCase {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Gate,
+        [Parameter(Mandatory = $true)][string]$Configuration,
+        [Parameter(Mandatory = $true)][bool]$ExpectedSuccess
+    )
+
+    $evidencePath = Join-Path $fixture "artifacts/$Name.json"
+    $commit = (& git -C $fixture rev-parse HEAD).Trim()
+    [ordered]@{
+        schemaVersion = 1
+        command = 'acceptance'
+        configuration = $Configuration
+        commit = $commit
+        status = 'passed'
+    } | ConvertTo-Json | Set-Content -LiteralPath $evidencePath -Encoding utf8NoBOM
+    $receiptDirectory = Join-Path $fixture 'artifacts/acceptance-receipts'
+    $output = & pwsh -NoLogo -NoProfile -File (
+        Join-Path $fixture 'scripts/Write-SharpProofQualificationReceipt.ps1') `
+        -Gate $Gate `
+        -EvidencePath $evidencePath `
+        -RepositoryRoot $fixture `
+        -ReceiptDirectory $receiptDirectory 2>&1
+    $success = $LASTEXITCODE -eq 0
+    if ($success -ne $ExpectedSuccess) {
+        throw "Acceptance receipt fixture '$Name' expected success=${ExpectedSuccess}: $output"
+    }
+    $receiptPath = Join-Path $receiptDirectory ($Gate + '.json')
+    if ($ExpectedSuccess) {
+        if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+            throw "Acceptance receipt fixture '$Name' did not write a receipt."
+        }
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json
+        if ([string]$receipt.configuration -cne $Configuration) {
+            throw "Acceptance receipt fixture '$Name' lost its configuration binding."
+        }
+    }
+    elseif (Test-Path -LiteralPath $receiptPath -PathType Leaf) {
+        throw "Acceptance receipt fixture '$Name' preserved a stale receipt."
+    }
+}
+
 function Invoke-QualificationTombstoneCase {
     $directory = Join-Path $fixture 'artifacts/release-qualification'
     [IO.Directory]::CreateDirectory($directory) | Out-Null
@@ -433,6 +476,10 @@ cat "$GH_FIXTURE_ROOT/$file.json"
     '{"schemaVersion":1,"commit":"' + $fixtureCommit + '"}' |
         Set-Content -LiteralPath $minimalEvidence -Encoding utf8NoBOM
     Invoke-ReceiptCase minimal-schema $minimalEvidence $false
+    Invoke-AcceptanceReceiptCase acceptance-debug-debug acceptance-debug Debug $true
+    Invoke-AcceptanceReceiptCase acceptance-release-release acceptance-release Release $true
+    Invoke-AcceptanceReceiptCase acceptance-debug-release acceptance-debug Release $false
+    Invoke-AcceptanceReceiptCase acceptance-release-debug acceptance-release Debug $false
     Invoke-QualificationTombstoneCase
     Invoke-PilotTombstoneCase
     Write-Host 'Release configuration exact-ref fixtures passed.'

@@ -81,9 +81,20 @@ if ($Gate -in @(
         throw 'Qualification evidence must bind exactly six unique package artifacts.'
     }
 }
+$expectedAcceptanceConfiguration = if ($Gate -ceq 'acceptance-debug') {
+    'Debug'
+}
+elseif ($Gate -ceq 'acceptance-release') {
+    'Release'
+}
+else {
+    $null
+}
 $valid = switch -Regex ($Gate) {
     '^acceptance-(?:debug|release)$' {
         [int]$evidence.schemaVersion -eq 1 -and
+        [string]$evidence.command -ceq 'acceptance' -and
+        [string]$evidence.configuration -ceq $expectedAcceptanceConfiguration -and
         [string]$evidence.status -ceq 'passed' -and
         [string]$evidence.commit -ceq $commit
     }
@@ -159,6 +170,9 @@ if ($packageArtifacts.Count -ne 0) {
 }
 if ($Gate -eq 'mutation') {
     $receipt['configuration'] = 'Release'
+}
+if ($Gate -in @('acceptance-debug', 'acceptance-release')) {
+    $receipt['configuration'] = [string]$evidence.configuration
 }
 if ($Gate -eq 'pilots') {
     $receipt.review = [ordered]@{

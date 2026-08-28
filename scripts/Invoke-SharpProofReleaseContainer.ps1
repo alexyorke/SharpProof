@@ -239,6 +239,22 @@ switch ($Mode) {
                     throw 'Release-configuration receipt identity does not match its evidence.'
                 }
             }
+            if ($gate -in @('acceptance-debug', 'acceptance-release')) {
+                $expectedConfiguration = if ($gate -ceq 'acceptance-debug') {
+                    'Debug'
+                }
+                else {
+                    'Release'
+                }
+                $acceptanceEvidence = Get-Content -LiteralPath $evidencePath -Raw |
+                    ConvertFrom-Json -ErrorAction Stop
+                if ([string]$receipt.configuration -cne $expectedConfiguration -or
+                    [string]$acceptanceEvidence.command -cne 'acceptance' -or
+                    [string]$acceptanceEvidence.configuration -cne
+                        $expectedConfiguration) {
+                    throw "Acceptance qualification receipt is not bound to $expectedConfiguration configuration."
+                }
+            }
             if ($gate -eq 'mutation') {
                 if ([string]$receipt.configuration -cne 'Release') {
                     throw 'Mutation qualification receipt is not bound to Release configuration.'
