@@ -21,7 +21,7 @@ internal static class CacheSoundnessRules
             IsCacheType(
                 invocation.Instance?.Type ?? invocation.TargetMethod.ContainingType,
                 symbols) &&
-            invocation.Arguments.Any(argument => IsNonCacheableSemanticAnswer(
+            StoredValueArguments(invocation).Any(argument => IsNonCacheableSemanticAnswer(
                 argument.Value, Root(argument.Value),
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default))))
         {
@@ -29,6 +29,23 @@ internal static class CacheSoundnessRules
         }
 
         AnalyzeRefArguments(context, invocation, symbols);
+    }
+
+    private static IEnumerable<IArgumentOperation> StoredValueArguments(
+        IInvocationOperation invocation)
+    {
+        if (!string.Equals(
+                invocation.TargetMethod.Name,
+                "TryUpdate",
+                StringComparison.Ordinal))
+        {
+            return invocation.Arguments;
+        }
+
+        return invocation.Arguments.Where(argument =>
+            argument.Parameter is { } parameter &&
+            (string.Equals(parameter.Name, "newValue", StringComparison.Ordinal) ||
+             parameter.Ordinal == 1));
     }
 
     internal static void AnalyzeAssignment(

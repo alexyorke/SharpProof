@@ -585,6 +585,33 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.EqualTo(2));
     }
 
+    [Test]
+    public async Task SemanticCacheTryUpdateInspectsOnlyNewValue()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache : ISemanticCache {
+                internal bool TryUpdate(
+                    string key,
+                    Answer newValue,
+                    Answer comparisonValue) => true;
+            }
+            sealed class C {
+                void M(ProofCache cache) {
+                    cache.TryUpdate("safe", Answer.Proven, Answer.Unknown);
+                    cache.TryUpdate("unsafe", Answer.Unknown, Answer.Proven);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(1));
+    }
+
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
     public async Task ReportsCSharpExpressionTextConstruction(string source)
     {
