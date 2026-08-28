@@ -29,6 +29,8 @@ public enum GeneratedIrCategory
     Justification = "The seeded generator intentionally produces deterministic test cases.")]
 public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 {
+    private const int DefaultMaximumNodes = 4096;
+
     private static readonly long[] InterestingIntegers = [
         long.MinValue,
         -3,
@@ -51,32 +53,37 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     private readonly IrVarId _values = factory.CreateVariable(
         "values",
         factory.GetOrCreateSequenceType(factory.IntegerType));
+    private int _remainingNodes;
 
-    public GeneratedIrCase Next(int maximumDepth = 4)
+    public GeneratedIrCase Next(
+        int maximumDepth = 4,
+        int maximumNodes = DefaultMaximumNodes)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximumDepth);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumNodes, 3);
+        _remainingNodes = maximumNodes;
         var category = (GeneratedIrCategory)_random.Next(7);
         var term = category switch
         {
             GeneratedIrCategory.Arithmetic => Integer(maximumDepth),
             GeneratedIrCategory.Boolean => Boolean(maximumDepth),
             GeneratedIrCategory.String => String(maximumDepth),
-            GeneratedIrCategory.StringLength => _factory.Length(String(maximumDepth)),
-            GeneratedIrCategory.NullCast => _factory.Cast(
-                _factory.StringType,
-                _factory.Variable(_reference)),
-            GeneratedIrCategory.ArrayLength => _factory.Length(_factory.Variable(_values)),
-            GeneratedIrCategory.ArrayIndex => _factory.SequenceAccess(
-                _factory.Variable(_values),
-                Integer(Math.Min(maximumDepth, 1))),
+            GeneratedIrCategory.StringLength => CreateStringLength(maximumDepth),
+            GeneratedIrCategory.NullCast => CreateNullCast(),
+            GeneratedIrCategory.ArrayLength => CreateArrayLength(),
+            GeneratedIrCategory.ArrayIndex => CreateArrayIndex(maximumDepth),
             _ => throw new InvalidOperationException()
         };
         return CreateCase(term, category);
     }
 
-    public GeneratedIrCase NextArithmeticOrBoolean(int maximumDepth = 4)
+    public GeneratedIrCase NextArithmeticOrBoolean(
+        int maximumDepth = 4,
+        int maximumNodes = DefaultMaximumNodes)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximumDepth);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumNodes, 1);
+        _remainingNodes = maximumNodes;
         var category = _random.Next(2) == 0
             ? GeneratedIrCategory.Arithmetic
             : GeneratedIrCategory.Boolean;
@@ -125,15 +132,22 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     {
         if (depth == 0)
         {
-            return _random.Next(3) switch
-            {
-                0 => _factory.Variable(_left),
-                1 => _factory.Variable(_right),
-                _ => _factory.Integer(NextInteger())
-            };
+            return IntegerLeaf();
         }
 
-        return _random.Next(5) switch
+        var choice = _random.Next(5);
+        var childCount = choice switch
+        {
+            0 => 1,
+            1 => 3,
+            _ => 2
+        };
+        if (!ReserveExpansion(childCount))
+        {
+            return IntegerLeaf();
+        }
+
+        return choice switch
         {
             0 => _factory.Unary(IrUnaryOperator.Negate, Integer(depth - 1)),
             1 => _factory.Conditional(
@@ -151,15 +165,22 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     {
         if (depth == 0)
         {
-            return _random.Next(3) switch
-            {
-                0 => _factory.Variable(_condition),
-                1 => _factory.Boolean(false),
-                _ => _factory.Boolean(true)
-            };
+            return BooleanLeaf();
         }
 
-        return _random.Next(5) switch
+        var choice = _random.Next(5);
+        var childCount = choice switch
+        {
+            0 => 1,
+            1 or 2 => 3,
+            _ => 2
+        };
+        if (!ReserveExpansion(childCount))
+        {
+            return BooleanLeaf();
+        }
+
+        return choice switch
         {
             0 => _factory.Unary(IrUnaryOperator.Not, Boolean(depth - 1)),
             1 => _factory.Binary(
@@ -183,17 +204,17 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     {
         if (depth == 0)
         {
-            return _random.Next(5) switch
-            {
-                0 => _factory.Variable(_text),
-                1 => _factory.Null(_factory.StringType),
-                2 => _factory.String(""),
-                3 => _factory.String("sharp"),
-                _ => _factory.String("proof")
-            };
+            return StringLeaf();
         }
 
-        return _random.Next(3) switch
+        var choice = _random.Next(3);
+        var childCount = choice == 0 ? 3 : choice == 1 ? 2 : 1;
+        if (!ReserveExpansion(childCount))
+        {
+            return StringLeaf();
+        }
+
+        return choice switch
         {
             0 => _factory.Conditional(
                 Boolean(depth - 1),
@@ -205,6 +226,103 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
                 _factory.String("proof")),
             _ => String(0)
         };
+    }
+
+    private IrTerm CreateStringLength(int depth)
+    {
+        ConsumeNodes(1);
+        return _factory.Length(String(depth));
+    }
+
+    private IrTerm CreateNullCast()
+    {
+        ConsumeNodes(2);
+        return _factory.Cast(
+            _factory.StringType,
+            _factory.Variable(_reference));
+    }
+
+    private IrTerm CreateArrayLength()
+    {
+        ConsumeNodes(2);
+        return _factory.Length(_factory.Variable(_values));
+    }
+
+    private IrTerm CreateArrayIndex(int depth)
+    {
+        ConsumeNodes(2);
+        return _factory.SequenceAccess(
+            _factory.Variable(_values),
+            Integer(Math.Min(depth, 1)));
+    }
+
+    private bool ReserveExpansion(int childCount)
+    {
+        // Reserve the parent and the minimum one node for every child. Keep a
+        // small slack slot for factory canonicalization and mixed-type
+        // branches so the public budget remains a hard cap on the resulting
+        // graph, not just on recursive calls.
+        if (_remainingNodes < childCount + 2 || _random.Next(5) == 0)
+        {
+            return false;
+        }
+
+        _remainingNodes -= 2;
+        return true;
+    }
+
+    private void ConsumeNodes(int count)
+    {
+        if (count < 0 || _remainingNodes < count)
+        {
+            throw new InvalidOperationException(
+                "The generated IR node budget cannot represent this category.");
+        }
+
+        _remainingNodes -= count;
+    }
+
+    private IrTerm IntegerLeaf()
+    {
+        ConsumeLeaf();
+        return _random.Next(3) switch
+        {
+            0 => _factory.Variable(_left),
+            1 => _factory.Variable(_right),
+            _ => _factory.Integer(NextInteger())
+        };
+    }
+
+    private IrTerm BooleanLeaf()
+    {
+        ConsumeLeaf();
+        return _random.Next(3) switch
+        {
+            0 => _factory.Variable(_condition),
+            1 => _factory.Boolean(false),
+            _ => _factory.Boolean(true)
+        };
+    }
+
+    private IrTerm StringLeaf()
+    {
+        ConsumeLeaf();
+        return _random.Next(5) switch
+        {
+            0 => _factory.Variable(_text),
+            1 => _factory.Null(_factory.StringType),
+            2 => _factory.String(""),
+            3 => _factory.String("sharp"),
+            _ => _factory.String("proof")
+        };
+    }
+
+    private void ConsumeLeaf()
+    {
+        if (_remainingNodes > 0)
+        {
+            _remainingNodes--;
+        }
     }
 
     private IrBinaryOperator RandomIntegerOperator()

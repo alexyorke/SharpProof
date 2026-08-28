@@ -63,6 +63,31 @@ public sealed class IrCSharpDifferentialOracleTests
     }
 
     [Test]
+    public void GeneratorHonorsNodeBudgetAndRetainsSeededDeterminism()
+    {
+        var firstFactory = new IrFactory();
+        var secondFactory = new IrFactory();
+        var first = new WellSortedIrGenerator(firstFactory, seed: 0x4B21);
+        var second = new WellSortedIrGenerator(secondFactory, seed: 0x4B21);
+
+        for (var index = 0; index < 100; index++)
+        {
+            var firstCase = first.Next(maximumDepth: 20, maximumNodes: 31);
+            var secondCase = second.Next(maximumDepth: 20, maximumNodes: 31);
+
+            Assert.That(
+                CountNodes(firstCase.Term),
+                Is.LessThanOrEqualTo(31),
+                $"case {index} ({firstCase.Category}) exceeded the node budget: " +
+                new IrPrinter(firstFactory).Print(firstCase.Term));
+            Assert.That(
+                new IrPrinter(firstFactory).Print(firstCase.Term),
+                Is.EqualTo(new IrPrinter(secondFactory).Print(secondCase.Term)));
+            Assert.That(firstCase.Category, Is.EqualTo(secondCase.Category));
+        }
+    }
+
+    [Test]
     public void ShortCircuitSkipsDivisionByZero()
     {
         var factory = new IrFactory();
@@ -200,6 +225,41 @@ public sealed class IrCSharpDifferentialOracleTests
                 nullReceiver.Interpreted.Exception!.Kind,
                 Is.EqualTo(IrExceptionKind.NullReference));
         }
+    }
+
+    private static int CountNodes(IrTerm root)
+    {
+        var seen = new HashSet<IrId>();
+        var pending = new Stack<IrTerm>();
+        pending.Push(root);
+        while (pending.Count != 0)
+        {
+            var term = pending.Pop();
+            if (!seen.Add(term.Id))
+            {
+                continue;
+            }
+
+            foreach (var child in term switch
+                     {
+                         IrUnaryTerm unary => [unary.Operand],
+                         IrBinaryTerm binary => [binary.Left, binary.Right],
+                         IrConditionalTerm conditional =>
+                             [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse],
+                         IrCastTerm cast => [cast.Operand],
+                         IrLengthTerm length => [length.Value],
+                         IrSequenceAccessTerm access => [access.Sequence, access.Index],
+                         IrOpaqueTerm opaque => opaque.Receiver == null
+                             ? opaque.Arguments
+                             : opaque.Arguments.Insert(0, opaque.Receiver),
+                         _ => []
+                     })
+            {
+                pending.Push(child);
+            }
+        }
+
+        return seen.Count;
     }
 
     [Test]
