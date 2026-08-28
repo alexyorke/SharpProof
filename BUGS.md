@@ -2306,45 +2306,6 @@ HEAD comparison SHA.
 **Confidence**: High; canonical A/B execution turned the same uncovered change
 from failed 0% to passed 100% solely by supplying current HEAD's hex identity.
 
-### 528. [CONFIRMED] A null manifest Claims collection crashes response validation
-
-**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs, sanitized manifest
-validation around lines 497-520 and raw response projection around lines
-751-756.
-
-**Description**: ValidateManifestCore records `manifest.claims` for a null
-collection and substitutes a safe empty local. ValidateRun later ignores that
-sanitized value and directly calls `response.Manifest.Claims.Where(...)`, which
-throws ArgumentNullException(source). This differs from finding 506's null
-element identity keys; the collection itself is absent.
-
-**Reproduction**: Starting from a fully valid empty Complete response:
-
-    control: Validate returned IsValid=True
-    after Manifest.Claims=null!:
-      ArgumentNullException: Value cannot be null. (Parameter 'source')
-      at Enumerable.Where
-      at WorkerProtocolJson.ValidateRun line 753
-
-**Impact**: Malformed in-memory failure models escape the public validation
-boundary as infrastructure exceptions and mask the stable `manifest.claims`
-error that the earlier stage already attempted to return. Strict JSON null
-remains a separate parse rejection.
-
-**Root cause**: Sanitized collection state is local to one validation phase and
-dependent validation dereferences the raw object graph.
-
-**Recommended fix**: Gate projection on nonnull claims or use
-`response.Manifest?.Claims ?? []`, combined with valid-key filtering from 506.
-Preserve the primary error and skip only checks requiring absent declarations.
-
-**Regression coverage**: Claims=null! must not throw, must return invalid, and
-must include manifest.claims. Retain valid empty and strict JSON-null controls,
-including expected-hash/manifest overloads.
-
-**Confidence**: High; changing only the collection from empty to null moves the
-public validator from valid result to a deterministic LINQ exception.
-
 ### 530. [CONFIRMED] Explicit Requires calls in nested blocks are marked unreplayable
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
