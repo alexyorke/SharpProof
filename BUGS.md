@@ -294,28 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 610. [CONFIRMED] Default self-application excludes Meta.Analyzers from itself
-
-**Location**: `SharpProof.SelfApply.targets`, around lines 9-10, 31-32, and
-91-92; `scripts/Invoke-SharpProofSelfApplication.ps1`, around lines 76 and
-144-146.
-
-**Description**: Default self-application loads the baseline Meta analyzer for
-other production projects but excludes the project named
-`SharpProof.Meta.Analyzers`. One property conflates production self-analysis
-with opt-in analysis of intentionally invalid test fixtures.
-
-**Reproduction**: An imported-target probe showed no Meta analyzer item by
-default and one when opting in. A production-named compile containing a manual
-DiagnosticDescriptor passed by default, then failed with SPMETA005 under the
-opt-in flag.
-
-**Impact**: The documented analyzer-change workflow can false-green on defects
-in the Meta analyzer itself.
-
-**Recommended fix**: Load the frozen baseline Meta analyzer for every production
-project, including itself; reserve opt-in only for non-production/test fixtures.
-
 ### 611. [CONFIRMED] Partial-SMT fuzzing repeats only 32 exact bundles
 
 **Location**: `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs`, around lines

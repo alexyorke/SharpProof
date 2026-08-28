@@ -29,7 +29,7 @@
     <_SharpProofSelfApplyMetaAnalyzerPath
         Condition="'$(SharpProofSelfApplyPayloadDirectory)' == ''">$(_SharpProofSelfApplySourceMetaAnalyzerPath)</_SharpProofSelfApplyMetaAnalyzerPath>
     <_SharpProofSelfApplyUseMetaAnalyzer
-        Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == 'true' OR ('$(SharpProofProductionProject)' == 'true' AND '$(MSBuildProjectName)' != 'SharpProof.Meta.Analyzers')">true</_SharpProofSelfApplyUseMetaAnalyzer>
+        Condition="'$(SharpProofSelfApplyIncludeMetaAnalyzers)' == 'true' OR '$(SharpProofProductionProject)' == 'true'">true</_SharpProofSelfApplyUseMetaAnalyzer>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(SharpProofSelfApply)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
