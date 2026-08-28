@@ -390,7 +390,7 @@ function Get-SharpProofPackageDependencyGraph {
                 [StringComparer]::Ordinal)
             foreach ($dependency in $actualDependencies) {
                 if (-not $seenIds.Add([string]$dependency.Id) -or
-                    [string]$dependency.Id -notin $expectedIds -or
+                    [string]$dependency.Id -cnotin $expectedIds -or
                     [string]$dependency.Version -ne "[$version]") {
                     throw "Package '$($model.Nuspec.Id)' has an invalid dependency identity or version."
                 }
@@ -620,8 +620,8 @@ function Test-SharpProofSbomDependencyGraph {
         $from = Get-SharpProofDependencySpdxId -Name $edge.FromId
         $to = Get-SharpProofDependencySpdxId -Name $edge.ToId
         if (@($actual | Where-Object {
-                [string]$_.spdxElementId -eq $from -and
-                [string]$_.relatedSpdxElement -eq $to
+                [string]$_.spdxElementId -ceq $from -and
+                [string]$_.relatedSpdxElement -ceq $to
             }).Count -ne 1) {
             throw "SPDX SBOM dependency is missing: $from -> $to"
         }

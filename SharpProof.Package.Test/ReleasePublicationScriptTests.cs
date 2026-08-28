@@ -31,6 +31,25 @@ public sealed class ReleasePublicationScriptTests
     }
 
     [Test]
+    public async Task PackageDependencyIdentityChecksAreOrdinal()
+    {
+        var script = await File.ReadAllTextAsync(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "scripts",
+                "Test-SharpProofPackageDependencies.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(script, Does.Contain("-cnotin $expectedIds"));
+            Assert.That(script, Does.Contain(
+                "[string]$_.spdxElementId -ceq $from"));
+            Assert.That(script, Does.Contain(
+                "[string]$_.relatedSpdxElement -ceq $to"));
+        }
+    }
+
+    [Test]
     public async Task PublisherUsesTheRepositorySdkPolicyForRealPushes()
     {
         var root = FindRepositoryRoot();
