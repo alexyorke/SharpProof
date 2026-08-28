@@ -61,6 +61,21 @@ function Invoke-GitLines {
     return $output
 }
 
+function Assert-CleanCheckout {
+    $status = @(Invoke-GitLines `
+        -Arguments @('status', '--porcelain=v1', '--untracked-files=all') `
+        -Operation 'Checking the release digest checkout')
+    $changes = @(
+        $status |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    if ($changes.Count -ne 0) {
+        throw (
+            'Release digest requires a clean checkout; live tracked or ' +
+            'untracked inputs would not match the requested commit. Changes: ' +
+            ($changes -join '; '))
+    }
+}
+
 function Get-GitTreeEntries {
     param(
         [Parameter(Mandatory = $true)]
@@ -358,6 +373,7 @@ $resolvedCommit = (
 if ($resolvedCommit -ne $Commit) {
     throw 'Release digest commit does not resolve exactly.'
 }
+Assert-CleanCheckout
 $inventoryScriptPath = Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1'
 if (-not (Test-Path -LiteralPath $inventoryScriptPath -PathType Leaf)) {
     throw "The production inventory helper '$inventoryScriptPath' is missing from this checkout."

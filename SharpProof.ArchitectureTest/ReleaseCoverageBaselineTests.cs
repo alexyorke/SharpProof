@@ -801,6 +801,9 @@ public sealed class ReleaseCoverageBaselineTests
                 "Microsoft Visual Studio Solution File, Format Version 12.00\n" +
                 "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Fixture\", \"Fixture/Fixture.csproj\", \"{11111111-1111-1111-1111-111111111111}\"\n" +
                 "EndProject\nGlobal\nEndGlobal\n");
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, ".gitignore"),
+                "**/bin/\n**/obj/\n");
             var generatedDirectory = Path.Combine(repository, "eng", "generated");
             Directory.CreateDirectory(generatedDirectory);
             await File.WriteAllTextAsync(
@@ -856,6 +859,28 @@ public sealed class ReleaseCoverageBaselineTests
                 "rev-parse",
                 "HEAD"))).Output.Trim();
 
+            var dirtyPath = Path.Combine(
+                repository,
+                paths[0].Replace('/', Path.DirectorySeparatorChar));
+            await File.AppendAllTextAsync(dirtyPath, "dirty checkout\n");
+            var dirty = await RunReleaseDigestProcessAsync(
+                root,
+                repository,
+                regularCommit,
+                "en-US");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(dirty.ExitCode, Is.Not.Zero);
+                Assert.That(dirty.Error, Does.Contain("clean checkout"));
+            }
+            await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "restore",
+                "--worktree",
+                "--",
+                paths[0]));
+
             var english = await RunReleaseDigestAsync(
                 root,
                 repository,
@@ -903,6 +928,17 @@ public sealed class ReleaseCoverageBaselineTests
                 componentCommit,
                 "en-US");
 
+            File.SetUnixFileMode(
+                Path.Combine(
+                    repository,
+                    paths[0].Replace('/', Path.DirectorySeparatorChar)),
+                UnixFileMode.UserRead |
+                UnixFileMode.UserWrite |
+                UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead |
+                UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead |
+                UnixFileMode.OtherExecute);
             await AssertSuccessAsync(RunAsync(
                 repository,
                 "git",
@@ -931,6 +967,15 @@ public sealed class ReleaseCoverageBaselineTests
                 "git",
                 "rev-parse",
                 $"{executableCommit}:{paths[0]}"))).Output.Trim();
+            File.Delete(
+                Path.Combine(
+                    repository,
+                    paths[0].Replace('/', Path.DirectorySeparatorChar)));
+            File.CreateSymbolicLink(
+                Path.Combine(
+                    repository,
+                    paths[0].Replace('/', Path.DirectorySeparatorChar)),
+                "same blob\n");
             await AssertSuccessAsync(RunAsync(
                 repository,
                 "git",
@@ -1063,6 +1108,35 @@ public sealed class ReleaseCoverageBaselineTests
         string commit,
         string culture)
     {
+        var result = await RunReleaseDigestProcessAsync(
+            root,
+            repository,
+            commit,
+            culture);
+        Assert.That(result.ExitCode, Is.Zero, result.Error);
+        using var document = JsonDocument.Parse(result.Output);
+        var evidence = document.RootElement;
+        return new ReleaseDigest(
+            evidence
+                .GetProperty("productionDigestSha256")
+                .GetString()!,
+            evidence
+                .GetProperty("trustedComputingBaseDigestSha256")
+                .GetString()!,
+            evidence
+                .GetProperty("productionFileCount")
+                .GetInt32(),
+            evidence
+                .GetProperty("trustedComputingBaseFileCount")
+                .GetInt32());
+    }
+
+    private static Task<ProcessResult> RunReleaseDigestProcessAsync(
+        string root,
+        string repository,
+        string commit,
+        string culture)
+    {
         const string command =
             "$culture = [Globalization.CultureInfo]::GetCultureInfo(" +
             "$env:SHARPPROOF_TEST_CULTURE); " +
@@ -1071,7 +1145,7 @@ public sealed class ReleaseCoverageBaselineTests
             "& $env:SHARPPROOF_TEST_SCRIPT " +
             "-RepositoryPath $env:SHARPPROOF_TEST_REPOSITORY " +
             "-Commit $env:SHARPPROOF_TEST_COMMIT";
-        var result = await RunAsyncCore(
+        return RunAsyncCore(
             root,
             "pwsh",
             new Dictionary<string, string>
@@ -1089,22 +1163,6 @@ public sealed class ReleaseCoverageBaselineTests
             "-NonInteractive",
             "-Command",
             command);
-        Assert.That(result.ExitCode, Is.Zero, result.Error);
-        using var document = JsonDocument.Parse(result.Output);
-        var evidence = document.RootElement;
-        return new ReleaseDigest(
-            evidence
-                .GetProperty("productionDigestSha256")
-                .GetString()!,
-            evidence
-                .GetProperty("trustedComputingBaseDigestSha256")
-                .GetString()!,
-            evidence
-                .GetProperty("productionFileCount")
-                .GetInt32(),
-            evidence
-                .GetProperty("trustedComputingBaseFileCount")
-                .GetInt32());
     }
 
     private static async Task<ProcessResult> AssertSuccessAsync(
