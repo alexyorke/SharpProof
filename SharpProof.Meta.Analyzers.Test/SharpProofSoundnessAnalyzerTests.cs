@@ -951,6 +951,35 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsConstStringFieldsInIrWithoutMutableStateDiagnostic()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Ir {
+                static class Identities {
+                    private const string ConstIdentity = "ir.const";
+                    private static readonly string ReadonlyIdentity = "ir.readonly";
+                }
+            }
+            namespace SharpProof.Analyzer {
+                static class Controls {
+                    private const int Constant = 1;
+                }
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA006"),
+                Is.EqualTo(2));
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Does.Not.Contain("SPMETA002"));
+        }
+    }
+
+    [Test]
     public async Task RejectsDerivedBroadAndBareCancellationCatches()
     {
         const string source =

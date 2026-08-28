@@ -552,12 +552,13 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeField(SymbolAnalysisContext context)
     {
         var field = (IFieldSymbol)context.Symbol;
-        if (field.IsConst || field.ContainingType?.TypeKind == TypeKind.Enum)
+        if (field.ContainingType?.TypeKind == TypeKind.Enum)
         {
             return;
         }
 
-        if (IsForbiddenMutableStaticStorage(field) &&
+        if (!field.IsConst &&
+            IsForbiddenMutableStaticStorage(field) &&
             (!field.IsReadOnly || IsMutableReferenceStorage(field.Type)))
         {
             Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
