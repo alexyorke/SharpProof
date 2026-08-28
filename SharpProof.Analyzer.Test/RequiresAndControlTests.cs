@@ -9,6 +9,48 @@ namespace SharpProof.Analyzer.Test;
 public sealed class RequiresAndControlTests
 {
     [Test]
+    public async Task DefinitelyNullFieldReceiverDoesNotRefuteLaterCall()
+    {
+        var source = """
+            using SharpProof.Attributes;
+
+            public sealed class Box {
+                public int Field;
+                public int Property => Field;
+            }
+
+            public static class Subject {
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void NullField() {
+                    Box box = null!;
+                    Positive(box.Field, -1);
+                }
+
+                public static void LiveField() {
+                    var box = new Box();
+                    Positive(box.Field, -1);
+                }
+            }
+            """;
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            source,
+            ["SP0027"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            "contracts");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+        Assert.That(
+            diagnostics[0].GetMessage(),
+            Does.Contain("Positive"));
+    }
+
+    [Test]
     public async Task ParenthesizedDirectCallsReplayPreconditionsInEveryOwnedShape()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

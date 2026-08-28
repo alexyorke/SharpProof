@@ -2182,10 +2182,14 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
                 ISimpleAssignmentOperation or IArrayElementReferenceOperation or
-                IFieldReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
                 ChildrenMayCompleteNormally(operation),
+            IFieldReferenceOperation field =>
+                ChildrenMayCompleteNormally(field) &&
+                (field.Field.IsStatic ||
+                 field.Instance == null ||
+                 !IsDefinitelyNull(field.Instance)),
             IPropertyReferenceOperation property =>
                 ChildrenMayCompleteNormally(property) &&
                 (property.Property.IsStatic ||

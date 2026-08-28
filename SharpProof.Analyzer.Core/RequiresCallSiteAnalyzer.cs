@@ -455,7 +455,11 @@ internal static partial class RequiresCallSiteAnalyzer
                 callSite.Instance != null &&
                 DefiniteOperationFacts.IsDefinitelyNull(callSite.Instance) ||
                 callSite.Arguments.Any(argument =>
-                    !operationFacts.MayCompleteNormally(argument.Value)))
+                    !operationFacts.MayCompleteNormally(argument.Value) ||
+                    HasProvenNullReceiver(
+                        argument.Value,
+                        callSite.Flow,
+                        callSite.Operation)))
             {
                 return null;
             }
@@ -516,6 +520,32 @@ internal static partial class RequiresCallSiteAnalyzer
                 evaluations.Add(new ClauseEvaluation(value.Value.Boolean, condition));
             }
             return CompleteEvaluation(callSite, evaluations);
+        }
+
+        private static bool HasProvenNullReceiver(
+            IOperation operation,
+            ManagedFlowResult? flow,
+            IOperation origin)
+        {
+            operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
+            return operation switch
+            {
+                IFieldReferenceOperation
+                {
+                    Field.IsStatic: false,
+                    Instance: { } instance
+                } =>
+                    DefiniteOperationFacts.IsDefinitelyNull(instance) ||
+                    flow?.ProvesNull(origin, instance) == true,
+                IPropertyReferenceOperation
+                {
+                    Property.IsStatic: false,
+                    Instance: { } instance
+                } =>
+                    DefiniteOperationFacts.IsDefinitelyNull(instance) ||
+                    flow?.ProvesNull(origin, instance) == true,
+                _ => false
+            };
         }
 
         private AnalyzerSemanticOutcome CompleteEvaluation(
