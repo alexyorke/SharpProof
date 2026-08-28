@@ -249,6 +249,61 @@ public sealed class ContractBinderTests
             Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
     }
 
+    [TestCase("Contract.Ensures(true);")]
+    [TestCase("Contract.Assume(true);")]
+    public void RequiresOnlyBindingIgnoresUnrelatedLateClauses(string lateClause)
+    {
+        var source = """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value) {
+                    Contract.Requires(value > 0);
+                    value++;
+                    LATE_CLAUSE
+                    return value;
+                }
+            }
+            """.Replace("LATE_CLAUSE", lateClause, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
+        var result = subject.BindRequires("Target", "Read");
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.Clauses, Has.Length.EqualTo(1));
+        Assert.That(
+            result.Contracts.Clauses[0].Kind,
+            Is.EqualTo(BoundContractKind.Requires));
+    }
+
+    [Test]
+    public void InvalidDirectPostconditionCannotExposeCompanionForRequiresOnlyBinding()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static long Read(long value) {
+                    value++;
+                    Contract.Ensures(true);
+                    return value;
+                }
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static long Read(long value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.BindRequires("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
+    }
+
     [Test]
     public void InvalidDirectIntrinsicCannotBeHiddenByACompanion()
     {

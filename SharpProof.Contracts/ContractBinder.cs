@@ -97,9 +97,12 @@ public sealed class ContractBinder(
                 return ContractBindingResult.Fail(directFailure);
             }
         }
-        if (resolution.Failure != ContractBindingFailure.None)
+        var resolutionFailure = requiresOnly
+            ? GetRequiresFailure(resolution)
+            : resolution.Failure;
+        if (resolutionFailure != ContractBindingFailure.None)
         {
-            return ContractBindingResult.Fail(resolution.Failure);
+            return ContractBindingResult.Fail(resolutionFailure);
         }
 
         var source = resolution.Source;
@@ -254,6 +257,31 @@ public sealed class ContractBinder(
         }
 
         return ContractBindingFailure.None;
+    }
+
+    private static ContractBindingFailure GetRequiresFailure(
+        EffectiveContractSourceResolution resolution)
+    {
+        if (resolution.Failure != ContractBindingFailure.InvalidClausePlacement)
+        {
+            return resolution.Failure;
+        }
+
+        var direct = resolution.DirectInventory;
+        if (direct.HasPlacementErrors &&
+            !direct.Clauses.Any(static clause => clause.IsValid))
+        {
+            // A malformed direct contract must not expose a valid companion
+            // merely because the caller requested only entry requirements.
+            return ContractBindingFailure.InvalidClausePlacement;
+        }
+
+        return resolution.Inventory.Clauses.Any(clause =>
+                clause.Kind == BoundContractKind.Requires &&
+                !clause.IsValid &&
+                clause.Placement != ContractClausePlacement.NestedCallable)
+            ? ContractBindingFailure.InvalidClausePlacement
+            : ContractBindingFailure.None;
     }
 
     private bool HasInterfacePreconditions(IMethodSymbol implementation)
