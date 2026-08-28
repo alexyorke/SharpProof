@@ -2619,29 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 590. [CONFIRMED] Zero-claim unsupported callables are rewritten as MalformedResult
-
-**Location**: Worker.Protocol/WorkerResultAssembler.cs around lines 195-202;
-SharpProof.Worker/SharpProofWorker.cs around lines 350-367;
-ClaimManifestBuilder.cs around lines 61-64 and 146-147.
-
-**Description**: A precondition-only callable can legitimately fail preparation
-as UnsupportedBody and produce Incomplete/SemanticUnknown with zero claim rows.
-Projection hard-codes every zero-claim complete-run callable to Complete/None.
-
-**Reproduction**: Manifest and preparation were valid, callable was
-Incomplete/SemanticUnknown with zero claims, but response validation emitted
-response.callable_projection; Worker then replaced it with
-Failed/MalformedResult.
-
-**Impact**: Ordinary typed semantic incompleteness is misreported as malformed
-worker output and the true UnsupportedBody reason is lost.
-
-**Recommended fix**: Preserve verifiable callable-level authority for zero-claim
-entries or admit the finite claimless incomplete reasons against compiler
-preparation authority. Add end-to-end Requires-only unsupported and supported
-controls.
-
 ### 591. [CONFIRMED] Void return closed attributes are selected then discarded
 
 **Location**: ContractSelectionInventory.cs around lines 141-146;
