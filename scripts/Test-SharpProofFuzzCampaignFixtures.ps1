@@ -69,7 +69,7 @@ $result = [ordered]@{
     PartialSmtUndefined = $cases; FrontendCoverage = $coverage
     CoverageSatisfied = $true
     Failures = @([ordered]@{
-        Case = 0; Seed = $seed; Oracle = 'frontend'; Original = 'original'
+        Case = 0; Seed = $seed; CampaignSeed = 0; Oracle = 'frontend'; Original = 'original'
         Minimized = 'minimized'; Detail = 'semantic mismatch'; Term = 'minimized'
     })
     AbstentionEvidence = [object[]]@(); Passed = $false

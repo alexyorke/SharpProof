@@ -203,51 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 511. [CONFIRMED] Recorded fuzz failure seeds cannot replay their own cases
-
-**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs, FuzzFailure around lines 7-15,
-case generation around lines 149-155 and 191-198, failure construction around
-lines 262-349, and CreateCaseSeed around lines 562-572; CLI options in
-Tools/SharpProof.Fuzz/Program.cs and FuzzOptions.cs.
-
-**Description**: FuzzFailure.Seed stores the derived case seed
-`CreateCaseSeed(campaignSeed,index)`. The only CLI seed option is interpreted as
-a campaign seed and is always hashed again with a fresh index. Therefore the
-obvious replay command `--seed <failure.Seed> --cases 1` generates a different
-case. The CLI exposes no case index, case-seed, or replay mode.
-
-**Reproduction**: The production assembly probe reported:
-
-    campaign --seed=20260523 failure Case=123
-    recorded FuzzFailure.Seed=-736518015
-    natural replay derives caseSeed=545807135
-    recorded seed equals replay-derived seed=False
-    original frontend SHA=ce3e6ed441f8588af4dbcbcdcaae8626d46bb590a906c957bdcfc098cb16a7a6
-    replay frontend SHA=321dec8c3a17dd36ae3194b651f9a698c011052a9736f96a794ea00625a79f4a
-    frontend bundles identical=False
-    --case-index accepted=false
-
-**Impact**: A deterministic retained mismatch appears unreproducible when its
-own Seed is used. The only workaround is the enclosing campaign seed plus
-rerunning every case from index zero; a late millionth case requires replaying
-the full prefix, and direct finite-SMT replay is unavailable.
-
-**Root cause**: Evidence names an internal derived value `Seed` without
-preserving its campaign mapping or a CLI mode that consumes it directly.
-
-**Recommended fix**: Record explicit CampaignSeed, CaseIndex, and CaseSeed, and
-emit an exact replay descriptor/command. Add a mutually exclusive replay-case
-mode using campaign seed/index or a case-seed mode that bypasses derivation. A
-public single-case runner should execute all three oracle bundles directly.
-
-**Regression coverage**: For campaign 20260523/index 123, replay mode must match
-normal RunAsync's effective seed and frontend/finite/partial fingerprints. Cover
-index zero, maximum index, CLI validation, and ensure ordinary `--seed
-<CaseSeed>` is never advertised as replay.
-
-**Confidence**: High; the production derivation, CLI parser, and generated
-bundle hashes demonstrated that recorded-seed replay changes the case.
-
 ### 512. [CONFIRMED] Relational specification packs accept ill-typed authoritative terms
 
 **Location**: SharpProof.CompilerCollector/CompilerArtifact/

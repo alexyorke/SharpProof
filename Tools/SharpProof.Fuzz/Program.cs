@@ -2,7 +2,7 @@ using System.Text.Json;
 using SharpProof.Fuzz;
 
 const string usage =
-    "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--max-parallelism 1..4]";
+    "Usage: SharpProof.Fuzz [--cases N] [--seed N] [--replay-index N] [--max-parallelism 1..4]";
 
 FuzzOptions options;
 try

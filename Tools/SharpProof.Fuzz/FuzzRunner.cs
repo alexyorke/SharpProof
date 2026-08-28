@@ -8,6 +8,7 @@ namespace SharpProof.Fuzz;
 public sealed record FuzzFailure(
     int Case,
     int Seed,
+    int CampaignSeed,
     string Oracle,
     string Original,
     string Minimized,
@@ -207,7 +208,8 @@ public static class FuzzRunner
         for (var index = 0; index < frontendCases.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var caseSeed = CreateCaseSeed(options.Seed, index);
+            var caseIndex = ResolveCaseIndex(options, index);
+            var caseSeed = CreateCaseSeed(options.Seed, caseIndex);
             frontendCases[index] = new SmallCSharpCaseGenerator(
                 unchecked(caseSeed ^ 0x35A1D7)).Next(
                     maximumDepth: 4);
@@ -256,7 +258,7 @@ public static class FuzzRunner
             async (index, token) =>
             {
                 token.ThrowIfCancellationRequested();
-                var caseSeed = CreateCaseSeed(options.Seed, index);
+                var caseSeed = CreateCaseSeed(options.Seed, ResolveCaseIndex(options, index));
                 var frontendCase = frontendCases[index];
                 var frontend = frontendResults[index];
                 frontendStatuses[index] = frontend.Status;
@@ -345,7 +347,8 @@ public static class FuzzRunner
         {
             cancellationToken.ThrowIfCancellationRequested();
             var index = failureKey.Case;
-            var caseSeed = CreateCaseSeed(options.Seed, index);
+            var caseIndex = ResolveCaseIndex(options, index);
+            var caseSeed = CreateCaseSeed(options.Seed, caseIndex);
             switch (failureKey.Oracle)
             {
                 case "frontend":
@@ -359,8 +362,9 @@ public static class FuzzRunner
                         minimizedFrontend,
                         cancellationToken);
                     failures.Add(new FuzzFailure(
-                        index,
+                        caseIndex,
                         caseSeed,
+                        options.Seed,
                         failureKey.Oracle,
                         frontendCase.Source,
                         minimizedFrontend.Source,
@@ -393,8 +397,9 @@ public static class FuzzRunner
                         .ConfigureAwait(false);
                     var printer = new IrPrinter(factory);
                     failures.Add(new FuzzFailure(
-                        index,
+                        caseIndex,
                         caseSeed,
+                        options.Seed,
                         failureKey.Oracle,
                         printer.Print(formula.Formula),
                         printer.Print(minimizedFiniteFormula),
@@ -426,8 +431,9 @@ public static class FuzzRunner
                             cancellationToken)
                         .ConfigureAwait(false);
                     failures.Add(new FuzzFailure(
-                        index,
+                        caseIndex,
                         caseSeed,
+                        options.Seed,
                         failureKey.Oracle,
                         partialPrinter.Print(partialCase.Formula),
                         partialPrinter.Print(minimizedPartialFormula),
@@ -462,7 +468,8 @@ public static class FuzzRunner
                 frontendCases,
                 frontendResults,
                 finiteResults,
-                partialResults)
+                partialResults,
+                options.ReplayCaseIndex)
         };
     }
 
@@ -471,7 +478,8 @@ public static class FuzzRunner
         IReadOnlyList<GeneratedCSharpCase> frontendCases,
         IReadOnlyList<FrontendDifferentialResult> frontendResults,
         IReadOnlyList<FiniteDomainDifferentialResult?> finiteResults,
-        IReadOnlyList<PartialTermSmtDifferentialResult?> partialResults)
+        IReadOnlyList<PartialTermSmtDifferentialResult?> partialResults,
+        int? replayCaseIndex = null)
     {
         if (frontendCases == null ||
             frontendResults == null ||
@@ -496,6 +504,11 @@ public static class FuzzRunner
         var evidence = ImmutableArray.CreateBuilder<FuzzAbstention>(
             MaximumRetainedAbstentions);
         var retained = new HashSet<FuzzFailureKey>();
+
+        int CaseIndex(int slot)
+        {
+            return replayCaseIndex ?? slot;
+        }
 
         // Reserve one entry for each oracle before applying the global cap.
         AddFirstFrontend();
@@ -523,8 +536,8 @@ public static class FuzzRunner
                 if (frontendResults[index].Status == FuzzOracleStatus.Abstained)
                 {
                     Add(new FuzzAbstention(
-                        index,
-                        CreateCaseSeed(seed, index),
+                        CaseIndex(index),
+                        CreateCaseSeed(seed, CaseIndex(index)),
                         "frontend",
                         frontendCases[index].Source,
                         frontendResults[index].Detail));
@@ -562,8 +575,8 @@ public static class FuzzRunner
             if (frontendResults[index].Status == FuzzOracleStatus.Abstained)
             {
                 Add(new FuzzAbstention(
-                    index,
-                    CreateCaseSeed(seed, index),
+                    CaseIndex(index),
+                    CreateCaseSeed(seed, CaseIndex(index)),
                     "frontend",
                     frontendCases[index].Source,
                     frontendResults[index].Detail));
@@ -578,14 +591,14 @@ public static class FuzzRunner
                 return;
             }
 
-            var caseSeed = CreateCaseSeed(seed, index);
+            var caseSeed = CreateCaseSeed(seed, CaseIndex(index));
             var factory = new IrFactory();
             var formula = CreateTotalFiniteDomainFormula(
                 factory,
                 caseSeed,
                 CancellationToken.None);
             Add(new FuzzAbstention(
-                index,
+                CaseIndex(index),
                 caseSeed,
                 "finite-domain-smt",
                 new IrPrinter(factory).Print(formula.Formula),
@@ -600,13 +613,13 @@ public static class FuzzRunner
                 return;
             }
 
-            var caseSeed = CreateCaseSeed(seed, index);
+            var caseSeed = CreateCaseSeed(seed, CaseIndex(index));
             var factory = new IrFactory();
             var generated = PartialTermSmtCaseGenerator.Create(
                 factory,
                 unchecked(caseSeed ^ 0x243F6A88));
             Add(new FuzzAbstention(
-                index,
+                CaseIndex(index),
                 caseSeed,
                 "partial-term-smt",
                 FormatPartialInput(factory, generated),
@@ -1109,6 +1122,17 @@ public static class FuzzRunner
         value = unchecked(value * 0x846CA68Bu);
         value ^= value >> 16;
         return unchecked((int)value);
+    }
+
+    internal static int ResolveCaseIndex(FuzzOptions options, int slot)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (slot < 0 || slot >= options.Cases)
+        {
+            throw new ArgumentOutOfRangeException(nameof(slot));
+        }
+
+        return options.ReplayCaseIndex ?? slot;
     }
 
     internal static bool IsSemanticFrontendMismatch(

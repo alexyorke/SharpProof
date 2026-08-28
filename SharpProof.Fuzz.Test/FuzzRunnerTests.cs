@@ -314,6 +314,27 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void ReplayIndexSelectsTheOriginalCaseFromTheCampaignSeed()
+    {
+        var options = FuzzOptions.Parse([
+            "--seed", "20260523",
+            "--replay-index", "123"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(options.Cases, Is.EqualTo(1));
+            Assert.That(options.Seed, Is.EqualTo(20260523));
+            Assert.That(options.ReplayCaseIndex, Is.EqualTo(123));
+            Assert.That(
+                FuzzRunner.ResolveCaseIndex(options, 0),
+                Is.EqualTo(123));
+            Assert.That(
+                FuzzRunner.CreateCaseSeed(options.Seed, options.ReplayCaseIndex!.Value),
+                Is.EqualTo(FuzzRunner.CreateCaseSeed(20260523, 123)));
+        }
+    }
+
+    [Test]
     public void CaseSeedHashIsInjectiveWithinLargeCampaigns()
     {
         var seeds = new HashSet<int>();

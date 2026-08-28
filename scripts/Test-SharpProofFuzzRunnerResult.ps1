@@ -135,7 +135,7 @@ try {
     $semanticFailure.Agreements = 9
     $semanticFailure.FrontendAgreements = 9
     $semanticFailure.Failures = @([ordered]@{
-            Case = 0; Seed = 456; Oracle = 'frontend'; Original = 'original'
+            Case = 0; Seed = 456; CampaignSeed = 123; Oracle = 'frontend'; Original = 'original'
             Minimized = 'minimized'; Detail = 'semantic mismatch'; Term = 'minimized'
         })
     $semanticFailure.Passed = $false
@@ -206,7 +206,7 @@ try {
     Assert-Rejected $fixture 'impossible-exception-total'
     $fixture = Copy-Result $canonical
     $fixture.Failures = [object[]]@([ordered]@{
-            Case = 1; Seed = 123; Oracle = 'frontend'; Original = 'a'
+            Case = 1; Seed = 123; CampaignSeed = 123; Oracle = 'frontend'; Original = 'a'
             Minimized = 'a'; Detail = 'mismatch'; Term = 'a'
         })
     Assert-Rejected $fixture 'reported-failure'

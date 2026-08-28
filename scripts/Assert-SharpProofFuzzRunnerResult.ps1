@@ -214,10 +214,11 @@ function Assert-SharpProofFuzzRunnerResult {
             Assert-ExactJsonObjectProperties -Object $failure `
                 -Description 'Fuzz failure' `
                 -Expected @(
-                    'Case', 'Seed', 'Oracle', 'Original', 'Minimized',
+                    'Case', 'Seed', 'CampaignSeed', 'Oracle', 'Original', 'Minimized',
                     'Detail', 'Term')
             [void](Get-ExactJsonInt32 $failure 'Case')
             [void](Get-ExactJsonInt32 $failure 'Seed')
+            [void](Get-ExactJsonInt32 $failure 'CampaignSeed')
             foreach ($name in @(
                     'Oracle', 'Original', 'Minimized', 'Detail', 'Term')) {
                 if ($failure.GetProperty($name).ValueKind -ne
