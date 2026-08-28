@@ -630,44 +630,6 @@ as negative controls.
 **Confidence**: High; canonical exact-source probe included direct and owned
 receiver controls.
 
-### 460. [CONFIRMED] Compiler-artifact schema generation and parity accept duplicate properties
-
-**Location**: scripts/Generate-CompilerArtifactModel.ps1 around line 371 and
-SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs around line 82.
-
-**Description**: ConvertFrom-Json drops earlier duplicate properties before
-envelope and mapping validation, while parity tests use last-wins
-JsonDocument.GetProperty. The generator owns compiler-artifact, portable IR,
-compilation, and collector wire models, so contradictory schema declarations
-can pass every authority.
-
-**Reproduction**: Change artifactEnvelope to:
-
-    "version": 999,
-    "version": 15
-
-Full verification of all four copied outputs exits 0:
-
-    Verified deterministic compiler-artifact model.
-
-The parity lookup independently returns PARITY_VALUE=15.
-
-**Impact**: Envelope versions and nested wire/IR/effect mappings can be
-ambiguous while generation, acceptance, and parity remain green.
-
-**Root cause**: Generator and parity consumer share last-wins JSON behavior with
-no raw duplicate-name preflight.
-
-**Recommended fix**: Recursively reject duplicate names before conversion and
-reuse the same strict reader in schema parity tests.
-
-**Regression coverage**: Add duplicate root schemaVersion,
-artifactEnvelope.version, and nested portable-IR/collector mapping cases.
-Require path-qualified rejection before any output verification.
-
-**Confidence**: High; self-verified with full generator verification and an
-independent parity primitive.
-
 ### 461. [CONFIRMED] The intentional SMT string materialization ceiling is mislabeled as malformed backend output
 
 **Location**: SharpProof.Smt/IrSmtBackend.cs around lines 260-269 and
