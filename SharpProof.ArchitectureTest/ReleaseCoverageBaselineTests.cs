@@ -9,12 +9,13 @@ public sealed class ReleaseCoverageBaselineTests
 {
     private const string FirstPreviewBaseline =
         "8347a70187a63cc7302b35e747d484747a929f6c";
-    private static readonly string[] s_upstreamJobs =
+    private static readonly string[] s_upstreamNeeds =
     [
-        "      - package",
-        "      - container-verifier",
-        "      - security",
-        "      - attest"
+        "package",
+        "container-verifier",
+        "security",
+        "attest",
+        "portable-consumers"
     ];
 
     [Test]
@@ -30,13 +31,67 @@ public sealed class ReleaseCoverageBaselineTests
         {
             Assert.That(workflow, Does.Not.Contain("always() &&"));
             Assert.That(workflow, Does.Contain("- attest"));
-            foreach (var job in s_upstreamJobs)
-            {
-                Assert.That(workflow, Does.Contain(job), job);
-            }
             Assert.That(workflow, Does.Contain("portable-consumers"));
             Assert.That(workflow, Does.Not.Contain("minimum-sdk-consumer"));
+
+            var needs = ParseJobNeeds(workflow, "release-qualification");
+            Assert.That(
+                needs,
+                Is.EqualTo(s_upstreamNeeds),
+                "The release qualification job must depend on exactly the upstream jobs.");
         }
+    }
+
+    private static string[] ParseJobNeeds(string workflow, string jobName)
+    {
+        var inJob = false;
+        var inNeeds = false;
+        var needs = new List<string>();
+        foreach (var rawLine in workflow.Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+            {
+                continue;
+            }
+
+            var indent = line.Length - line.TrimStart().Length;
+            if (indent == 2 && trimmed == jobName + ":")
+            {
+                inJob = true;
+                inNeeds = false;
+                continue;
+            }
+
+            if (!inJob)
+            {
+                continue;
+            }
+
+            if (indent == 2 && trimmed.EndsWith(":", StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            if (indent == 4 && trimmed == "needs:")
+            {
+                inNeeds = true;
+                continue;
+            }
+
+            if (inNeeds && indent <= 4)
+            {
+                break;
+            }
+
+            if (inNeeds && indent >= 6 && trimmed.StartsWith("- ", StringComparison.Ordinal))
+            {
+                needs.Add(trimmed[2..].Trim());
+            }
+        }
+
+        return needs.ToArray();
     }
 
     [Test]
