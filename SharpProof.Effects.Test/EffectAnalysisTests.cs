@@ -939,6 +939,44 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void RecordWithCloneUsesFreshReceiverAndSourceArgument()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed record Sample(int Value)
+            {
+                private Sample(Sample other) : base() { Value = other.Value; }
+            }
+
+            public static class Factory {
+                public static Sample Clone(Sample source) => source with { };
+            }
+            """);
+        var method = EffectTestHost.RequireMethod(compilation, "Factory", "Clone");
+        var result = new EffectAnalysisSession(compilation).Analyze(method);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                result.Summary.Reads.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.False);
+            Assert.That(
+                result.Summary.Writes.Regions,
+                Has.Some.Property(nameof(EffectRegionId.Kind))
+                    .EqualTo(EffectRegionKind.Fresh));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void CapturedPrimaryConstructorParametersReadReceiverState()
     {
         var compilation = EffectTestHost.CreateCompilation(

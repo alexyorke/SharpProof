@@ -294,27 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 619. [CONFIRMED] Record with-clones misattribute receiver effects and omit allocation
-
-**Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines
-663-679; `OperationEffectScanner.Expressions.cs`, around lines 318-345.
-
-**Description**: Both clone paths call the record copy constructor with the
-original object as receiver and no source argument. Runtime instead allocates a
-fresh receiver and passes the original as parameter 0.
-
-**Reproduction**: A sealed record copy constructor read the source into its fresh
-receiver. Runtime returned a distinct record. The Complete summary reported no
-managed allocation, unknown reads, and a write to caller parameter 0. A temp
-fresh-receiver/source-argument fix passed the oracle.
-
-**Impact**: Allocation contracts get a false negative and ownership/purity gets
-an invented caller-state mutation.
-
-**Recommended fix**: Model a Fresh receiver, original operand as argument 0, and
-Managed allocation in both lowered/direct paths. Test throwing constructors,
-initializers, structs, and open dispatch.
-
 ### 620. [CONFIRMED] Cached refutation replay is quadratic per callable
 
 **Location**: `SharpProof.Worker/VerificationCache.cs`, around lines 661-809;

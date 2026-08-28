@@ -518,13 +518,9 @@ internal sealed partial class OperationEffectScanner
         {
             var callMethod = OperationCompletionEvaluator
                 .GetRecordCopyConstructor(cloneMethod) ?? cloneMethod;
-            clone = ScanCallStep(
+            clone = ScanRecordClone(
                 callMethod,
                 withOperation.Operand,
-                [],
-                [],
-                [],
-                dispatchUncertain: false,
                 withOperation);
         }
         else

@@ -708,13 +708,9 @@ internal sealed partial class OperationEffectScanner
             OperationCompletionEvaluator.GetRecordCopyConstructor(
                 invocation.TargetMethod) is { } copyConstructor)
         {
-            var cloneCallStep = ScanCallStep(
+            var cloneCallStep = ScanRecordClone(
                 copyConstructor,
                 invocation.Instance,
-                [],
-                [],
-                [],
-                dispatchUncertain: false,
                 invocation);
             return cloneCallStep.Summary;
         }
@@ -838,6 +834,56 @@ internal sealed partial class OperationEffectScanner
         return result.Then(new EffectStep(
             call,
             _completionEvaluator.CanCompleteInvocation(method, instance, origin)));
+    }
+
+    private EffectStep ScanRecordClone(
+        IMethodSymbol copyConstructor,
+        IOperation? source,
+        IOperation origin)
+    {
+        if (source == null)
+        {
+            return new EffectStep(
+                EffectSummaryOperations.Unsupported(),
+                false);
+        }
+
+        var sourceStep = ScanStep(source);
+        if (!sourceStep.CompletesNormally)
+        {
+            return sourceStep;
+        }
+
+        // A record with-expression allocates a fresh receiver and passes the
+        // original record as the copy-constructor's first argument. Treating
+        // the source as the receiver incorrectly reports writes to caller
+        // state and loses both the source read and managed allocation.
+        var receiver = EffectRegionSet.Create(
+            EffectRegionId.Fresh(origin.Syntax.SpanStart));
+        var argumentRegions = ImmutableArray.Create(
+            _conversionOwnership.ClassifyRegion(source, aliasSource: true));
+        var call = ScanCallStep(
+            copyConstructor,
+            instance: null,
+            arguments: [],
+            argumentRegions: argumentRegions,
+            actualArguments: [source],
+            dispatchUncertain: false,
+            origin: origin,
+            receiver: receiver);
+        var nullCheck = source.Type?.IsReferenceType == true
+            ? new EffectStep(
+                PotentialNullReceiver(source, origin),
+                !_nullnessEvaluator.IsProvenNull(source, origin))
+            : EffectStep.Empty;
+        var allocation = copyConstructor.ContainingType.IsValueType
+            ? EffectSummary.Empty
+            : EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
+        return sourceStep
+            .Then(nullCheck)
+            .Then(new EffectStep(
+                EffectSummaryDomain.Instance.Join(allocation, call.Summary),
+                call.CompletesNormally));
     }
 
     private bool UsesDefensiveReceiverCopy(
