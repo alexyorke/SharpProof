@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 592. [CONFIRMED] Targeted package tests depend on default Worker shard inventory
-
-**Location**: scripts/Invoke-SharpProofPackageTests.ps1 around lines 220-246 and
-281-293.
-
-**Description**: The script always performs WorkerMsBuildIntegrationTests
-list-tests discovery and enforces at least 40 methods before checking whether an
-explicit TestFilter requested a single selected shard.
-
-**Reproduction**: A project with one passing requested LauncherArgument test and
-no Worker fixture passed direct dotnet test, but the wrapper failed because
-Worker discovery returned zero. Moving discovery into default mode made the
-same wrapper pass one test.
-
-**Impact**: Healthy targeted diagnosis is blocked by unrelated Worker fixture
-renames/topology and always pays irrelevant discovery overhead.
-
-**Recommended fix**: Execute Worker inventory/bucketing only for empty-filter
-default mode; selected mode should enqueue its filter directly. Test zero-Worker
-selected success and default-mode floor failure.
-
 ### 593. [CONFIRMED] Invalid closed attributes in referenced metadata are silent
 
 **Location**: ContractBinder.cs around lines 249-301; AnalyzerSession.cs around
