@@ -355,6 +355,47 @@ public sealed class ApiSpecInstantiationCoverageTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ConditionalSequenceNullUsesTheExactPeerType(bool nullOnTrue)
+    {
+        var variable = Variable(
+            SpecVariableRole.Parameter,
+            0,
+            IrTypeKind.Sequence);
+        var nullValue = new SpecNullDeclaration(IrTypeKind.Sequence);
+        var conditional = new SpecConditionalDeclaration(
+            new SpecBooleanDeclaration(true),
+            nullOnTrue ? nullValue : variable,
+            nullOnTrue ? variable : nullValue,
+            IrTypeKind.Sequence);
+        var template = CreateTemplate(
+            isStatic: true,
+            receiverType: null,
+            parameterTypes: [IrTypeKind.Sequence],
+            resultType: null,
+            [Equal(conditional, variable)]);
+        var factory = new IrFactory();
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
+            template,
+            factory,
+            new Dictionary<SpecVarId, IrTerm>
+            {
+                [template.Parameters.Single()] = factory.Variable(
+                    factory.CreateVariable("sequence", sequenceType))
+            });
+
+        Assert.That(instantiated.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
+        var comparison = instantiated.Postconditions.Single() as IrBinaryTerm;
+        Assert.That(comparison, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(comparison!.Left.Type, Is.EqualTo(sequenceType));
+            Assert.That(comparison.Right.Type, Is.EqualTo(sequenceType));
+        }
+    }
+
     [Test]
     public void ExactReferenceAndSequenceTypesMustAgreeBeforeIrConstruction()
     {
