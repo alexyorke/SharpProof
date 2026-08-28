@@ -3030,27 +3030,6 @@ using Linux; all three portability rows can come from one host.
 **Recommended fix**: Derive the OS family from runtime APIs or reject mismatch
 before work/output; record OS/architecture provenance. Test all cross-OS pairs.
 
-### 631. [CONFIRMED] Omitted optional in arguments miss definite violations
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
-lines 385-447 and 623-639; `CallArgumentAliasPolicy.cs`, around lines 30-32.
-
-**Description**: Roslyn represents an omitted optional `in` argument as implicit
-`ArgumentKind.DefaultValue` with invocation syntax. Alias policy rejects every
-non-ArgumentSyntax alias before recognizing that this is a compiler-created
-snapshot.
-
-**Reproduction**: `[Positive] in int value = -1; Take()` bound successfully and
-runtime received -1, but no SP0027. Explicit `-1` and omitted by-value controls
-emitted SP0027; satisfying optional-in stayed clean.
-
-**Impact**: Optional defaults and `in` work separately, but their intersection
-creates a definite call-site false negative.
-
-**Recommended fix**: Classify `ArgumentKind.DefaultValue` as Snapshot before the
-syntax guard, preserving explicit `in local` call-entry semantics. Extend the
-alias/default matrix.
-
 ### 632. [CONFIRMED] Partial-SMT outcome coverage is computed then discarded
 
 **Location**: `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs`, around lines
