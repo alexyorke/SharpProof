@@ -9,6 +9,26 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class AcceptanceScriptTests
 {
+    [Test]
+    public void ContainerSemanticTestsForwardTheRequestedFilter()
+    {
+        var dispatcher = File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "scripts", "Invoke-SharpProofContainer.ps1"));
+        var start = dispatcher.IndexOf(
+            "'semantic-tests' {", StringComparison.Ordinal);
+        var end = dispatcher.IndexOf(
+            "'portable-tests' {", start, StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(start, Is.GreaterThanOrEqualTo(0));
+            Assert.That(end, Is.GreaterThan(start));
+            Assert.That(
+                dispatcher[start..end],
+                Does.Contain("-TestFilter $TestFilter"));
+        }
+    }
+
     [TestCase("canonical", true)]
     [TestCase("zero-restore", true)]
     [TestCase("nonzero-restore", true)]

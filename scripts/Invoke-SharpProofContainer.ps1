@@ -142,7 +142,8 @@ switch ($Command) {
     'semantic-tests' {
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofSemanticTests.ps1') `
-            -Configuration $Configuration
+            -Configuration $Configuration `
+            -TestFilter $TestFilter
     }
     'portable-tests' {
         $target = 'SharpProof.Portable.Tests.slnf'
