@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 $repositoryDefaultBranch = 'master'
 $currentMaintainedDocuments = @(
     'README.md',
@@ -722,8 +723,18 @@ $derivedVersions = [ordered]@{
     RelationalSummary = $relationalSummaryVersion.Groups['value'].Value
     SpecificationPack = $specificationPackVersion.Groups['value'].Value
 }
-$acceptanceContract = Get-RequiredText 'eng\acceptance\contract.json' |
-    ConvertFrom-Json
+$acceptanceContractText = Get-RequiredText 'eng\acceptance\contract.json'
+$acceptanceDocument = [System.Text.Json.JsonDocument]::Parse(
+    $acceptanceContractText)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $acceptanceDocument.RootElement `
+        -Context 'acceptance contract'
+}
+finally {
+    $acceptanceDocument.Dispose()
+}
+$acceptanceContract = $acceptanceContractText | ConvertFrom-Json
 $protocolSchema = Get-RequiredText (
     'SharpProof.Worker.Protocol\ProtocolModel.schema.json') |
     ConvertFrom-Json

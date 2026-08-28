@@ -15,6 +15,7 @@ param(
         'resource-claim-case',
         'resource-claim-spacing',
         'catalog-resource-drift',
+        'duplicate-acceptance-property',
         'check-plan-drift',
         'missing-vacuous-entry',
         'wrong-unavailable-meaning',
@@ -32,6 +33,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $relativePath = switch ($Mutation) {
     'stale-contract-api-silence' { 'docs\diagnostic-examples.md' }
     'catalog-resource-drift' { 'eng\acceptance\contract.json' }
+    'duplicate-acceptance-property' { 'eng\acceptance\contract.json' }
     'protocol-certainty-schema-drift' {
         'SharpProof.Worker.Protocol\ProtocolModel.schema.json'
     }
@@ -125,6 +127,12 @@ try {
             $text = $text.Replace(
                 '"mutationParallelism": 4',
                 '"mutationParallelism": 5',
+                [StringComparison]::Ordinal)
+        }
+        'duplicate-acceptance-property' {
+            $text = $text.Replace(
+                '"mutationParallelism": 4',
+                "`"mutationParallelism`": 99,`n        `"mutationParallelism`": 4",
                 [StringComparison]::Ordinal)
         }
         'check-plan-drift' {
