@@ -155,56 +155,6 @@ controls.
 **Confidence**: High; all eight edges were independently tested with analyzer
 differentials and runtime counters.
 
-### 455. [CONFIRMED] Fuzz campaigns discard valid semantic-failure JSON before parsing and accounting
-
-**Location**: Tools/SharpProof.Fuzz/Program.cs around lines 31-37;
-scripts/Invoke-SharpProofFuzzCampaign.ps1 around lines 131-179 and 193-206;
-scripts/Assert-SharpProofFuzzRunnerResult.ps1 around lines 130-189.
-
-**Description**: The fuzz runner writes a complete FuzzSummary and returns 1
-when it finds a semantic mismatch. The campaign script throws immediately on
-any nonzero exit before parsing, hashing, or populating that JSON. Its catch
-leaves observedCases and agreement counts at zero and schema/hash null. The
-only validator combines structural validation with a pass-only policy, so it
-also rejects internally consistent failing summaries.
-
-**Reproduction**: A one-case fixture models a frontend mismatch with finite and
-partial SMT agreement, zero abstentions, and Passed=false. The self-verification
-reported:
-
-    validator=rejected message=Invalid fuzz runner result:
-      The fuzz runner counts do not form a complete agreement partition.
-    campaign branch for ExitCode=1:
-      throws before Assert-SharpProofFuzzRunnerResult
-
-FuzzRunner's actual control flow can produce exactly this shape: per-oracle
-agreements are recorded, the mismatch is retained, overall agreement and
-abstention are not incremented, JSON is written, and exit 1 follows.
-
-**Impact**: The first real bug found by fuzzing is collapsed into the same path
-as a crash or tool failure. Campaign evidence undercounts completed work, drops
-schema and structured failure details, omits resultSha256 binding, and forces
-operators to inspect an unvalidated stdout file manually.
-
-**Root cause**: Process success is treated as a prerequisite for decoding
-output, and schema/integrity validation is inseparable from require-pass policy.
-
-**Recommended fix**: Split a structural FuzzSummary decoder from the
-require-pass policy. Always parse and hash available stdout for expected exits.
-Classify valid exit 1 plus Passed=false as semantic failure while preserving
-observed counts, schema, failures, and hash. Reserve malformed or missing JSON
-and unexpected exits for infrastructure failure. Compute campaign pass only
-after structured classification.
-
-**Regression coverage**: Use a fake runner that emits a valid mismatch summary
-and exits 1. Require the campaign to fail while its run record has structural
-validation passed, schema 4, observedCases equal requested, non-null result
-hash, preserved failures, and totalCases including the run. Retain malformed
-output and crash controls.
-
-**Confidence**: High; the agent self-verified the valid failure fixture against
-the current validator and traced the exact campaign branches.
-
 ### 478. [CONFIRMED] Abrupt launcher termination strands worker-runtime snapshots in /tmp
 
 **Location**: SharpProof.Worker.Launcher/Program.cs around lines 57 and

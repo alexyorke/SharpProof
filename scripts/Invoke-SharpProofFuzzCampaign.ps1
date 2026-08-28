@@ -144,7 +144,7 @@ function Invoke-FuzzRun {
     $runnerPassed = $false
     $resultSha256 = $null
     try {
-        if ($process.ExitCode -ne 0) {
+        if ($process.ExitCode -notin @(0, 1)) {
             throw "runner exited with code $($process.ExitCode)"
         }
         if (-not (Test-Path -LiteralPath $standardOutput -PathType Leaf)) {
@@ -154,7 +154,11 @@ function Invoke-FuzzRun {
             -Path $standardOutput `
             -ExpectedCases $Cases `
             -ExpectedSeed $Seed `
-            -ExpectedMaximumParallelism ([int]$contract.fuzz.maximumParallelism)
+            -ExpectedMaximumParallelism ([int]$contract.fuzz.maximumParallelism) `
+            -AllowFailure:($process.ExitCode -eq 1)
+        if ($process.ExitCode -eq 1 -and [bool]$result.Passed) {
+            throw 'Runner exited with semantic-failure code but reported Passed=true.'
+        }
         $runnerSchemaVersion = [int]$result.SchemaVersion
         $observedCases = [int]$result.Cases
         $agreements = [int]$result.Agreements

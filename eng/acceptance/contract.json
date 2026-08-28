@@ -161,6 +161,7 @@
       "scripts/Invoke-SharpProofDotnet.ps1",
       "scripts/Invoke-SharpProofGateEvidence.ps1",
       "scripts/Invoke-SharpProofFuzzCampaign.ps1",
+      "scripts/Test-SharpProofFuzzCampaignFixtures.ps1",
       "scripts/Invoke-SharpProofPackageTests.ps1",
       "scripts/Invoke-SharpProofReleaseContainer.ps1",
       "scripts/Invoke-SharpProofSemanticTests.ps1",

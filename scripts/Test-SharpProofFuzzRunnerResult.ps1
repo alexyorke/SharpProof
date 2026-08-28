@@ -131,6 +131,25 @@ try {
     }
     Assert-Accepted $small 'canonical-small-budget' 1 7
 
+    $semanticFailure = Copy-Result $canonical
+    $semanticFailure.Agreements = 9
+    $semanticFailure.FrontendAgreements = 9
+    $semanticFailure.Failures = @([ordered]@{
+            Case = 0; Seed = 456; Oracle = 'frontend'; Original = 'original'
+            Minimized = 'minimized'; Detail = 'semantic mismatch'; Term = 'minimized'
+        })
+    $semanticFailure.Passed = $false
+    $semanticFailurePath = Write-Result $semanticFailure 'semantic-failure'
+    $parsedFailure = Assert-SharpProofFuzzRunnerResult `
+        -Path $semanticFailurePath -ExpectedCases 10 -ExpectedSeed 123 `
+        -ExpectedMaximumParallelism 4 -AllowFailure
+    if ($parsedFailure.Passed -or $parsedFailure.Agreements -ne 9 -or
+        $parsedFailure.Failures.Count -ne 1 -or
+        [string]::IsNullOrWhiteSpace([string]$parsedFailure.ResultSha256)) {
+        throw 'A valid semantic-failure result was not structurally retained.'
+    }
+    Assert-Rejected $semanticFailure 'semantic-failure-without-opt-in'
+
     $fixture = Copy-Result $canonical; $fixture.Cases = '10'
     Assert-Rejected $fixture 'numeric-string'
     $fixture = Copy-Result $canonical; $fixture.Failures = $null
