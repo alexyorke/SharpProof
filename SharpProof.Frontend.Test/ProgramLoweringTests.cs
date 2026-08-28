@@ -11,6 +11,39 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class ProgramLoweringTests
 {
+    [TestCase(true, 1L)]
+    [TestCase(false, 2L)]
+    public void ConditionalAssignmentUpdatesTheOriginalLocal(
+        bool choose,
+        long expected)
+    {
+        var lowered = Lower(
+            """
+            public static long Target(bool choose) {
+                long value = 0L;
+                value = choose ? 1L : 2L;
+                return value;
+            }
+            """);
+        var chooseVariable = lowered.Result.Variables.Single(binding =>
+            binding.Symbol is IParameterSymbol { Name: "choose" }).Variable;
+        var execution = new IrProgramInterpreter(lowered.Factory).Execute(
+            lowered.Result.Program,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [chooseVariable] = lowered.Factory.CreateBooleanValue(choose)
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.True);
+            Assert.That(
+                execution.Status,
+                Is.EqualTo(IrProgramExecutionStatus.Returned));
+            Assert.That(execution.ReturnValue?.Integer, Is.EqualTo(expected));
+        }
+    }
+
     [Test]
     public void NegativeLiteralReturnsRemainExact()
     {

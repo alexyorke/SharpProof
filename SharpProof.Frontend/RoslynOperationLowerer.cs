@@ -10,6 +10,7 @@ public sealed class RoslynOperationLowerer
     private readonly Dictionary<ITypeSymbol, IrVarId> _instances =
         new(SymbolEqualityComparer.Default);
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
+    private readonly Dictionary<CaptureId, IOperation> _captureStorages = [];
     private readonly HashSet<CaptureId> _boundCaptures = [];
     private readonly List<IrVarId> _captureOrder = [];
     private readonly LoweringVisitor _visitor;
@@ -145,6 +146,34 @@ public sealed class RoslynOperationLowerer
     internal void BindCapture(CaptureId id)
     {
         _boundCaptures.Add(id);
+    }
+
+    internal void RememberCaptureStorage(CaptureId id, IOperation value)
+    {
+        if (value is IFlowCaptureReferenceOperation reference &&
+            _captureStorages.TryGetValue(reference.Id, out var storage))
+        {
+            value = storage;
+        }
+
+        if (value is ILocalReferenceOperation or
+            IParameterReferenceOperation or
+            IFieldReferenceOperation or
+            IArrayElementReferenceOperation or
+            IPropertyReferenceOperation)
+        {
+            if (!_captureStorages.ContainsKey(id))
+            {
+                _captureStorages.Add(id, value);
+            }
+        }
+    }
+
+    internal bool TryGetCaptureStorage(
+        CaptureId id,
+        out IOperation storage)
+    {
+        return _captureStorages.TryGetValue(id, out storage!);
     }
 
     internal bool IsCaptureBound(CaptureId id)

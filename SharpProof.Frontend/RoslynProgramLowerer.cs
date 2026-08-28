@@ -198,6 +198,7 @@ public sealed class RoslynProgramLowerer(
             IrBlockId block, OperationId operation, IFlowCaptureOperation capture)
         {
             var target = _expressions.GetCapture(capture.Id, capture.Value.Type);
+            _expressions.RememberCaptureStorage(capture.Id, capture.Value);
             _expressions.BindCapture(capture.Id);
             var value = LowerValue(block, operation, capture.Value);
             AssignOrHavoc(block, operation, target.Variable, value);
@@ -206,7 +207,14 @@ public sealed class RoslynProgramLowerer(
         private void LowerAssignment(
             IrBlockId block, OperationId operation, ISimpleAssignmentOperation assignment)
         {
-            var variable = _expressions.GetReferencedVariable(assignment.Target, unwrapConversions: false);
+            var target = assignment.Target;
+            if (target is IFlowCaptureReferenceOperation capture &&
+                _expressions.TryGetCaptureStorage(capture.Id, out var storage))
+            {
+                target = storage;
+            }
+
+            var variable = _expressions.GetReferencedVariable(target, unwrapConversions: false);
             if (variable.HasValue)
             {
                 var directValue = LowerValue(
