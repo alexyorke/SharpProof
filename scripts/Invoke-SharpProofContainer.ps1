@@ -172,8 +172,18 @@ switch ($Command) {
         $arguments = @(
             'test', $Target, '--configuration', $Configuration, '--no-restore',
             "/m:$testProjectParallelism")
+        $sourceHasGit = @(
+            & git -C $repositoryRoot rev-parse --is-inside-work-tree 2>$null
+        ).Count -eq 1
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $arguments += @('--filter', $TestFilter)
+            $filter = $TestFilter
+            if (-not $sourceHasGit) {
+                $filter = "($filter)&TestCategory!=GitBound"
+            }
+            $arguments += @('--filter', $filter)
+        }
+        elseif (-not $sourceHasGit) {
+            $arguments += @('--filter', 'TestCategory!=GitBound')
         }
         Invoke-DotNet $arguments
     }

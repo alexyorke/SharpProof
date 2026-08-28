@@ -20,6 +20,7 @@ public sealed class SbomReleaseIdentityTests
     [TestCase("creator-extra", false)]
     [TestCase("creation-extra", false)]
     [TestCase("creation-case", false)]
+    [Category("GitBound")]
     public async Task SbomReleaseIdentityIsExact(
         string mutation,
         bool expectedSuccess)

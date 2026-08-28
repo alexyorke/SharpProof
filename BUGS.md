@@ -203,51 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 489. [CONFIRMED] Ordinary test fixtures require checkout Git metadata despite the archive-test contract
-
-**Location**: SharpProof.ArchitectureTest release-authority, qualification-
-receipt, resolver, and SBOM fixtures; representative task-root Git reads occur
-around lines 181, 265, and 394 in their test sources. The production inventory
-script reached by Test-SharpProofReleaseAuthorityClosure.ps1 also queries Git.
-
-**Description**: The canonical `tooling test` contract intentionally supports a
-source archive without `.git`, and `test` is absent from the container
-entrypoint's Git-required command list. Several ordinary test fixtures
-nevertheless query the task checkout's HEAD or historical ancestry rather than
-creating self-contained repositories. Some negative SBOM cases then pass
-vacuously because the missing-Git setup error supplies the expected nonzero
-exit before the intended mutation is evaluated.
-
-**Reproduction**: A canonical Gitless run of the four affected classes produced
-29 passes and six failures. Failures were the canonical release-authority
-closure invocation, two malformed qualification-receipt tests, the release
-resolver test, and the canonical SBOM identity case. Thirteen negative SBOM
-mutation cases still passed even though their fixture failed first at
-`git rev-parse HEAD`, demonstrating the false-positive oracle.
-
-**Impact**: Ordinary archive-based test runs are red for environmental reasons,
-while multiple negative release tests can be green without exercising their
-claimed mutation. This weakens both developer feedback and release-governance
-evidence.
-
-**Root cause**: Tests mix production checkout state with fixture authority.
-They neither declare a Git requirement nor build the small deterministic commit
-graphs needed by their assertions.
-
-**Recommended fix**: Move the canonical current-checkout closure invocation to
-the existing Git-bound acceptance command, or supply a synthetic repository.
-Convert qualification and SBOM tests to temporary Git repositories with fixed
-identity/timestamps. Build a synthetic tagged ancestry for the resolver test.
-For every negative case, assert a mutation-specific rejection sentinel so setup
-failure cannot satisfy the oracle.
-
-**Regression coverage**: Add a Gitless/archive targeted run containing these
-fixtures. Require both the intended negative reason and proof that fixture setup
-completed; retain the Git-bound canonical release check separately.
-
-**Confidence**: High; the canonical Gitless run isolated six checkout-metadata
-dependencies and exposed the vacuous negative-test behavior.
-
 ### 491. [CONFIRMED] Separate object-initializer receivers collapse to one exact IR variable
 
 **Location**: SharpProof.Frontend/RoslynOperationLowerer.cs, `_instances` near

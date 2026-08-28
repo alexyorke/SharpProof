@@ -351,6 +351,7 @@ public sealed class PackageLayoutSmokeTests
     }
 
     [Test]
+    [Category("GitBound")]
     public async Task SymbolPackagesAreExactPortableAndSourceLinked()
     {
         var feed = await PackagedProductFeed.GetAsync();

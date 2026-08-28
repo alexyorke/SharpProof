@@ -8,6 +8,7 @@ public sealed class ReleaseAuthorityClosureTests
 {
     [TestCase("Test-SharpProofReleaseAuthorityClosure.ps1")]
     [TestCase("Test-SharpProofReleaseAuthorityClosureFixtures.ps1")]
+    [Category("GitBound")]
     public async Task ReleaseAuthorityClosureIsIndependentAndMutationDiscriminating(
         string scriptName)
     {

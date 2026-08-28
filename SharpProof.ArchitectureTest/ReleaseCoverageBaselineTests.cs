@@ -233,6 +233,7 @@ public sealed class ReleaseCoverageBaselineTests
     }
 
     [Test]
+    [Category("GitBound")]
     public async Task QualificationReceiptRejectsMalformedPackageIdentityEvidence()
     {
         var root = RepositoryRoot();
@@ -317,6 +318,7 @@ public sealed class ReleaseCoverageBaselineTests
     }
 
     [Test]
+    [Category("GitBound")]
     public async Task QualificationReceiptRejectsMalformedFailedAndStaleEvidence()
     {
         var root = RepositoryRoot();
@@ -568,6 +570,7 @@ public sealed class ReleaseCoverageBaselineTests
     }
 
     [Test]
+    [Category("GitBound")]
     public async Task ResolverSelectsExactCommitsAndFailsClosed()
     {
         var root = RepositoryRoot();

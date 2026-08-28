@@ -385,6 +385,32 @@ public sealed class ContainerSourceCleanlinessTests
         }
     }
 
+    [Test]
+    public void ArchiveTestRunExcludesGitBoundFixturesExplicitly()
+    {
+        var root = RepositoryRoot();
+        var dispatcher = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(dispatcher, Does.Contain("TestCategory!=GitBound"));
+            Assert.That(
+                File.ReadAllText(Path.Combine(
+                    root,
+                    "SharpProof.ArchitectureTest",
+                    "ReleaseAuthorityClosureTests.cs")),
+                Does.Contain("Category(\"GitBound\")"));
+            Assert.That(
+                File.ReadAllText(Path.Combine(
+                    root,
+                    "SharpProof.ArchitectureTest",
+                    "SbomReleaseIdentityTests.cs")),
+                Does.Contain("Category(\"GitBound\")"));
+        }
+    }
+
     private static async Task<string> CreateGitFailureWrapperAsync(
         string repository,
         string condition,
