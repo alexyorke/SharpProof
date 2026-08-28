@@ -2387,43 +2387,6 @@ including expected-hash/manifest overloads.
 **Confidence**: High; changing only the collection from empty to null moves the
 public validator from valid result to a deterministic LINQ exception.
 
-### 529. [CONFIRMED] semantic-tests silently drops its TestFilter argument
-
-**Location**: scripts/Invoke-SharpProofContainer.ps1 semantic-tests dispatch
-around lines 125-128; implemented parameter in
-scripts/Invoke-SharpProofSemanticTests.ps1 around lines 11 and 127-132.
-
-**Description**: The container wrapper accepts `-TestFilter`, and the semantic
-runner implements it, but the dispatch branch forwards only Configuration.
-Targeted commands therefore run the broad default filter. Requests for
-Performance, Coverage, or Corpus categories can instead execute the default
-suite that explicitly excludes those tests.
-
-**Reproduction**: A canonical isolated dispatcher probe ran:
-
-    tooling semantic-tests -TestFilter FullyQualifiedName~SentinelProbe
-
-The runner observed `SEMANTIC_FILTER_PROBE=<>`. Adding only
-`-TestFilter $TestFilter` to the temporary dispatch produced
-`SEMANTIC_FILTER_PROBE=<FullyQualifiedName~SentinelProbe>`. Both exited zero
-without running the broad suite.
-
-**Impact**: Developers and automation can receive success for a targeted
-semantic test command that never runs the requested tests, while also wasting
-time on unrelated defaults.
-
-**Root cause**: Parameter plumbing terminates at the top-level switch case.
-
-**Recommended fix**: Forward `-TestFilter $TestFilter` in the semantic-tests
-branch, preserving null/empty default behavior.
-
-**Regression coverage**: Add a branch-scoped architecture assertion and trusted
-mutation that removes forwarding. Prefer a behavioral dispatcher fixture that
-captures the bound parameter for empty and nonempty filters.
-
-**Confidence**: High; the exact dispatch lost the value and a one-argument
-forwarding change delivered it unchanged.
-
 ### 530. [CONFIRMED] Explicit Requires calls in nested blocks are marked unreplayable
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
