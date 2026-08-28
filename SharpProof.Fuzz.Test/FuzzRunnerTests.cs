@@ -660,6 +660,32 @@ public sealed class FuzzRunnerTests
         }
     }
 
+    [Test]
+    public void FiniteDomainEnumerationVisitsEachAssignmentOnce()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var enabled = factory.CreateVariable("enabled", factory.BooleanType);
+        var formula = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            factory.Binary(
+                IrBinaryOperator.Equal,
+                factory.Variable(value),
+                factory.Integer(0)),
+            factory.Variable(enabled));
+
+        var result = FiniteDomainSmtDifferentialOracle.EnumerateFiniteDomain(
+            factory,
+            formula);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.AllDefined, Is.True);
+            Assert.That(result.AnyTrue, Is.True);
+            Assert.That(result.LeafEvaluations, Is.EqualTo(10));
+        }
+    }
+
     [TestCase(0, 0, 1, 1)]
     [TestCase(7, 1, 0, 1)]
     [TestCase(8, 0, 2, 0)]

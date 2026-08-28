@@ -19,6 +19,11 @@ public sealed record FiniteDomainDifferentialResult(
     int FiniteDomainAssumptions,
     string Detail);
 
+internal readonly record struct FiniteDomainEnumerationResult(
+    bool AllDefined,
+    bool AnyTrue,
+    int LeafEvaluations);
+
 public sealed class FiniteDomainSmtDifferentialOracle
 {
     public static ImmutableArray<long> IntegerDomain
@@ -49,22 +54,49 @@ public sealed class FiniteDomainSmtDifferentialOracle
                 nameof(formula));
         }
 
+        return EnumerateFiniteDomain(
+            factory,
+            formula,
+            cancellationToken).AllDefined;
+    }
+
+    internal static FiniteDomainEnumerationResult EnumerateFiniteDomain(
+        IrFactory factory,
+        IrTerm formula,
+        CancellationToken cancellationToken = default)
+    {
         var variables = CollectVariables(formula);
         var interpreter = new IrInterpreter(factory);
         var environment = new Dictionary<IrVarId, IrValue>();
-        return Check(0);
+        var allDefined = true;
+        var anyTrue = false;
+        var leafEvaluations = 0;
+        Visit(0);
+        return new FiniteDomainEnumerationResult(
+            allDefined,
+            anyTrue,
+            leafEvaluations);
 
-        bool Check(int index)
+        void Visit(int index)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (index == variables.Length)
             {
+                leafEvaluations++;
                 var evaluated = interpreter.Evaluate(
                     formula,
                     environment,
                     cancellationToken);
-                return evaluated.Status == IrEvaluationStatus.Value &&
-                       evaluated.Value is { Kind: IrValueKind.Boolean };
+                if (evaluated.Status != IrEvaluationStatus.Value ||
+                    evaluated.Value is not { Kind: IrValueKind.Boolean } value)
+                {
+                    allDefined = false;
+                }
+                else
+                {
+                    anyTrue |= value.Boolean;
+                }
+                return;
             }
 
             var variable = variables[index];
@@ -73,16 +105,9 @@ public sealed class FiniteDomainSmtDifferentialOracle
             if (type == IrTypeKind.Boolean)
             {
                 environment[variable] = factory.CreateBooleanValue(false);
-                if (!Check(index + 1))
-                {
-                    return false;
-                }
-
+                Visit(index + 1);
                 environment[variable] = factory.CreateBooleanValue(true);
-                if (!Check(index + 1))
-                {
-                    return false;
-                }
+                Visit(index + 1);
             }
             else if (type == IrTypeKind.Integer)
             {
@@ -90,18 +115,14 @@ public sealed class FiniteDomainSmtDifferentialOracle
                 {
                     environment[variable] =
                         factory.CreateIntegerValue(value);
-                    if (!Check(index + 1))
-                    {
-                        return false;
-                    }
+                    Visit(index + 1);
                 }
             }
             else
             {
-                return false;
+                allDefined = false;
             }
             environment.Remove(variable);
-            return true;
         }
     }
 
@@ -117,6 +138,34 @@ public sealed class FiniteDomainSmtDifferentialOracle
         IrFactory factory,
         IrTerm formula,
         CancellationToken cancellationToken = default)
+    {
+        return await CompareCoreAsync(
+                factory,
+                formula,
+                precomputed: null,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    internal async Task<FiniteDomainDifferentialResult> CompareAsync(
+        IrFactory factory,
+        IrTerm formula,
+        FiniteDomainEnumerationResult precomputed,
+        CancellationToken cancellationToken = default)
+    {
+        return await CompareCoreAsync(
+                factory,
+                formula,
+                precomputed,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<FiniteDomainDifferentialResult> CompareCoreAsync(
+        IrFactory factory,
+        IrTerm formula,
+        FiniteDomainEnumerationResult? precomputed,
+        CancellationToken cancellationToken)
     {
         if (factory == null)
         {
@@ -165,11 +214,11 @@ public sealed class FiniteDomainSmtDifferentialOracle
                             variable.Value))));
         }
 
-        var expected = IsSatisfiableByEnumeration(
+        var enumeration = precomputed ?? EnumerateFiniteDomain(
             factory,
             formula,
-            variables,
-            cancellationToken)
+            cancellationToken);
+        var expected = enumeration.AnyTrue
             ? FiniteDomainSatisfiability.Satisfiable
             : FiniteDomainSatisfiability.Unsatisfiable;
         var query = new VerificationQuery(
@@ -218,71 +267,6 @@ public sealed class FiniteDomainSmtDifferentialOracle
                   " while SMT reported " +
                   actual +
                   ".");
-    }
-
-    private static bool IsSatisfiableByEnumeration(
-        IrFactory factory,
-        IrTerm formula,
-        ImmutableArray<IrVarId> variables,
-        CancellationToken cancellationToken)
-    {
-        var interpreter = new IrInterpreter(factory);
-        var environment = new Dictionary<IrVarId, IrValue>();
-        return Search(0);
-
-        bool Search(int index)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (index == variables.Length)
-            {
-                var evaluated = interpreter.Evaluate(
-                    formula,
-                    environment,
-                    cancellationToken);
-                return evaluated.Status == IrEvaluationStatus.Value &&
-                       evaluated.Value is
-                       {
-                           Kind: IrValueKind.Boolean,
-                           Boolean: true
-                       };
-            }
-
-            var variable = variables[index];
-            var type = factory.GetTypeInfo(
-                factory.GetVariableInfo(variable).Type).Kind;
-            if (type == IrTypeKind.Boolean)
-            {
-                environment[variable] = factory.CreateBooleanValue(false);
-                if (Search(index + 1))
-                {
-                    return true;
-                }
-
-                environment[variable] = factory.CreateBooleanValue(true);
-                if (Search(index + 1))
-                {
-                    return true;
-                }
-            }
-            else if (type == IrTypeKind.Integer)
-            {
-                foreach (var value in IntegerDomain)
-                {
-                    environment[variable] =
-                        factory.CreateIntegerValue(value);
-                    if (Search(index + 1))
-                    {
-                        return true;
-                    }
-                }
-            }
-            else
-            {
-                return false;
-            }
-            environment.Remove(variable);
-            return false;
-        }
     }
 
     private static bool TryCreateDomainPredicate(

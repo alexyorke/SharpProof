@@ -144,6 +144,10 @@ public static class FuzzRunner
         internal static GeneratedEvaluation Failure => new(true, null);
     }
 
+    private readonly record struct TotalFiniteDomainFormula(
+        IrTerm Formula,
+        FiniteDomainEnumerationResult Enumeration);
+
     private const int FrontendCompilationBatchSize = 256;
     private const int PullRequestCoverageBudget = FuzzOptions.DefaultCases;
     internal const int MaximumRetainedFailures = 64;
@@ -249,7 +253,8 @@ public static class FuzzRunner
                 var smtOracle = new FiniteDomainSmtDifferentialOracle();
                 var smt = await smtOracle.CompareAsync(
                         factory,
-                        formula,
+                        formula.Formula,
+                        formula.Enumeration,
                         token)
                     .ConfigureAwait(false);
                 smtStatuses[index] = smt.Status;
@@ -349,7 +354,7 @@ public static class FuzzRunner
                     var minimizedFiniteFormula = await IrStructuralShrinker
                         .MinimizeAsync(
                             factory,
-                            formula,
+                            formula.Formula,
                             async (candidate, cancellation) =>
                                 (await smtOracle.CompareAsync(
                                         factory,
@@ -369,7 +374,7 @@ public static class FuzzRunner
                         index,
                         caseSeed,
                         failureKey.Oracle,
-                        printer.Print(formula),
+                        printer.Print(formula.Formula),
                         printer.Print(minimizedFiniteFormula),
                         minimizedSmtResult.Detail));
                     break;
@@ -801,7 +806,7 @@ public static class FuzzRunner
         return coverage.HasExpandedCategories;
     }
 
-    private static IrTerm CreateTotalFiniteDomainFormula(
+    private static TotalFiniteDomainFormula CreateTotalFiniteDomainFormula(
         IrFactory factory,
         int caseSeed,
         CancellationToken cancellationToken)
@@ -825,16 +830,23 @@ public static class FuzzRunner
                                 FiniteDomainSmtDifferentialOracle
                                     .IntegerDomain
                                     .Length)]));
-            if (FiniteDomainSmtDifferentialOracle
-                .IsDefinedForAllAssignments(
+            var enumeration = FiniteDomainSmtDifferentialOracle
+                .EnumerateFiniteDomain(
                     factory,
                     formula,
-                    cancellationToken))
+                    cancellationToken);
+            if (enumeration.AllDefined)
             {
-                return formula;
+                return new TotalFiniteDomainFormula(formula, enumeration);
             }
         }
-        return factory.Boolean((caseSeed & 1) == 0);
+        var fallback = factory.Boolean((caseSeed & 1) == 0);
+        return new TotalFiniteDomainFormula(
+            fallback,
+            new FiniteDomainEnumerationResult(
+                AllDefined: true,
+                AnyTrue: (caseSeed & 1) == 0,
+                LeafEvaluations: 1));
     }
 
     internal static int CreateCaseSeed(int seed, int index)

@@ -3054,26 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 668. [CONFIRMED] Accepted finite-domain formulas are enumerated twice
-
-**Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, around lines 534-556;
-`FiniteDomainSmtFuzzing.cs`, around lines 30-106, 168-174, and 223-285.
-
-**Description**: Candidate acceptance traverses every assignment to prove
-totality, discards satisfiability, then the oracle traverses the same Cartesian
-domain again to compute the expected verdict.
-
-**Reproduction**: A production-shaped total UNSAT formula with two integer and
-one Boolean variables performed 50 leaf evaluations for definedness and another
-50 for satisfiability. Repeated timing was 475 ms plus 413 ms for 20,000 runs.
-
-**Impact**: Accepted UNSAT campaigns do exactly twice the necessary interpreter
-work; large campaign ceilings allow tens of millions of redundant evaluations.
-
-**Recommended fix**: Return `{AllDefined, AnyTrue}` from one enumeration and
-carry the expected verdict into comparison. Retain a standalone one-pass public
-oracle. Add deterministic leaf-count, early-SAT, partial, and cancellation tests.
-
 ### 669. [CONFIRMED] Package configuration failures have no stable diagnostic code
 
 **Location**: `SharpProof.Package/buildTransitive/SharpProof.targets`, around
