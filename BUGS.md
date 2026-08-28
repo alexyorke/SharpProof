@@ -561,60 +561,6 @@ output and exit codes.
 **Confidence**: High; self-verified with exact helper logic in the canonical
 container.
 
-### 465. [CONFIRMED] Derived catch handlers are marked unreachable for base-typed throw expressions
-
-**Location**: SharpProof.Effects/ExceptionHandlerReachability.cs around
-lines 2742 and 2786-2797; related overlap logic in
-SharpProof.Effects/EffectExceptionFlow.cs around line 225.
-
-**Description**: CatchesKnownType returns true only when the static thrown type
-is assignable to the caught type. A throw expression statically typed Exception
-can hold InvalidOperationException and reach catch (InvalidOperationException),
-but Exception is not assignable to InvalidOperationException, so the handler
-is excluded. EffectExceptionFlow already recognizes the reverse subtype
-relation as Maybe, exposing an internal semantic disagreement.
-
-**Reproduction**:
-
-    Exception error = new InvalidOperationException();
-    try { throw error; }
-    catch (InvalidOperationException) { s_state++; }
-
-Runtime always executes the catch. The Effects summary reported:
-
-    Writes.IsUnknown = false
-    Writes = [Fresh]
-    Throws = [System.Exception]
-    Completeness = Complete
-    Termination = Terminates
-
-The reachable static write is absent from a supposedly complete exact set.
-
-**Impact**: This is not merely lost precision: a complete effect summary omits
-a real reachable static mutation. Purity/effect contracts can consume that
-summary as stronger evidence than the program permits.
-
-**Root cause**: Catch matching is represented as a Boolean one-way subtype test
-instead of overlap certainty.
-
-**Recommended fix**: Replace it with a tri-state catch selection:
-
-- thrown type assignable to caught type => Always;
-- caught type assignable to thrown type => Maybe;
-- otherwise => Never.
-
-Treat Maybe and Always target handlers as reachable. An earlier catch should
-block later handlers only when both its type selection and filter are Always.
-
-**Regression coverage**: Add the base-typed throw/derived-catch case and require
-a complete summary containing Static. Retain exact escaping-exception tests.
-Split the existing broad exception-handler test so widened Writes.Unknown cases
-assert fail-closed unknown rather than querying Contains(false) on top.
-
-**Confidence**: High; reproduced in a pinned temp checkout, and a temporary
-tri-state implementation passed the new regression plus existing exception
-escape coverage.
-
 ### 467. [CONFIRMED] SPMETA010 treats ConcurrentDictionary.TryUpdate comparisonValue as a stored value
 
 **Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
