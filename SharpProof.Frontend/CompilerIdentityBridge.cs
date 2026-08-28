@@ -140,7 +140,11 @@ public static class CompilerIdentityBridge
             (operation as IUnaryOperation)?.OperatorKind,
             (operation as IInstanceReferenceOperation)?.ReferenceKind,
             CompilerIdentityProjections.IsChecked(operation),
-            CompilerIdentityProjections.IsLifted(operation));
+            CompilerIdentityProjections.IsLifted(operation),
+            operation.ConstantValue.HasValue,
+            operation.ConstantValue.HasValue
+                ? operation.ConstantValue.Value
+                : null);
     }
 
     public static string CreateSymbolDisplay(ISymbol? symbol)
@@ -215,14 +219,15 @@ public static class CompilerIdentityBridge
         BinaryOperatorKind? binaryOperator,
         UnaryOperatorKind? unaryOperator,
         InstanceReferenceKind? instanceReference,
-        bool isChecked, bool isLifted)
+        bool isChecked, bool isLifted, bool hasConstantValue,
+        object? constantValue)
         : IEquatable<OperationSemanticIdentity>
     {
         private readonly (
             OperationKind, IrIdentityId, IrIdentityId, BinaryOperatorKind?,
-            UnaryOperatorKind?, InstanceReferenceKind?, bool, bool) _value =
+            UnaryOperatorKind?, InstanceReferenceKind?, bool, bool, bool, object?) _value =
             (kind, type, operandType, binaryOperator, unaryOperator, instanceReference,
-             isChecked, isLifted);
+             isChecked, isLifted, hasConstantValue, constantValue);
 
         public bool Equals(OperationSemanticIdentity other)
         {

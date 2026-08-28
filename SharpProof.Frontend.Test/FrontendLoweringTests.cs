@@ -155,6 +155,33 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void DistinctFoldedConstantsDoNotSharePureOpaqueTerms()
+    {
+        using var distinct = CompiledMethod.Create(
+            """
+            private const int First = 0;
+            private const int Second = 0;
+            public static bool Target() => nameof(First) == nameof(Second);
+            """);
+        var distinctTerm = (IrOpaqueTerm)distinct.Lower().Term;
+
+        Assert.That(
+            ReferenceEquals(distinctTerm.Arguments[0], distinctTerm.Arguments[1]),
+            Is.False);
+
+        using var repeated = CompiledMethod.Create(
+            """
+            private const int First = 0;
+            public static bool Target() => nameof(First) == nameof(First);
+            """);
+        var repeatedTerm = (IrOpaqueTerm)repeated.Lower().Term;
+
+        Assert.That(
+            ReferenceEquals(repeatedTerm.Arguments[0], repeatedTerm.Arguments[1]),
+            Is.True);
+    }
+
+    [Test]
     public void ArrayLengthAndElementAccessMatchCompiledCSharp()
     {
         using var element = CompiledMethod.Create(
