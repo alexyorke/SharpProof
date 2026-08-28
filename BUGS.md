@@ -2619,24 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 569. [CONFIRMED] Proven-failing explicit casts are treated as completing
-
-**Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184,
-1910-1912, and 2583-2592; RequiresCallSiteAnalyzer.cs around lines 450-460.
-
-**Description**: MayCompleteNormally treats conversions as completing children
-and ignores a statically certain InvalidCastException.
-
-**Reproduction**: Positive((string)new object(), -1) emitted SP0027, but runtime
-threw before invocation and call count stayed zero. Null and valid reference
-casts executed and reported as controls.
-
-**Impact**: Unreachable calls receive deterministic false refutations.
-
-**Recommended fix**: Give conversions a permissive but exception-aware
-classifier: reject proven bad explicit casts/unboxes and checked overflows, keep
-unknown runtime casts possible, and account for user-defined conversion calls.
-
 ### 570. [CONFIRMED] A completed lock statement suppresses later SP0027 diagnostics
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
