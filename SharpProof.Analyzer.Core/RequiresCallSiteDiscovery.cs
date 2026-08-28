@@ -50,7 +50,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationFacts,
                 semanticModel.Compilation,
                 cancellationToken,
-                semanticModel);
+                semanticModel,
+                caller);
             if (calls.IsDefaultOrEmpty)
             {
                 continue;
@@ -156,7 +157,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     operationFacts,
                     semanticModel.Compilation,
                     cancellationToken,
-                    semanticModel);
+                    semanticModel,
+                    caller);
+                var isSynthesizedDispose =
+                    operation is IInvocationOperation invocation &&
+                    UsingDisposalEffectResolver
+                        .IsSynthesizedSynchronousDispose(invocation);
                 if (calls.IsDefaultOrEmpty ||
                     !SymbolEqualityComparer.Default.Equals(
                         semanticModel.GetEnclosingSymbol(
@@ -172,7 +178,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 if (flowAnalysis.IsComplete &&
                     !hasFlowState &&
                     !IsInsideExceptionHandler(operation) &&
-                    operation is not IListPatternOperation)
+                    operation is not IListPatternOperation &&
+                    !isSynthesizedDispose)
                 {
                     continue;
                 }
@@ -187,15 +194,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     {
                         continue;
                     }
-                    var candidate = new RequiresCallSiteCandidate(
-                        operation,
-                        call.TargetMethod,
-                        call.Instance,
-                        call.Arguments,
-                        call.ExplicitArguments,
-                        call.CanReplay &&
-                        (IsAccessorCall(call.TargetMethod) ||
-                            operation is IListPatternOperation
+                    var canReplay = isSynthesizedDispose
+                        ? call.Instance == null ||
+                            operationFacts.CompletesNormally(
+                                call.Instance)
+                        : (IsAccessorCall(call.TargetMethod) ||
+                            operation is IListPatternOperation)
                             ? HasReplayableAccessorEvaluation(
                                 call,
                                 operation,
@@ -209,7 +213,14 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             : (hasFlowState || !flowAnalysis.IsComplete) &&
                                 HasReplayablePrefix(
                                     operation,
-                                    operationFacts)),
+                                    operationFacts);
+                    var candidate = new RequiresCallSiteCandidate(
+                        operation,
+                        call.TargetMethod,
+                        call.Instance,
+                        call.Arguments,
+                        call.ExplicitArguments,
+                        call.CanReplay && canReplay,
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status);
                     var existingIndex = callSites.FindIndex(existing =>
@@ -729,10 +740,37 @@ internal sealed partial class RequiresCallSiteDiscovery(
         DefiniteOperationFacts? operationFacts = null,
         Compilation? compilation = null,
         CancellationToken cancellationToken = default,
-        SemanticModel? semanticModel = null)
+        SemanticModel? semanticModel = null,
+        IMethodSymbol? caller = null)
     {
         return operation switch
         {
+            IUsingOperation @using when
+                compilation != null && caller != null &&
+                !@using.IsAsynchronous =>
+                GetUsingCalls(
+                    @using.Resources,
+                    compilation,
+                    caller),
+            IUsingDeclarationOperation declaration when
+                compilation != null && caller != null &&
+                !declaration.IsAsynchronous =>
+                GetUsingCalls(
+                    declaration.DeclarationGroup,
+                    compilation,
+                    caller),
+            IInvocationOperation invocation when
+                compilation != null &&
+                caller != null &&
+                semanticModel != null &&
+                UsingDisposalEffectResolver.IsSynthesizedSynchronousDispose(
+                    invocation) =>
+                GetSynthesizedDisposeCalls(
+                    invocation,
+                    compilation,
+                    caller,
+                    semanticModel,
+                    cancellationToken),
             IInvocationOperation invocation => [new(
                 invocation.TargetMethod,
                 invocation.Instance,
@@ -759,6 +797,153 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 cancellationToken),
             _ => []
         };
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetUsingCalls(
+        IOperation resources,
+        Compilation compilation,
+        IMethodSymbol caller)
+    {
+        var candidates = new List<(ITypeSymbol Type, IOperation Resource)>();
+        if (resources is IVariableDeclarationGroupOperation group)
+        {
+            foreach (var declarator in group.Declarations.SelectMany(
+                         static declaration => declaration.Declarators))
+            {
+                if (declarator.Initializer?.Value is { } resource)
+                {
+                    candidates.Add((
+                        GetConcreteResourceType(
+                            declarator.Symbol.Type,
+                            resource),
+                        resource));
+                }
+            }
+        }
+        else if (resources.Type is { } resourceType)
+        {
+            candidates.Add((
+                GetConcreteResourceType(resourceType, resources),
+                resources));
+        }
+
+        var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>();
+        foreach (var candidate in candidates)
+        {
+            var dispose = UsingDisposalEffectResolver.ResolveDispose(
+                compilation,
+                caller,
+                candidate.Type);
+            if (dispose == null)
+            {
+                continue;
+            }
+
+            calls.Add(new RequiresCallTarget(
+                dispose,
+                candidate.Resource,
+                [],
+                ImmutableDictionary<int, IOperation>.Empty,
+                true));
+        }
+        return calls.ToImmutable();
+    }
+
+    private static ImmutableArray<RequiresCallTarget>
+        GetSynthesizedDisposeCalls(
+            IInvocationOperation invocation,
+            Compilation compilation,
+            IMethodSymbol caller,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+    {
+        var resource = GetUsingResource(
+            invocation,
+            semanticModel,
+            cancellationToken);
+        var resourceType = resource?.Type ??
+            semanticModel.GetSymbolInfo(
+                    invocation.Syntax,
+                    cancellationToken)
+                .Symbol switch
+            {
+                ILocalSymbol local => local.Type,
+                IParameterSymbol parameter => parameter.Type,
+                IFieldSymbol field => field.Type,
+                _ => invocation.Instance?.Type
+            };
+        if (resourceType == null)
+        {
+            return [];
+        }
+
+        var resourceOperation = resource ?? invocation.Instance;
+        if (resourceOperation == null ||
+            DefiniteOperationFacts.IsDefinitelyNull(resourceOperation))
+        {
+            return [];
+        }
+
+        var dispose = UsingDisposalEffectResolver.ResolveDispose(
+            compilation,
+            caller,
+            GetConcreteResourceType(
+                resourceType,
+                resourceOperation));
+        return dispose == null
+            ? []
+            : [new RequiresCallTarget(
+                dispose,
+                resourceOperation,
+                [],
+                ImmutableDictionary<int, IOperation>.Empty,
+                true)];
+    }
+
+    private static IOperation? GetUsingResource(
+        IInvocationOperation invocation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var usingSyntax = invocation.Syntax.AncestorsAndSelf()
+            .FirstOrDefault(static syntax =>
+                syntax is UsingStatementSyntax ||
+                syntax is LocalDeclarationStatementSyntax
+                {
+                    UsingKeyword.RawKind: not 0
+                });
+        var usingOperation = usingSyntax == null
+            ? null
+            : semanticModel.GetOperation(
+                usingSyntax,
+                cancellationToken);
+        return usingOperation switch
+        {
+            IUsingOperation @using => @using.Resources,
+            IUsingDeclarationOperation declaration =>
+                declaration.DeclarationGroup.Declarations
+                    .SelectMany(static group => group.Declarators)
+                    .Select(static declarator => declarator.Initializer?.Value)
+                    .FirstOrDefault(static value => value != null),
+            _ => null
+        };
+    }
+
+    private static ITypeSymbol GetConcreteResourceType(
+        ITypeSymbol declaredType,
+        IOperation resource)
+    {
+        resource = DefiniteOperationFacts.UnwrapHarmlessValue(resource);
+        return declaredType is INamedTypeSymbol
+        {
+            TypeKind: TypeKind.Interface
+        } &&
+        resource.Type is INamedTypeSymbol
+        {
+            TypeKind: not TypeKind.Interface
+        } concrete
+            ? concrete
+            : declaredType;
     }
 
     private static ImmutableArray<RequiresCallTarget> GetListPatternCalls(

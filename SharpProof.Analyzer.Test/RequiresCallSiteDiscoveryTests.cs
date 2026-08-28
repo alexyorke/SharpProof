@@ -27,7 +27,6 @@ public sealed class RequiresCallSiteDiscoveryTests
                 constructor.Identifier.ValueText == "Derived");
         var semanticModel = compilation.GetSemanticModel(tree);
         var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-
         var candidates = new RequiresCallSiteDiscovery(
                 caller,
                 declaration,
@@ -72,7 +71,6 @@ public sealed class RequiresCallSiteDiscoveryTests
             .Single();
         var semanticModel = compilation.GetSemanticModel(tree);
         var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-
         var candidates = new RequiresCallSiteDiscovery(
                 caller,
                 declaration,
@@ -93,6 +91,228 @@ public sealed class RequiresCallSiteDiscoveryTests
                     compilation.Assembly),
                 Is.False);
         }
+    }
+
+    [Test]
+    public void UsingStatementsProduceConcreteDisposeReplayCandidates()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() {
+                    Contract.Requires(false);
+                }
+            }
+
+            public static class Subject {
+                public static void Call(Resource resource) {
+                    using (resource) {
+                    }
+                }
+            }
+            """,
+            ["SP0027"]);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Call");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        var dispose = candidates!.Value
+            .Where(static candidate => candidate.TargetMethod.Name == "Dispose")
+            .ToArray();
+        Assert.That(dispose, Has.Length.EqualTo(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                dispose[0].TargetMethod.ContainingType.Name,
+                Is.EqualTo("Resource"));
+            Assert.That(dispose[0].CanReplay, Is.True);
+        }
+    }
+
+    [Test]
+    public void UsingDeclarationsProduceConcreteDisposeReplayCandidates()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() {
+                    Contract.Requires(false);
+                }
+            }
+
+            public static class Subject {
+                public static void Call(Resource resource) {
+                    using var local = resource;
+                }
+            }
+            """,
+            ["SP0027"]);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Call");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        var dispose = candidates!.Value
+            .Where(static candidate => candidate.TargetMethod.Name == "Dispose")
+            .ToArray();
+        Assert.That(dispose, Has.Length.EqualTo(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                dispose[0].TargetMethod.ContainingType.Name,
+                Is.EqualTo("Resource"));
+            Assert.That(dispose[0].CanReplay, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task UsingDisposalRequiresAreReportedOncePerResource()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() {
+                    Contract.Requires(false);
+                }
+            }
+
+            public static class Subject {
+                public static void Statement(Resource resource) {
+                    using (resource) {
+                    }
+                }
+
+                public static void Declaration(Resource resource) {
+                    using var local = resource;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+    }
+
+    [Test]
+    public void NestedUsingStatementsRetainBothDisposalTargets()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() {
+                    Contract.Requires(false);
+                }
+            }
+
+            public static class Subject {
+                public static void Call(Resource first, Resource second) {
+                    using (first)
+                    using (second) {
+                    }
+                }
+            }
+            """,
+            ["SP0027"]);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Call");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        var dispose = candidates!.Value
+            .Where(static candidate => candidate.TargetMethod.Name == "Dispose")
+            .ToArray();
+        Assert.That(dispose, Has.Length.EqualTo(2));
+        Assert.That(
+            dispose.Select(static candidate => candidate.Operation.Syntax.ToString()),
+            Is.EqualTo(["first", "second"]));
+    }
+
+    [Test]
+    public void DefinitelyNullUsingResourceHasNoDisposalCandidate()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() {
+                    Contract.Requires(false);
+                }
+            }
+
+            public static class Subject {
+                public static void Call() {
+                    using ((Resource)null) {
+                    }
+                }
+            }
+            """,
+            ["SP0027"]);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Call");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        Assert.That(
+            candidates!.Value.Any(static candidate =>
+                candidate.TargetMethod.Name == "Dispose"),
+            Is.False);
     }
 
 
