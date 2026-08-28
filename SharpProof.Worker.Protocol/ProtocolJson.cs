@@ -356,9 +356,10 @@ public static partial class WorkerProtocolJson
             result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
         }
 
+        var claimIndex = CreateClaimIndex(response.Manifest);
         response.ClaimResults = [.. (response.ClaimResults ?? [])
-            .OrderBy(value => FindClaimCallableId(response.Manifest, value?.ClaimId), s_ordinal)
-            .ThenBy(value => FindClaimOrdinal(response.Manifest, value?.ClaimId))
+            .OrderBy(value => claimIndex.FindCallableId(value?.ClaimId), s_ordinal)
+            .ThenBy(value => claimIndex.FindOrdinal(value?.ClaimId))
             .ThenBy(static value => value?.ClaimId, s_ordinal)];
         foreach (var result in response.ClaimResults.OfType<WorkerClaimResult>())
         {
@@ -1264,16 +1265,65 @@ public static partial class WorkerProtocolJson
         using var document = ParseAndEnsureJsonShape(json, typeof(T).Name);
         return document.RootElement.Deserialize<T>(s_options);
     }
-    private static int FindClaimOrdinal(WorkerClaimManifest? manifest, string? id)
+    private static ClaimIndex CreateClaimIndex(WorkerClaimManifest? manifest)
     {
-        return manifest?.Claims?.FirstOrDefault(value => value != null && value.ClaimId == id)?.Ordinal ??
-        int.MaxValue;
+        var index = new ClaimIndex();
+        foreach (var claim in manifest?.Claims ?? [])
+        {
+            if (claim != null)
+            {
+                index.Add(claim);
+            }
+        }
+        return index;
     }
 
-    private static string FindClaimCallableId(WorkerClaimManifest? manifest, string? id)
+    private sealed class ClaimIndex
     {
-        return manifest?.Claims?.FirstOrDefault(value => value != null && value.ClaimId == id)?.CallableId ??
-            string.Empty;
+        private readonly Dictionary<string, (string? CallableId, int Ordinal)> _byId =
+            new(s_ordinal);
+        private bool _hasNull;
+        private (string? CallableId, int Ordinal) _null;
+
+        internal void Add(WorkerClaimManifestEntry claim)
+        {
+            if (claim.ClaimId is { } id)
+            {
+                if (!_byId.ContainsKey(id))
+                {
+                    _byId.Add(id, (claim.CallableId, claim.Ordinal));
+                }
+            }
+            else if (!_hasNull)
+            {
+                _null = (claim.CallableId, claim.Ordinal);
+                _hasNull = true;
+            }
+        }
+
+        internal int FindOrdinal(string? id)
+        {
+            return Find(id).Ordinal;
+        }
+
+        internal string FindCallableId(string? id)
+        {
+            return Find(id).CallableId ?? string.Empty;
+        }
+
+        private (string? CallableId, int Ordinal) Find(string? id)
+        {
+            if (id == null)
+            {
+                return _hasNull ? _null : (null, int.MaxValue);
+            }
+            if (_byId.TryGetValue(id, out var value))
+            {
+                return value;
+            }
+
+            return (null, int.MaxValue);
+        }
     }
 
     internal static bool IsSha256(string? value)

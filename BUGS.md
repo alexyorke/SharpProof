@@ -203,53 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 497. [CONFIRMED] Claim canonicalization performs quadratic manifest scans
-
-**Location**: SharpProof.Worker.Protocol/ProtocolManifest.cs around lines 31-37;
-SharpProof.Worker.Protocol/ProtocolJson.cs around lines 283-286 and helper
-lookups around lines 1035-1044.
-
-**Description**: Callable ClaimIds are sorted by FindClaimOrdinal, and response
-results are sorted by both FindClaimCallableId and FindClaimOrdinal. Each helper
-uses `manifest.Claims.FirstOrDefault(...)`, so every sort-key evaluation scans
-the entire claim array. Canonicalizing N claims plus N IDs/results performs
-quadratic string comparisons before JSON serialization or hashing.
-
-**Reproduction**: Warmed public Canonicalize measurements for reversed IDs:
-
-    manifest: 3,000 =   71.799 ms
-              6,000 =  248.747 ms
-             12,000 = 1,115.070 ms
-
-    response: 3,000 =  141.751 ms
-              6,000 =  553.243 ms
-             12,000 = 1,987.112 ms
-
-The 12,000-result response serialized to 4,849,870 bytes, comfortably below the
-16 MiB protocol cap. A fully valid 3,000-claim manifest reproduced the cost and
-passed ValidateManifest, so malformed input is not required.
-
-**Impact**: SealManifest and every SerializeResponse can consume seconds or
-tens of seconds on representable claim sets, reducing project time available
-for actual verification and amplifying cancellation latency.
-
-**Root cause**: Linear claim-ID lookup is nested inside sorting key selectors,
-and the same manifest index is rebuilt implicitly for every element.
-
-**Recommended fix**: After canonicalizing claims, construct one ordinal
-Dictionary from claim ID to `(CallableId, Ordinal)` and reuse it for callable
-IDs and response results. Preserve existing first-match/null semantics for
-malformed manifests using TryAdd and an explicit missing fallback. Complexity
-then becomes O(N + N log N).
-
-**Regression coverage**: Canonicalize a large valid reversed-order manifest and
-response; assert order, hash, and validation. Add a warmed size-doubling guard
-or generous 12k ceiling that rejects quadratic growth without making ordinary
-unit tests timing-fragile.
-
-**Confidence**: High; two independent public-path timing series show near-
-quadratic growth on valid inputs.
-
 ### 498. [CONFIRMED] Same-seed fuzz runs duplicate a prefix while campaign totals count it twice
 
 **Location**: scripts/Invoke-SharpProofFuzzCampaign.ps1 around lines 65-73 and
