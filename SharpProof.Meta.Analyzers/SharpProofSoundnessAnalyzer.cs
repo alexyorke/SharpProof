@@ -875,12 +875,17 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        if (IsExactNamespace(
-                named.ContainingNamespace,
-                "System",
-                "Collections",
-                "Generic") &&
-            MutableCollectionNames.Contains(named.Name))
+        if (MutableCollectionNames.Contains(named.Name) &&
+            (IsExactNamespace(
+                 named.ContainingNamespace,
+                 "System",
+                 "Collections",
+                 "Generic") ||
+             IsExactNamespace(
+                 named.ContainingNamespace,
+                 "System",
+                 "Collections",
+                 "Concurrent")))
         {
             return true;
         }

@@ -1561,6 +1561,26 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.EqualTo(3));
     }
 
+    [Test]
+    public async Task RejectsConcurrentMutableStaticCollections()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System.Collections.Concurrent;
+            namespace SharpProof.Analyzer;
+            static class C {
+                internal static readonly BlockingCollection<int> Blocking = new();
+                internal static readonly ConcurrentBag<int> Bag = new();
+                internal static readonly ConcurrentQueue<int> Queue = new();
+                internal static readonly ConcurrentStack<int> Stack = new();
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(4));
+    }
+
     [TestCase(
         "true ? await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Failed)) : await Respond(WorkerResultAssembler.Create(WorkerRunStatus.Canceled))")]
     [TestCase(
