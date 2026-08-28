@@ -6201,26 +6201,6 @@ evidence policy failures.
 UserAssume or TrustedBoundary only. Test earlier preconditions, both policy kinds,
 console structure, and SARIF URI.
 
-### 697. [CONFIRMED] Filesystem-root projects produce malformed SARIF base URIs
-
-**Location**: `SharpProof.Worker.Launcher/SarifProjection.cs`, around lines
-107-114 and 172-234.
-
-**Description**: ProjectRootUri unconditionally appends a directory separator.
-For `/`, it creates `//` and serializes `file:////`; relative artifact locations
-then resolve as URI authorities/hosts.
-
-**Reproduction**: With canonical project directory `/`, relative `user.cs`
-resolved from emitted `file:////` to `file://user.cs/` instead of
-`file:///user.cs`. Non-root already-terminated paths also gain a duplicate slash.
-
-**Impact**: SARIF navigation, artifact correlation, and baselining break for
-valid root-located projects.
-
-**Recommended fix**: Append a separator only when `Path.EndsInDirectorySeparator`
-is false, preserving root exactly. Parameterize root, terminated, and unterminated
-project paths with resolved-artifact assertions.
-
 ### 698. [CONFIRMED] Banned-symbol inventory test uses overlapping substring matches
 
 **Location**: `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs`, around
