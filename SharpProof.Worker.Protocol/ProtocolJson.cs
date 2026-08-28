@@ -1004,8 +1004,30 @@ public static partial class WorkerProtocolJson
 
     private static bool CompleteUnique<T>(T[]? values, Func<T, bool> complete, Func<T, string?> key) where T : class
     {
-        return values != null && values.All(value => value != null && complete(value)) &&
-            values.Select(key).Distinct(s_ordinal).Count() == values.Length;
+        if (values == null)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < values.Length; index++)
+        {
+            var value = values[index];
+            if (value == null || !complete(value))
+            {
+                return false;
+            }
+
+            var valueKey = key(value);
+            for (var prior = 0; prior < index; prior++)
+            {
+                if (string.Equals(valueKey, key(values[prior]), StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static T[] Present<T>(T[]? values, string code, Validator errors) where T : class

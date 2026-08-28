@@ -328,6 +328,30 @@ public sealed class ProtocolModelSchemaTests
         Assert.That(allocated, Is.LessThan(4_096));
     }
 
+    [Test]
+    public void EmptyCollectionValidationDoesNotAllocatePerLookup()
+    {
+        var values = Array.Empty<string>();
+        for (var index = 0; index < 1_000; index++)
+        {
+            _ = WorkerProtocolJson.AreDistinctNonblank(values);
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var valid = true;
+        for (var index = 0; index < 100_000; index++)
+        {
+            valid &= WorkerProtocolJson.AreDistinctNonblank(values);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.That(valid, Is.True);
+        Assert.That(allocated, Is.LessThan(4_096));
+    }
+
     private static void AssertDefinedEnums(JsonElement schema)
     {
         var defined = schema.GetProperty("definedEnums")
