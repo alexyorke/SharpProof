@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 487. [CONFIRMED] Package-consumer validation bypasses all command timeouts
-
-**Location**: scripts/Test-SharpProofPackageConsumers.ps1, especially
-Invoke-ConsumerDotNet around lines 245-280, restore/query/build calls around
-lines 484-516, and the final package-test invocation around line 615.
-
-**Description**: The package-consumer helper invokes `dotnet` synchronously
-through PowerShell's call operator. It has no timeout parameter, deadline,
-process-tree kill path, or cancellation token. The final package test bypasses
-the helper and invokes raw `dotnet` too. Dead capture-output variables and an
-unused RepositoryRoot parameter are remnants of bounded-runner plumbing but do
-not constrain any process.
-
-**Reproduction**: In the canonical Linux image, the exact helper was extracted
-and its `dotnet` command was replaced by a blocking native program. The helper
-remained blocked until that program voluntarily completed, then returned
-success; no timer, signal, or child cleanup path ran. Workflow inspection found
-no enclosing step or job timeout for `package-consumers`.
-
-**Impact**: A stalled restore, MSBuild/analyzer invocation, package build, or
-test can hang Linux qualification and the portable Windows/macOS/Linux consumer
-gates until the CI service's external cancellation. The qualification receipt
-is never written, and any descendant process can remain alive after a shallow
-runner termination.
-
-**Root cause**: This script family did not adopt the repository's bounded
-cross-platform process runner. The separate samples timeout defect does not
-cover these consumer commands.
-
-**Recommended fix**: Add a validated timeout parameter and route every consumer
-command, including the final test, through a cross-platform ProcessStartInfo
-runner with asynchronous stdout/stderr draining, bounded WaitForExit,
-Kill(entireProcessTree: true), a final wait, and disposal. Preserve each
-command's exit code and output attribution.
-
-**Regression coverage**: Inject a fake dotnet that spawns a long-lived child.
-Exercise both the helper and final-test paths with a one-second budget and
-require prompt exit 124/failure, captured output, restored working directory,
-and no surviving process tree. Add fast success and nonzero-exit controls on
-Linux, Windows, and macOS runners.
-
-**Confidence**: High; the exact helper blocked under an executable probe, its
-blob matched the assigned baseline, and no outer workflow timeout exists.
-
 ### 489. [CONFIRMED] Ordinary test fixtures require checkout Git metadata despite the archive-test contract
 
 **Location**: SharpProof.ArchitectureTest release-authority, qualification-

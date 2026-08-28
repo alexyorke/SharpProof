@@ -19,6 +19,10 @@ param(
     [switch]$FrameworkConsumersOnly,
 
     [Parameter()]
+    [ValidateRange(1, 86400)]
+    [int]$TimeoutSeconds = 1800,
+
+    [Parameter()]
     [switch]$ValidatePackageSourceOnly
 )
 
@@ -251,28 +255,45 @@ function Invoke-ConsumerDotNet {
         [string[]]$Arguments,
 
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds
     )
 
     Push-Location $WorkingDirectory
-    $capturePath = $null
+    $capturePath = Join-Path ([IO.Path]::GetTempPath()) (
+        'SharpProof-package-consumer-' + [Guid]::NewGuid().ToString('N') + '.log')
     try {
-        $captureOutput = $Arguments[0] -eq '--version' -or
-            $Arguments[0] -eq 'msbuild'
-        $output = & dotnet @Arguments 2>&1 | Out-String
+        $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+        & $dotnetWrapper `
+            -TimeoutSeconds $TimeoutSeconds `
+            -OutputPath $capturePath `
+            @Arguments
         $exitCode = $LASTEXITCODE
+        $output = if ([IO.File]::Exists($capturePath)) {
+            [IO.File]::ReadAllText($capturePath)
+        }
+        else {
+            ''
+        }
         if (-not [string]::IsNullOrEmpty($output)) {
             Write-Host $output.TrimEnd()
         }
         if ($exitCode -ne 0) {
+            $suffix = if ($exitCode -eq 124) {
+                " timed out after $TimeoutSeconds seconds (exit code 124)."
+            }
+            else {
+                " failed with exit code $exitCode."
+            }
             throw (
-                "dotnet $($Arguments -join ' ') failed with exit code " +
-                "$exitCode.")
+                "dotnet $($Arguments -join ' ')" + $suffix)
         }
         return $output.Trim()
     }
     finally {
-        if ($null -ne $capturePath -and [IO.File]::Exists($capturePath)) {
+        if ([IO.File]::Exists($capturePath)) {
             Remove-Item -LiteralPath $capturePath -Force
         }
         Pop-Location
@@ -428,7 +449,8 @@ function Test-SharpProofFrameworkConsumers {
         $actualSdk = Invoke-ConsumerDotNet `
             -WorkingDirectory $root `
             -Arguments @('--version') `
-            -RepositoryRoot $RepositoryRoot
+            -RepositoryRoot $RepositoryRoot `
+            -TimeoutSeconds $TimeoutSeconds
         if (-not [string]::IsNullOrWhiteSpace($SdkVersion) -and
             $actualSdk.Trim() -ne $SdkVersion) {
             throw (
@@ -491,7 +513,8 @@ function Test-SharpProofFrameworkConsumers {
                     '--packages',
                     $cache,
                     '--nologo') `
-                -RepositoryRoot $RepositoryRoot | Out-Null
+                -RepositoryRoot $RepositoryRoot `
+                -TimeoutSeconds $TimeoutSeconds | Out-Null
             $analyzers = Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
@@ -499,7 +522,8 @@ function Test-SharpProofFrameworkConsumers {
                     'Consumer.csproj',
                     '-getItem:Analyzer',
                     '--nologo') `
-                -RepositoryRoot $RepositoryRoot
+                -RepositoryRoot $RepositoryRoot `
+                -TimeoutSeconds $TimeoutSeconds
             Assert-SharpProofAnalyzerItems `
                 -Output $analyzers `
                 -Framework $framework
@@ -513,7 +537,8 @@ function Test-SharpProofFrameworkConsumers {
                     '--no-restore',
                     '--nologo',
                     "/m:$parallelism") `
-                -RepositoryRoot $RepositoryRoot | Out-Null
+                -RepositoryRoot $RepositoryRoot `
+                -TimeoutSeconds $TimeoutSeconds | Out-Null
         }
     }
     finally {
@@ -612,10 +637,11 @@ try {
             'FullyQualifiedName=SharpProof.Package.Test.PackageLayoutSmokeTests.VerifierPackageTransitivelySuppliesPortableProduct'
         $packageTestArguments += @('--filter', $focusedPackageFilter)
     }
-    & dotnet @packageTestArguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "SharpProof package consumer tests failed with exit code $LASTEXITCODE."
-    }
+    Invoke-ConsumerDotNet `
+        -WorkingDirectory $repositoryRoot `
+        -Arguments $packageTestArguments `
+        -RepositoryRoot $repositoryRoot `
+        -TimeoutSeconds $TimeoutSeconds | Out-Null
 }
 finally {
     Pop-Location
