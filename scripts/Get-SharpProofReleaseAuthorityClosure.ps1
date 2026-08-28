@@ -62,11 +62,11 @@ function Get-SharpProofReleaseAuthorityClosure {
                         $node -is [Management.Automation.Language.StringConstantExpressionAst]
                     }, $true)) {
                 $value = ([string]$literal.Value).Replace('\', '/')
-                if ($value -match '(?i)^(?:scripts|eng|\.github|SharpProof(?:\.[A-Za-z0-9_.-]+)?)/.+\.(?:ps1|json|ya?ml|props|targets|nuspec)$' -or
+                if ($value -match '(?i)^(?:scripts|eng|\.github|SharpProof(?:\.[A-Za-z0-9_.-]+)?)/.+\.(?:ps1|psm1|json|ya?ml|props|targets|nuspec)$' -or
                     $value -match '(?i)^scripts/.+\.cs$') {
                     $references.Add($value)
                 }
-                elseif ($value -match '(?i)^[A-Za-z0-9_.-]+\.ps1$' -or
+                elseif ($value -match '(?i)^[A-Za-z0-9_.-]+\.(?:ps1|psm1)$' -or
                     $value -ceq 'SharpProof.SymbolPackageValidator.cs') {
                     $references.Add((Split-Path $path -Parent).Replace('\', '/') + '/' + $value)
                 }

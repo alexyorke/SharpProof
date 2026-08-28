@@ -50,6 +50,7 @@ jobs:
     }
     Write-FixtureFile 'eng/container/entrypoint.sh' "pwsh scripts/Invoke-SharpProofContainer.ps1`n"
     Write-FixtureFile 'scripts/Invoke-SharpProofContainer.ps1' @'
+Import-Module (Join-Path $PSScriptRoot 'ImportedAuthority.psm1') -Force
 & 'scripts/New-SharpProofReleaseEvidence.ps1'
 & 'scripts/Test-SharpProofReleaseArtifacts.ps1'
 & 'scripts/Publish-SharpProofRelease.ps1'
@@ -64,6 +65,7 @@ $manifest = 'SharpProof.Verifier/SharpProof.Verifier.nuspec'
             'scripts/New-SharpProofReleaseEvidence.ps1',
             'scripts/Test-SharpProofReleaseArtifacts.ps1',
             'scripts/Publish-SharpProofRelease.ps1',
+            'scripts/ImportedAuthority.psm1',
             'scripts/SharpProof.PublicationPlanIdentity.psm1',
             'scripts/Test-SharpProofPublicationPlan.ps1',
             'scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1')) {
@@ -89,6 +91,7 @@ $manifest = 'SharpProof.Verifier/SharpProof.Verifier.nuspec'
         'scripts/New-SharpProofReleaseEvidence.ps1',
         'scripts/Test-SharpProofReleaseArtifacts.ps1',
         'scripts/Publish-SharpProofRelease.ps1',
+        'scripts/ImportedAuthority.psm1',
         'scripts/SharpProof.PublicationPlanIdentity.psm1',
         'scripts/Test-SharpProofPublicationPlan.ps1',
         'scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1',
