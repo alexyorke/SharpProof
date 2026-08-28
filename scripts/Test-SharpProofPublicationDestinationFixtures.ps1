@@ -7,8 +7,10 @@ param(
         'fixture-uri-conflict','missing-fixture','changed-fixture',
         'removed-symbol-projection','actions-targetless','actions-fixture',
         'actions-registry-unchecked','actions-registry-absent',
+        'actions-registry-exact','actions-registry-collision',
         'actions-symbol-preflight','actions-swapped',
         'actions-removed-projection','mocked-main-missing',
+        'mocked-main-collision',
         'mocked-main-exists','mocked-main-error','mocked-main-query-base',
         'zero-symbol-preflight',
         'fixture-empty','fixture-foreign','fixture-main-case-collision',
@@ -203,11 +205,14 @@ try {
             'actions-fixture' { 'fixture' }
             default { 'registry' }
         }
-        $mainState = if ($Mutation -eq 'actions-registry-unchecked') {
-            'Unchecked'
+        $mainState = switch ($Mutation) {
+            'actions-registry-unchecked' { 'Unchecked' }
+            'actions-registry-exact' { 'ExactPresent' }
+            'actions-registry-collision' { 'Collision' }
+            default {
+                if ($mode -ceq 'registry') { 'Absent' } else { $null }
+            }
         }
-        elseif ($mode -ceq 'registry') { 'Absent' }
-        else { $null }
         $action = New-SharpProofPublicationActionAuthority `
             -Mode $mode -MainState $mainState
         if ($Mutation -eq 'actions-symbol-preflight') {
@@ -229,13 +234,16 @@ try {
         $script:preflightCalls = [Collections.Generic.List[string]]::new()
         $status = switch ($Mutation) {
             'mocked-main-exists' { 200 }
+            'mocked-main-collision' { 200 }
             'mocked-main-error' { 503 }
             default { 404 }
         }
         $package = [pscustomobject]@{
             packageId = 'SharpProof'
             version = '1.0.0-preview.1'
+            mainPath = Join-Path $packages 'SharpProof.1.0.0-preview.1.nupkg'
         }
+        [IO.File]::WriteAllText($package.mainPath, 'expected package bytes')
         $baseAddress = if ($Mutation -eq 'mocked-main-query-base') {
             'https://packages.example.test/v3-flatcontainer?q=1'
         }
@@ -245,10 +253,24 @@ try {
             -BaseAddress $baseAddress `
             -Get {
                 param($uri, $outputPath)
-                $script:preflightCalls.Add([string]$uri)
-                return [pscustomobject]@{ StatusCode = $status }
+            $script:preflightCalls.Add([string]$uri)
+            if ($status -eq 200) {
+                $remoteBytes = if ($Mutation -eq 'mocked-main-exists') {
+                    [IO.File]::ReadAllBytes($package.mainPath)
+                }
+                else {
+                    [Text.Encoding]::UTF8.GetBytes('different package bytes')
+                }
+                [IO.File]::WriteAllBytes($outputPath, $remoteBytes)
             }
-        if ($result.state -cne 'Absent' -or
+            return [pscustomobject]@{ StatusCode = $status }
+        }
+        $expectedState = switch ($Mutation) {
+            'mocked-main-exists' { 'ExactPresent' }
+            'mocked-main-collision' { 'Collision' }
+            default { 'Absent' }
+        }
+        if ($result.state -cne $expectedState -or
             $script:preflightCalls.Count -ne 1 -or
             $script:preflightCalls[0] -notmatch '\.nupkg$' -or
             $script:preflightCalls[0] -match '\.snupkg$') {

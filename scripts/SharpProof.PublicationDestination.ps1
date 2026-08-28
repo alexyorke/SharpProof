@@ -261,8 +261,8 @@ function New-SharpProofPublicationActionAuthority {
         throw 'Only registry publication has a main remote state.'
     }
     if ($Mode -ceq 'registry' -and
-        $MainState -cnotin @('Absent', 'Unchecked')) {
-        throw 'Registry main state must be Absent or Unchecked.'
+        $MainState -cnotin @('Absent', 'Unchecked', 'ExactPresent', 'Collision')) {
+        throw 'Registry main state is invalid.'
     }
     if ($Mode -ceq 'fixture') {
         if ([string]::IsNullOrEmpty($FixtureMainState)) {
@@ -300,10 +300,12 @@ function New-SharpProofPublicationActionAuthority {
         'registry' {
             [pscustomobject][ordered]@{
                 mainState = $MainState
-                mainAction = if ($MainState -ceq 'Absent') {
-                    'Push'
+                mainAction = switch ($MainState) {
+                    'Absent' { 'Push' }
+                    'Unchecked' { 'PreflightThenPush' }
+                    'ExactPresent' { 'None' }
+                    'Collision' { 'Collision' }
                 }
-                else { 'PreflightThenPush' }
                 symbolsState = 'Unchecked'
                 symbolsAction = 'CollisionOnPush'
             }
@@ -383,9 +385,29 @@ function Invoke-SharpProofMainPackagePreflight {
                 "NuGet PackageBaseAddress returned HTTP $status for " +
                 "$($Package.packageId) $($Package.version).")
         }
-        throw (
-            "Remote main package already exists; publication is " +
-            "non-overwriting: $($Package.packageId) $($Package.version).")
+        $localPath = $Package.PSObject.Properties['mainPath']
+        if ($null -eq $localPath -or
+            -not [IO.File]::Exists([string]$localPath.Value) -or
+            -not [IO.File]::Exists($temporaryPath)) {
+            throw (
+                "Remote main package identity cannot be compared for " +
+                "$($Package.packageId) $($Package.version).")
+        }
+        $localHash = (Get-FileHash `
+                -LiteralPath ([string]$localPath.Value) `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
+        $remoteHash = (Get-FileHash `
+                -LiteralPath $temporaryPath `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
+        return [pscustomobject][ordered]@{
+            state = if ($localHash -ceq $remoteHash) {
+                'ExactPresent'
+            }
+            else {
+                'Collision'
+            }
+            remoteUrl = $remoteUrl
+        }
     }
     finally {
         if ([IO.File]::Exists($temporaryPath)) {

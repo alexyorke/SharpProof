@@ -700,12 +700,14 @@ and temporary OIDC credentials. Both paths download, revalidate, and promote
 the exact package bytes that passed the container consumer matrix.
 Before any write, the publisher validates `SharpProof.release.json` and every
 artifact hash, then queries the feed's V3 `PackageBaseAddress` for all three
-IDs and rejects any existing main package. The publisher then sends main and
-symbol packages separately in dependency order: Attributes, SharpProof, then
-the verifier. Publication is intentionally non-overwriting, and no push uses
-`--skip-duplicate`, so an existing symbol package or publication race also
-fails the release. An interrupted publication must use a new package version
-rather than treating remote bytes as reusable.
+IDs. An existing main package is downloaded and compared byte-for-byte: exact
+bytes are safely treated as already published, while differing bytes are a
+collision and fail closed. The publisher then sends main and symbol packages
+separately in dependency order: Attributes, SharpProof, then the verifier.
+Publication is intentionally non-overwriting, and no push uses
+`--skip-duplicate`; an existing symbol package or publication race still fails
+the release. A partial publication can therefore retry missing symbols, while
+a conflicting package version requires a new version.
 Repository owners must configure `NUGET_PRIVATE_SOURCE` and
 `NUGET_PRIVATE_API_KEY` in the private-preview environment, and `NUGET_USER`
 plus a matching NuGet trusted-publishing policy in the public environment.

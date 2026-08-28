@@ -145,10 +145,11 @@ matrix, and exact public API XML coverage are implemented. The tag workflow
 requires checked-in version equality, master ancestry, and predecessor-tag
 order, then allowlists private `preview.1`, public `preview.2`, public `rc.1`,
 and stable `1.0.0` promotion of the already-tested bytes. Publication
-preflights every main package and fails if the version already exists;
-duplicate skipping is never used. Main and symbol packages are then pushed
-separately in dependency order. A symbol collision or partial publication
-requires a new version. Deterministic SARIF 2.1.0 projection is available as an
+preflights every main package and compares any existing bytes exactly; an exact
+match is reused, while a differing package is rejected as a collision. No push
+uses the NuGet `--skip-duplicate` option. Main and symbol packages are
+then pushed separately in dependency order. Missing symbols can be retried;
+a symbol collision or conflicting package requires a new version. Deterministic SARIF 2.1.0 projection is available as an
 opt-in verifier output. Owner configuration of
 protected release environments and tags, pilot-library evidence, the first
 private/public NuGet publications, and exact-candidate release evidence are

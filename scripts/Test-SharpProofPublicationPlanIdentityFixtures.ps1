@@ -8,7 +8,8 @@ param(
         'destination-tamper','package-action-tamper','fixture-canonical',
         'fixture-authority-tamper','fixture-nonexistent-archive',
         'registry-canonical',
-        'registry-url-tamper','targetless-publish-tamper',
+        'registry-url-tamper','registry-exact','registry-collision',
+        'targetless-publish-tamper',
         'version-authority-hash-tamper','json-roundtrip','two-bundle')]
     [string]$Mutation
 )
@@ -177,7 +178,9 @@ try {
             $package.symbolsAction = 'Push'
         }
     }
-    if ($Mutation -in @('registry-canonical','registry-url-tamper')) {
+    if ($Mutation -in @(
+            'registry-canonical','registry-url-tamper',
+            'registry-exact','registry-collision')) {
         $plan.planOnly = $false
         $plan.publicationDestination.mode = 'registry'
         $plan.publicationDestination.mainDestination =
@@ -198,6 +201,24 @@ try {
             $package.mainAction = 'Push'
             $package.symbolsState = 'Unchecked'
             $package.symbolsAction = 'CollisionOnPush'
+        }
+    }
+    if ($Mutation -in @('registry-exact','registry-collision')) {
+        $state = if ($Mutation -ceq 'registry-exact') {
+            'ExactPresent'
+        }
+        else {
+            'Collision'
+        }
+        foreach ($package in $plan.packages) {
+            $package.remoteState = $state
+            $package.mainState = $state
+            $package.mainAction = if ($state -ceq 'ExactPresent') {
+                'None'
+            }
+            else {
+                'Collision'
+            }
         }
     }
     switch ($Mutation) {

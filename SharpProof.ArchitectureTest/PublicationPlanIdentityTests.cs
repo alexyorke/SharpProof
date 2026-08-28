@@ -28,6 +28,8 @@ public sealed class PublicationPlanIdentityTests
     [TestCase("fixture-authority-tamper", false)]
     [TestCase("fixture-nonexistent-archive", true)]
     [TestCase("registry-canonical", true)]
+    [TestCase("registry-exact", true)]
+    [TestCase("registry-collision", true)]
     [TestCase("registry-url-tamper", false)]
     [TestCase("targetless-publish-tamper", false)]
     [TestCase("json-roundtrip", true)]

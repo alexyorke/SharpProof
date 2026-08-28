@@ -63,9 +63,12 @@ Release evidence includes SPDX 2.3, `SHA256SUMS`, the release manifest,
 container-toolchain identity, and exact source commit. Publication promotes
 the tested bytes in dependency order:
 `SharpProof.Attributes -> SharpProof -> SharpProof.Verifier`.
-Every main package must be absent before publication, and duplicate skipping is
-never used. A main or symbol collision fails closed; any partial publication
-requires a new version rather than reusing remote bytes.
+An existing main package is downloaded and compared byte-for-byte before
+publication: an exact match is reused, while a differing package is a
+collision and fails closed. No push uses the NuGet `--skip-duplicate` option.
+Symbols have no symmetric V3 download surface, so a symbol collision fails on
+push; missing symbols can be retried, while conflicting publication requires a
+new version.
 
 The worker protocol is 11, the cache schema is 13, and compiler artifacts use
 schema 15. The worker consumes sealed compiler artifacts rather than parsing

@@ -988,14 +988,33 @@ try {
         $package = $publicationStage.Release.packages[$index]
         Test-SharpProofPublicationPlanIdentity `
             -Plan $publicationStage.Plan
-        Write-Host (
-            "Publishing $($package.packageId) $($package.version) " +
-            "main package.")
-        Invoke-NuGetPush `
-            -Path $package.mainPath `
-            -Destination $publicationDestination.mainDestination `
-            -Key $ApiKey `
-            -NoSymbols $true
+        switch ([string]$publicationStage.Plan.packages[$index].mainAction) {
+            'Push' {
+                Write-Host (
+                    "Publishing $($package.packageId) $($package.version) " +
+                    "main package.")
+                Invoke-NuGetPush `
+                    -Path $package.mainPath `
+                    -Destination $publicationDestination.mainDestination `
+                    -Key $ApiKey `
+                    -NoSymbols $true
+            }
+            'None' {
+                Write-Host (
+                    "Main package $($package.packageId) $($package.version) " +
+                    "is already present with exact bytes; skipping.")
+            }
+            'Collision' {
+                throw (
+                    "Remote main package bytes conflict with the release: " +
+                    "$($package.packageId) $($package.version).")
+            }
+            default {
+                throw (
+                    "Publication plan has an unsupported main action for " +
+                    "$($package.packageId) $($package.version).")
+            }
+        }
         Test-SharpProofPublicationPlanIdentity `
             -Plan $publicationStage.Plan
         Write-Host (

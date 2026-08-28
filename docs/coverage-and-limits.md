@@ -322,11 +322,13 @@ projection of the validated worker response. The workflow already promotes
 only the tested bytes after revalidating tag, version, master ancestry,
 predecessor-tag order, hashes, SBOM, repository identity, and package
 inventory. Before publication, each of the three target V3 main-package
-identities at the release version must be absent. Main and symbol packages are
-published separately in dependency order without duplicate skipping. The
-symbol service has no symmetric V3 download surface, so a symbol-package
-collision is detected by the push and fails the release. Any partial or
-conflicting publication requires a new version. These limits are not
+identities at the release version is compared byte-for-byte when present: an
+exact match is reused, while a differing package fails closed. Main and symbol
+packages are published separately in dependency order; no push uses the NuGet
+`--skip-duplicate` option. The symbol service has no symmetric V3 download
+surface, so a symbol-package collision is detected by the push and fails the
+release. Missing symbols can be retried; any conflicting publication requires
+a new version. These limits are not
 worker-side compilation reconstruction, postcondition-counterexample replay,
 the admitted allocation-effect replay, package separation, SARIF, or
 release-artifact provenance work. Replay support for throw, field,

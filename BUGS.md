@@ -3076,30 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 685. [CONFIRMED] A transient symbol push failure makes release publication non-retryable
-
-**Location**: `scripts/Publish-SharpProofRelease.ps1`, around lines 690-727,
-883-945, and 982-1009; `scripts/SharpProof.PublicationDestination.ps1`, around
-lines 359-389.
-
-**Description**: Publication pushes each main nupkg before its snupkg. If the
-symbol push fails transiently, a retry sees the already-published main, and
-preflight throws on every HTTP 200 without comparing bytes. Although the planner
-computes main/symbol actions, the execution loop ignores them.
-
-**Reproduction**: Exact preflight returned Absent initially. The inspected loop
-proved main-before-symbol ordering and no action use or skip-duplicate behavior.
-On retry, byte-identical present-main state was rejected as
-`Remote main package already exists`, before reaching the missing symbol.
-
-**Impact**: One ordinary transient feed failure can leave an immutable public
-version permanently missing symbols with no supported automated repair.
-
-**Recommended fix**: Download/compare present main bytes, classify exact identity
-as ExactPresent/Skip and mismatch as Collision, and make execution honor both
-planned actions so missing symbols retry independently. Test main success plus
-symbol failure then successful retry, collision, fresh publish, and complete no-op.
-
 ### 686. [CONFIRMED] Unsupported IR cast pairs become false differential mismatches
 
 **Location**: `SharpProof.Ir/IrTermServices.cs`, around lines 206-214;

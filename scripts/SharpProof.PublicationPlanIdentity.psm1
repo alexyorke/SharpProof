@@ -305,7 +305,11 @@ function Test-SharpProofPublicationPlanIdentity {
             'registry' {
                 $expectedRemote = if ($Plan.planOnly) {
                     'Unchecked'
-                } else { 'Absent' }
+                } else {
+                    $package.remoteState
+                }
+                $validRuntimeRemote = $Plan.planOnly -or
+                    $expectedRemote -in @('Absent', 'ExactPresent', 'Collision')
                 $remoteUrlValid = $Plan.planOnly -and
                     $null -eq $package.remoteUrl
                 if (-not $Plan.planOnly -and
@@ -322,12 +326,20 @@ function Test-SharpProofPublicationPlanIdentity {
                 }
                 if ($package.remoteState -isnot [string] -or
                     $package.remoteState -cne $expectedRemote -or
+                    -not $validRuntimeRemote -or
                     $null -ne $package.fixtureState -or
                     -not $remoteUrlValid -or
                     $package.mainState -cne $expectedRemote -or
                     $package.mainAction -cne $(if ($Plan.planOnly) {
                         'PreflightThenPush'
-                    } else { 'Push' }) -or
+                    }
+                    else {
+                        switch ($expectedRemote) {
+                            'Absent' { 'Push' }
+                            'ExactPresent' { 'None' }
+                            'Collision' { 'Collision' }
+                        }
+                    }) -or
                     $package.symbolsState -cne 'Unchecked' -or
                     $package.symbolsAction -cne 'CollisionOnPush') {
                     throw 'Registry package decision is invalid.'
