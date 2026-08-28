@@ -13,6 +13,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($SchemaPath)) {
@@ -50,6 +51,28 @@ if (-not [IO.File]::Exists($SchemaPath)) {
 }
 if (-not [IO.File]::Exists($ProtocolSchemaPath)) {
     throw "Protocol schema not found: $ProtocolSchemaPath"
+}
+
+function Read-UniqueJson {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    $json = Get-Content -LiteralPath $Path -Raw
+    $document = [System.Text.Json.JsonDocument]::Parse($json)
+    try {
+        Assert-SharpProofUniqueJsonProperties `
+            -Value $document.RootElement `
+            -Context $Context
+    }
+    finally {
+        $document.Dispose()
+    }
+    return $json
 }
 
 function Get-RequiredMember {
@@ -368,7 +391,7 @@ function Add-RecordMembers {
     }
 }
 
-$schema = Get-Content -LiteralPath $SchemaPath -Raw |
+$schema = Read-UniqueJson -Path $SchemaPath -Context 'schema' |
     ConvertFrom-Json -Depth 100
 if ([int](Get-RequiredMember $schema 'schemaVersion' 'schema') -ne 1) {
     throw 'Only compiler-artifact model schema version 1 is supported.'
@@ -1390,7 +1413,9 @@ if ($domain -ne 'SharpProof.CompilerEffectClaimEvidence' -or
     $evidenceVersion -ne 8) {
     throw 'Compiler effect evidence must preserve domain version 8.'
 }
-$protocolSchema = Get-Content -LiteralPath $ProtocolSchemaPath -Raw |
+$protocolSchema = Read-UniqueJson `
+    -Path $ProtocolSchemaPath `
+    -Context 'protocol schema' |
     ConvertFrom-Json -Depth 100
 $effectCertaintyTables = @(
     (Get-MemberArray $protocolSchema 'validationTables') |

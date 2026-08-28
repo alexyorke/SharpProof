@@ -86,6 +86,16 @@ try {
         -Schema $canonical `
         -ShouldPass $true
 
+    $duplicateSchemaVersion = $canonical.Replace(
+        '  "schemaVersion": 1,',
+        '  "schemaVersion": 1,' + [Environment]::NewLine +
+            '  "schemaVersion": 1,')
+    Invoke-GeneratorCase `
+        -Name 'duplicate-schema-version' `
+        -Schema $duplicateSchemaVersion `
+        -ShouldPass $false `
+        -ExpectedMessage "duplicate property 'schemaVersion'"
+
     $unknownProperty = $canonical.Replace(
         '      "method": "TypeRow",',
         "      `"unexpected`": true,`n      `"method`": `"TypeRow`",")
