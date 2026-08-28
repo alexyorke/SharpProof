@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 595. [CONFIRMED] Launcher snapshots the Worker closure twice before startup
-
-**Location**: Worker.Launcher/Program.cs around lines 21-23, 57-58, and 115-119;
-CompilerManifestArtifact.cs around lines 49-124 and 178-187.
-
-**Description**: Outer CreateSnapshot stages the closure, then its prelaunch hash
-delegate calls ComputeSha256, which creates another full snapshot. Each snapshot
-also materializes multiple full component arrays.
-
-**Reproduction**: A normal 16-component 2.09 MB closure allocated 15.16 MB, read
-16.75 MB, and took 122 ms before launch. A one-snapshot control halved both
-ratios; hashes matched and cleanup completed.
-
-**Impact**: Every project pays roughly 7.25x allocation and 8x reads before
-Worker/Z3; supported large closures multiply this into hundreds of MB.
-
-**Recommended fix**: Hash the retained first snapshot directly; stream copy,
-comparison, and canonical hashing with pooled buffers. Test one snapshot,
-identical bytes/hash, cleanup, bounded I/O/allocation, and mutation/size limits.
-
 ### 596. [CONFIRMED] Non-completing object initializers lose reached effects
 
 **Location**: EffectMethodNodeBuilder.cs around lines 138-158;
