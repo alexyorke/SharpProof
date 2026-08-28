@@ -573,7 +573,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeProperty(SymbolAnalysisContext context)
     {
         var property = (IPropertySymbol)context.Symbol;
-        if (property.SetMethod != null &&
+        if ((property.SetMethod != null || IsMutableReferenceStorage(property.Type)) &&
             IsForbiddenMutableStaticStorage(property) &&
             IsAutoProperty(property, context.CancellationToken))
         {

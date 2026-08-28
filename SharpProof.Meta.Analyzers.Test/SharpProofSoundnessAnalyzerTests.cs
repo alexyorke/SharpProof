@@ -879,6 +879,40 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsGetOnlyMutableStaticReferenceProperties()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System.Collections.Generic;
+            using System.Collections.Immutable;
+            namespace SharpProof.Analyzer;
+            static class C {
+                internal static List<int> Values { get; } = new();
+                internal static int[] Array { get; } = new int[1];
+                internal static int Number { get; } = 1;
+                internal static ImmutableArray<int> Immutable { get; } = ImmutableArray<int>.Empty;
+            }
+            """);
+
+        var mutableState = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SPMETA002")
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(mutableState, Has.Length.EqualTo(2));
+            Assert.That(
+                mutableState.Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contains("Values"));
+            Assert.That(
+                mutableState.Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+                Has.Some.Contains("Array"));
+        }
+    }
+
+    [Test]
     public async Task AllowsStaticImmutableAndNonStorageMemberForms()
     {
         const string source =
