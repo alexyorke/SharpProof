@@ -575,7 +575,42 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is IBinaryOperation binary &&
                 binary.OperatorMethod is { } binaryOperator)
             {
-                if (canCompleteNormally(binary.LeftOperand) &&
+                var leftCompletes = canCompleteNormally(binary.LeftOperand);
+                var conditionalOperatorCompletes = leftCompletes;
+                if (leftCompletes &&
+                    binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or
+                        BinaryOperatorKind.ConditionalOr)
+                {
+                    var truthOperatorName = binary.OperatorKind ==
+                        BinaryOperatorKind.ConditionalAnd
+                            ? "op_False"
+                            : "op_True";
+                    var truthOperator = binaryOperator.ContainingType
+                        .GetMembers(truthOperatorName)
+                        .OfType<IMethodSymbol>()
+                        .FirstOrDefault(method => method.Parameters.Length == 1);
+                    if (truthOperator != null)
+                    {
+                        conditionalOperatorCompletes =
+                            AddStaticInitializationPotential(
+                                truthOperator,
+                                binary,
+                                Add);
+                        if (conditionalOperatorCompletes)
+                        {
+                            Add(
+                                GetOperatorExceptions(
+                                    truthOperator,
+                                    activeMethods,
+                                    depth),
+                                binary);
+                            conditionalOperatorCompletes =
+                                canMethodCompleteNormally(truthOperator);
+                        }
+                    }
+                }
+
+                if (conditionalOperatorCompletes &&
                     canCompleteNormally(binary.RightOperand))
                 {
                     if (AddStaticInitializationPotential(

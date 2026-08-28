@@ -5134,6 +5134,60 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ConditionalTruthOperatorExceptionsReachMatchingCatches()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class TruthOperatorException : Exception { }
+
+            public readonly struct Gate {
+                public static bool operator false(Gate value) =>
+                    throw new TruthOperatorException();
+                public static bool operator true(Gate value) =>
+                    throw new TruthOperatorException();
+                public static Gate operator &(Gate left, Gate right) => left;
+                public static Gate operator |(Gate left, Gate right) => left;
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                public static void And() {
+                    try { _ = new Gate() && new Gate(); }
+                    catch (TruthOperatorException) { s_state++; }
+                }
+
+                public static void Or() {
+                    try { _ = new Gate() || new Gate(); }
+                    catch (TruthOperatorException) { s_state++; }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var andSummary = session.Analyze(Method(compilation, "And")).Summary;
+        var orSummary = session.Analyze(Method(compilation, "Or")).Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                andSummary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                orSummary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                andSummary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(
+                orSummary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void ExceptionHandlersContributeEffectsOnlyWhenReachable()
     {
         var compilation = EffectTestHost.CreateCompilation(
