@@ -434,10 +434,10 @@ public sealed class ProgramLoweringTests
                 lowered.Factory.GetMemberInfo(call.Member).Name))
             .ToArray();
 
-        Assert.That(lowered.Result.IsExact, Is.False);
+        Assert.That(lowered.Result.IsExact, Is.True);
         Assert.That(
             lowered.Result.Abstentions.Select(static value => value.Reason),
-            Does.Contain(FrontendAbstention.UnsupportedInvocationShape));
+            Does.Not.Contain(FrontendAbstention.UnsupportedInvocationShape));
         Assert.That(calls, Has.Length.EqualTo(8));
         string[] expectedNames = [
             "GetReceiver", "Probe", "Ext", "GetReceiver",
