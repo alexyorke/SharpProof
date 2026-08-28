@@ -1555,46 +1555,6 @@ completed; retain the Git-bound canonical release check separately.
 **Confidence**: High; the canonical Gitless run isolated six checkout-metadata
 dependencies and exposed the vacuous negative-test behavior.
 
-### 490. [CONFIRMED] Human-reviewed pilot receipts are rejected by PowerShell operator precedence
-
-**Location**: scripts/Write-SharpProofQualificationReceipt.ps1 around line 98;
-the human-reviewed caller is eng/container/Invoke-SharpProofContainer.ps1 around
-lines 424-433.
-
-**Description**: The receipt writer admits reviewed human evidence or
-unreviewed automated evidence using an unparenthesized mixture of `-and` and
-`-or`. PowerShell evaluates the chain left-to-right, so the final
-`-and $Automated` applies to the intermediate result. Valid Reviewed plus
-non-automated input therefore evaluates false.
-
-**Reproduction**: `ReceiptWriterRequiresReviewedPilotEvidence` creates its own
-valid repository and fails independently of the Gitless fixture issue. In a
-temporary baseline copy, adding only explicit grouping made the canonical
-targeted test pass 1/1.
-
-**Impact**: `tooling pilot-review` cannot write the reviewed receipt required by
-release qualification, even when the human review and evidence are valid.
-Automated/unreviewed behavior is not a substitute for the required reviewed
-gate.
-
-**Root cause**: The intended two-branch truth table is encoded without grouping:
-
-    Reviewed -and -not Automated -or Unreviewed -and Automated
-
-**Recommended fix**: Group each allowed branch explicitly:
-
-    ((Reviewed -and (-not Automated)) -or
-     (Unreviewed -and Automated))
-
-Prefer named booleans for the two cases to prevent future precedence drift.
-
-**Regression coverage**: Exercise the complete truth table: reviewed/human and
-unreviewed/automated pass; reviewed/automated and unreviewed/human reject.
-Include the real `tooling pilot-review` receipt path.
-
-**Confidence**: High; the current fixture reproduces the rejection and the
-one-expression grouping change makes it pass.
-
 ### 491. [CONFIRMED] Separate object-initializer receivers collapse to one exact IR variable
 
 **Location**: SharpProof.Frontend/RoslynOperationLowerer.cs, `_instances` near
