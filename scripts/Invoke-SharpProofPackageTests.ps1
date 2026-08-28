@@ -133,6 +133,96 @@ function Get-WorkerMethodTimings {
         } | Sort-Object name)
 }
 
+function Get-ListedTestNames {
+    param(
+        [Parameter(Mandatory = $true)][string]$DotNetWrapper,
+        [Parameter(Mandatory = $true)][int]$TimeoutSeconds,
+        [Parameter(Mandatory = $true)][string]$TestProject,
+        [Parameter(Mandatory = $true)][string]$Configuration,
+        [Parameter(Mandatory = $true)][string]$Filter,
+        [Parameter(Mandatory = $true)][string]$OutputPath
+    )
+
+    & $DotNetWrapper `
+        -TimeoutSeconds $TimeoutSeconds `
+        -OutputPath $OutputPath `
+        test $TestProject `
+        -c $Configuration `
+        --no-build `
+        --no-restore `
+        --list-tests `
+        --filter $Filter
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not discover package tests for filter '$Filter'."
+    }
+
+    $text = Get-Content -LiteralPath $OutputPath -Raw
+    return @(
+        [regex]::Matches(
+            $text,
+            '(?m)^\s{4}(?<name>[^\r\n]+?)\s*$') |
+            ForEach-Object { $_.Groups['name'].Value.Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Sort-Object -Unique)
+}
+
+function Get-TestMethodName {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    $index = $Name.IndexOf('(', [StringComparison]::Ordinal)
+    if ($index -lt 0) {
+        return $Name
+    }
+    return $Name.Substring(0, $index)
+}
+
+function Get-TestFixtureClassNames {
+    param([Parameter(Mandatory = $true)][string]$PackageTestRoot)
+
+    $names = [Collections.Generic.List[string]]::new()
+    foreach ($source in Get-ChildItem `
+            -LiteralPath $PackageTestRoot `
+            -Recurse `
+            -Filter *.cs `
+            -File) {
+        $text = Get-Content -LiteralPath $source.FullName -Raw
+        foreach ($match in [regex]::Matches(
+                $text,
+                '(?ms)\[TestFixture(?:\s*\([^\)]*\))?\]\s*' +
+                '(?:(?:\[[^\]]*\]\s*)*)' +
+                '(?:(?:public|internal|private|protected)\s+)?' +
+                '(?:(?:sealed|abstract|partial)\s+)*class\s+' +
+                '(?<name>[A-Za-z_][A-Za-z0-9_]*)')) {
+            $names.Add($match.Groups['name'].Value)
+        }
+    }
+    return @($names | Sort-Object -Unique)
+}
+
+function Get-TrxExecutedCount {
+    param([Parameter(Mandatory = $true)][string]$ResultsDirectory)
+
+    if (-not [IO.Directory]::Exists($ResultsDirectory)) {
+        return [pscustomobject]@{ Files = 0; Executed = 0 }
+    }
+
+    $files = @(Get-ChildItem `
+        -LiteralPath $ResultsDirectory `
+        -Recurse `
+        -Filter *.trx `
+        -File)
+    $executed = 0
+    foreach ($file in $files) {
+        [xml]$document = Get-Content -LiteralPath $file.FullName -Raw
+        $results = @($document.TestRun.Results.UnitTestResult)
+        $executed += $results.Count
+    }
+    return [pscustomobject]@{
+        Files = $files.Count
+        Executed = $executed
+    }
+}
+
 $root = Join-Path ([IO.Path]::GetTempPath()) (
     'sharpproof-package-tests-' + [Guid]::NewGuid().ToString('N'))
 $feed = if ([string]::IsNullOrWhiteSpace($PackageSource)) {
@@ -230,69 +320,28 @@ try {
 
     $workerClass =
         'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
-    $workerListPath = Join-Path $root 'worker-test-list.txt'
-    & $dotnetWrapper `
-        -TimeoutSeconds $TimeoutSeconds `
-        -OutputPath $workerListPath `
-        test $testProject `
-        -c $Configuration `
-        --no-build `
-        --no-restore `
-        --list-tests `
-        --filter "FullyQualifiedName~$workerClass"
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Could not discover Worker MSBuild integration tests.'
-    }
-    $workerList = Get-Content -LiteralPath $workerListPath -Raw
-    $workerMethods = @(
-        [regex]::Matches(
-            $workerList,
-            '(?m)^\s{4}(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|\s*$)') |
-            ForEach-Object { $_.Groups['method'].Value } |
-            Sort-Object -Unique)
-    if ($workerMethods.Count -lt 40) {
-        throw (
-            'Worker MSBuild integration discovery returned only ' +
-            "$($workerMethods.Count) test methods.")
-    }
-    $workerBuckets = @(
-        for ($index = 0; $index -lt $parallelism; $index++) {
-            [pscustomobject]@{
-                Index = $index
-                Methods = [Collections.Generic.List[string]]::new()
-                EstimatedMilliseconds = 0L
-            }
-        })
-    $orderedWorkerMethods = @($workerMethods | Sort-Object `
-        @{ Expression = {
-                if ($priorMethodMilliseconds.ContainsKey($_)) {
-                    [long]$priorMethodMilliseconds[$_]
-                }
-                else {
-                    1L
-                }
-            }; Descending = $true }, `
-        @{ Expression = { $_ }; Descending = $false })
-    foreach ($method in $orderedWorkerMethods) {
-        $bucket = $workerBuckets | Sort-Object `
-            EstimatedMilliseconds, `
-            @{ Expression = { $_.Methods.Count } }, `
-            Index | Select-Object -First 1
-        $bucket.Methods.Add($method)
-        $bucket.EstimatedMilliseconds +=
-            $(if ($priorMethodMilliseconds.ContainsKey($method)) {
-                [long]$priorMethodMilliseconds[$method]
-            }
-            else {
-                1L
-            })
-    }
-
+    $packageTestRoot = Join-Path $repositoryRoot 'SharpProof.Package.Test'
     $shards = [Collections.Generic.List[object]]::new()
+    $expectedTestKeys = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+
     if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+        $selectedListPath = Join-Path $root 'selected-test-list.txt'
+        $selectedTests = @(Get-ListedTestNames `
+            -DotNetWrapper $dotnetWrapper `
+            -TimeoutSeconds $TimeoutSeconds `
+            -TestProject $testProject `
+            -Configuration $Configuration `
+            -Filter $TestFilter `
+            -OutputPath $selectedListPath)
+        if ($selectedTests.Count -eq 0) {
+            throw "The package test filter matched no tests: $TestFilter"
+        }
         $shards.Add([pscustomobject]@{
             Name = 'selected'
             Filter = $TestFilter
+            ExpectedTests = $selectedTests
+            ExpectedCount = $selectedTests.Count
             EstimatedMilliseconds =
                 $(if ($priorFilterMilliseconds.ContainsKey($TestFilter)) {
                     [long]$priorFilterMilliseconds[$TestFilter]
@@ -303,22 +352,117 @@ try {
         })
     }
     else {
-        $fixtureClasses = @(
-            'BuildTaskTests',
-            'DependencyAuditScriptTests',
-            'FinalCompilationProbeTests',
-            'LauncherArgumentTests',
-            'PackageLayoutSmokeTests',
-            'ReleasePublicationScriptTests')
+        $fixtureClasses = @(Get-TestFixtureClassNames $packageTestRoot)
+        if ($fixtureClasses.Count -eq 0) {
+            throw 'Package test discovery found no TestFixture classes.'
+        }
+
+        $fixtureInventory = [Collections.Generic.List[object]]::new()
         foreach ($fixtureClass in $fixtureClasses) {
             $filter =
                 "FullyQualifiedName~SharpProof.Package.Test.$fixtureClass"
-            $shards.Add([pscustomobject]@{
-                Name = 'fixture-' + $fixtureClass.ToLowerInvariant()
+            $listPath = Join-Path $root (
+                'test-list-' + $fixtureClass + '.txt')
+            $tests = @(Get-ListedTestNames `
+                -DotNetWrapper $dotnetWrapper `
+                -TimeoutSeconds $TimeoutSeconds `
+                -TestProject $testProject `
+                -Configuration $Configuration `
+                -Filter $filter `
+                -OutputPath $listPath)
+            if ($tests.Count -eq 0) {
+                throw (
+                    "Package fixture '$fixtureClass' discovered no tests " +
+                    "for filter '$filter'.")
+            }
+
+            $qualifiedTests = @($tests | ForEach-Object {
+                    "$fixtureClass.$_"
+                })
+            foreach ($test in $qualifiedTests) {
+                if (-not $expectedTestKeys.Add($test)) {
+                    throw "Package test identity was discovered twice: $test"
+                }
+            }
+            $fixtureInventory.Add([pscustomobject]@{
+                ClassName = $fixtureClass
                 Filter = $filter
+                Tests = $qualifiedTests
+            })
+        }
+
+        $workerFixture = $fixtureInventory | Where-Object {
+            $_.ClassName -eq 'WorkerMsBuildIntegrationTests'
+        } | Select-Object -First 1
+        if ($null -eq $workerFixture) {
+            throw "Package test discovery did not find $workerClass."
+        }
+
+        $workerMethods = @($workerFixture.Tests | ForEach-Object {
+                Get-TestMethodName ($_.Substring('WorkerMsBuildIntegrationTests.'.Length))
+            } | Sort-Object -Unique)
+        if ($workerMethods.Count -eq 0) {
+            throw 'Worker MSBuild integration discovery returned no test methods.'
+        }
+        $workerTestsByMethod = @{}
+        foreach ($test in $workerFixture.Tests) {
+            $method = Get-TestMethodName (
+                $test.Substring('WorkerMsBuildIntegrationTests.'.Length))
+            if (-not $workerTestsByMethod.ContainsKey($method)) {
+                $workerTestsByMethod[$method] =
+                    [Collections.Generic.List[string]]::new()
+            }
+            $workerTestsByMethod[$method].Add($test)
+        }
+
+        $workerBuckets = @(
+            for ($index = 0; $index -lt $parallelism; $index++) {
+                [pscustomobject]@{
+                    Index = $index
+                    Methods = [Collections.Generic.List[string]]::new()
+                    Tests = [Collections.Generic.List[string]]::new()
+                    EstimatedMilliseconds = 0L
+                }
+            })
+        $orderedWorkerMethods = @($workerMethods | Sort-Object `
+            @{ Expression = {
+                    if ($priorMethodMilliseconds.ContainsKey($_)) {
+                        [long]$priorMethodMilliseconds[$_]
+                    }
+                    else {
+                        1L
+                    }
+                }; Descending = $true }, `
+            @{ Expression = { $_ }; Descending = $false })
+        foreach ($method in $orderedWorkerMethods) {
+            $bucket = $workerBuckets | Sort-Object `
+                EstimatedMilliseconds, `
+                @{ Expression = { $_.Methods.Count } }, `
+                Index | Select-Object -First 1
+            $bucket.Methods.Add($method)
+            foreach ($test in @($workerTestsByMethod[$method])) {
+                $bucket.Tests.Add($test)
+            }
+            $bucket.EstimatedMilliseconds +=
+                $(if ($priorMethodMilliseconds.ContainsKey($method)) {
+                    [long]$priorMethodMilliseconds[$method]
+                }
+                else {
+                    1L
+                })
+        }
+
+        foreach ($fixture in @($fixtureInventory | Where-Object {
+                    $_.ClassName -ne 'WorkerMsBuildIntegrationTests'
+                })) {
+            $shards.Add([pscustomobject]@{
+                Name = 'fixture-' + $fixture.ClassName.ToLowerInvariant()
+                Filter = $fixture.Filter
+                ExpectedTests = $fixture.Tests
+                ExpectedCount = $fixture.Tests.Count
                 EstimatedMilliseconds =
-                    $(if ($priorFilterMilliseconds.ContainsKey($filter)) {
-                        [long]$priorFilterMilliseconds[$filter]
+                    $(if ($priorFilterMilliseconds.ContainsKey($fixture.Filter)) {
+                        [long]$priorFilterMilliseconds[$fixture.Filter]
                     }
                     else {
                         1L
@@ -334,8 +478,25 @@ try {
                 Filter = @($bucket.Methods | ForEach-Object {
                         "FullyQualifiedName~$workerClass.$_"
                     }) -join '|'
+                ExpectedTests = @($bucket.Tests)
+                ExpectedCount = $bucket.Tests.Count
                 EstimatedMilliseconds = $bucket.EstimatedMilliseconds
             })
+        }
+
+        $assignedTestKeys = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($shard in $shards) {
+            foreach ($test in @($shard.ExpectedTests)) {
+                if (-not $assignedTestKeys.Add([string]$test)) {
+                    throw "Package test identity was assigned twice: $test"
+                }
+            }
+        }
+        if ($assignedTestKeys.Count -ne $expectedTestKeys.Count) {
+            throw (
+                'Package test shard coverage mismatch: discovered ' +
+                "$($expectedTestKeys.Count), assigned $($assignedTestKeys.Count).")
         }
     }
 
@@ -429,6 +590,23 @@ try {
             if (-not [string]::IsNullOrWhiteSpace($stderr)) {
                 Write-Host $stderr.TrimEnd()
             }
+            $trx = Get-TrxExecutedCount (Join-Path $results $active.Shard.Name)
+            if ($trx.Files -eq 0) {
+                $failures.Add(
+                    "$($active.Shard.Name) produced no TRX execution evidence: " +
+                    $active.Shard.Filter)
+            }
+            elseif ($trx.Executed -eq 0) {
+                $failures.Add(
+                    "$($active.Shard.Name) executed zero tests: " +
+                    $active.Shard.Filter)
+            }
+            elseif ($trx.Executed -ne $active.Shard.ExpectedCount) {
+                $failures.Add(
+                    "$($active.Shard.Name) executed $($trx.Executed) tests, " +
+                    "but discovery expected " +
+                    "$($active.Shard.ExpectedCount): $($active.Shard.Filter)")
+            }
             if ($active.Process.ExitCode -ne 0) {
                 $failures.Add(
                     "$($active.Shard.Name) exited $($active.Process.ExitCode): " +
@@ -437,6 +615,8 @@ try {
             $shardTimings.Add([pscustomobject]@{
                 name = $active.Shard.Name
                 filter = $active.Shard.Filter
+                expectedCount = $active.Shard.ExpectedCount
+                executedCount = $trx.Executed
                 elapsedMilliseconds = [long](
                     ($active.Process.ExitTime.ToUniversalTime() -
                         $active.StartedUtc).TotalMilliseconds)
