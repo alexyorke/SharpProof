@@ -27,6 +27,22 @@ Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Forc
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
 $runtimePlatform = Get-SharpProofRuntimePlatform
+$portableGate = $Gate -in @(
+    'portable-linux', 'portable-windows', 'portable-macos')
+$portableEvidencePath = $null
+$portableReceiptPath = $null
+function Remove-PortableQualificationOutputs {
+    foreach ($path in @($portableEvidencePath, $portableReceiptPath)) {
+        if (-not [string]::IsNullOrWhiteSpace($path) -and
+            (Test-Path -LiteralPath $path -PathType Leaf)) {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+trap {
+    if ($portableGate) { Remove-PortableQualificationOutputs }
+    throw
+}
 $expectedAcceptancePhases = @()
 if ($Gate -in @('acceptance-debug', 'acceptance-release')) {
     Import-Module (Join-Path `
@@ -51,14 +67,15 @@ if (-not $receiptDirectory.StartsWith(
     throw 'ReceiptDirectory must remain inside the repository.'
 }
 $receiptPath = Join-Path $receiptDirectory "$Gate.json"
+$portableReceiptPath = if ($portableGate) { $receiptPath } else { $null }
 if (Test-Path -LiteralPath $receiptPath -PathType Container) {
     throw "Receipt path is a directory: $receiptPath"
 }
 if (Test-Path -LiteralPath $receiptPath -PathType Leaf) {
     Remove-Item -LiteralPath $receiptPath -Force
 }
-$commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $resolvedEvidence = (Resolve-Path -LiteralPath $EvidencePath).Path
+$portableEvidencePath = if ($portableGate) { $resolvedEvidence } else { $null }
 $relativeEvidence = [IO.Path]::GetRelativePath(
     $repositoryRoot,
     $resolvedEvidence).Replace('\', '/')
@@ -66,10 +83,9 @@ if ($relativeEvidence.StartsWith('../', [StringComparison]::Ordinal) -or
     [IO.Path]::IsPathRooted($relativeEvidence)) {
     throw 'Qualification gate evidence must remain inside the repository.'
 }
+$commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $evidence = Get-Content -LiteralPath $resolvedEvidence -Raw |
     ConvertFrom-Json -ErrorAction Stop
-$portableGate = $Gate -in @(
-    'portable-linux', 'portable-windows', 'portable-macos')
 if ($portableGate) {
     $expectedOsFamily = $Gate.Substring(9)
     if ($expectedOsFamily -cne $runtimePlatform.OsFamily -or
@@ -79,6 +95,9 @@ if ($portableGate) {
     if (-not $evidence.PSObject.Properties['architecture'] -or
         [string]$evidence.architecture -cne $runtimePlatform.Architecture) {
         throw "Portable receipt '$Gate' does not record the runtime architecture."
+    }
+    if ([string]$evidence.attemptId -notmatch '^[0-9a-f]{32}$') {
+        throw "Portable receipt '$Gate' does not contain a valid attempt identity."
     }
 }
 $packageArtifacts = @()
@@ -217,6 +236,9 @@ if ($Gate -eq 'pilots') {
 if ($Gate -eq 'release-configuration') {
     $receipt.attemptId = [string]$evidence.attemptId
     $receipt.checkedAtUtc = [string]$evidence.checkedAtUtc
+}
+if ($portableGate) {
+    $receipt.attemptId = [string]$evidence.attemptId
 }
 [IO.File]::WriteAllText(
     $receiptPath,

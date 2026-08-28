@@ -133,6 +133,7 @@ public sealed partial class ReleaseQualificationMatrixTests
                     commit,
                     osFamily,
                     architecture = RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(),
+                    attemptId = new string('a', 32),
                     packageArtifacts = packages.Take(count)
                 }));
                 return await RunExitCodeAsync(

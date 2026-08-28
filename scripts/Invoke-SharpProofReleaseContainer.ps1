@@ -230,6 +230,16 @@ switch ($Mode) {
                     ConvertTo-Json -Compress) -cne $packageArtifactJson) {
                 throw "Qualification gate receipt targets different packages: '$gate'."
             }
+            if ($gate -in @('portable-linux', 'portable-windows', 'portable-macos')) {
+                $portableEvidence = Get-Content -LiteralPath $evidencePath -Raw |
+                    ConvertFrom-Json -ErrorAction Stop
+                if (-not $portableEvidence.PSObject.Properties['attemptId'] -or
+                    [string]$portableEvidence.attemptId -notmatch '^[0-9a-f]{32}$' -or
+                    [string]$receipt.attemptId -cne
+                        [string]$portableEvidence.attemptId) {
+                    throw "Portable qualification receipt is not bound to one attempt: '$gate'."
+                }
+            }
             if ($gate -eq 'release-configuration') {
                 $releaseContract = Get-Content -LiteralPath (
                     Join-Path $repositoryRoot 'eng/release/environment-contract.json') -Raw |

@@ -43,6 +43,7 @@ try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/SharpProof.ReleaseConfigurationEvidence.psm1') `
         -Destination (Join-Path $fixtureScripts 'SharpProof.ReleaseConfigurationEvidence.psm1')
+    $consumerStub = Join-Path $fixtureScripts 'Test-SharpProofPackageConsumers.ps1'
     @'
 [CmdletBinding()]
 param(
@@ -50,17 +51,20 @@ param(
     [switch]$FrameworkConsumersOnly
 )
 exit 0
-'@ | Set-Content -LiteralPath (
-        Join-Path $fixtureScripts 'Test-SharpProofPackageConsumers.ps1') -Encoding utf8
+'@ | Set-Content -LiteralPath $consumerStub -Encoding utf8
+    $receiptStub = Join-Path $fixtureScripts 'Write-SharpProofQualificationReceipt.ps1'
     @'
 [CmdletBinding()]
 param(
     [string]$Gate,
     [string]$EvidencePath
 )
+$root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$path = Join-Path $root "artifacts/release-qualification/qualification-receipts/$Gate.json"
+[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path)) | Out-Null
+[IO.File]::WriteAllText($path, "receipt`n")
 exit 0
-'@ | Set-Content -LiteralPath (
-        Join-Path $fixtureScripts 'Write-SharpProofQualificationReceipt.ps1') -Encoding utf8
+'@ | Set-Content -LiteralPath $receiptStub -Encoding utf8
 
     & git -C $fixture init --quiet
     & git -C $fixture config user.email 'fixture@example.invalid'
@@ -90,8 +94,58 @@ exit 0
     $matching = Get-Content -LiteralPath $matchingEvidence -Raw |
         ConvertFrom-Json -ErrorAction Stop
     if ([string]$matching.osFamily -cne $hostOsFamily -or
-        [string]$matching.architecture -eq '') {
+        [string]$matching.architecture -eq '' -or
+        [string]$matching.attemptId -notmatch '^[0-9a-f]{32}$') {
         throw 'Matching-host portable evidence did not record runtime provenance.'
+    }
+    $matchingReceipt = Join-Path $fixtureArtifacts `
+        "qualification-receipts/portable-$hostOsFamily.json"
+    if (-not (Test-Path -LiteralPath $matchingReceipt -PathType Leaf)) {
+        throw 'Matching-host portable qualification did not publish a receipt.'
+    }
+
+    @'
+[CmdletBinding()]
+param(
+    [string]$PackageSource,
+    [switch]$FrameworkConsumersOnly
+)
+exit 1
+'@ | Set-Content -LiteralPath $consumerStub -Encoding utf8
+    $output = @(& pwsh -NoLogo -NoProfile -File (
+            Join-Path $fixtureScripts 'Test-SharpProofPortableConsumer.ps1') `
+            -PackageSource $fixturePackageSource -OsFamily $hostOsFamily 2>&1)
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -eq 0 -or
+        (Test-Path -LiteralPath $matchingEvidence -PathType Leaf) -or
+        (Test-Path -LiteralPath $matchingReceipt -PathType Leaf)) {
+        throw "Failed portable child preserved a prior passing pair: $($output -join [Environment]::NewLine)"
+    }
+
+    @'
+[CmdletBinding()]
+param(
+    [string]$PackageSource,
+    [switch]$FrameworkConsumersOnly
+)
+exit 0
+'@ | Set-Content -LiteralPath $consumerStub -Encoding utf8
+    @'
+[CmdletBinding()]
+param(
+    [string]$Gate,
+    [string]$EvidencePath
+)
+exit 1
+'@ | Set-Content -LiteralPath $receiptStub -Encoding utf8
+    $output = @(& pwsh -NoLogo -NoProfile -File (
+            Join-Path $fixtureScripts 'Test-SharpProofPortableConsumer.ps1') `
+            -PackageSource $fixturePackageSource -OsFamily $hostOsFamily 2>&1)
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -eq 0 -or
+        (Test-Path -LiteralPath $matchingEvidence -PathType Leaf) -or
+        (Test-Path -LiteralPath $matchingReceipt -PathType Leaf)) {
+        throw "Failed receipt publication preserved a passing pair: $($output -join [Environment]::NewLine)"
     }
 
     $receiptFixture = Join-Path $fixture 'receipt-repo'
@@ -137,6 +191,8 @@ exit 0
             status = 'passed'
             commit = $commit
             osFamily = $spoofedOsFamily
+            architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+            attemptId = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
             packageArtifacts = $packageArtifacts
         }
         [IO.File]::WriteAllText(

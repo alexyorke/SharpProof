@@ -294,30 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 634. [CONFIRMED] A failed same-OS portable rerun preserves a prior passing receipt
-
-**Location**: `scripts/Test-SharpProofPortableConsumer.ps1`, around lines 12-43;
-`scripts/Write-SharpProofQualificationReceipt.ps1`; portable validation in
-`scripts/Invoke-SharpProofReleaseContainer.ps1`, around lines 175-210.
-
-**Description**: The portable consumer runs its fallible child before taking
-ownership of the output pair and publishes evidence only on success. A later
-failed run therefore leaves the old passed evidence and receipt intact, while
-the final authority has no attempt-freshness concept.
-
-**Reproduction**: After a successful Linux run, a second same-OS run was forced
-to fail in the child. Both evidence files survived byte-for-byte and the exact
-final release predicate still returned true for the current commit, packages,
-and hashes.
-
-**Impact**: A failed current qualification attempt can be reported as passing
-from stale same-host evidence.
-
-**Recommended fix**: Atomically invalidate or tombstone both files before any
-fallible work, bind evidence and receipt to one attempt ID, and make receipt
-generation independently invalidate stale output on failure. Test pass-then-fail,
-receipt-writer failure, and interrupted pair publication.
-
 ### 670. [CONFIRMED] NuGet package archives are not byte reproducible
 
 **Location**: `scripts/Invoke-SharpProofContainer.ps1`, around lines 383-393;
