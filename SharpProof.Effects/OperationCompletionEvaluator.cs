@@ -777,16 +777,35 @@ internal sealed class OperationCompletionEvaluator
             _compilation,
             deconstruction,
             out var info) ||
-            DeconstructionPhasesMayComplete(
-                info,
-                deconstruction.Value,
-                isRoot: true,
-                origin: deconstruction);
+            DeconstructionPhaseWalker.Enumerate(info).All(phase =>
+                CanCompleteDeconstructionPhase(
+                    phase,
+                    deconstruction.Value,
+                    deconstruction));
         return phasesMayComplete &&
             CanCompleteDeconstructionTarget(deconstruction.Target);
     }
 
-    private bool CanCompleteDeconstructionTarget(IOperation target)
+    internal bool CanCompleteDeconstructionPhase(
+        DeconstructionPhase phase,
+        IOperation value,
+        IOperation origin)
+    {
+        if (phase.Method is { } method)
+        {
+            var callable = method.ReducedFrom ?? method;
+            return phase.IsRootMethod &&
+                !method.IsStatic &&
+                method.ReducedFrom == null
+                    ? CanCompleteInvocation(method, value, origin)
+                    : CanMethodCompleteNormally(callable);
+        }
+
+        return phase.Conversion is not { } conversion ||
+            CanMethodCompleteNormally(conversion);
+    }
+
+    internal bool CanCompleteDeconstructionTarget(IOperation target)
     {
         if (target is ITupleOperation tuple)
         {
@@ -794,44 +813,6 @@ internal sealed class OperationCompletionEvaluator
         }
 
         return CanCompleteWriteTarget(target);
-    }
-
-    private bool DeconstructionPhasesMayComplete(
-        Microsoft.CodeAnalysis.CSharp.DeconstructionInfo info,
-        IOperation value,
-        bool isRoot,
-        IOperation origin)
-    {
-        if (info.Method is { } method)
-        {
-            var callable = method.ReducedFrom ?? method;
-            var completes = isRoot &&
-                !method.IsStatic &&
-                method.ReducedFrom == null
-                    ? CanCompleteInvocation(method, value, origin)
-                    : CanMethodCompleteNormally(callable);
-            if (!completes)
-            {
-                return false;
-            }
-        }
-
-        foreach (var nested in info.Nested.IsDefault
-                     ? ImmutableArray<DeconstructionInfo>.Empty
-                     : info.Nested)
-        {
-            if (!DeconstructionPhasesMayComplete(
-                    nested,
-                    value,
-                    isRoot: false,
-                    origin: origin))
-            {
-                return false;
-            }
-        }
-
-        return info.Conversion?.MethodSymbol is not { } conversion ||
-            CanMethodCompleteNormally(conversion);
     }
 
     private static bool TryGetDeconstructionInfo(

@@ -6210,6 +6210,58 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void DeconstructionConversionEffectsAreRetainedBeforeFailure()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global
+            {
+                public static int State;
+            }
+
+            public struct Converted
+            {
+                public static implicit operator int(Converted value)
+                {
+                    Global.State = 1729;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public sealed class Source
+            {
+                public void Deconstruct(out Converted value, out int other)
+                {
+                    value = default;
+                    other = 0;
+                }
+            }
+
+            public static class Sample
+            {
+                public static void Caller(Source source)
+                {
+                    try
+                    {
+                        int result;
+                        int other;
+                        (result, other) = source;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                    }
+                }
+            }
+            """);
+
+        var summary = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Caller")).Summary;
+        Assert.That(summary.Writes.Contains(EffectRegionId.Static()), Is.True);
+    }
+
+    [Test]
     public void NullReceiverStillEvaluatesArgumentsFirst()
     {
         var compilation = EffectTestHost.CreateCompilation(

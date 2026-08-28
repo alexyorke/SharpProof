@@ -64,33 +64,89 @@ internal sealed partial class OperationEffectScanner
             return value.Summary;
         }
 
-        var completes = _completionEvaluator.CanCompleteNormally(deconstruction);
-        var deconstructionCall = ScanDeconstructionCall(deconstruction);
-        return value.Then(new EffectStep(
-            EffectSummaryOperations.Join(
-                deconstructionCall,
+        if (!TryGetDeconstructionInfo(deconstruction, out var info))
+        {
+            return value.Then(new EffectStep(
+                EffectSummaryOperations.Unsupported(),
+                _completionEvaluator.CanCompleteNormally(deconstruction))).Summary;
+        }
+
+        var reached = value;
+        var hasPhase = false;
+        foreach (var phase in DeconstructionPhaseWalker.Enumerate(info))
+        {
+            hasPhase = true;
+            var summary = phase.Method is { } method
+                ? phase.IsRootMethod
+                    ? ScanDeconstructionCall(deconstruction, method)
+                    : ScanDeconstructionMethod(deconstruction, method)
+                : ScanDeconstructionConversion(
+                    deconstruction,
+                    phase.Conversion!);
+            var completes = _completionEvaluator.CanCompleteDeconstructionPhase(
+                phase,
+                deconstruction.Value,
+                deconstruction);
+            reached = reached.Then(new EffectStep(
+                EffectSummaryOperations.Join(
+                    summary,
+                    completes
+                        ? EffectSummary.Empty
+                        : EffectSummaryOperations.MayDiverge()),
+                completes));
+            if (!reached.CompletesNormally)
+            {
+                return reached.Summary;
+            }
+        }
+
+        if (!hasPhase)
+        {
+            var completes = _completionEvaluator.CanCompleteNormally(deconstruction);
+            return reached.Then(new EffectStep(
                 completes
                     ? EffectSummaryOperations.Unsupported()
+                    : EffectSummaryOperations.MayDiverge(),
+                completes)).Summary;
+        }
+
+        foreach (var target in FlattenDeconstructionTargets(deconstruction.Target))
+        {
+            reached = reached.Then(ScanDeconstructionTarget(target));
+            if (!reached.CompletesNormally)
+            {
+                return reached.Summary;
+            }
+        }
+
+        return reached.Summary;
+    }
+
+    private EffectStep ScanDeconstructionTarget(IOperation target)
+    {
+        var evaluation = ScanWriteTargetEvaluation(target);
+        if (!evaluation.CompletesNormally)
+        {
+            return evaluation;
+        }
+
+        var completes = _completionEvaluator.CanCompleteDeconstructionTarget(target);
+        return evaluation.Then(new EffectStep(
+            EffectSummaryOperations.Join(
+                ScanWriteTarget(
+                    target,
+                    value: null,
+                    valueIsStoredDirectly: false),
+                completes
+                    ? EffectSummary.Empty
                     : EffectSummaryOperations.MayDiverge()),
-            completes)).Summary;
+            completes));
     }
 
     private EffectSummary ScanDeconstructionCall(
-        IDeconstructionAssignmentOperation deconstruction)
+        IDeconstructionAssignmentOperation deconstruction,
+        IMethodSymbol method)
     {
-        if (deconstruction.Syntax is not AssignmentExpressionSyntax syntax)
-        {
-            return EffectSummary.Empty;
-        }
-
-        var model = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(_session.Compilation, syntax.SyntaxTree);
-        var info = model.GetDeconstructionInfo(syntax);
-        if (info.Method is not { } method)
-        {
-            return EffectSummary.Empty;
-        }
-
         var hasReceiver = method.ReducedFrom != null || !method.IsStatic;
         var receiver = hasReceiver
             ? _conversionOwnership.ClassifyRegion(
@@ -123,6 +179,67 @@ internal sealed partial class OperationEffectScanner
             method.IsVirtual || method.IsAbstract,
             deconstruction,
             hasReceiver ? deconstruction.Value : null);
+    }
+
+    private EffectSummary ScanDeconstructionMethod(
+        IDeconstructionAssignmentOperation deconstruction,
+        IMethodSymbol method)
+    {
+        var hasReceiver = method.ReducedFrom != null || !method.IsStatic;
+        var arguments = Enumerable.Repeat(
+                EffectRegionSet.Unknown,
+                method.Parameters.Length)
+            .ToImmutableArray();
+        var actualArguments = Enumerable.Repeat<IOperation?>(
+                null,
+                method.Parameters.Length)
+            .ToImmutableArray();
+        var receiver = hasReceiver
+            ? EffectRegionSet.Unknown
+            : EffectRegionSet.Empty;
+        return _callResolver.Resolve(
+            method,
+            receiver,
+            receiver,
+            arguments,
+            actualArguments,
+            method.IsVirtual || method.IsAbstract,
+            deconstruction,
+            instance: null);
+    }
+
+    private EffectSummary ScanDeconstructionConversion(
+        IDeconstructionAssignmentOperation deconstruction,
+        IMethodSymbol conversion)
+    {
+        return _callResolver.ResolveOperator(
+            conversion,
+            EffectRegionSet.Empty,
+            Enumerable.Repeat(
+                    EffectRegionSet.Unknown,
+                    conversion.Parameters.Length)
+                .ToImmutableArray(),
+            Enumerable.Repeat<IOperation?>(
+                    null,
+                    conversion.Parameters.Length)
+                .ToImmutableArray(),
+            deconstruction);
+    }
+
+    private bool TryGetDeconstructionInfo(
+        IDeconstructionAssignmentOperation deconstruction,
+        out DeconstructionInfo info)
+    {
+        info = default;
+        if (deconstruction.Syntax is not AssignmentExpressionSyntax syntax)
+        {
+            return false;
+        }
+
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_session.Compilation, syntax.SyntaxTree);
+        info = model.GetDeconstructionInfo(syntax);
+        return true;
     }
 
     private static IEnumerable<IOperation> FlattenDeconstructionTargets(

@@ -4,7 +4,7 @@ internal sealed partial class OperationEffectScanner
 {
     private EffectSummary ScanWriteTarget(
         IOperation target,
-        IOperation value,
+        IOperation? value,
         bool valueIsStoredDirectly = true)
     {
         target = _coalesceCaptures.Resolve(target);
