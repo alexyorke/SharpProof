@@ -340,6 +340,23 @@ public sealed class ProofKernelTests
     }
 
     [Test]
+    public async Task ForeignBackendCancellationBecomesMalformedResult()
+    {
+        var fixture = CreateFixture();
+        using var foreignCancellation = new CancellationTokenSource();
+        foreignCancellation.Cancel();
+
+        var outcome = await new ProofKernel(
+                new ForeignCanceledBackend(foreignCancellation.Token))
+            .VerifyAsync(fixture.Query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.MalformedBackendResult));
+    }
+
+    [Test]
     public void CancellationDuringBackendArgumentFailurePropagates()
     {
         var fixture = CreateFixture();
@@ -580,6 +597,17 @@ public sealed class ProofKernelTests
         {
             await cancellation.CancelAsync();
             throw new ArgumentException("malformed backend result");
+        }
+    }
+
+    private sealed class ForeignCanceledBackend(
+        CancellationToken foreignCancellation) : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromCanceled<BackendCheckResult>(foreignCancellation);
         }
     }
 

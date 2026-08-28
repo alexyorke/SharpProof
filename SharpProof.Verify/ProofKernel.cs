@@ -23,6 +23,14 @@ public sealed class ProofKernel(ISmtBackend backend)
         {
             result = null;
         }
+        catch (OperationCanceledException) when (
+            !cancellationToken.IsCancellationRequested)
+        {
+            // A backend must not be able to manufacture caller cancellation
+            // with a task canceled by an unrelated token. Treat that task as
+            // malformed and let the common validation below classify it.
+            result = null;
+        }
         cancellationToken.ThrowIfCancellationRequested();
         if (result == null)
         {

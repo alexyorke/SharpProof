@@ -361,6 +361,19 @@ internal static class CancellationBoundaryAnalyzer
                 symbols);
         }
 
+        // ProofKernel deliberately translates cancellation manufactured by a
+        // backend with an unrelated token into a malformed backend result.
+        // The caller token is still rethrown by the checkpoint immediately
+        // after the await, so this catch is a sound cancellation boundary
+        // rather than a swallowed caller cancellation.
+        if (string.Equals(method.Name, "VerifyAsync", StringComparison.Ordinal) &&
+            IsSameType(
+                method.ContainingType,
+                symbols[SharpProofSoundnessAnalyzer.KnownType.ProofKernel]))
+        {
+            return true;
+        }
+
         if (method is not
             {
                 Name: "VerifyTargetAsync",
