@@ -4,7 +4,16 @@ public static partial class WorkerProtocolJson
 {
     private static string CreateManifestPayload(WorkerClaimManifest manifest)
     {
-        var writer = new ManifestWriter().Add(WorkerManifestIdentityCatalog.Domain)
+        var writer = new ManifestWriter();
+        WriteManifestPayload(manifest, writer);
+        return writer.ToString();
+    }
+
+    private static void WriteManifestPayload(
+        WorkerClaimManifest manifest,
+        ManifestWriter writer)
+    {
+        writer.Add(WorkerManifestIdentityCatalog.Domain)
             .Add(WorkerManifestVersions.Current);
         writer.Add("manifest.schemaVersion").Add(manifest.SchemaVersion);
         writer.Add("manifest.callables").Add(manifest.Callables?.Length ?? -1);
@@ -42,6 +51,5 @@ public static partial class WorkerProtocolJson
             writer.Add("claim.effectContractKind").Add(ManifestName(entry?.EffectContractKind ?? WorkerEffectContractKind.Unspecified));
             writer.AddLocation("claim.location", entry?.Location);
         }
-        return writer.ToString();
     }
 }

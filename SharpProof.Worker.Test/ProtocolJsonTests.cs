@@ -511,6 +511,7 @@ public sealed class ProtocolJsonTests
                 Does.Contain("manifest.hash"));
     }
 
+
     [Test]
     public void ManifestHashRejectsIllFormedUtf16InsteadOfReplacingIt()
     {
@@ -520,6 +521,33 @@ public sealed class ProtocolJsonTests
         Assert.That(
             (Action)(() => WorkerProtocolJson.ComputeManifestHash(manifest)),
             Throws.TypeOf<EncoderFallbackException>());
+    }
+
+    [Test]
+    public void LargeManifestHashDoesNotMaterializeThePayload()
+    {
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = Enumerable.Range(0, 5_000)
+                .Select(index => new WorkerCallableManifestEntry
+                {
+                    CallableId = $"M:Subject.C{index:D5}"
+                })
+                .ToArray()
+        };
+        WorkerProtocolJson.ComputeManifestHash(manifest);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var hash = WorkerProtocolJson.ComputeManifestHash(manifest);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(hash, Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(allocated, Is.LessThan(5_000_000));
+        }
     }
 
     [Test]

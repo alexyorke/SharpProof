@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -226,8 +228,22 @@ public static partial class WorkerProtocolJson
     }
 
     private sealed class ManifestWriter
+        : IDisposable
     {
-        private readonly StringBuilder _builder = new();
+        private readonly StringBuilder? _builder;
+        private readonly IncrementalHash? _hash;
+        private readonly byte[]? _buffer;
+
+        internal ManifestWriter()
+        {
+            _builder = new();
+        }
+
+        internal ManifestWriter(IncrementalHash hash)
+        {
+            _hash = hash ?? throw new ArgumentNullException(nameof(hash));
+            _buffer = ArrayPool<byte>.Shared.Rent(4096);
+        }
 
         internal ManifestWriter Add(int value)
         {
@@ -238,12 +254,14 @@ public static partial class WorkerProtocolJson
         {
             if (value == null)
             {
-                _builder.Append("-1:;");
+                Append("-1:;");
             }
             else
             {
-                _builder.Append(value.Length.ToString(CultureInfo.InvariantCulture))
-                    .Append(':').Append(value).Append(';');
+                Append(value.Length.ToString(CultureInfo.InvariantCulture));
+                Append(":");
+                Append(value);
+                Append(";");
             }
 
             return this;
@@ -283,7 +301,43 @@ public static partial class WorkerProtocolJson
 
         public override string ToString()
         {
-            return _builder.ToString();
+            return _builder?.ToString() ??
+                throw new InvalidOperationException(
+                    "A streaming manifest writer has no string payload.");
+        }
+
+        public void Dispose()
+        {
+            if (_buffer != null)
+            {
+                ArrayPool<byte>.Shared.Return(_buffer);
+            }
+        }
+
+        private void Append(string value)
+        {
+            if (_builder != null)
+            {
+                _builder.Append(value);
+                return;
+            }
+
+            var hash = _hash!;
+            var buffer = _buffer!;
+            var byteCount = s_strictUtf8.GetByteCount(value);
+            if (byteCount <= buffer.Length)
+            {
+                var written = s_strictUtf8.GetBytes(
+                    value,
+                    0,
+                    value.Length,
+                    buffer,
+                    0);
+                hash.AppendData(buffer, 0, written);
+                return;
+            }
+
+            hash.AppendData(s_strictUtf8.GetBytes(value));
         }
     }
 

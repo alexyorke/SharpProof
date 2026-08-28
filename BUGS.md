@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 517. [CONFIRMED] Manifest hashing materializes multiple full payload copies
-
-**Location**: SharpProof.Worker.Protocol/ProtocolManifest.cs around lines 44-50
-and 67-75; canonical payload construction in
-SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around lines 208-267.
-
-**Description**: ComputeManifestHash builds the complete framed payload in a
-growing StringBuilder, copies it to one full UTF-16 string, allocates a full
-UTF-8 byte array, and only then computes SHA-256. ManifestsEqual additionally
-materializes both complete canonical payload strings. This is separate from the
-quadratic claim lookup in finding 497 and occurs even on already-canonical input.
-
-**Reproduction**: Warmed direct hashing probes measured:
-
-    10,000 claims, 3,309,011-byte payload: 18,022,992 bytes allocated
-    20,000 claims, 6,629,011-byte payload: 36,013,416 bytes allocated
-     5,000 fully valid claims:             9,810,992 bytes allocated
-
-The valid manifest subsequently passed ValidateManifest, and every hash had the
-expected 64-character shape.
-
-**Impact**: SealManifest, validation rehashing, strict expected-manifest checks,
-and equality can create tens or hundreds of megabytes of transient
-StringBuilder chunks, LOH strings, and byte arrays for representable manifests.
-GC pressure consumes verification time and increases peak memory before response
-serialization.
-
-**Root cause**: The canonical hash API accepts only a completed byte array, and
-the framing writer is string-backed rather than incremental.
-
-**Recommended fix**: Preserve the exact framing/hash identity while streaming
-frames into IncrementalHash through a small reusable buffer or IBufferWriter.
-Write the ASCII UTF-16-code-unit length, colon, strict UTF-8 value, and semicolon
-incrementally; use Utf8Formatter for numbers. Compare canonical fields/sequences
-or incremental streams in ManifestsEqual instead of building both strings.
-
-**Regression coverage**: Retain the pinned known hash and add non-ASCII and
-ill-formed-UTF16 compatibility cases. Warm a fully valid 5k-claim hash and set a
-generous allocation ceiling far below 9.8 MB. Cover equality true and one-field
-differences without payload materialization.
-
-**Confidence**: High; public hash allocation scales at about 5.4 times payload
-size on already-constructed, valid manifests.
-
 ### 518. [CONFIRMED] Backend-reported timeouts become malformed worker results
 
 **Location**: SharpProof.Worker/CallableVerificationPolicy.cs around lines 43-55;
