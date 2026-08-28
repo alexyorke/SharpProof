@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 583. [CONFIRMED] Callable projection validation is quadratic
-
-**Location**: Worker.Protocol/ProtocolJson.cs around lines 751-773;
-WorkerResultAssembler.cs around lines 171-187.
-
-**Description**: ValidateRun loops every callable result, and each
-MatchesCallableProjection call linearly scans manifest.Callables from the start
-with FirstOrDefault despite already building claim indexes.
-
-**Reproduction**: Valid empty-claim responses took 18.9 ms at 1,000 callables,
-123 ms at 4,000, 506 ms at 8,000, and 1,487 ms at 16,000. The 16,000-row
-response validated and was only 4.87 MB.
-
-**Impact**: Large ordinary projects spend seconds in repeated validation at
-worker, launcher, and publication boundaries after verification is complete.
-
-**Recommended fix**: Build one ordinal CallableId index beside claimsByCallable
-and pass resolved declarations into projection validation. Preserve malformed
-duplicate/null behavior and add deterministic lookup-count or warmed scaling
-coverage.
-
 ### 584. [CONFIRMED] SPMETA002 whitelists mutable immutable-collection builders
 
 **Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs around
