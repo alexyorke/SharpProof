@@ -393,11 +393,18 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             _maximumDecodedStringLength = maximumDecodedStringLength;
             _stringSort = owner.OwnSort(
                 (SeqSort)_context.MkSeqSort(_context.IntSort));
+            var maximumDepths = new Dictionary<IrId, int>();
             foreach (var assumption in query.Assumptions)
             {
-                ValidateDepth(assumption.Predicate, cancellationToken);
+                ValidateDepth(
+                    assumption.Predicate,
+                    cancellationToken,
+                    maximumDepths);
             }
-            ValidateDepth(query.Goal.Predicate, cancellationToken);
+            ValidateDepth(
+                query.Goal.Predicate,
+                cancellationToken,
+                maximumDepths);
             Variables = query.ModelVariables;
             IntegerVariables = [.. Variables.Where(variable =>
                 _factory.GetVariableInfo(variable).Type == _factory.IntegerType)];
@@ -444,9 +451,9 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
         private static void ValidateDepth(
             IrTerm root,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Dictionary<IrId, int> maximumDepths)
         {
-            var maximumDepths = new Dictionary<IrId, int>();
             var pending = new Stack<(IrTerm Term, int Depth)>();
             pending.Push((root, 1));
             while (pending.Count != 0)
