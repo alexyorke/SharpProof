@@ -118,6 +118,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 AnalyzeCompoundAssignmentExpressionText,
                 OperationKind.CompoundAssignment);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
+            startContext.RegisterOperationAction(c => AnalyzeWith(c, symbols), OperationKind.With);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
             startContext.RegisterOperationAction(
                 AnalyzeInterpolatedString,
@@ -229,6 +230,26 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 MetaDiagnosticDescriptors.ProofOutcomeConstruction,
                 creation.Syntax.GetLocation(),
                 creation.Type?.Name ?? string.Empty);
+        }
+    }
+
+    private static void AnalyzeWith(OperationAnalysisContext context, KnownSymbols symbols)
+    {
+        var withOperation = (IWithOperation)context.Operation;
+        var containingType = context.ContainingSymbol.ContainingType;
+        if (IsSameType(withOperation.Type, symbols[KnownType.EffectSummary]) &&
+            !IsAnyType(
+                containingType,
+                symbols,
+                KnownType.EffectSummary,
+                KnownType.EffectSummaryDomain,
+                KnownType.EffectSummaryOperations,
+                KnownType.ExternalEffectResolver))
+        {
+            Report(
+                context,
+                MetaDiagnosticDescriptors.EffectSummaryConstruction,
+                withOperation.Syntax.GetLocation());
         }
     }
 

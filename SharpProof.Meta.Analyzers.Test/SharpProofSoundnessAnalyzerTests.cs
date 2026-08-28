@@ -1852,6 +1852,27 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsEffectSummaryWithExpressionsOutsideTheEffectDomain()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Effects {
+                public record EffectSummary;
+            }
+            namespace SharpProof.Analyzer {
+                static class Consumer {
+                    static SharpProof.Effects.EffectSummary Clone(
+                        SharpProof.Effects.EffectSummary value) => value with { };
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA008"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task RejectsDisplayStringsRegardlessOfProductionNamespace()
     {
         const string source =
