@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 500. [CONFIRMED] Synchronous using omits the hidden concrete Dispose precondition call
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
-GetCalls around lines 591-624. Source-aware disposal resolution exists in
-SharpProof.Effects/UsingDisposalEffectResolver.cs around lines 5-9, 38-89,
-237-312, and 452-508.
-
-**Description**: Requires discovery has no IUsingOperation or
-IUsingDeclarationOperation disposal model. Source operation trees expose no
-ordinary concrete Dispose invocation. The lowered CFG may expose an implicit
-IDisposable.Dispose call, but it loses the concrete receiver implementation;
-Effects compensates with a source-aware resolver while Requires does not.
-
-**Reproduction**: A sealed Resource implements IDisposable and its concrete
-Dispose contains `Contract.Requires(false)`. Runtime counters showed generated
-using disposal and a direct Dispose call each execute once. Analyzer output was:
-
-    SP0027 at direct Dispose call only
-    no diagnostic at using statement
-
-**Impact**: An admitted synchronous using statement can silently invoke an
-always-invalid concrete precondition at scope exit. Spelling the same call
-directly changes the verdict.
-
-**Root cause**: Potential-owner screening and call discovery omit source-level
-disposal semantics, and the generic lowered operation cannot recover the
-concrete method.
-
-**Recommended fix**: Reuse or factor the Effects resource inventory and concrete
-Dispose resolution. For each reachable, acquired, nonnull resource, create a
-receiver-only Requires candidate at the resource/declaration location, preserve
-acquisition completion and reverse disposal order, and stop later candidates
-when an earlier reverse-order Dispose cannot complete. Keep async disposal
-separate until modeled.
-
-**Regression coverage**: Cover using statement and declaration parity,
-Requires(false) concrete Dispose, direct-call parity, definitely-null resource,
-non-completing acquisition, multiple-resource reverse order, and
-interface-typed/concrete initializer resolution.
-
-**Confidence**: High; executable analyzer/runtime differentials isolate the
-missing hidden call, and the repository's Effects code documents the exact
-lowered-CFG information loss.
-
 ### 501. [CONFIRMED] Escaping lambdas in field and property initializers skip Requires analysis
 
 **Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around lines
