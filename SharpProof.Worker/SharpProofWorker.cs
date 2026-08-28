@@ -627,7 +627,9 @@ public sealed class SharpProofWorker : IDisposable
                         lanes.Any(lane => !ReferenceEquals(lane, this) &&
                             ReferenceEquals(lane.Backend, replacement)))
                     {
-                        (replacement as IDisposable)?.Dispose();
+                        // A duplicate belongs to this lane or to another live
+                        // lane. It is not owned by the renewal attempt, so
+                        // disposing it here can corrupt the live owner.
                         return LaneRenewalResult.BackendUnavailable;
                     }
 

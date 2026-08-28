@@ -5675,6 +5675,8 @@ public sealed class WorkerTests
                     ? new ThrowingDisposeDelayingBackend()
                     : scenario == "dispose-canceled"
                         ? new ThrowingCancellationDisposeDelayingBackend()
+                    : scenario == "reuse"
+                        ? new DisposableDelayingBackend()
                     : new DelayingBackend();
                 return original;
             }
@@ -5701,6 +5703,12 @@ public sealed class WorkerTests
                     WorkerClaimReason.MethodTimeout,
                     expectedClaimReason
                 ]));
+            if (scenario == "reuse")
+            {
+                Assert.That(
+                    ((DisposableDelayingBackend)original!).DisposeCount,
+                    Is.EqualTo(1));
+            }
         }
     }
 
@@ -6543,6 +6551,22 @@ public sealed class WorkerTests
         {
             throw new OperationCanceledException();
         }
+    }
+
+    private sealed class DisposableDelayingBackend : ISmtBackend, IDisposable
+    {
+        internal int DisposeCount { get; private set; }
+
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return BackendCheckResult.Unknown(
+                BackendFailureReason.InfrastructureFailure);
+        }
+
+        public void Dispose() => DisposeCount++;
     }
 
     private sealed class SpuriousModelBackend : ISmtBackend
