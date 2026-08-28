@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 515. [CONFIRMED] Release regular-file validation accepts FIFOs and hashing can hang
-
-**Location**: scripts/SharpProof.ReleaseChecksums.ps1,
-Test-SharpProofExactRegularFileSet around lines 115-137 and topology delegation
-around lines 184-187; hashing in scripts/Publish-SharpProofRelease.ps1 around
-lines 322-360.
-
-**Description**: The release topology validator rejects directories, reparse
-points, nesting, and duplicate device/inode identities but never checks Linux
-inode mode. PowerShell reports a FIFO as File, Leaf, non-container, and Normal;
-`stat %d:%i` also succeeds. An exact-name bundle containing a FIFO therefore
-passes topology, then Get-FileHash blocks waiting for a writer.
-
-**Reproduction**: A canonical Linux fixture replaced one of the exact nine
-expected artifact names with mkfifo:
-
-    BundleTopologyAcceptedFifo=true
-    ValidationError=""
-    FifoStatType=fifo
-    EntryCount=9 ExpectedEntryCount=9
-    PathTypeLeaf=true GetChildItemFileCount=1
-    GetFileHashExit=137 ElapsedMs=2012
-
-The last probe killed the blocked hash after two seconds.
-
-**Impact**: An accidental non-regular artifact is certified by topology and can
-hang release publication indefinitely instead of failing with an attributable
-validation error.
-
-**Root cause**: Cross-platform PowerShell leaf/file attributes are treated as a
-regular-file guarantee, while device/inode identity is collected without file
-type.
-
-**Recommended fix**: Collect numeric stat mode (for example `%f`) and require
-`(mode & 0xF000) == 0x8000` before accepting identity. Emit a dedicated
-non-regular-member error before any content read/hash.
-
-**Regression coverage**: Create an exact valid nine-name bundle with one FIFO;
-topology must throw before hashing. Retain regular-file positive, directory,
-symlink/reparse, duplicate identity, and cleanup-in-finally controls.
-
-**Confidence**: High; topology accepted a real FIFO and the next production hash
-blocked until killed.
-
 ### 516. [CONFIRMED] Congruence-implied Int64 endpoints are treated as infinities
 
 **Location**: SharpProof.Dataflow/IntervalDomain.cs, construction around lines

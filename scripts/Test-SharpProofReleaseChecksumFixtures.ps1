@@ -10,6 +10,7 @@ param(
         'bundle-missing-manifest','bundle-missing-checksums',
         'bundle-missing-package','bundle-case-collision',
         'bundle-empty-directory','bundle-hardlink-alias',
+        'bundle-fifo',
         'bundle-atomic-replacement','bundle-atomic-failure-cleanup')]
     [string]$Mutation
 )
@@ -86,6 +87,11 @@ try {
                     (Join-Path $root 'hardlink-alias.nupkg')
                 if ($LASTEXITCODE -ne 0) { throw 'Could not create hardlink fixture.' }
             }
+            'bundle-fifo' {
+                Remove-Item -LiteralPath (Join-Path $root $artifacts[0].fileName)
+                & mkfifo -- (Join-Path $root $artifacts[0].fileName)
+                if ($LASTEXITCODE -ne 0) { throw 'Could not create FIFO fixture.' }
+            }
         }
         if ($Mutation -in @(
                 'bundle-atomic-replacement',
@@ -120,9 +126,25 @@ try {
                     -Owner 'Fixture atomic bundle'
             }
         }
-        Test-SharpProofReleaseBundleTopology `
-            -Directory $root -Artifacts $artifacts `
-            -Owner 'Fixture release bundle'
+        if ($Mutation -eq 'bundle-fifo') {
+            try {
+                Test-SharpProofReleaseBundleTopology `
+                    -Directory $root -Artifacts $artifacts `
+                    -Owner 'Fixture release bundle'
+                throw 'A FIFO was accepted as a release artifact.'
+            }
+            catch {
+                if ($_.Exception.Message -eq
+                        'A FIFO was accepted as a release artifact.') {
+                    throw
+                }
+            }
+        }
+        else {
+            Test-SharpProofReleaseBundleTopology `
+                -Directory $root -Artifacts $artifacts `
+                -Owner 'Fixture release bundle'
+        }
         Write-Host "Release bundle fixture passed: $Mutation"
         return
     }

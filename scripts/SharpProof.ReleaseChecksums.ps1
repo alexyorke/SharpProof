@@ -129,6 +129,21 @@ function Test-SharpProofExactRegularFileSet {
         if (-not $actual.Add($entry.Name)) {
             throw "$Owner contains a duplicate file name."
         }
+        $modeText = (& stat -Lc '%f' -- $entry.FullName).Trim()
+        $mode = 0
+        $isRegular = $LASTEXITCODE -eq 0 -and
+            $modeText -match '^[0-9a-fA-F]+$'
+        if ($isRegular) {
+            try {
+                $mode = [Convert]::ToInt32($modeText, 16)
+            }
+            catch {
+                $isRegular = $false
+            }
+        }
+        if (-not $isRegular -or ($mode -band 0xF000) -ne 0x8000) {
+            throw "$Owner contains a non-regular file: '$($entry.Name)'."
+        }
         $identity = (& stat -Lc '%d:%i' -- $entry.FullName).Trim()
         if ($LASTEXITCODE -ne 0 -or
             $identity -notmatch '^[0-9]+:[0-9]+$' -or
