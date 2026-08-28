@@ -233,6 +233,42 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task DefinitelyNonNullConditionalPropertyAccessReplaysRequires()
+    {
+        const string source =
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+            public sealed class Subject {
+                public int Value {
+                    get { Contract.Requires(false); return 0; }
+                }
+
+                public static int Direct(Subject subject) =>
+                    subject.Value;
+                public static int Fresh() =>
+                    new Subject()?.Value ?? 0;
+                public static int Guarded(Subject? subject) {
+                    if (subject is null) return 0;
+                    return subject?.Value ?? 0;
+                }
+                public static int Unknown(Subject? subject) =>
+                    subject?.Value ?? 0;
+                public static int Null() =>
+                    ((Subject?)null)?.Value ?? 0;
+            }
+            """;
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            source,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", 3)));
+    }
+
+    [Test]
     public async Task GeneratedAccessorCallsRemainQuiet()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

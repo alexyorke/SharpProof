@@ -49,7 +49,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operation,
                 operationFacts,
                 semanticModel.Compilation,
-                cancellationToken);
+                cancellationToken,
+                semanticModel);
             if (calls.IsDefaultOrEmpty)
             {
                 continue;
@@ -154,7 +155,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     operation,
                     operationFacts,
                     semanticModel.Compilation,
-                    cancellationToken);
+                    cancellationToken,
+                    semanticModel);
                 if (calls.IsDefaultOrEmpty ||
                     !SymbolEqualityComparer.Default.Equals(
                         semanticModel.GetEnclosingSymbol(
@@ -196,7 +198,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             operation is IListPatternOperation
                             ? HasReplayableAccessorEvaluation(
                                 call,
-                                operationFacts) &&
+                                operation,
+                                operationFacts,
+                                flowResult,
+                                semanticModel,
+                                cancellationToken) &&
                                 HasReplayableBlockPrefix(
                                     operation,
                                     operationFacts)
@@ -482,14 +488,55 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private static bool HasReplayableAccessorEvaluation(
         RequiresCallTarget call,
-        DefiniteOperationFacts operationFacts)
+        IOperation operation,
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
     {
         return (call.Instance == null ||
                 operationFacts.CompletesNormally(call.Instance)) &&
+            HasDefinitelyExecutingConditionalAccess(
+                operation,
+                call.Instance,
+                flowResult,
+                semanticModel,
+                cancellationToken) &&
             call.Arguments.All(argument =>
                 operationFacts.CompletesNormally(argument.Value)) &&
             call.ExplicitArguments.Values.All(
                 operationFacts.CompletesNormally);
+    }
+
+    private static bool HasDefinitelyExecutingConditionalAccess(
+        IOperation operation,
+        IOperation? instance,
+        ManagedFlowResult? flowResult,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (instance == null)
+        {
+            return true;
+        }
+
+        var conditional = operation.Syntax.Ancestors()
+            .OfType<ConditionalAccessExpressionSyntax>()
+            .Select(access =>
+                semanticModel.GetOperation(access, cancellationToken)
+                    as IConditionalAccessOperation)
+            .FirstOrDefault(access => access != null &&
+                access.WhenNotNull.Syntax.Span == operation.Syntax.Span);
+        if (conditional == null)
+        {
+            return true;
+        }
+
+        return DefiniteOperationFacts.IsDefinitelyNonNull(
+                   conditional.Operation) ||
+            flowResult?.ProvesNonNull(
+                conditional,
+                conditional.Operation) == true;
     }
 
     private bool HasReplayableBlockPrefix(
@@ -508,6 +555,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 candidate.Parent,
                 block));
         return statement != null &&
+            IsTransparentConditionalAccessorStatement(
+                statement,
+                callSite) &&
             block.Statements
                 .TakeWhile(candidate => !ReferenceEquals(
                     candidate,
@@ -518,7 +568,93 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     operationFacts.CompletesNormally(
                         semanticModel.GetOperation(
                             prior,
-                            cancellationToken)));
+                            cancellationToken)) ||
+                    IsConditionalAccessorPrefixStatement(
+                        prior,
+                        callSite));
+    }
+
+    private bool IsConditionalAccessorPrefixStatement(
+        StatementSyntax statement,
+        IOperation callSite)
+    {
+        if (!IsConditionalAccessorOperation(callSite))
+        {
+            return false;
+        }
+
+        var operation = semanticModel.GetOperation(
+            statement,
+            cancellationToken);
+        return operation is IConditionalOperation &&
+            new DefiniteOperationFacts(
+                semanticModel.Compilation,
+                cancellationToken).MayCompleteNormally(operation);
+    }
+
+    private bool IsTransparentConditionalAccessorStatement(
+        StatementSyntax statement,
+        IOperation callSite)
+    {
+        if (!IsConditionalAccessorOperation(callSite))
+        {
+            return true;
+        }
+
+        var statementOperation = semanticModel.GetOperation(
+            statement,
+            cancellationToken);
+        var expression = statementOperation switch
+        {
+            IReturnOperation { ReturnedValue: { } value } => value,
+            IExpressionStatementOperation { Operation: { } value } => value,
+            _ => null
+        };
+        if (expression == null)
+        {
+            return false;
+        }
+
+        var property = expression.DescendantsAndSelf()
+            .OfType<IPropertyReferenceOperation>()
+            .FirstOrDefault(candidate =>
+                candidate.Syntax.Span == callSite.Syntax.Span);
+        if (property?.Parent is not IConditionalAccessOperation access ||
+            access.WhenNotNull.Syntax.Span != property.Syntax.Span)
+        {
+            return false;
+        }
+
+        IOperation current = access;
+        while (current.Parent is IParenthesizedOperation parenthesized &&
+               parenthesized.Syntax.Span.Contains(current.Syntax.Span))
+        {
+            current = parenthesized;
+        }
+
+        if (current.Parent is ICoalesceOperation coalesce &&
+            ReferenceEquals(coalesce.Value, current))
+        {
+            current = coalesce;
+        }
+
+        return current.Syntax.Span == expression.Syntax.Span;
+    }
+
+    private bool IsConditionalAccessorOperation(IOperation callSite)
+    {
+        if (callSite is not IPropertyReferenceOperation)
+        {
+            return false;
+        }
+
+        return callSite.Syntax.Ancestors()
+            .OfType<ConditionalAccessExpressionSyntax>()
+            .Select(access =>
+                semanticModel.GetOperation(access, cancellationToken)
+                    as IConditionalAccessOperation)
+            .Any(access => access != null &&
+                access.WhenNotNull.Syntax.Span == callSite.Syntax.Span);
     }
 
     private static bool CanCoalesceGetterComplete(
@@ -592,7 +728,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IOperation operation,
         DefiniteOperationFacts? operationFacts = null,
         Compilation? compilation = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        SemanticModel? semanticModel = null)
     {
         return operation switch
         {
@@ -612,7 +749,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 ImmutableDictionary<int, IOperation>.Empty,
                 true)],
             IPropertyReferenceOperation property =>
-                GetPropertyCalls(property),
+                GetPropertyCalls(property, semanticModel, cancellationToken),
             IEventReferenceOperation eventReference =>
                 GetEventCalls(eventReference),
             IListPatternOperation listPattern => GetListPatternCalls(
@@ -1542,7 +1679,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
     }
 
     private static ImmutableArray<RequiresCallTarget> GetPropertyCalls(
-        IPropertyReferenceOperation property)
+        IPropertyReferenceOperation property,
+        SemanticModel? semanticModel = null,
+        CancellationToken cancellationToken = default)
     {
         var getter = property.Property.GetMethod;
         var setter = property.Property.SetMethod;
@@ -1551,7 +1690,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             return setter == null
                 ? []
-                : [CreateSetterCall(property, setter, assignment.Value, true)];
+                : [CreateSetterCall(
+                    property,
+                    setter,
+                    assignment.Value,
+                    true,
+                    semanticModel,
+                    cancellationToken)];
         }
         if (property.Parent is ICoalesceAssignmentOperation coalesce &&
             ReferenceEquals(coalesce.Target, property))
@@ -1559,7 +1704,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
             var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>(2);
             if (getter != null)
             {
-                calls.Add(CreateGetterCall(property, getter));
+                calls.Add(CreateGetterCall(
+                    property, getter, semanticModel, cancellationToken));
             }
             if (setter != null)
             {
@@ -1567,7 +1713,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     property,
                     setter,
                     coalesce.Value,
-                    canReplay: false));
+                    canReplay: false,
+                    semanticModel,
+                    cancellationToken));
             }
             return calls.ToImmutable();
         }
@@ -1579,11 +1727,18 @@ internal sealed partial class RequiresCallSiteDiscovery(
             var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>(2);
             if (getter != null)
             {
-                calls.Add(CreateGetterCall(property, getter));
+                calls.Add(CreateGetterCall(
+                    property, getter, semanticModel, cancellationToken));
             }
             if (setter != null)
             {
-                calls.Add(CreateSetterCall(property, setter, null, false));
+                calls.Add(CreateSetterCall(
+                    property,
+                    setter,
+                    null,
+                    false,
+                    semanticModel,
+                    cancellationToken));
             }
             return calls.ToImmutable();
         }
@@ -1591,16 +1746,19 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             return [];
         }
-        return [CreateGetterCall(property, getter)];
+        return [CreateGetterCall(
+            property, getter, semanticModel, cancellationToken)];
     }
 
     private static RequiresCallTarget CreateGetterCall(
         IPropertyReferenceOperation property,
-        IMethodSymbol getter)
+        IMethodSymbol getter,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
     {
         return new RequiresCallTarget(
             getter,
-            property.Instance,
+            GetAccessorInstance(property, semanticModel, cancellationToken),
             property.Arguments,
             ImmutableDictionary<int, IOperation>.Empty,
             true);
@@ -1610,7 +1768,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IPropertyReferenceOperation property,
         IMethodSymbol setter,
         IOperation? value,
-        bool canReplay)
+        bool canReplay,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
     {
         var explicitArguments = value == null
             ? ImmutableDictionary<int, IOperation>.Empty
@@ -1619,10 +1779,52 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 value);
         return new RequiresCallTarget(
             setter,
-            property.Instance,
+            GetAccessorInstance(property, semanticModel, cancellationToken),
             property.Arguments,
             explicitArguments,
             canReplay);
+    }
+
+    private static IOperation? GetAccessorInstance(
+        IPropertyReferenceOperation property,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (property.Instance is not IConditionalAccessInstanceOperation &&
+            property.Instance is not IFlowCaptureReferenceOperation)
+        {
+            return property.Instance;
+        }
+
+        for (var ancestor = property.Parent;
+             ancestor != null;
+             ancestor = ancestor.Parent)
+        {
+            if (ancestor is IConditionalAccessOperation conditional)
+            {
+                return conditional.Operation;
+            }
+        }
+
+        if (semanticModel != null &&
+            property.Syntax.SpanStart >= 0 &&
+            property.Syntax.Ancestors()
+                .OfType<ConditionalAccessExpressionSyntax>()
+                .Select(conditional =>
+                    (Syntax: conditional,
+                        Operation: semanticModel.GetOperation(
+                            conditional,
+                            cancellationToken) as IConditionalAccessOperation))
+                .FirstOrDefault(candidate =>
+                    candidate.Operation != null &&
+                    candidate.Operation.WhenNotNull.Syntax.Span ==
+                        property.Syntax.Span)
+                .Operation is { } conditionalAccess)
+        {
+            return conditionalAccess.Operation;
+        }
+
+        return property.Instance;
     }
 
 
