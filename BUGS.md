@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 597. [CONFIRMED] Canonical container dotnet commands have no internal deadline
-
-**Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 1-40 and
-ordinary test/build/gate call sites; bounded wrapper exists in
-Invoke-SharpProofDotnet.ps1 around lines 21-59.
-
-**Description**: Invoke-DotNet calls raw dotnet with no timeout, tree kill, or
-exit-124 attribution, bypassing the repository's existing bounded runner.
-
-**Reproduction**: A benign fake dotnet slept for 30 seconds. Baseline required an
-external two-second watchdog. Routing through the existing wrapper with a
-one-second bound failed attributably in 1.61 s and left no child alive.
-
-**Impact**: Hung restore, build, analyzer, testhost, gate, pack, or fuzz setup can
-block developer/CI tasks indefinitely until external cancellation.
-
-**Recommended fix**: Route every dispatcher dotnet invocation through the
-bounded wrapper using contract-owned build/test deadlines and an optional
-validated override. Test timeout attribution, child cleanup, short-circuit, and
-fast restore+test.
-
 ### 598. [CONFIRMED] Legal 513-character source call identity causes fatal SP0049
 
 **Location**: CompilerRelationalSummaryProvider.cs around lines 136-149,
