@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 565. [CONFIRMED] Request serialization replaces lone UTF-16 surrogates in paths
-
-**Location**: Worker.Protocol/ProtocolModel.generated.cs around lines 816-821;
-ProtocolJson.cs around lines 108-115; ProtocolJsonSupport.cs around lines
-192-205.
-
-**Description**: Request validation accepts any nonblank path. System.Text.Json
-silently replaces an unmatched surrogate with U+FFFD before strict UTF-8 hashing.
-
-**Reproduction**: Windows created and found a path containing code unit 55296.
-Both original and round-tripped requests validated; round trip contained 65533,
-paths differed, only the original existed, and request hashes were equal.
-
-**Impact**: A valid request can be serialized into a different nonexistent path
-and fail verification; malformed input can also collapse onto a legitimate
-literal-U+FFFD path.
-
-**Recommended fix**: Reject ill-formed UTF-16 in every request string before
-serialization while preserving valid surrogate pairs and literal U+FFFD. Add
-high/low-surrogate, non-BMP, and U+FFFD path tests.
-
 ### 566. [CONFIRMED] SPMETA003 rejects safe cancellation-excluding conjunctions
 
 **Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs around
