@@ -348,7 +348,6 @@ public sealed class GeneratedCSharpExpression
                 left.Type is not (
                     GeneratedExpressionType.Integer or
                     GeneratedExpressionType.String or
-                    GeneratedExpressionType.Sequence or
                     GeneratedExpressionType.Reference))
             {
                 throw new ArgumentException(

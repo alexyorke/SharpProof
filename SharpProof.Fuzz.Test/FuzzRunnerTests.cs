@@ -9,6 +9,25 @@ namespace SharpProof.Fuzz.Test;
 public sealed class FuzzRunnerTests
 {
     [Test]
+    public void GeneratedModelRejectsSequenceEqualityUntilFrontendSupportsIt()
+    {
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            _ = GeneratedCSharpExpression.Binary(
+                GeneratedExpressionKind.Equal,
+                GeneratedCSharpExpression.Values(),
+                GeneratedCSharpExpression.Values());
+        }));
+        Assert.Throws<ArgumentException>((Action)(() =>
+        {
+            _ = GeneratedCSharpExpression.Binary(
+                GeneratedExpressionKind.NotEqual,
+                GeneratedCSharpExpression.Values(),
+                GeneratedCSharpExpression.Values());
+        }));
+    }
+
+    [Test]
     public void FailureEvidenceRetentionUsesDeterministicBoundedKeys()
     {
         var statuses = Enumerable.Repeat(
