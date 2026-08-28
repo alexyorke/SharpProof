@@ -785,6 +785,27 @@ public static partial class WorkerProtocolJson
             .GroupBy(static callable => callable.CallableId, s_ordinal)
             .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
         var claims = response.Manifest?.Claims ?? [];
+        var claimsById = new Dictionary<string, WorkerClaimManifestEntry>(s_ordinal);
+        WorkerClaimManifestEntry? firstNullClaim = null;
+        foreach (var claim in claims)
+        {
+            if (claim == null)
+            {
+                continue;
+            }
+
+            if (claim.ClaimId is { } claimId)
+            {
+                if (!claimsById.ContainsKey(claimId))
+                {
+                    claimsById.Add(claimId, claim);
+                }
+            }
+            else
+            {
+                firstNullClaim ??= claim;
+            }
+        }
         foreach (var result in response.ClaimResults ?? [])
         {
             if (result?.Assumptions is not { Length: > 0 })
@@ -792,8 +813,15 @@ public static partial class WorkerProtocolJson
                 continue;
             }
 
-            var manifestClaim = claims.FirstOrDefault(claim =>
-                claim != null && claim.ClaimId == result.ClaimId);
+            WorkerClaimManifestEntry? manifestClaim;
+            if (result.ClaimId is { } resultClaimId)
+            {
+                claimsById.TryGetValue(resultClaimId, out manifestClaim);
+            }
+            else
+            {
+                manifestClaim = firstNullClaim;
+            }
             if (manifestClaim != null &&
                 !string.IsNullOrWhiteSpace(manifestClaim.CallableId) &&
                 callables.TryGetValue(manifestClaim.CallableId, out var callable) &&

@@ -294,25 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 623. [CONFIRMED] Oversized-response assumption compaction is quadratic
-
-**Location**: `SharpProof.Worker.Protocol/ProtocolJson.cs`, around lines 666-695.
-
-**Description**: `CompactClaimAssumptions` indexes callables but linearly searches
-all manifest claims for every result, making the size-saving fallback O(claims^2).
-
-**Reproduction**: Valid 1k/2k/4k/8k inputs measured
-5.4/18.9/77.1/348.7 ms; indexed control measured
-0.38/0.56/1.03/1.48 ms. Public serialization compacted a valid 20.33 MB expanded
-response to a valid 1.79 MB round trip.
-
-**Impact**: The path used under greatest protocol pressure adds avoidable delay
-and allocation during publication/recovery.
-
-**Recommended fix**: Build one first-match ordinal ClaimId index beside the
-callable index, preserving malformed/duplicate fallback behavior. Add compact
-semantic and near-linear scaling tests.
-
 ### 624. [CONFIRMED] Ordinary proofs underreport used preconditions
 
 **Location**: `SharpProof.Worker/CallableEvidenceBuilder.cs`, around lines 23-24
