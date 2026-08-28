@@ -181,47 +181,6 @@ rechecks unchanged refuted, missing, corrupt, and infrastructure results. An
 3. Use an explicit interface implementation as a control: the same selected EII body remains in the verifier-supported callable set and is covered by `ClaimManifestBuilderTests.ExplicitInterfaceImplementationUsesTheSupportedCallableSet`.
 **Confidence**: High for the original explicit-interface divergence, which is resolved by `fa58c7533`; static-constructor admission remains intentionally fail-closed because constructor initialization and replay semantics need a separate design.
 
-### 370. [CONFIRMED] HasStaticStateMutation treats static-constructor local assignments as static-state writes
-
-**Status**: A conservative gate for actual or unknown static-state writes may be
-intentional, but the current syntactic implementation has a separately verified
-false-positive slice: local-only assignments and increments in a static
-constructor are classified as static-state mutation. This rejects a member even
-when the analyzer proves its effect claim and no static storage is written.
-
-**Location**: `SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs` (Conjunct at Line 105: `!(analyzerEffectsSelected && HasStaticStateMutation(target))` inside `supported`; predicate Lines 186-207 scanning ALL statements of explicitly declared static constructors for any assignment/increment; unavailable-routing Lines 463-472 `MarkUnavailable(evidence, WorkerClaimReason.UnsupportedContract)`); no analyzer counterpart `SharpProof.Analyzer.Core\AnalyzerFeaturePipeline.cs` (Lines 192-360; the only `StaticConstructors` uses in Analyzer.Core are member-initializer reachability at scattered lines).
-**Description**: When any effect attribute selects a method, the collector
-rejects it if the containing type's explicit static constructor contains any
-IAssignmentOperation or IIncrementOrDecrementOperation. The helper never
-examines the destination. Thus `int local = 0; local++;` sets `supported=false`
-and routes the member's effect evidence to Unknown/UnsupportedContract/
-Unavailable even though it mutates no static state. CompilerCallableLowerer
-then emits UnsupportedCallable. The analyzer's effect evaluator independently
-returns Proven for the selected member. Actual static-field writes remain a
-sound conservative control; the confirmed defect is the destination-blind
-classification.
-**Reproduction Steps**:
-1. Analyze `sealed class Subject { static Subject() { int local = 0; local++; }
-   [EnforcePure] public int Identity(int value) => value; }`.
-2. The isolated canonical-container probe reports analyzer effect evaluation
-   Proven, but ClaimManifestBuilder returns IsVerifierSupported=false and
-   Unknown/UnsupportedContract/Unavailable; the targeted assertion fails only
-   on compiler support/evidence.
-3. Replace the local with `static int state; static Subject() { state++; }` as a
-   control; that real static-state case must remain rejected.
-
-**Recommended fix**: Reuse the effect engine's static-constructor write-region
-summary and reject only unknown writes or EffectRegionId.Static(). A smaller
-fix may classify assignment/increment targets and ignore local/parameter
-destinations, but it must preserve conservative handling for complex aliases.
-
-**Regression coverage**: The local-only static constructor must retain
-verifier-supported Proven evidence and lowerable IR. Pair it with an actual
-static-field write that remains UnsupportedContract.
-
-**Confidence**: High; a canonical targeted probe independently produced
-analyzer Proven and collector Unknown for the local-only trigger.
-
 ### 371. [INTENTIONAL POLICY] [SharpProofSuppress] Silences the In-Process Analyzer but Is Never Consulted by the Collector - Suppression Meaning Flips When Moving Advisory->Strict With Zero Surfacing
 
 **Status**: Suppression is documented as changing analyzer reporting only; collector verification intentionally remains active so a suppressed claim cannot bypass strict evidence checks. The profile-dependent outcome is therefore policy, not an unconfirmed implementation gap. No production change is made; any future UX improvement should add explicit diagnostics/documentation rather than skip verification.

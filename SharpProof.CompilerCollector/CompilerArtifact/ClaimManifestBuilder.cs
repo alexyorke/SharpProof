@@ -190,18 +190,14 @@ internal sealed partial class ClaimManifestBuilder(
         foreach (var constructor in method.ContainingType.StaticConstructors
                      .Where(static constructor => !constructor.IsImplicitlyDeclared))
         {
-            foreach (var reference in constructor.DeclaringSyntaxReferences)
+            var summary = _effectSession.AnalyzeEffects(
+                constructor,
+                cancellationToken).Summary;
+            if (summary.Writes.IsUnknown ||
+                summary.Writes.Regions.Any(static region =>
+                    region.Kind == SharpProof.Effects.EffectRegionKind.Static))
             {
-                var syntax = reference.GetSyntax(cancellationToken);
-                var model = SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(_compilation, syntax.SyntaxTree);
-                var operation = model.GetOperation(syntax, cancellationToken);
-                if (operation?.DescendantsAndSelf().Any(static candidate =>
-                        candidate is IAssignmentOperation or
-                            IIncrementOrDecrementOperation) == true)
-                {
-                    return true;
-                }
+                return true;
             }
         }
 

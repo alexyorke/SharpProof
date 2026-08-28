@@ -882,6 +882,67 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void LocalOnlyStaticConstructorAssignmentsDoNotBlockEffectCallable()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Subject {
+                static Subject() {
+                    int local = 0;
+                    local++;
+                }
+
+                [DoesNotThrow]
+                public int Identity(int value) => value;
+            }
+            """));
+        var target = result.Targets.Values.Single(static candidate =>
+            candidate.Method.Name == "Identity");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(target.IsVerifierSupported, Is.True);
+            Assert.That(
+                target.EffectClaims.Single().Evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+        }
+    }
+
+    [Test]
+    public void StaticFieldMutationInStaticConstructorRemainsUnsupported()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Subject {
+                private static int state;
+
+                static Subject() {
+                    state++;
+                }
+
+                [DoesNotThrow]
+                public int Identity(int value) => value;
+            }
+            """));
+        var target = result.Targets.Values.Single(static candidate =>
+            candidate.Method.Name == "Identity");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(target.IsVerifierSupported, Is.False);
+            Assert.That(
+                target.EffectClaims.Single().Evidence.Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+        }
+    }
+
+    [Test]
     public void BodylessEffectAdmissionMatchesTheAnalyzerException()
     {
         var result = Build((
