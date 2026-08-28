@@ -122,57 +122,6 @@ SharpProof.Armed/1 record.
 **Confidence**: High; the agent traced every lifecycle edge and reproduced the
 underlying setsid behavior in the canonical environment.
 
-### 439. [CONFIRMED] Record copy constructors are treated as owners of instance member initializers
-
-**Location**: SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
-lines 472-487 and 524-552; existing record-copy identification in
-SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines 382-422.
-
-**Description**: AnalyzeMemberInitializer builds its candidate owners from
-every type.InstanceConstructor. That includes record copy constructors, but C#
-copy construction does not execute instance field or property initializers.
-The repository already encodes this semantic distinction when discovering
-implicit base-constructor calls, but member-initializer analysis does not reuse
-it.
-
-**Reproduction**: A record has an initializer calling Guard.Positive(-1), a
-suppressed ordinary constructor, and an unsuppressed user-declared protected
-copy constructor. The analyzer still emits:
-
-    SP0027|14|Call to 'Positive' violates precondition 'false'
-
-Since the only actual initializer-running constructor is suppressed, the
-diagnostic can only be attributed to the copy constructor. A runtime control
-prints:
-
-    ordinary=1
-    copy=0
-
-confirming that ordinary construction executes the initializer and with/copy
-construction does not.
-
-**Impact**: Records receive false SP0027 diagnostics and incorrect semantic
-outcomes for copy constructors. Constructor-level suppression or selection on
-the constructors that really execute initializers is defeated by a callable
-that never owns that initialization.
-
-**Root cause**: InstanceConstructors is consumed without filtering the special
-record-copy constructor, despite an existing IsRecordCopyConstructor predicate
-elsewhere in the analyzer.
-
-**Recommended fix**: Factor or reuse the existing record-copy predicate and
-exclude copy constructors only from AnalyzeMemberInitializer's owner list.
-Continue ordinary callable analysis of the copy-constructor body itself.
-
-**Regression coverage**: Add
-RecordCopyConstructorDoesNotOwnMemberInitializers with an invalid Requires call
-in a record field initializer, suppressed ordinary constructor, and
-unsuppressed explicit copy constructor, expecting no SP0027. Add an unsuppressed
-ordinary-constructor control expecting one SP0027.
-
-**Confidence**: High; the agent reproduced the diagnostic and separately
-verified the runtime initialization counts.
-
 ### 440. [CONFIRMED] SPMETA010 misses semantic-cache writes through tuple deconstruction aliases
 
 **Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
