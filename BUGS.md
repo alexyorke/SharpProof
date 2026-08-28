@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 604. [CONFIRMED] Non-completing deconstruction conversion phases lose reached effects
-
-**Location**: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, around
-lines 58-75; `OperationCompletionEvaluator.cs`, around lines 768-834;
-`EffectSummaryOperations.cs`, lines 117-119.
-
-**Description**: `ScanDeconstruction` scans only the RHS/root Deconstruct call.
-When completion says a nested call, conversion, or target write cannot complete,
-the scanner substitutes Complete `MayDiverge` and skips the reached phase.
-
-**Reproduction**: A conversion wrote static state 1729 then threw
-`InvalidOperationException`. Runtime observed both. The summary was Complete and
-nonunknown but had no static write, no throw, and `MayDiverge`. A phase-ordered
-temp fix passed the oracle and an existing deconstruction-effects control.
-
-**Impact**: Purity, exception, handler-reachability, and termination consumers
-can receive false results.
-
-**Recommended fix**: Share a language-ordered deconstruction phase traversal
-between completion and effects: RHS, root/nested calls, conversions, then target
-writes; record each reached phase before stopping.
-
 ### 605. [CONFIRMED] Rejected contract API usage is silently accepted in companion bodies
 
 **Location**: `SharpProof.Contracts/ContractClauseInventoryBuilder.cs`, around
