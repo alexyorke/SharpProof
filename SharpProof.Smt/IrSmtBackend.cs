@@ -952,10 +952,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             var condition = EncodeBoolean(conditional.Condition);
             var whenTrue = Encode(conditional.WhenTrue);
             var whenFalse = Encode(conditional.WhenFalse);
-            if (!whenTrue.Value.Sort.Equals(whenFalse.Value.Sort))
-            {
-                throw new UnsupportedIrEncodingException();
-            }
 
             var value = Own(_context.MkITE(
                 condition.Value,

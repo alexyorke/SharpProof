@@ -630,6 +630,36 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task ConditionalEncodingReleasesItsOwnedExpressions()
+    {
+        var factory = new IrFactory();
+        var condition = factory.CreateVariable("condition", factory.BooleanType);
+        IrTerm value = factory.Integer(0);
+        for (var index = 0; index < 128; index++)
+        {
+            value = factory.Conditional(
+                factory.Variable(condition),
+                value,
+                factory.Integer(index));
+        }
+
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Binary(IrBinaryOperator.Equal, value, value),
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)),
+            [condition]);
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
+    }
+
+    [Test]
     public async Task NonBmpStringLengthUsesUtf16CodeUnits()
     {
         var factory = new IrFactory();

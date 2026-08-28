@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 519. [CONFIRMED] Conditional encoding leaks two Z3 Sort wrappers until finalization
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 650-658, especially
-`whenTrue.Value.Sort.Equals(whenFalse.Value.Sort)`; ownership contract in
-SharpProof.Smt/Z3ExpressionOwner.cs around lines 3-23.
-
-**Description**: Each Z3 Expr.Sort property access constructs a fresh,
-independently disposable managed wrapper over the native sort. Conditional
-encoding obtains two wrappers for equality comparison but neither disposes them
-or registers them with Z3ExpressionOwner. Every conditional therefore retains
-two native references until finalization.
-
-**Reproduction**: Pinned Microsoft.Z3 4.12.2 probes reported:
-
-    sort-is-disposable=True
-    same-wrapper=False
-    same-native=True
-    first-live-after-dispose=False
-    second-live-after-first-dispose=True
-    finalization-pending-after-collect=50002
-
-A public production query with 1,000 integer conditionals returned
-Unsatisfiable/None but left `production-finalization-pending=2006`, matching
-approximately two wrappers per conditional plus fixed baseline.
-
-**Impact**: Wide or repeated conditional queries retain native references until
-GC and create a proportional finalizer backlog. Verdicts remain correct, but
-native memory, GC cadence, and query latency become nondeterministic under load.
-
-**Root cause**: Property-result ownership is overlooked; Equals neither
-transfers nor disposes wrappers, and the query owner never sees them.
-
-**Recommended fix**: Prefer comparing already-validated IR branch types without
-creating native Sort wrappers. Otherwise acquire both into `using` variables or
-register both with OwnSort and dispose deterministically with the query owner.
-
-**Regression coverage**: Encode N conditionals and compare forced-GC pending
-finalizers against a no-conditional control; the delta must not scale as 2N.
-Add an ownership observer/helper assertion that acquired native handles are
-released when query encoding ends, without requiring GC.
-
-**Confidence**: High; wrapper/native-handle probes and the production 1,000-
-conditional query independently show two undisposed Sort objects per term.
-
 ### 520. [CONFIRMED] Architecture-test process harnesses can deadlock on redirected output
 
 **Location**: SharpProof.ArchitectureTest/StandaloneGateEvidenceTests.cs around
