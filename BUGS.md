@@ -5917,28 +5917,6 @@ when language type semantics alone establish the result.
 LoweredJustification over identical UserAssumedJustification, retaining the user
 declaration as unused. Test redundant/nonredundant/mixed evidence controls.
 
-### 692. [CONFIRMED] Plan output inside PackageSource invalidates the certified bundle
-
-**Location**: `scripts/SharpProof.PublicationPlanTopology.ps1`, around lines
-46-176; `Publish-SharpProofRelease.ps1`, around lines 841-850 and 963-970;
-`SharpProof.ReleaseChecksums.ps1`, around lines 95-187.
-
-**Description**: Topology rejects reserved names and aliases of existing inputs,
-but permits a new ordinary PlanOutputPath inside PackageSource. Its filtered
-snapshot ignores that JSON file, while the release-bundle authority requires
-exactly nine top-level files.
-
-**Reproduction**: A valid nine-file bundle accepted and wrote
-`PackageSource/publication-plan.json`, returned success, then contained ten files
-and immediately failed exact-bundle validation.
-
-**Impact**: A natural plan-only output location self-invalidates qualified release
-bytes until manually removed.
-
-**Recommended fix**: Reject any canonically resolved plan output contained under
-PackageSource or the remote fixture directory before writing. Test new paths,
-case/symlink-resolved containment, disjoint output, and bundle preservation.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
