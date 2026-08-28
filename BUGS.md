@@ -3076,31 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 684. [CONFIRMED] IrPrinter exponentially expands tiny shared DAGs until OOM
-
-**Location**: `SharpProof.Ir/IrPrinter.cs`, around lines 5-26;
-`IrPrinterProjections.generated.cs`, around lines 24-29; consumers include
-`RequiresCallSiteAnalyzer.cs`, around lines 537-545, and `FuzzRunner.cs`, around
-lines 309-329.
-
-**Description**: The printer guards only maximum depth, then recursively expands
-both child references as if the hash-consed DAG were a tree. A small repeated-
-child DAG can have shallow depth but exponential rendered length; no output/node/
-character budget exists.
-
-**Reproduction**: Repeatedly setting `term = AndAlso(term, term)` produced only 24
-unique nodes and depth 24. Printing under a 256 MiB heap cap threw
-OutOfMemoryException after about 3.96 GB cumulative allocations. Depth 21 already
-rendered 8.39 MB and allocated 470 MB.
-
-**Impact**: Valid compact IR can replace expected diagnostics/fuzz evidence with
-OOM despite being far below the advertised depth limit.
-
-**Recommended fix**: Compute expanded length iteratively with saturating arithmetic
-or format into a capped builder, returning an attributable bounded result before
-large allocation. Preserve canonical text below the cap. Test shared-DAG boundary,
-linear-depth guard, low allocations, and analyzer/fuzz graceful degradation.
-
 ### 685. [CONFIRMED] A transient symbol push failure makes release publication non-retryable
 
 **Location**: `scripts/Publish-SharpProofRelease.ps1`, around lines 690-727,

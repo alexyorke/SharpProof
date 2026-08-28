@@ -1349,6 +1349,26 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void PrinterRejectsSharedDagBeyondItsExpandedNodeBudget()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.BooleanType);
+        var term = (IrTerm)factory.Variable(value);
+        for (var index = 0; index < 20; index++)
+        {
+            term = factory.Binary(
+                IrBinaryOperator.AndAlso,
+                term,
+                term);
+        }
+
+        var failure = Assert.Throws<InvalidOperationException>(
+            (Action)(() => new IrPrinter(factory).Print(term)));
+
+        Assert.That(failure!.Message, Does.Contain("expanded node budget"));
+    }
+
+    [Test]
     public void TermsWithinTheDepthBudgetStillEvaluate()
     {
         var factory = new IrFactory();

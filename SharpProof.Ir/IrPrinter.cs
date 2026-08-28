@@ -8,6 +8,10 @@ public sealed partial class IrPrinter(IrFactory factory)
     /// </summary>
     private const int MaximumPrintDepth = 256;
 
+    // Terms are hash-consed DAGs, but formatting expands each edge into the
+    // textual tree. Bound the expanded work as well as the structural depth.
+    private const int MaximumExpandedPrintNodes = 1_000_000;
+
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
 
@@ -22,8 +26,38 @@ public sealed partial class IrPrinter(IrFactory factory)
                 "The IR term exceeds the printer depth budget of " +
                 MaximumPrintDepth.ToString(CultureInfo.InvariantCulture) + ".");
         }
+        if (ExceedsExpandedNodeBudget(term))
+        {
+            throw new InvalidOperationException(
+                "The IR term exceeds the expanded node budget of " +
+                MaximumExpandedPrintNodes.ToString(
+                    CultureInfo.InvariantCulture) + ".");
+        }
 
         return Format(term);
+    }
+
+    private static bool ExceedsExpandedNodeBudget(IrTerm root)
+    {
+        var pending = new Stack<IrTerm>();
+        pending.Push(root);
+        var expandedNodes = 0;
+        while (pending.Count != 0)
+        {
+            var term = pending.Pop();
+            expandedNodes++;
+            if (expandedNodes > MaximumExpandedPrintNodes)
+            {
+                return true;
+            }
+
+            foreach (var child in IrTraversal.GetChildren(term))
+            {
+                pending.Push(child);
+            }
+        }
+
+        return false;
     }
 
     private string FormatOpaque(IrOpaqueTerm opaque)
