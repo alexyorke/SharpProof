@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 586. [CONFIRMED] An all-break switch suppresses later SP0027 diagnostics
-
-**Location**: RequiresCallSiteDiscovery.cs around lines 188-208 and 425-471;
-ManagedAbstractFlow.cs around lines 1842-1917.
-
-**Description**: Strict replay-prefix completion recognizes neither
-ISwitchOperation nor a break that normally exits that switch.
-
-**Reproduction**: Direct and empty-block controls had CanReplay=true and one
-SP0027. A constant/default switch whose every branch broke had Complete flow,
-runtime reached the target once, CanReplay=false, and zero diagnostics.
-All-abrupt and safe controls stayed quiet.
-
-**Impact**: A documented ordinary switch before a contracted call erases a
-definite violation even when every selector continues.
-
-**Recommended fix**: Add conservative constant/default switch completion and
-treat a break owned by that exact switch as normal exit. Reject patterns, guards,
-gotos, nested breaks, and abrupt sections. Add no-default and no-duplicate tests.
-
 ### 587. [CONFIRMED] Literal-true postconditions consume a redundant query reservation
 
 **Location**: CallableEntryFeasibility.cs around lines 110-140;
