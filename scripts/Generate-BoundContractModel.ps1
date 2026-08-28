@@ -8,6 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($SchemaPath)) {
@@ -18,7 +19,17 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 $SchemaPath = [IO.Path]::GetFullPath($SchemaPath)
 $OutputPath = [IO.Path]::GetFullPath($OutputPath)
-$schema = Get-Content -LiteralPath $SchemaPath -Raw | ConvertFrom-Json
+$schemaJson = Get-Content -LiteralPath $SchemaPath -Raw
+$schemaDocument = [System.Text.Json.JsonDocument]::Parse($schemaJson)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $schemaDocument.RootElement `
+        -Context 'schema'
+}
+finally {
+    $schemaDocument.Dispose()
+}
+$schema = $schemaJson | ConvertFrom-Json
 
 function Get-RequiredProperty([object]$Object, [string]$Name, [string]$Context) {
     $property = $Object.PSObject.Properties[$Name]
