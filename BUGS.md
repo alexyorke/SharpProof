@@ -2619,25 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 568. [CONFIRMED] Conditional assignments write a flow-capture temporary instead of the lvalue
-
-**Location**: SharpProof.Frontend/RoslynProgramLowerer.cs around lines 197-220;
-RoslynOperationLowerer.cs around lines 155-175.
-
-**Description**: Every flow capture is represented as a value temporary. When
-Roslyn captures assignment-target storage across conditional evaluation, the
-write targets that temporary rather than the original local/location.
-
-**Reproduction**: For value = choose ? 1L : 2L; return value, lowering was Exact
-with zero abstentions, yet execution returned 0 for both choose values.
-
-**Impact**: Exact acyclic scalar IR and reusable relational summaries can encode
-wrong results.
-
-**Recommended fix**: Track storage captures separately from value snapshots and
-resolve assignment-target capture references to the original variable or
-once-evaluated location. Add local, member, and array target oracles.
-
 ### 569. [CONFIRMED] Proven-failing explicit casts are treated as completing
 
 **Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184,
