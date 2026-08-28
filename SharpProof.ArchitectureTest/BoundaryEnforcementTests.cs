@@ -209,6 +209,11 @@ public sealed class BoundaryEnforcementTests
             "Compilation.GetSymbolsWithName",
             "Compilation.GetSemanticModel",
             "Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions)",
+            "Compilation.GetDiagnostics",
+            "Compilation.GetDeclarationDiagnostics",
+            "CSharpCompilation.Create",
+            "CSharpSyntaxTree.ParseText",
+            "CSharpSyntaxTree.Create",
             "CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean)",
             "SemanticModel.GetDiagnostics",
             "GetSpeculativeSemanticModel",
@@ -240,6 +245,11 @@ public sealed class BoundaryEnforcementTests
         var exactRequired = new[] {
             "M:Microsoft.CodeAnalysis.Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean)",
             "M:Microsoft.CodeAnalysis.Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions)",
+            "M:Microsoft.CodeAnalysis.Compilation.GetDiagnostics",
+            "M:Microsoft.CodeAnalysis.Compilation.GetDeclarationDiagnostics",
+            "M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create",
+            "M:Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText",
+            "M:Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.Create",
             "M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean)",
             "M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions)"
         };
@@ -271,6 +281,14 @@ public sealed class BoundaryEnforcementTests
                     .Replace(
                         "CompilationModelProvider.GetSemanticModel(",
                         "AllowedSemanticModel(",
+                        StringComparison.Ordinal)
+                    .Replace(
+                        "SharpProof.Meta.Analyzers.AnalyzerSemanticModelProvider.GetSemanticModel(",
+                        "AllowedSemanticModel(",
+                        StringComparison.Ordinal)
+                    .Replace(
+                        "AnalyzerSemanticModelProvider.GetSemanticModel(",
+                        "AllowedSemanticModel(",
                         StringComparison.Ordinal);
                 if (compact.Contains(
                         ".GetSemanticModel(",
@@ -290,8 +308,20 @@ public sealed class BoundaryEnforcementTests
 
         var expected =
             Path.Combine(adapterProject, adapterFile).Replace('\\', '/');
-        Assert.That(directCallFiles, Is.EqualTo([expected]));
-        Assert.That(suppressionFiles, Is.EqualTo([expected]));
+        var analyzerAdapter =
+            Path.Combine("SharpProof.Meta.Analyzers", "AnalyzerSemanticModelProvider.cs")
+                .Replace('\\', '/');
+        var constructionBoundary =
+            Path.Combine("SharpProof.Frontend", "CompilerConstructionBoundary.cs")
+                .Replace('\\', '/');
+        Assert.That(
+            directCallFiles.OrderBy(static value => value, StringComparer.Ordinal),
+            Is.EqualTo(new[] { analyzerAdapter, expected }
+                .OrderBy(static value => value, StringComparer.Ordinal)));
+        Assert.That(
+            suppressionFiles.OrderBy(static value => value, StringComparer.Ordinal),
+            Is.EqualTo(new[] { analyzerAdapter, constructionBoundary, expected }
+                .OrderBy(static value => value, StringComparer.Ordinal)));
 
         var adapter = File.ReadAllText(
             Path.Combine(RepositoryRoot(), adapterProject, adapterFile));
@@ -304,6 +334,74 @@ public sealed class BoundaryEnforcementTests
         Assert.That(
             Count(adapter, "#pragma warning restore RS0030"),
             Is.EqualTo(1));
+
+        var analyzerAdapterSource = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            analyzerAdapter.Replace('/', Path.DirectorySeparatorChar)));
+        Assert.That(
+            analyzerAdapterSource,
+            Does.Contain("Audited meta-analyzer inspection boundary."));
+        Assert.That(
+            Count(analyzerAdapterSource, "#pragma warning disable RS0030"),
+            Is.EqualTo(1));
+        Assert.That(
+            Count(analyzerAdapterSource, "#pragma warning restore RS0030"),
+            Is.EqualTo(1));
+
+        var construction = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            constructionBoundary.Replace('/', Path.DirectorySeparatorChar)));
+        Assert.That(
+            construction,
+            Does.Contain("Audited release/fuzz source-synthesis boundary."));
+        Assert.That(
+            Count(construction, "#pragma warning disable RS0030"),
+            Is.EqualTo(4));
+        Assert.That(
+            Count(construction, "#pragma warning restore RS0030"),
+            Is.EqualTo(4));
+    }
+
+    [Test]
+    public void CompilerConstructionAndDiagnosticsFlowThroughOneAuditedBoundary()
+    {
+        var allowed = Path.Combine(
+                "SharpProof.Frontend",
+                "CompilerConstructionBoundary.cs")
+            .Replace('\\', '/');
+        var patterns = new[] {
+            @"CSharpSyntaxTree\s*\.\s*ParseText\s*\(",
+            @"CSharpSyntaxTree\s*\.\s*Create\s*\(",
+            @"CSharpCompilation\s*\.\s*Create\s*\(",
+            @"\.\s*GetDiagnostics\s*\(",
+            @"\.\s*GetDeclarationDiagnostics\s*\("
+        };
+
+        var callers = BannedApiProjects
+            .SelectMany(SourceFiles)
+            .Where(file => patterns.Any(pattern => Regex.IsMatch(
+                File.ReadAllText(file),
+                pattern)))
+            .Select(Relative)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(callers, Is.EqualTo([allowed]));
+        var boundary = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            allowed.Replace('/', Path.DirectorySeparatorChar)));
+        Assert.That(
+            boundary,
+            Does.Contain("CSharpSyntaxTree.ParseText("));
+        Assert.That(
+            boundary,
+            Does.Contain("CSharpSyntaxTree.Create("));
+        Assert.That(
+            boundary,
+            Does.Contain("CSharpCompilation.Create("));
+        Assert.That(
+            boundary,
+            Does.Contain("compilation.GetDiagnostics("));
     }
 
     [Test]

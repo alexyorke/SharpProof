@@ -2534,6 +2534,37 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsWholeCompilationSynthesisAndDiagnosticsApis()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            using Microsoft.CodeAnalysis.CSharp;
+            using System.Linq;
+            namespace SharpProof.Tooling;
+            static class C {
+                static Compilation Create(string source) =>
+                    CSharpCompilation.Create(
+                        "generated",
+                        [CSharpSyntaxTree.ParseText(source)]);
+
+                static SyntaxTree CreateTree(CSharpSyntaxNode root) =>
+                    CSharpSyntaxTree.Create(root);
+
+                static Diagnostic[] Diagnostics(Compilation compilation) =>
+                    compilation.GetDiagnostics().ToArray();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(4),
+            string.Join(" | ", diagnostics.Select(static diagnostic =>
+                $"{diagnostic.Id}:{diagnostic.GetMessage()}")));
+    }
+
+    [Test]
     public async Task RejectsCSharpSpeculativeBindingHelpers()
     {
         const string source =

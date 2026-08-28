@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Configuration;
+using SharpProof.Frontend.Host;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -20,7 +21,7 @@ internal static class OpenSourceCorpusRunner
     {
         var trees = ImmutableArray.CreateBuilder<SyntaxTree>(
             document.Files.Length + 1);
-        trees.Add(CSharpSyntaxTree.ParseText(
+        trees.Add(CompilerConstructionBoundary.ParseCSharpText(
             """
             global using System;
             global using System.Collections.Generic;
@@ -49,7 +50,7 @@ internal static class OpenSourceCorpusRunner
         foreach (var file in document.Files)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var root = CSharpSyntaxTree.ParseText(
+            var root = CompilerConstructionBoundary.ParseCSharpText(
                     OpenSourceCorpusCatalog.NormalizeLineEndings(file.Content),
                     AnalyzerGateHost.ParseOptions,
                     file.Path,
@@ -68,7 +69,7 @@ internal static class OpenSourceCorpusRunner
                         rewritten,
                         selected[original].Id));
             }
-            var tree = CSharpSyntaxTree.Create(
+            var tree = CompilerConstructionBoundary.CreateCSharpTree(
                 root,
                 AnalyzerGateHost.ParseOptions,
                 file.Path,
@@ -104,7 +105,9 @@ internal static class OpenSourceCorpusRunner
         var compilation = template
             .RemoveSyntaxTrees(template.SyntaxTrees)
             .AddSyntaxTrees(trees);
-        var compilerErrors = compilation.GetDiagnostics(cancellationToken)
+        var compilerErrors = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                compilation,
+                cancellationToken)
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)
             .Take(25)

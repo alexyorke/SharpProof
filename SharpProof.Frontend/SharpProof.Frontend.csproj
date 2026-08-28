@@ -22,6 +22,8 @@
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
     <InternalsVisibleTo Include="SharpProof.Effects" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
   </ItemGroup>
   <Target Name="GenerateSharpProofAttributesPayloadIdentity"
           BeforeTargets="CoreCompile"

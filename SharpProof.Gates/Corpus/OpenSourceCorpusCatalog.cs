@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Frontend.Host;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -159,7 +160,7 @@ internal static class OpenSourceCorpusCatalog
                     $"OSS corpus source file hash does not match: {key}.");
             }
 
-            var root = CSharpSyntaxTree.ParseText(
+            var root = CompilerConstructionBoundary.ParseCSharpText(
                     content,
                     AnalyzerGateHost.ParseOptions,
                     file.Path)

@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
+using SharpProof.Frontend.Host;
 using SharpProof.Ir;
 using SharpProof.Testing;
 
@@ -992,11 +993,11 @@ public sealed class FrontendDifferentialOracle
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateBatchSource(generatedCases);
-        var syntaxTree = CSharpSyntaxTree.ParseText(
+        var syntaxTree = CompilerConstructionBoundary.ParseCSharpText(
             source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
             cancellationToken: cancellationToken);
-        var compilation = CSharpCompilation.Create(
+        var compilation = CompilerConstructionBoundary.CreateCSharpCompilation(
             "SharpProofFrontendFuzz",
             [syntaxTree],
             References.Value,
@@ -1154,11 +1155,11 @@ public sealed class FrontendDifferentialOracle
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateSemanticEdgeSource(cases);
-        var syntaxTree = CSharpSyntaxTree.ParseText(
+        var syntaxTree = CompilerConstructionBoundary.ParseCSharpText(
             source,
             new CSharpParseOptions(LanguageVersion.CSharp12),
             cancellationToken: cancellationToken);
-        var compilation = CSharpCompilation.Create(
+        var compilation = CompilerConstructionBoundary.CreateCSharpCompilation(
             "SharpProofFrontendSemanticEdges",
             [syntaxTree],
             References.Value,

@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using SharpProof.Analyzer;
+using SharpProof.Frontend.Host;
 
 namespace SharpProof.Gates.Performance;
 
@@ -350,7 +351,9 @@ internal static class PerformanceGate
                 source,
                 kind,
                 index);
-            _ = compilation.GetDiagnostics(cancellationToken);
+            _ = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                compilation,
+                cancellationToken);
             diagnosticCount += AnalyzeUnannotatedAdvisory(
                 compilation,
                 analyzer,
@@ -689,11 +692,15 @@ internal static class PerformanceGate
             var baseline = AnalyzerGateHost.CreateCompilation(
                 source,
                 $"RetentionBaselineWarmup_{index}");
-            _ = baseline.GetDiagnostics(cancellationToken);
+            _ = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                baseline,
+                cancellationToken);
             var unannotatedAdvisory = AnalyzerGateHost.CreateCompilation(
                 source,
                 $"RetentionUnannotatedAdvisoryWarmup_{index}");
-            _ = unannotatedAdvisory.GetDiagnostics(cancellationToken);
+            _ = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                unannotatedAdvisory,
+                cancellationToken);
             _ = AnalyzeUnannotatedAdvisory(
                 unannotatedAdvisory,
                 analyzer,
@@ -722,7 +729,9 @@ internal static class PerformanceGate
             var compilation = AnalyzerGateHost.CreateCompilation(
                 source,
                 $"Retained_{kind}_{index}");
-            _ = compilation.GetDiagnostics(cancellationToken);
+            _ = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                compilation,
+                cancellationToken);
             retained.Add(compilation);
         }
         ForceCollection();
@@ -748,7 +757,9 @@ internal static class PerformanceGate
             var compilation = AnalyzerGateHost.CreateCompilation(
                 source,
                 $"Retained_{kind}_{index}");
-            _ = compilation.GetDiagnostics(cancellationToken);
+            _ = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                compilation,
+                cancellationToken);
             diagnosticCount += AnalyzeUnannotatedAdvisory(
                 compilation,
                 analyzer,

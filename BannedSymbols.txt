@@ -8,6 +8,11 @@ M:Microsoft.CodeAnalysis.Compilation.RemoveSyntaxTrees(System.Collections.Generi
 M:Microsoft.CodeAnalysis.Compilation.RemoveAllSyntaxTrees;Do not remove syntax trees during analysis.
 M:Microsoft.CodeAnalysis.Compilation.GetSymbolsWithName(System.Func{System.String,System.Boolean},Microsoft.CodeAnalysis.SymbolFilter,System.Threading.CancellationToken);Use compiler-bound symbols reachable from the analyzed operation.
 M:Microsoft.CodeAnalysis.Compilation.GetSymbolsWithName(System.String,Microsoft.CodeAnalysis.SymbolFilter,System.Threading.CancellationToken);Use compiler-bound symbols reachable from the analyzed operation.
+M:Microsoft.CodeAnalysis.Compilation.GetDiagnostics;Do not enumerate whole-compilation diagnostics in a soundness boundary.
+M:Microsoft.CodeAnalysis.Compilation.GetDeclarationDiagnostics;Do not enumerate whole-compilation diagnostics in a soundness boundary.
+M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create;Do not fabricate compilations in a soundness boundary.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText;Do not reparse source text in a soundness boundary.
+M:Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.Create;Do not fabricate syntax trees in a soundness boundary.
 
 # Semantic models may only be obtained by the audited host adapter.
 M:Microsoft.CodeAnalysis.Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean);Use SharpProof.Frontend.Host.CompilationModelProvider.

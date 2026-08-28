@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpProof.Frontend.Host;
 
 namespace SharpProof.Gates.Corpus;
 
@@ -275,7 +276,7 @@ internal static class OpenSourceCorpusImporter
                     relativePath,
                     OpenSourceCorpusCatalog.ComputeSha256(content),
                     content));
-            var tree = CSharpSyntaxTree.ParseText(
+            var tree = CompilerConstructionBoundary.ParseCSharpText(
                 content,
                 AnalyzerGateHost.ParseOptions,
                 relativePath);

@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
+using SharpProof.Frontend.Host;
 using SharpProof.Verify;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
@@ -633,11 +634,11 @@ internal static class WorkerPerformanceProbe
             string artifactPath, string assemblyName, string sourcePath,
             string source, IEnumerable<string> referencePaths)
         {
-            var tree = CSharpSyntaxTree.ParseText(
+            var tree = CompilerConstructionBoundary.ParseCSharpText(
                 source,
                 new CSharpParseOptions(LanguageVersion.CSharp12),
                 sourcePath);
-            var compilation = CSharpCompilation.Create(
+            var compilation = CompilerConstructionBoundary.CreateCSharpCompilation(
                 assemblyName,
                 [tree],
                 referencePaths.Select(static path =>
@@ -684,7 +685,7 @@ internal static class WorkerPerformanceProbe
             var path = Path.Combine(
                 WorkerDirectoryPath,
                 "UncooperativeWorker.dll");
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var syntaxTree = CompilerConstructionBoundary.ParseCSharpText(
                 """
                 using System;
                 using System.Globalization;
@@ -721,7 +722,7 @@ internal static class WorkerPerformanceProbe
                     "TRUSTED_PLATFORM_ASSEMBLIES") ??
                 throw new InvalidOperationException(
                     "Trusted platform assemblies are unavailable.");
-            var compilation = CSharpCompilation.Create(
+            var compilation = CompilerConstructionBoundary.CreateCSharpCompilation(
                 "UncooperativeWorker",
                 [syntaxTree],
                 trustedPlatformAssemblies

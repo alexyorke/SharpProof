@@ -1,4 +1,6 @@
 // This producer runs only in the build-time compiler collector.
+using SharpProof.Frontend.Host;
+
 namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerManifestArtifactProducer
@@ -24,7 +26,9 @@ internal static class CompilerManifestArtifactProducer
             specificationPackAuthority.SpecificationPackCatalogSha256;
         var locationValidation =
             new CompilerSourceLocationAuthority.ValidationContext();
-        var diagnostics = compilation.GetDiagnostics(cancellationToken)
+        var diagnostics = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                compilation,
+                cancellationToken)
             .Where(static item =>
                 item.Severity == DiagnosticSeverity.Error &&
                 !item.IsSuppressed)

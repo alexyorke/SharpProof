@@ -186,7 +186,9 @@ internal static class CacheSoundnessRules
                 foreach (var reference in invocation.TargetMethod.DeclaringSyntaxReferences)
                 {
                     var syntax = reference.GetSyntax(context.CancellationToken);
-                    var model = context.Compilation.GetSemanticModel(syntax.SyntaxTree);
+                    var model = AnalyzerSemanticModelProvider.GetSemanticModel(
+                        context.Compilation,
+                        syntax.SyntaxTree);
                     var expression = syntax switch
                     {
                         ArrowExpressionClauseSyntax arrow => arrow.Expression,

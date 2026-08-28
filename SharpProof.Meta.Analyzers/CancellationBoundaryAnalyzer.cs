@@ -854,7 +854,7 @@ internal static class CancellationBoundaryAnalyzer
         if (operation.DescendantsAndSelf()
                 .OfType<ILiteralOperation>()
                 .Any(literal => literal.ConstantValue is
-                    { HasValue: true, Value: bool }))
+                { HasValue: true, Value: bool }))
         {
             return false;
         }
@@ -882,9 +882,9 @@ internal static class CancellationBoundaryAnalyzer
                      .OfType<IPropertyReferenceOperation>()
                      .Any(property => callerCheck.Contains(property))) &&
                 (binary.LeftOperand.ConstantValue is
-                     { HasValue: true, Value: bool } ||
+                { HasValue: true, Value: bool } ||
                  binary.RightOperand.ConstantValue is
-                     { HasValue: true, Value: bool }));
+                 { HasValue: true, Value: bool }));
     }
 
     private static bool IsCancellationProjection(

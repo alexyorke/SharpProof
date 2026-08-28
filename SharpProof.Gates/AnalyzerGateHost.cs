@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Attributes;
+using SharpProof.Frontend.Host;
 
 namespace SharpProof.Gates;
 
@@ -50,9 +51,12 @@ internal static class AnalyzerGateHost
                     static id => id,
                     static _ => ReportDiagnostic.Warn,
                     StringComparer.Ordinal));
-        return CSharpCompilation.Create(
+        return CompilerConstructionBoundary.CreateCSharpCompilation(
             assemblyName,
-            [CSharpSyntaxTree.ParseText(source, ParseOptions, "input.cs")],
+            [CompilerConstructionBoundary.ParseCSharpText(
+                source,
+                ParseOptions,
+                "input.cs")],
             References.Value,
             options);
     }
@@ -63,7 +67,9 @@ internal static class AnalyzerGateHost
         CancellationToken cancellationToken = default)
     {
         var compilation = CreateCompilation(source);
-        var errors = compilation.GetDiagnostics(cancellationToken)
+        var errors = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                compilation,
+                cancellationToken)
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
@@ -170,7 +176,9 @@ internal static class AnalyzerGateHost
         Compilation compilation,
         CancellationToken cancellationToken)
     {
-        var errors = compilation.GetDiagnostics(cancellationToken)
+        var errors = CompilerConstructionBoundary.GetCompilationDiagnostics(
+                compilation,
+                cancellationToken)
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)
             .ToImmutableArray();
@@ -199,7 +207,7 @@ internal static class AnalyzerGateHost
                 MetadataReference.CreateFromFile(
                     typeof(Contract).Assembly.Location))
         ];
-        var externalTree = CSharpSyntaxTree.ParseText(
+        var externalTree = CompilerConstructionBoundary.ParseCSharpText(
             """
             using SharpProof.Attributes;
 
@@ -217,7 +225,7 @@ internal static class AnalyzerGateHost
             """,
             ParseOptions,
             "ExternalCorpusEffects.cs");
-        var externalCompilation = CSharpCompilation.Create(
+        var externalCompilation = CompilerConstructionBoundary.CreateCSharpCompilation(
             "SharpProof.Gates.ExternalEffects",
             [externalTree],
             references,

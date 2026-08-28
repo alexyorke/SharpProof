@@ -13,6 +13,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static readonly ImmutableArray<string> KnownTypeNames = [
         "Microsoft.CodeAnalysis.Compilation", "Microsoft.CodeAnalysis.SemanticModel",
         "Microsoft.CodeAnalysis.CSharp.CSharpCompilation",
+        "Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree",
         "Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel",
         "Microsoft.CodeAnalysis.CSharp.CSharpExtensions",
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.ISymbol",
@@ -20,6 +21,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
         "System.Threading.CancellationToken", "Microsoft.Build.Framework.ITask",
         "SharpProof.Frontend.Host.CompilationModelProvider",
+        "SharpProof.Frontend.Host.CompilerConstructionBoundary",
+        "SharpProof.Meta.Analyzers.AnalyzerSemanticModelProvider",
         "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForValidation.ContractForDiagnosticDescriptors",
         "SharpProof.Meta.Analyzers.MetaDiagnosticDescriptors",
         "System.String", "SharpProof.Verify.Assumption", "SharpProof.Verify.ProofKernel",
@@ -47,7 +50,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "AddSyntaxTrees",
                 "RemoveSyntaxTrees",
                 "RemoveAllSyntaxTrees",
+                "GetDiagnostics",
+                "GetDeclarationDiagnostics",
                 "GetSymbolsWithName"),
+            [KnownType.CSharpCompilation] = Names("Create"),
             [KnownType.SemanticModel] = Names(
                 "TryGetSpeculativeSemanticModel",
                 "GetSpeculativeSymbolInfo",
@@ -67,6 +73,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "GetSpeculativeSymbolInfo",
                 "GetSpeculativeTypeInfo",
                 "GetSpeculativeAliasInfo"),
+            [KnownType.CSharpSyntaxTree] = Names("Create", "ParseText"),
             [KnownType.SyntaxFactory] = Names("ParseStatement", "ParseExpression", "ParseTypeName")
         }.ToImmutableDictionary();
 
@@ -211,8 +218,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             receiver,
             compilation,
             symbols,
-            cancellationToken,
-            []);
+            [],
+            cancellationToken);
         if (receiverType == null)
         {
             return false;
@@ -246,8 +253,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         IOperation? operation,
         Compilation compilation,
         KnownSymbols symbols,
-        CancellationToken cancellationToken,
-        HashSet<ISymbol> visited)
+        HashSet<ISymbol> visited,
+        CancellationToken cancellationToken)
     {
         if (operation == null)
         {
@@ -280,14 +287,16 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            var model = compilation.GetSemanticModel(initializer.SyntaxTree);
+            var model = AnalyzerSemanticModelProvider.GetSemanticModel(
+                compilation,
+                initializer.SyntaxTree);
             var initializerOperation = model.GetOperation(initializer, cancellationToken);
             var resolved = FindDynamicReceiverType(
                 initializerOperation,
                 compilation,
                 symbols,
-                cancellationToken,
-                visited);
+                visited,
+                cancellationToken);
             if (resolved != null)
             {
                 return resolved;
@@ -341,6 +350,16 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         ISymbol containingSymbol,
         KnownSymbols symbols)
     {
+        if (IsApprovedAnalyzerSemanticModelBoundary(method, containingSymbol, symbols))
+        {
+            return false;
+        }
+
+        if (IsApprovedCompilerConstructionBoundary(method, containingSymbol, symbols))
+        {
+            return false;
+        }
+
         foreach (var entry in ForbiddenMethods)
         {
             if (IsSameType(method.ContainingType, symbols[entry.Key]) && entry.Value.Contains(method.Name))
@@ -365,6 +384,56 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         return IsSameType(method.ContainingType, symbols[KnownType.SymbolDisplay]) ||
                IsSameType(receiverType, symbols[KnownType.Symbol]) ||
                receiverType?.AllInterfaces.Any(value => IsSameType(value, symbols[KnownType.Symbol])) == true;
+    }
+
+    private static bool IsApprovedCompilerConstructionBoundary(
+        IMethodSymbol method,
+        ISymbol containingSymbol,
+        KnownSymbols symbols)
+    {
+        if (!IsSameType(
+                containingSymbol.ContainingType,
+                symbols[KnownType.CompilerConstructionBoundary]))
+        {
+            return false;
+        }
+
+        if (!string.Equals(
+                containingSymbol.ContainingAssembly?.Name,
+                "SharpProof.Frontend",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return method.Name switch
+        {
+            "Create" =>
+                IsSameType(method.ContainingType, symbols[KnownType.CSharpCompilation]) ||
+                IsSameType(method.ContainingType, symbols[KnownType.CSharpSyntaxTree]),
+            "ParseText" => IsSameType(
+                method.ContainingType,
+                symbols[KnownType.CSharpSyntaxTree]),
+            "GetDiagnostics" or "GetDeclarationDiagnostics" =>
+                IsSameType(method.ContainingType, symbols[KnownType.Compilation]),
+            _ => false
+        };
+    }
+
+    private static bool IsApprovedAnalyzerSemanticModelBoundary(
+        IMethodSymbol method,
+        ISymbol containingSymbol,
+        KnownSymbols symbols)
+    {
+        return method.Name == "GetSemanticModel" &&
+            IsSameType(
+                containingSymbol.ContainingType,
+                symbols[KnownType.AnalyzerSemanticModelProvider]) &&
+            string.Equals(
+                containingSymbol.ContainingAssembly?.Name,
+                "SharpProof.Meta.Analyzers",
+                StringComparison.Ordinal) &&
+            IsSameType(method.ContainingType, symbols[KnownType.Compilation]);
     }
 
     private static void AnalyzeObjectCreation(OperationAnalysisContext context, KnownSymbols symbols)
@@ -1001,10 +1070,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     internal enum KnownType
     {
-        Compilation, SemanticModel, CSharpCompilation, CSharpSemanticModel,
+        Compilation, SemanticModel, CSharpCompilation, CSharpSyntaxTree, CSharpSemanticModel,
         CSharpExtensions, SyntaxFactory, Symbol, SymbolDisplay, DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, MsBuildTask,
-        CompilationModelProvider,
+        CompilationModelProvider, CompilerConstructionBoundary,
+        AnalyzerSemanticModelProvider,
         AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, MetaDiagnosticDescriptors, String,
         Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,
         PostconditionObligationBuilder,
