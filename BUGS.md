@@ -2056,52 +2056,6 @@ Expression<Func<T>> controls. Add field-like event coverage if supported.
 **Confidence**: High; exact-baseline canonical execution held activation and
 configuration constant and failed only the two initializer-lambda sites.
 
-### 504. [CONFIRMED] Failed pack preflights leave the prior canonical release bundle live
-
-**Location**: scripts/Invoke-SharpProofContainer.ps1 pack branch around lines
-361-401; default pilots consumer around lines 411-415. Staging/publication occurs
-later in scripts/New-SharpProofReleaseEvidence.ps1 around lines 561-570,
-751-810, and 927-973.
-
-**Description**: `pack` runs README verification and solution restore before it
-invalidates or recreates `artifacts/container-packages`. If either preflight
-fails, the prior package/SBOM/checksum bundle remains at the canonical path.
-The atomic publisher is never entered, so it cannot retire or mark the previous
-success. Default pilots and external collectors continue to see the old bundle
-as current.
-
-**Reproduction**: A canonical-image fixture seeded the three canonical evidence
-files, then forced README verification to fail before publication. `pack`
-exited 1, but SharpProof.spdx.json, SharpProof.release.json, and SHA256SUMS all
-survived byte-for-byte with identical pre/post SHA-256:
-
-    19814A92D86A085823D90234A89C3C2C528493D30F2364614FE852B4D7A7441A
-
-**Impact**: The command itself correctly fails, but a reused local/CI workspace
-continues advertising stale package evidence as the canonical latest result.
-A later default pilots invocation can consume it. Same-commit retries are not
-distinguishable because release identity and SBOM timestamps are commit-based,
-not attempt-based.
-
-**Root cause**: Caller-owned canonical output is invalidated only after two
-failure-prone preflights. Publication has no current-attempt marker outside its
-eventual staging transaction.
-
-**Recommended fix**: Make pack output attempt-scoped. Before any pack preflight,
-atomically clear the canonical `current` marker or archive the old bundle as
-explicitly historical. Build into a fresh attempt directory and publish current
-only after all checks succeed. If prior output is retained, write a failed
-current-attempt status and make default consumers refuse it.
-
-**Regression coverage**: Seed a valid same-commit bundle, force README and
-restore failures independently, and require nonzero pack plus absent/failed
-current output; default pilots must refuse it. A successful retry must atomically
-publish a new current bundle. Distinguish this ordinary preflight path from the
-interrupted directory-swap case in deferred finding 337.
-
-**Confidence**: High; an unchanged production script failed normally while all
-canonical old evidence survived unchanged.
-
 ### 505. [CONFIRMED] Custom await omits the hidden GetAwaiter precondition call
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
