@@ -13,6 +13,9 @@ param(
 
     [string]$TestFilter = '',
 
+    [ValidateRange(0, 86400)]
+    [int]$TimeoutSeconds = 0,
+
     [switch]$IncludeMetaAnalyzers
 )
 
@@ -26,6 +29,29 @@ Set-Location $repositoryRoot
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 
+$automation = (Get-Content -LiteralPath (Join-Path `
+        $repositoryRoot 'eng/acceptance/contract.json') -Raw |
+    ConvertFrom-Json).automation
+$buildTimeoutSeconds = [int]$automation.solutionBuildWallSeconds
+$testTimeoutSeconds = [int]$automation.solutionTestWallSeconds
+if ($buildTimeoutSeconds -lt 1 -or $testTimeoutSeconds -lt 1) {
+    throw 'The contract-owned .NET command deadlines must be positive.'
+}
+$testCommands = @(
+    'pr-gates', 'test', 'portable-tests', 'worker-tests', 'acceptance')
+$contractTimeoutSeconds = if ($Command -in $testCommands) {
+    $testTimeoutSeconds
+}
+else {
+    $buildTimeoutSeconds
+}
+$dotnetTimeoutSeconds = if ($TimeoutSeconds -gt 0) {
+    $TimeoutSeconds
+}
+else {
+    $contractTimeoutSeconds
+}
+
 if (-not $IsLinux -or [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
     throw 'SharpProof container commands require Linux x64.'
 }
@@ -35,8 +61,15 @@ if ($env:SHARPPROOF_CONTAINER -cne '1' -or
 }
 
 function Invoke-DotNet([string[]]$Arguments) {
-    & dotnet @Arguments
+    $dotnetWrapper = Join-Path `
+        $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+    & $dotnetWrapper -TimeoutSeconds $dotnetTimeoutSeconds @Arguments
     if ($LASTEXITCODE -ne 0) {
+        if ($LASTEXITCODE -eq 124) {
+            throw (
+                "dotnet $($Arguments -join ' ') timed out after " +
+                "$dotnetTimeoutSeconds seconds (exit code 124).")
+        }
         throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
     }
 }

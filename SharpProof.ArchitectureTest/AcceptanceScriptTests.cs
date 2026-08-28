@@ -10,6 +10,24 @@ namespace SharpProof.ArchitectureTest;
 public sealed class AcceptanceScriptTests
 {
     [Test]
+    public void ContainerDispatcherUsesTheBoundedDotnetWrapper()
+    {
+        var dispatcher = File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "scripts", "Invoke-SharpProofContainer.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                dispatcher,
+                Does.Contain("Invoke-SharpProofDotnet.ps1"));
+            Assert.That(
+                dispatcher,
+                Does.Contain("-TimeoutSeconds $dotnetTimeoutSeconds"));
+            Assert.That(dispatcher, Does.Not.Contain("& dotnet @Arguments"));
+        }
+    }
+
+    [Test]
     public void ContainerSemanticTestsForwardTheRequestedFilter()
     {
         var dispatcher = File.ReadAllText(Path.Combine(
