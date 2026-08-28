@@ -3054,27 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 647. [CONFIRMED] Frontend fuzz coverage counts unreachable syntax as executed coverage
-
-**Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, around lines 53-66,
-179-184, and 424-517.
-
-**Description**: Frontend category coverage recursively counts every syntax
-child without reachability/evaluation information. Operations placed only under
-literal-false conditionals therefore satisfy the semantic coverage gate.
-
-**Reproduction**: In a 1,000-case benign campaign, all Text/StringLiteral/
-NullString/Concat/StringLength nodes were confined to false branches. Every
-frontend comparison agreed, and the summary reported those counters nonzero,
-`Expanded=True CoverageSatisfied=True Passed=True`.
-
-**Impact**: Release evidence can claim semantic coverage for operations that
-never affect either oracle, masking operation-specific regressions.
-
-**Recommended fix**: Separate generated-shape from live/evaluated coverage and
-gate on the latter, or dedicate root-level live cases. Test false/true branch and
-short-circuit controls with deterministic parallel totals.
-
 ### 648. [CONFIRMED] WellSortedIrGenerator category labels survive operation folding
 
 **Location**: `SharpProof.Testing/WellSortedIrGenerator.cs`, around lines 58-69
