@@ -3054,28 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 635. [CONFIRMED] SPMETA002 misses four catalogued concurrent collections
-
-**Location**: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around
-lines 80-94 and 608-650.
-
-**Description**: The catalog names `BlockingCollection`, `ConcurrentBag`,
-`ConcurrentQueue`, and `ConcurrentStack`, but mutable-storage recognition checks
-those names only in `System.Collections.Generic`. Their real namespace is
-`System.Collections.Concurrent`. `ConcurrentDictionary` happens to be caught
-through `IDictionary`; the other four are silently missed.
-
-**Reproduction**: A Roslyn probe declared one field of each real concurrent type
-and received zero SPMETA002 diagnostics. `ConcurrentDictionary` and `List`
-controls each produced one; immutable controls stayed clean.
-
-**Impact**: Soundness-critical projects can store mutable concurrent collections
-despite the analyzer claiming to forbid them.
-
-**Recommended fix**: Match exact metadata identities, or correctly include
-`System.Collections.Concurrent`. Table-drive all five types, prevent duplicate
-dictionary diagnostics, and keep same-named lookalikes clean.
-
 ### 636. [CONFIRMED] Omitted by-value optional arguments block reusable source summaries
 
 **Location**: `SharpProof.Frontend/RoslynProgramLowerer.cs`, around lines 35-53
