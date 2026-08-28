@@ -6025,27 +6025,6 @@ evidence policy failures.
 UserAssume or TrustedBoundary only. Test earlier preconditions, both policy kinds,
 console structure, and SARIF URI.
 
-### 699. [CONFIRMED] Release needs test accepts commented-out dependencies
-
-**Location**: `SharpProof.ArchitectureTest/ReleaseCoverageBaselineTests.cs`,
-around lines 12-39; workflow dependency block in
-`.github/workflows/package-consumers.yml`, around lines 197-208.
-
-**Description**: The test searches the entire YAML text for dependency strings
-instead of parsing `jobs.release-qualification.needs`. Comments or unrelated job
-text satisfy it.
-
-**Reproduction**: Replacing active `- security` with `#      - security` left the
-test passing, while scoped parsing showed security absent from active needs. A
-job-scoped assertion failed the mutation and passed after restoration.
-
-**Impact**: Required qualification jobs can be disabled without the architecture
-backstop noticing, allowing publication jobs to bypass the omitted dependency.
-
-**Recommended fix**: Parse YAML and require the exact needs set, plus separate
-publisher-to-qualification dependencies. Test comment, move, misspell, duplicate,
-removal, and valid reorderings.
-
 ### 700. [CONFIRMED] IrStructuralShrinker expands shared DAG occurrences exponentially
 
 **Location**: `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs`, around lines
