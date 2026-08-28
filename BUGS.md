@@ -2743,27 +2743,6 @@ supported and Proven.
 and map arrow clauses to their property/indexer owner throughout manifest and
 lowering paths.
 
-### 615. [CONFIRMED] Case-drifted nuspec dependency IDs create accepted dangling SPDX edges
-
-**Location**: `scripts/Test-SharpProofPackageDependencies.ps1`, around lines
-384-412 and 443-446.
-
-**Description**: PowerShell `-notin` validates expected dependency IDs
-case-insensitively, then preserves the untrusted spelling when deriving the
-case-sensitive SPDX relationship target.
-
-**Reproduction**: Changing only `SharpProof.Attributes` to
-`sharpproof.attributes` passed graph/topology validation. The relationship used
-`SPDXRef-Package-sharpproof.attributes`, while the package row remained
-`SPDXRef-Package-SharpProof.Attributes`; the endpoint was dangling. A temp
-`-cnotin` fix rejected it and preserved the canonical control.
-
-**Impact**: Release generation, validation, and publication can accept a
-contradictory package/SBOM graph.
-
-**Recommended fix**: Use ordinal ID membership and require every relationship
-endpoint to exist in the ordinal SPDX-ID set. Add dependency-case fixtures.
-
 ### 616. [CONFIRMED] Canonical pack output depends on its random checkout path
 
 **Location**: `Directory.Build.props`, line 4; `compose.yaml`, around lines
