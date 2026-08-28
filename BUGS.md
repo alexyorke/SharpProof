@@ -3054,31 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 658. [CONFIRMED] Self-targeting ContractFor suppresses executable method analysis
-
-**Location**: `SharpProof.Contracts/ContractForSymbolMatcher.cs`, around lines
-53-112, 154-164, and 244-249; `ContractForValidationEngine.cs`, around lines
-135-141; `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs`, around lines
-31-35 and 207-210.
-
-**Description**: `[ContractFor(typeof(Itself))]` is accepted on a static class.
-Discovery then classifies the executable target as a companion, so both selected
-and unselected operation-block paths skip every real method in the class.
-
-**Reproduction**: A self-targeted static class contained `[EnforcePure] Write()`
-that mutated static state. It discovered `Target->Target`, emitted no SPCF or
-SP0002 diagnostics, and wrote state at runtime. No-ContractFor and separate-
-companion controls both emitted SP0002.
-
-**Impact**: One accepted attribute suppresses effect, contract-body, and
-call-site analysis for an entire executable class, creating analyzer/collector
-divergence.
-
-**Recommended fix**: Reject equal original definitions during validation and
-binding, and harden companion classification so invalid/self descriptors cannot
-drive operation-block suppression. Test non-generic/open-generic self targets,
-SPCF0003 plus continued SP0002, binder failure, and valid separate companions.
-
 ### 659. [CONFIRMED] A missing compiler manifest does not trigger incremental recompilation
 
 **Location**: `SharpProof.CompilerCollector/FinalCompilationCollector.cs`, around

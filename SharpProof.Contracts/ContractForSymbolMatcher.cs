@@ -91,6 +91,13 @@ internal static class ContractForSymbolMatcher
         INamedTypeSymbol companion,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget)
     {
+        if (SymbolEqualityComparer.Default.Equals(
+                companion.OriginalDefinition,
+                contractTarget.Target.OriginalDefinition))
+        {
+            return false;
+        }
+
         if (companion is not { TypeKind: TypeKind.Class, IsStatic: true })
         {
             return false;
@@ -160,7 +167,12 @@ internal static class ContractForSymbolMatcher
             var attributes = GetAttributes(type, contractFor);
             if (attributes.Length == 1 && TryGetTarget(attributes[0], out var target))
             {
-                result.Add(new CompanionDescriptor(type, target));
+                var failure = SymbolEqualityComparer.Default.Equals(
+                    target.Target.OriginalDefinition,
+                    type.OriginalDefinition)
+                    ? ContractBindingFailure.UnsupportedTarget
+                    : ContractBindingFailure.None;
+                result.Add(new CompanionDescriptor(type, target, failure));
             }
             else if (attributes.Length == 1)
             {
@@ -247,8 +259,10 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<CompanionDescriptor> companions,
         INamedTypeSymbol type)
     {
-        return companions.Any(companion => SymbolEqualityComparer.Default.Equals(
-            companion.Type.OriginalDefinition, type.OriginalDefinition));
+        return companions.Any(companion =>
+            companion.Failure != ContractBindingFailure.UnsupportedTarget &&
+            SymbolEqualityComparer.Default.Equals(
+                companion.Type.OriginalDefinition, type.OriginalDefinition));
     }
 
     internal static bool MemberSignaturesMatch(

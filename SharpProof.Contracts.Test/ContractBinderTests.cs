@@ -1802,6 +1802,29 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void SelfTargetingContractForCannotBindAsACompanion()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            [ContractFor(typeof(Subject))]
+            public static class Subject {
+                public static int Read(int value) {
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Subject", "Read");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
+    }
+
+    [Test]
     public void ProductionBinderContainsNoTextualOrSpeculativeBindingEscapeHatches()
     {
         var root = FindRepositoryRoot();

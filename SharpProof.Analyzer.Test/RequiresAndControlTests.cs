@@ -3045,6 +3045,33 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task SelfTargetingContractForDoesNotHideTheExecutableMethod()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(Subject))]
+            public static class Subject {
+                private static int state;
+
+                [EnforcePure]
+                public static int Write() {
+                    state++;
+                    return state;
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SPCF0003", "SP0002"],
+            features: "effects");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EquivalentTo(["SPCF0003", "SP0002"]));
+    }
+
+    [Test]
     public async Task NestedCallableClausesAreValidatedOnlyByTheirOwner()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
