@@ -3054,30 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 661. [CONFIRMED] Definitely-null property ??= setters remain unreplayable
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
-lines 180-186, 230-270, 524-535, and 1556-1571;
-`RequiresCallSiteAnalyzer.cs`, around lines 339-342.
-
-**Description**: Property coalesce-assignment always creates the potential setter
-with `CanReplay=false`, no flow, and BudgetExceeded. It models whether the getter
-can complete, but not whether its result is definitely null or nonnull.
-
-**Reproduction**: A getter that always returned null caused runtime to call the
-setter once with null, violating its Requires. Discovery emitted a nonreplayable
-setter and no SP0027; direct assignment diagnosed. Nonnull and throwing-getter
-controls correctly executed no setter.
-
-**Impact**: Definite property/indexer setter violations through `??=` disappear
-even when source semantics prove the setter executes.
-
-**Recommended fix**: Add conservative getter-result classification. Omit the
-setter when definitely nonnull, retain fail-closed Unknown when uncertain, and
-build an exact post-getter/RHS replay state when definitely null. Test block and
-expression getters, RHS failure, indexers, nullable values, and single-evaluation
-ordering.
-
 ### 662. [CONFIRMED] Supervisor control records leak into user-visible verifier output
 
 **Location**: `SharpProof.BuildTasks/VerifierProcessSupervisor.cs`, around lines

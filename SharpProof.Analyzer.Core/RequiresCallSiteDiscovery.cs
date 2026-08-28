@@ -270,17 +270,47 @@ internal sealed partial class RequiresCallSiteDiscovery(
                      .Where(property =>
                          CanCoalesceGetterComplete(property, operationFacts)))
         {
-            foreach (var call in GetPropertyCalls(property).Where(static call =>
+            foreach (var call in GetPropertyCalls(
+                         property,
+                         semanticModel,
+                         cancellationToken).Where(static call =>
                          call.TargetMethod.MethodKind == MethodKind.PropertySet))
             {
-                if (callSites.Any(existing =>
+                var canReplay =
+                    ClassifyCoalesceGetterResult(
+                        property,
+                        semanticModel,
+                        cancellationToken) == CoalesceGetterResult.Null &&
+                    HasReplayableAccessorEvaluation(
+                        call,
+                        property,
+                        operationFacts,
+                        flowResult,
+                        semanticModel,
+                        cancellationToken) &&
+                    HasReplayableBlockPrefix(property, operationFacts);
+                var existingIndex = callSites.FindIndex(existing =>
                         existing.Operation.Syntax.SyntaxTree ==
                             property.Syntax.SyntaxTree &&
                         existing.Operation.Syntax.Span == property.Syntax.Span &&
                         SymbolEqualityComparer.Default.Equals(
                             existing.TargetMethod,
-                            call.TargetMethod)))
+                            call.TargetMethod));
+                if (existingIndex >= 0)
                 {
+                    if (!callSites[existingIndex].CanReplay && canReplay)
+                    {
+                        callSites[existingIndex] = new RequiresCallSiteCandidate(
+                            property,
+                            call.TargetMethod,
+                            call.Instance,
+                            call.Arguments,
+                            call.ExplicitArguments,
+                            call.SyntheticArguments,
+                            CanReplay: true,
+                            Flow: flowResult,
+                            flowAnalysis.Status);
+                    }
                     continue;
                 }
 
@@ -291,9 +321,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     call.Arguments,
                     call.ExplicitArguments,
                     call.SyntheticArguments,
-                    CanReplay: false,
-                    Flow: null,
-                    ManagedFlowStatus.BudgetExceeded));
+                    CanReplay: canReplay,
+                    Flow: flowResult,
+                    flowAnalysis.Status));
             }
         }
 
@@ -1950,18 +1980,22 @@ internal sealed partial class RequiresCallSiteDiscovery(
             ReferenceEquals(coalesce.Target, property))
         {
             var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>(2);
+            var getterResult = ClassifyCoalesceGetterResult(
+                property,
+                semanticModel,
+                cancellationToken);
             if (getter != null)
             {
                 calls.Add(CreateGetterCall(
                     property, getter, semanticModel, cancellationToken));
             }
-            if (setter != null)
+            if (setter != null && getterResult != CoalesceGetterResult.NonNull)
             {
                 calls.Add(CreateSetterCall(
                     property,
                     setter,
                     coalesce.Value,
-                    canReplay: false,
+                    canReplay: getterResult == CoalesceGetterResult.Null,
                     semanticModel,
                     cancellationToken));
             }
@@ -1996,6 +2030,92 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
         return [CreateGetterCall(
             property, getter, semanticModel, cancellationToken)];
+    }
+
+    private enum CoalesceGetterResult
+    {
+        Unknown,
+        Null,
+        NonNull
+    }
+
+    private static CoalesceGetterResult ClassifyCoalesceGetterResult(
+        IPropertyReferenceOperation property,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (DefiniteOperationFacts.IsDefinitelyNull(property))
+        {
+            return CoalesceGetterResult.Null;
+        }
+        if (DefiniteOperationFacts.IsDefinitelyNonNull(property))
+        {
+            return CoalesceGetterResult.NonNull;
+        }
+        if (semanticModel == null || property.Property.GetMethod == null)
+        {
+            return CoalesceGetterResult.Unknown;
+        }
+
+        var declaration = property.Property.GetMethod.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .FirstOrDefault();
+        var expression = declaration switch
+        {
+            PropertyDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            IndexerDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            AccessorDeclarationSyntax
+            { ExpressionBody.Expression: { } body } => body,
+            AccessorDeclarationSyntax accessor
+                when accessor.Body?.Statements.Count == 1 &&
+                     accessor.Body.Statements[0] is
+                         ReturnStatementSyntax returned &&
+                     returned.Expression is { } body => body,
+            _ => null
+        };
+        if (expression == null)
+        {
+            var accessor = declaration?.DescendantNodes()
+                .OfType<AccessorDeclarationSyntax>()
+                .FirstOrDefault(static candidate =>
+                    candidate.IsKind(SyntaxKind.GetAccessorDeclaration));
+            if (accessor?.ExpressionBody?.Expression is { } body)
+            {
+                expression = body;
+            }
+            else if (accessor?.Body?.Statements.Count == 1 &&
+                     accessor.Body.Statements[0] is
+                         ReturnStatementSyntax returned &&
+                     returned.Expression is { } returnedExpression)
+            {
+                expression = returnedExpression;
+            }
+        }
+        if (expression == null)
+        {
+            return CoalesceGetterResult.Unknown;
+        }
+
+        var operation = semanticModel.GetOperation(
+            expression,
+            cancellationToken);
+        if (operation == null)
+        {
+            return CoalesceGetterResult.Unknown;
+        }
+        if (DefiniteOperationFacts.IsDefinitelyNull(operation) ||
+            operation is IDefaultValueOperation &&
+            (property.Type?.IsReferenceType == true ||
+             property.Type?.OriginalDefinition.SpecialType ==
+                 SpecialType.System_Nullable_T))
+        {
+            return CoalesceGetterResult.Null;
+        }
+        return DefiniteOperationFacts.IsDefinitelyNonNull(operation)
+            ? CoalesceGetterResult.NonNull
+            : CoalesceGetterResult.Unknown;
     }
 
     private static RequiresCallTarget CreateGetterCall(

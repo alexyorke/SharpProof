@@ -1110,6 +1110,40 @@ public sealed class RequiresCallSiteDiscoveryTests
             Is.True);
     }
 
+    [Test]
+    public void DefinitelyNullCoalesceGetterProducesReplayableSetterCandidate()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public sealed class Subject {
+                public string? Value {
+                    get => null;
+                    set { Contract.Requires(value == null); }
+                }
+                public void Run() { Value ??= "assigned"; }
+            }
+            """,
+            []);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single();
+        var caller = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                model,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        var setter = candidates!.Value.Single(candidate =>
+            candidate.TargetMethod.MethodKind == MethodKind.PropertySet);
+        Assert.That(setter.CanReplay, Is.True);
+    }
+
     private static IMethodSymbol GetMethod(
         Compilation compilation,
         string typeName,

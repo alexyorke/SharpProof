@@ -473,7 +473,55 @@ public sealed class RequiresAndControlTests
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
+            Is.EqualTo(["SP0027", "SP0027"]),
+            string.Join(" | ", diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))));
+    }
+
+    [Test]
+    public async Task CoalesceAssignmentReplaysSettersAfterDefinitelyNullGetters()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Subject {
+                public string? BlockNull {
+                    get { return null; }
+                    set { Contract.Requires(value == null); }
+                }
+
+                public string? ExpressionNull {
+                    get => null;
+                    set { Contract.Requires(value == null); }
+                }
+
+                public string? NonNull {
+                    get => "ready";
+                    set { Contract.Requires(value == null); }
+                }
+
+                public void InvalidBlock() {
+                    BlockNull ??= "assigned";
+                }
+
+                public void InvalidExpression() {
+                    ExpressionNull ??= "assigned";
+                }
+
+                public void NoSetterCall() {
+                    NonNull ??= "assigned";
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]),
+            string.Join(" | ", diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))));
     }
 
     [Test]
