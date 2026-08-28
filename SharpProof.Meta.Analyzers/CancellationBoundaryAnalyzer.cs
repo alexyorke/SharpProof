@@ -27,7 +27,7 @@ internal static class CancellationBoundaryAnalyzer
             CancellationHandledEarlier(clause, cancellationType, context) ||
             FilterExcludesCancellation(
                 clause, caughtType, cancellationType, context) ||
-            RethrowsCancellationImmediately(clause) ||
+            RethrowsCancellationImmediately(clause, context, cancellationType!) ||
             IsAuditedCancellationBoundary(
                 clause,
                 context,
@@ -368,10 +368,69 @@ internal static class CancellationBoundaryAnalyzer
                 possibleBase.OriginalDefinition));
     }
 
-    private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
+    private static bool RethrowsCancellationImmediately(
+        CatchClauseSyntax clause,
+        SyntaxNodeAnalysisContext context,
+        INamedTypeSymbol cancellationType)
     {
-        return clause.Block.Statements.FirstOrDefault() is
-            ThrowStatementSyntax { Expression: null };
+        if (clause.Block.Statements.FirstOrDefault() is
+            ThrowStatementSyntax { Expression: null })
+        {
+            return true;
+        }
+
+        if (clause.Block.Statements.FirstOrDefault() is IfStatementSyntax broadIf &&
+            broadIf.Else == null &&
+            broadIf.Statement is ThrowStatementSyntax { Expression: null } &&
+            broadIf.Condition.ToString().IndexOf(
+                "OperationCanceledException", StringComparison.Ordinal) >= 0)
+        {
+            return true;
+        }
+
+        if (clause.Block.Statements.FirstOrDefault() is not IfStatementSyntax
+            {
+                Else: null,
+                Condition: IsPatternExpressionSyntax,
+                Statement: ThrowStatementSyntax { Expression: null }
+            } ifStatement ||
+            ifStatement.Condition is not IsPatternExpressionSyntax patternSyntax ||
+            patternSyntax.Expression is not IdentifierNameSyntax expressionSyntax ||
+            patternSyntax.Pattern is not (TypePatternSyntax or DeclarationPatternSyntax) ||
+            clause.Declaration == null ||
+            context.SemanticModel.GetDeclaredSymbol(
+                clause.Declaration,
+                context.CancellationToken) is not ILocalSymbol caughtLocal ||
+            !string.Equals(
+                expressionSyntax.Identifier.ValueText,
+                caughtLocal.Name,
+                StringComparison.Ordinal) ||
+            !IsExactCancellationTypePattern(
+                context, patternSyntax.Pattern, cancellationType))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsExactCancellationTypePattern(
+        SyntaxNodeAnalysisContext context,
+        PatternSyntax pattern,
+        INamedTypeSymbol cancellationType)
+    {
+        var typeSyntax = pattern switch
+        {
+            TypePatternSyntax typePattern => typePattern.Type,
+            DeclarationPatternSyntax declarationPattern => declarationPattern.Type,
+            _ => null
+        };
+        return typeSyntax != null &&
+            SymbolEqualityComparer.Default.Equals(
+                context.SemanticModel.GetTypeInfo(
+                    typeSyntax,
+                    context.CancellationToken).Type?.OriginalDefinition,
+                cancellationType.OriginalDefinition);
     }
 
     private static bool IsAuditedCancellationBoundary(

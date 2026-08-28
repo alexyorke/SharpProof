@@ -203,42 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 534. [CONFIRMED] SPMETA003 rejects an exhaustive cancellation type guard
-
-**Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs,
-RethrowsCancellationImmediately around lines 311-315.
-
-**Description**: The analyzer recognizes immediate cancellation propagation only
-when a catch's first statement is a bare `throw;`. It rejects the ordinary safe
-pattern `if (exception is OperationCanceledException) throw;` even though every
-cancellation exception, including derived types, is rethrown before handling
-continues.
-
-**Reproduction**:
-
-    bare rethrow control:       SPMETA003 count=0
-    cancellation type guard:   SPMETA003 count=1
-    unrelated type guard:      SPMETA003 count=1
-
-All compiler-error counts were zero; SPMETA003 is Error-level.
-
-**Impact**: Safe broad-catch code cannot compile under the repository's analyzer
-without a source-shape rewrite, producing an ordinary false positive.
-
-**Root cause**: Cancellation propagation is recognized by a one-statement syntax
-shape rather than semantic/CFG proof.
-
-**Recommended fix**: Accept a side-effect-free first guard proving the caught
-local is OCE (or a subtype-exhaustive pattern) whose taken branch immediately
-bare-rethrows. Keep arbitrary boolean and unrelated-type guards diagnostic.
-
-**Regression coverage**: OCE type guard and bare rethrow are clean; bool and
-ArgumentException guards report. Add negated/else forms only when semantically
-proven equivalent.
-
-**Confidence**: High; the exact analyzer reports only the semantically safe guard
-relative to its bare-rethrow control.
-
 ### 535. [CONFIRMED] Invalid ContractFor surfaces still contribute partial companion facts
 
 **Location**: whole-surface validation in

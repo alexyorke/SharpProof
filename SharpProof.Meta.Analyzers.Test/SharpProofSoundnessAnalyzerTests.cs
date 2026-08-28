@@ -932,6 +932,46 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task AllowsCancellationTypeGuardThatRethrowsImmediately()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static void Guarded() {
+                    try { }
+                    catch (Exception exception) {
+                        if (exception is OperationCanceledException) throw;
+                        Console.WriteLine(exception.Message);
+                    }
+                }
+                static void Unrelated() {
+                    try { }
+                    catch (Exception exception) {
+                        if (exception is ArgumentException) throw;
+                        Console.WriteLine(exception.Message);
+                    }
+                }
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+                Is.EqualTo(1),
+                string.Join(" | ", diagnostics
+                    .Where(static diagnostic => diagnostic.Id == "SPMETA003")
+                    .Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture))));
+            Assert.That(
+                diagnostics.Single(static diagnostic => diagnostic.Id == "SPMETA003")
+                    .GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("cancellation"));
+        }
+    }
+
+    [Test]
     public async Task RejectsMutableStaticPropertyAndEventStorage()
     {
         const string source =
