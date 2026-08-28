@@ -561,52 +561,6 @@ output and exit codes.
 **Confidence**: High; self-verified with exact helper logic in the canonical
 container.
 
-### 467. [CONFIRMED] SPMETA010 treats ConcurrentDictionary.TryUpdate comparisonValue as a stored value
-
-**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
-lines 20-26.
-
-**Description**: AnalyzeWrite scans every invocation argument for a
-noncacheable answer without considering parameter roles. For TryUpdate,
-newValue is the only value that can be stored; comparisonValue is read-only
-expected-state input. A safe update can therefore receive SPMETA010 solely
-because it compares against Unknown.
-
-**Reproduction**:
-
-    cache.TryUpdate(
-        key: "answer",
-        newValue: Answer.Proven,
-        comparisonValue: Answer.Unknown);
-
-with ProofCache : ConcurrentDictionary<string, Answer>, ISemanticCache:
-
-    SAFE_CONTROL_SPMETA010_COUNT=0
-    UNSAFE_NEW_VALUE_CONTROL_SPMETA010_COUNT=1
-    UNKNOWN_COMPARISON_ONLY_SPMETA010_COUNT=1
-
-All compiler-error counts were zero.
-
-**Impact**: The soundness analyzer produces a false positive for a standard
-conditional cache update that can only store a cacheable value. Warnings as
-errors can block legitimate cache code and encourage suppressing the broader
-rule.
-
-**Root cause**: Write-method recognition is name-based and all arguments are
-treated as potential stored values.
-
-**Recommended fix**: Resolve the method symbol/signature and select only
-stored-value parameters. For TryUpdate inspect newValue and never
-comparisonValue. Define roles for every cataloged write method rather than a
-single Any(argument) rule.
-
-**Regression coverage**: Unknown newValue plus Proven comparison must report;
-Proven newValue plus Unknown comparison must not. Include named and positional
-arguments and a different overload/lookalike control.
-
-**Confidence**: High; self-verified with safe, unsafe, and comparison-only
-controls.
-
 ### 468. [CONFIRMED] Boxing conversions are interned as pure and collapse fresh object identities
 
 **Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
