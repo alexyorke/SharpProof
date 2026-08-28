@@ -6349,28 +6349,6 @@ future sequence-coverage expansion.
 array identity is implemented end-to-end, or return explicit Abstained. Add a
 model-vs-lowerer support matrix and integer/string/reference controls.
 
-### 702. [CONFIRMED] SPMETA008 misses EffectSummary record with-expressions
-
-**Location**: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around
-lines 120 and 190-221; `SharpProof.Effects/EffectSummary.cs`.
-
-**Description**: Construction enforcement registers only ObjectCreation and casts
-to `IObjectCreationOperation`. C# record cloning is `IWithOperation`, so
-`source with { }` creates a distinct EffectSummary outside the authority allowlist
-without SPMETA008.
-
-**Reproduction**: Direct `new` emitted one SPMETA008. A synthetic record and the
-real repository EffectSummary both compiled a With operation with zero
-diagnostics; runtime confirmed a distinct but equal instance.
-
-**Impact**: Consumers bypass the stated construction/identity boundary, and any
-future init member would also bypass constructor validation.
-
-**Recommended fix**: Register OperationKind.With, compare its type/operand to the
-known EffectSummary symbol, and apply the identical containing-type allowlist.
-Test rejected consumers, allowed EffectSummary/operations authorities, and direct
-new preservation.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
