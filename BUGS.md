@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 599. [CONFIRMED] Exact-commit release tasks compile Git-ignored source files
-
-**Location**: .gitignore entry for Generated Files; eng/container/entrypoint.sh
-around lines 90-130 and 137-187.
-
-**Description**: Clean-source validation uses git ls-files --others
---exclude-standard, hiding ignored paths. The later live-worktree tar overlay
-does not honor Git ignores and copies them into the detached HEAD task clone.
-
-**Reproduction**: An ignored Generated Files/IgnoredCompileBreak.cs was absent
-from ordinary status, passed the clean gate, then compiled inside canonical pack
-with RepositoryCommit fixed to HEAD and failed on its #error.
-
-**Impact**: Exact-commit release commands can fail or produce different package
-assemblies from ignored local leftovers while provenance still names HEAD.
-
-**Recommended fix**: Execute clean-required commands directly from detached HEAD
-and copy only explicitly authorized external inputs, or reject every overlaid
-path outside that allowlist. Test ignored Compile source, allowed nupkgs, and
-excluded artifacts/bin/obj.
-
 ### 600. [CONFIRMED] Expanded params arrays are discarded before Requires evaluation
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
