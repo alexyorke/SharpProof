@@ -3054,26 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 655. [CONFIRMED] Package scheduler governance stays green after queue sorting is deleted
-
-**Location**: `scripts/Invoke-SharpProofPackageTests.ps1`, around lines 331-335;
-`SharpProof.ArchitectureTest/ArchitectureTests.cs`, around lines 1465-1580.
-
-**Description**: The test asserts that the script contains timing vocabulary and
-some `Sort-Object` token, but several unrelated sorts satisfy it. It does not
-couple descending EstimatedMilliseconds order to pending-queue insertion.
-
-**Reproduction**: Removing only the longest-estimate-first queue sort left the
-named governance test passing. A queue-specific assertion failed under mutation
-and passed after restoration.
-
-**Impact**: A scheduling regression to insertion order can increase package-suite
-makespan and deadline failures while the supposed backstop remains green.
-
-**Recommended fix**: Extract a pure shard-schedule helper and test synthetic
-estimates, descending order, deterministic name ties, selected mode, and unknown
-estimates. At minimum pin the unique queue-sort adjacency with a deletion test.
-
 ### 656. [CONFIRMED] NoModeledNormalReturn proof is discarded at the query-budget boundary
 
 **Location**: `SharpProof.Worker/CallableVerifier.cs`, around lines 145-184,

@@ -28,6 +28,8 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
 
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.PackageScheduling.psm1') -Force
 $parallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
@@ -501,9 +503,7 @@ try {
     }
 
     $pending = [Collections.Generic.Queue[object]]::new()
-    foreach ($shard in @($shards | Sort-Object `
-            @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
-            @{ Expression = 'Name'; Descending = $false })) {
+    foreach ($shard in Get-SharpProofPackageShardSchedule -Shards @($shards)) {
         $pending.Enqueue($shard)
     }
     $running = [Collections.Generic.List[object]]::new()
