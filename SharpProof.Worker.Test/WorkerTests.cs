@@ -5454,6 +5454,33 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task InitialBackendFactoryInfrastructureFailureIsNotReportedAsUnavailable()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(() =>
+        {
+            throw new InvalidOperationException("factory configuration failed");
+        });
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("worker.infrastructure"));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.All.EqualTo(WorkerClaimReason.InfrastructureFailure));
+        }
+    }
+
+    [Test]
     public async Task MethodTimeoutRetiresAndRecreatesTheInterruptedSolverLane()
     {
         using var project = TestProject.Create(

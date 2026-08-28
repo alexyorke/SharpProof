@@ -248,12 +248,30 @@ public sealed class SharpProofWorker : IDisposable
                     }
                 }
             }
-            if (!TryCreateLanes(request.Budgets, targets.Length, out solverLanes, out var backendError))
+            if (!TryCreateLanes(
+                    request.Budgets,
+                    targets.Length,
+                    out solverLanes,
+                    out var backendError,
+                    out var backendException))
             {
                 projectBoundary.Token.ThrowIfCancellationRequested();
-                return FailedAfterManifest(WorkerRunFailureReason.BackendUnavailable,
-                    Error("backend.unavailable", "The native SMT backend is unavailable: " + backendError),
-                    WorkerClaimReason.BackendUnavailable);
+                var backendUnavailable = backendException != null &&
+                    Program.IsBackendUnavailable(backendException);
+                return FailedAfterManifest(
+                    backendUnavailable
+                        ? WorkerRunFailureReason.BackendUnavailable
+                        : WorkerRunFailureReason.InfrastructureFailure,
+                    Error(
+                        backendUnavailable
+                            ? "backend.unavailable"
+                            : "worker.infrastructure",
+                        backendUnavailable
+                            ? "The native SMT backend is unavailable: " + backendError
+                            : "The SMT backend lane factory failed: " + backendError),
+                    backendUnavailable
+                        ? WorkerClaimReason.BackendUnavailable
+                        : WorkerClaimReason.InfrastructureFailure);
             }
             var orderedTargets = targets.OrderBy(
                 static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
@@ -501,11 +519,16 @@ public sealed class SharpProofWorker : IDisposable
         return (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
     }
 
-    private bool TryCreateLanes(WorkerBudgets budgets, int targetCount,
-        out VerificationLane[] lanes, out string? error)
+    private bool TryCreateLanes(
+        WorkerBudgets budgets,
+        int targetCount,
+        out VerificationLane[] lanes,
+        out string? error,
+        out Exception? failure)
     {
         lanes = [];
         error = null;
+        failure = null;
         if (targetCount == 0)
         {
             return true;
@@ -552,6 +575,7 @@ public sealed class SharpProofWorker : IDisposable
                 }
             }
 
+            failure = exception;
             error = exception.GetBaseException().Message;
             return false;
         }
