@@ -1222,6 +1222,64 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task RequiresOnlyUnsupportedBodyRemainsTypedUnknownWithoutClaims()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                public static int Verify(int value) {
+                    Contract.Requires(value >= 0);
+                    while (value > 0)
+                        value--;
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CountingBackend(
+                BackendCheckResult.Unsatisfiable([])));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.Errors, Is.Empty);
+            Assert.That(response.ClaimResults, Is.Empty);
+            Assert.That(response.CallableResults, Has.Length.EqualTo(1));
+            Assert.That(
+                response.CallableResults.Single().Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(
+                response.CallableResults.Single().Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+
+            var authority = CreateResponseAuthority(request);
+            Assert.That(
+                WorkerProtocolJson.Validate(
+                    response,
+                    response.InputHash,
+                    response.Manifest,
+                    authority).IsValid,
+                Is.True);
+            response.CallableResults.Single().Reason =
+                WorkerCallableCoverageReason.UnsupportedCallable;
+            Assert.That(
+                WorkerProtocolJson.Validate(
+                    response,
+                    response.InputHash,
+                    response.Manifest,
+                    authority).Errors.Select(static error => error.Code),
+                Does.Contain("response.evidence_authority"));
+        }
+    }
+
+    [Test]
     public async Task CompilerEffectWitnessTamperingCannotBypassReplay()
     {
         using var project = TestProject.Create(

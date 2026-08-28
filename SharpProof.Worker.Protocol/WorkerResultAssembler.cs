@@ -200,7 +200,9 @@ internal static class WorkerResultAssembler
         }
         else if (owned.Length == 0)
         {
-            expected = runStatus switch
+            expected = IsClaimlessIncompleteReason(callable)
+                ? callable.Reason
+                : runStatus switch
             {
                 WorkerRunStatus.Canceled => WorkerCallableCoverageReason.Canceled,
                 WorkerRunStatus.TimedOut => WorkerCallableCoverageReason.ProjectTimeout,
@@ -246,6 +248,16 @@ internal static class WorkerResultAssembler
             callable.Coverage == WorkerCallableCoverage.Incomplete &&
             callable.Reason == WorkerCallableCoverageReason.InfrastructureFailure;
         return matchesExpected || directInfrastructureFailure;
+    }
+
+    private static bool IsClaimlessIncompleteReason(
+        WorkerCallableResult callable)
+    {
+        return callable.Coverage == WorkerCallableCoverage.Incomplete &&
+            callable.Reason is WorkerCallableCoverageReason.UnsupportedCallable or
+                WorkerCallableCoverageReason.UnsupportedContract or
+                WorkerCallableCoverageReason.SemanticUnknown or
+                WorkerCallableCoverageReason.InfrastructureFailure;
     }
 
     private static (WorkerRunStatus Status, WorkerRunFailureReason Failure)?

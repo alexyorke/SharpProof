@@ -1358,6 +1358,10 @@ public sealed class ProtocolJsonTests
         response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
         response.CallableResults[0].Reason =
             WorkerCallableCoverageReason.SemanticUnknown;
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+
+        response.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.MissingClaimResult;
         Assert.That(
             ValidateForRequest(response).Errors.Select(static error => error.Code),
             Does.Contain("response.callable_projection"));

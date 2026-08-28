@@ -62,6 +62,10 @@ internal sealed class CompilerResponseEvidenceAuthority :
             }
 
             ValidateCallableAssumptions(target, callable, errors);
+            if (target.Entry.ClaimIds.Length == 0)
+            {
+                ValidateClaimlessCallable(target, callable, errors);
+            }
             foreach (var claimId in target.Entry.ClaimIds)
             {
                 if (claims.TryGetValue(claimId, out var claim))
@@ -72,6 +76,27 @@ internal sealed class CompilerResponseEvidenceAuthority :
         }
 
         return errors.OrderBy(static code => code, StringComparer.Ordinal);
+    }
+
+    private static void ValidateClaimlessCallable(
+        CompilerCallablePreparation target,
+        WorkerCallableResult result,
+        HashSet<string> errors)
+    {
+        var expectedCoverage = target.IsSuccess
+            ? WorkerCallableCoverage.Complete
+            : WorkerCallableCoverage.Incomplete;
+        var expectedReason = target.IsSuccess ||
+            target.FailureReason == WorkerClaimReason.None
+            ? WorkerCallableCoverageReason.None
+            : target.FailureReason == WorkerClaimReason.UnsupportedCallable
+                ? WorkerCallableCoverageReason.UnsupportedCallable
+                : WorkerCallableCoverageReason.SemanticUnknown;
+        if (result.Coverage != expectedCoverage ||
+            result.Reason != expectedReason)
+        {
+            errors.Add("response.evidence_authority");
+        }
     }
 
     private static void ValidateCallableAssumptions(
