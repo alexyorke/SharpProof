@@ -653,7 +653,7 @@ internal sealed partial class OperationEffectScanner
             }
 
             var formattedValue =
-                StringConcatenationEffectResolver.ResolveFormattedValue(
+                StringConcatenationEffectResolver.ResolveInterpolatedValue(
                     value.Expression,
                     value,
                     _session.Compilation,
@@ -663,7 +663,7 @@ internal sealed partial class OperationEffectScanner
             result = result.Then(new EffectStep(
                 formattedValue,
                 StringConcatenationEffectResolver
-                    .CanFormattedValueCompleteNormally(
+                    .CanInterpolatedValueCompleteNormally(
                         value.Expression,
                         value,
                         _session.Compilation,

@@ -294,28 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 629. [CONFIRMED] Interpolation analyzes the wrong ToString overload
-
-**Location**: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, around
-lines 421-487; `StringConcatenationEffectResolver.cs`, around lines 50-203.
-
-**Description**: Ordinary interpolation reuses concatenation resolution and
-always analyzes parameterless `ToString()`. Runtime can invoke
-`IFormattable.ToString(format, provider)` instead.
-
-**Reproduction**: A sealed type's parameterless override was pure, while its
-IFormattable implementation wrote state 1729 and threw InvalidOperationException.
-Runtime observed both; the analyzer returned Complete/nonunknown with no static
-write and empty throws. A temp target-selection fix passed the oracle and five
-existing controls.
-
-**Impact**: Interpolation can be falsely certified pure/nonthrowing and later
-reachability is based on the wrong method.
-
-**Recommended fix**: Model framework formatting precedence separately from
-concatenation, including IFormattable/ISpanFormattable/custom handlers, and fail
-closed for unresolved dispatch.
-
 ### 630. [CONFIRMED] Any host OS can mint another OS's portable receipt
 
 **Location**: `scripts/Test-SharpProofPortableConsumer.ps1`, around lines 6-18

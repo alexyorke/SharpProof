@@ -184,6 +184,17 @@ public sealed class EffectAnalysisTests
                 }
             }
 
+            public sealed class FormattableValue : IFormattable {
+                private static int s_state;
+                public override string ToString() => "pure";
+                string IFormattable.ToString(
+                    string? format,
+                    IFormatProvider? formatProvider) {
+                    s_state++;
+                    throw new InvalidOperationException();
+                }
+            }
+
             public static class Sample {
                 private static int s_state;
                 private static string Next() { s_state++; return "next"; }
@@ -191,6 +202,7 @@ public sealed class EffectAnalysisTests
                 public static string Scalar(int value) => $"value={value}";
                 public static string Ordered(string value) => $"{Next()}{value}";
                 public static string Throwing(ThrowingValue value) => $"{value}";
+                public static string Formattable(FormattableValue value) => $"{value}";
                 public static string Aligned(string value) => $"{value,4}";
                 public static string Formatted(int value) => $"{value:X}";
             }
@@ -219,6 +231,18 @@ public sealed class EffectAnalysisTests
         AssertContainsThrows(
             throwing.Summary,
             "System.InvalidOperationException");
+
+        var formattable = session.Analyze(
+            Method(compilation, "Formattable"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                formattable.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            AssertContainsThrows(
+                formattable.Summary,
+                "System.InvalidOperationException");
+        }
 
         foreach (var unsupported in new[] { "Aligned", "Formatted" })
         {

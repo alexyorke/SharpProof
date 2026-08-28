@@ -81,6 +81,41 @@ internal static class StringConcatenationEffectResolver
             formatted.Operand);
     }
 
+    internal static EffectSummary ResolveInterpolatedValue(
+        IOperation operand,
+        IOperation origin,
+        Compilation compilation,
+        EffectCallSiteResolver calls,
+        ManagedFlowResult? flow,
+        Func<IOperation?, bool, EffectRegionSet> classifyRegion)
+    {
+        var formatted = ResolveFormattedValueCall(
+            operand,
+            origin,
+            compilation,
+            flow,
+            preferFormattable: true);
+        if (!formatted.IsRequired)
+        {
+            return EffectSummary.Empty;
+        }
+        if (formatted.Target == null)
+        {
+            return EffectSummaryOperations.Unsupported();
+        }
+
+        return calls.Resolve(
+            formatted.Target,
+            classifyRegion(formatted.Operand, false),
+            ImmutableArray<EffectRegionSet>.Empty,
+            ImmutableArray<IOperation?>.Empty,
+            IsDispatchUncertain(
+                formatted.Target,
+                formatted.ReceiverType),
+            origin,
+            formatted.Operand);
+    }
+
     internal static bool CanFormattedValueCompleteNormally(
         IOperation operand,
         IOperation origin,
@@ -104,11 +139,36 @@ internal static class StringConcatenationEffectResolver
                 origin);
     }
 
+    internal static bool CanInterpolatedValueCompleteNormally(
+        IOperation operand,
+        IOperation origin,
+        Compilation compilation,
+        ManagedFlowResult? flow,
+        OperationCompletionEvaluator completionEvaluator)
+    {
+        var formatted = ResolveFormattedValueCall(
+            operand,
+            origin,
+            compilation,
+            flow,
+            preferFormattable: true);
+        return !formatted.IsRequired ||
+            formatted.Target == null ||
+            IsDispatchUncertain(
+                formatted.Target,
+                formatted.ReceiverType) ||
+            completionEvaluator.CanCompleteInvocation(
+                formatted.Target,
+                formatted.Operand,
+                origin);
+    }
+
     private static FormattedValueCall ResolveFormattedValueCall(
         IOperation operand,
         IOperation origin,
         Compilation compilation,
-        ManagedFlowResult? flow)
+        ManagedFlowResult? flow,
+        bool preferFormattable = false)
     {
         operand = UnwrapImplicitConversion(operand);
         if (operand.Type?.SpecialType == SpecialType.System_String ||
@@ -126,7 +186,9 @@ internal static class StringConcatenationEffectResolver
         var receiverType = UnwrapNullable(operand.Type);
         return new(
             operand,
-            ResolveToString(receiverType, compilation),
+            preferFormattable
+                ? ResolveInterpolatedToString(receiverType, compilation)
+                : ResolveToString(receiverType, compilation),
             receiverType,
             IsRequired: true);
     }
@@ -193,12 +255,80 @@ internal static class StringConcatenationEffectResolver
             .SingleOrDefault(IsParameterlessToString);
     }
 
+    private static IMethodSymbol? ResolveInterpolatedToString(
+        ITypeSymbol? receiverType,
+        Compilation compilation)
+    {
+        if (receiverType is not INamedTypeSymbol named)
+        {
+            return null;
+        }
+
+        var spanFormattable = compilation.GetTypeByMetadataName(
+            "System.ISpanFormattable");
+        if (spanFormattable != null &&
+            named.AllInterfaces.Any(@interface =>
+                SymbolEqualityComparer.Default.Equals(
+                    @interface.OriginalDefinition,
+                    spanFormattable)))
+        {
+            // The default handler prefers TryFormat, whose span/provider
+            // overload is not represented by the ordinary call resolver.
+            // Refuse to guess rather than certifying a parameterless or
+            // IFormattable implementation that the runtime will not call.
+            return null;
+        }
+
+        var formattable = compilation.GetTypeByMetadataName(
+            "System.IFormattable");
+        if (formattable != null &&
+            named.AllInterfaces.Any(@interface =>
+                SymbolEqualityComparer.Default.Equals(
+                    @interface.OriginalDefinition,
+                    formattable)))
+        {
+            var formatProvider = compilation.GetTypeByMetadataName(
+                "System.IFormatProvider");
+            var interfaceMethod = formattable.GetMembers("ToString")
+                .OfType<IMethodSymbol>()
+                .SingleOrDefault(method => IsFormattableToString(
+                    method,
+                    formatProvider));
+            if (interfaceMethod == null)
+            {
+                return null;
+            }
+
+            return named.FindImplementationForInterfaceMember(interfaceMethod)
+                as IMethodSymbol ?? interfaceMethod;
+        }
+
+        return ResolveToString(receiverType, compilation);
+    }
+
     private static bool IsParameterlessToString(IMethodSymbol method)
     {
         return method.MethodKind == MethodKind.Ordinary &&
             !method.IsStatic &&
             method.Arity == 0 &&
             method.Parameters.IsEmpty &&
+            method.ReturnType.SpecialType == SpecialType.System_String;
+    }
+
+    private static bool IsFormattableToString(
+        IMethodSymbol method,
+        ITypeSymbol? formatProvider)
+    {
+        return method.MethodKind == MethodKind.Ordinary &&
+            !method.IsStatic &&
+            method.Arity == 0 &&
+            method.Parameters.Length == 2 &&
+            method.Parameters[0].Type.SpecialType ==
+                SpecialType.System_String &&
+            formatProvider != null &&
+            SymbolEqualityComparer.Default.Equals(
+                method.Parameters[1].Type,
+                formatProvider) &&
             method.ReturnType.SpecialType == SpecialType.System_String;
     }
 
