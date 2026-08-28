@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 591. [CONFIRMED] Void return closed attributes are selected then discarded
-
-**Location**: ContractSelectionInventory.cs around lines 141-146;
-ClosedContractDiagnostics.cs around lines 18-26; ContractBinder.cs around lines
-260-270.
-
-**Description**: Return attributes select contracts, but analyzer and binder
-skip all return validation when ReturnsVoid and construct zero clauses.
-
-**Reproduction**: Return-target NotNull, Positive, and InRange on void compiled
-cleanly, were retained by Roslyn and selected, emitted no SP0024, and bound
-successfully with zero clauses. Invalid and valid nonvoid controls behaved
-correctly.
-
-**Impact**: Malformed selected declarations are silently accepted and mislead
-authors into believing a contract is active.
-
-**Recommended fix**: Always validate return attributes against ReturnType,
-including System.Void; gate only clause construction on a result term. Test all
-closed attributes on void plus no-attribute and nonvoid controls.
-
 ### 592. [CONFIRMED] Targeted package tests depend on default Worker shard inventory
 
 **Location**: scripts/Invoke-SharpProofPackageTests.ps1 around lines 220-246 and
