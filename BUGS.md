@@ -2619,29 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 574. [CONFIRMED] Explicit-interface implementation preconditions are unreachable from calls
-
-**Location**: SharpProof.Contracts/ContractBinder.cs around lines 74-82 and
-243-254; RequiresCallSiteDiscovery.cs around lines 59-63;
-RequiresCallSiteAnalyzer.cs around lines 302-324.
-
-**Description**: A closed precondition on an explicit implementation binds to
-that implementation, but every source invocation targets the interface symbol.
-No contract projection or placement diagnostic joins them.
-
-**Reproduction**: Positive on the explicit implementation parameter was valid
-and bound one clause there; interface/call-target binding had zero clauses and a
-literal bad call emitted nothing. Moving Positive to the interface emitted
-SP0027.
-
-**Impact**: Implementation analysis can assume a condition that no source caller
-can be checked against.
-
-**Recommended fix**: Reject implementation-only strengthening unless all
-implemented interface members declare an equivalent contract, and import
-interface preconditions into implementation analysis. Test multiple-interface
-agreement/conflict.
-
 ### 575. [CONFIRMED] Advisory performance validation accepts an effective off profile
 
 **Location**: SharpProof.Gates/Performance/PerformanceGate.cs around lines 101,
