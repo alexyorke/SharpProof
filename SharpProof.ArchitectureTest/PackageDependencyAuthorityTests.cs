@@ -20,6 +20,13 @@ public sealed class PackageDependencyAuthorityTests
     [TestCase("wrong-framework", false)]
     [TestCase("duplicate", false)]
     [TestCase("symbol-mismatch", false)]
+    [TestCase("id-duplicate", false)]
+    [TestCase("version-duplicate", false)]
+    [TestCase("id-missing", false)]
+    [TestCase("version-missing", false)]
+    [TestCase("id-attributed", false)]
+    [TestCase("version-nested", false)]
+    [TestCase("id-whitespace", false)]
     public async Task PackageDependencyGraphIsDerivedFromExactNuspecs(
         string mutation,
         bool expectedSuccess)
@@ -319,7 +326,14 @@ public sealed class PackageDependencyAuthorityTests
                 if (extension == ".snupkg" &&
                     mutation is not "symbol-mismatch" and
                         not "license-symbol-mismatch" and
-                        not "metadata-symbol-mismatch")
+                        not "metadata-symbol-mismatch" and
+                        not "id-duplicate" and
+                        not "version-duplicate" and
+                        not "id-missing" and
+                        not "version-missing" and
+                        not "id-attributed" and
+                        not "version-nested" and
+                        not "id-whitespace")
                 {
                     effectiveMutation = "canonical";
                 }
@@ -344,6 +358,7 @@ public sealed class PackageDependencyAuthorityTests
                 var dependencies = DependencyXml(id, effectiveMutation);
                 var license = LicenseXml(id, effectiveMutation);
                 var publicMetadata = PublicMetadataXml(id, effectiveMutation);
+                var identity = IdentityXml(id, effectiveMutation);
                 if (extension == ".snupkg" &&
                     effectiveMutation == "canonical")
                 {
@@ -362,8 +377,7 @@ public sealed class PackageDependencyAuthorityTests
                     <?xml version="1.0" encoding="utf-8"?>
                     <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
                       <metadata>
-                        <id>{{id}}</id>
-                        <version>{{Version}}</version>
+                        {{identity}}
                         {{license}}
                         {{publicMetadata}}
                         {{dependencies}}
@@ -393,6 +407,34 @@ public sealed class PackageDependencyAuthorityTests
             "license-spelling" => "<license type=\"expression\">MITT</license>",
             _ => "<license type=\"expression\">MIT</license>"
         };
+    }
+
+    private static string IdentityXml(string id, string mutation)
+    {
+        var idNode = mutation switch
+        {
+            "id-missing" => string.Empty,
+            "id-attributed" => $"<id xml:lang=\"en\">{id}</id>",
+            "id-whitespace" => $"<id> {id} </id>",
+            _ => $"<id>{id}</id>"
+        };
+        if (mutation == "id-duplicate")
+        {
+            idNode += $"<id>{id}</id>";
+        }
+
+        var versionNode = mutation switch
+        {
+            "version-missing" => string.Empty,
+            "version-nested" => $"<version><value>{Version}</value></version>",
+            _ => $"<version>{Version}</version>"
+        };
+        if (mutation == "version-duplicate")
+        {
+            versionNode += $"<version>{Version}</version>";
+        }
+
+        return idNode + Environment.NewLine + "                        " + versionNode;
     }
 
     private static string PublicMetadataXml(string id, string mutation)

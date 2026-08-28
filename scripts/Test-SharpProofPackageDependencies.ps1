@@ -208,14 +208,25 @@ function Get-SharpProofNuspecDependencyModel {
     if ($null -eq $metadata) {
         throw "Package '$PackagePath' has no nuspec metadata."
     }
-    $idNode = $metadata.SelectSingleNode('n:id', $manager)
-    $versionNode = $metadata.SelectSingleNode('n:version', $manager)
+    $idNodes = @($metadata.SelectNodes('n:id', $manager))
+    $versionNodes = @($metadata.SelectNodes('n:version', $manager))
     $licenseNodes = @($metadata.SelectNodes('n:license', $manager))
-    if ($null -eq $idNode -or
-        $null -eq $versionNode -or
+    if ($idNodes.Count -ne 1 -or
+        $versionNodes.Count -ne 1 -or
         $licenseNodes.Count -gt 1) {
         throw "Package '$PackagePath' has incomplete nuspec metadata."
     }
+    foreach ($node in @($idNodes[0], $versionNodes[0])) {
+        if ($node.Attributes.Count -ne 0 -or
+            $node.ChildNodes.Count -ne 1 -or
+            $node.ChildNodes[0].NodeType -ne [Xml.XmlNodeType]::Text -or
+            [string]::IsNullOrWhiteSpace($node.InnerText) -or
+            [string]$node.InnerText -cne [string]$node.InnerText.Trim()) {
+            throw "Package '$PackagePath' has invalid nuspec identity metadata."
+        }
+    }
+    $idNode = $idNodes[0]
+    $versionNode = $versionNodes[0]
     $licenseExpression = $null
     if ($licenseNodes.Count -eq 1) {
         $license = $licenseNodes[0]

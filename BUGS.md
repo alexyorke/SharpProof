@@ -294,26 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 621. [CONFIRMED] Exact nuspec validation accepts duplicate identity nodes
-
-**Location**: `scripts/Test-SharpProofPackageDependencies.ps1`, around lines
-203-217.
-
-**Description**: The parser uses `SelectSingleNode` for package id/version and
-checks only null, silently selecting the first of contradictory duplicates even
-though adjacent metadata uses exact node counts.
-
-**Reproduction**: Adding a second `<id>Fabricated.Package</id>` or
-`<version>9.9.9</version>` left `GRAPH_ACCEPTED=true`. Requiring exactly one node
-preserved canonical input and rejected both mutations.
-
-**Impact**: Malformed packages can satisfy release graph, final validation, and
-publication preflight under only their first identity.
-
-**Recommended fix**: Require one metadata/id/version node with canonical text
-shape. Add duplicate-order, missing, attributed, nested, whitespace, and symbol
-package fixtures.
-
 ### 622. [CONFIRMED] Provably in-bounds array writes suppress later SP0027
 
 **Location**: `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
