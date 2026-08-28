@@ -1056,6 +1056,64 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task CanceledChecksQueuedBehindAnActiveQueryDoNotOccupyWorkers()
+    {
+        var factory = new IrFactory();
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend();
+        using var cancellation = new CancellationTokenSource();
+        var gate = typeof(IrSmtBackend).GetField(
+                "_gate",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic)?
+            .GetValue(backend);
+        var activeChecks = typeof(IrSmtBackend).GetField(
+                "_activeCheckCount",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic);
+        Assert.That(gate, Is.Not.Null);
+        Assert.That(activeChecks, Is.Not.Null);
+
+        Task<BackendCheckResult> active;
+        Task<BackendCheckResult>[] queued;
+        lock (gate!)
+        {
+            active = backend.CheckAsync(query, CancellationToken.None);
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => (int)activeChecks!.GetValue(backend)! == 1,
+                    TimeSpan.FromSeconds(5)),
+                Is.True);
+            queued = Enumerable.Range(0, 32)
+                .Select(_ => backend.CheckAsync(query, cancellation.Token))
+                .ToArray();
+            cancellation.Cancel();
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => queued.All(static task => task.IsCanceled),
+                    TimeSpan.FromSeconds(1)),
+                Is.True);
+            Assert.That(
+                (int)activeChecks!.GetValue(backend)!,
+                Is.EqualTo(1));
+        }
+
+        await active;
+        foreach (var task in queued)
+        {
+            Func<Task> canceled = async () => await task;
+            Assert.ThrowsAsync<OperationCanceledException>(canceled);
+        }
+    }
+
+    [Test]
     public async Task UnsupportedModelVariablesAreRejectedBeforeEncoding()
     {
         var factory = new IrFactory();
