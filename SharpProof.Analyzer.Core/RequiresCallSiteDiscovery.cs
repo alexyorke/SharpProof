@@ -640,27 +640,290 @@ internal sealed partial class RequiresCallSiteDiscovery(
             return false;
         }
 
-        var statement = callSite.Syntax.AncestorsAndSelf()
+        return HasReplayableStatementPath(
+            callSite.Syntax,
+            block,
+            operationFacts,
+            callSite);
+    }
+
+    private bool HasReplayableStatementPath(
+        SyntaxNode callSite,
+        BlockSyntax block,
+        DefiniteOperationFacts operationFacts,
+        IOperation? callOperation)
+    {
+        var statement = callSite.AncestorsAndSelf()
             .OfType<StatementSyntax>()
             .FirstOrDefault(candidate => ReferenceEquals(
                 candidate.Parent,
                 block));
         return statement != null &&
-               IsDirectReplayableStatement(
-                   statement,
-                   callSite,
-                   operationFacts) &&
-               block.Statements
-                   .TakeWhile(candidate => !ReferenceEquals(
-                       candidate,
-                       statement))
-                   .All(prior =>
-                       prior is EmptyStatementSyntax or
-                           LocalFunctionStatementSyntax ||
-                       operationFacts.CompletesNormally(
-                               semanticModel.GetOperation(
-                                   prior,
-                                   cancellationToken)));
+            block.Statements
+                .TakeWhile(candidate => !ReferenceEquals(candidate, statement))
+                .All(prior =>
+                    prior is EmptyStatementSyntax or
+                        LocalFunctionStatementSyntax ||
+                    operationFacts.CompletesNormally(
+                        semanticModel.GetOperation(
+                            prior,
+                            cancellationToken))) &&
+            HasReplayableStatement(
+                statement,
+                callSite,
+                operationFacts,
+                callOperation);
+    }
+
+    private bool HasReplayableStatement(
+        StatementSyntax statement,
+        SyntaxNode callSite,
+        DefiniteOperationFacts operationFacts,
+        IOperation? callOperation)
+    {
+        if (!statement.Span.Contains(callSite.Span))
+        {
+            return false;
+        }
+
+        if (IsDirectReplayableStatement(
+                statement,
+                callSite,
+                callOperation,
+                operationFacts))
+        {
+            return true;
+        }
+
+        switch (statement)
+        {
+            case BlockSyntax block:
+                return HasReplayableStatementPath(
+                    callSite,
+                    block,
+                    operationFacts,
+                    callOperation);
+            case IfStatementSyntax conditional:
+                if (conditional.Condition.Span.Contains(callSite.Span))
+                {
+                    return HasReplayableExpression(
+                        conditional.Condition,
+                        callSite,
+                        operationFacts);
+                }
+
+                if (!CompletesSyntaxNormally(
+                        conditional.Condition,
+                        operationFacts))
+                {
+                    return false;
+                }
+
+                return conditional.Statement.Span.Contains(callSite.Span)
+                    ? HasReplayableNestedBody(
+                        conditional.Statement,
+                        callSite,
+                        operationFacts,
+                        callOperation)
+                    : conditional.Else?.Statement is { } alternate &&
+                        alternate.Span.Contains(callSite.Span) &&
+                        HasReplayableNestedBody(
+                            alternate,
+                            callSite,
+                            operationFacts,
+                            callOperation);
+            case TryStatementSyntax @try:
+                if (@try.Block.Span.Contains(callSite.Span))
+                {
+                    return HasReplayableNestedBody(
+                        @try.Block,
+                        callSite,
+                        operationFacts,
+                        callOperation);
+                }
+
+                foreach (var clause in @try.Catches)
+                {
+                    if (!clause.Span.Contains(callSite.Span))
+                    {
+                        continue;
+                    }
+
+                    return (clause.Filter == null ||
+                            CompletesSyntaxNormally(
+                                clause.Filter,
+                                operationFacts)) &&
+                        HasReplayableNestedBody(
+                            clause.Block,
+                            callSite,
+                            operationFacts,
+                            callOperation);
+                }
+
+                return @try.Finally?.Span.Contains(callSite.Span) == true &&
+                    HasReplayableNestedBody(
+                        @try.Finally.Block,
+                        callSite,
+                        operationFacts,
+                        callOperation);
+            case SwitchStatementSyntax @switch:
+                if (!CompletesSyntaxNormally(@switch.Expression, operationFacts))
+                {
+                    return false;
+                }
+
+                foreach (var section in @switch.Sections)
+                {
+                    if (!section.Span.Contains(callSite.Span))
+                    {
+                        continue;
+                    }
+
+                    return HasReplayableStatementList(
+                        section.Statements,
+                        callSite,
+                        operationFacts,
+                        callOperation);
+                }
+
+                return false;
+            case WhileStatementSyntax @while:
+                return CompletesSyntaxNormally(@while.Condition, operationFacts) &&
+                    HasReplayableNestedBody(
+                        @while.Statement,
+                        callSite,
+                        operationFacts,
+                        callOperation);
+            case DoStatementSyntax @do:
+                return HasReplayableNestedBody(
+                        @do.Statement,
+                        callSite,
+                        operationFacts,
+                        callOperation) &&
+                    CompletesSyntaxNormally(@do.Condition, operationFacts);
+            case ForStatementSyntax @for:
+                return @for.Initializers.All(initializer =>
+                        CompletesSyntaxNormally(initializer, operationFacts)) &&
+                    (@for.Condition == null ||
+                     CompletesSyntaxNormally(@for.Condition, operationFacts)) &&
+                    HasReplayableNestedBody(
+                        @for.Statement,
+                        callSite,
+                        operationFacts,
+                        callOperation);
+            case ForEachStatementSyntax @foreach:
+                return CompletesSyntaxNormally(@foreach.Expression, operationFacts) &&
+                    HasReplayableNestedBody(
+                        @foreach.Statement,
+                        callSite,
+                        operationFacts,
+                        callOperation);
+            case UsingStatementSyntax @using:
+                return (@using.Expression == null ||
+                        CompletesSyntaxNormally(@using.Expression, operationFacts)) &&
+                    HasReplayableNestedBody(
+                        @using.Statement,
+                        callSite,
+                        operationFacts,
+                        callOperation);
+            case LockStatementSyntax @lock:
+                return CompletesSyntaxNormally(@lock.Expression, operationFacts) &&
+                    HasReplayableNestedBody(
+                        @lock.Statement,
+                        callSite,
+                        operationFacts,
+                        callOperation);
+            case CheckedStatementSyntax @checked:
+                return HasReplayableNestedBody(
+                    @checked.Block,
+                    callSite,
+                    operationFacts,
+                    callOperation);
+            case UnsafeStatementSyntax @unsafe:
+                return HasReplayableNestedBody(
+                    @unsafe.Block,
+                    callSite,
+                    operationFacts,
+                    callOperation);
+            default:
+                return false;
+        }
+    }
+
+    private bool HasReplayableStatementList(
+        SyntaxList<StatementSyntax> statements,
+        SyntaxNode callSite,
+        DefiniteOperationFacts operationFacts,
+        IOperation? callOperation)
+    {
+        var statement = statements.FirstOrDefault(
+            candidate => candidate.Span.Contains(callSite.Span));
+        return statement != null &&
+            statements
+                .TakeWhile(candidate => !ReferenceEquals(candidate, statement))
+                .All(prior =>
+                    prior is EmptyStatementSyntax or
+                        LocalFunctionStatementSyntax ||
+                    operationFacts.CompletesNormally(
+                        semanticModel.GetOperation(
+                            prior,
+                            cancellationToken))) &&
+            HasReplayableStatement(
+                statement,
+                callSite,
+                operationFacts,
+                callOperation);
+    }
+
+    private bool HasReplayableNestedBody(
+        StatementSyntax body,
+        SyntaxNode callSite,
+        DefiniteOperationFacts operationFacts,
+        IOperation? callOperation)
+    {
+        return body is BlockSyntax block
+            ? HasReplayableStatementPath(
+                callSite,
+                block,
+                operationFacts,
+                callOperation)
+            : HasReplayableStatement(
+                body,
+                callSite,
+                operationFacts,
+                callOperation);
+    }
+
+    private bool HasReplayableExpression(
+        ExpressionSyntax expression,
+        SyntaxNode callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        if (expression.Span == callSite.Span)
+        {
+            return true;
+        }
+
+        var operation = semanticModel.GetOperation(
+            expression,
+            cancellationToken);
+        return operation != null &&
+            operationFacts.CompletesNormally(operation) &&
+            expression.DescendantNodesAndSelf()
+                .OfType<ExpressionSyntax>()
+                .Where(candidate => candidate.Span.Contains(callSite.Span))
+                .OrderByDescending(candidate => candidate.Span.Length)
+                .Skip(1)
+                .FirstOrDefault() is { } nested &&
+            HasReplayableExpression(nested, callSite, operationFacts);
+    }
+
+    private bool CompletesSyntaxNormally(
+        SyntaxNode syntax,
+        DefiniteOperationFacts operationFacts)
+    {
+        return operationFacts.CompletesNormally(
+            semanticModel.GetOperation(syntax, cancellationToken));
     }
 
     private bool IsInterpolatedHandlerProtocolCall(
@@ -924,7 +1187,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private bool IsDirectReplayableStatement(
         StatementSyntax statement,
-        IOperation callSite,
+        SyntaxNode callSite,
+        IOperation? callOperation,
         DefiniteOperationFacts operationFacts)
     {
         return statement switch
@@ -936,7 +1200,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 SyntaxKind.SimpleAssignmentExpression) =>
                 IsOwnedCallSiteExpression(
                     assignment.Right,
-                    callSite.Syntax) &&
+                    callSite) &&
                 operationFacts.CompletesNormally(
                     semanticModel.GetOperation(
                         assignment.Left,
@@ -944,37 +1208,37 @@ internal sealed partial class RequiresCallSiteDiscovery(
             ExpressionStatementSyntax expression =>
                 IsOwnedCallSiteExpression(
                     expression.Expression,
-                    callSite.Syntax) ||
+                    callSite) ||
                 IsCollectionInitializerCall(
                     expression.Expression,
-                    callSite,
+                    callOperation,
                     operationFacts),
             LocalDeclarationStatementSyntax local =>
                 local.Declaration.Variables.Count == 1 &&
-                IsOwnedCallSiteExpression(
-                    local.Declaration.Variables[0]
-                        .Initializer?.Value,
-                    callSite.Syntax) ||
+                    IsOwnedCallSiteExpression(
+                        local.Declaration.Variables[0]
+                            .Initializer?.Value,
+                        callSite) ||
                 local.Declaration.Variables.Count == 1 &&
                 IsCollectionInitializerCall(
                     local.Declaration.Variables[0].Initializer?.Value,
-                    callSite,
+                    callOperation,
                     operationFacts),
             ReturnStatementSyntax returned =>
                 IsOwnedCallSiteExpression(
                     returned.Expression,
-                    callSite.Syntax),
+                    callSite),
             ThrowStatementSyntax thrown =>
                 IsOwnedCallSiteExpression(
                     thrown.Expression,
-                    callSite.Syntax),
+                    callSite),
             _ => false
         };
     }
 
     private bool IsCollectionInitializerCall(
         ExpressionSyntax? statementExpression,
-        IOperation callSite,
+        IOperation? callSite,
         DefiniteOperationFacts operationFacts)
     {
         if (statementExpression == null ||

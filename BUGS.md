@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 530. [CONFIRMED] Explicit Requires calls in nested blocks are marked unreplayable
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
-194-206, 425-471, and 538-575; Unknown mapping in
-RequiresCallSiteAnalyzer.cs around lines 339-342.
-
-**Description**: Ordinary call candidates require HasReplayablePrefix. That
-logic climbs to the statement directly under the callable's outer body and
-accepts only a small set of top-level expression/return/local shapes with exact
-span ownership. A reachable call inside an if or nested block therefore has
-complete flow state but is rejected because its outer ancestor is
-IfStatementSyntax or BlockSyntax.
-
-**Reproduction**: Positive(-1) has a positive Requires clause. Probe output:
-
-    Direct:       can-replay=True  flow=Complete
-    IfTrue:       can-replay=False flow=Complete
-    IfParameter:  can-replay=False flow=Complete
-    NestedBlock:  can-replay=False flow=Complete
-
-Only the direct top-level call emitted SP0027. Runtime executed direct, if-true,
-if-parameter-true, and nested-block once each; false branches were correctly
-unreached. Compiler errors were zero.
-
-**Impact**: Explicit ordinary precondition violations disappear merely because
-they are nested in reachable control flow, with no SP0047 fallback.
-
-**Root cause**: Prefix replayability is defined by one outer syntax-span shape
-instead of evaluation order along the reachable CFG path.
-
-**Recommended fix**: Walk evaluation-order ancestors from the call, validating
-preceding operands/siblings/statements at each enclosing block/control construct
-with DefiniteOperationFacts. Retain reachable CFG and complete-flow requirements;
-do not admit calls after throwing conditions, arguments, receivers, or earlier
-statements.
-
-**Regression coverage**: Invalid calls inside if(true), if(parameter), and an
-unconditional nested block must report. Cover valid arguments, if(false),
-throwing condition, non-completing prior statement, and representative else/
-switch/try nesting.
-
-**Confidence**: High; candidate-flow, analyzer, and runtime probes isolate the
-outer-syntax replayability gate.
-
 ### 531. [CONFIRMED] Worker creation and request verification use different QueryRlimit authorities
 
 **Location**: SharpProof.Worker/SharpProofWorker.cs around lines 28-38;

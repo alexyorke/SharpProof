@@ -301,6 +301,45 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task NestedControlCallsReplayPreconditions()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void IfTrue() {
+                    if (true) {
+                        Positive(-1);
+                    }
+                }
+
+                public static void IfParameter(bool condition) {
+                    if (condition) {
+                        Positive(-2);
+                    }
+                }
+
+                public static void NestedBlock() {
+                    {
+                        Positive(-3);
+                    }
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", 3)));
+    }
+
+    [Test]
     public async Task NontransparentWrappersRemainFailClosedForDirectReplay()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
