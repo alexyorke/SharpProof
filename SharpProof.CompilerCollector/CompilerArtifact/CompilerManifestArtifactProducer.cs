@@ -25,7 +25,9 @@ internal static class CompilerManifestArtifactProducer
         var locationValidation =
             new CompilerSourceLocationAuthority.ValidationContext();
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
-            .Where(static item => item.Severity == DiagnosticSeverity.Error)
+            .Where(static item =>
+                item.Severity == DiagnosticSeverity.Error &&
+                !item.IsSuppressed)
             .Select(item => CreateDiagnostic(
                 item,
                 sourceTrees,

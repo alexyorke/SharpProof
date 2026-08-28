@@ -3076,29 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 675. [CONFIRMED] Reported suppressed compiler errors poison every callable
-
-**Location**: `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs`,
-around lines 26-48; `CompilerWireMappings.generated.cs`, around line 314.
-
-**Description**: Compiler artifact production filters diagnostics only by
-`Severity == Error`. With `ReportSuppressedDiagnostics=true`, a pragma-suppressed
-warning promoted to Error is retained despite `IsSuppressed=true`, then assigned
-to every callable as UnsupportedCallable.
-
-**Reproduction**: Suppressed CS0168 promoted to Error yielded zero normal Roslyn
-errors, but reporting mode returned one suppressed Error, one artifact error, and
-UnsupportedCallable for the target. The otherwise identical baseline artifact
-had no errors/failure.
-
-**Impact**: Requesting suppressed diagnostics for reporting can downgrade all
-claims to Unknown and fail strict verification without changing compilation
-semantics.
-
-**Recommended fix**: Retain only Error diagnostics with `!IsSuppressed`. Compare
-reporting false/true artifacts and fingerprints, and keep an unsuppressed promoted
-error as the poisoning control.
-
 ### 676. [CONFIRMED] Delegate signature contracts are selected but silently ignored
 
 **Location**: `SharpProof.Attributes/ClosedContractAttributes.cs`, around lines

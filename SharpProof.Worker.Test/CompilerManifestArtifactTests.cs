@@ -125,6 +125,55 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void SuppressedCompilerErrorsDoNotPoisonCallableArtifacts()
+    {
+        var source =
+            "using SharpProof.Attributes;\n" +
+            "public static class Subject {\n" +
+            "    public static int Identity(int value) {\n" +
+            "        #pragma warning disable CS0168\n" +
+            "        int unused;\n" +
+            "        #pragma warning restore CS0168\n" +
+            "        Contract.Ensures(Contract.Result<int>() == value);\n" +
+            "        return value;\n" +
+            "    }\n" +
+            "}\n";
+        var compilation = CreateCompilation(
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            source,
+            includeContractReference: true);
+        var options = compilation.Options
+            .WithReportSuppressedDiagnostics(true)
+            .WithSpecificDiagnosticOptions(
+                compilation.Options.SpecificDiagnosticOptions
+                    .SetItem("CS0168", ReportDiagnostic.Error));
+        compilation = compilation.WithOptions(options);
+        var suppressedError = compilation.GetDiagnostics()
+            .Single(diagnostic => diagnostic.Id == "CS0168");
+        Assert.That(suppressedError.IsSuppressed, Is.True);
+        Assert.That(suppressedError.Severity, Is.EqualTo(DiagnosticSeverity.Error));
+
+        var artifact = CompilerManifestArtifactProducer.Create(
+            compilation,
+            TestContext.CurrentContext.WorkDirectory,
+            "net8.0",
+            WorkerFeatureSet.All,
+            new ClaimManifestBuilder(
+                compilation,
+                WorkerFeatureSet.All,
+                CancellationToken.None).Build(),
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
+
+        Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+        Assert.That(
+            artifact.Callables,
+            Is.All.Matches<CompilerCallableArtifact>(callable =>
+                callable.FailureReason !=
+                CompilerCallableProducerReasonCatalog.DiagnosticFailureReason));
+    }
+
+    [Test]
     public void CompilerFeatureSetCannotBeExpandedPastDiscoveredScope()
     {
         var artifact = CreateFeatureArtifact(
