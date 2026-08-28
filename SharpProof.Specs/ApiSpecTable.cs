@@ -2,6 +2,10 @@ namespace SharpProof.Specs;
 
 public sealed partial class ApiSpecTable
 {
+    // Keep public, programmatic specifications from exhausting the host stack
+    // before the normal type and totality validation can report an error.
+    private const int MaximumTermDepth = 256;
+    private const int MaximumTermNodes = 65536;
     private const SpecEffect DefinedEffects =
         SpecEffect.Unknown |
         SpecEffect.ReadsReceiverState |
@@ -128,6 +132,7 @@ public sealed partial class ApiSpecTable
             }
 
             ValidateEvidence(postcondition.Evidence, nameof(declaration));
+            ValidateTermStructure(postcondition.Condition, nameof(declaration));
             var condition = ApiSpecTermValidator.Validate(
                 postcondition.Condition,
                 bySlot,
@@ -150,6 +155,56 @@ public sealed partial class ApiSpecTable
             id, declaration.Target, facets,
             variableArray, receiver, parameters.MoveToImmutable(), result,
             postconditions);
+    }
+
+    private static void ValidateTermStructure(
+        SpecTermDeclaration root,
+        string parameterName)
+    {
+        var pending = new Stack<(SpecTermDeclaration Term, int Depth)>();
+        pending.Push((root, 1));
+        var nodes = 0;
+        while (pending.Count > 0)
+        {
+            var (term, depth) = pending.Pop();
+            if (term == null)
+            {
+                throw new ArgumentException(
+                    "Spec expressions cannot contain null.",
+                    parameterName);
+            }
+            if (depth > MaximumTermDepth)
+            {
+                throw new ArgumentException(
+                    $"Spec expressions exceed the maximum depth of {MaximumTermDepth}.",
+                    parameterName);
+            }
+            if (++nodes > MaximumTermNodes)
+            {
+                throw new ArgumentException(
+                    $"Spec expressions exceed the maximum node count of {MaximumTermNodes}.",
+                    parameterName);
+            }
+
+            switch (term)
+            {
+                case SpecUnaryDeclaration unary:
+                    pending.Push((unary.Operand, depth + 1));
+                    break;
+                case SpecBinaryDeclaration binary:
+                    pending.Push((binary.Right, depth + 1));
+                    pending.Push((binary.Left, depth + 1));
+                    break;
+                case SpecConditionalDeclaration conditional:
+                    pending.Push((conditional.WhenFalse, depth + 1));
+                    pending.Push((conditional.WhenTrue, depth + 1));
+                    pending.Push((conditional.Condition, depth + 1));
+                    break;
+                case SpecLengthDeclaration length:
+                    pending.Push((length.Value, depth + 1));
+                    break;
+            }
+        }
     }
 
     private static SpecVarId AddVariable(

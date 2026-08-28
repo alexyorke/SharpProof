@@ -294,26 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 608. [CONFIRMED] Deep well-formed API-spec terms can terminate the process
-
-**Location**: `SharpProof.Specs/ApiSpecTermValidator.cs`, around lines 9-12,
-68-75, 96-102, 127-133, and 172-179; recursive siblings in
-`ApiSpecContentDigest.cs` and `ApiSpecInstantiation.cs`.
-
-**Description**: Public `ApiSpecTable.Create` and its validators/digesters use
-unbounded recursive term walks with no depth or node budget.
-
-**Reproduction**: A well-formed nested Boolean Not term at depth 1,000 created
-and digested successfully; depth 2,000 terminated the child process with
-`Stack overflow` after 1,106 repeated validator frames.
-
-**Impact**: Bespoke programmatic specs can kill a normal host instead of
-returning an attributable validation error.
-
-**Recommended fix**: Add iterative structure/depth/node prevalidation and make
-validator, digest, and instantiation iterative or consistently bounded. Use a
-child-process boundary/over-limit regression.
-
 ### 610. [CONFIRMED] Default self-application excludes Meta.Analyzers from itself
 
 **Location**: `SharpProof.SelfApply.targets`, around lines 9-10, 31-32, and

@@ -135,6 +135,41 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void DeepSpecTermsFailClosedBeforeExhaustingTheHostStack()
+    {
+        SpecTermDeclaration condition = new SpecVariableDeclaration(
+            SpecVariableRole.Parameter,
+            0,
+            IrTypeKind.Boolean);
+        for (var depth = 0; depth < 2000; depth++)
+        {
+            condition = new SpecUnaryDeclaration(
+                IrUnaryOperator.Not,
+                condition,
+                IrTypeKind.Boolean);
+        }
+
+        var declaration = Declaration(
+            "deep-term",
+            "M:Missing.Deep.Run(System.Boolean)",
+            "Missing.Deep",
+            parameterTypes: [IrTypeKind.Boolean]) with
+        {
+            Postconditions = [
+                new SpecPostconditionDeclaration(
+                    condition,
+                    new SpecEvidence(
+                        SpecEvidenceKind.Observed,
+                        "deep-term-test"))]
+        };
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            ApiSpecTable.Create([declaration]));
+
+        Assert.That(exception!.Message, Does.Contain("maximum depth"));
+    }
+
+    [Test]
     public void ApprovedReferenceFamiliesMustBeDefined()
     {
         var declaration = Declaration("row", "M:Missing.Row.Run", "Missing.Row");
