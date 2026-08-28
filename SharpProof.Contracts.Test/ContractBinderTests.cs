@@ -93,6 +93,39 @@ public sealed class ContractBinderTests
                 : ContractBindingFailure.CompanionSignatureMismatch));
     }
 
+    [TestCase("-0.0m", "0.0m", false)]
+    [TestCase("0.0m", "0.00m", false)]
+    [TestCase("0.00m", "0.00m", true)]
+    public void DecimalDefaultBitsControlCompanionResolution(
+        string targetDefault,
+        string companionDefault,
+        bool expectedSuccess)
+    {
+        using var subject = ContractSubject.Create(
+            $$"""
+            using SharpProof.Attributes;
+            public interface Target {
+                void Read(decimal value = {{targetDefault}});
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static void Read(
+                    Target receiver,
+                    decimal value = {{companionDefault}}) {
+                }
+            }
+            """);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.EqualTo(expectedSuccess));
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(expectedSuccess
+                ? ContractBindingFailure.None
+                : ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
     [Test]
     public void FunctionPointerConventionOrderBindsExactCompanion()
     {

@@ -449,10 +449,22 @@ internal static class ContractForSymbolMatcher
             (double leftValue, double rightValue) =>
                 BitConverter.DoubleToInt64Bits(leftValue) ==
                 BitConverter.DoubleToInt64Bits(rightValue),
+            (decimal leftValue, decimal rightValue) =>
+                DecimalBitsMatch(leftValue, rightValue),
             _ => Equals(
                 left.ExplicitDefaultValue,
                 right.ExplicitDefaultValue)
         };
+    }
+
+    private static bool DecimalBitsMatch(decimal left, decimal right)
+    {
+        var leftBits = decimal.GetBits(left);
+        var rightBits = decimal.GetBits(right);
+        return leftBits[0] == rightBits[0] &&
+            leftBits[1] == rightBits[1] &&
+            leftBits[2] == rightBits[2] &&
+            leftBits[3] == rightBits[3];
     }
 
     private static int SingleBits(float value)

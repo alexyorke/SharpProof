@@ -1419,46 +1419,6 @@ pin protocol ordering if later edges are modeled.
 **Confidence**: High; executable analyzer/runtime probes isolated the missing
 compiler-hidden call and matched the repository's existing Effects inventory.
 
-### 507. [CONFIRMED] Decimal optional defaults are not matched by representation
-
-**Location**: SharpProof.Contracts/ContractForSymbolMatcher.cs,
-ExplicitDefaultValuesMatch around lines 420-439.
-
-**Description**: Companion signature matching compares float and double default
-values by their bit representation, but decimal values fall through to
-`object.Equals`. Decimal equality ignores scale and signed-zero representation,
-so metadata-distinct optional defaults are accepted as the same signature.
-
-**Reproduction**: A target parameter defaulted to `-0.0m` and its companion to
-`0.00m`. Canonical Roslyn plus the actual matcher/binder reported:
-
-    target-bits=0,0,0,-2147418112
-    companion-bits=0,0,0,131072
-    member-signatures-match=True
-    binding-success=True
-    binding-failure=None
-    uses-companion=True
-
-The existing double-default regression establishes that optional defaults are
-intended to match by representation, not merely numeric equality.
-
-**Impact**: Validation and binding attach companion contracts despite a
-metadata-observably different optional default. Callers omitting the argument
-can therefore be analyzed against a companion signature that is not exact.
-
-**Root cause**: Decimal has multiple bit representations for equal numeric
-values, but the fallback comparer applies its value-equality semantics.
-
-**Recommended fix**: Add a decimal branch comparing all four words returned by
-`decimal.GetBits`; do not use decimal.Equals for signature identity.
-
-**Regression coverage**: Require `-0.0m` vs `0.0m` and `0.0m` vs `0.00m` to
-produce CompanionSignatureMismatch, while identical decimal bits bind. Retain
-float/double bit controls.
-
-**Confidence**: High; the actual binder accepted two defaults whose four-word
-representations differ.
-
 ### 508. [CONFIRMED] Open-generic companions reject identical caller-owned type parameters after specialization
 
 **Location**: SharpProof.Contracts/ContractForSymbolMatcher.cs, definition match
