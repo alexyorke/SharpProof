@@ -1045,17 +1045,32 @@ public sealed class SharpProofSoundnessAnalyzerTests
             using System;
             namespace Microsoft.Build.Framework
             {
-                interface ICancelableTask { void Cancel(); }
+                interface ITask { bool Execute(); }
+                interface ICancelableTask : ITask { void Cancel(); }
             }
             namespace SharpProof.BuildTasks
             {
                 sealed class TaskBoundary : Microsoft.Build.Framework.ICancelableTask
                 {
-                    public void Cancel() { }
-                    public void Execute()
+                    public void Cancel()
                     {
                         try { throw new OperationCanceledException(); }
-                        catch (OperationCanceledException) { return; }
+                        catch (OperationCanceledException) { }
+                    }
+                    public bool Execute()
+                    {
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) { return false; }
+                    }
+                    private static void StaticHelper()
+                    {
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) { }
+                    }
+                    private void InstanceHelper()
+                    {
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) { }
                     }
                 }
 
@@ -1073,7 +1088,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
         var diagnostics = await Analyze(source);
         Assert.That(
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
-            Is.EqualTo(1));
+            Is.EqualTo(4));
     }
 
     [Test]

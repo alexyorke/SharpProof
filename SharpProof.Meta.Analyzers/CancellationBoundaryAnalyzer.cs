@@ -390,10 +390,9 @@ internal static class CancellationBoundaryAnalyzer
         // catches are not semantic proof answers, so they are audited at the
         // build-protocol boundary rather than reported as swallowed
         // cancellation.
-        if (method.ContainingType?.AllInterfaces.Any(interfaceType =>
-                IsSameType(
-                    interfaceType,
-                    symbols[SharpProofSoundnessAnalyzer.KnownType.MsBuildCancelableTask])) == true)
+        if (IsMsBuildExecuteImplementation(
+                method,
+                symbols[SharpProofSoundnessAnalyzer.KnownType.MsBuildTask]))
         {
             return true;
         }
@@ -460,6 +459,44 @@ internal static class CancellationBoundaryAnalyzer
                    method,
                    symbols) ||
                ReifiesCallerCancellation(clause, context, method, symbols);
+    }
+
+    private static bool IsMsBuildExecuteImplementation(
+        IMethodSymbol method,
+        INamedTypeSymbol? taskType)
+    {
+        if (method.IsStatic || method.Parameters.Length != 0 ||
+            method.ReturnType.SpecialType != SpecialType.System_Boolean ||
+            method.ContainingType == null || taskType == null)
+        {
+            return false;
+        }
+
+        foreach (var interfaceType in method.ContainingType.AllInterfaces)
+        {
+            if (!IsSameType(interfaceType, taskType))
+            {
+                continue;
+            }
+
+            foreach (var member in interfaceType.GetMembers("Execute")
+                         .OfType<IMethodSymbol>()
+                         .Where(static candidate =>
+                             !candidate.IsStatic &&
+                             candidate.Parameters.Length == 0 &&
+                             candidate.ReturnType.SpecialType ==
+                                 SpecialType.System_Boolean))
+            {
+                if (SymbolEqualityComparer.Default.Equals(
+                        method.ContainingType.FindImplementationForInterfaceMember(member),
+                        method))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static bool ReifiesWorkerProgramCancellation(

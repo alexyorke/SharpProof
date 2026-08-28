@@ -18,7 +18,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.ISymbol",
         "Microsoft.CodeAnalysis.CSharp.SymbolDisplay",
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
-        "System.Threading.CancellationToken", "Microsoft.Build.Framework.ICancelableTask",
+        "System.Threading.CancellationToken", "Microsoft.Build.Framework.ITask",
         "SharpProof.Frontend.Host.CompilationModelProvider",
         "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForValidation.ContractForDiagnosticDescriptors",
         "SharpProof.Meta.Analyzers.MetaDiagnosticDescriptors",
@@ -971,7 +971,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         Compilation, SemanticModel, CSharpCompilation, CSharpSemanticModel,
         CSharpExtensions, SyntaxFactory, Symbol, SymbolDisplay, DiagnosticDescriptor,
-        OperationCanceledException, CancellationToken, MsBuildCancelableTask,
+        OperationCanceledException, CancellationToken, MsBuildTask,
         CompilationModelProvider,
         AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, MetaDiagnosticDescriptors, String,
         Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,
