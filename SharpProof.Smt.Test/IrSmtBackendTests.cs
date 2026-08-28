@@ -502,6 +502,79 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task SymbolicStringsAreConstrainedToWellFormedUtf16()
+    {
+        var factory = new IrFactory();
+        var left = factory.CreateVariable("left", factory.StringType);
+        var right = factory.CreateVariable("right", factory.StringType);
+        var leftTerm = factory.Variable(left);
+        var rightTerm = factory.Variable(right);
+        var one = factory.Integer(1);
+        var emoji = factory.String("\uD83D\uDE00");
+        var nonNullLeft = factory.Binary(
+            IrBinaryOperator.NotEqual,
+            leftTerm,
+            factory.Null(factory.StringType));
+        var nonNullRight = factory.Binary(
+            IrBinaryOperator.NotEqual,
+            rightTerm,
+            factory.Null(factory.StringType));
+        var exactLengths = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            factory.Binary(
+                IrBinaryOperator.Equal,
+                factory.Length(leftTerm),
+                one),
+            factory.Binary(
+                IrBinaryOperator.Equal,
+                factory.Length(rightTerm),
+                one));
+        var goal = factory.Binary(
+            IrBinaryOperator.NotEqual,
+            factory.Binary(
+                IrBinaryOperator.StringConcat,
+                leftTerm,
+                rightTerm),
+            emoji);
+        var query = new VerificationQuery(
+            factory,
+            [
+                new Assumption(
+                    factory,
+                    nonNullLeft,
+                    new LoweredJustification(
+                        factory.CreateOperation("non-null left"))),
+                new Assumption(
+                    factory,
+                    nonNullRight,
+                    new LoweredJustification(
+                        factory.CreateOperation("non-null right"))),
+                new Assumption(
+                    factory,
+                    exactLengths,
+                    new LoweredJustification(
+                        factory.CreateOperation("single-unit strings")))
+            ],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)),
+            [left, right]);
+
+        using var backend = new IrSmtBackend();
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        Assert.That(
+            result.Status,
+            Is.EqualTo(BackendCheckStatus.Unsatisfiable),
+            result.FailureReason.ToString());
+        using var kernelBackend = new IrSmtBackend();
+        var outcome = await new ProofKernel(kernelBackend).VerifyAsync(query);
+        Assert.That(outcome, Is.TypeOf<ProvenOutcome>());
+    }
+
+    [Test]
     public async Task OpaqueTermsFailClosed()
     {
         var factory = new IrFactory();

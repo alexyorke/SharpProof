@@ -3,6 +3,8 @@ namespace SharpProof.Smt;
 public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDisposable
 {
     private const int MaximumEncodingDepth = 256;
+    private const int MaximumMalformedModelRetries = 4;
+    private const int WellFormedUtf16PrefixLength = 1;
     private readonly Context _context = new();
     private readonly object _gate = new();
     private readonly IrSmtBackendOptions _options =
@@ -71,7 +73,8 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                         ArithmeticException)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        return BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure);
+                        return BackendCheckResult.Unknown(
+                            BackendFailureReason.InfrastructureFailure);
                     }
                 }
             }
@@ -125,6 +128,11 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 owner.Own(_context.MkInt(long.MaxValue)))));
         }
 
+        foreach (var variable in encoder.StringVariables)
+        {
+            solver.Assert(encoder.CreateWellFormedUtf16PrefixConstraint(variable));
+        }
+
         var tracked = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var index = 0; index < query.Assumptions.Length; index++)
         {
@@ -139,20 +147,46 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         }
 
         var goal = encoder.EncodeBoolean(query.Goal.Predicate);
+        var goalDefined = owner.Own((BoolExpr)goal.Defined.Simplify());
+        var goalValue = owner.Own((BoolExpr)goal.Value.Simplify());
         solver.Assert(
             owner.Own(_context.MkNot(
-                owner.Own(_context.MkAnd(goal.Defined, goal.Value)))));
+                owner.Own(_context.MkAnd(goalDefined, goalValue)))));
         cancellationToken.ThrowIfCancellationRequested();
-        var status = solver.Check();
-        AccountResources(solver);
-        cancellationToken.ThrowIfCancellationRequested();
-        return status switch
+        var malformedModelRetries = 0;
+        while (true)
         {
-            Status.UNSATISFIABLE => CreateUnsatisfiable(solver, tracked),
-            Status.SATISFIABLE => CreateSatisfiable(query, encoder, solver),
-            _ => BackendCheckResult.Unknown(
-                ClassifyUnknown(solver.ReasonUnknown))
-        };
+            var status = solver.Check();
+            AccountResources(solver);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (status == Status.UNSATISFIABLE)
+            {
+                return CreateUnsatisfiable(solver, tracked);
+            }
+
+            if (status != Status.SATISFIABLE)
+            {
+                return BackendCheckResult.Unknown(
+                    ClassifyUnknown(solver.ReasonUnknown));
+            }
+
+            var result = CreateSatisfiable(
+                query,
+                encoder,
+                solver,
+                out var excludedMalformedModel);
+            if (!excludedMalformedModel)
+            {
+                return result;
+            }
+
+            malformedModelRetries++;
+            if (malformedModelRetries >= MaximumMalformedModelRetries)
+            {
+                return BackendCheckResult.Unknown(
+                    BackendFailureReason.MalformedResult);
+            }
+        }
     }
 
     private static BackendFailureReason ClassifyUnknown(string? reason)
@@ -247,8 +281,10 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
     private static BackendCheckResult CreateSatisfiable(
         VerificationQuery query,
         QueryEncoder encoder,
-        Solver solver)
+        Solver solver,
+        out bool excludedMalformedModel)
     {
+        excludedMalformedModel = false;
         using var model = solver.Model;
         var assignments = ImmutableArray.CreateBuilder<KeyValuePair<IrVarId, IrValue>>();
         foreach (var variable in encoder.Variables)
@@ -265,6 +301,12 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                     model,
                     out var value))
             {
+                if (query.Factory.GetVariableInfo(variable).Type ==
+                    query.Factory.StringType)
+                {
+                    encoder.ExcludeModel(solver, model);
+                    excludedMalformedModel = true;
+                }
                 return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
             }
 
@@ -419,6 +461,65 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 : null;
         }
 
+        internal IEnumerable<IrVarId> StringVariables => _nullVariables.Keys;
+
+        internal SeqExpr GetStringVariable(IrVarId variable)
+        {
+            return (SeqExpr)_variables[variable];
+        }
+
+        // Keep the first code unit in the same domain as IrFactory.  Z3's
+        // sequence solver can exhaust its unfolding budget on a full regular
+        // language over an unconstrained Seq<Int>; the model-replay guard below
+        // rejects any malformed suffix that is not covered by this cheap prefix.
+        internal BoolExpr CreateWellFormedUtf16PrefixConstraint(IrVarId variable)
+        {
+            var sequence = GetStringVariable(variable);
+            var length = Own(_context.MkLength(sequence));
+            var validUnits = new BoolExpr[WellFormedUtf16PrefixLength];
+            for (var index = 0; index < validUnits.Length; index++)
+            {
+                var indexExpression = Own(_context.MkInt(index));
+                var unit = Own((ArithExpr)_context.MkNth(sequence, indexExpression));
+                var ordinaryLow = Own(_context.MkAnd(
+                    Own(_context.MkGe(unit, Own(_context.MkInt(0)))),
+                    Own(_context.MkLe(unit, Own(_context.MkInt(0xD7FF))))));
+                var ordinaryHigh = Own(_context.MkAnd(
+                    Own(_context.MkGe(unit, Own(_context.MkInt(0xE000)))),
+                    Own(_context.MkLe(unit, Own(_context.MkInt(0xFFFF))))));
+                var ordinary = Own(_context.MkOr(ordinaryLow, ordinaryHigh));
+                var highLower = Own(_context.MkGe(
+                    unit,
+                    Own(_context.MkInt(0xD800))));
+                var highUpper = Own(_context.MkLe(
+                    unit,
+                    Own(_context.MkInt(0xDBFF))));
+                var high = Own(_context.MkAnd(highLower, highUpper));
+                var lowLower = Own(_context.MkGe(
+                    unit,
+                    Own(_context.MkInt(0xDC00))));
+                var lowUpper = Own(_context.MkLe(
+                    unit,
+                    Own(_context.MkInt(0xDFFF))));
+                var low = Own(_context.MkAnd(lowLower, lowUpper));
+                var pairStart = Own(_context.MkAnd(
+                    high,
+                    Own(_context.MkGt(
+                        length,
+                        Own(_context.MkInt(index + 1))))));
+                var pairContinuation = index == 0
+                    ? Own(_context.MkFalse())
+                    : low;
+                validUnits[index] = Own(_context.MkImplies(
+                    Own(_context.MkGt(length, indexExpression)),
+                    Own(_context.MkOr(ordinary, pairStart, pairContinuation))));
+            }
+
+            return Own(_context.MkImplies(
+                Own(_context.MkNot(GetNullVariable(variable)!)),
+                Own(_context.MkAnd(validUnits))));
+        }
+
         internal bool TryCreateValue(
             IrFactory factory,
             IrVarId variable,
@@ -452,6 +553,31 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             }
 
             return value != null;
+        }
+
+        internal void ExcludeModel(Solver solver, Model model)
+        {
+            var equalities = new List<BoolExpr>(Variables.Length * 2);
+            foreach (var variable in Variables)
+            {
+                var expression = GetVariable(variable);
+                using var evaluated = model.Evaluate(expression, true);
+                equalities.Add(_context.MkEq(expression, evaluated));
+                if (GetNullVariable(variable) is { } nullVariable)
+                {
+                    using var evaluatedNull = model.Evaluate(nullVariable, true);
+                    equalities.Add(
+                        _context.MkEq(nullVariable, evaluatedNull));
+                }
+            }
+
+            using var conjunction = _context.MkAnd(equalities.ToArray());
+            using var exclusion = _context.MkNot(conjunction);
+            solver.Assert(exclusion);
+            foreach (var equality in equalities)
+            {
+                equality.Dispose();
+            }
         }
 
         private IrValue? DecodeString(
@@ -721,6 +847,16 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             EncodedValue right,
             BoolExpr defined)
         {
+            if (left.IsNull?.IsTrue == true)
+            {
+                return new EncodedValue(NullFlag(right), defined);
+            }
+
+            if (right.IsNull?.IsTrue == true)
+            {
+                return new EncodedValue(NullFlag(left), defined);
+            }
+
             if (left.Value is SeqExpr && right.Value is SeqExpr)
             {
                 var payloadEqual = Own(_context.MkEq(left.Value, right.Value));
