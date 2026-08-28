@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 557. [CONFIRMED] Known-pure ref/out calls omit havoc for memory locations
-
-**Location**: SharpProof.Frontend/RoslynProgramLowerer.cs around lines 310-321;
-RoslynOperationLowerer.cs around lines 155-175.
-
-**Description**: Ref/out mutation discovery retains only locals, parameters,
-and captures. Array elements, fields, and ref-return locations disappear, and an
-empty variable list is incorrectly treated as no mutation.
-
-**Reproduction**: Change(ref value) emitted VariablesAndMemory havoc; the same
-known-pure callee invoked as Change(ref values[0]) emitted a load and call but
-zero havoc while lowering stayed Exact.
-
-**Impact**: The exact program preserves stale memory across a byref call and can
-support reasoning over an unmodeled mutation.
-
-**Recommended fix**: Classify variable targets, memory locations, and discards
-separately. Any writable non-variable location must force Memory havoc. Add
-local, element, field, ref-return, and out-discard tests.
-
 ### 558. [CONFIRMED] Dynamic dispatch bypasses SPMETA001 Roslyn API enforcement
 
 **Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs around
