@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 560. [CONFIRMED] SkipCompilerExecution can republish stale Proven evidence
-
-**Location**: SharpProof.Package/buildTransitive/SharpProof.targets around lines
-47-50; SharpProof.Verifier.targets around lines 148, 232-234, and 320-323.
-
-**Description**: With SkipCompilerExecution=true and ProvideCommandLineArgs=true,
-Csc and the collector do not run, but SharpProofVerify still consumes the
-previous stable compiler manifest after CoreCompile.
-
-**Reproduction**: Identity first built Proven. Source changed to negation.
-Compiler-suppressed Build exited zero, left the manifest unchanged, and
-republished Proven. A normal Build changed the manifest, returned Refuted, and
-failed with SP0051.
-
-**Impact**: An ordinary Build can certify prior source state under require-proven.
-
-**Recommended fix**: In compiler-suppression mode invalidate prior publication
-but do not invoke the verifier; emit an explicit diagnostic when verification is
-requested outside design-time. Add stale-proven and normal-regeneration tests.
-
 ### 561. [CONFIRMED] Conditional member initializers lose viable-arm effects
 
 **Location**: SharpProof.Effects/EffectMethodNodeBuilder.cs around lines 134-162;
