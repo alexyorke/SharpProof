@@ -167,7 +167,8 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             _maximumDecodedStringLength);
         using var solver = _context.MkSolver();
         using var parameters = _context.MkParams();
-        parameters.Add("rlimit", _options.QueryRlimit);
+        using var rlimit = _context.MkSymbol("rlimit");
+        parameters.Add(rlimit, _options.QueryRlimit);
         solver.Parameters = parameters;
 
         foreach (var variable in encoder.IntegerVariables)

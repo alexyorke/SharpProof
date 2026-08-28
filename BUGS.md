@@ -3076,26 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 680. [CONFIRMED] Z3 rlimit setup leaves one StringSymbol finalizer per query
-
-**Location**: `SharpProof.Smt/IrSmtBackend.cs`, around lines 112-115.
-
-**Description**: `parameters.Add("rlimit", value)` uses a convenience overload
-that creates a disposable native-backed StringSymbol wrapper the caller cannot
-dispose. Params disposal does not own it.
-
-**Reproduction**: 128 real queries produced 128 proportional pending finalizers
-(129 including a measured one-object Task.Run baseline). The explicit
-`MkSymbol("rlimit")` plus `Add(Symbol, uint)` and disposal control produced zero
-while preserving UNSAT/resource behavior.
-
-**Impact**: Long-lived solver lanes accumulate native references and finalizer/GC
-pressure on every query, including trivial Boolean checks.
-
-**Recommended fix**: Create and explicitly dispose the rlimit symbol per setup,
-or cache one backend-owned symbol disposed before Context. Test N-query finalizer
-growth, correct resource limits, cancellation, and exceptional exits.
-
 ### 681. [CONFIRMED] Debug mutation campaigns can satisfy Release qualification
 
 **Location**: `scripts/Invoke-SharpProofContainer.ps1`, around lines 7-8 and
