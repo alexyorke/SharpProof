@@ -2619,30 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 581. [CONFIRMED] A global SARIF path loses earlier projects' evidence
-
-**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
-around lines 64-66 and 128-130; Worker.Launcher/Program.cs around lines 632-670;
-SarifProjection.cs around lines 74-102.
-
-**Description**: Configured SARIF is projected only by target framework, not by
-project identity. Command-line properties propagate through ProjectReference,
-so every project publishes its one-run document to the same destination and the
-last cooperative writer replaces the earlier one.
-
-**Reproduction**: App -> Lib with distinct SARIF paths produced two documents;
-Lib contained SP0047 and each root matched its project. One shared absolute path
-made the successful build leave a single App document with no Lib subject or
-SP0047, although both projects reported using the path.
-
-**Impact**: Multi-project advisory builds silently lose warnings, informational
-evidence, and proven claims from all but the last project.
-
-**Recommended fix**: Add a stable project-full-path hash plus TFM to configured
-projection, reject cross-project reuse with SP0054, or implement locked
-multi-run aggregation. Test App/Lib shared-path behavior and retain same-project
-cooperative publication.
-
 ### 582. [CONFIRMED] Property-assignment arguments ignore non-returning setters
 
 **Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184
