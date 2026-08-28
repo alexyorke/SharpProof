@@ -13,6 +13,7 @@ $mockBin = Join-Path $fixture 'mock-bin'
 $apiRoot = Join-Path $fixture 'api'
 New-Item -ItemType Directory -Path `
     (Join-Path $fixture 'scripts'), `
+    (Join-Path $fixture 'eng/acceptance'), `
     (Join-Path $fixture 'eng/release'), `
     (Join-Path $fixture '.github/workflows'), `
     $mockBin, $apiRoot -Force | Out-Null
@@ -179,12 +180,19 @@ function Invoke-AcceptanceReceiptCase {
 
     $evidencePath = Join-Path $fixture "artifacts/$Name.json"
     $commit = (& git -C $fixture rev-parse HEAD).Trim()
+    $phases = @(
+        (Get-Content -LiteralPath (Join-Path $fixture 'eng/acceptance/contract.json') -Raw |
+            ConvertFrom-Json).automation.acceptanceTimingPhases |
+            ForEach-Object {
+                [pscustomobject]@{ name = [string]$_; status = 'passed' }
+            })
     [ordered]@{
         schemaVersion = 1
         command = 'acceptance'
         configuration = $Configuration
         commit = $commit
         status = 'passed'
+        phases = $phases
     } | ConvertTo-Json | Set-Content -LiteralPath $evidencePath -Encoding utf8NoBOM
     $receiptDirectory = Join-Path $fixture 'artifacts/acceptance-receipts'
     $output = & pwsh -NoLogo -NoProfile -File (
@@ -292,6 +300,9 @@ try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/Write-SharpProofQualificationReceipt.ps1') `
         -Destination (Join-Path $fixture 'scripts/Write-SharpProofQualificationReceipt.ps1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/SharpProof.AcceptanceEvidence.psm1') `
+        -Destination (Join-Path $fixture 'scripts/SharpProof.AcceptanceEvidence.psm1')
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/SharpProof.MutationEvidence.psm1') `
         -Destination (Join-Path $fixture 'scripts/SharpProof.MutationEvidence.psm1')

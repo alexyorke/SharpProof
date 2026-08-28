@@ -331,6 +331,17 @@ public sealed class ReleaseCoverageBaselineTests
                 .Output.Trim();
             var evidencePath = Path.Combine(workspace, "acceptance.json");
             var receiptDirectory = Path.Combine(workspace, "receipts");
+            using var contract = JsonDocument.Parse(File.ReadAllText(
+                Path.Combine(root, "eng", "acceptance", "contract.json")));
+            var phaseNames = contract.RootElement
+                .GetProperty("automation")
+                .GetProperty("acceptanceTimingPhases")
+                .EnumerateArray()
+                .Select(static phase => phase.GetString()!)
+                .ToArray();
+            var passingPhases = phaseNames
+                .Select(static name => new { name, status = "passed" })
+                .ToArray();
             var fixtures = new[]
             {
                 (Value: "not-json", Valid: false),
@@ -350,7 +361,8 @@ public sealed class ReleaseCoverageBaselineTests
                 {
                     schemaVersion = 1,
                     status = "passed",
-                    commit = head
+                    commit = head,
+                    phases = passingPhases
                 }), Valid: true)
             };
             foreach (var fixture in fixtures)
@@ -382,6 +394,43 @@ public sealed class ReleaseCoverageBaselineTests
                     receiptDirectory,
                     "acceptance-release.json")),
                 Is.True);
+
+            var failedPhases = passingPhases
+                .Select((phase, index) => index == 2
+                    ? new { phase.name, status = "failed" }
+                    : phase)
+                .ToArray();
+            await File.WriteAllTextAsync(
+                evidencePath,
+                JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    command = "acceptance",
+                    configuration = "Release",
+                    status = "passed",
+                    commit = head,
+                    phases = failedPhases
+                }));
+            var failedPhaseResult = await RunAsync(
+                root,
+                "pwsh",
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                Path.Combine(
+                    root,
+                    "scripts",
+                    "Write-SharpProofQualificationReceipt.ps1"),
+                "-Gate",
+                "acceptance-release",
+                "-EvidencePath",
+                evidencePath,
+                "-ReceiptDirectory",
+                receiptDirectory);
+            Assert.That(
+                failedPhaseResult.ExitCode,
+                Is.Not.Zero,
+                failedPhaseResult.Output + failedPhaseResult.Error);
         }
         finally
         {

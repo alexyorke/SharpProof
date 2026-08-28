@@ -294,26 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 617. [CONFIRMED] Acceptance receipts can certify a failed required phase
-
-**Location**: `scripts/Write-SharpProofQualificationReceipt.ps1`, around lines
-62-67; `eng/acceptance/Verify.ps1`, around lines 178-198; final trust in
-`Invoke-SharpProofReleaseContainer.ps1`, around lines 184-197.
-
-**Description**: Receipt minting checks schema version, outer status, and commit,
-but never correlates outer `passed` with the required inner phase statuses.
-
-**Reproduction**: Correct Release evidence with outer `passed` and
-`static-validation.status=failed` exited 0 and minted a passed receipt whose hash
-matched the evidence. Outer `failed` control exited 1.
-
-**Impact**: Producer or evidence-assembly regressions can falsely qualify a
-release despite a failed required phase.
-
-**Recommended fix**: Share a strict acceptance evidence validator and require
-every exact phase to pass for outer passed; validate at receipt mint and final
-qualification. Test failed/skipped/missing/duplicate/reordered phases.
-
 ### 619. [CONFIRMED] Record with-clones misattribute receiver effects and omit allocation
 
 **Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines

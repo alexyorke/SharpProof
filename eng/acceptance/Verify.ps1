@@ -197,6 +197,13 @@ function Write-AcceptanceTimingEvidence {
         -Phases @($timingPhases) `
         -ExpectedPhaseNames $expectedPhases `
         -RequireComplete ($Status -in @('passed','incomplete'))
+    if ($Status -eq 'passed') {
+        Import-Module (Join-Path `
+            $repositoryRoot 'scripts\SharpProof.AcceptanceEvidence.psm1') -Force
+        $null = Assert-SharpProofAcceptanceEvidencePhases `
+            -Evidence ([pscustomobject]@{ phases = @($timingPhases) }) `
+            -ExpectedPhaseNames $expectedPhases
+    }
     $commit = ''
     try {
         $commitOutput = & git -C $repositoryRoot rev-parse HEAD 2>$null

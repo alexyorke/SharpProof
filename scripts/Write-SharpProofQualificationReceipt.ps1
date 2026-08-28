@@ -26,6 +26,17 @@ $repositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
+$expectedAcceptancePhases = @()
+if ($Gate -in @('acceptance-debug', 'acceptance-release')) {
+    Import-Module (Join-Path `
+        $PSScriptRoot 'SharpProof.AcceptanceEvidence.psm1') -Force
+    $acceptanceContract = Get-Content -LiteralPath (
+        Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
+        ConvertFrom-Json -ErrorAction Stop
+    $expectedAcceptancePhases = @(
+        $acceptanceContract.automation.acceptanceTimingPhases |
+            ForEach-Object { [string]$_ })
+}
 $receiptCandidate = if ([IO.Path]::IsPathRooted($ReceiptDirectory)) {
     $ReceiptDirectory
 }
@@ -92,11 +103,17 @@ else {
 }
 $valid = switch -Regex ($Gate) {
     '^acceptance-(?:debug|release)$' {
-        [int]$evidence.schemaVersion -eq 1 -and
+        $identityValid = [int]$evidence.schemaVersion -eq 1 -and
         [string]$evidence.command -ceq 'acceptance' -and
         [string]$evidence.configuration -ceq $expectedAcceptanceConfiguration -and
         [string]$evidence.status -ceq 'passed' -and
         [string]$evidence.commit -ceq $commit
+        if ($identityValid) {
+            $null = Assert-SharpProofAcceptanceEvidencePhases `
+                -Evidence $evidence `
+                -ExpectedPhaseNames $expectedAcceptancePhases
+        }
+        $identityValid
     }
     '^portable-(?:linux|windows|macos)$' {
         [int]$evidence.schemaVersion -eq 1 -and

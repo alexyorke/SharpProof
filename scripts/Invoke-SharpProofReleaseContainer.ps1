@@ -190,6 +190,14 @@ switch ($Mode) {
         if ($requiredGates.Count -ne 10) {
             throw 'Release qualification matrix must project exactly ten receipts.'
         }
+        Import-Module (Join-Path `
+            $PSScriptRoot 'SharpProof.AcceptanceEvidence.psm1') -Force
+        $acceptanceContract = Get-Content -LiteralPath (
+            Join-Path $repositoryRoot 'eng/acceptance/contract.json') -Raw |
+            ConvertFrom-Json -ErrorAction Stop
+        $expectedAcceptancePhases = @(
+            $acceptanceContract.automation.acceptanceTimingPhases |
+                ForEach-Object { [string]$_ })
         $receiptDirectory = Join-Path `
             $repositoryRoot `
             'artifacts/release-qualification/qualification-receipts'
@@ -248,6 +256,9 @@ switch ($Mode) {
                 }
                 $acceptanceEvidence = Get-Content -LiteralPath $evidencePath -Raw |
                     ConvertFrom-Json -ErrorAction Stop
+                $null = Assert-SharpProofAcceptanceEvidencePhases `
+                    -Evidence $acceptanceEvidence `
+                    -ExpectedPhaseNames $expectedAcceptancePhases
                 if ([string]$receipt.configuration -cne $expectedConfiguration -or
                     [string]$acceptanceEvidence.command -cne 'acceptance' -or
                     [string]$acceptanceEvidence.configuration -cne
