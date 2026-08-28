@@ -2784,26 +2784,6 @@ release despite a failed required phase.
 every exact phase to pass for outer passed; validate at receipt mint and final
 qualification. Test failed/skipped/missing/duplicate/reordered phases.
 
-### 618. [CONFIRMED] Proven checked overflow in an earlier argument causes false SP0027
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
-lines 450-460; `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
-2175-2177 and 1898-1901.
-
-**Description**: Permissive binary completion checks children/divide-by-zero but
-ignores `IsChecked` and proven overflow. The analyzer evaluates a later invalid
-argument even though the invocation never occurs.
-
-**Reproduction**: `Positive(checked(int.MaxValue + 1), -1)` emitted SP0027 while
-runtime call count was zero and overflow threw. Checked-safe, unchecked-overflow,
-and direct controls executed and were diagnosed.
-
-**Impact**: Deterministic false diagnostics and warnings-as-errors failures.
-
-**Recommended fix**: Add a flow-aware proven-overflow predicate for checked
-operations; return non-completing only when all evaluations overflow, preserving
-mixed/unknown and unchecked cases.
-
 ### 619. [CONFIRMED] Record with-clones misattribute receiver effects and omit allocation
 
 **Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines
@@ -3091,30 +3071,6 @@ invisible.
 **Recommended fix**: Aggregate/serialize exact scenario outcome counts, validate
 their sum, and require at least one defined and one undefined outcome wherever
 coverage is claimed. Add malformed/round-trip/default-seed tests.
-
-### 633. [CONFIRMED] Signed MinValue divided or reduced by -1 produces a false SP0027
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
-lines 450-460; `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
-2175-2177 and 2461-2465.
-
-**Description**: Permissive argument completion treats signed `MinValue / -1`
-and `MinValue % -1` as completing because its exceptional check recognizes only
-a literal zero divisor. The runtime throws `OverflowException` even in unchecked
-code, so a following contracted call is unreachable.
-
-**Reproduction**: Calls whose first unused argument was
-`unchecked(long.MinValue / -1)` or the equivalent remainder produced SP0027,
-while runtime controls recorded zero target calls and an overflow. Safe division
-and direct-call controls remained reachable and diagnosed.
-
-**Impact**: Deterministic false contract-violation diagnostics can fail builds
-for unreachable calls.
-
-**Recommended fix**: Add a flow-aware signed division-overflow predicate for
-both Divide and Remainder, using the existing safe-direction facts and preserving
-unknown/mixed-type cases. Test all signed widths, checked/unchecked syntax, and
-safe-direction controls.
 
 ### 634. [CONFIRMED] A failed same-OS portable rerun preserves a prior passing receipt
 
