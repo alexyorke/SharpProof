@@ -203,57 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 501. [CONFIRMED] Escaping lambdas in field and property initializers skip Requires analysis
-
-**Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around lines
-113-123 and 166-171; AnalyzerFeaturePipeline.cs around lines 5-24, 447-552;
-RequiresCallSiteDiscovery.cs around lines 815-823; ordinary callable policy in
-RequiresCallSiteTreeAnalyzer.cs around lines 252-280, 370-395, and 537-559.
-
-**Description**: Member-initializer analysis enumerates executable unflowed
-descendants, but that enumeration immediately stops at anonymous and local
-functions. Nested-callable syntax registration validates only control
-attributes. Thus a lambda stored by a field or auto-property initializer is
-never analyzed, even though ordinary method-body policy deliberately analyzes
-anonymous functions that escape rather than remain in a local.
-
-**Reproduction**: An explicit-constructor sealed class initialized:
-
-    readonly Func<int> Field = () => Positive(-3);
-    Func<int> Property { get; } = () => Positive(-4);
-
-where Positive Requires value > 0. Canonical analyzer results:
-
-    direct initializer control:        1 SP0027
-    method-returned lambda control:    1 SP0027
-    uninvoked local lambda control:    0 SP0027
-    field/property initializer lambdas:0 SP0027 (expected 2)
-
-Compiler diagnostics were zero in every case.
-
-**Impact**: Requires violations in common callback/factory fields and properties
-are silently missed, while the same escaping lambda returned from a method is
-reported. Multiple constructors do not repair the omission.
-
-**Root cause**: Initializer traversal treats callable boundaries as terminal but
-does not hand escaped callables to their own CFG-based analysis path.
-
-**Recommended fix**: Add callable-aware initializer discovery. Analyze top-level
-non-expression-tree anonymous functions stored by member initializers as escaped
-callables using their normalized symbol and own CFG, reusing
-RequiresCallSiteTreeAnalyzer policy. Gate on applicable unsuppressed constructor
-activation and use existing session/location deduplication so multiple
-constructors do not duplicate findings. Do not model the lambda body as running
-during initialization.
-
-**Regression coverage**: Field and auto-property lambdas with two constructors
-must emit exactly two diagnostics at invocation spans. Retain direct initializer,
-valid lambda, unreachable lambda branch, uninvoked local lambda, and
-Expression<Func<T>> controls. Add field-like event coverage if supported.
-
-**Confidence**: High; exact-baseline canonical execution held activation and
-configuration constant and failed only the two initializer-lambda sites.
-
 ### 505. [CONFIRMED] Custom await omits the hidden GetAwaiter precondition call
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,

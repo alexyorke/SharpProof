@@ -656,8 +656,63 @@ internal static partial class AnalyzerFeaturePipeline
                         context.SemanticModel, session,
                         ReportInitializerDiagnostic, context.CancellationToken));
             }
+
+            foreach (var lambda in root.DescendantsAndSelf()
+                         .OfType<IAnonymousFunctionOperation>()
+                         .Where(lambda => !lambda.Syntax.Ancestors()
+                             .Any(static ancestor =>
+                                 ancestor is AnonymousFunctionExpressionSyntax))
+                         .Where(lambda => !IsExpressionTree(
+                             lambda.Syntax,
+                             context.SemanticModel,
+                             context.CancellationToken)))
+            {
+                var method = ContractClauseInventoryBuilder
+                    .NormalizeCallable(lambda.Symbol);
+                if (!session.TryBeginRequiresCallSiteAnalysis(method))
+                {
+                    continue;
+                }
+
+                var lambdaOutcome = AnalyzerSemanticOutcome.NotApplicable;
+                foreach (var operation in RequiresCallSiteDiscovery
+                             .ExecutableUnflowedDescendantsAndSelf(
+                                 lambda.Body,
+                                 operationFacts))
+                {
+                    lambdaOutcome = AnalyzerSemanticOutcomes.Combine(
+                        lambdaOutcome,
+                        RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
+                            method,
+                            initializer,
+                            operation,
+                            context.SemanticModel,
+                            session,
+                            ReportInitializerDiagnostic,
+                            context.CancellationToken));
+                }
+                session.RecordSemanticOutcome(method, lambdaOutcome);
+                outcome = AnalyzerSemanticOutcomes.Combine(
+                    outcome,
+                    lambdaOutcome);
+            }
             session.RecordSemanticOutcome(candidate, outcome);
         }
+    }
+
+    private static bool IsExpressionTree(
+        SyntaxNode syntax,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        var expression = semanticModel.Compilation.GetTypeByMetadataName(
+            "System.Linq.Expressions.Expression`1");
+        return expression != null &&
+            semanticModel.GetTypeInfo(syntax, cancellationToken).ConvertedType is
+            INamedTypeSymbol converted &&
+            SymbolEqualityComparer.Default.Equals(
+                converted.OriginalDefinition,
+                expression.OriginalDefinition);
     }
 
     private static bool CanReachMemberInitializer(

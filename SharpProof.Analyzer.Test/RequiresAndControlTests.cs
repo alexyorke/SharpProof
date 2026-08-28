@@ -664,6 +664,34 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task EscapingInitializerLambdasCheckRequiresExactlyOnce()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed class Subject {
+                private readonly Func<int> Field = () => Guard.Positive(-1);
+                private Func<int> Property { get; } = () => Guard.Positive(-2);
+                public Subject() { }
+                public Subject(int value) { }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+    }
+
+    [Test]
     public async Task RecordCopyConstructorDoesNotOwnMemberInitializers()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
