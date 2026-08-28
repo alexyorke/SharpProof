@@ -3054,32 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 660. [CONFIRMED] List-pattern indexer and Slice calls lose synthesized arguments
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
-lines 209-225 and 627-703; `RequiresCallSiteAnalyzer.cs`, around lines 380-405
-and 570-593.
-
-**Description**: List-pattern discovery finds Length, indexers, and Slice, but
-constructs every implicit member call with empty argument arrays. Reconciliation
-also keys only by syntax and target, collapsing repeated indexer calls at
-different synthesized indices.
-
-**Reproduction**: Runtime traced `Length, Item(0), Item(1)` for `[1,2]` and
-`Length, Item(0), Slice(1,1)` for `[1,..var r]`. Discovered candidates had one or
-two parameters but zero actuals and emitted no SP0027 for index/start-dependent
-violations. Equivalent direct calls diagnosed; constant-false clauses showed
-that implicit member discovery itself was active.
-
-**Impact**: List-pattern contracts depending on index, slice start, or slice
-length silently become Unknown, and distinct implicit invocations lose context.
-
-**Recommended fix**: Carry synthetic typed actual values and an invocation
-ordinal through candidates/reconciliation. Derive prefix/suffix indices and
-Slice start/length from sound length facts, preserving evaluation order and
-fail-closed unknown-length/noncompletion cases. Test repeated getter vectors,
-prefix/suffix/slice parameters, mismatches, and throwing members.
-
 ### 661. [CONFIRMED] Definitely-null property ??= setters remain unreplayable
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around

@@ -123,6 +123,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 Instance: null,
                 Arguments: [],
                 ImmutableDictionary<int, IOperation>.Empty,
+                ImmutableDictionary<int, long>.Empty,
                 CanReplay: true,
                 Flow: null,
                 ManagedFlowStatus.BudgetExceeded));
@@ -220,6 +221,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         call.Instance,
                         call.Arguments,
                         call.ExplicitArguments,
+                        call.SyntheticArguments,
                         call.CanReplay && canReplay,
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status);
@@ -230,7 +232,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             operation.Syntax.Span &&
                         SymbolEqualityComparer.Default.Equals(
                             existing.TargetMethod,
-                            candidate.TargetMethod));
+                            candidate.TargetMethod) &&
+                        existing.SyntheticArguments.Count ==
+                            candidate.SyntheticArguments.Count &&
+                        existing.SyntheticArguments.All(pair =>
+                            candidate.SyntheticArguments.TryGetValue(
+                                pair.Key, out var value) &&
+                            value == pair.Value));
                     if (existingIndex < 0)
                     {
                         callSites.Add(candidate);
@@ -282,6 +290,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     call.Instance,
                     call.Arguments,
                     call.ExplicitArguments,
+                    call.SyntheticArguments,
                     CanReplay: false,
                     Flow: null,
                     ManagedFlowStatus.BudgetExceeded));
@@ -776,6 +785,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 invocation.Instance,
                 invocation.Arguments,
                 ImmutableDictionary<int, IOperation>.Empty,
+                ImmutableDictionary<int, long>.Empty,
                 true)],
             IObjectCreationOperation
             {
@@ -785,6 +795,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 null,
                 creation.Arguments,
                 ImmutableDictionary<int, IOperation>.Empty,
+                ImmutableDictionary<int, long>.Empty,
                 true)],
             IPropertyReferenceOperation property =>
                 GetPropertyCalls(property, semanticModel, cancellationToken),
@@ -844,6 +855,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 candidate.Resource,
                 [],
                 ImmutableDictionary<int, IOperation>.Empty,
+                ImmutableDictionary<int, long>.Empty,
                 true));
         }
         return calls.ToImmutable();
@@ -897,6 +909,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 resourceOperation,
                 [],
                 ImmutableDictionary<int, IOperation>.Empty,
+                ImmutableDictionary<int, long>.Empty,
                 true)];
     }
 
@@ -962,9 +975,20 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>();
         var length = SwitchExpressionFacts.GetCallableListPatternMember(
             pattern.LengthSymbol);
+        var knownLength = 0L;
+        var hasKnownLength = compilation != null &&
+            TryGetKnownListLength(
+                pattern,
+                instance,
+                compilation,
+                cancellationToken,
+                out knownLength);
         if (length != null)
         {
-            calls.Add(CreateImplicitListPatternCall(length, instance));
+            calls.Add(CreateImplicitListPatternCall(
+                length,
+                instance,
+                ImmutableDictionary<int, long>.Empty));
             if (operationFacts != null &&
                 !operationFacts.MethodCanCompleteNormally(length))
             {
@@ -976,13 +1000,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             static item => item is not ISlicePatternOperation);
         var hasSlice = pattern.Patterns.Any(
             static item => item is ISlicePatternOperation);
-        if (compilation != null &&
-            TryGetKnownListLength(
-                pattern,
-                instance,
-                compilation,
-                cancellationToken,
-                out var knownLength) &&
+        if (hasKnownLength &&
             (hasSlice
                 ? knownLength < requiredLength
                 : knownLength != requiredLength))
@@ -990,8 +1008,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
             return calls.ToImmutable();
         }
 
-        foreach (var item in pattern.Patterns)
+        for (var index = 0; index < pattern.Patterns.Length; index++)
         {
+            var item = pattern.Patterns[index];
             var member = item is ISlicePatternOperation slice
                 ? slice.Pattern == null
                     ? null
@@ -1003,7 +1022,48 @@ internal sealed partial class RequiresCallSiteDiscovery(
             {
                 continue;
             }
-            calls.Add(CreateImplicitListPatternCall(member, instance));
+            var syntheticArguments = ImmutableDictionary<int, long>.Empty;
+            if (item is ISlicePatternOperation && hasKnownLength)
+            {
+                var prefixLength = pattern.Patterns
+                    .Take(index)
+                    .Count(static candidate =>
+                        candidate is not ISlicePatternOperation);
+                var sliceLength = knownLength - requiredLength;
+                if (member.Parameters.Length > 0)
+                {
+                    syntheticArguments = syntheticArguments.Add(0, prefixLength);
+                }
+                if (member.Parameters.Length > 1)
+                {
+                    syntheticArguments = syntheticArguments.Add(1, sliceLength);
+                }
+            }
+            else if (item is not ISlicePatternOperation &&
+                     member.Parameters.Length > 0)
+            {
+                var hasSliceBefore = pattern.Patterns
+                    .Take(index)
+                    .Any(static candidate =>
+                        candidate is ISlicePatternOperation);
+                var argument = hasSliceBefore && hasKnownLength
+                    ? knownLength - pattern.Patterns
+                        .Skip(index + 1)
+                        .Count(static candidate =>
+                            candidate is not ISlicePatternOperation) - 1
+                    : pattern.Patterns
+                        .Take(index)
+                        .Count(static candidate =>
+                            candidate is not ISlicePatternOperation);
+                if (!hasSliceBefore || hasKnownLength)
+                {
+                    syntheticArguments = syntheticArguments.Add(0, argument);
+                }
+            }
+            calls.Add(CreateImplicitListPatternCall(
+                member,
+                instance,
+                syntheticArguments));
             if (operationFacts != null &&
                 !operationFacts.MethodCanCompleteNormally(member))
             {
@@ -1015,13 +1075,15 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private static RequiresCallTarget CreateImplicitListPatternCall(
         IMethodSymbol method,
-        IOperation? instance)
+        IOperation? instance,
+        ImmutableDictionary<int, long> syntheticArguments)
     {
         return new RequiresCallTarget(
             method,
             instance,
             [],
             ImmutableDictionary<int, IOperation>.Empty,
+            syntheticArguments,
             true);
     }
 
@@ -1111,6 +1173,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 call.Instance,
                 call.Arguments,
                 call.ExplicitArguments,
+                call.SyntheticArguments,
                 call.CanReplay,
                 Flow: null,
                 ManagedFlowStatus.BudgetExceeded))];
@@ -1946,6 +2009,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             GetAccessorInstance(property, semanticModel, cancellationToken),
             property.Arguments,
             ImmutableDictionary<int, IOperation>.Empty,
+            ImmutableDictionary<int, long>.Empty,
             true);
     }
 
@@ -1967,6 +2031,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             GetAccessorInstance(property, semanticModel, cancellationToken),
             property.Arguments,
             explicitArguments,
+            ImmutableDictionary<int, long>.Empty,
             canReplay);
     }
 
@@ -2035,6 +2100,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             ImmutableDictionary<int, IOperation>.Empty.Add(
                 0,
                 assignment.HandlerValue),
+            ImmutableDictionary<int, long>.Empty,
             true)];
     }
 

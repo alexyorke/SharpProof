@@ -439,6 +439,44 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ListPatternCallsReplayTheirSynthesizedArguments()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class IndexContractList {
+                public int Length => 2;
+                public int this[int index] {
+                    get { Contract.Requires(index > 0); return index; }
+                }
+            }
+
+            public sealed class SliceContractList {
+                public int Length => 3;
+                public int this[int index] => index;
+                public SliceContractList Slice(int start, int length) {
+                    Contract.Requires(start == 0 && length == 2);
+                    return this;
+                }
+            }
+
+            public static class Subject {
+                public static bool InvalidIndexer() =>
+                    new IndexContractList() is [0, 1];
+                public static bool InvalidSlice() =>
+                    new SliceContractList() is [0, .. var rest];
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+    }
+
+    [Test]
     public async Task IndexerAccessorsBindIndexAndSetterValueArguments()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
