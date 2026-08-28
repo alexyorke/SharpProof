@@ -2747,7 +2747,8 @@ internal sealed class ExceptionHandlerReachability(
     {
         foreach (var @catch in @try.Catches)
         {
-            if (!CatchesKnownType(@catch, thrown, model))
+            var typeSelection = CatchesKnownType(@catch, thrown, model);
+            if (typeSelection == CatchSelection.Never)
             {
                 continue;
             }
@@ -2755,7 +2756,8 @@ internal sealed class ExceptionHandlerReachability(
             {
                 return true;
             }
-            if (GetFilterSelection(@catch, model) == CatchSelection.Always)
+            if (typeSelection == CatchSelection.Always &&
+                GetFilterSelection(@catch, model) == CatchSelection.Always)
             {
                 return false;
             }
@@ -2783,18 +2785,27 @@ internal sealed class ExceptionHandlerReachability(
         return false;
     }
 
-    private static bool CatchesKnownType(
+    private static CatchSelection CatchesKnownType(
         CatchClauseSyntax @catch,
         INamedTypeSymbol thrown,
         SemanticModel model)
     {
         if (@catch.Declaration == null)
         {
-            return true;
+            return CatchSelection.Always;
         }
-        return model.GetTypeInfo(@catch.Declaration.Type).Type is
-            INamedTypeSymbol caught &&
-            EffectTypeFacts.IsDerivedFrom(thrown, caught);
+        if (model.GetTypeInfo(@catch.Declaration.Type).Type is not
+            INamedTypeSymbol caught)
+        {
+            return CatchSelection.Maybe;
+        }
+        if (EffectTypeFacts.IsDerivedFrom(thrown, caught))
+        {
+            return CatchSelection.Always;
+        }
+        return EffectTypeFacts.IsDerivedFrom(caught, thrown)
+            ? CatchSelection.Maybe
+            : CatchSelection.Never;
     }
 
     private bool CatchesAllExceptions(

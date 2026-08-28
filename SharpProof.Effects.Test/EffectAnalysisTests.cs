@@ -5084,6 +5084,34 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void BaseTypedThrowCanReachDerivedCatch()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            public static class Sample {
+                private static int s_state;
+                public static void Run() {
+                    Exception error = new InvalidOperationException();
+                    try { throw error; }
+                    catch (InvalidOperationException) { s_state++; }
+                }
+            }
+            """);
+        var summary = new EffectAnalysisSession(compilation)
+            .Analyze(Method(compilation, "Run"))
+            .Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void ExceptionHandlersContributeEffectsOnlyWhenReachable()
     {
         var compilation = EffectTestHost.CreateCompilation(
