@@ -691,52 +691,6 @@ Cover finite-SMT Unknown and partial-backend unrecognized paths.
 **Confidence**: High; self-verified through focused canonical tests and exact
 result-retention flow.
 
-### 474. [CONFIRMED] Generated protocol enum membership boxes every validated value
-
-**Location**: SharpProof.Worker.Protocol/ProtocolModel.generated.cs around
-lines 620-652 and generated validation calls around lines 826-870;
-SharpProof.Worker.Protocol/ProtocolJson.cs around lines 1059-1062.
-
-**Description**: WorkerProtocolMetadata stores every value from every protocol
-enum in one HashSet<Enum>. Generic IsKnown<T> executes
-s_knownValues.Contains((Enum)(object)value), boxing each enum on every semantic
-validation. Request, manifest, callable, and claim rules call IsDefined/IsKnown
-for each relevant field after parsing and deserialization have already
-allocated their models.
-
-**Reproduction**:
-
-    100,000 IsKnown<WorkerSelectedFeature> checks:
-      2,400,000 bytes allocated
-    50,000 checks:
-      1,200,000 bytes allocated
-    type-specific HashSet<WorkerSelectedFeature> control:
-      0 bytes allocated
-
-The exact 24 bytes per lookup demonstrate boxing rather than test harness
-noise. The shared set also places equal underlying numbers from different enum
-types into colliding buckets, adding comparisons even though Enum.Equals
-preserves type correctness.
-
-**Impact**: Large claim and manifest arrays incur needless Gen0 allocation
-after strict shape walking and typed deserialization. Duplicate-filled arrays
-pay the boxing cost before later uniqueness rejection.
-
-**Root cause**: Generator convenience uses a nongeneric Enum collection for
-type-specific membership.
-
-**Recommended fix**: Generate type-specific switches, overloads, or
-HashSet<T>/generic static caches and dispatch IsKnown without boxing. Preserve
-current unknown and Unspecified semantics.
-
-**Regression coverage**: Warm IsKnown(WorkerSelectedFeature.Effects), perform
-100,000 accumulated checks, and require near-zero allocation. Verify all known
-generated values remain accepted and cast 999 plus Unspecified behavior through
-IsDefined remains unchanged.
-
-**Confidence**: High; self-verified with exact linear allocation counts and a
-zero-allocation type-specific control.
-
 ### 476. [CONFIRMED] Distinct unsupported parameters and locals collapse to one opaque value
 
 **Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
