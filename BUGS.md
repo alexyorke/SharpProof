@@ -726,48 +726,6 @@ schema validation of commit/time/attempt identity.
 
 **Confidence**: High; self-verified byte-for-byte with unchanged scripts.
 
-### 483. [CONFIRMED] Shared protocol collection validation allocates even for empty arrays
-
-**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 869-943
-and generated consumers in
-SharpProof.Worker.Protocol/ProtocolModel.generated.cs around lines 850-890.
-
-**Description**: CompleteUnique<T> combines a captured All predicate with
-Select(key).Distinct(s_ordinal).Count(). It backs distinct-nonblank, model,
-assumption, proof-core, claim-ID, and exception-hierarchy checks. The captured
-predicate allocates even for empty arrays, while nonempty arrays also allocate
-the LINQ iterator/hash-set pipeline.
-
-**Reproduction**:
-
-    two-string array: 376 bytes allocated per call
-    empty array:       88 bytes allocated per call
-    explicit loop:      0 bytes allocated per call
-
-Thus each otherwise-valid claim with default empty ProofCore and Model pays at
-least 176 bytes before broader model validation. At 100,000 claims that is
-17.6 MiB for empty checks alone.
-
-**Impact**: Common valid protocol shapes incur repeated Gen0 churn after
-parsing/deserialization, and large collections allocate iterator stacks and
-sets before duplicate rejection.
-
-**Root cause**: A generic captured LINQ pipeline is used for hot structural
-validation, including trivial empty/small cases.
-
-**Recommended fix**: Implement one explicit completeness/uniqueness pass.
-Return allocation-free for empty, directly compare one/small arrays, and lazily
-create one capacity-sized HashSet<string> only for larger inputs. Reject
-invalid/duplicate entries immediately.
-
-**Regression coverage**: Functional cases for null, empty, blank, duplicate,
-distinct, duplicate model variable, and duplicate assumption ID. Warm and run
-100,000 empty calls with a near-zero allocation requirement and bound two-item
-allocation.
-
-**Confidence**: High; exact empty and two-item allocation measurements matched
-zero-allocation explicit controls.
-
 ### 484. [CONFIRMED] Abrupt MSBuild termination permanently strands per-invocation run directories
 
 **Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
