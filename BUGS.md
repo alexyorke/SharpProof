@@ -3054,30 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 637. [CONFIRMED] A safe synchronous using prefix suppresses a later SP0027
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
-lines 188-208 and 425-471; `SharpProof.Effects/ManagedAbstractFlow.cs`, around
-lines 1842-1917; `RequiresCallSiteAnalyzer.cs`, around lines 339-342.
-
-**Description**: Prefix completion has no `IUsingOperation` or using-declaration
-model. Even a completed acquisition/body/disposal, or a null-resource no-op,
-makes a later explicit contracted call non-replayable.
-
-**Reproduction**: Safe using statement, safe using declaration, and null-resource
-prefixes all had complete flow and reached the invalid call at runtime, yet
-reported no SP0027. Direct/empty-prefix controls reported it. A throwing using
-statement did not reach the call, while a throwing declaration disposal occurred
-after the call.
-
-**Impact**: Common resource-management syntax creates deterministic analyzer
-false negatives.
-
-**Recommended fix**: Model synchronous using timing with the existing disposal
-resolver. A statement requires acquisition, body, and disposal completion; a
-declaration preceding a same-scope call requires only acquisition at that point.
-Preserve throwing-disposal controls.
-
 ### 638. [CONFIRMED] Framework identity scanning misses nonconstant string concatenation
 
 **Location**: `SharpProof.ArchitectureTest/FrameworkIdentityScanner.cs`, around
