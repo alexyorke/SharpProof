@@ -761,42 +761,6 @@ Add a supervisor-cancellation integration case.
 **Confidence**: High source-closure evidence: the random directory has one
 normal deletion path, no scavenger, and production cleanup uses SIGKILL.
 
-### 479. [CONFIRMED] Unattributed backend cancellation is fabricated into MethodTimeout
-
-**Location**: SharpProof.Worker/CallableVerificationPolicy.cs around
-lines 57-68 and SharpProof.Worker/SharpProofWorker.cs around lines 302-323.
-
-**Description**: CallableVerificationPolicy catches every
-OperationCanceledException. After checking caller and project cancellation, it
-defaults every remaining exception to MethodTimeout without checking
-methodBoundary.IsCancellationRequested. SharpProofWorker then treats that
-fabricated timeout as an expired lane and disposes/renews or retires it.
-
-**Reproduction**: A backend returned a faulted task with
-OperationCanceledException while all supplied tokens remained live:
-
-    projectCanceled=False
-    callableReason=MethodTimeout
-    claimReason=MethodTimeout
-
-**Impact**: Backend/library bugs or internal cancellation are reported as
-timeouts, healthy lanes can be needlessly replaced, and factoryless lanes can
-retire remaining work as timed out. Run status and remediation are false.
-
-**Root cause**: The catch assumes every otherwise-unattributed cancellation
-came from CancelAfter.
-
-**Recommended fix**: Require methodBoundary.IsCancellationRequested before
-assigning MethodTimeout. Route unattributed OCE through ordinary
-InfrastructureFailure handling.
-
-**Regression coverage**: Faulted backend OCE plus all-live tokens must yield
-InfrastructureFailure and no renewal. Retain genuine caller, project, and
-method timeout cases.
-
-**Confidence**: High; self-verified in a canonical reflection probe with live
-tokens.
-
 ### 481. [CONFIRMED] Dependency-audit restore failures preserve stale passing evidence with no freshness identity
 
 **Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 43-44 and
