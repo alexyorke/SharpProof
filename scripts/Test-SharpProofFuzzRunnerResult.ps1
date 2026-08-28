@@ -11,9 +11,14 @@ $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) (
 
 function New-CanonicalResult([int]$Cases, [int]$Seed) {
     return [ordered]@{
-        SchemaVersion = 4; Cases = $Cases; Seed = $Seed
+        SchemaVersion = 5; Cases = $Cases; Seed = $Seed
         MaximumParallelism = 4; Agreements = $Cases; Abstentions = 0
         FrontendAgreements = $Cases; SmtAgreements = $Cases
+        FiniteSmtSatisfiable = [Math]::Max(1, [Math]::Floor($Cases / 2))
+        FiniteSmtUnsatisfiable = $Cases - [Math]::Max(1, [Math]::Floor($Cases / 2))
+        FiniteSmtAssumptions = $Cases
+        PartialSmtDefinedTrue = $Cases; PartialSmtDefinedFalse = 0
+        PartialSmtUndefined = $Cases
         PartialSmtAgreements = $Cases
         FrontendCoverage = [ordered]@{
             TextParameters = 1; StringLiterals = 1; NullStrings = 1
@@ -153,6 +158,15 @@ try {
     Assert-Rejected $fixture 'count-mismatch'
     $fixture = Copy-Result $canonical; $fixture.FrontendAgreements = 9
     Assert-Rejected $fixture 'frontend-count-mismatch'
+    $fixture = Copy-Result $canonical; $fixture.FiniteSmtSatisfiable = 0
+    Assert-Rejected $fixture 'finite-smt-satisfiable-missing'
+    $fixture = Copy-Result $canonical; $fixture.FiniteSmtUnsatisfiable = 0
+    Assert-Rejected $fixture 'finite-smt-unsatisfiable-missing'
+    $fixture = Copy-Result $canonical; $fixture.FiniteSmtAssumptions = 0
+    Assert-Rejected $fixture 'finite-smt-assumptions-missing'
+    $fixture = Copy-Result $canonical
+    $fixture.FiniteSmtUnsatisfiable = $fixture.FiniteSmtUnsatisfiable + 1
+    Assert-Rejected $fixture 'finite-smt-outcome-sum-mismatch'
     $fixture = Copy-Result $canonical
     [void]$fixture.FrontendCoverage.Remove('StringCasts')
     Assert-Rejected $fixture 'missing-coverage-field'

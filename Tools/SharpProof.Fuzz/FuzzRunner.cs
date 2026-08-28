@@ -88,6 +88,9 @@ public sealed record FuzzSummary(
     int Abstentions,
     int FrontendAgreements,
     int SmtAgreements,
+    int FiniteSmtSatisfiable,
+    int FiniteSmtUnsatisfiable,
+    int FiniteSmtAssumptions,
     int PartialSmtAgreements,
     int PartialSmtDefinedTrue,
     int PartialSmtDefinedFalse,
@@ -97,7 +100,7 @@ public sealed record FuzzSummary(
     ImmutableArray<FuzzFailure> Failures)
 {
     public bool Passed =>
-        SchemaVersion == 4 &&
+        SchemaVersion == 5 &&
         Cases is > 0 and <= FuzzOptions.MaximumCases &&
         MaximumParallelism is >= 1 and <= 4 &&
         !Failures.IsDefault &&
@@ -105,6 +108,14 @@ public sealed record FuzzSummary(
         FrontendCoverage != null &&
         FrontendCoverage.HasValidCounts &&
         FrontendCoverage.HasValidExceptionCounts(Cases) &&
+        FiniteSmtSatisfiable >= 0 &&
+        FiniteSmtUnsatisfiable >= 0 &&
+        FiniteSmtAssumptions >= 0 &&
+        (long)FiniteSmtSatisfiable + FiniteSmtUnsatisfiable == Cases &&
+        (Cases < FuzzOptions.DefaultCases ||
+         FiniteSmtSatisfiable > 0 &&
+         FiniteSmtUnsatisfiable > 0 &&
+         FiniteSmtAssumptions > 0) &&
         PartialSmtDefinedTrue >= 0 &&
         PartialSmtDefinedFalse >= 0 &&
         PartialSmtUndefined >= 0 &&
@@ -160,6 +171,9 @@ public static class FuzzRunner
         var abstentions = 0;
         var frontendAgreements = 0;
         var smtAgreements = 0;
+        var finiteSmtSatisfiable = 0;
+        var finiteSmtUnsatisfiable = 0;
+        var finiteSmtAssumptions = 0;
         var partialSmtAgreements = 0;
         var partialSmtDefinedTrue = 0;
         var partialSmtDefinedFalse = 0;
@@ -238,6 +252,17 @@ public static class FuzzRunner
                 {
                     Interlocked.Increment(ref smtAgreements);
                 }
+                if (smt.Expected == FiniteDomainSatisfiability.Satisfiable)
+                {
+                    Interlocked.Increment(ref finiteSmtSatisfiable);
+                }
+                else
+                {
+                    Interlocked.Increment(ref finiteSmtUnsatisfiable);
+                }
+                Interlocked.Add(
+                    ref finiteSmtAssumptions,
+                    smt.FiniteDomainAssumptions);
 
                 var partialCase = PartialTermSmtCaseGenerator.Create(
                     factory,
@@ -380,7 +405,7 @@ public static class FuzzRunner
         }
 
         return new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             options.Cases,
             options.Seed,
             options.MaximumParallelism,
@@ -388,6 +413,9 @@ public static class FuzzRunner
             abstentions,
             frontendAgreements,
             smtAgreements,
+            finiteSmtSatisfiable,
+            finiteSmtUnsatisfiable,
+            finiteSmtAssumptions,
             partialSmtAgreements,
             partialSmtDefinedTrue,
             partialSmtDefinedFalse,

@@ -15,7 +15,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
@@ -23,6 +23,9 @@ public sealed class FuzzRunnerTests
             Abstentions: 0,
             FrontendAgreements: 1,
             SmtAgreements: 1,
+            FiniteSmtSatisfiable: 1,
+            FiniteSmtUnsatisfiable: 0,
+            FiniteSmtAssumptions: 1,
             PartialSmtAgreements: 1,
             PartialSmtDefinedTrue: 1,
             PartialSmtDefinedFalse: 0,
@@ -123,12 +126,18 @@ public sealed class FuzzRunnerTests
         var second = await FuzzRunner.RunAsync(options);
 
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.SchemaVersion, Is.EqualTo(4));
+        Assert.That(first.SchemaVersion, Is.EqualTo(5));
         Assert.That(first.Passed, Is.True);
         Assert.That(first.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.Abstentions, Is.Zero);
         Assert.That(first.FrontendAgreements, Is.EqualTo(options.Cases));
         Assert.That(first.SmtAgreements, Is.EqualTo(options.Cases));
+        Assert.That(
+            first.FiniteSmtSatisfiable + first.FiniteSmtUnsatisfiable,
+            Is.EqualTo(options.Cases));
+        Assert.That(first.FiniteSmtSatisfiable, Is.GreaterThan(0));
+        Assert.That(first.FiniteSmtUnsatisfiable, Is.GreaterThan(0));
+        Assert.That(first.FiniteSmtAssumptions, Is.GreaterThan(0));
         Assert.That(
             first.PartialSmtAgreements,
             Is.EqualTo(options.Cases));
@@ -222,6 +231,15 @@ public sealed class FuzzRunnerTests
             Is.EqualTo(serial.FrontendAgreements));
         Assert.That(parallel.SmtAgreements, Is.EqualTo(serial.SmtAgreements));
         Assert.That(
+            parallel.FiniteSmtSatisfiable,
+            Is.EqualTo(serial.FiniteSmtSatisfiable));
+        Assert.That(
+            parallel.FiniteSmtUnsatisfiable,
+            Is.EqualTo(serial.FiniteSmtUnsatisfiable));
+        Assert.That(
+            parallel.FiniteSmtAssumptions,
+            Is.EqualTo(serial.FiniteSmtAssumptions));
+        Assert.That(
             parallel.PartialSmtAgreements,
             Is.EqualTo(serial.PartialSmtAgreements));
         Assert.That(
@@ -242,7 +260,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
@@ -250,6 +268,9 @@ public sealed class FuzzRunnerTests
             Abstentions: 1,
             FrontendAgreements: 1,
             SmtAgreements: 1,
+            FiniteSmtSatisfiable: 1,
+            FiniteSmtUnsatisfiable: 0,
+            FiniteSmtAssumptions: 1,
             PartialSmtAgreements: 1,
             PartialSmtDefinedTrue: 0,
             PartialSmtDefinedFalse: 0,
@@ -271,7 +292,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             Cases: cases,
             Seed: 7,
             MaximumParallelism: maximumParallelism,
@@ -279,6 +300,9 @@ public sealed class FuzzRunnerTests
             Abstentions: 0,
             FrontendAgreements: cases,
             SmtAgreements: cases,
+            FiniteSmtSatisfiable: cases,
+            FiniteSmtUnsatisfiable: 0,
+            FiniteSmtAssumptions: cases,
             PartialSmtAgreements: cases,
             PartialSmtDefinedTrue: 0,
             PartialSmtDefinedFalse: 0,
@@ -304,7 +328,7 @@ public sealed class FuzzRunnerTests
             OverflowExceptions = 1
         };
         var valid = new FuzzSummary(
-            SchemaVersion: 4,
+            SchemaVersion: 5,
             Cases: FuzzOptions.DefaultCases,
             Seed: 7,
             MaximumParallelism: 1,
@@ -312,6 +336,10 @@ public sealed class FuzzRunnerTests
             Abstentions: 0,
             FrontendAgreements: FuzzOptions.DefaultCases,
             SmtAgreements: FuzzOptions.DefaultCases,
+            FiniteSmtSatisfiable: FuzzOptions.DefaultCases / 2,
+            FiniteSmtUnsatisfiable: FuzzOptions.DefaultCases -
+                FuzzOptions.DefaultCases / 2,
+            FiniteSmtAssumptions: FuzzOptions.DefaultCases,
             PartialSmtAgreements: FuzzOptions.DefaultCases,
             PartialSmtDefinedTrue: FuzzOptions.DefaultCases,
             PartialSmtDefinedFalse: 0,
@@ -372,6 +400,22 @@ public sealed class FuzzRunnerTests
                 Is.False);
             Assert.That(
                 (valid with { PartialSmtDefinedTrue = 0 }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { FiniteSmtSatisfiable = 0 }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { FiniteSmtUnsatisfiable = 0 }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { FiniteSmtAssumptions = 0 }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with
+                {
+                    FiniteSmtSatisfiable = FuzzOptions.DefaultCases - 1,
+                    FiniteSmtUnsatisfiable = FuzzOptions.DefaultCases
+                }).Passed,
                 Is.False);
         }
     }

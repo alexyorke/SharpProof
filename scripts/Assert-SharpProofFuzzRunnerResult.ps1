@@ -100,7 +100,11 @@ function Assert-SharpProofFuzzRunnerResult {
             -Expected @(
                 'SchemaVersion', 'Cases', 'Seed', 'MaximumParallelism',
                 'Agreements', 'Abstentions', 'FrontendAgreements',
-                'SmtAgreements', 'PartialSmtAgreements', 'FrontendCoverage',
+                'SmtAgreements', 'FiniteSmtSatisfiable',
+                'FiniteSmtUnsatisfiable', 'FiniteSmtAssumptions',
+                'PartialSmtAgreements', 'PartialSmtDefinedTrue',
+                'PartialSmtDefinedFalse', 'PartialSmtUndefined',
+                'FrontendCoverage',
                 'CoverageSatisfied', 'Failures', 'Passed')
 
         $schema = Get-ExactJsonInt32 $root 'SchemaVersion'
@@ -111,12 +115,24 @@ function Assert-SharpProofFuzzRunnerResult {
         $abstentions = Get-ExactJsonInt32 $root 'Abstentions'
         $frontendAgreements = Get-ExactJsonInt32 $root 'FrontendAgreements'
         $smtAgreements = Get-ExactJsonInt32 $root 'SmtAgreements'
+        $finiteSmtSatisfiable = Get-ExactJsonInt32 `
+            $root 'FiniteSmtSatisfiable'
+        $finiteSmtUnsatisfiable = Get-ExactJsonInt32 `
+            $root 'FiniteSmtUnsatisfiable'
+        $finiteSmtAssumptions = Get-ExactJsonInt32 `
+            $root 'FiniteSmtAssumptions'
+        $partialSmtDefinedTrue = Get-ExactJsonInt32 `
+            $root 'PartialSmtDefinedTrue'
+        $partialSmtDefinedFalse = Get-ExactJsonInt32 `
+            $root 'PartialSmtDefinedFalse'
+        $partialSmtUndefined = Get-ExactJsonInt32 `
+            $root 'PartialSmtUndefined'
         $partialSmtAgreements = Get-ExactJsonInt32 `
             $root 'PartialSmtAgreements'
         $coverageSatisfied = Get-ExactJsonBoolean $root 'CoverageSatisfied'
         $passed = Get-ExactJsonBoolean $root 'Passed'
 
-        if ($schema -ne 4) { throw "Unsupported fuzz schema '$schema'." }
+        if ($schema -ne 5) { throw "Unsupported fuzz schema '$schema'." }
         if ($cases -lt 1) {
             throw 'The fuzz runner case count must be positive.'
         }
@@ -129,11 +145,21 @@ function Assert-SharpProofFuzzRunnerResult {
         }
         if ($agreements -lt 0 -or $abstentions -lt 0 -or
             $frontendAgreements -lt 0 -or $smtAgreements -lt 0 -or
+            $finiteSmtSatisfiable -lt 0 -or
+            $finiteSmtUnsatisfiable -lt 0 -or
+            $finiteSmtAssumptions -lt 0 -or
+            $partialSmtDefinedTrue -lt 0 -or
+            $partialSmtDefinedFalse -lt 0 -or
+            $partialSmtUndefined -lt 0 -or
             $partialSmtAgreements -lt 0 -or
             $agreements + $abstentions -ne $cases -or
             $abstentions -ne 0 -or $agreements -ne $cases -or
             $frontendAgreements -ne $cases -or
             $smtAgreements -ne $cases -or
+            $finiteSmtSatisfiable + $finiteSmtUnsatisfiable -ne $cases -or
+            $finiteSmtAssumptions -eq 0 -or
+            $partialSmtDefinedTrue + $partialSmtDefinedFalse +
+                $partialSmtUndefined -ne $cases * 2 -or
             $partialSmtAgreements -ne $cases) {
             throw 'The fuzz runner counts do not form a complete agreement partition.'
         }
