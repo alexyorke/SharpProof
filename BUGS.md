@@ -3076,31 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 688. [CONFIRMED] Seven CSharp speculative-binding APIs bypass both enforcement layers
-
-**Location**: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around
-lines 51-66; `BannedSymbols.txt`, around lines 18-20.
-
-**Description**: GetSpeculativeSymbolInfo, GetSpeculativeTypeInfo, and
-GetSpeculativeAliasInfo are catalogued under SemanticModel/internal
-CSharpSemanticModel, while all seven public C# overloads bind to static
-`Microsoft.CodeAnalysis.CSharp.CSharpExtensions`. The banned IDs likewise use
-nonmatching reduced-looking SemanticModel signatures.
-
-**Reproduction**: Exact Roslyn operation binding showed all seven calls with
-ContainingType=CSharpExtensions and `ReducedFrom=null`. A GetDiagnostics control
-emitted SPMETA001/RS0030; all seven candidates emitted neither. Adding the seven
-exact static documentation IDs produced exactly seven RS0030 warnings.
-
-**Impact**: Analyzer-attached code can perform speculative expression, cref,
-attribute, constructor-initializer, primary-base, type, and alias binding while
-both claimed compile-time safeguards remain green.
-
-**Recommended fix**: Add all three method families to the CSharpExtensions
-SPMETA catalog and replace/add the seven exact static BannedSymbols IDs. Generate
-inventory coverage from pinned Roslyn symbols. Test extension/static syntax,
-TryGet controls, lookalikes, deletion, and RS0030-as-error behavior.
-
 ### 689. [CONFIRMED] Inline method-group delegate calls omit the exact target contract
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around

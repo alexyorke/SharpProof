@@ -2427,6 +2427,45 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsCSharpSpeculativeBindingHelpers()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            using Microsoft.CodeAnalysis.CSharp;
+            using Microsoft.CodeAnalysis.CSharp.Syntax;
+            namespace SharpProof.Tooling;
+            static class C {
+                static void Speculative(
+                    SemanticModel model,
+                    ExpressionSyntax expression,
+                    CrefSyntax cref,
+                    AttributeSyntax attribute,
+                    ConstructorInitializerSyntax initializer,
+                    PrimaryConstructorBaseTypeSyntax primary,
+                    IdentifierNameSyntax alias) {
+                    _ = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSpeculativeSymbolInfo(
+                        model, 0, expression, SpeculativeBindingOption.BindAsExpression);
+                    _ = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSpeculativeSymbolInfo(
+                        model, 0, cref, SpeculativeBindingOption.BindAsTypeOrNamespace);
+                    _ = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSpeculativeSymbolInfo(model, 0, attribute);
+                    _ = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSpeculativeSymbolInfo(model, 0, initializer);
+                    _ = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSpeculativeSymbolInfo(model, 0, primary);
+                    _ = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSpeculativeTypeInfo(
+                        model, 0, expression, SpeculativeBindingOption.BindAsExpression);
+                    _ = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetSpeculativeAliasInfo(
+                        model, 0, alias, SpeculativeBindingOption.BindAsExpression);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(7));
+    }
+
+    [Test]
     public async Task RejectsSemanticComparisonsOutsideConditionalSyntax()
     {
         const string source =

@@ -63,7 +63,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "GetDiagnostics"),
             [KnownType.CSharpExtensions] = Names(
                 "TryGetSpeculativeSemanticModelForMethodBody",
-                "TryGetSpeculativeSemanticModel"),
+                "TryGetSpeculativeSemanticModel",
+                "GetSpeculativeSymbolInfo",
+                "GetSpeculativeTypeInfo",
+                "GetSpeculativeAliasInfo"),
             [KnownType.SyntaxFactory] = Names("ParseStatement", "ParseExpression", "ParseTypeName")
         }.ToImmutableDictionary();
 
