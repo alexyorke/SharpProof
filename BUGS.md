@@ -294,26 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 620. [CONFIRMED] Cached refutation replay is quadratic per callable
-
-**Location**: `SharpProof.Worker/VerificationCache.cs`, around lines 661-809;
-`CallableCounterexampleReplayer.cs`, around lines 4-22.
-
-**Description**: For every cached claim, replay rematerializes/scans all Ensures
-clauses, rebuilds variable-label maps, and re-enumerates entry assumptions. The
-replayer then rematerializes Ensures again.
-
-**Reproduction**: Valid 250/500/1000/2000-claim fixtures allocated
-1.54/4.77/17.25/66.22 MB; 2,000 replayed successfully in 72.8 ms. Allocation
-approached 4x for each 2x input.
-
-**Impact**: A cache hit can allocate tens/hundreds of MB and consume substantial
-time despite avoiding SMT work.
-
-**Recommended fix**: Precompute claim-to-clause, per-target label, and entry
-assumption indexes, and pass resolved clauses to the replayer. Test linear
-allocation plus shuffled/malformed/cancellation controls.
-
 ### 621. [CONFIRMED] Exact nuspec validation accepts duplicate identity nodes
 
 **Location**: `scripts/Test-SharpProofPackageDependencies.ps1`, around lines

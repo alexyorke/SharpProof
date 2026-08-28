@@ -4,6 +4,22 @@ internal static class CallableCounterexampleReplayer
     internal static WorkerClaimReason Replay(CompilerCallablePreparation target, int claimOrdinal,
         ImmutableDictionary<IrVarId, IrValue> model, CancellationToken cancellationToken = default)
     {
+        return Replay(
+            target,
+            target.Clauses.Where(static clause =>
+                clause.Kind == CompilerContractKind.Ensures).ToImmutableArray(),
+            claimOrdinal,
+            model,
+            cancellationToken);
+    }
+
+    internal static WorkerClaimReason Replay(
+        CompilerCallablePreparation target,
+        ImmutableArray<CompilerPreparedClause> ensures,
+        int claimOrdinal,
+        ImmutableDictionary<IrVarId, IrValue> model,
+        CancellationToken cancellationToken = default)
+    {
         if (target.Body is not { } body)
         {
             return WorkerClaimReason.CounterexampleReplayFailed;
@@ -12,8 +28,6 @@ internal static class CallableCounterexampleReplayer
         try
         {
             var factory = target.Factory;
-            var ensures = target.Clauses.Where(static clause =>
-                clause.Kind == CompilerContractKind.Ensures).ToArray();
             if ((uint)claimOrdinal >= (uint)ensures.Length)
             {
                 return WorkerClaimReason.CounterexampleReplayFailed;

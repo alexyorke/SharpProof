@@ -673,6 +673,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         var targetByCallable = targets.ToDictionary(
             static target => target.Entry.CallableId,
             StringComparer.Ordinal);
+        var replayPlans = targets.ToDictionary(
+            static target => target.Entry.CallableId,
+            static target => ReplayPlan.Create(target),
+            StringComparer.Ordinal);
         var claimById = manifest.Claims.ToDictionary(
             static claim => claim.ClaimId,
             StringComparer.Ordinal);
@@ -682,20 +686,17 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             if (!claimById.TryGetValue(claim.ClaimId, out var declaration) ||
                 declaration.Kind != WorkerClaimKind.Postcondition ||
                 !targetByCallable.TryGetValue(declaration.CallableId, out var target) ||
-                !TryCreateModel(target, claim.Model, out var model))
+                !replayPlans.TryGetValue(declaration.CallableId, out var plan) ||
+                !plan.ClaimOrdinals.TryGetValue(claim.ClaimId, out var ordinal) ||
+                !TryCreateModel(target, plan.Variables, claim.Model, out var model))
             {
                 return false;
             }
 
-            var postconditions = target.Clauses.Where(static clause =>
-                clause.Kind == CompilerContractKind.Ensures).ToArray();
-            var ordinal = Array.FindIndex(
-                postconditions,
-                clause => clause.ClaimId == claim.ClaimId);
-            if (ordinal < 0 ||
-                !EntryAssumptionsHold(target, model, cancellationToken) ||
+            if (!EntryAssumptionsHold(target.Factory, plan.EntryAssumptions, model, cancellationToken) ||
                 CallableCounterexampleReplayer.Replay(
                     target,
+                    plan.Postconditions,
                     ordinal,
                     model,
                     cancellationToken) != WorkerClaimReason.None)
@@ -709,6 +710,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private static bool TryCreateModel(
         CompilerCallablePreparation target,
+        ImmutableDictionary<string, CompilerCanonicalVariable> variables,
         WorkerModelValue[] rows,
         out ImmutableDictionary<IrVarId, IrValue> model)
     {
@@ -718,9 +720,6 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             return false;
         }
 
-        var variables = target.Variables.ToDictionary(
-            static variable => variable.ModelLabel,
-            StringComparer.Ordinal);
         var result = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
         foreach (var row in rows)
         {
@@ -785,14 +784,13 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
     }
 
     private static bool EntryAssumptionsHold(
-        CompilerCallablePreparation target,
+        IrFactory factory,
+        ImmutableArray<CompilerPreparedClause> entryAssumptions,
         ImmutableDictionary<IrVarId, IrValue> model,
         CancellationToken cancellationToken)
     {
-        var interpreter = new IrInterpreter(target.Factory);
-        foreach (var clause in target.Clauses.Where(static clause =>
-                     clause.Kind is CompilerContractKind.Requires or
-                         CompilerContractKind.Assume))
+        var interpreter = new IrInterpreter(factory);
+        foreach (var clause in entryAssumptions)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var evaluated = interpreter.Evaluate(
@@ -807,6 +805,33 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
 
         return true;
+    }
+
+    private sealed record ReplayPlan(
+        ImmutableArray<CompilerPreparedClause> Postconditions,
+        ImmutableArray<CompilerPreparedClause> EntryAssumptions,
+        ImmutableDictionary<string, int> ClaimOrdinals,
+        ImmutableDictionary<string, CompilerCanonicalVariable> Variables)
+    {
+        internal static ReplayPlan Create(CompilerCallablePreparation target)
+        {
+            var postconditions = target.Clauses.Where(static clause =>
+                clause.Kind == CompilerContractKind.Ensures).ToImmutableArray();
+            return new ReplayPlan(
+                postconditions,
+                target.Clauses.Where(static clause =>
+                    clause.Kind is CompilerContractKind.Requires or
+                        CompilerContractKind.Assume).ToImmutableArray(),
+                postconditions
+                    .Select((clause, ordinal) => (clause.ClaimId!, ordinal))
+                    .ToImmutableDictionary(
+                        static item => item.Item1,
+                        static item => item.Item2,
+                        StringComparer.Ordinal),
+                target.Variables.ToImmutableDictionary(
+                    static variable => variable.ModelLabel,
+                    StringComparer.Ordinal));
+        }
     }
 
 }
