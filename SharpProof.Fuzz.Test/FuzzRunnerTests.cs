@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Fuzz;
+using SharpProof.Testing;
 
 namespace SharpProof.Fuzz.Test;
 
@@ -127,6 +128,21 @@ public sealed class FuzzRunnerTests
                 FuzzRunner.CreateCaseSeed(20260605, 3773),
                 Is.Not.EqualTo(FuzzRunner.CreateCaseSeed(20260605, 7592)));
         }
+    }
+
+    [Test]
+    public void OppositeSignedSeedsProduceDifferentGeneratorStreams()
+    {
+        var positive = new DeterministicRandom(123456789);
+        var negative = new DeterministicRandom(-123456789);
+        var positiveStream = Enumerable.Range(0, 8)
+            .Select(_ => positive.Next(int.MaxValue))
+            .ToArray();
+        var negativeStream = Enumerable.Range(0, 8)
+            .Select(_ => negative.Next(int.MaxValue))
+            .ToArray();
+
+        Assert.That(positiveStream, Is.Not.EqualTo(negativeStream));
     }
 
     [Test]

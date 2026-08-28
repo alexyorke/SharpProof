@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
 using SharpProof.Ir;
+using SharpProof.Testing;
 
 namespace SharpProof.Fuzz;
 
@@ -713,7 +714,7 @@ public sealed class SmallCSharpCaseGenerator(int seed)
     ];
 
     private static readonly long[] LiteralIntegers = [-3, -1, 0, 1, 2, 3];
-    private readonly Random _random = new(seed);
+    private readonly DeterministicRandom _random = new(seed);
 
     public GeneratedCSharpCase Next(int maximumDepth = 4)
     {
