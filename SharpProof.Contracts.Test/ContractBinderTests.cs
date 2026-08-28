@@ -366,7 +366,7 @@ public sealed class ContractBinderTests
             """
             using SharpProof.Attributes;
             public interface ITarget {
-                int Read(int value);
+                int Read([Positive] int value);
             }
             public sealed class Target : ITarget {
                 int ITarget.Read(int value) {
@@ -386,6 +386,34 @@ public sealed class ContractBinderTests
         Assert.That(
             result.Contracts.Clauses[0].Kind,
             Is.EqualTo(BoundContractKind.Requires));
+    }
+
+    [Test]
+    public void ExplicitImplementationOnlyPreconditionIsRejected()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface ITarget {
+                int Read(int value);
+            }
+            public sealed class Target : ITarget {
+                int ITarget.Read(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindMethodKind(
+            "Target",
+            MethodKind.ExplicitInterfaceImplementation);
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
     }
 
     [Test]

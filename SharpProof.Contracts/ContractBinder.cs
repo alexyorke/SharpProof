@@ -162,6 +162,17 @@ public sealed class ContractBinder(
             return ContractBindingResult.Fail(attributeResult.Failure);
         }
 
+        if (target.MethodKind == MethodKind.ExplicitInterfaceImplementation &&
+            (invocationResult.Clauses.Any(static clause =>
+                 clause.Kind == BoundContractKind.Requires) ||
+             attributeResult.Clauses.Any(static clause =>
+                 clause.Kind == BoundContractKind.Requires)) &&
+            !HasInterfacePreconditions(target))
+        {
+            return ContractBindingResult.Fail(
+                ContractBindingFailure.UnsupportedTarget);
+        }
+
         clauses.AddRange(attributeResult.Clauses);
 
         return ContractBindingResult.Success(new BoundMethodContracts(
@@ -243,6 +254,23 @@ public sealed class ContractBinder(
         }
 
         return ContractBindingFailure.None;
+    }
+
+    private bool HasInterfacePreconditions(IMethodSymbol implementation)
+    {
+        if (implementation.ExplicitInterfaceImplementations.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        return implementation.ExplicitInterfaceImplementations.All(
+            interfaceMember =>
+            {
+                var binding = BindRequires(interfaceMember);
+                return binding is { IsSuccess: true, Contracts: not null } &&
+                    binding.Contracts.Clauses.Any(static clause =>
+                        clause.Kind == BoundContractKind.Requires);
+            });
     }
 
     private ClauseBindingResult BindClosedAttributes(
