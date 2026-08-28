@@ -353,6 +353,31 @@ public sealed class RequiresReplaySoundnessTests
     }
 
     [Test]
+    public async Task OmittedOptionalInArgumentUsesItsDefaultSnapshot()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequirePositive(in int value = -1) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call() {
+                    RequirePositive();
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task MutationBearingArgumentSnapshotCannotBeRecomputed()
     {
         var factory = new RecordingSessionFactory();

@@ -670,6 +670,11 @@ internal static partial class RequiresCallSiteAnalyzer
             return CallArgumentEvaluation.Unsupported;
         }
 
+        if (argument.ArgumentKind == ArgumentKind.DefaultValue)
+        {
+            return CallArgumentEvaluation.Snapshot;
+        }
+
         var isSyntheticReceiver =
             callSite.TargetMethod.IsExtensionMethod &&
             callSite.TargetMethod.ReducedFrom == null &&
