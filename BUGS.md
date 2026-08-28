@@ -3054,27 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 648. [CONFIRMED] WellSortedIrGenerator category labels survive operation folding
-
-**Location**: `SharpProof.Testing/WellSortedIrGenerator.cs`, around lines 58-69
-and 182 onward; `SharpProof.Ir/IrFactory.cs`, around lines 516-533;
-`IrCSharpDifferentialOracleTests.cs`, around lines 20-30.
-
-**Description**: The generator records the requested category before building
-the term. `Length` of a string literal is folded immediately into an integer, but
-the result remains labelled StringLength and is credited as such by tests.
-
-**Reproduction**: In the canonical 200-case sequence, 26 cases were labelled
-StringLength but only 22 had length roots; indices 115, 119, 128, and 157 were
-integer literals after folding.
-
-**Impact**: Category-based coverage overstates exercised IR operations and can
-stay green if every selected operation is folded away.
-
-**Recommended fix**: Use guaranteed nonfoldable operands for operation-specific
-categories, or derive/retry the category from the emitted term. Assert category
-shape invariants for every operation-specific label.
-
 ### 649. [CONFIRMED] SPMETA001 misses forbidden Roslyn method-group delegates
 
 **Location**: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around
