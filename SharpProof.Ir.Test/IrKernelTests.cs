@@ -76,6 +76,36 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void ConstrainSuccessfulEvaluationValidatesSortAndOwnership()
+    {
+        var factory = new IrFactory();
+        var foreign = new IrFactory();
+
+        Assert.Throws<ArgumentException>(
+            (Action)(() => IrSemanticTerms.ConstrainSuccessfulEvaluation(
+                factory,
+                factory.Integer(1),
+                factory.Boolean(true))));
+        Assert.Throws<ArgumentException>(
+            (Action)(() => IrSemanticTerms.ConstrainSuccessfulEvaluation(
+                factory,
+                foreign.Boolean(true),
+                factory.Boolean(true))));
+        Assert.Throws<ArgumentException>(
+            (Action)(() => IrSemanticTerms.ConstrainSuccessfulEvaluation(
+                factory,
+                factory.Boolean(true),
+                foreign.Boolean(true))));
+
+        Assert.That(
+            IrSemanticTerms.ConstrainSuccessfulEvaluation(
+                factory,
+                factory.Boolean(true),
+                factory.Integer(1)),
+            Is.SameAs(factory.Boolean(true)));
+    }
+
+    [Test]
     public void MemberInterningIncludesTheMemberName()
     {
         var factory = new IrFactory();

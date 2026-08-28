@@ -25,6 +25,18 @@ public static class IrSemanticTerms
     {
         ArgumentNullGuard.NotNull(factory, nameof(factory));
         ArgumentNullGuard.NotNull(predicate, nameof(predicate));
+        factory.EnsureTerm(predicate, nameof(predicate));
+        if (predicate.Type != factory.BooleanType)
+        {
+            throw new ArgumentException(
+                "The successful-evaluation predicate must be Boolean.",
+                nameof(predicate));
+        }
+
+        if (evaluated != null)
+        {
+            factory.EnsureTerm(evaluated, nameof(evaluated));
+        }
 
         if (!RequiresDefinednessWitness(evaluated))
         {
