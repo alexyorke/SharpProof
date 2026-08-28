@@ -3827,6 +3827,54 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ParameterizedArrayRangeSlicesRecordManagedAllocation()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Sample {
+                public static int[] Slice(int[] values, Range range) =>
+                    values[range];
+                public static int Index(int[] values, int index) =>
+                    values[index];
+                public static int[] Jagged(int[][] values, int index) =>
+                    values[index];
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var slice = session.Analyze(Method(compilation, "Slice"));
+        var index = session.Analyze(Method(compilation, "Index"));
+        var jagged = session.Analyze(Method(compilation, "Jagged"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                slice.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                slice.Projection.Effects & SharpProofEffect.Allocates,
+                Is.EqualTo(SharpProofEffect.Allocates));
+            Assert.That(
+                slice.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            AssertContainsThrows(
+                slice.Summary,
+                "System.ArgumentOutOfRangeException");
+            AssertDoesNotThrow(
+                slice.Summary,
+                "System.IndexOutOfRangeException");
+            Assert.That(
+                index.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.None));
+            Assert.That(
+                jagged.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.None));
+        }
+    }
+
+    [Test]
     public void PossiblyNullThrownExpressionIncludesNullReferenceExceptionUnlessRequiredNonNull()
     {
         var compilation = EffectTestHost.CreateCompilation(

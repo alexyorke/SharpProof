@@ -22,6 +22,7 @@ internal sealed partial class OperationEffectScanner
     private readonly ConversionOwnershipClassifier _conversionOwnership;
     private readonly IMethodSymbol _method;
     private readonly INamedTypeSymbol? _monitorType;
+    private readonly INamedTypeSymbol? _rangeType;
     private readonly IOperation _root;
     private readonly EffectAnalysisSession _session;
     private readonly OperationNullnessEvaluator _nullnessEvaluator;
@@ -61,6 +62,7 @@ internal sealed partial class OperationEffectScanner
         _directSyntax = GetDirectSyntax(root.Syntax);
         _exceptionType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         _monitorType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Monitor);
+        _rangeType = session.Compilation.GetTypeByMetadataName("System.Range");
         _nullnessEvaluator = new OperationNullnessEvaluator(
             session,
             _root,
@@ -597,9 +599,18 @@ internal sealed partial class OperationEffectScanner
                 Throw(FrameworkTypeMetadataNames.NullReferenceException));
         }
 
+        var allocation = IsRangeIndex(element)
+            ? EffectSummaryOperations.Allocate(EffectAllocationKind.Managed)
+            : EffectSummary.Empty;
+
         if (_abstractFlow?.ProvesArrayAccess(element) != true)
         {
-            exceptions = EffectSummaryOperations.Join(exceptions, Throw(FrameworkTypeMetadataNames.IndexOutOfRangeException));
+            var boundsException = IsRangeIndex(element)
+                ? FrameworkTypeMetadataNames.ArgumentOutOfRangeException
+                : FrameworkTypeMetadataNames.IndexOutOfRangeException;
+            exceptions = EffectSummaryOperations.Join(
+                exceptions,
+                Throw(boundsException));
         }
 
         if (access == EffectAccess.Write &&
@@ -613,7 +624,17 @@ internal sealed partial class OperationEffectScanner
         return EffectSummaryOperations.Join(
             evaluation.Summary,
             accessSummary,
+            allocation,
             exceptions);
+    }
+
+    private bool IsRangeIndex(IArrayElementReferenceOperation element)
+    {
+        return element.Indices.Length == 1 &&
+            _rangeType != null &&
+            SymbolEqualityComparer.Default.Equals(
+                element.Indices[0].Type,
+                _rangeType);
     }
 
     private EffectSummary ScanFlowCapture(IFlowCaptureOperation capture)

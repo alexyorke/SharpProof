@@ -7,6 +7,8 @@ namespace SharpProof.Specs;
 public static class FrameworkTypeMetadataNames
 {
     public const string ArgumentNullException = "System.ArgumentNullException";
+    public const string ArgumentOutOfRangeException =
+        "System.ArgumentOutOfRangeException";
     public const string ArrayTypeMismatchException =
         "System.ArrayTypeMismatchException";
     public const string ConditionalAttribute =

@@ -3054,51 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 663. [CONFIRMED] Parameterized array range slices omit mandatory allocation
-
-**Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines
-544-596.
-
-**Description**: Array-element scanning treats a single `System.Range` index as
-ordinary element access. It evaluates receiver/index and exceptions but never
-records that a successful array slice allocates a new managed array.
-
-**Reproduction**: `int[] Slice(int[] values, Range range) => values[range]`
-returned a distinct array; mutation did not affect the source, and 64 escaping
-calls allocated 2,048 bytes. Effects reported `Allocation=None`, Complete, and a
-complete projection. Ordinary int-index and jagged-array selection controls
-correctly allocated nothing.
-
-**Impact**: No-allocation and purity contracts can accept a method that allocates
-on every successful call.
-
-**Recommended fix**: Recognize the semantic `System.Range` index identity and
-join a Managed allocation/direct witness after receiver/index/null gating. Do
-not infer from array result type alone. Test range, int index, jagged selection,
-and invalid receiver controls.
-
-### 664. [CONFIRMED] Array range slices report the wrong exception type
-
-**Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines
-544-596.
-
-**Description**: Every unproven array access is assigned
-`IndexOutOfRangeException`. Range slicing instead validates offsets through
-Range/GetOffsetAndLength and throws `ArgumentOutOfRangeException` for invalid
-ranges.
-
-**Reproduction**: `values[new Range(new Index(10), ^0)]` threw
-ArgumentOutOfRangeException at runtime, while the Complete summary listed
-IndexOutOfRangeException and omitted the actual type. Ordinary `values[10]`
-correctly threw/listed IndexOutOfRangeException.
-
-**Impact**: AllowedExceptions, DoesNotThrow, and exception-handler reachability
-can prove the wrong contract for array slicing.
-
-**Recommended fix**: For the exact System.Range index form, add canonical
-ArgumentOutOfRangeException and retain IndexOutOfRangeException for integer
-indices. Add valid/invalid range and ordinary-index controls.
-
 ### 666. [CONFIRMED] SPMETA003 trusts CallerCancellationWon by name, not behavior
 
 **Location**: `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs`, around
