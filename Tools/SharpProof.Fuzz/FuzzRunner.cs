@@ -92,7 +92,7 @@ public sealed record FuzzSummary(
 {
     public bool Passed =>
         SchemaVersion == 4 &&
-        Cases > 0 &&
+        Cases is > 0 and <= FuzzOptions.MaximumCases &&
         MaximumParallelism is >= 1 and <= 4 &&
         !Failures.IsDefault &&
         Failures.IsEmpty &&

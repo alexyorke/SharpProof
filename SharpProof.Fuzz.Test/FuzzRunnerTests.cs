@@ -246,6 +246,16 @@ public sealed class FuzzRunnerTests
         {
             Assert.That(valid.Passed, Is.True);
             Assert.That(
+                (valid with
+                {
+                    Cases = FuzzOptions.MaximumCases + 1,
+                    Agreements = FuzzOptions.MaximumCases + 1,
+                    FrontendAgreements = FuzzOptions.MaximumCases + 1,
+                    SmtAgreements = FuzzOptions.MaximumCases + 1,
+                    PartialSmtAgreements = FuzzOptions.MaximumCases + 1
+                }).Passed,
+                Is.False);
+            Assert.That(
                 (valid with { SchemaVersion = 999 }).Passed,
                 Is.False);
             Assert.That(
