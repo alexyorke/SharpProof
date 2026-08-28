@@ -31,6 +31,28 @@ public sealed class IrCSharpDifferentialOracleTests
     }
 
     [Test]
+    public void StringLengthCategoryAlwaysRetainsALengthTerm()
+    {
+        var factory = new IrFactory();
+        var generator = new WellSortedIrGenerator(factory, seed: 0x5A17);
+        var count = 0;
+
+        for (var index = 0; index < 2000; index++)
+        {
+            var generated = generator.Next(maximumDepth: 4);
+            if (generated.Category != GeneratedIrCategory.StringLength)
+            {
+                continue;
+            }
+
+            count++;
+            Assert.That(generated.Term, Is.TypeOf<IrLengthTerm>());
+        }
+
+        Assert.That(count, Is.GreaterThan(0));
+    }
+
+    [Test]
     public void GeneratedNullCastsCoverNullStringAndNonStringReferences()
     {
         var factory = new IrFactory();

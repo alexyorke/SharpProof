@@ -231,7 +231,18 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     private IrTerm CreateStringLength(int depth)
     {
         ConsumeNodes(1);
-        return _factory.Length(String(depth));
+        var operand = String(depth);
+        if (operand is IrStringTerm)
+        {
+            // A literal length is folded by IrFactory and would make the
+            // requested StringLength category disappear from the emitted IR.
+            operand = _factory.Binary(
+                IrBinaryOperator.StringConcat,
+                _factory.Variable(_text),
+                operand);
+        }
+
+        return _factory.Length(operand);
     }
 
     private IrTerm CreateNullCast()
