@@ -914,6 +914,26 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public void ResourceAccountingAccumulatesCumulativeContextSnapshotsAsDeltas()
+    {
+        var consumed = 0L;
+        var previous = 0L;
+        foreach (var observed in new[] { 10L, 30L, 60L })
+        {
+            consumed = IrSmtBackend.AddResourceSnapshot(
+                consumed,
+                previous,
+                observed);
+            previous = observed;
+        }
+
+        Assert.That(consumed, Is.EqualTo(60L));
+        Assert.That(
+            IrSmtBackend.AddResourceSnapshot(60L, 60L, 5L),
+            Is.EqualTo(65L));
+    }
+
+    [Test]
     public void CancellationWhileQueuedAtTheBackendGateDoesNotRunTheQuery()
     {
         var factory = new IrFactory();
