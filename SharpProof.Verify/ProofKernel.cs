@@ -95,7 +95,10 @@ public sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        if (!ValidateAssignments(query, result.Model.Assignments))
+        if (!ValidateAssignments(
+                query,
+                result.Model.Assignments,
+                cancellationToken))
         {
             return Unknown(AbstentionReason.CounterexampleReplayFailed);
         }
@@ -130,16 +133,33 @@ public sealed class ProofKernel(ISmtBackend backend)
             ? new RefutedOutcome(new ValidatedModel(result.Model.Assignments))
             : Unknown(AbstentionReason.CounterexampleReplayFailed);
     }
-    private static bool ValidateAssignments(VerificationQuery query,
-        ImmutableDictionary<IrVarId, IrValue> assignments)
+    private static bool ValidateAssignments(
+        VerificationQuery query,
+        ImmutableDictionary<IrVarId, IrValue> assignments,
+        CancellationToken cancellationToken)
     {
         if (assignments.Count != query.ModelVariables.Length ||
-            query.ModelVariables.Any(variable => !assignments.ContainsKey(variable)))
+            query.ModelVariables.Any(variable =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return !assignments.ContainsKey(variable);
+            }))
         {
             return false;
         }
 
-        return assignments.All(IsValid);
+        foreach (var assignment in assignments)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsValid(assignment))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return false;
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return true;
 
         bool IsValid(KeyValuePair<IrVarId, IrValue> assignment)
         {

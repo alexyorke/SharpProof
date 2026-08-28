@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace SharpProof.Verify.Test;
 
@@ -529,6 +531,38 @@ public sealed class ProofKernelTests
         Assert.ThrowsAsync<OperationCanceledException>(action);
     }
 
+    [Test]
+    public void CancellationDuringMalformedModelValidationPropagates()
+    {
+        var factory = new IrFactory();
+        var variables = Enumerable.Range(0, 500_000)
+            .Select(index => factory.CreateVariable(
+                "value" + index,
+                factory.IntegerType))
+            .ToImmutableArray();
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(false),
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)),
+            variables);
+        var model = new BackendModel(
+            variables.Select(variable => KeyValuePair.Create(
+                variable,
+                factory.CreateIntegerValue(0))));
+        using var cancellation = new CancellationTokenSource();
+        Func<Task> action = () => new ProofKernel(
+                new CancelingSatisfiableBackend(model, cancellation))
+            .VerifyAsync(query, cancellation.Token);
+
+        var stopwatch = Stopwatch.StartNew();
+        Assert.ThrowsAsync<OperationCanceledException>(action);
+        Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromMilliseconds(100)));
+    }
+
     private static Fixture CreateFixture()
     {
         var factory = new IrFactory();
@@ -584,6 +618,25 @@ public sealed class ProofKernelTests
                 await cancellation.CancelAsync().ConfigureAwait(false);
             });
             return Task.FromResult(result);
+        }
+    }
+
+    private sealed class CancelingSatisfiableBackend(
+        BackendModel model,
+        CancellationTokenSource cancellation) : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            _ = query;
+            _ = cancellationToken;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1).ConfigureAwait(false);
+                await cancellation.CancelAsync().ConfigureAwait(false);
+            });
+            return Task.FromResult(BackendCheckResult.Satisfiable(model));
         }
     }
 

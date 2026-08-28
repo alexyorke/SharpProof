@@ -203,49 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 494. [CONFIRMED] Cancellation during malformed SAT-model validation returns semantic Unknown
-
-**Location**: SharpProof.Verify/ProofKernel.cs, last common token check around
-line 30, ReplayCounterexample around lines 74-90, and tokenless
-ValidateAssignments around lines 111-117.
-
-**Description**: After a SAT backend result, ProofKernel scans the expected
-variables and model assignments without a cancellation token. If the malformed
-model is detected, ReplayCounterexample immediately returns
-Unknown(CounterexampleReplayFailed) before the next cancellation checkpoint.
-Cancellation during either full-model pass is therefore swallowed as ordinary
-semantic evidence.
-
-**Reproduction**: A completed fake backend returned a 500,000-variable model
-that omitted the final expected key and added one extra key. Cancellation was
-scheduled after backend return and fired during the last-key membership scan.
-Two canonical runs reported:
-
-    tokenCanceled=True; postCancelWorkMs=138
-    outcome=UnknownOutcome; reason=CounterexampleReplayFailed
-    control=OperationCanceledException
-
-**Impact**: The public ProofKernel can perform substantial post-cancellation
-work and return a non-canceled outcome. Current Worker callers add a later
-check, but direct/kernel consumers and custom backends observe incorrect
-cancellation semantics.
-
-**Root cause**: ValidateAssignments has no token checkpoints, and its false
-return is an early semantic branch before the shared post-replay check.
-
-**Recommended fix**: Pass the token through model validation, check before and
-during both expected-key and assignment-value scans, and add a final common
-ThrowIfCancellationRequested before every mapped outcome or malformed-result
-return.
-
-**Regression coverage**: Deterministically cancel during expected-key
-enumeration and require OperationCanceledException. Retain uncanceled malformed
-model -> CounterexampleReplayFailed, cancel-before-backend-return, and valid SAT
-replay controls.
-
-**Confidence**: High; two exact repeat runs returned semantic Unknown more than
-100 ms after their tokens were canceled while the control threw.
-
 ### 495. [CONFIRMED] Package-test setup failures leave earlier parallel shards running
 
 **Location**: scripts/Invoke-SharpProofPackageTests.ps1, process creation and
