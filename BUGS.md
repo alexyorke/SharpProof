@@ -404,44 +404,6 @@ Require the old pair absent or nonpassing and prove qualification rejects it.
 **Confidence**: High; self-verified byte-for-byte in a temp canonical fixture
 and traced through qualification consumption.
 
-### 458. [CONFIRMED] Distinct unsupported folded constants collapse to one pure opaque IR term
-
-**Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
-lines 319, 332, and 469; SharpProof.Frontend/CompilerIdentityBridge.cs around
-line 124.
-
-**Description**: Representable folded constants are classified as pure, but
-unsupported-operation child structure is discarded and OperationSemanticIdentity
-does not include ConstantValue. Pure opaque interning therefore assigns the
-same identity to semantically distinct folded constants such as nameof(First)
-and nameof(Second).
-
-**Reproduction**:
-
-    first constant=First  exact=False abstention=UnsupportedOperationKind term=IrOpaqueTerm id=0
-    second constant=Second exact=False abstention=UnsupportedOperationKind term=IrOpaqueTerm id=0
-    same-term=True
-
-**Impact**: The outer classification remains a closed abstention, but retained
-IR falsely correlates distinct unknown values. Program lowering reuses one
-expression lowerer across nodes, so downstream partial analysis can treat
-different constants as one deterministic value. This violates the existing
-UnsupportedConstantsDoNotSharePureOpaqueTerms invariant.
-
-**Root cause**: Pure-operation semantic identity distinguishes operation shape
-and type but not constant presence, nullness, or value.
-
-**Recommended fix**: Add a type-tagged constant discriminator to
-OperationSemanticIdentity, distinguishing no constant, null, and concrete
-values. Preserve interning only for semantically identical constants.
-
-**Regression coverage**: Lower nameof(First) == nameof(Second), inspect the
-outer opaque term's arguments, and require distinct pure opaque terms. Add a
-same-value control proving identical nameof(First) occurrences may still share.
-
-**Confidence**: High; self-verified through the exact lowerer/factory with
-distinct constants and term IDs.
-
 ### 459. [CONFIRMED] SPMETA010 loses cache ownership for mutation methods on owned child objects
 
 **Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
