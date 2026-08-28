@@ -267,58 +267,6 @@ unsafe cache property target and retain a fully cacheable tuple control.
 **Confidence**: High; self-verified in a canonical exact-source probe with
 positive inline and negative alias/factory controls.
 
-### 445. [CONFIRMED] Strict verification silently succeeds for non-C# projects
-
-**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
-around lines 4-5, 110, 225, 323, and 364;
-SharpProof.Package/buildTransitive/SharpProof.targets around lines 15-16 and
-85-89; C#-only analyzer, generator, and collector registrations.
-
-**Description**: The verifier targets mark every project extension except
-.csproj as language-unsupported. Verification initialization, the public
-SharpProofVerify target, verifier execution, and even the unsupported-host
-rejection target are gated on language support. Strict profile still sets
-SharpProofVerify=true, but its package check validates only that the verifier
-package is present. Roslyn ignores the C#-only analyzer, generator, and
-collector in VB or F# projects. The complete pipeline therefore skips silently.
-
-**Canonical executable probe**:
-
-    CASE=vb-strict EXIT=0
-    Build succeeded.
-    0 Warning(s)
-    0 Error(s)
-    request/result/compiler-manifest/SARIF: all absent
-
-    CASE=cs-strict EXIT=1
-    error SP0054 at SharpProof.Verifier.targets(365,5)
-
-    CASE=vb-forced-language-supported EXIT=1
-    error SP0054 at SharpProof.Verifier.targets(365,5)
-
-The C# and forced-VB controls used identical verification inputs, isolating the
-language-support guard.
-
-**Impact**: A .vbproj or .fsproj can opt into strict or explicit verification,
-exit green, and produce no analyzer diagnostic or proof evidence. A
-mixed-language solution can therefore appear fully strict while some projects
-were never analyzed.
-
-**Root cause**: Unsupported language is used as a condition for both execution
-and rejection, converting an explicit strict request into a no-op.
-
-**Recommended fix**: Add a language-specific SP0054 rejection target before
-CoreCompile and direct SharpProofVerify whenever verification is enabled and
-the profile is not off. Keep advisory/off behavior explicit rather than
-implicitly skipping.
-
-**Regression coverage**: Add isolated-feed VB and F# consumers. Strict and
-explicit SharpProofVerify=true must fail with the language SP0054 and create no
-evidence; profile off should remain a successful control.
-
-**Confidence**: High; self-verified with executable canonical MSBuild target
-graphs and two controls that activate the existing rejection path.
-
 ### 447. [CONFIRMED] Scalar-semantics generation accepts duplicate semantic properties
 
 **Location**: scripts/Generate-CSharpScalarSemantics.ps1 around line 195;
