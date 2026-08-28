@@ -691,45 +691,6 @@ Cover finite-SMT Unknown and partial-backend unrecognized paths.
 **Confidence**: High; self-verified through focused canonical tests and exact
 result-retention flow.
 
-### 476. [CONFIRMED] Distinct unsupported parameters and locals collapse to one opaque value
-
-**Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
-lines 339, 492, and 503; SharpProof.Frontend/CompilerIdentityBridge.cs around
-line 38.
-
-**Description**: Unsupported parameter and local reads call Opaque without
-passing the referenced symbol. They are classified pure, and semantic identity
-then contains only operation kind and type. Distinct symbols of the same
-unsupported type are structurally interned as one PureOpaque term.
-
-**Reproduction**:
-
-    public static bool Target(double left, double right) => left == right;
-
-The probe reported:
-
-    runtime=False
-    exact=False abstention=UnsupportedType
-    left purity=Pure id=0
-    right purity=Pure id=0
-    same-parameter-term=True
-
-**Impact**: Partial IR loses independence between unrelated double, decimal,
-enum, custom-struct, and other unsupported values. Downstream analysis can
-propagate false equality/correlation.
-
-**Root cause**: Opaque identity omits IParameterSymbol or ILocalSymbol even
-though repeated reads of one symbol should share and reads of different symbols
-should not.
-
-**Recommended fix**: Pass operation.Parameter or operation.Local as the symbol
-argument for unsupported references.
-
-**Regression coverage**: For double left == right require distinct child terms;
-for left == left require shared child terms.
-
-**Confidence**: High; runtime and lowerer term identities were self-verified.
-
 ### 477. [CONFIRMED] Generated enum-array uniqueness validation allocates on every call
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 874-879
