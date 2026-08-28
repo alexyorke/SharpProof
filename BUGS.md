@@ -2619,25 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 603. [CONFIRMED] Failure-response claim projection is quadratic
-
-**Location**: `SharpProof.Worker.Protocol/WorkerResultAssembler.cs`, around
-lines 59-71 (`CreateIncomplete`).
-
-**Description**: Every manifest claim performs `Callables.FirstOrDefault` to
-find its owner, making failure/cancellation projection O(callables * claims).
-
-**Reproduction**: Valid 1k/2k/4k/8k fixtures measured 8.9/35.5/143.9/563.2 ms;
-an ordinal dictionary control stayed below 0.1 ms. The full 8k response was
-valid and 6.56 MB.
-
-**Impact**: Recovery after timeout/cancellation can consume remaining launcher
-grace on large ordinary manifests.
-
-**Recommended fix**: Build one first-match ordinal callable-ID dictionary,
-preserving duplicate-first and missing-owner behavior. Test exact assumption
-propagation and near-linear scaling.
-
 ### 604. [CONFIRMED] Non-completing deconstruction conversion phases lose reached effects
 
 **Location**: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, around
