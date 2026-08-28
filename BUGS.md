@@ -6025,28 +6025,6 @@ evidence policy failures.
 UserAssume or TrustedBoundary only. Test earlier preconditions, both policy kinds,
 console structure, and SARIF URI.
 
-### 700. [CONFIRMED] IrStructuralShrinker expands shared DAG occurrences exponentially
-
-**Location**: `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs`, around lines
-430-559.
-
-**Description**: Candidate generation creates a fresh local seen set on every
-recursive call and traverses shared children once per occurrence. Duplicate
-filtering happens only after repeated recursive rebuilding; cancellation cannot
-interrupt GetCandidates.
-
-**Reproduction**: Shared `Add(term,term)` DAGs with 9/13/17 unique nodes returned
-only three candidates but allocated 1.26/20.13/322.13 MB. Every four added unique
-nodes multiplied allocation by 16.
-
-**Impact**: Minimization can consume hundreds of MB or more on tiny valid terms
-and fail before emitting fuzz evidence.
-
-**Recommended fix**: Memoize candidate arrays by IrId for the full traversal (or
-visit unique DAG nodes/parent edges once), preserve deterministic order, and
-thread cancellation through enumeration. Add shared-depth allocation/visit-count
-and cancellation tests.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
