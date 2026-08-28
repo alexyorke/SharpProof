@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 587. [CONFIRMED] Literal-true postconditions consume a redundant query reservation
-
-**Location**: CallableEntryFeasibility.cs around lines 110-140;
-CallableVerifier.cs around lines 186-237; IrSemanticTerms.cs around lines 44-62.
-
-**Description**: A feasible entry query can use the final method reservation.
-Even when the folded postcondition obligation is literal true, CallableVerifier
-requires another reservation and returns Unknown(ResourceLimit).
-
-**Reproduction**: With Requires(value > 0), Ensures(true), and method limit one,
-entry was Feasible and outcome Unknown/ResourceLimit. Raising only the method
-limit to two produced Proven and consumed additional SMT resources.
-
-**Impact**: A logically unconditional claim is downgraded and strict builds can
-fail; with capacity, an unnecessary solver call is charged.
-
-**Recommended fix**: Discharge literal true before TryStartQuery as Proven with
-an empty nonvacuous core. Add one-call tight-budget, nonliteral control, and
-backend-test fixture adjustments.
-
 ### 588. [CONFIRMED] Disabling analyzers republishes stale Proven evidence
 
 **Location**: CompilerCollector/FinalCompilationCollectorAnalyzer.cs around
