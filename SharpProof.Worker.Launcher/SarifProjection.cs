@@ -86,9 +86,7 @@ internal static class SarifProjection
             },
             invocations = new[] { new {
                 executionSuccessful = runStatus == WorkerRunStatus.Complete &&
-                    errors.Length == 0 &&
-                    !claimResults.Any(static result =>
-                        result.Outcome == WorkerClaimOutcome.Refuted),
+                    errors.Length == 0,
                 properties = new { RunStatus = runStatus, FailureReason = failureReason },
                 toolExecutionNotifications = notifications
             }},

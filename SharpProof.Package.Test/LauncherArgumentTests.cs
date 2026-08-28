@@ -1776,7 +1776,7 @@ public sealed class LauncherArgumentTests
             Assert.That(
                 run.GetProperty("invocations")[0]
                     .GetProperty("executionSuccessful").GetBoolean(),
-                Is.False);
+                Is.True);
             Assert.That(results.GetArrayLength(), Is.EqualTo(2));
             Assert.That(
                 results[0].GetProperty("ruleId").GetString(),
