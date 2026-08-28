@@ -175,10 +175,16 @@ internal static class WorkerResultAssembler
         WorkerRunStatus runStatus,
         WorkerRunFailureReason failureReason,
         bool hasErrors,
-        IReadOnlyDictionary<string, WorkerClaimResult[]>? claimsByCallable = null)
+        IReadOnlyDictionary<string, WorkerClaimResult[]>? claimsByCallable = null,
+        IReadOnlyDictionary<string, WorkerCallableManifestEntry>? callablesById = null)
     {
-        var ownedIds = manifest.Callables.FirstOrDefault(entry =>
-            entry.CallableId == callable.CallableId)?.ClaimIds ?? [];
+        var declared = callablesById != null
+            ? callablesById.TryGetValue(callable.CallableId, out var indexedCallable)
+                ? indexedCallable
+                : null
+            : manifest.Callables.FirstOrDefault(entry =>
+                entry.CallableId == callable.CallableId);
+        var ownedIds = declared?.ClaimIds ?? [];
         var owned = claimsByCallable != null
             ? claimsByCallable.TryGetValue(callable.CallableId, out var indexed)
                 ? indexed

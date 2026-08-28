@@ -855,6 +855,11 @@ public static partial class WorkerProtocolJson
                     ? manifestClaim.CallableId ?? string.Empty
                     : string.Empty, s_ordinal)
                 .ToDictionary(static group => group.Key, static group => group.ToArray(), s_ordinal);
+            var callablesById = (response.Manifest.Callables ?? [])
+                .Where(static callable => callable != null &&
+                    !string.IsNullOrWhiteSpace(callable.CallableId))
+                .GroupBy(static callable => callable.CallableId, s_ordinal)
+                .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
             foreach (var callable in callables)
             {
                 errors.Check(WorkerResultAssembler.MatchesCallableProjection(
@@ -864,7 +869,8 @@ public static partial class WorkerProtocolJson
                         expectedStatus,
                         expectedFailure,
                         protocolErrors.Length != 0,
-                        claimsByCallable),
+                        claimsByCallable,
+                        callablesById),
                     "response.callable_projection");
             }
         }
