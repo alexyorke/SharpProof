@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 570. [CONFIRMED] A completed lock statement suppresses later SP0027 diagnostics
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
-188-208 and 425-471; ManagedAbstractFlow.cs around lines 1842-1917;
-lock-aware logic already exists in OperationCompletionEvaluator.cs around
-992-997.
-
-**Description**: Replay-prefix validation requires CompletesNormally for every
-prior statement, but that strict switch has no ILockOperation arm.
-
-**Reproduction**: Direct and empty-block controls had CanReplay=true and one
-SP0027. After lock(new object()){} or a known nonnull local lock, flow was
-Complete, runtime reached the call once, CanReplay=false, and diagnostics were
-zero. Null lock stayed quiet.
-
-**Impact**: A common lock-then-call shape loses all later concrete precondition
-refutations.
-
-**Recommended fix**: Share lock completion: completing acquisition, proven
-nonnull receiver, and completing body. Keep null/unknown, throwing acquisition,
-and abrupt body fail-closed. Add discovery/analyzer parity tests.
-
 ### 571. [CONFIRMED] Event handler expressions are skipped before null receiver failure
 
 **Location**: SharpProof.Effects/OperationEffectScanner.Expressions.cs around
@@ -2790,29 +2768,6 @@ crashes every affected construction before the body.
 **Recommended fix**: Keep body-only prologue placement, but validate constructor
 initializer operations as additional executable roots. Test base(Result),
 this(Old), valid body prologue, and no duplicate diagnostics.
-
-### 578. [CONFIRMED] A completed try statement suppresses later SP0027 diagnostics
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
-188-208 and 425-471; SharpProof.Effects/ManagedAbstractFlow.cs around lines
-1842-1917; OperationCompletionEvaluator.cs already recognizes ITryOperation.
-
-**Description**: Strict replay-prefix completion has no ITryOperation arm, so
-any preceding try makes a later direct call unreplayable even when flow, body,
-and finally are all complete.
-
-**Reproduction**: Direct and empty-block controls emitted SP0027. Empty
-try/finally, empty try/catch, and a completing try/finally all reached the target
-at runtime with Complete flow but CanReplay=false and zero diagnostics. Abrupt
-try did not reach the call and stayed quiet.
-
-**Impact**: Moving a direct call after an admitted try/catch/finally statement
-silences concrete precondition refutations.
-
-**Recommended fix**: Add a conservative structural try case: definitely
-completing/no-throw body and completing optional finally. Keep recovered throws,
-filters, abrupt body/finally, and unknown calls fail-closed until shared
-exception semantics are available.
 
 ### 579. [CONFIRMED] ICancelableTask exempts every helper from SPMETA003
 
