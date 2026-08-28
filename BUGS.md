@@ -2045,48 +2045,6 @@ cleanup controls.
 **Confidence**: High; the exact sequential harness hung under a bounded
 large-stderr fixture, while concurrent draining alone made it pass.
 
-### 521. [CONFIRMED] SPMETA002 ignores mutable get-only static auto-properties
-
-**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs,
-AnalyzeProperty around lines 573-585; corresponding field logic around lines
-552-564.
-
-**Description**: Static auto-property analysis requires a setter, so every
-get-only property is skipped regardless of storage type. A get-only static
-List<T> or array cannot be rebound but remains process-wide mutable state through
-its members. The equivalent static readonly mutable-reference field is already
-reported by SPMETA002.
-
-**Reproduction**:
-
-    static List<int> Values { get; } = new();
-
-Analyzer controls produced:
-
-    readonly List field:       SPMETA002 count=1
-    get-only List property:    SPMETA002 count=0
-    settable List property:    SPMETA002 count=1
-
-All compiler-error counts were zero.
-
-**Impact**: Soundness-critical analyzer code can retain mutable process-wide
-state in a property and evade the rule, allowing cross-compilation leakage or
-concurrent-analysis nondeterminism.
-
-**Root cause**: Rebindability (`SetMethod != null`) is used as a proxy for value
-mutability, unlike the field path's mutable-reference classification.
-
-**Recommended fix**: For static auto-properties, report when a setter exists or
-`IsMutableReferenceStorage(property.Type)` is true. Preserve immutable get-only
-properties.
-
-**Regression coverage**: Get-only List<T> and array properties must report;
-get-only int and ImmutableArray<T> controls remain clean. Retain field and
-settable-property controls.
-
-**Confidence**: High; the exact analyzer distinguished only the property setter
-across otherwise equivalent mutable storage.
-
 ### 522. [CONFIRMED] Flow nullability falsely invalidates Contract.Result<T> for class? parameters
 
 **Location**: SharpProof.Contracts/ContractIntrinsicValidator.cs around lines
