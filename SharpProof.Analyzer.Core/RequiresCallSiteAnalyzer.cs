@@ -314,6 +314,38 @@ internal static partial class RequiresCallSiteAnalyzer
         return outcome;
     }
 
+    internal static AnalyzerSemanticOutcome AnalyzeSynthesizedCall(
+        IMethodSymbol caller,
+        SyntaxNode declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        IMethodSymbol target,
+        IOperation origin,
+        CancellationToken cancellationToken)
+    {
+        var candidate = new RequiresCallSiteCandidate(
+            origin,
+            target,
+            Instance: null,
+            Arguments: [],
+            ImmutableDictionary<int, IOperation>.Empty,
+            ImmutableDictionary<int, long>.Empty,
+            CanReplay: true,
+            Flow: null,
+            ManagedFlowStatus.Complete);
+        return new Analysis(
+                caller,
+                declaration,
+                semanticModel,
+                session,
+                reportDiagnostic,
+                graph: null,
+                operationRoot: null,
+                cancellationToken)
+            .AnalyzeCallSite(candidate, requireCallerOwnership: false);
+    }
+
     private sealed class Analysis(
         IMethodSymbol caller,
         SyntaxNode declaration,

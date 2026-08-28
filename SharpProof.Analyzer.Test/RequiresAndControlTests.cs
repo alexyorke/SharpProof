@@ -823,6 +823,118 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task SynthesizedRecordCopyConstructorReplaysBaseRequires()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public record Base
+            {
+                protected Base(Base original)
+                {
+                    Contract.Requires(false);
+                }
+            }
+            public sealed record Derived : Base;
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SP0027"));
+    }
+
+    [Test]
+    public async Task SynthesizedRecordMembersReplayRequires()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System.Text;
+            using SharpProof.Attributes;
+
+            public record BasePrint
+            {
+                protected virtual bool PrintMembers(StringBuilder builder)
+                {
+                    Contract.Requires(false);
+                    return true;
+                }
+            }
+            public sealed record DerivedPrint(int Value) : BasePrint;
+
+            public record BaseHash
+            {
+                public override int GetHashCode()
+                {
+                    Contract.Requires(false);
+                    return 0;
+                }
+            }
+            public sealed record DerivedHash(int Value) : BaseHash;
+
+            public record PropertyRecord
+            {
+                public int Value
+                {
+                    get
+                    {
+                        Contract.Requires(false);
+                        return 0;
+                    }
+                }
+            }
+
+            public record CloneRecord
+            {
+                protected CloneRecord(CloneRecord original)
+                {
+                    Contract.Requires(false);
+                }
+            }
+
+            public record EqualityRecord
+            {
+                public bool Equals(EqualityRecord? other)
+                {
+                    Contract.Requires(false);
+                    return true;
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        var messages = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SP0027")
+            .Select(static diagnostic => diagnostic.GetMessage(CultureInfo.InvariantCulture))
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                messages.Any(static message => message.Contains(
+                    "PrintMembers", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                messages.Any(static message => message.Contains(
+                    "GetHashCode", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                messages.Any(static message => message.Contains(
+                    "get_Value", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                messages.Any(static message => message.Contains(
+                    ".ctor", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                messages.Any(static message => message.Contains(
+                    "Equals", StringComparison.Ordinal)),
+                Is.True);
+        }
+    }
+
+    [Test]
     public async Task MemberInitializersStopAfterNonCompletingOperands()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

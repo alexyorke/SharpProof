@@ -170,6 +170,13 @@ internal sealed partial class SharpProofAnalyzerEngine
                     SyntaxKind.RecordStructDeclaration);
                 context.RegisterSyntaxNodeAction(
                     syntaxContext =>
+                        AnalyzerFeaturePipeline.AnalyzeSynthesizedRecordMembers(
+                            syntaxContext,
+                            session),
+                    SyntaxKind.RecordDeclaration,
+                    SyntaxKind.RecordStructDeclaration);
+                context.RegisterSyntaxNodeAction(
+                    syntaxContext =>
                         AnalyzerFeaturePipeline.AnalyzeMemberInitializer(
                             syntaxContext,
                             session),
