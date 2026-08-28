@@ -2619,25 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 585. [CONFIRMED] WellSortedIrGenerator maximumDepth forces exponential full-depth trees
-
-**Location**: SharpProof.Testing/WellSortedIrGenerator.cs around lines 55-79,
-124-147, and 150-179.
-
-**Description**: Positive depth has no leaf production. Integer and Boolean
-generators always recurse with expected two children, so maximumDepth behaves as
-required full depth, with no node budget or upper bound.
-
-**Reproduction**: Fixed-seed generation retained about 81.8 MB at depth 20 in
-1.07 s and 945.4 MB at depth 24 in 13.3 s for one case.
-
-**Impact**: Raising the public testing depth can stall or exhaust the test
-process before any differential oracle runs.
-
-**Recommended fix**: Add a bounded node budget and allow leaves at every depth,
-using maximumDepth only as a ceiling; optionally enforce a documented hard cap.
-Test depth/size bounds, fixed-seed determinism, and budget exhaustion.
-
 ### 586. [CONFIRMED] An all-break switch suppresses later SP0027 diagnostics
 
 **Location**: RequiresCallSiteDiscovery.cs around lines 188-208 and 425-471;
