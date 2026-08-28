@@ -55,11 +55,15 @@ internal static class ApiSpecContentDigest
                 hash.Add(variable.Role, variable.Ordinal, variable.Type);
             }
 
+            var variableIds = template.Variables.ToImmutableDictionary(
+                static variable => (variable.Role, variable.Ordinal),
+                static variable => variable.Id.Value);
+
             hash.Add("postconditions", template.Postconditions.Length);
             foreach (var postcondition in template.Postconditions)
             {
                 Add(hash, postcondition.Evidence);
-                Add(hash, postcondition.Condition, template.Variables);
+                Add(hash, postcondition.Condition, variableIds);
             }
         }
         return hash.Finish();
@@ -74,7 +78,7 @@ internal static class ApiSpecContentDigest
 
     private static void Add(
         CanonicalHashWriter hash, SpecTermDeclaration term,
-        ImmutableArray<SpecVariableInfo> variables)
+        ImmutableDictionary<(SpecVariableRole Role, int Ordinal), int> variableIds)
     {
         hash.Add(
             term.GetType().Name.Replace("Declaration", "Term"),
@@ -82,8 +86,7 @@ internal static class ApiSpecContentDigest
         (object? Payload, SpecTermDeclaration[] Children) parts = term switch
         {
             SpecVariableDeclaration variable => (
-                variables.Single(item =>
-                    item.Role == variable.Role && item.Ordinal == variable.Ordinal).Id.Value, []),
+                variableIds[(variable.Role, variable.Ordinal)], []),
             SpecBooleanDeclaration boolean => (boolean.Value, []),
             SpecIntegerDeclaration integer => (integer.Value, []),
             SpecStringDeclaration text => (text.Value, []),
@@ -102,7 +105,7 @@ internal static class ApiSpecContentDigest
 
         foreach (var child in parts.Children)
         {
-            Add(hash, child, variables);
+            Add(hash, child, variableIds);
         }
     }
 }

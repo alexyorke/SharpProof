@@ -109,6 +109,32 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void ContentDigestHandlesManyVariableReferences()
+    {
+        const int variableCount = 2048;
+        var evidence = new SpecEvidence(SpecEvidenceKind.Observed, "many-variable-test");
+        var declaration = Declaration(
+            "many-variables",
+            "M:Missing.ManyVariables.Run",
+            "Missing.ManyVariables",
+            parameterTypes: Enumerable.Repeat(IrTypeKind.Boolean, variableCount).ToImmutableArray()) with
+        {
+            Postconditions = Enumerable.Range(0, variableCount)
+                .Select(ordinal => new SpecPostconditionDeclaration(
+                    new SpecVariableDeclaration(
+                        SpecVariableRole.Parameter,
+                        ordinal,
+                        IrTypeKind.Boolean),
+                    evidence))
+                .ToImmutableArray()
+        };
+
+        var table = ApiSpecTable.Create([declaration]);
+
+        Assert.That(table.ContentSha256, Does.Match("^[0-9a-f]{64}$"));
+    }
+
+    [Test]
     public void ApprovedReferenceFamiliesMustBeDefined()
     {
         var declaration = Declaration("row", "M:Missing.Row.Run", "Missing.Row");

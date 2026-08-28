@@ -3054,25 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 651. [CONFIRMED] API-spec digest variable lookup is quadratic
-
-**Location**: `SharpProof.Specs/ApiSpecContentDigest.cs`, around lines 84-86.
-
-**Description**: Every variable-reference leaf calls `variables.Single(...)`,
-which scans the whole declaration array to prove uniqueness even though table
-validation already builds a slot dictionary.
-
-**Reproduction**: Valid balanced templates with 2k/4k/8k/16k distinct Boolean
-variables took 53/176/618/2371 ms minimum, approximately quadrupling per doubling
-despite logarithmic expression depth.
-
-**Impact**: Large generated or programmatic Specs spend seconds constructing a
-single table/content identity.
-
-**Recommended fix**: Build one `(Role, Ordinal) -> Id` dictionary per template
-and pass it through traversal. Preserve the golden digest and prove one O(1)
-lookup per leaf with scaling coverage.
-
 ### 652. [CONFIRMED] Default release-evidence generation cannot rerun in place
 
 **Location**: `scripts/New-SharpProofReleaseEvidence.ps1`, around lines 543-586
