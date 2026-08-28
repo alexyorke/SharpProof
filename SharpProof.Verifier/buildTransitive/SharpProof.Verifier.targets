@@ -204,6 +204,8 @@
       <_SharpProofCompilerOwnedOutput Include="$(ProjectDepsFilePath)" Condition="'$(ProjectDepsFilePath)' != ''" />
       <_SharpProofCompilerOwnedOutput Include="$(ProjectRuntimeConfigFilePath)" Condition="'$(ProjectRuntimeConfigFilePath)' != ''" />
       <_SharpProofCompilerOwnedOutput Include="$(ProjectRuntimeConfigDevFilePath)" Condition="'$(ProjectRuntimeConfigDevFilePath)' != ''" />
+      <CustomAdditionalCompileOutputs Include="$(_SharpProofCompilerManifestSourcePath)" />
+      <FileWrites Include="$(_SharpProofCompilerManifestSourcePath)" />
     </ItemGroup>
     <SharpProof.BuildTasks.InvalidatePublishedResult
         Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"

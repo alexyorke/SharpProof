@@ -3054,31 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 659. [CONFIRMED] A missing compiler manifest does not trigger incremental recompilation
-
-**Location**: `SharpProof.CompilerCollector/FinalCompilationCollector.cs`, around
-lines 7 and 19-35; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,
-around lines 148-182 and 232-234.
-
-**Description**: The analyzer-generated manifest is a required CoreCompile side
-output, but the package never declares it in `@(CustomAdditionalCompileOutputs)`.
-MSBuild can therefore skip Csc while the verifier immediately requires the
-missing undeclared file.
-
-**Reproduction**: A verified project built Proven. Deleting only
-`obj/Release/net8.0/SharpProof/compiler-manifest.input.json` and running ordinary
-Build produced `CoreCompile` up-to-date, zero Csc tasks, then SP0049. The assembly
-was byte-identical and the file stayed absent. Rebuild recreated it and proved
-the unchanged project.
-
-**Impact**: Partial obj cleanup or incomplete build-cache restoration leaves a
-project repeatedly broken until another compiler output changes or Rebuild runs.
-
-**Recommended fix**: Under the active collector condition, add the stable
-manifest to `@(CustomAdditionalCompileOutputs)` before CoreCompile and to
-`@(FileWrites)` for Clean. Test delete-only repair, subsequent no-op build,
-custom paths, and verify-disabled behavior.
-
 ### 660. [CONFIRMED] List-pattern indexer and Slice calls lose synthesized arguments
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around

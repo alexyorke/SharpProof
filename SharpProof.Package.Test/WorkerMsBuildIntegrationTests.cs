@@ -3491,6 +3491,16 @@ public sealed class WorkerMsBuildIntegrationTests
                     "SharpProofCompilerManifestFile"),
                 Is.Not.Empty);
             Assert.That(
+                initialize.Descendants("CustomAdditionalCompileOutputs")
+                    .Select(static element => element.Attribute("Include")?.Value),
+                Does.Contain("$(_SharpProofCompilerManifestSourcePath)"),
+                "The compiler manifest must participate in CoreCompile up-to-date checks.");
+            Assert.That(
+                initialize.Descendants("FileWrites")
+                    .Select(static element => element.Attribute("Include")?.Value),
+                Does.Contain("$(_SharpProofCompilerManifestSourcePath)"),
+                "Clean must know about the compiler manifest output.");
+            Assert.That(
                 arguments,
                 Does.Contain("--compiler-manifest")
                     .And.Contain("$(_SharpProofCompilerManifestPath)")
