@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis;
 using SharpProof.Effects;
+using SharpProof.Ir;
 namespace SharpProof.Specs;
 public enum ApiSpecResolutionFailureKind
 {
@@ -12,6 +13,7 @@ public enum ApiSpecResolutionFailureKind
     UnapprovedReferenceFamily,
     MissingMember,
     AmbiguousMember,
+    IncompatibleMemberShape,
     DuplicateResolvedSymbol
 }
 public enum ApiSpecLookupStatus
@@ -167,12 +169,15 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 assemblyMatch.ReferencePath + "'.");
         }
 
-        var normalized = DocumentationCommentId.GetSymbolsForDeclarationId(
+        var candidates = DocumentationCommentId.GetSymbolsForDeclarationId(
                 target.DocumentationCommentId, compilation)
             .Where(candidate => SymbolEqualityComparer.Default.Equals(
-                    candidate.ContainingType?.OriginalDefinition,
-                    containingType.OriginalDefinition) &&
-                MatchesTarget(candidate, target))
+                candidate.ContainingType?.OriginalDefinition,
+                containingType.OriginalDefinition))
+            .Where(candidate => MatchesMemberShape(candidate, target))
+            .ToArray();
+        var normalized = candidates
+            .Where(candidate => MatchesTarget(candidate, target))
             .Select(ResolvedApiSpecTable.NormalizeSymbol)
             .Where(static symbol => symbol != null)
             .Select(static symbol => symbol!)
@@ -181,8 +186,12 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         {
             0 => Unresolved(
                 template,
-                ApiSpecResolutionFailureKind.MissingMember,
-                "The documentation identifier did not resolve to the declared member shape."),
+                candidates.Length == 0
+                    ? ApiSpecResolutionFailureKind.MissingMember
+                    : ApiSpecResolutionFailureKind.IncompatibleMemberShape,
+                candidates.Length == 0
+                    ? "The documentation identifier did not resolve to the declared member shape."
+                    : "The resolved member has incompatible receiver, parameter, or result types."),
             1 => (normalized.Single(), null),
             _ => Unresolved(
                 template,
@@ -192,6 +201,38 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
     }
     private static bool MatchesTarget(ISymbol symbol, ApiSpecTarget target)
     {
+        if (!MatchesMemberShape(symbol, target))
+        {
+            return false;
+        }
+
+        return target.MemberKind switch
+        {
+            SpecTargetMemberKind.Constructor => symbol is IMethodSymbol
+            {
+                MethodKind: MethodKind.Constructor
+            } constructor &&
+                MatchesReceiver(constructor.ContainingType, target) &&
+                MatchesParameters(constructor.Parameters, target.ParameterTypes) &&
+                !target.ResultType.HasValue,
+            SpecTargetMemberKind.Method => symbol is IMethodSymbol
+            {
+                MethodKind: MethodKind.Ordinary
+            } method &&
+                MatchesReceiver(method.ContainingType, target) &&
+                MatchesParameters(method.Parameters, target.ParameterTypes) &&
+                MatchesResult(method.ReturnType, method.ReturnsVoid, target.ResultType),
+            SpecTargetMemberKind.PropertyGet => symbol is IPropertySymbol property &&
+                MatchesReceiver(property.ContainingType, target) &&
+                MatchesParameters(property.Parameters, target.ParameterTypes) &&
+                target.ResultType.HasValue &&
+                MatchesType(property.Type, target.ResultType.Value),
+            _ => false
+        };
+    }
+
+    private static bool MatchesMemberShape(ISymbol symbol, ApiSpecTarget target)
+    {
         return target.MemberKind switch
         {
             SpecTargetMemberKind.Constructor => symbol is IMethodSymbol
@@ -199,7 +240,10 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 MethodKind: MethodKind.Constructor
             } constructor &&
                 !constructor.IsStatic &&
-                string.Equals(constructor.MetadataName, target.MemberName, StringComparison.Ordinal) &&
+                string.Equals(
+                    constructor.MetadataName,
+                    target.MemberName,
+                    StringComparison.Ordinal) &&
                 constructor.Arity == target.GenericArity &&
                 constructor.Parameters.Length == target.ParameterTypes.Length,
             SpecTargetMemberKind.Method => symbol is IMethodSymbol
@@ -207,16 +251,99 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 MethodKind: MethodKind.Ordinary
             } method &&
                 method.IsStatic == target.IsStatic &&
-                string.Equals(method.Name, target.MemberName, StringComparison.Ordinal) &&
+                string.Equals(
+                    method.Name,
+                    target.MemberName,
+                    StringComparison.Ordinal) &&
                 method.Arity == target.GenericArity &&
                 method.Parameters.Length == target.ParameterTypes.Length,
             SpecTargetMemberKind.PropertyGet => symbol is IPropertySymbol property &&
                 property.GetMethod != null &&
                 property.IsStatic == target.IsStatic &&
-                string.Equals(property.Name, target.MemberName, StringComparison.Ordinal) &&
+                string.Equals(
+                    property.Name,
+                    target.MemberName,
+                    StringComparison.Ordinal) &&
                 property.Parameters.Length == target.ParameterTypes.Length,
             _ => false
         };
+    }
+
+    private static bool MatchesReceiver(
+        ITypeSymbol? actual,
+        ApiSpecTarget target)
+    {
+        return target.IsStatic
+            ? !target.ReceiverType.HasValue
+            : target.ReceiverType.HasValue &&
+              MatchesType(actual, target.ReceiverType.Value);
+    }
+
+    private static bool MatchesParameters(
+        ImmutableArray<IParameterSymbol> actual,
+        ImmutableArray<IrTypeKind> expected)
+    {
+        if (actual.Length != expected.Length)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < actual.Length; index++)
+        {
+            if (!MatchesType(actual[index].Type, expected[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool MatchesResult(
+        ITypeSymbol actual,
+        bool returnsVoid,
+        IrTypeKind? expected)
+    {
+        return expected.HasValue
+            ? !returnsVoid && MatchesType(actual, expected.Value)
+            : returnsVoid;
+    }
+
+    private static bool MatchesType(
+        ITypeSymbol? actual,
+        IrTypeKind expected)
+    {
+        return ClassifyType(actual) == expected;
+    }
+
+    private static IrTypeKind? ClassifyType(ITypeSymbol? type)
+    {
+        if (type == null)
+        {
+            return null;
+        }
+
+        if (type.SpecialType == SpecialType.System_Boolean)
+        {
+            return IrTypeKind.Boolean;
+        }
+
+        if (CSharpScalarSemantics.IsSupportedInteger(type.SpecialType))
+        {
+            return IrTypeKind.Integer;
+        }
+
+        if (type.SpecialType == SpecialType.System_String)
+        {
+            return IrTypeKind.String;
+        }
+
+        if (type is IArrayTypeSymbol array)
+        {
+            return array.Rank == 1 ? IrTypeKind.Sequence : null;
+        }
+
+        return type.IsReferenceType ? IrTypeKind.Reference : null;
     }
 
     private static (bool IdentityApproved, bool FamilyApproved,

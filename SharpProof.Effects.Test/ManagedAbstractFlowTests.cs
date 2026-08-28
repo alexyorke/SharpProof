@@ -312,7 +312,7 @@ public sealed class ManagedAbstractFlowTests
                     0,
                     null,
                     [],
-                    IrTypeKind.Reference,
+                    IrTypeKind.String,
                     [new ApiSpecAssemblyIdentity("EffectsTest", string.Empty)]),
                 new ApiSpecFacets(
                     new SpecEffectFacet(SpecEffect.None, evidence),
