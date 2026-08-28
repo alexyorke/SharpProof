@@ -1250,40 +1250,6 @@ schema validation of commit/time/attempt identity.
 
 **Confidence**: High; self-verified byte-for-byte with unchanged scripts.
 
-### 482. [CONFIRMED] ProofKernel can return Proven after cancellation during UNSAT-core processing
-
-**Location**: SharpProof.Verify/ProofKernel.cs around lines 30, 36-60.
-
-**Description**: The last cancellation check occurs before status dispatch.
-CreateProven then performs full-core validation and projection passes with no
-token and no final checkpoint. Cancellation arriving during a large valid core
-is ignored and a semantic proof is returned.
-
-**Reproduction**: A completed fake backend returned a valid 20,000,000-entry
-core and canceled 10-15 ms after return, after the line-30 check:
-
-    outcome=ProvenOutcome; tokenCanceled=True; postCancelWorkMs=322
-    outcome=ProvenOutcome; tokenCanceled=True; postCancelWorkMs=553
-    control=OperationCanceledException
-
-**Impact**: Public ProofKernel violates cancellation and can return proof
-evidence hundreds of milliseconds after cancellation. Worker callers currently
-perform another check, mitigating the shipped worker path.
-
-**Root cause**: Cancellation is not threaded through post-solver proof
-construction.
-
-**Recommended fix**: Pass the token into CreateProven, combine core validation
-and projection into one token-aware pass, and add a final cancellation check
-immediately before returning every outcome branch.
-
-**Regression coverage**: Deterministically cancel during core enumeration and
-require OperationCanceledException with no ProvenOutcome. Retain cancel-before
-backend return and uncanceled duplicate/core semantics.
-
-**Confidence**: High; two canonical runs reproduced post-cancel proof returns
-with a working cancellation control.
-
 ### 483. [CONFIRMED] Shared protocol collection validation allocates even for empty arrays
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 869-943
