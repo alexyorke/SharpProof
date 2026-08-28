@@ -2619,45 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 546. [CONFIRMED] Direct SharpProofVerify verifies a stale compiler manifest
-
-**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets,
-_SharpProofVerifyCore around lines 223-224 and public SharpProofVerify around
-lines 320-323.
-
-**Description**: `AfterTargets="CoreCompile"` schedules verification after a
-normal build but does not make direct target invocation depend on compilation.
-The public target depends only on initialization and VerifyCore; VerifyCore
-depends on ResolveReferences. A previous compiler-manifest.input.json is reused
-after source edits.
-
-**Reproduction**: A supported-host consumer first proved Boolean identity, then
-changed it to `return !value`:
-
-    initial Build: CoreCompile=1, manifest SHA A, outcome Proven
-    direct -t:SharpProofVerify:
-      exit=0 CoreCompile=0 manifest SHA A outcome Proven
-    full Build control:
-      exit=1 CoreCompile=1 manifest SHA B outcome Refuted, SP0051
-
-**Impact**: The advertised public target can publish successful proof evidence
-for prior source state while current source is refuted.
-
-**Root cause**: Automatic after-compile hook and callable public entrypoint share
-one target graph whose direct path lacks CoreCompile/freshness.
-
-**Recommended fix**: Separate the automatic AfterTargets hook from the public
-entrypoint and make explicit SharpProofVerify depend on CoreCompile before
-VerifyCore. Alternatively prove manifest freshness against all current compiler
-inputs, though compiling matches public target expectations.
-
-**Regression coverage**: Build identity, edit to negation, invoke direct target;
-require CoreCompile, changed manifest hash, nonzero Refuted outcome and SP0051.
-Retain ordinary Build parity.
-
-**Confidence**: High; the direct target preserved the exact stale manifest and
-verdict while a full build immediately refuted current source.
-
 ### 548. [CONFIRMED] Production fuzz JSON emits coverage properties the strict parser rejects
 
 **Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs, FrontendFuzzCoverage around
