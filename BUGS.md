@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 577. [CONFIRMED] Contract intrinsics in constructor initializers bypass validation
-
-**Location**: SharpProof.Contracts/ContractClauseInventoryBuilder.cs around
-lines 250-315; ContractIntrinsicValidator.cs around lines 12-45;
-ContractBinder.cs around lines 166-240; AnalyzerSession.cs around lines 204-210.
-
-**Description**: GetBody returns only a constructor block/expression body and
-drops ConstructorDeclarationSyntax.Initializer, although base/this arguments are
-executable.
-
-**Reproduction**: base(Contract.Result<int>()) compiled with zero errors,
-produced no initializer SP0024 or intrinsic violation, bound successfully with
-zero clauses, emitted, then construction threw InvalidOperationException. A
-body misuse control produced SP0024 and binder failure.
-
-**Impact**: Compiler-valid Result/Old misuse is accepted as an empty contract and
-crashes every affected construction before the body.
-
-**Recommended fix**: Keep body-only prologue placement, but validate constructor
-initializer operations as additional executable roots. Test base(Result),
-this(Old), valid body prologue, and no duplicate diagnostics.
-
 ### 579. [CONFIRMED] ICancelableTask exempts every helper from SPMETA003
 
 **Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs around
