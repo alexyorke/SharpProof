@@ -1308,58 +1308,6 @@ allocation-free numeric conversion interning controls.
 **Confidence**: High; runtime and lowerer identities were self-verified in one
 probe.
 
-### 469. [CONFIRMED] Closed generic ContractFor companions cannot bind generic member invocations
-
-**Location**: SharpProof.Contracts/ContractForSymbolMatcher.cs around
-lines 218-229 and 288-316; validator path in
-SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs
-around lines 30-42.
-
-**Description**: For a closed containing type, ResolveCompanion uses the fully
-constructed call symbol as signatureTarget. For
-IRepository<int>.Select<string>, the companion candidate is still the generic
-definition RepositoryContracts.Select<U>. The initial match compares string
-against method type parameter U and rejects the candidate before
-SpecializeCompanion can apply target.TypeArguments. The validator enumerates
-the definition-shaped member and reports no SPCF diagnostic.
-
-**Reproduction**: Closed target and generic method:
-
-    CASE=closed-containing-plus-generic-method
-    SPCF_IDS=<none>
-    TARGET=IRepository<int>.Select<string>(string)
-    CONSTRUCTED_FROM=IRepository<int>.Select<U>(U)
-    MATCH_TARGET=False
-    MATCH_CONSTRUCTED_FROM=True
-    BIND_SUCCESS=False
-    BIND_FAILURE=CompanionSignatureMismatch
-    CLAUSES=-1
-
-Controls for closed containing plus nongeneric method and nongeneric containing
-plus generic method both bind successfully with one clause.
-
-**Impact**: Constructed generic-member calls using a closed-generic
-ContractFor companion lose all companion clauses despite validation accepting
-the declaration. This fails closed but can break strict builds and discard
-valid requires/ensures.
-
-**Root cause**: Containing-type and method construction are normalized as one
-decision; the later method specialization is unreachable after the premature
-signature mismatch.
-
-**Recommended fix**: In the closed-target branch, use
-target.ConstructedFrom for generic methods during initial matching while
-retaining the constructed containing type. Continue applying target type
-arguments in SpecializeCompanion.
-
-**Regression coverage**: Add the closed IRepository<int> plus Select<U>
-intersection, requiring successful binding, one clause, and a string-specialized
-source method. Add matching validator coverage with no SPCF diagnostics and
-retain both single-axis controls.
-
-**Confidence**: High; executable canonical matrix isolated the exact
-intersection and both controls.
-
 ### 470. [CONFIRMED] Release-configuration evidence can remain stale and its receipt validates only schema plus commit
 
 **Location**: scripts/Test-SharpProofReleaseConfiguration.ps1 around
