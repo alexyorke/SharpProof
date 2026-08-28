@@ -61,7 +61,9 @@ internal static class CallableEvidenceBuilder
             {
                 preconditions.Add(assumption);
             }
-            if (clause.Kind == CompilerContractKind.Assume)
+            if (clause.Kind is (CompilerContractKind.Requires or
+                    CompilerContractKind.Assume) &&
+                !string.IsNullOrWhiteSpace(clause.AssumptionId))
             {
                 userAssumptionIds.Add(
                     justification,

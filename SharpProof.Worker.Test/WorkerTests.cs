@@ -2294,6 +2294,54 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task ProofCoreMarksUsedRequiresAsPreconditionEvidence()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Requires(value >= 0);
+                    Contract.Ensures(Contract.Result<long>() >= 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var snapshot = await WorkerInputSnapshot.LoadAsync(
+            request,
+            WorkerCacheIdentity.Current,
+            CancellationToken.None);
+        var expectedRequiresId = snapshot.CompilerManifest.Callables.Single()
+            .Clauses.First(static clause =>
+                clause.Kind == CompilerContractKind.Requires)
+            .AssumptionId;
+        using var worker = new SharpProofWorker(
+            new FeasibleThenProofBackend());
+
+        var response = await worker.VerifyAsync(request);
+
+        var record = response.ClaimResults.Single();
+        var precondition = record.Assumptions!
+            .Single(static evidence =>
+                evidence.Kind == WorkerAssumptionKind.Precondition);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(record.ProofCore, Does.Contain("requires:0"));
+            Assert.That(precondition.Id, Is.EqualTo(expectedRequiresId));
+            Assert.That(precondition.Used, Is.True);
+            Assert.That(
+                WorkerProtocolJson.Validate(
+                    response,
+                    response.InputHash,
+                    response.Manifest,
+                    CreateResponseAuthority(request)).IsValid,
+                Is.True);
+        }
+    }
+
+    [Test]
     public async Task RedundantUserAssumptionKeepsSourceDomainProvenance()
     {
         using var project = TestProject.Create(
@@ -6723,6 +6771,29 @@ public sealed class WorkerTests
             cancellationToken.ThrowIfCancellationRequested();
             _query = query;
             return Task.FromResult(_result);
+        }
+    }
+
+    private sealed class FeasibleThenProofBackend : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (query.Goal.Diagnostic != ProofDiagnosticKind.Postcondition)
+            {
+                var assignments = query.ModelVariables.Select(variable =>
+                    KeyValuePair.Create(
+                        variable,
+                        query.Factory.CreateIntegerValue(0)));
+                return Task.FromResult(
+                    BackendCheckResult.Satisfiable(
+                        new BackendModel(assignments)));
+            }
+
+            return Task.FromResult(
+                BackendCheckResult.Unsatisfiable([0]));
         }
     }
 

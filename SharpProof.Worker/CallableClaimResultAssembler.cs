@@ -65,7 +65,9 @@ internal static class CallableClaimResultAssembler
         record.Assumptions = [.. target.Entry.Assumptions.Select(evidence =>
             new WorkerAssumptionEvidence {
                 Id = evidence.Id, Kind = evidence.Kind,
-                Used = evidence.Kind == WorkerAssumptionKind.UserAssume &&
+                Used = evidence.Kind is
+                           (WorkerAssumptionKind.Precondition or
+                            WorkerAssumptionKind.UserAssume) &&
                        usedUserAssumptions.Contains(evidence.Id)
             })];
         return record;

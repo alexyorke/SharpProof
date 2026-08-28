@@ -294,27 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 624. [CONFIRMED] Ordinary proofs underreport used preconditions
-
-**Location**: `SharpProof.Worker/CallableEvidenceBuilder.cs`, around lines 23-24
-and 64-68; `CallableClaimResultAssembler.cs`, around lines 39-70;
-`CompilerResponseEvidenceAuthority.cs`, around lines 123-127 and 535-549.
-
-**Description**: Justification-to-assumption mapping and `Used` marking include
-only Assume, not Requires, for ordinary proven postconditions. The authority
-reconstructs and accepts the same omission.
-
-**Reproduction**: Real SMT proof of Requires(value>0) => Ensures(value>0)
-returned `proofCore=requires:0`, but the Precondition row had `used=False`,
-summary used=0, and response validation passed.
-
-**Impact**: JSON/SARIF/provenance contradict the proof core and underreport the
-assumptions required for a proof.
-
-**Recommended fix**: Map both Requires and Assume labels for ordinary proofs,
-retaining Requires-only contradictory-entry handling. Test used/unused/mixed,
-vacuity, and trusted controls.
-
 ### 625. [CONFIRMED] Shared SyntaxTree ownership is reference-order dependent
 
 **Location**: `SharpProof.Frontend/CompilationModelProvider.cs`, around lines

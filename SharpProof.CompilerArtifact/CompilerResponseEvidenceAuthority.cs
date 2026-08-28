@@ -646,8 +646,9 @@ internal sealed class CompilerResponseEvidenceAuthority :
             .Where(assumptionIdsByLabel.ContainsKey)
             .Where(label => !requiresOnly || label.StartsWith(
                 "requires:", StringComparison.Ordinal))
-            .Where(label => requiresOnly || label.StartsWith(
-                "assume:", StringComparison.Ordinal))
+            .Where(label => requiresOnly ||
+                label.StartsWith("requires:", StringComparison.Ordinal) ||
+                label.StartsWith("assume:", StringComparison.Ordinal))
             .Select(label => assumptionIdsByLabel[label]);
     }
 
