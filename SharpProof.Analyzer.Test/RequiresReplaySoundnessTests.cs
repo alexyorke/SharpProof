@@ -412,6 +412,53 @@ public sealed class RequiresReplaySoundnessTests
     }
 
     [Test]
+    public async Task DefinitelyInvalidArrayElementDoesNotRefuteLaterCall()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void NullArray() {
+                    Positive(((int[])null!)[0], -1);
+                }
+
+                public static void EmptyArray() {
+                    Positive((new int[0])[0], -1);
+                }
+
+                public static void LiveArray() {
+                    Positive((new int[1])[0], -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                factory.Outcomes["NullArray"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["EmptyArray"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["LiveArray"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+        }
+    }
+
+    [Test]
     public async Task DirectBreakLoopsRetainFollowingRequiresDiagnostics()
     {
         var factory = new RecordingSessionFactory();

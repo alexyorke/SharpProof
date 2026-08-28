@@ -1871,6 +1871,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 (fieldReference.Field.IsStatic ||
                  fieldReference.Instance != null &&
                  IsDefinitelyNonNull(fieldReference.Instance)),
+            IArrayElementReferenceOperation element =>
+                CompletesNormally(element.ArrayReference) &&
+                !IsDefinitelyNull(element.ArrayReference) &&
+                !IsDefinitelyOutOfRange(element) &&
+                element.Indices.All(CompletesNormally),
             IPropertyReferenceOperation property =>
                 CompletesPropertyGetNormally(property),
             IEventAssignmentOperation eventAssignment =>
@@ -2337,9 +2342,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 !IsDefinitelyZeroDivision(binary),
             ISimpleAssignmentOperation assignment =>
                 MayCompleteAssignmentNormally(assignment),
+            IArrayElementReferenceOperation element =>
+                MayCompleteArrayElement(element),
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
-                IArrayElementReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
                 (operation is not IConversionOperation conversion ||
@@ -2379,6 +2385,15 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             ILoopOperation or ISwitchOperation => true,
             _ => true
         };
+    }
+
+    private bool MayCompleteArrayElement(
+        IArrayElementReferenceOperation element)
+    {
+        return MayCompleteNormally(element.ArrayReference) &&
+            !IsDefinitelyNull(element.ArrayReference) &&
+            !IsDefinitelyOutOfRange(element) &&
+            element.Indices.All(MayCompleteNormally);
     }
 
     private bool MayCompleteAssignmentNormally(
@@ -2793,6 +2808,65 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             }
         }
         return operation.ConstantValue is { HasValue: true, Value: null };
+    }
+
+    internal static bool IsDefinitelyOutOfRange(
+        IArrayElementReferenceOperation element)
+    {
+        if (element.ArrayReference is not IArrayCreationOperation creation ||
+            creation.DimensionSizes.Length != 1 ||
+            element.Indices.Length != 1 ||
+            !TryGetIntegralConstant(
+                creation.DimensionSizes[0],
+                out var length) ||
+            !TryGetIntegralConstant(element.Indices[0], out var index))
+        {
+            return false;
+        }
+
+        return index < 0 || index >= length;
+    }
+
+    private static bool TryGetIntegralConstant(
+        IOperation operation,
+        out long value)
+    {
+        value = 0;
+        if (operation.ConstantValue is not
+            { HasValue: true, Value: { } constant })
+        {
+            return false;
+        }
+
+        switch (constant)
+        {
+            case sbyte signed:
+                value = signed;
+                return true;
+            case byte unsignedByte:
+                value = unsignedByte;
+                return true;
+            case short signedShort:
+                value = signedShort;
+                return true;
+            case ushort unsignedShort:
+                value = unsignedShort;
+                return true;
+            case int signedInt:
+                value = signedInt;
+                return true;
+            case uint unsignedInt:
+                value = unsignedInt;
+                return true;
+            case long signedLong:
+                value = signedLong;
+                return true;
+            case ulong unsignedLong when unsignedLong <= long.MaxValue:
+                value = (long)unsignedLong;
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static bool HarmlessConversion(IConversionOperation conversion)

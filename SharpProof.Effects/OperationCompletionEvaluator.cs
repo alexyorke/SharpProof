@@ -722,6 +722,7 @@ internal sealed class OperationCompletionEvaluator
     {
         return CanCompleteNormally(element.ArrayReference) &&
             !_isProvenNull(element.ArrayReference, element) &&
+            !DefiniteOperationFacts.IsDefinitelyOutOfRange(element) &&
             element.Indices.All(CanCompleteNormally);
     }
 
