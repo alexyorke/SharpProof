@@ -237,11 +237,11 @@ internal static class WorkerResultAssembler
             expected = IsClaimlessIncompleteReason(callable)
                 ? callable.Reason
                 : runStatus switch
-            {
-                WorkerRunStatus.Canceled => WorkerCallableCoverageReason.Canceled,
-                WorkerRunStatus.TimedOut => WorkerCallableCoverageReason.ProjectTimeout,
-                _ => WorkerCallableCoverageReason.None
-            };
+                {
+                    WorkerRunStatus.Canceled => WorkerCallableCoverageReason.Canceled,
+                    WorkerRunStatus.TimedOut => WorkerCallableCoverageReason.ProjectTimeout,
+                    _ => WorkerCallableCoverageReason.None
+                };
         }
         else if (owned.All(static claim => claim.Outcome != WorkerClaimOutcome.Unknown))
         {

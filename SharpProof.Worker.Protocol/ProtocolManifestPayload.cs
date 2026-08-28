@@ -2,13 +2,6 @@ namespace SharpProof.Worker.Protocol;
 
 public static partial class WorkerProtocolJson
 {
-    private static string CreateManifestPayload(WorkerClaimManifest manifest)
-    {
-        var writer = new ManifestWriter();
-        WriteManifestPayload(manifest, writer);
-        return writer.ToString();
-    }
-
     private static void WriteManifestPayload(
         WorkerClaimManifest manifest,
         ManifestWriter writer)
