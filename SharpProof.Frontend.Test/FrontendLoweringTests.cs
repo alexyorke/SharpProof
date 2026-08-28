@@ -448,6 +448,24 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void UnsupportedParameterReferencesKeepSymbolIdentity()
+    {
+        using var distinct = CompiledMethod.Create(
+            "public static bool Target(double left, double right) => left == right;");
+        var distinctTerm = (IrOpaqueTerm)distinct.Lower().Term;
+        var distinctLeft = (IrOpaqueTerm)distinctTerm.Arguments[0];
+        var distinctRight = (IrOpaqueTerm)distinctTerm.Arguments[1];
+        Assert.That(distinctLeft.Id, Is.Not.EqualTo(distinctRight.Id));
+
+        using var repeated = CompiledMethod.Create(
+            "public static bool Target(double value) => value == value;");
+        var repeatedTerm = (IrOpaqueTerm)repeated.Lower().Term;
+        var repeatedLeft = (IrOpaqueTerm)repeatedTerm.Arguments[0];
+        var repeatedRight = (IrOpaqueTerm)repeatedTerm.Arguments[1];
+        Assert.That(repeatedLeft.Id, Is.EqualTo(repeatedRight.Id));
+    }
+
+    [Test]
     public void AbstractAndInterfaceReferenceEqualityLowersExactly()
     {
         AssertClassification(

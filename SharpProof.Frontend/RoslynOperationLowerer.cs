@@ -504,7 +504,8 @@ public sealed class RoslynOperationLowerer
                     _owner.GetVariable(operation.Local, operation.Type))
                 : _owner.Opaque(
                     operation,
-                    FrontendAbstention.UnsupportedType);
+                    FrontendAbstention.UnsupportedType,
+                    symbol: operation.Local);
         }
 
         public override LoweredExpression VisitParameterReference(
@@ -515,7 +516,8 @@ public sealed class RoslynOperationLowerer
                     _owner.GetVariable(operation.Parameter, operation.Type))
                 : _owner.Opaque(
                     operation,
-                    FrontendAbstention.UnsupportedType);
+                    FrontendAbstention.UnsupportedType,
+                    symbol: operation.Parameter);
         }
 
         public override LoweredExpression VisitFlowCapture(
