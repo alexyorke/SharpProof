@@ -1138,7 +1138,7 @@ internal static class PerformanceGate
         return failures.ToImmutable();
     }
 
-    private static void ValidateContract(AcceptancePerformanceContract contract)
+    internal static void ValidateContract(AcceptancePerformanceContract contract)
     {
         if (contract.Warmups != 5 ||
             contract.Samples != 30 ||
@@ -1152,6 +1152,7 @@ internal static class PerformanceGate
         if (contract.SmokeWarmups < 1 ||
             contract.SmokeSamples < 2 ||
             (contract.SmokeSamples & 1) != 0 ||
+            !double.IsFinite(contract.SmokeMaximumRatio) ||
             contract.SmokeMaximumRatio <= 0)
         {
             throw new InvalidDataException(
@@ -1159,15 +1160,22 @@ internal static class PerformanceGate
                 "a positive even sample count, and a positive ratio limit.");
         }
 
-        if (contract.MaximumMedianRatio <= 0 ||
+        if (!double.IsFinite(contract.MaximumMedianRatio) ||
+            contract.MaximumMedianRatio <= 0 ||
+            !double.IsFinite(contract.MaximumP95Ratio) ||
             contract.MaximumP95Ratio <= 0 ||
+            !double.IsFinite(contract.MaximumRetainedMemoryRatio) ||
             contract.MaximumRetainedMemoryRatio <= 0 ||
             contract.MaximumRetainedMemoryIncreaseMiB < 0 ||
             contract.MaximumEnabledRetainedCompilations < 0 ||
             contract.MaximumEnabledRetainedMemoryIncreaseMiB < 0 ||
+            !double.IsFinite(contract.IdeEditP95Milliseconds) ||
             contract.IdeEditP95Milliseconds <= 0 ||
+            !double.IsFinite(contract.IdeEditMaximumMilliseconds) ||
             contract.IdeEditMaximumMilliseconds <= 0 ||
+            !double.IsFinite(contract.CancellationP95Milliseconds) ||
             contract.CancellationP95Milliseconds <= 0 ||
+            !double.IsFinite(contract.ForcedTerminationMilliseconds) ||
             contract.ForcedTerminationMilliseconds <= 0)
         {
             throw new InvalidDataException(

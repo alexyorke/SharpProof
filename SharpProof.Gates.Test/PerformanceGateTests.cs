@@ -39,6 +39,30 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public void RejectsNonFinitePerformanceThresholds()
+    {
+        var baseline = AcceptancePerformanceContract.Load(
+            RepositoryLayout.FindRoot());
+        var invalid = new[]
+        {
+            baseline with { SmokeMaximumRatio = double.PositiveInfinity },
+            baseline with { MaximumMedianRatio = double.NaN },
+            baseline with { MaximumP95Ratio = double.PositiveInfinity },
+            baseline with { MaximumRetainedMemoryRatio = double.NaN },
+            baseline with { IdeEditP95Milliseconds = double.PositiveInfinity },
+            baseline with { IdeEditMaximumMilliseconds = double.NaN },
+            baseline with { CancellationP95Milliseconds = double.PositiveInfinity },
+            baseline with { ForcedTerminationMilliseconds = double.NaN }
+        };
+
+        foreach (var contract in invalid)
+        {
+            Assert.Throws<InvalidDataException>(
+                (Action)(() => PerformanceGate.ValidateContract(contract)));
+        }
+    }
+
+    [Test]
     public void PackageBuildMedianAveragesTheMiddleEvenSamples()
     {
         var median = PackageBuildEstimator.Median([1, 9, 3, 5]);
