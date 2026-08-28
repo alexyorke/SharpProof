@@ -41,6 +41,18 @@ function Resolve-RepositoryPath([string]$Path) {
         -ParameterName 'Release path'
 }
 
+function Remove-QualificationEvidence {
+    $directory = Join-Path $repositoryRoot 'artifacts/release-qualification'
+    [IO.Directory]::CreateDirectory($directory) | Out-Null
+    $path = Join-Path $directory 'qualification.json'
+    if (Test-Path -LiteralPath $path -PathType Container) {
+        throw "Qualification evidence path is a directory: $path"
+    }
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        Remove-Item -LiteralPath $path -Force
+    }
+}
+
 switch ($Mode) {
     'ValidateTag' {
         $version = Get-SharpProofReleaseVersion `
@@ -93,6 +105,9 @@ switch ($Mode) {
         Write-Host "Coverage baseline evidence: $output"
     }
     'WriteQualificationEvidence' {
+        # Claim ownership before any preflight so a failed retry cannot leave
+        # a previous passing qualification record in persistent artifacts.
+        Remove-QualificationEvidence
         $commit = Require-Environment 'GITHUB_SHA'
         $tag = Require-Environment 'GITHUB_REF_NAME'
         $packageRoot = Resolve-RepositoryPath $PackageSource

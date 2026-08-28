@@ -517,6 +517,16 @@ switch ($Command) {
             -PlanOutputPath (Join-Path $planDirectory 'publication-plan.json')
     }
     'release-qualification' {
+        $qualificationDirectory = Join-Path `
+            $repositoryRoot 'artifacts/release-qualification'
+        [IO.Directory]::CreateDirectory($qualificationDirectory) | Out-Null
+        $qualificationPath = Join-Path $qualificationDirectory 'qualification.json'
+        if (Test-Path -LiteralPath $qualificationPath -PathType Container) {
+            throw "Qualification evidence path is a directory: $qualificationPath"
+        }
+        if (Test-Path -LiteralPath $qualificationPath -PathType Leaf) {
+            Remove-Item -LiteralPath $qualificationPath -Force
+        }
         & (Join-Path $repositoryRoot 'scripts/Generate-Readme.ps1') -Verify
         & (Join-Path $repositoryRoot `
             'scripts/Invoke-SharpProofReleaseContainer.ps1') `

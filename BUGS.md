@@ -214,54 +214,6 @@ controls.
 **Confidence**: High; all eight edges were independently tested with analyzer
 differentials and runtime counters.
 
-### 451. [CONFIRMED] Failed release-qualification reruns preserve the previous passing qualification.json
-
-**Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 458-463;
-scripts/Invoke-SharpProofReleaseContainer.ps1 around lines 17-24, 92-232;
-persistent artifact handling in eng/container/entrypoint.sh around
-lines 65-130 and 178-188; always-upload workflow path in
-.github/workflows/package-consumers.yml around lines 300-313.
-
-**Description**: WriteQualificationEvidence performs platform, environment,
-checkout, tag, package, SBOM, and ten-receipt preflights before it owns
-qualification.json. The outer release-qualification command also verifies
-README generation first. Neither path invalidates the prior final record at
-attempt start. The passed record binds commit, tag, inputs, and receipt hashes
-but has no run-attempt identity. A same-commit/tag retry that fails before the
-final write leaves the prior pass indistinguishable from current evidence.
-
-**Reproduction**: In a temporary canonical fixture, seed a known
-qualification.json and invoke WriteQualificationEvidence without GITHUB_SHA.
-The script exits 1 with "The GITHUB_SHA environment variable is required", but:
-
-    QUALIFICATION_SURVIVED=True
-    HASH_UNCHANGED=True
-
-The SHA-256 remains exactly the seeded value.
-
-**Impact**: Command and job status remain failed, so this is not an automatic CI
-false green. However, persistent/self-hosted/local workspaces and always-upload
-steps can publish a previous passing record under the failed attempt. Operators
-and artifact consumers cannot attribute the surviving record to the current
-run.
-
-**Root cause**: qualification.json uses publish-only-on-success in persistent
-artifact storage with no pending/failure lifecycle state.
-
-**Recommended fix**: At both outer release-qualification entry and
-WriteQualificationEvidence mode entry, resolve the final path before any
-failure-prone preflight and atomically remove it or replace it with a nonpassing
-tombstone containing commit, tag, and run-attempt identity when available.
-Atomically replace it with status passed only after all checks.
-
-**Regression coverage**: Seed a valid same-commit/tag record, then fail on
-missing GITHUB_SHA, corrupt/missing receipt, and release-artifact validation.
-Require the old pass to be absent or failure-tombstoned and the evidence
-validator to reject it.
-
-**Confidence**: High; reproduced with unchanged production scripts in the
-canonical Linux image and traced through persistence and upload paths.
-
 ### 455. [CONFIRMED] Fuzz campaigns discard valid semantic-failure JSON before parsing and accounting
 
 **Location**: Tools/SharpProof.Fuzz/Program.cs around lines 31-37;

@@ -169,6 +169,35 @@ function Invoke-ReceiptCase {
     }
 }
 
+function Invoke-QualificationTombstoneCase {
+    $directory = Join-Path $fixture 'artifacts/release-qualification'
+    [IO.Directory]::CreateDirectory($directory) | Out-Null
+    $path = Join-Path $directory 'qualification.json'
+    [IO.File]::WriteAllText(
+        $path,
+        '{"status":"passed","commit":"stale"}',
+        [Text.UTF8Encoding]::new($false))
+    $oldSha = $env:GITHUB_SHA
+    $oldContainer = $env:SHARPPROOF_CONTAINER
+    try {
+        $env:GITHUB_SHA = $null
+        $env:SHARPPROOF_CONTAINER = '1'
+        $output = & pwsh -NoLogo -NoProfile -File (
+            Join-Path $fixture 'scripts/Invoke-SharpProofReleaseContainer.ps1') `
+            -Mode WriteQualificationEvidence -PackageSource nupkgs 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            throw 'Qualification tombstone fixture unexpectedly succeeded.'
+        }
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            throw "Qualification tombstone fixture preserved stale evidence: $output"
+        }
+    }
+    finally {
+        $env:GITHUB_SHA = $oldSha
+        $env:SHARPPROOF_CONTAINER = $oldContainer
+    }
+}
+
 try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/Test-SharpProofReleaseConfiguration.ps1') `
@@ -191,6 +220,12 @@ try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/SharpProof.ReleaseConfigurationEvidence.psm1') `
         -Destination (Join-Path $fixture 'scripts/SharpProof.ReleaseConfigurationEvidence.psm1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Invoke-SharpProofReleaseContainer.ps1') `
+        -Destination (Join-Path $fixture 'scripts/Invoke-SharpProofReleaseContainer.ps1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Get-SharpProofReleaseVersion.ps1') `
+        -Destination (Join-Path $fixture 'scripts/Get-SharpProofReleaseVersion.ps1')
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/Test-SharpProofPilotReport.ps1') `
         -Destination (Join-Path $fixture 'scripts/Test-SharpProofPilotReport.ps1')
@@ -342,6 +377,7 @@ cat "$GH_FIXTURE_ROOT/$file.json"
     '{"schemaVersion":1,"commit":"' + $fixtureCommit + '"}' |
         Set-Content -LiteralPath $minimalEvidence -Encoding utf8NoBOM
     Invoke-ReceiptCase minimal-schema $minimalEvidence $false
+    Invoke-QualificationTombstoneCase
     Write-Host 'Release configuration exact-ref fixtures passed.'
 }
 finally {
