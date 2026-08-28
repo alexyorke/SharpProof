@@ -2743,25 +2743,6 @@ supported and Proven.
 and map arrow clauses to their property/indexer owner throughout manifest and
 lowering paths.
 
-### 614. [CONFIRMED] Rejected API identity detection omits Contract.Result and Contract.Old
-
-**Location**: `SharpProof.Frontend/ContractApiIdentityResolver.cs`, around lines
-117-131; `ContractApiMetadata.generated.cs`, around lines 66-70.
-
-**Description**: The rejected-name classifier includes Requires/Ensures/Assume
-but not Old/Result. Non-authoritative exact-name intrinsics therefore fall
-through both rejection and genuine intrinsic validation.
-
-**Reproduction**: Aliased fake Result/Old calls set no rejection flag, emitted
-no diagnostic, and bound successfully with zero clauses. Genuine misplaced
-Result/Old emitted SP0024; fake Requires emitted SP0047.
-
-**Impact**: Exact-name ghost intrinsics silently supply no contract semantics and
-identity enforcement is inconsistent.
-
-**Recommended fix**: Extend the authoritative-exclusion classifier to all five
-API names. Test fake/genuine Result, Old, Requires, and unrelated lookalikes.
-
 ### 615. [CONFIRMED] Case-drifted nuspec dependency IDs create accepted dangling SPDX edges
 
 **Location**: `scripts/Test-SharpProofPackageDependencies.ps1`, around lines
