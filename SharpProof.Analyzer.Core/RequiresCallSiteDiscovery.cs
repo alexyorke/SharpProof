@@ -462,17 +462,28 @@ internal sealed partial class RequiresCallSiteDiscovery(
     {
         baseConstructor = null!;
         syntheticArguments = ImmutableDictionary<int, long>.Empty;
-        if (declaration is not ConstructorDeclarationSyntax
+        var hasImplicitBaseInitializer = declaration is ConstructorDeclarationSyntax
             {
                 Initializer: null
             } ||
+            declaration is TypeDeclarationSyntax primaryDeclaration &&
+            primaryDeclaration.BaseList?.Types.Any(static baseType =>
+                baseType is not PrimaryConstructorBaseTypeSyntax) == true &&
+            PrimaryConstructorCallableInventory.IsDeclaration(
+                caller,
+                primaryDeclaration,
+                semanticModel,
+                cancellationToken);
+        if (!hasImplicitBaseInitializer ||
             caller is not
             {
                 MethodKind: MethodKind.Constructor,
                 IsStatic: false
             } ||
             caller.ContainingType.TypeKind != TypeKind.Class ||
-            IsRecordCopyConstructor(caller))
+            IsRecordCopyConstructor(caller) ||
+            caller.ContainingType.BaseType?.SpecialType ==
+                SpecialType.System_Object)
         {
             return false;
         }

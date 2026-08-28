@@ -103,7 +103,13 @@ internal static partial class RequiresCallSiteAnalyzer
             .SingleOrDefault();
         if (initializer == null)
         {
-            return AnalyzerSemanticOutcome.NotApplicable;
+            return AnalyzeImplicitPrimaryConstructorBase(
+                constructor,
+                declaration,
+                semanticModel,
+                session,
+                reportDiagnostic,
+                cancellationToken);
         }
 
         var initializerOperation = semanticModel.GetOperation(
@@ -198,6 +204,83 @@ internal static partial class RequiresCallSiteAnalyzer
                     baseCall,
                     requireCallerOwnership: false))
             : outcome;
+    }
+
+    private static AnalyzerSemanticOutcome AnalyzeImplicitPrimaryConstructorBase(
+        IMethodSymbol constructor,
+        TypeDeclarationSyntax declaration,
+        SemanticModel semanticModel,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
+        var baseType = constructor.ContainingType.BaseType;
+        if (declaration.BaseList?.Types.Any(static baseTypeSyntax =>
+                baseTypeSyntax is not PrimaryConstructorBaseTypeSyntax) != true ||
+            baseType == null ||
+            baseType.SpecialType == SpecialType.System_Object)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+
+        var candidates = baseType
+            .InstanceConstructors
+            .Where(static candidate =>
+                candidate.Parameters.IsEmpty ||
+                candidate.Parameters.All(static parameter => parameter.IsOptional))
+            .ToImmutableArray();
+        if (candidates.Length != 1)
+        {
+            return AnalyzerSemanticOutcome.NotApplicable;
+        }
+
+        var baseConstructor = candidates[0];
+        var baseDeclaration = baseConstructor.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<ConstructorDeclarationSyntax>()
+            .FirstOrDefault();
+        if (baseDeclaration == null)
+        {
+            return AnalyzerSemanticOutcome.Unknown;
+        }
+
+        var baseModel = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(semanticModel.Compilation, baseDeclaration.SyntaxTree);
+        var origin = (IOperation?)
+            (baseDeclaration.Body == null
+                ? baseDeclaration.ExpressionBody == null
+                    ? null
+                    : baseModel.GetOperation(
+                        baseDeclaration.ExpressionBody.Expression,
+                        cancellationToken)
+                : baseModel.GetOperation(
+                    baseDeclaration.Body,
+                    cancellationToken));
+        if (origin == null)
+        {
+            return AnalyzerSemanticOutcome.Unknown;
+        }
+
+        var call = new RequiresCallSiteCandidate(
+            origin,
+            baseConstructor,
+            Instance: null,
+            Arguments: [],
+            ImmutableDictionary<int, IOperation>.Empty,
+            ImmutableDictionary<int, long>.Empty,
+            CanReplay: true,
+            Flow: null,
+            ManagedFlowStatus.BudgetExceeded);
+        return new Analysis(
+                constructor,
+                declaration,
+                semanticModel,
+                session,
+                reportDiagnostic,
+                graph: null,
+                operationRoot: null,
+                cancellationToken)
+            .AnalyzeCallSite(call, requireCallerOwnership: false);
     }
 
     internal static AnalyzerSemanticOutcome AnalyzeInitializerCall(

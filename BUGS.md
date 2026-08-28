@@ -203,51 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 523. [CONFIRMED] Primary constructors omit their implicit parameterless base call
-
-**Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around lines
-157-165; AnalyzerFeaturePipeline.cs around lines 409-444;
-RequiresCallSiteAnalyzer.cs around lines 98-104; implicit-base discovery in
-RequiresCallSiteDiscovery.cs around lines 382-399.
-
-**Description**: Dedicated primary-constructor analysis handles only
-`PrimaryConstructorBaseTypeSyntax`, meaning an explicit `: Base(...)`. When a
-class primary constructor names a non-object base with simple `: Base`, the
-compiler still invokes parameterless Base(), but the dedicated path returns
-NotApplicable. Generic implicit-base discovery accepts only
-ConstructorDeclarationSyntax, not the primary constructor's TypeDeclarationSyntax.
-
-**Reproduction**: Base() contains `Contract.Requires(false)` and
-`sealed class Derived(int marker) : Base`. Canonical controls:
-
-    ordinary source ctor implicit base:  1 SP0027
-    primary ctor explicit : Base():      1 SP0027
-    primary ctor implicit : Base:        0 SP0027 (expected 1)
-    wholly synthesized derived ctor:     0 SP0027 (current policy)
-
-Every source compiled without diagnostics.
-
-**Impact**: A base-constructor precondition is silently unenforced for a user-
-declared primary constructor. Semantically equivalent `: Base()` syntax makes
-the diagnostic appear.
-
-**Root cause**: Primary and ordinary constructor paths partition syntax shapes
-without covering the implicit-call combination; the session is claimed before
-the dedicated path returns NotApplicable.
-
-**Recommended fix**: When a class primary constructor lacks an explicit base
-invocation and has a non-object base, resolve the unique parameterless base
-instance constructor and analyze an empty-argument replay candidate once. Exclude
-structs, record copy constructors, explicit calls, and wholly synthesized
-constructors; retain session deduplication.
-
-**Regression coverage**: Add the exact implicit-primary case plus ordinary
-implicit, explicit primary, Requires(true), object-base/no-custom-base, and
-synthesized-constructor controls.
-
-**Confidence**: High; the analyzer/runtime-equivalent matrix failed only the
-simple-base primary-constructor form.
-
 ### 524. [CONFIRMED] Compiler response authority performs quadratic claim-to-clause matching
 
 **Location**: SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs,

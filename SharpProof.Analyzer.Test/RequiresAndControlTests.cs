@@ -949,6 +949,25 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ImplicitPrimaryConstructorBaseInitializerChecksRequires()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public class Base {
+                public Base() { Contract.Requires(false); }
+            }
+            public sealed class Derived(int marker) : Base { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task PrimaryConstructorBaseInitializerChecksViolatingOptionalDefault()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
