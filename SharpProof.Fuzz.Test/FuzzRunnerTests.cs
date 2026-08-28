@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Text.Json;
 using SharpProof.Ir;
 using SharpProof.Fuzz;
 using SharpProof.Testing;
@@ -8,6 +9,36 @@ namespace SharpProof.Fuzz.Test;
 [TestFixture]
 public sealed class FuzzRunnerTests
 {
+    [Test]
+    public void SerializedCoverageContainsOnlyStrictSchemaCounters()
+    {
+        var coverage = new FrontendFuzzCoverage(
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+        var summary = new FuzzSummary(
+            SchemaVersion: 4,
+            Cases: 1,
+            Seed: 7,
+            MaximumParallelism: 1,
+            Agreements: 1,
+            Abstentions: 0,
+            FrontendAgreements: 1,
+            SmtAgreements: 1,
+            PartialSmtAgreements: 1,
+            FrontendCoverage: coverage,
+            CoverageSatisfied: true,
+            Failures: []);
+
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(summary));
+        var properties = document.RootElement
+            .GetProperty("FrontendCoverage")
+            .EnumerateObject()
+            .Select(static property => property.Name)
+            .ToArray();
+
+        Assert.That(properties, Does.Not.Contain("HasValidCounts"));
+        Assert.That(properties, Does.Not.Contain("HasExpandedCategories"));
+    }
+
     [Test]
     public void GeneratedModelRejectsSequenceEqualityUntilFrontendSupportsIt()
     {
