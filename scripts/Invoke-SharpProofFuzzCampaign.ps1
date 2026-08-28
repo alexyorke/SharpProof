@@ -25,11 +25,19 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputDirectory `
     -ParameterName 'OutputDirectory'
-Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput
 $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'Unable to bind fuzz evidence to the exact source commit.'
 }
+$workingTreeStatus = & git -C $repositoryRoot status --porcelain=v1 `
+    --untracked-files=all
+if ($LASTEXITCODE -ne 0) {
+    throw 'Unable to inspect working-tree source state.'
+}
+if (@($workingTreeStatus).Count -ne 0) {
+    throw 'SharpProof fuzz campaign requires clean exact-commit source.'
+}
+Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput
 $contract = Get-Content `
     -LiteralPath (Join-Path $repositoryRoot 'eng\acceptance\contract.json') `
     -Raw |

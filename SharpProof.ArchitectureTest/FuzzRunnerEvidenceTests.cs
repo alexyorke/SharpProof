@@ -100,6 +100,31 @@ public sealed class FuzzRunnerEvidenceTests
     }
 
     [Test]
+    public void FuzzCampaignRequiresCleanExactCommitSource()
+    {
+        var campaign = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofFuzzCampaign.ps1"));
+        var sourceCheck = campaign.IndexOf(
+            "status --porcelain=v1",
+            StringComparison.Ordinal);
+        var initialization = campaign.IndexOf(
+            "Initialize-SharpProofFuzzEvidence",
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(sourceCheck, Is.GreaterThanOrEqualTo(0));
+            Assert.That(initialization, Is.GreaterThan(sourceCheck));
+            Assert.That(campaign, Does.Contain("--untracked-files=all"));
+            Assert.That(
+                campaign,
+                Does.Contain("requires clean exact-commit source"));
+        }
+    }
+
+    [Test]
     public void FuzzCoverageThresholdIsSynchronizedAcrossAuthorities()
     {
         var root = RepositoryRoot();
