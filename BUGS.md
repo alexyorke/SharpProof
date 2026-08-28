@@ -203,55 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 512. [CONFIRMED] Relational specification packs accept ill-typed authoritative terms
-
-**Location**: SharpProof.CompilerCollector/CompilerArtifact/
-CompilerSpecificationPackProvider.cs, TryBuild around lines 165-175,
-Instantiate around lines 257-292, ParseMethod around lines 544-560, and ParseTerm
-around lines 616-667; typed rejection in SharpProof.Ir/IrFactory.cs around lines
-448-467.
-
-**Description**: Pack parsing validates JSON shape, literals, operator names,
-and only the outer result type. It does not recursively validate parameter
-ordinals/types, operator operand signatures, equality types, or conditional
-guard/branch types. Provider construction therefore accepts an unusable audited
-pack. At the first matching call, IrFactory throws ArgumentException and
-TryBuild silently converts it to false, making the selected relation disappear.
-
-**Reproduction**: A complete pack declared an Integer conditional whose
-condition was also Integer. The exact private parser and instantiator reported:
-
-    PARSE_PACK=ACCEPTED
-    TERM_TYPE=ConditionalTerm
-    DECLARED_TYPE=Integer
-    INSTANTIATE=REJECTED
-    INNER_TYPE=System.ArgumentException
-    MESSAGE=The conditional guard must be boolean.
-
-**Impact**: A maintainer can update and correctly pin an embedded pack whose
-catalog loads successfully but whose advertised relation always abstains at
-use. Dependent verification degrades to Unknown without a configuration or
-catalog error. This is fail-closed but violates strict-authority guarantees.
-
-**Root cause**: Semantic type checking is deferred from authority loading to
-per-call IR construction, and the latter's exception is intentionally treated
-as an ordinary unsupported relation.
-
-**Recommended fix**: During ParseMethod, recursively infer and validate every
-term against method parameter types and IrOperatorCatalog. Require in-range
-ordinals, exact declared parameter types, valid unary/binary signatures,
-same-type supported equality, Boolean conditional guards, and equal branch/
-declared types. Throw path-qualified InvalidDataException eagerly; retain the
-runtime catch as defense in depth.
-
-**Regression coverage**: Reject integer guard, unequal branches, wrong unary/
-binary operands/results, out-of-range ordinal, and parameter-type mismatch at
-parse/load time. Retain positive coverage for all scalar operators and an
-integration proof that a valid enabled pack produces its summary.
-
-**Confidence**: High; the exact parser accepted and exact instantiator rejected
-the same authoritative term for a deterministic type error.
-
 ### 513. [CONFIRMED] One acceptance result can mint both Debug and Release receipts
 
 **Location**: producer eng/acceptance/Verify.ps1 around lines 209-219; consumer

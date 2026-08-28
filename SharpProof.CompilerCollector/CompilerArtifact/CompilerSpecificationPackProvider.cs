@@ -553,6 +553,7 @@ internal sealed class CompilerSpecificationPackProvider
         var result = ParseTerm(
             RequiredProperty(element, "result", "method"),
             depth: 0);
+        ValidateTerm(result, parameterTypes, "method.result");
         if (result.Type != resultType)
         {
             throw new InvalidDataException(
@@ -567,6 +568,142 @@ internal sealed class CompilerSpecificationPackProvider
             result,
             EvidenceSha256: string.Empty,
             EvidenceIdentity: string.Empty);
+    }
+
+    private static void ValidateTerm(
+        Term term,
+        ImmutableArray<IrTypeKind> parameterTypes,
+        string path)
+    {
+        switch (term)
+        {
+            case ParameterTerm parameter:
+                if (parameter.Ordinal < 0 ||
+                    parameter.Ordinal >= parameterTypes.Length)
+                {
+                    throw new InvalidDataException(
+                        path + ".ordinal is outside the parameter list.");
+                }
+
+                if (parameter.Type != parameterTypes[parameter.Ordinal])
+                {
+                    throw new InvalidDataException(
+                        path + " parameter type does not match its ordinal.");
+                }
+
+                return;
+            case BooleanTerm boolean when term.Type == IrTypeKind.Boolean:
+                return;
+            case IntegerTerm integer when term.Type == IrTypeKind.Integer:
+                return;
+            case UnaryTerm unary:
+                ValidateTerm(unary.Operand, parameterTypes, path + ".operand");
+                if (unary.Operator == IrUnaryOperator.Not &&
+                    (unary.Type != IrTypeKind.Boolean ||
+                     unary.Operand.Type != IrTypeKind.Boolean))
+                {
+                    throw new InvalidDataException(
+                        path + " Not requires Boolean operands and result.");
+                }
+
+                if (unary.Operator == IrUnaryOperator.Negate &&
+                    (unary.Type != IrTypeKind.Integer ||
+                     unary.Operand.Type != IrTypeKind.Integer))
+                {
+                    throw new InvalidDataException(
+                        path + " Negate requires Integer operands and result.");
+                }
+
+                return;
+            case BinaryTerm binary:
+                ValidateTerm(binary.Left, parameterTypes, path + ".left");
+                ValidateTerm(binary.Right, parameterTypes, path + ".right");
+                ValidateBinaryTerm(binary, path);
+                return;
+            case ConditionalTerm conditional:
+                ValidateTerm(conditional.Condition, parameterTypes, path + ".condition");
+                ValidateTerm(conditional.WhenTrue, parameterTypes, path + ".whenTrue");
+                ValidateTerm(conditional.WhenFalse, parameterTypes, path + ".whenFalse");
+                if (conditional.Condition.Type != IrTypeKind.Boolean)
+                {
+                    throw new InvalidDataException(
+                        path + " condition must be Boolean.");
+                }
+
+                if (conditional.WhenTrue.Type != conditional.WhenFalse.Type ||
+                    conditional.Type != conditional.WhenTrue.Type)
+                {
+                    throw new InvalidDataException(
+                        path + " branches must have the declared type.");
+                }
+
+                return;
+            default:
+                throw new InvalidDataException(
+                    path + " has an invalid term type.");
+        }
+    }
+
+    private static void ValidateBinaryTerm(BinaryTerm binary, string path)
+    {
+        var arithmetic = binary.Operator is
+            IrBinaryOperator.Add or
+            IrBinaryOperator.Subtract or
+            IrBinaryOperator.Multiply or
+            IrBinaryOperator.Divide or
+            IrBinaryOperator.Remainder;
+        var logical = binary.Operator is
+            IrBinaryOperator.AndAlso or
+            IrBinaryOperator.OrElse;
+        var equality = binary.Operator is
+            IrBinaryOperator.Equal or
+            IrBinaryOperator.NotEqual;
+        var comparison = binary.Operator is
+            IrBinaryOperator.LessThan or
+            IrBinaryOperator.LessThanOrEqual or
+            IrBinaryOperator.GreaterThan or
+            IrBinaryOperator.GreaterThanOrEqual;
+
+        if (arithmetic &&
+            (binary.Type != IrTypeKind.Integer ||
+             binary.Left.Type != IrTypeKind.Integer ||
+             binary.Right.Type != IrTypeKind.Integer))
+        {
+            throw new InvalidDataException(
+                path + " arithmetic operators require Integer operands and result.");
+        }
+
+        if (logical &&
+            (binary.Type != IrTypeKind.Boolean ||
+             binary.Left.Type != IrTypeKind.Boolean ||
+             binary.Right.Type != IrTypeKind.Boolean))
+        {
+            throw new InvalidDataException(
+                path + " logical operators require Boolean operands and result.");
+        }
+
+        if (equality &&
+            (binary.Type != IrTypeKind.Boolean ||
+             binary.Left.Type != binary.Right.Type))
+        {
+            throw new InvalidDataException(
+                path + " equality operators require same-typed operands and Boolean result.");
+        }
+
+        if (comparison &&
+            (binary.Type != IrTypeKind.Boolean ||
+             binary.Left.Type != IrTypeKind.Integer ||
+             binary.Right.Type != IrTypeKind.Integer))
+        {
+            throw new InvalidDataException(
+                path + " comparison operators require Integer operands and Boolean result.");
+        }
+
+        if (!arithmetic && !logical && !equality && !comparison)
+        {
+            throw new InvalidDataException(
+                path + " has an unsupported binary operator.");
+        }
     }
 
     private static Term ParseTerm(JsonElement element, int depth)

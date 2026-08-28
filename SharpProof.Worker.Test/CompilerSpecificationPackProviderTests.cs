@@ -229,7 +229,23 @@ public sealed class CompilerSpecificationPackProviderTests
                     "[]",
                     "Integer",
                     """{"kind":"parameter","type":"Integer","ordinal":"zero"}"""),
-                "ordinal must be an Int32")
+                "ordinal must be an Int32"),
+            (
+                MethodJson(
+                    "M:X.M",
+                    """[{"name":"A","publicKeyToken":""}]""",
+                    "[]",
+                    "Integer",
+                    """{"kind":"parameter","type":"Integer","ordinal":0}"""),
+                "ordinal is outside"),
+            (
+                MethodJson(
+                    "M:X.M",
+                    """[{"name":"A","publicKeyToken":""}]""",
+                    "[\"Integer\"]",
+                    "Integer",
+                    """{"kind":"conditional","type":"Integer","condition":{"kind":"integer","type":"Integer","value":1},"whenTrue":{"kind":"parameter","type":"Integer","ordinal":0},"whenFalse":{"kind":"integer","type":"Integer","value":0}}"""),
+                "condition must be Boolean")
         };
 
         using (Assert.EnterMultipleScope())
