@@ -1736,6 +1736,54 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ProvenCheckedOverflowInEarlierArgumentSuppressesLaterRequires()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Run() {
+                    Positive(checked(int.MaxValue + 1), -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task ProvenSignedMinValueDivisionInEarlierArgumentSuppressesLaterRequires()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Run() {
+                    const int minimum = int.MinValue;
+                    const int divisor = -1;
+                    Positive(minimum / divisor, -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task NonCompletingPrefixSuppressesAccessorAndListPatternRefutations()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

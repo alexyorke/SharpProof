@@ -2339,7 +2339,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 MayCompleteNormally(@lock.Body),
             IBinaryOperation binary =>
                 ChildrenMayCompleteNormally(binary) &&
-                !IsDefinitelyZeroDivision(binary),
+                !IsDefinitelyZeroDivision(binary) &&
+                !IsDefinitelyCheckedOverflow(binary) &&
+                !IsDefinitelySignedDivisionOverflow(binary),
             ISimpleAssignmentOperation assignment =>
                 MayCompleteAssignmentNormally(assignment),
             IArrayElementReferenceOperation element =>
@@ -2693,6 +2695,43 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         return binary.OperatorKind is BinaryOperatorKind.Divide or
             BinaryOperatorKind.Remainder &&
             binary.RightOperand.ConstantValue is { HasValue: true, Value: 0 };
+    }
+
+    private static bool IsDefinitelyCheckedOverflow(IBinaryOperation binary)
+    {
+        if (!binary.IsChecked || binary.OperatorMethod != null ||
+            binary.OperatorKind is not (
+                BinaryOperatorKind.Add or
+                BinaryOperatorKind.Subtract or
+                BinaryOperatorKind.Multiply))
+        {
+            return false;
+        }
+
+        return IntegerType(binary.Type, out _) &&
+            TryGetIntegralConstant(binary.LeftOperand, out var left) &&
+            TryGetIntegralConstant(binary.RightOperand, out var right) &&
+            (!TryArithmetic(
+                binary.OperatorKind,
+                IntervalValue.Constant(left),
+                IntervalValue.Constant(right),
+                out var result) ||
+             !FitsType(result, binary.Type));
+    }
+
+    private static bool IsDefinitelySignedDivisionOverflow(IBinaryOperation binary)
+    {
+        if (binary.OperatorMethod != null || binary.OperatorKind is not (
+                BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder) ||
+            !IntegerType(binary.Type, out var semantics))
+        {
+            return false;
+        }
+
+        return TryGetIntegralConstant(binary.LeftOperand, out var left) &&
+            TryGetIntegralConstant(binary.RightOperand, out var right) &&
+            left == semantics.Minimum &&
+            right == -1;
     }
 
     private bool ChildrenCompleteNormally(IOperation operation)
