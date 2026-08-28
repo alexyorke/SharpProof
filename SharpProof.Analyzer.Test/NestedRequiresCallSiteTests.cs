@@ -523,6 +523,36 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task CompletingLocalCoalesceAssignmentPreservesLaterRequires()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    string? value = null;
+                    value ??= "ok";
+                    return Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-1)", StringComparison.Ordinal)));
+    }
+
+    [Test]
     public async Task TupleMethodGroupsOnlyReachThroughTheirOwnComponent()
     {
         const string source =

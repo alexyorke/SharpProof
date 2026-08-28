@@ -1885,6 +1885,12 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                             assignment.Value),
                     _ => false
                 },
+            ICoalesceAssignmentOperation coalesce =>
+                (coalesce.Target is ILocalReferenceOperation or
+                    IParameterReferenceOperation or IDiscardOperation) &&
+                CompletesNormally(coalesce.Target) &&
+                (IsDefinitelyNonNull(coalesce.Target) ||
+                 CompletesNormally(coalesce.Value)),
             ICompoundAssignmentOperation assignment =>
                 assignment.OperatorMethod == null &&
                 !assignment.IsChecked &&
