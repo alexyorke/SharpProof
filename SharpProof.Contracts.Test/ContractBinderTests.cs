@@ -1257,6 +1257,42 @@ public sealed class ContractBinderTests
             Is.EqualTo(SpecialType.System_String));
     }
 
+    [Test]
+    public void ClosedContainingTypeAndGenericMethodUseCompanionMember()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface IRepository<T> where T : class {
+                U Select<U>(T value, U replacement);
+            }
+            [ContractFor(typeof(IRepository<>))]
+            public static class RepositoryContracts<T> where T : class {
+                public static U Select<U>(
+                    IRepository<T> receiver,
+                    T value,
+                    U replacement) {
+                    Contract.Requires(value != null);
+                    return replacement;
+                }
+            }
+            public static class Caller {
+                public static int Call(
+                    IRepository<string> repository,
+                    string value,
+                    int replacement) =>
+                    repository.Select<int>(value, replacement);
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.BindCallRequires("Caller", "Call", "Select");
+
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        Assert.That(result.Contracts!.UsesCompanion, Is.True);
+        Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
+    }
+
     [TestCase("Left", ContractBindingFailure.None)]
     [TestCase("Other", ContractBindingFailure.CompanionSignatureMismatch)]
     public void TupleElementNamesAreMatchedExactly(

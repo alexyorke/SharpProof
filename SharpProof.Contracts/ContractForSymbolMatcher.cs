@@ -221,7 +221,9 @@ internal static class ContractForSymbolMatcher
                 target.ContainingType,
                 target.ContainingType.OriginalDefinition)
                 ? target.ConstructedFrom
-                : target;
+                : target.Arity != 0
+                    ? target.ConstructedFrom
+                    : target;
         var named = GetOrdinaryMethods(companion.Type)
             .Where(candidate => string.Equals(candidate.Name, target.Name, StringComparison.Ordinal))
             .ToImmutableArray();
