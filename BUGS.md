@@ -610,45 +610,6 @@ accept one complete current report.
 **Confidence**: High; both producer lifecycle and weak receipt authority were
 self-verified with unchanged scripts.
 
-### 471. [CONFIRMED] Lane renewal disposes a backend still owned by another live lane
-
-**Location**: SharpProof.Worker/SharpProofWorker.cs around lines 591-607,
-especially duplicate detection near 602-604 and disposal near 606; concurrent
-caller around lines 298-328.
-
-**Description**: With multiple lanes, a renewal factory can return the backend
-already owned by another lane. Renew correctly detects the duplicate and
-returns BackendUnavailable, but then unconditionally disposes the returned
-instance. The other lane retains the now-disposed backend, may be actively
-using it, and later disposes it again during owner cleanup.
-
-**Canonical probe**:
-
-    renewal=BackendUnavailable
-    firstDisposeCount=1
-    borrowedDisposeCountBeforeOwnerCleanup=1
-    secondStillReferencesBorrowed=True
-    borrowedDisposeCountAfterOwnerCleanup=2
-
-**Impact**: One invalid renewal corrupts a different live solver lane, causing
-mid-check failures, subsequent use-after-dispose behavior, and double disposal.
-
-**Root cause**: The same cleanup branch handles a newly created rejected
-replacement and an instance whose ownership never left another lane.
-
-**Recommended fix**: Split duplicate cases. If replacement is reference-equal
-to any existing lane backend, return the typed renewal failure without
-disposing it. Dispose only a newly acquired replacement owned by the renewal
-attempt. Prefer explicit acquisition/ownership tracking.
-
-**Regression coverage**: Two lanes own A and B; A's renewal factory returns B.
-Require typed failure, B disposal count zero and usability retained until B's
-own cleanup, then exactly one disposal. Add a concurrency variant with B held
-inside CheckAsync during A renewal.
-
-**Confidence**: High; self-verified through the private lifecycle in the
-canonical container with reference and disposal-count inspection.
-
 ### 473. [CONFIRMED] Campaign-fatal fuzz abstentions retain no case-level evidence
 
 **Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 239-366 and
