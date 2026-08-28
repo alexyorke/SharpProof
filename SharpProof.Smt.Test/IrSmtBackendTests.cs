@@ -449,6 +449,42 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public void CancellationDuringLargeStringEncodingIsPrompt()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("text", factory.StringType);
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Binary(
+                    IrBinaryOperator.Equal,
+                    factory.Variable(variable),
+                    factory.String(new string('a', 100_000))),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var cancellation = new CancellationTokenSource();
+        using var backend = new IrSmtBackend(
+            new IrSmtBackendOptions(),
+            IrSmtBackend.MaximumDecodedStringLength,
+            static () => new Z3Context(),
+            units =>
+            {
+                if (units == 32)
+                {
+                    cancellation.Cancel();
+                }
+            });
+
+        Func<Task> check = async () =>
+            await backend.CheckAsync(query, cancellation.Token);
+        Assert.That(
+            Assert.ThrowsAsync<OperationCanceledException>(check),
+            Is.Not.Null);
+    }
+
+    [Test]
     public async Task NullableStringConcatMatchesInterpreterNullSemantics()
     {
         var factory = new IrFactory();

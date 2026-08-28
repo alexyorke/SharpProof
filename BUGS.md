@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 510. [CONFIRMED] Large string-literal encoding ignores cancellation before solver execution
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 109-145, 286-301, and
-EncodeStringLiteral around lines 694-702.
-
-**Description**: A query token is checked during depth validation and after goal
-encoding/assertion, but it is not retained by QueryEncoder. EncodeStringLiteral
-creates two native AST wrappers per UTF-16 code unit and one giant MkConcat
-without a checkpoint. The literal is one IR leaf, so depth validation completes
-immediately and Context.Interrupt cannot stop this pre-solver construction.
-
-**Reproduction**: A public CheckAsync probe compared a string variable to a
-100,000-character literal, canceled after the backend gate was acquired, and
-reported:
-
-    gate-entered=True
-    cancel-request-ms=33
-    cancel-observed-ms=19386
-    cancel-overshoot-ms=19352
-    reuse-status=Unsatisfiable failure=None
-
-No solver Check occurred before the long encoding/unwind completed.
-
-**Impact**: Cancellation can overshoot by roughly 19 seconds while monopolizing
-the serialized backend gate and consuming CPU/native memory. The failure is
-fail-closed and the backend remains reusable, but public ProofKernel/backend
-callers cannot enforce timely cancellation.
-
-**Root cause**: Encoding is modeled as an indivisible operation. The token is
-not threaded through wide-term construction, and the LINQ-shaped literal build
-has no bounded interruption points.
-
-**Recommended fix**: Retain/pass the token through QueryEncoder and all recursive
-encoders. Use an imperative string-unit loop with bounded checks, check before
-large concatenation, and preferably chunk/balance concat construction so no
-single native call is unbounded.
-
-**Regression coverage**: With a deterministic encoder-progress hook, cancel
-after N units and require prompt OCE before solver.Check, bounded owned-object
-growth and cleanup, then successful reuse. Cover other wide expression forms.
-
-**Confidence**: High; the exact public backend delayed observed cancellation by
-19.3 seconds and then passed its reuse control.
-
 ### 511. [CONFIRMED] Recorded fuzz failure seeds cannot replay their own cases
 
 **Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs, FuzzFailure around lines 7-15,

@@ -11,6 +11,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     private readonly SemaphoreSlim _checkGate = new(1, 1);
     private readonly IrSmtBackendOptions _options;
     private readonly int _maximumDecodedStringLength;
+    private readonly Action<int>? _stringLiteralProgress;
     private long _consumedResourceCount;
     private long _lastResourceSnapshot;
     private bool _resourceAccountingExhausted;
@@ -38,7 +39,8 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     internal IrSmtBackend(
         IrSmtBackendOptions options,
         int maximumDecodedStringLength,
-        Func<Context> contextFactory)
+        Func<Context> contextFactory,
+        Action<int>? stringLiteralProgress = null)
     {
         _options = ArgumentNullGuard.NotNull(options, nameof(options));
         if (maximumDecodedStringLength <= 0)
@@ -49,6 +51,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
         contextFactory = ArgumentNullGuard.NotNull(contextFactory, nameof(contextFactory));
         _maximumDecodedStringLength = maximumDecodedStringLength;
+        _stringLiteralProgress = stringLiteralProgress;
         _context = contextFactory();
     }
 
@@ -170,7 +173,8 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             query,
             owner,
             cancellationToken,
-            _maximumDecodedStringLength);
+            _maximumDecodedStringLength,
+            _stringLiteralProgress);
         using var solver = _context.MkSolver();
         using var parameters = _context.MkParams();
         using var rlimit = _context.MkSymbol("rlimit");
@@ -436,18 +440,23 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private readonly IrFactory _factory;
         private readonly SeqSort _stringSort;
         private readonly int _maximumDecodedStringLength;
+        private readonly CancellationToken _cancellationToken;
+        private readonly Action<int>? _stringLiteralProgress;
 
         internal QueryEncoder(
             Context context,
             VerificationQuery query,
             Z3ExpressionOwner owner,
             CancellationToken cancellationToken,
-            int maximumDecodedStringLength)
+            int maximumDecodedStringLength,
+            Action<int>? stringLiteralProgress)
         {
             _context = context;
             _owner = owner;
             _factory = query.Factory;
             _maximumDecodedStringLength = maximumDecodedStringLength;
+            _cancellationToken = cancellationToken;
+            _stringLiteralProgress = stringLiteralProgress;
             _stringSort = owner.OwnSort(
                 (SeqSort)_context.MkSeqSort(_context.IntSort));
             var maximumDepths = new Dictionary<IrId, int>();
@@ -803,6 +812,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
         private EncodedValue Encode(IrTerm term)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             if (_encoded.TryGetValue(term.Id, out var existing))
             {
                 return existing;
@@ -983,13 +993,35 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
         private SeqExpr EncodeStringLiteral(string value)
         {
-            var units = value
-                .Select(character => (SeqExpr)Own(_context.MkUnit(
-                    Own(_context.MkInt(character)))))
-                .ToArray();
-            return units.Length == 0
-                ? Own(_context.MkEmptySeq(_stringSort))
-                : Own(_context.MkConcat(units));
+            if (value.Length == 0)
+            {
+                return Own(_context.MkEmptySeq(_stringSort));
+            }
+
+            const int chunkSize = 256;
+            var chunks = new List<SeqExpr>(
+                (value.Length + chunkSize - 1) / chunkSize);
+            for (var offset = 0; offset < value.Length; offset += chunkSize)
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                var count = Math.Min(chunkSize, value.Length - offset);
+                var units = new SeqExpr[count];
+                for (var index = 0; index < count; index++)
+                {
+                    _cancellationToken.ThrowIfCancellationRequested();
+                    units[index] = (SeqExpr)Own(_context.MkUnit(
+                        Own(_context.MkInt(value[offset + index]))));
+                    _stringLiteralProgress?.Invoke(offset + index + 1);
+                }
+
+                chunks.Add(count == 1
+                    ? units[0]
+                    : Own(_context.MkConcat(units)));
+            }
+
+            return chunks.Count == 1
+                ? chunks[0]
+                : Own(_context.MkConcat(chunks.ToArray()));
         }
 
         private EncodedValue EncodeEquality(
