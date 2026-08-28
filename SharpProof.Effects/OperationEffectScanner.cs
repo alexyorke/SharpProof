@@ -26,7 +26,6 @@ internal sealed partial class OperationEffectScanner
     private readonly EffectAnalysisSession _session;
     private readonly OperationNullnessEvaluator _nullnessEvaluator;
     private readonly bool _useAbstractReachability;
-    private bool _capturesReceiver;
     private IOperation? _directOperation;
     private int _scanDepth;
     private int _nestingDepth;
@@ -119,9 +118,6 @@ internal sealed partial class OperationEffectScanner
                         _method.OriginalDefinition):
                     _capturedSymbols.Add(parameter.Parameter);
                     break;
-                case IInstanceReferenceOperation:
-                    _capturesReceiver = true;
-                    break;
             }
         }
         _conversionOwnership.BuildLocalRegions(root, IsReachable);
@@ -143,13 +139,7 @@ internal sealed partial class OperationEffectScanner
 
         try
         {
-            var result = Scan(operation, EffectAccess.Read);
-            return _capturedSymbols.Count == 0 && !_capturesReceiver
-                ? result
-                : EffectSummaryOperations.Join(
-                    EffectSummaryOperations.Allocate(
-                        EffectAllocationKind.Managed),
-                    result);
+            return Scan(operation, EffectAccess.Read);
         }
         finally
         {

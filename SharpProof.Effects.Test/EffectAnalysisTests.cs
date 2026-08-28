@@ -1046,7 +1046,7 @@ public sealed class EffectAnalysisTests
                     region => region.Kind == EffectRegionKind.Captured));
             Assert.That(
                 step.Summary.Allocation,
-                Is.EqualTo(EffectAllocationKind.Managed));
+                Is.EqualTo(EffectAllocationKind.None));
             Assert.That(
                 counter.Summary.Allocation,
                 Is.EqualTo(EffectAllocationKind.Managed));
