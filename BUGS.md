@@ -2619,25 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 594. [CONFIRMED] SMT depth prevalidation re-walks shared DAGs per assumption
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 297-301 and 346-364.
-
-**Description**: Query construction calls ValidateDepth separately for every
-assumption and goal, and each call creates a fresh depth memo although actual
-encoding shares its cache.
-
-**Reproduction**: Sixty-four roots shared one 8,191-node DAG. Direct validation
-allocation grew from 746,600 to 47,677,064 bytes, a 63.9x ratio; public backend
-latency grew from 58 to 193 ms. Both results were valid Unsatisfiable.
-
-**Impact**: O(shared nodes + assumptions) query data causes O(assumptions *
-shared nodes) work before Z3.Check and outside solver accounting.
-
-**Recommended fix**: Share the maximum-depth memo across roots while resetting
-root depth and revisiting a node reached later at greater depth. Add linear
-scaling, depth-256 ordering, and cancellation tests.
-
 ### 595. [CONFIRMED] Launcher snapshots the Worker closure twice before startup
 
 **Location**: Worker.Launcher/Program.cs around lines 21-23, 57-58, and 115-119;
