@@ -939,6 +939,89 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void FunctionPointerOverloadsHaveDistinctStableIdentities()
+    {
+        const string source = """
+            public static unsafe class Subject {
+                public static void Pick(delegate*<int, void> callback) { }
+                public static void Pick(delegate*<string, void> callback) { }
+            }
+            """;
+        static CSharpCompilation CreateCompilation(string assemblyName)
+        {
+            var tree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.CSharp12));
+            return CSharpCompilation.Create(
+                assemblyName,
+                [tree],
+                PlatformReferences,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary,
+                    allowUnsafe: true));
+        }
+
+        var first = CreateCompilation("FunctionPointer.Identity");
+        var second = CreateCompilation("FunctionPointer.Identity");
+        var firstOverloads = first.GetTypeByMetadataName("Subject")!
+            .GetMembers("Pick").OfType<IMethodSymbol>()
+            .OrderBy(static method => method.Parameters[0].Type.ToDisplayString())
+            .ToArray();
+        var secondOverloads = second.GetTypeByMetadataName("Subject")!
+            .GetMembers("Pick").OfType<IMethodSymbol>()
+            .OrderBy(static method => method.Parameters[0].Type.ToDisplayString())
+            .ToArray();
+        Assert.That(firstOverloads, Has.Length.EqualTo(2));
+
+        var factory = new IrFactory();
+        var firstDisplays = firstOverloads
+            .Select(CompilerIdentityBridge.CreateSymbolDisplay)
+            .ToArray();
+        var secondDisplays = secondOverloads
+            .Select(CompilerIdentityBridge.CreateSymbolDisplay)
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(firstDisplays[0], Is.Not.EqualTo(firstDisplays[1]));
+            Assert.That(firstDisplays, Is.EqualTo(secondDisplays));
+            Assert.That(
+                CompilerIdentityBridge.InternSymbol(factory, firstOverloads[0]),
+                Is.Not.EqualTo(
+                    CompilerIdentityBridge.InternSymbol(factory, firstOverloads[1])));
+        }
+    }
+
+    [Test]
+    public void AnonymousTypeIdentitiesIncludeOrderedProperties()
+    {
+        const string source = """
+            public static class Subject {
+                public static object First() => new { Value = 1 };
+                public static object Second() => new { Text = "value" };
+            }
+            """;
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create(
+            "Anonymous.Identity",
+            [tree],
+            PlatformReferences,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var model = compilation.GetSemanticModel(tree);
+        var anonymousTypes = tree.GetRoot().DescendantNodes()
+            .OfType<AnonymousObjectCreationExpressionSyntax>()
+            .Select(node => model.GetTypeInfo(node).Type)
+            .OfType<INamedTypeSymbol>()
+            .ToArray();
+        Assert.That(anonymousTypes, Has.Length.EqualTo(2));
+        Assert.That(
+            CompilerIdentityBridge.CreateTypeDisplay(anonymousTypes[0]),
+            Is.Not.EqualTo(
+                CompilerIdentityBridge.CreateTypeDisplay(anonymousTypes[1])));
+    }
+
+    [Test]
     public void InheritedInstanceInvocationsLowerTotallyWithTypedReceivers()
     {
         using var compiled = CompiledMethod.Create(

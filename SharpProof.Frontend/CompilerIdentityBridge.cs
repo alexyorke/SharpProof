@@ -173,16 +173,124 @@ public static class CompilerIdentityBridge
 
     private static string SymbolReference(ISymbol symbol)
     {
-        return DocumentationCommentId.CreateDeclarationId(symbol) is { Length: > 0 } id
+        var reference = DocumentationCommentId.CreateDeclarationId(symbol) is
+            { Length: > 0 } id
             ? id
             : FallbackReference(symbol);
+        return ContainsStructuralType(symbol)
+            ? reference + "|sig:" + StructuralSymbolIdentity(symbol)
+            : reference;
     }
 
     private static string TypeReference(ITypeSymbol type)
     {
-        return DocumentationCommentId.CreateReferenceId(type) is { Length: > 0 } id
+        var reference = DocumentationCommentId.CreateReferenceId(type) is
+            { Length: > 0 } id
             ? id
             : FallbackReference(type);
+        return ContainsStructuralType(type)
+            ? reference + "|sig:" + StructuralTypeIdentity(type)
+            : reference;
+    }
+
+    private static bool ContainsStructuralType(ISymbol symbol)
+    {
+        return symbol switch
+        {
+            IMethodSymbol method =>
+                method.Parameters.Any(static parameter =>
+                    ContainsStructuralType(parameter.Type)) ||
+                ContainsStructuralType(method.ReturnType),
+            IPropertySymbol property => ContainsStructuralType(property.Type) ||
+                property.Parameters.Any(static parameter =>
+                    ContainsStructuralType(parameter.Type)),
+            IFieldSymbol field => ContainsStructuralType(field.Type),
+            IEventSymbol @event => ContainsStructuralType(@event.Type),
+            ITypeSymbol type => ContainsStructuralType(type),
+            _ => false
+        };
+    }
+
+    private static bool ContainsStructuralType(ITypeSymbol type)
+    {
+        return type switch
+        {
+            IFunctionPointerTypeSymbol => true,
+            INamedTypeSymbol { IsAnonymousType: true } => true,
+            IArrayTypeSymbol array => ContainsStructuralType(array.ElementType),
+            IPointerTypeSymbol pointer => ContainsStructuralType(pointer.PointedAtType),
+            INamedTypeSymbol named => named.TypeArguments.Any(ContainsStructuralType),
+            _ => false
+        };
+    }
+
+    private static string StructuralSymbolIdentity(ISymbol symbol)
+    {
+        return symbol switch
+        {
+            IMethodSymbol method =>
+                "method:" + method.RefKind + ":" +
+                string.Join(",", method.Parameters.Select(static parameter =>
+                    parameter.RefKind + ":" + StructuralTypeIdentity(parameter.Type))) +
+                "->" + StructuralTypeIdentity(method.ReturnType),
+            IPropertySymbol property =>
+                "property:" + string.Join(",", property.Parameters.Select(
+                    static parameter => parameter.RefKind + ":" +
+                        StructuralTypeIdentity(parameter.Type))) +
+                "->" + StructuralTypeIdentity(property.Type),
+            IFieldSymbol field => "field:" + StructuralTypeIdentity(field.Type),
+            IEventSymbol @event => "event:" + StructuralTypeIdentity(@event.Type),
+            ITypeSymbol type => StructuralTypeIdentity(type),
+            _ => symbol.Kind + ":" + symbol.MetadataName
+        };
+    }
+
+    private static string StructuralTypeIdentity(ITypeSymbol type)
+    {
+        return StructuralTypeIdentity(type, 0);
+    }
+
+    private static string StructuralTypeIdentity(ITypeSymbol type, int depth)
+    {
+        if (depth >= 64)
+        {
+            return "depth-limit";
+        }
+
+        return type switch
+        {
+            IFunctionPointerTypeSymbol functionPointer =>
+                "fnptr[" + functionPointer.Signature.CallingConvention + ";" +
+                string.Join(",", functionPointer.Signature.UnmanagedCallingConventionTypes
+                    .Select(static convention => convention.ToDisplayString())) +
+                "](" +
+                string.Join(",", functionPointer.Signature.Parameters.Select(
+                    parameter => parameter.RefKind + ":" +
+                        StructuralTypeIdentity(parameter.Type, depth + 1))) +
+                ")->" + functionPointer.Signature.RefKind + ":" +
+                StructuralTypeIdentity(functionPointer.Signature.ReturnType, depth + 1),
+            IArrayTypeSymbol array =>
+                "array" + array.Rank + "[" +
+                StructuralTypeIdentity(array.ElementType, depth + 1) + "]",
+            IPointerTypeSymbol pointer =>
+                "pointer[" + StructuralTypeIdentity(pointer.PointedAtType, depth + 1) + "]",
+            INamedTypeSymbol { IsAnonymousType: true } anonymous =>
+                "anonymous{" + string.Join(";", anonymous.GetMembers()
+                    .OfType<IPropertySymbol>()
+                    .Select(property => property.Name + ":" +
+                        StructuralTypeIdentity(property.Type, depth + 1))) + "}",
+            INamedTypeSymbol named =>
+                (DocumentationCommentId.CreateReferenceId(named) ??
+                    named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)) +
+                (named.IsGenericType
+                    ? "<" + string.Join(",", named.TypeArguments.Select(
+                        argument => StructuralTypeIdentity(argument, depth + 1))) + ">"
+                    : string.Empty),
+            ITypeParameterSymbol parameter =>
+                "typeparam[" + parameter.TypeParameterKind + ":" +
+                parameter.Ordinal + "]",
+            _ => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+        };
     }
 
     private static string FallbackReference(ISymbol symbol)
