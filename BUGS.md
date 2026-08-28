@@ -3054,27 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 638. [CONFIRMED] Framework identity scanning misses nonconstant string concatenation
-
-**Location**: `SharpProof.ArchitectureTest/FrameworkIdentityScanner.cs`, around
-lines 107-150 and 207-232; consuming gate in `ArchitectureTests.cs`, around lines
-441-464.
-
-**Description**: The scanner detects interpolated framework identities but has
-no structural fallback for string-add expressions. Expressions such as
-`"System." + suffix` therefore evade the exact policy.
-
-**Reproduction**: A fixture using `"System." + suffix` produced zero violations,
-while the interpolation equivalent was caught. A temporary string-add-prefix
-walker made the full six-case scanner suite pass.
-
-**Impact**: The architecture gate can remain green while production code embeds
-framework identities through ordinary concatenation.
-
-**Recommended fix**: Flatten string-add chains, prove a leading constant
-`System.` prefix, require string typing, and preserve exclusions/deduplication.
-Test one- and multi-literal prefixes plus nonstring and later-segment controls.
-
 ### 639. [CONFIRMED] Successful dotnet clean leaves compiler-manifest.input.json
 
 **Location**: `SharpProof.CompilerCollector/FinalCompilationCollector.cs`, around
