@@ -47,6 +47,7 @@ function Invoke-CapturedDotNet {
         [string[]]$Arguments,
 
         [Parameter()]
+        [ValidateRange(0, 86400)]
         [int]$TimeoutSeconds = 300
     )
 
@@ -70,11 +71,53 @@ function Invoke-CapturedDotNet {
             "-flp:logfile=$logPath;verbosity=normal")
     }
 
-    $lines = @(& dotnet @effectiveArguments 2>&1)
-    $exitCode = $LASTEXITCODE
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'dotnet'
+    $startInfo.WorkingDirectory = (Get-Location).Path
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in $effectiveArguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    $started = $false
+    $timedOut = $false
+    try {
+        if (-not $process.Start()) {
+            throw 'The dotnet process could not be started.'
+        }
+        $started = $true
+        $standardOutput = $process.StandardOutput.ReadToEndAsync()
+        $standardError = $process.StandardError.ReadToEndAsync()
+        if ($TimeoutSeconds -gt 0 -and
+            -not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            $timedOut = $true
+            if (-not $process.HasExited) {
+                $process.Kill($true)
+            }
+            $process.WaitForExit()
+        }
+        else {
+            $process.WaitForExit()
+        }
+
+        $capturedOutput =
+            $standardOutput.GetAwaiter().GetResult() +
+            $standardError.GetAwaiter().GetResult()
+        $exitCode = if ($timedOut) { 124 } else { $process.ExitCode }
+    }
+    finally {
+        if ($started -and -not $process.HasExited) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        $process.Dispose()
+    }
     $global:LASTEXITCODE = 0
-    $capturedOutput =
-        @($lines | ForEach-Object { $_.ToString() }) -join "`n"
     $loggedOutput = if ($null -ne $logPath -and
         (Test-Path -LiteralPath $logPath -PathType Leaf)) {
         Get-Content -LiteralPath $logPath -Raw

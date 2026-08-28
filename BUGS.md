@@ -358,43 +358,6 @@ Require the old pair absent or nonpassing and prove qualification rejects it.
 **Confidence**: High; self-verified byte-for-byte in a temp canonical fixture
 and traced through qualification consumption.
 
-### 464. [CONFIRMED] Sample validation accepts timeout parameters but never enforces them
-
-**Location**: scripts/Test-SharpProofSamples.ps1 around lines 43-50, 72,
-304, 345, and 359.
-
-**Description**: Invoke-CapturedDotNet accepts TimeoutSeconds, with call sites
-requesting 900 seconds for package creation and 300 seconds for restore/build.
-The value is never read. The helper invokes dotnet synchronously and has no
-bounded wait or process-tree termination.
-
-**Reproduction**: In the canonical Linux image, extract the unchanged helper,
-substitute a fake dotnet that runs for two seconds, and request one second:
-
-    {"RequestedTimeoutSeconds":1,"ElapsedMilliseconds":2111,"ExitCode":0}
-
-The helper waits for normal completion and returns success.
-
-**Impact**: tooling samples and package-consumers sample validation can hang
-until a much broader workflow timeout when restore, build, pack, an analyzer,
-or MSBuild deadlocks, defeating documented per-command budgets.
-
-**Root cause**: TimeoutSeconds is dead API surface; direct synchronous
-invocation bypasses the repository's established bounded process runner.
-
-**Recommended fix**: Execute dotnet with a bounded ProcessStartInfo runner,
-asynchronously drain stdout/stderr, and on expiry Kill(true), wait for full
-process-tree exit, and return or throw a typed timeout such as exit code 124.
-Factor the established Invoke-SharpProofDotnet.ps1 logic for reuse.
-
-**Regression coverage**: Use a fake dotnet that spawns a long-lived child,
-request a one-second timeout, and require prompt exit 124 with no surviving
-child. Add fast success and ordinary nonzero controls preserving captured
-output and exit codes.
-
-**Confidence**: High; self-verified with exact helper logic in the canonical
-container.
-
 ### 470. [CONFIRMED] Release-configuration evidence can remain stale and its receipt validates only schema plus commit
 
 **Location**: scripts/Test-SharpProofReleaseConfiguration.ps1 around
