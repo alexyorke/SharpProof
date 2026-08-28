@@ -85,13 +85,15 @@ internal static partial class SemanticClaimIdentity
 
         method = NormalizePartial(method).OriginalDefinition;
         var documentationId = DocumentationCommentId.CreateDeclarationId(method);
-        if (!string.IsNullOrEmpty(documentationId))
+        if (!HasFileLocalOwner(method) &&
+            !string.IsNullOrEmpty(documentationId))
         {
             return documentationId!;
         }
 
         using var writer = new CanonicalHashWriter();
         writer.Add("SharpProofCallable/v1");
+        WriteFileLocalOwner(writer, method);
         WriteMethod(writer, method, new ClaimIdentityContext(method, method, false));
         return "spm1:" + writer.Finish();
     }
@@ -112,6 +114,7 @@ internal static partial class SemanticClaimIdentity
         method = NormalizePartial(method).OriginalDefinition;
         using var writer = new CanonicalHashWriter();
         writer.Add("SharpProofCallable/v1").Add(parentId).Add(siblingOrdinal);
+        WriteFileLocalOwner(writer, method);
         WriteMethod(writer, method, new ClaimIdentityContext(method, method, false));
         return "spm1:" + writer.Finish();
     }
@@ -120,7 +123,8 @@ internal static partial class SemanticClaimIdentity
         symbol = ArgumentNullGuard.NotNull(symbol, nameof(symbol));
 
         var documentationId = DocumentationCommentId.CreateDeclarationId(symbol);
-        if (!string.IsNullOrEmpty(documentationId))
+        if (!HasFileLocalOwner(symbol) &&
+            !string.IsNullOrEmpty(documentationId))
         {
             return documentationId!;
         }
@@ -129,7 +133,49 @@ internal static partial class SemanticClaimIdentity
         writer.Add("SharpProofContainer/v1").Add(symbol.Kind.ToString())
             .Add(symbol.MetadataName)
             .Add(DocumentationCommentId.CreateReferenceId(symbol));
+        WriteFileLocalOwner(writer, symbol);
         return "sps1:" + writer.Finish();
+    }
+
+    private static bool HasFileLocalOwner(ISymbol symbol)
+    {
+        for (var current = symbol is IMethodSymbol method
+                ? method.ContainingType
+                : symbol as INamedTypeSymbol;
+            current != null;
+            current = current.ContainingType)
+        {
+            if (current.IsFileLocal)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void WriteFileLocalOwner(
+        CanonicalHashWriter writer,
+        ISymbol symbol)
+    {
+        var owners = new Stack<INamedTypeSymbol>();
+        for (var current = symbol is IMethodSymbol method
+                ? method.ContainingType
+                : symbol as INamedTypeSymbol;
+            current != null;
+            current = current.ContainingType)
+        {
+            if (current.IsFileLocal)
+            {
+                owners.Push(current);
+            }
+        }
+
+        writer.Add(owners.Count);
+        foreach (var owner in owners)
+        {
+            writer.Add(owner.MetadataName);
+        }
     }
 
     private static string CreateMalformedInvocationFingerprint(

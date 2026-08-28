@@ -294,27 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 628. [CONFIRMED] Same-named file-local types collide in callable identity
-
-**Location**: `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs`,
-around lines 82-91; `ClaimManifestBuilder.cs`, around lines 37-46 and 587-639.
-
-**Description**: Documentation IDs erase file-local ownership. Two legal
-same-named file-local types in different files receive identical callable and
-claim IDs despite distinct Roslyn MetadataName values.
-
-**Reproduction**: Two files each declared the same selected `file static class
-Subject.Value(int)`. Both IDs were `M:Subject.Value(System.Int32)~System.Int32`;
-full artifact creation threw JsonException and collector surfaces fatal SP0049.
-
-**Impact**: Legal file-local naming makes verification-enabled builds fail before
-worker launch.
-
-**Recommended fix**: Use a shared bounded source-method identity incorporating
-the containing file-local metadata identity for callable and source-summary
-paths. Test two files, nested file-local owners, order stability, and public-ID
-compatibility.
-
 ### 629. [CONFIRMED] Interpolation analyzes the wrong ToString overload
 
 **Location**: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, around

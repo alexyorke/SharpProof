@@ -1400,6 +1400,41 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void FileLocalCallableIdentitiesRemainDistinctAndOrderStable()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            file static class Subject {
+                public static int Value(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """;
+        var first = Build(("First.cs", source), ("Second.cs", source));
+        var reversed = Build(("Second.cs", source), ("First.cs", source));
+        var firstCallableIds = first.Manifest.Callables
+            .Select(static callable => callable.CallableId)
+            .OrderBy(static id => id, StringComparer.Ordinal)
+            .ToArray();
+        var reversedCallableIds = reversed.Manifest.Callables
+            .Select(static callable => callable.CallableId)
+            .OrderBy(static id => id, StringComparer.Ordinal)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.Manifest.Callables, Has.Length.EqualTo(2));
+            Assert.That(firstCallableIds, Has.Length.EqualTo(2));
+            Assert.That(firstCallableIds, Is.Unique);
+            Assert.That(firstCallableIds, Is.EqualTo(reversedCallableIds));
+            Assert.That(first.Manifest.Claims.Select(static claim => claim.ClaimId),
+                Is.Unique);
+        }
+    }
+
+    [Test]
     public void EffectEvidenceAccountsForCalleePreconditions()
     {
         var discovery = Build((

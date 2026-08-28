@@ -373,7 +373,9 @@ internal sealed class CompilerCallableLowerer
     private static bool TryGetCallIdentity(IMethodSymbol method, out string identity)
     {
         var symbol = ResolvedApiSpecTable.NormalizeSymbol(method);
-        identity = symbol?.GetDocumentationCommentId() ?? string.Empty;
+        identity = symbol is IMethodSymbol callable
+            ? SemanticClaimIdentity.CreateCallableId(callable)
+            : string.Empty;
         return identity.Length != 0;
     }
 

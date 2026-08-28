@@ -283,7 +283,7 @@ internal sealed class CompilerRelationalSummaryProvider
             new IrSummaryProvenance(
                 IrSummaryOrigin.Source,
                 evidenceSha256,
-                evidenceCallIdentity: method.GetDocumentationCommentId() ?? string.Empty));
+                evidenceCallIdentity: SemanticClaimIdentity.CreateCallableId(method)));
         var built = IrRelationalSummaryBuilder.Build(
             selected.Lowering.Program,
             signature,
@@ -347,7 +347,7 @@ internal sealed class CompilerRelationalSummaryProvider
         if (!CompilerIdentityValidation.IsValidCallIdentity(callIdentity) ||
             !string.Equals(
                 callIdentity,
-                method.GetDocumentationCommentId() ?? string.Empty,
+                SemanticClaimIdentity.CreateCallableId(method),
                 StringComparison.Ordinal))
         {
             return null;

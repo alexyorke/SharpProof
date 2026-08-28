@@ -145,6 +145,39 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void FileLocalSourceSummaryUsesTheFileLocalCallableIdentity()
+    {
+        var (compilation, target, factory) = CreateTarget(
+            """
+            using SharpProof.Attributes;
+            file static class Helper {
+                internal static int Read(int value) => value;
+            }
+            internal static class Subject {
+                internal static int Verify(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Helper.Read(value);
+                }
+            }
+            """,
+            "Verify");
+
+        var preparation = new CompilerCallableLowerer(compilation, factory)
+            .Prepare(target);
+        var summary = preparation.Body!.SummaryCalls.Values.Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.True,
+                preparation.FailureReason.ToString());
+            Assert.That(summary.Origin, Is.EqualTo(CompilerSummaryOrigin.Source));
+            Assert.That(summary.CallIdentity, Does.StartWith("spm1:"));
+            Assert.That(summary.CallIdentity, Does.Not.EqualTo(
+                "M:Helper.Read(System.Int32)"));
+        }
+    }
+
+    [Test]
     public void ResolvedSpecCallIsBoundToExactLoweredInstruction()
     {
         var preparation = Prepare(
