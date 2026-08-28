@@ -10,12 +10,112 @@ namespace SharpProof.Fuzz.Test;
 public sealed class FuzzRunnerTests
 {
     [Test]
+    public void AbstentionEvidenceRetainsEachOracleBeforeApplyingTheCap()
+    {
+        var generatedCases = Enumerable.Range(0, 80)
+            .Select(_ => new GeneratedCSharpCase(
+                GeneratedCSharpExpression.Boolean(true),
+                0,
+                0,
+                false))
+            .ToArray();
+        var frontendResults = Enumerable.Range(0, generatedCases.Length)
+            .Select(index => new FrontendDifferentialResult(
+                FuzzOracleStatus.Abstained,
+                "frontend-detail-" + index))
+            .ToArray();
+        var finiteResults = Enumerable.Range(0, generatedCases.Length)
+            .Select(index => new FiniteDomainDifferentialResult(
+                FuzzOracleStatus.Abstained,
+                null,
+                null,
+                0,
+                "finite-detail-" + index))
+            .ToArray();
+        var partialResults = Enumerable.Range(0, generatedCases.Length)
+            .Select(index => new PartialTermSmtDifferentialResult(
+                FuzzOracleStatus.Abstained,
+                PartialTermSmtCaseGenerator.ScenarioCount,
+                0,
+                0,
+                0,
+                "partial-detail-" + index))
+            .ToArray();
+
+        var evidence = FuzzRunner.SelectAbstentionEvidence(
+            seed: 123,
+            generatedCases,
+            frontendResults,
+            finiteResults,
+            partialResults);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence.Length,
+                Is.EqualTo(FuzzRunner.MaximumRetainedAbstentions));
+            Assert.That(
+                evidence.Take(3).Select(static item => item.Oracle),
+                Is.EqualTo(new[]
+                {
+                    "frontend",
+                    "finite-domain-smt",
+                    "partial-term-smt"
+                }));
+            Assert.That(evidence[0].Detail, Is.EqualTo("frontend-detail-0"));
+            Assert.That(evidence[0].Input, Does.Contain("Target"));
+            Assert.That(
+                evidence[1].Detail,
+                Is.EqualTo("finite-detail-0"));
+            Assert.That(
+                evidence[2].Detail,
+                Is.EqualTo("partial-detail-0"));
+
+            var coverage = new FrontendFuzzCoverage(
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+            var summary = new FuzzSummary(
+                SchemaVersion: 6,
+                Cases: 1,
+                Seed: 123,
+                MaximumParallelism: 1,
+                Agreements: 0,
+                Abstentions: 1,
+                FrontendAgreements: 1,
+                SmtAgreements: 1,
+                FiniteSmtSatisfiable: 1,
+                FiniteSmtUnsatisfiable: 0,
+                FiniteSmtAssumptions: 1,
+                PartialSmtAgreements: 1,
+                PartialSmtDefinedTrue: 1,
+                PartialSmtDefinedFalse: 0,
+                PartialSmtUndefined: 1,
+                FrontendCoverage: coverage,
+                CoverageSatisfied: true,
+                Failures: [])
+            {
+                AbstentionEvidence = [evidence[0]]
+            };
+            using var document = JsonDocument.Parse(
+                JsonSerializer.Serialize(summary));
+            var serialized = document.RootElement
+                .GetProperty("AbstentionEvidence");
+            Assert.That(serialized.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(
+                serialized[0].GetProperty("Oracle").GetString(),
+                Is.EqualTo("frontend"));
+            Assert.That(
+                serialized[0].GetProperty("Detail").GetString(),
+                Is.EqualTo("frontend-detail-0"));
+        }
+    }
+
+    [Test]
     public void SerializedCoverageContainsOnlyStrictSchemaCounters()
     {
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 5,
+            SchemaVersion: 6,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
@@ -126,7 +226,7 @@ public sealed class FuzzRunnerTests
         var second = await FuzzRunner.RunAsync(options);
 
         Assert.That(first, Is.EqualTo(second));
-        Assert.That(first.SchemaVersion, Is.EqualTo(5));
+        Assert.That(first.SchemaVersion, Is.EqualTo(6));
         Assert.That(first.Passed, Is.True);
         Assert.That(first.Agreements, Is.EqualTo(options.Cases));
         Assert.That(first.Abstentions, Is.Zero);
@@ -260,7 +360,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 5,
+            SchemaVersion: 6,
             Cases: 1,
             Seed: 7,
             MaximumParallelism: 1,
@@ -292,7 +392,7 @@ public sealed class FuzzRunnerTests
         var coverage = new FrontendFuzzCoverage(
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
         var summary = new FuzzSummary(
-            SchemaVersion: 5,
+            SchemaVersion: 6,
             Cases: cases,
             Seed: 7,
             MaximumParallelism: maximumParallelism,
@@ -328,7 +428,7 @@ public sealed class FuzzRunnerTests
             OverflowExceptions = 1
         };
         var valid = new FuzzSummary(
-            SchemaVersion: 5,
+            SchemaVersion: 6,
             Cases: FuzzOptions.DefaultCases,
             Seed: 7,
             MaximumParallelism: 1,

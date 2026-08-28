@@ -358,48 +358,6 @@ Require the old pair absent or nonpassing and prove qualification rejects it.
 **Confidence**: High; self-verified byte-for-byte in a temp canonical fixture
 and traced through qualification consumption.
 
-### 473. [CONFIRMED] Campaign-fatal fuzz abstentions retain no case-level evidence
-
-**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 239-366 and
-369-405; detailed oracle results in
-Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs around lines 195-205 and
-Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs around lines 160-209.
-
-**Description**: Any no-mismatch case with an abstained oracle increments the
-aggregate Abstentions count and makes FuzzSummary.Passed false. However,
-SelectFailureKeys retains only Mismatch statuses. An abstained case produces no
-FuzzFailure, and the detailed reason already returned by the oracle is
-discarded after status counting.
-
-**Verification**: Existing focused tests prove both halves:
-
-- Agreement/Agreement/Abstained has HasAbstention true and no failure key.
-- SupportedDomainAbstentionFailsTheCampaign requires the summary to fail.
-
-The canonical filtered run passed both tests, confirming the current
-contradictory contract.
-
-**Impact**: Nightly/release fuzzing can fail with only Abstentions: N. JSON
-contains no case, effective seed, oracle, source/formula/scenarios, or reason.
-Operators must rerun the full campaign, and resource-sensitive abstentions may
-not reproduce. This persists even if valid exit-1 JSON is later parsed.
-
-**Root cause**: Retained evidence is modeled as mismatch-only even though pass
-policy treats mismatch and abstention as fatal.
-
-**Recommended fix**: Add a bounded, schema-owned AbstentionEvidence collection
-with Case, effective seed, oracle, unminimized input/scenarios, and original
-Detail. Keep Failures for semantic mismatches and retain at least one
-representative per abstaining oracle before applying global caps.
-
-**Regression coverage**: Inject Agreement/Agreement/Abstained with a known
-detail into aggregation. Require Passed=false, Abstentions=1, Failures empty,
-and one serialized abstention record with case/oracle/seed/input/detail.
-Cover finite-SMT Unknown and partial-backend unrecognized paths.
-
-**Confidence**: High; self-verified through focused canonical tests and exact
-result-retention flow.
-
 ### 478. [CONFIRMED] Abrupt launcher termination strands worker-runtime snapshots in /tmp
 
 **Location**: SharpProof.Worker.Launcher/Program.cs around lines 57 and

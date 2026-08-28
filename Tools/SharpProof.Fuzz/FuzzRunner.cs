@@ -16,6 +16,13 @@ public sealed record FuzzFailure(
     public string Term => Minimized;
 }
 
+public sealed record FuzzAbstention(
+    int Case,
+    int Seed,
+    string Oracle,
+    string Input,
+    string Detail);
+
 internal readonly record struct FuzzFailureKey(int Case, string Oracle);
 internal readonly record struct FuzzCaseClassification(
     bool HasMismatch,
@@ -99,8 +106,14 @@ public sealed record FuzzSummary(
     bool CoverageSatisfied,
     ImmutableArray<FuzzFailure> Failures)
 {
+    public ImmutableArray<FuzzAbstention> AbstentionEvidence
+    {
+        get;
+        init;
+    } = [];
+
     public bool Passed =>
-        SchemaVersion == 5 &&
+        SchemaVersion == 6 &&
         Cases is > 0 and <= FuzzOptions.MaximumCases &&
         MaximumParallelism is >= 1 and <= 4 &&
         !Failures.IsDefault &&
@@ -130,6 +143,8 @@ public sealed record FuzzSummary(
             (Cases < FuzzOptions.DefaultCases ||
              FrontendCoverage.HasExpandedCategories) &&
         CoverageSatisfied &&
+        !AbstentionEvidence.IsDefault &&
+        (Abstentions != 0 || AbstentionEvidence.IsEmpty) &&
         Abstentions == 0 &&
         Agreements == Cases &&
         FrontendAgreements == Cases &&
@@ -151,6 +166,7 @@ public static class FuzzRunner
     private const int FrontendCompilationBatchSize = 256;
     private const int PullRequestCoverageBudget = FuzzOptions.DefaultCases;
     internal const int MaximumRetainedFailures = 64;
+    internal const int MaximumRetainedAbstentions = 64;
 
     public static async Task<FuzzSummary> RunAsync(
         FuzzOptions options,
@@ -198,6 +214,10 @@ public static class FuzzRunner
         }
         var frontendResults =
             new FrontendDifferentialResult[options.Cases];
+        var finiteResults =
+            new FiniteDomainDifferentialResult?[options.Cases];
+        var partialResults =
+            new PartialTermSmtDifferentialResult?[options.Cases];
         var frontendStatuses = new FuzzOracleStatus[options.Cases];
         var smtStatuses = new FuzzOracleStatus[options.Cases];
         var partialStatuses = new FuzzOracleStatus[options.Cases];
@@ -257,6 +277,7 @@ public static class FuzzRunner
                         formula.Enumeration,
                         token)
                     .ConfigureAwait(false);
+                finiteResults[index] = smt;
                 smtStatuses[index] = smt.Status;
                 if (smt.Status == FuzzOracleStatus.Agreement)
                 {
@@ -284,6 +305,7 @@ public static class FuzzRunner
                         partialCase,
                         token)
                     .ConfigureAwait(false);
+                partialResults[index] = partial;
                 partialStatuses[index] = partial.Status;
                 if (partial.Status == FuzzOracleStatus.Agreement)
                 {
@@ -414,8 +436,8 @@ public static class FuzzRunner
             }
         }
 
-        return new FuzzSummary(
-            SchemaVersion: 5,
+        var summary = new FuzzSummary(
+            SchemaVersion: 6,
             options.Cases,
             options.Seed,
             options.MaximumParallelism,
@@ -433,6 +455,206 @@ public static class FuzzRunner
             frontendCoverage,
             coverageSatisfied,
             [.. failures]);
+        return summary with
+        {
+            AbstentionEvidence = SelectAbstentionEvidence(
+                options.Seed,
+                frontendCases,
+                frontendResults,
+                finiteResults,
+                partialResults)
+        };
+    }
+
+    internal static ImmutableArray<FuzzAbstention> SelectAbstentionEvidence(
+        int seed,
+        IReadOnlyList<GeneratedCSharpCase> frontendCases,
+        IReadOnlyList<FrontendDifferentialResult> frontendResults,
+        IReadOnlyList<FiniteDomainDifferentialResult?> finiteResults,
+        IReadOnlyList<PartialTermSmtDifferentialResult?> partialResults)
+    {
+        if (frontendCases == null ||
+            frontendResults == null ||
+            finiteResults == null ||
+            partialResults == null)
+        {
+            throw new ArgumentNullException(
+                frontendCases == null ? nameof(frontendCases) :
+                frontendResults == null ? nameof(frontendResults) :
+                finiteResults == null ? nameof(finiteResults) :
+                nameof(partialResults));
+        }
+
+        if (frontendCases.Count != frontendResults.Count ||
+            frontendResults.Count != finiteResults.Count ||
+            finiteResults.Count != partialResults.Count)
+        {
+            throw new ArgumentException(
+                "Fuzz evidence collections must have equal lengths.");
+        }
+
+        var evidence = ImmutableArray.CreateBuilder<FuzzAbstention>(
+            MaximumRetainedAbstentions);
+        var retained = new HashSet<FuzzFailureKey>();
+
+        // Reserve one entry for each oracle before applying the global cap.
+        AddFirstFrontend();
+        AddFirstFinite();
+        AddFirstPartial();
+
+        for (var index = 0; index < frontendResults.Count; index++)
+        {
+            AddFrontend(index);
+            AddFinite(index);
+            AddPartial(index);
+            if (evidence.Count >= MaximumRetainedAbstentions)
+            {
+                break;
+            }
+        }
+
+        evidence.Capacity = evidence.Count;
+        return evidence.MoveToImmutable();
+
+        void AddFirstFrontend()
+        {
+            for (var index = 0; index < frontendResults.Count; index++)
+            {
+                if (frontendResults[index].Status == FuzzOracleStatus.Abstained)
+                {
+                    Add(new FuzzAbstention(
+                        index,
+                        CreateCaseSeed(seed, index),
+                        "frontend",
+                        frontendCases[index].Source,
+                        frontendResults[index].Detail));
+                    return;
+                }
+            }
+        }
+
+        void AddFirstFinite()
+        {
+            for (var index = 0; index < finiteResults.Count; index++)
+            {
+                if (finiteResults[index]?.Status == FuzzOracleStatus.Abstained)
+                {
+                    AddFinite(index);
+                    return;
+                }
+            }
+        }
+
+        void AddFirstPartial()
+        {
+            for (var index = 0; index < partialResults.Count; index++)
+            {
+                if (partialResults[index]?.Status == FuzzOracleStatus.Abstained)
+                {
+                    AddPartial(index);
+                    return;
+                }
+            }
+        }
+
+        void AddFrontend(int index)
+        {
+            if (frontendResults[index].Status == FuzzOracleStatus.Abstained)
+            {
+                Add(new FuzzAbstention(
+                    index,
+                    CreateCaseSeed(seed, index),
+                    "frontend",
+                    frontendCases[index].Source,
+                    frontendResults[index].Detail));
+            }
+        }
+
+        void AddFinite(int index)
+        {
+            var result = finiteResults[index];
+            if (result?.Status != FuzzOracleStatus.Abstained)
+            {
+                return;
+            }
+
+            var caseSeed = CreateCaseSeed(seed, index);
+            var factory = new IrFactory();
+            var formula = CreateTotalFiniteDomainFormula(
+                factory,
+                caseSeed,
+                CancellationToken.None);
+            Add(new FuzzAbstention(
+                index,
+                caseSeed,
+                "finite-domain-smt",
+                new IrPrinter(factory).Print(formula.Formula),
+                result.Detail));
+        }
+
+        void AddPartial(int index)
+        {
+            var result = partialResults[index];
+            if (result?.Status != FuzzOracleStatus.Abstained)
+            {
+                return;
+            }
+
+            var caseSeed = CreateCaseSeed(seed, index);
+            var factory = new IrFactory();
+            var generated = PartialTermSmtCaseGenerator.Create(
+                factory,
+                unchecked(caseSeed ^ 0x243F6A88));
+            Add(new FuzzAbstention(
+                index,
+                caseSeed,
+                "partial-term-smt",
+                FormatPartialInput(factory, generated),
+                result.Detail));
+        }
+
+        void Add(FuzzAbstention item)
+        {
+            if (evidence.Count >= MaximumRetainedAbstentions ||
+                !retained.Add(new FuzzFailureKey(item.Case, item.Oracle)))
+            {
+                return;
+            }
+
+            evidence.Add(item);
+        }
+    }
+
+    private static string FormatPartialInput(
+        IrFactory factory,
+        PartialTermSmtCase generated)
+    {
+        var printer = new IrPrinter(factory);
+        var scenarios = string.Join(
+            "; ",
+            generated.Scenarios.Select((scenario, index) =>
+                "scenario " + index.ToString() + ": " +
+                string.Join(
+                    ", ",
+                    scenario
+                        .OrderBy(static pair => pair.Key.Value)
+                        .Select(static pair =>
+                            pair.Key + "=" + FormatValue(pair.Value)))));
+        return printer.Print(generated.Formula) +
+            " scenarios=[" + scenarios + "]";
+
+        static string FormatValue(IrValue value)
+        {
+            return value.Kind switch
+            {
+                IrValueKind.Boolean => value.Boolean ? "true" : "false",
+                IrValueKind.Integer => value.Integer.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture),
+                IrValueKind.String => value.String,
+                IrValueKind.Null => "null",
+                _ => value.Kind.ToString()
+            };
+        }
     }
 
     internal static ImmutableArray<FuzzFailureKey> SelectFailureKeys(

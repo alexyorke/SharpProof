@@ -105,7 +105,7 @@ function Assert-SharpProofFuzzRunnerResult {
                 'PartialSmtAgreements', 'PartialSmtDefinedTrue',
                 'PartialSmtDefinedFalse', 'PartialSmtUndefined',
                 'FrontendCoverage',
-                'CoverageSatisfied', 'Failures', 'Passed')
+                'CoverageSatisfied', 'Failures', 'AbstentionEvidence', 'Passed')
 
         $schema = Get-ExactJsonInt32 $root 'SchemaVersion'
         $cases = Get-ExactJsonInt32 $root 'Cases'
@@ -132,7 +132,7 @@ function Assert-SharpProofFuzzRunnerResult {
         $coverageSatisfied = Get-ExactJsonBoolean $root 'CoverageSatisfied'
         $passed = Get-ExactJsonBoolean $root 'Passed'
 
-        if ($schema -ne 5) { throw "Unsupported fuzz schema '$schema'." }
+        if ($schema -ne 6) { throw "Unsupported fuzz schema '$schema'." }
         if ($cases -lt 1) {
             throw 'The fuzz runner case count must be positive.'
         }
@@ -210,7 +210,25 @@ function Assert-SharpProofFuzzRunnerResult {
                 }
             }
         }
+        $abstentionEvidence = $root.GetProperty('AbstentionEvidence')
+        if ($abstentionEvidence.ValueKind -ne [Text.Json.JsonValueKind]::Array) {
+            throw 'Fuzz abstention evidence must be a non-null JSON array.'
+        }
+        foreach ($abstention in $abstentionEvidence.EnumerateArray()) {
+            Assert-ExactJsonObjectProperties -Object $abstention `
+                -Description 'Fuzz abstention evidence' `
+                -Expected @('Case', 'Seed', 'Oracle', 'Input', 'Detail')
+            [void](Get-ExactJsonInt32 $abstention 'Case')
+            [void](Get-ExactJsonInt32 $abstention 'Seed')
+            foreach ($name in @('Oracle', 'Input', 'Detail')) {
+                if ($abstention.GetProperty($name).ValueKind -ne
+                    [Text.Json.JsonValueKind]::String) {
+                    throw "Fuzz abstention '$name' must be a string."
+                }
+            }
+        }
         if ($failures.GetArrayLength() -ne 0 -or
+            $abstentionEvidence.GetArrayLength() -ne 0 -or
             -not $coverageSatisfied -or -not $passed) {
             throw 'The fuzz runner did not produce a passing result.'
         }

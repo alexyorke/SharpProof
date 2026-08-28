@@ -11,7 +11,7 @@ $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) (
 
 function New-CanonicalResult([int]$Cases, [int]$Seed) {
     return [ordered]@{
-        SchemaVersion = 5; Cases = $Cases; Seed = $Seed
+        SchemaVersion = 6; Cases = $Cases; Seed = $Seed
         MaximumParallelism = 4; Agreements = $Cases; Abstentions = 0
         FrontendAgreements = $Cases; SmtAgreements = $Cases
         FiniteSmtSatisfiable = [Math]::Max(1, [Math]::Floor($Cases / 2))
@@ -27,7 +27,8 @@ function New-CanonicalResult([int]$Cases, [int]$Seed) {
             OverflowExceptions = 1; NullReferenceExceptions = 1
             IndexOutOfRangeExceptions = 1; InvalidCastExceptions = 1
         }
-        CoverageSatisfied = $true; Failures = [object[]]@(); Passed = $true
+        CoverageSatisfied = $true; Failures = [object[]]@()
+        AbstentionEvidence = [object[]]@(); Passed = $true
     }
 }
 
