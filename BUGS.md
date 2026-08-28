@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 571. [CONFIRMED] Event handler expressions are skipped before null receiver failure
-
-**Location**: SharpProof.Effects/OperationEffectScanner.Expressions.cs around
-lines 139-195; correct ordering exists in ExceptionHandlerReachability.cs around
-lines 313-328.
-
-**Description**: Event assignment scans the receiver and performs its null check
-before scanning HandlerValue. Runtime evaluates receiver expression, then
-handler expression, then invokes the accessor.
-
-**Reproduction**: For nullTarget.Changed += MakeHandler(), MakeHandler wrote
-static state 1729 before the runtime null failure. Analysis returned Complete
-and Writes.IsUnknown=false but omitted the static write. Reordering the scan
-fixed the oracle and retained the unknown-receiver control.
-
-**Impact**: Complete effect summaries can omit arbitrary handler-factory calls,
-writes, allocations, and throws.
-
-**Recommended fix**: Scan HandlerValue after receiver-expression evaluation but
-before the null check; resolve/invoke the accessor afterward. Test add, remove,
-throwing factory, and unknown receiver.
-
 ### 572. [CONFIRMED] Release digests mix committed Git blobs with dirty checkout bytes
 
 **Location**: scripts/Get-SharpProofReleaseDigests.ps1 around lines 365-435;
