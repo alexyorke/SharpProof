@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 602. [CONFIRMED] Supported claimless callables unnecessarily require an SMT backend
-
-**Location**: `SharpProof.Worker/SharpProofWorker.cs`, around lines 251-256 and
-504-536; `SharpProof.Worker/CallableVerifier.cs`, around lines 34-52.
-
-**Description**: Lane creation is based on target count, even though a supported
-Requires-only target has zero claims and `CallableVerifier` completes it without
-using a backend.
-
-**Reproduction**: The policy returned Complete/None with zero claims/resources,
-but one such target still invoked a throwing backend factory and failed. A
-zero-target control did not invoke it.
-
-**Impact**: Solver-free valid projects can fail as BackendUnavailable and pay
-backend startup costs.
-
-**Recommended fix**: Prepopulate solver-free callable results and create lanes
-only for targets with solver work. Coordinate with #590 so unsupported
-claimless callables remain typed incomplete.
-
 ### 603. [CONFIRMED] Failure-response claim projection is quadratic
 
 **Location**: `SharpProof.Worker.Protocol/WorkerResultAssembler.cs`, around
