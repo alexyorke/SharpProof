@@ -358,55 +358,6 @@ Require the old pair absent or nonpassing and prove qualification rejects it.
 **Confidence**: High; self-verified byte-for-byte in a temp canonical fixture
 and traced through qualification consumption.
 
-### 470. [CONFIRMED] Release-configuration evidence can remain stale and its receipt validates only schema plus commit
-
-**Location**: scripts/Test-SharpProofReleaseConfiguration.ps1 around
-lines 9-21 and 151-311;
-.github/workflows/package-consumers.yml around lines 253-264 and 300-313;
-scripts/Write-SharpProofQualificationReceipt.ps1 around lines 75-78 and
-120-149; scripts/Invoke-SharpProofReleaseContainer.ps1 around lines 175-210.
-
-**Description**: Live release-configuration checks can fail before owning the
-old report, and the receipt writer runs only after success. More seriously, the
-receipt authority accepts release-configuration evidence using only
-schemaVersion == 1 and commit == HEAD. It ignores checkedAtUtc, repository,
-rulesets, jobs, environments, and all live-check content. Final qualification
-checks the receipt/evidence hash but never reparses those semantics.
-
-**Self-verification**:
-
-1. Seed report and receipt, remove gh from PATH, and rerun the unchanged live
-   check. It exits 1 while both artifacts survive byte-for-byte.
-2. Supply the receipt writer with only
-   schemaVersion 1, matching commit, and checkedAtUtc in year 2000. It emits a
-   status-passed receipt:
-
-       MINIMAL_STALE_EVIDENCE_ACCEPTED=True
-
-**Impact**: GitHub rulesets, environments, variables, and secrets can change
-without repository SHA changes. A failed rerun or ancient same-commit snapshot
-can remain accepted as current passing evidence. Normal job failure still
-blocks automatic publish, but resumed/manual/persistent workflows can consume
-stale mutable-state authority.
-
-**Root cause**: Split publish-only-on-success lifecycle is compounded by an
-under-specified receipt arm that treats commit identity as sufficient for
-mutable external state.
-
-**Recommended fix**: Tombstone report and receipt before any live check and
-publish atomically after success. Define an exact report schema with status,
-required configuration fields, checkedAtUtc bound, and an attempt identity such
-as GITHUB_RUN_ID/GITHUB_RUN_ATTEMPT or a local nonce. Require all of these in
-receipt and final qualification validation.
-
-**Regression coverage**: Persistent fixture failures for missing gh, API error,
-and detected drift must invalidate old evidence. Receipt fixtures must reject
-schema-plus-commit-only, ancient, missing-field, and wrong-attempt evidence and
-accept one complete current report.
-
-**Confidence**: High; both producer lifecycle and weak receipt authority were
-self-verified with unchanged scripts.
-
 ### 473. [CONFIRMED] Campaign-fatal fuzz abstentions retain no case-level evidence
 
 **Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 239-366 and

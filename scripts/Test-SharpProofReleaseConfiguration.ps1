@@ -8,10 +8,24 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
 $contractPath = Join-Path $repositoryRoot 'eng\release\environment-contract.json'
 $workflowPath = Join-Path $repositoryRoot '.github\workflows\package-consumers.yml'
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 $workflow = Get-Content -LiteralPath $workflowPath -Raw
+
+$resolvedOutput = $null
+if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+    $resolvedOutput = Resolve-SharpProofContainedPath `
+        -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
+    if (Test-Path -LiteralPath $resolvedOutput -PathType Container) {
+        throw "OutputPath is a directory: $resolvedOutput"
+    }
+    if (Test-Path -LiteralPath $resolvedOutput -PathType Leaf) {
+        Remove-Item -LiteralPath $resolvedOutput -Force
+    }
+}
 
 if ([int]$contract.schemaVersion -ne 1 -or
     [string]::IsNullOrWhiteSpace([string]$contract.repository)) {
@@ -314,9 +328,11 @@ foreach ($required in $contract.environments) {
 
 $evidence = [ordered]@{
     schemaVersion = 1
+    status = 'passed'
     repository = $repository
     commit = $head
     checkedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+    attemptId = Get-SharpProofReleaseAttemptId
     tagRulesetId = [long]$tagRuleset.id
     tagRules = @($contract.tagRuleset.rules)
     tagRulesetBypassActors = @($contract.tagRuleset.bypassActors)
@@ -324,8 +340,6 @@ $evidence = [ordered]@{
     environments = $environmentEvidence
 }
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
-    $resolvedOutput = Resolve-SharpProofContainedPath `
-        -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
     $directory = [IO.Path]::GetDirectoryName($resolvedOutput)
     [IO.Directory]::CreateDirectory($directory) | Out-Null
     [IO.File]::WriteAllText(

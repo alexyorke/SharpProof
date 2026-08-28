@@ -23,6 +23,8 @@ Set-Location $repositoryRoot
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
 
 function Require-Environment([string]$Name) {
     $value = [Environment]::GetEnvironmentVariable($Name)
@@ -204,6 +206,23 @@ switch ($Mode) {
                     Sort-Object fileName |
                     ConvertTo-Json -Compress) -cne $packageArtifactJson) {
                 throw "Qualification gate receipt targets different packages: '$gate'."
+            }
+            if ($gate -eq 'release-configuration') {
+                $releaseContract = Get-Content -LiteralPath (
+                    Join-Path $repositoryRoot 'eng/release/environment-contract.json') -Raw |
+                    ConvertFrom-Json -ErrorAction Stop
+                $releaseEvidence = Get-Content -LiteralPath $evidencePath -Raw |
+                    ConvertFrom-Json -ErrorAction Stop
+                Assert-SharpProofReleaseConfigurationEvidence `
+                    -Evidence $releaseEvidence `
+                    -ExpectedCommit $head `
+                    -ExpectedRepository ([string]$releaseContract.repository)
+                if ([string]$receipt.attemptId -cne
+                        [string]$releaseEvidence.attemptId -or
+                    [string]$receipt.checkedAtUtc -cne
+                        [string]$releaseEvidence.checkedAtUtc) {
+                    throw 'Release-configuration receipt identity does not match its evidence.'
+                }
             }
             if ($gate -eq 'mutation') {
                 if ([string]$receipt.configuration -cne 'Release') {

@@ -24,6 +24,27 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
+$receiptCandidate = if ([IO.Path]::IsPathRooted($ReceiptDirectory)) {
+    $ReceiptDirectory
+}
+else {
+    Join-Path $repositoryRoot $ReceiptDirectory
+}
+$receiptDirectory = [IO.Path]::GetFullPath($receiptCandidate)
+if (-not $receiptDirectory.StartsWith(
+        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
+        [StringComparison]::Ordinal)) {
+    throw 'ReceiptDirectory must remain inside the repository.'
+}
+$receiptPath = Join-Path $receiptDirectory "$Gate.json"
+if (Test-Path -LiteralPath $receiptPath -PathType Container) {
+    throw "Receipt path is a directory: $receiptPath"
+}
+if (Test-Path -LiteralPath $receiptPath -PathType Leaf) {
+    Remove-Item -LiteralPath $receiptPath -Force
+}
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $resolvedEvidence = (Resolve-Path -LiteralPath $EvidencePath).Path
 $relativeEvidence = [IO.Path]::GetRelativePath(
@@ -74,8 +95,14 @@ $valid = switch -Regex ($Gate) {
         $packageArtifacts.Count -eq 6
     }
     '^release-configuration$' {
-        [int]$evidence.schemaVersion -eq 1 -and
-        [string]$evidence.commit -ceq $commit
+        $releaseContract = Get-Content -LiteralPath (
+            Join-Path $repositoryRoot 'eng/release/environment-contract.json') -Raw |
+            ConvertFrom-Json -ErrorAction Stop
+        Assert-SharpProofReleaseConfigurationEvidence `
+            -Evidence $evidence `
+            -ExpectedCommit $commit `
+            -ExpectedRepository ([string]$releaseContract.repository)
+        $true
     }
     'coverage' {
         $passed = $evidence.PSObject.Properties['passed']
@@ -113,18 +140,6 @@ $valid = switch -Regex ($Gate) {
 if (-not $valid) {
     throw "Qualification evidence is incomplete, stale, or failed: '$Gate'."
 }
-$receiptCandidate = if ([IO.Path]::IsPathRooted($ReceiptDirectory)) {
-    $ReceiptDirectory
-}
-else {
-    Join-Path $repositoryRoot $ReceiptDirectory
-}
-$receiptDirectory = [IO.Path]::GetFullPath($receiptCandidate)
-if (-not $receiptDirectory.StartsWith(
-        $repositoryRoot + [IO.Path]::DirectorySeparatorChar,
-        [StringComparison]::Ordinal)) {
-    throw 'ReceiptDirectory must remain inside the repository.'
-}
 [IO.Directory]::CreateDirectory($receiptDirectory) | Out-Null
 $receipt = [ordered]@{
     schemaVersion = 1
@@ -154,7 +169,11 @@ if ($Gate -eq 'pilots') {
             [ordered]@{ id = [string]$_.id; evidence = @($_.evidence) }
         })
 }
+if ($Gate -eq 'release-configuration') {
+    $receipt.attemptId = [string]$evidence.attemptId
+    $receipt.checkedAtUtc = [string]$evidence.checkedAtUtc
+}
 [IO.File]::WriteAllText(
-    (Join-Path $receiptDirectory "$Gate.json"),
+    $receiptPath,
     (($receipt | ConvertTo-Json -Depth 5) + "`n"),
     [Text.UTF8Encoding]::new($false))

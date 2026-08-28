@@ -120,6 +120,12 @@ function Invoke-Case {
         [string]$state.Workflow,
         [Text.UTF8Encoding]::new($false))
 
+    $outputPath = Join-Path $fixture "artifacts/$Name.json"
+    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($outputPath)) | Out-Null
+    [IO.File]::WriteAllText(
+        $outputPath,
+        '{"status":"passed","commit":"stale"}',
+        [Text.UTF8Encoding]::new($false))
     $output = & pwsh -NoLogo -NoProfile -File (
         Join-Path $fixture 'scripts/Test-SharpProofReleaseConfiguration.ps1') `
         -OutputPath "artifacts/$Name.json" 2>&1
@@ -130,6 +136,36 @@ function Invoke-Case {
     if ($success -and -not (Test-Path -LiteralPath (
                 Join-Path $fixture "artifacts/$Name.json") -PathType Leaf)) {
         throw "Release configuration fixture '$Name' wrote no evidence."
+    }
+    if (-not $success -and (Test-Path -LiteralPath $outputPath -PathType Leaf)) {
+        throw "Release configuration fixture '$Name' preserved stale evidence."
+    }
+}
+
+function Invoke-ReceiptCase {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$EvidencePath,
+        [Parameter(Mandatory = $true)][bool]$ExpectedSuccess
+    )
+
+    $receiptDirectory = Join-Path $fixture 'artifacts/receipts'
+    $output = & pwsh -NoLogo -NoProfile -File (
+        Join-Path $fixture 'scripts/Write-SharpProofQualificationReceipt.ps1') `
+        -Gate release-configuration `
+        -EvidencePath $EvidencePath `
+        -RepositoryRoot $fixture `
+        -ReceiptDirectory $receiptDirectory 2>&1
+    $success = $LASTEXITCODE -eq 0
+    if ($success -ne $ExpectedSuccess) {
+        throw "Receipt fixture '$Name' expected success=${ExpectedSuccess}: $output"
+    }
+    $receiptPath = Join-Path $receiptDirectory 'release-configuration.json'
+    if ($ExpectedSuccess -and -not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+        throw "Receipt fixture '$Name' did not write a receipt."
+    }
+    if (-not $ExpectedSuccess -and (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+        throw "Receipt fixture '$Name' preserved a stale receipt."
     }
 }
 
@@ -146,6 +182,18 @@ try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot '.github/workflows/package-consumers.yml') `
         -Destination (Join-Path $fixture '.github/workflows/package-consumers.yml')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Write-SharpProofQualificationReceipt.ps1') `
+        -Destination (Join-Path $fixture 'scripts/Write-SharpProofQualificationReceipt.ps1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/SharpProof.MutationEvidence.psm1') `
+        -Destination (Join-Path $fixture 'scripts/SharpProof.MutationEvidence.psm1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/SharpProof.ReleaseConfigurationEvidence.psm1') `
+        -Destination (Join-Path $fixture 'scripts/SharpProof.ReleaseConfigurationEvidence.psm1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Test-SharpProofPilotReport.ps1') `
+        -Destination (Join-Path $fixture 'scripts/Test-SharpProofPilotReport.ps1')
 @'
 #!/bin/sh
 paginate=0
@@ -282,6 +330,18 @@ cat "$GH_FIXTURE_ROOT/$file.json"
         $env:PATH = $oldPath
         $env:GH_FIXTURE_ROOT = $oldFixtureRoot
     }
+    $exactEvidence = Join-Path $fixture 'artifacts/exact-contract.json'
+    Invoke-ReceiptCase exact-contract $exactEvidence $true
+    $staleEvidence = Join-Path $fixture 'artifacts/stale.json'
+    $stale = Get-Content -LiteralPath $exactEvidence -Raw | ConvertFrom-Json
+    $stale.checkedAtUtc = '2000-01-01T00:00:00.0000000+00:00'
+    $stale | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $staleEvidence -Encoding utf8NoBOM
+    Invoke-ReceiptCase stale-timestamp $staleEvidence $false
+    $minimalEvidence = Join-Path $fixture 'artifacts/minimal.json'
+    $fixtureCommit = (& git -C $fixture rev-parse HEAD).Trim()
+    '{"schemaVersion":1,"commit":"' + $fixtureCommit + '"}' |
+        Set-Content -LiteralPath $minimalEvidence -Encoding utf8NoBOM
+    Invoke-ReceiptCase minimal-schema $minimalEvidence $false
     Write-Host 'Release configuration exact-ref fixtures passed.'
 }
 finally {

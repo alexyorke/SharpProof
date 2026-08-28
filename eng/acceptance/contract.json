@@ -171,6 +171,7 @@
       "scripts/SharpProof.PublicationPlanTopology.ps1",
       "scripts/SharpProof.PublicationPlanIdentity.psm1",
       "scripts/SharpProof.ReleaseChecksums.ps1",
+      "scripts/SharpProof.ReleaseConfigurationEvidence.psm1",
       "scripts/SharpProof.ReleaseJson.ps1",
       "scripts/SharpProof.FuzzEvidenceLifecycle.ps1",
       "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
@@ -200,6 +201,7 @@
       "scripts/Test-SharpProofReleaseAuthorityClosureFixtures.ps1",
       "scripts/Test-SharpProofReleaseConfiguration.ps1",
       "scripts/Test-SharpProofReleaseConfigurationFixtures.ps1",
+      "scripts/Test-SharpProofSamplesFixtures.ps1",
       "scripts/Test-SharpProofSamples.ps1",
       "scripts/Test-SharpProofSymbolPackages.ps1",
       "scripts/SharpProof.SymbolPackageValidator.cs",
@@ -655,7 +657,8 @@
           ".github/workflows/package-consumers.yml",
           "eng/release/environment-contract.json",
           "scripts/Test-SharpProofReleaseConfiguration.ps1",
-          "scripts/Test-SharpProofReleaseConfigurationFixtures.ps1"
+          "scripts/Test-SharpProofReleaseConfigurationFixtures.ps1",
+          "scripts/SharpProof.ReleaseConfigurationEvidence.psm1"
         ]
       },
       {
@@ -676,6 +679,7 @@
           "scripts/Invoke-SharpProofChangedTests.ps1",
           "scripts/Invoke-SharpProofDevCheck.ps1",
           "scripts/Invoke-SharpProofReleaseContainer.ps1",
+          "scripts/SharpProof.ReleaseConfigurationEvidence.psm1",
           "scripts/Invoke-SharpProofPackageTests.ps1",
           "scripts/Invoke-SharpProofSemanticTests.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
@@ -716,6 +720,7 @@
           "scripts/SharpProof.PublicationPlanTopology.ps1",
           "scripts/SharpProof.PublicationPlanIdentity.psm1",
           "scripts/SharpProof.ReleaseChecksums.ps1",
+          "scripts/SharpProof.ReleaseConfigurationEvidence.psm1",
           "scripts/SharpProof.ReleaseJson.ps1",
           "scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1",
           "scripts/Test-SharpProofDependencyAudit.ps1",
