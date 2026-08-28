@@ -48,6 +48,17 @@ internal static class WorkerResultAssembler
         WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0,
         WorkerCacheStatus cacheStatus = WorkerCacheStatus.Disabled)
     {
+        var callablesById = new Dictionary<string, WorkerCallableManifestEntry>(
+            StringComparer.Ordinal);
+        foreach (var callable in manifest.Callables)
+        {
+            // Preserve the manifest's first-match semantics when malformed
+            // input contains duplicate callable identifiers.
+            if (!callablesById.ContainsKey(callable.CallableId))
+            {
+                callablesById.Add(callable.CallableId, callable);
+            }
+        }
         return Create(inputHash, manifest, status, failureReason,
             manifest.Callables.Select(callable => new WorkerCallableResult
             {
@@ -67,8 +78,10 @@ internal static class WorkerResultAssembler
                 // This runs on the failure path, where the manifest may already be
                 // malformed. A claim naming an absent callable must not turn a
                 // reported failure into an unhandled exception.
-                Assumptions = manifest.Callables.FirstOrDefault(callable =>
-                    callable.CallableId == claim.CallableId)?.Assumptions ?? []
+                Assumptions = callablesById.TryGetValue(
+                    claim.CallableId, out var callable)
+                    ? callable.Assumptions
+                    : []
             }),
             budgets, cacheStatus, elapsedMilliseconds, errors, requestHash, versions);
     }

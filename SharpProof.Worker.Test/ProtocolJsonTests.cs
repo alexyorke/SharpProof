@@ -129,6 +129,72 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void IncompleteProjectionUsesFirstCallableAssumptionsAndHandlesMissingOwners()
+    {
+        var firstAssumption = new WorkerAssumptionEvidence
+        {
+            Id = "first",
+            Kind = WorkerAssumptionKind.UserAssume
+        };
+        var laterAssumption = new WorkerAssumptionEvidence
+        {
+            Id = "later",
+            Kind = WorkerAssumptionKind.TrustedBoundary
+        };
+        var duplicateId = "M:Subject.Duplicate";
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = [
+                new WorkerCallableManifestEntry
+                {
+                    CallableId = duplicateId,
+                    Assumptions = [firstAssumption],
+                    ClaimIds = ["first-claim"]
+                },
+                new WorkerCallableManifestEntry
+                {
+                    CallableId = duplicateId,
+                    Assumptions = [laterAssumption]
+                }
+            ],
+            Claims = [
+                new WorkerClaimManifestEntry
+                {
+                    ClaimId = "first-claim",
+                    CallableId = duplicateId,
+                    Kind = WorkerClaimKind.Postcondition
+                },
+                new WorkerClaimManifestEntry
+                {
+                    ClaimId = "missing-owner",
+                    CallableId = "M:Subject.Missing",
+                    Kind = WorkerClaimKind.Postcondition
+                }
+            ]
+        };
+
+        var response = WorkerResultAssembler.CreateIncomplete(
+            new string('a', 64),
+            new string('b', 64),
+            manifest,
+            new WorkerBudgets(),
+            WorkerRunStatus.Failed,
+            WorkerRunFailureReason.InfrastructureFailure,
+            WorkerCallableCoverageReason.InfrastructureFailure,
+            WorkerClaimReason.InfrastructureFailure);
+
+        var claims = response.ClaimResults.ToDictionary(
+            static claim => claim.ClaimId,
+            StringComparer.Ordinal);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(claims["first-claim"].Assumptions,
+                Is.EqualTo([firstAssumption]));
+            Assert.That(claims["missing-owner"].Assumptions, Is.Empty);
+        }
+    }
+
+    [Test]
     public void OversizedAssumptionExpansionUsesAValidatedCompactClaimForm()
     {
         const int assumptionCount = 400;
