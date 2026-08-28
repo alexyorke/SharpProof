@@ -1961,48 +1961,6 @@ totals.
 production planning arithmetic reported the duplicated work as additional
 coverage.
 
-### 499. [CONFIRMED] Developer-check planning accepts duplicate package-project graphs
-
-**Location**: scripts/Get-SharpProofDevCheckPlan.ps1 around line 11 and its
-documentation consumer scripts/Generate-Readme.ps1 around line 886; authority
-file scripts/package-projects.json.
-
-**Description**: The developer-check planner parses the package-project
-authority with bare ConvertFrom-Json and validates only schema version and the
-collapsed retained array. Duplicate `projects` properties can present two
-contradictory package graphs while the plan, its exact-ID regression, and README
-verification certify only the last one.
-
-**Reproduction**: A fixture declared a three-project Ghost graph followed by
-the real three-project graph under a second `projects` key. Both consumers
-succeeded:
-
-    PLAN_EXIT=0
-    PACK_IDS=package-pack:SharpProof.Attributes,package-pack:SharpProof.Package,
-             package-pack:SharpProof.Verifier
-    DOCUMENTATION_VERIFY_EXIT=0
-    SharpProof documentation matches ...
-
-**Impact**: The checked-in package authority can be ambiguous while developer
-and documentation gates remain green. Reviewers and parsers may act on different
-graphs, undermining claims that the exact package set was audited.
-
-**Root cause**: Last-property-wins parsing occurs before schema/count checks,
-and documentation trusts the resulting plan instead of independently validating
-the authority's structure.
-
-**Recommended fix**: Introduce one strict package-manifest loader that
-recursively rejects duplicate properties and validates the exact ordered
-project set. Use it in every PowerShell and C# consumer.
-
-**Regression coverage**: Run Debug and Release plan generation plus
-documentation verification against duplicate-array fixtures; require a
-path-qualified duplicate error before plan emission. Cover case variants and a
-valid control.
-
-**Confidence**: High; both production consumers accepted the contradictory
-fixture and emitted the final graph.
-
 ### 500. [CONFIRMED] Synchronous using omits the hidden concrete Dispose precondition call
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
