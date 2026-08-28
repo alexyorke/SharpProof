@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using NUnit.Framework;
@@ -330,22 +331,24 @@ public sealed class BoundaryEnforcementTests
     {
         foreach (var project in SoundnessCriticalProjects)
         {
-            var reference = XDocument.Load(ProjectFile(project))
-                .Descendants("ProjectReference")
-                .SingleOrDefault(element =>
+            foreach (var configuration in new[] { "Debug", "Release" })
+            {
+                var references = EvaluateProjectReferences(project, configuration);
+                var matches = references.Where(reference =>
                     Path.GetFileNameWithoutExtension(
-                        ((string?)element.Attribute("Include") ?? string.Empty)
-                            .Replace('\\', '/')) ==
-                    "SharpProof.Meta.Analyzers");
-            Assert.That(reference, Is.Not.Null, project);
-            Assert.That(
-                (string?)reference!.Attribute("OutputItemType"),
-                Is.EqualTo("Analyzer"),
-                project);
-            Assert.That(
-                (string?)reference.Attribute("ReferenceOutputAssembly"),
-                Is.EqualTo("false"),
-                project);
+                        reference.Identity.Replace('\\', '/')) ==
+                    "SharpProof.Meta.Analyzers").ToArray();
+                Assert.That(matches, Has.Length.EqualTo(1),
+                    $"{project} ({configuration})");
+                Assert.That(
+                    matches[0].OutputItemType,
+                    Is.EqualTo("Analyzer"),
+                    $"{project} ({configuration})");
+                Assert.That(
+                    matches[0].ReferenceOutputAssembly,
+                    Is.EqualTo("false"),
+                    $"{project} ({configuration})");
+            }
         }
     }
 
@@ -608,6 +611,84 @@ public sealed class BoundaryEnforcementTests
                 (string?)element.Attribute("Include") ?? string.Empty)
             .Where(static value => !string.IsNullOrWhiteSpace(value))];
     }
+
+    private static EvaluatedProjectReference[] EvaluateProjectReferences(
+        string project,
+        string configuration)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = Environment.ProcessPath ?? "dotnet",
+            WorkingDirectory = RepositoryRoot(),
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("msbuild");
+        startInfo.ArgumentList.Add(ProjectFile(project));
+        startInfo.ArgumentList.Add("-nologo");
+        startInfo.ArgumentList.Add($"-p:Configuration={configuration}");
+        startInfo.ArgumentList.Add("-p:DesignTimeBuild=false");
+        startInfo.ArgumentList.Add("-getItem:ProjectReference");
+
+        using var process = Process.Start(startInfo) ??
+            throw new InvalidOperationException(
+                "Could not start dotnet msbuild for " + project + ".");
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(60_000))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // The process exited between the timeout check and Kill.
+            }
+            throw new InvalidOperationException(
+                "dotnet msbuild timed out while evaluating " + project + ".");
+        }
+
+        var output = outputTask.GetAwaiter().GetResult();
+        var error = errorTask.GetAwaiter().GetResult();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                "dotnet msbuild failed while evaluating " + project + ": " +
+                error.Trim());
+        }
+
+        using var document = JsonDocument.Parse(output);
+        if (!document.RootElement.TryGetProperty("Items", out var items) ||
+            !items.TryGetProperty("ProjectReference", out var values) ||
+            values.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return [.. values.EnumerateArray().Select(static value =>
+            new EvaluatedProjectReference(
+                value.GetProperty("Identity").GetString() ?? string.Empty,
+                OptionalItemMetadata(value, "OutputItemType"),
+                OptionalItemMetadata(value, "ReferenceOutputAssembly")))];
+    }
+
+    private static string? OptionalItemMetadata(
+        JsonElement item,
+        string name)
+    {
+        return item.TryGetProperty(name, out var value) &&
+            value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private sealed record EvaluatedProjectReference(
+        string Identity,
+        string? OutputItemType,
+        string? ReferenceOutputAssembly);
 
     private static IEnumerable<string> SourceFiles(string project)
     {

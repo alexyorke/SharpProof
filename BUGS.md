@@ -3076,28 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 678. [CONFIRMED] Meta-analyzer enrollment gate trusts unevaluated project XML
-
-**Location**: `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs`, around
-lines 295-315.
-
-**Description**: Enrollment is checked by raw XDocument element presence and
-metadata. MSBuild conditions, ItemGroup conditions, imports, Choose, and Update
-can remove or alter the analyzer reference after evaluation while XML still looks
-correct.
-
-**Reproduction**: Adding `Condition="'$(Configuration)' == 'Disabled'"` to the
-Effects meta-analyzer ProjectReference left the architecture test passing. Actual
-Debug and Release `-getItem:ProjectReference` evaluation omitted the analyzer.
-
-**Impact**: A soundness-critical project can stop running every SPMETA rule while
-the test named `RunsTheMetaAnalyzer` remains green.
-
-**Recommended fix**: Reuse evaluated-MSBuild inspection for every critical project
-in Debug and Release, requiring exactly one evaluated analyzer reference with
-the exact metadata. Test element/ItemGroup conditions, configuration-only items,
-imports/Update, and valid unconditional enrollment.
-
 ### 679. [CONFIRMED] Verifier-only policies force full C# recompilation
 
 **Location**: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props`,
