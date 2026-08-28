@@ -20,13 +20,13 @@ internal static class Program
     {
         return await RunMain(
             args,
-            static path => WorkerBinaryIdentity.ComputeSha256(path))
+            computeWorkerSha256: null)
             .ConfigureAwait(false);
     }
 
     internal static async Task<int> RunMain(
         string[] args,
-        Func<string, string> computeWorkerSha256,
+        Func<string, string>? computeWorkerSha256,
         Func<LauncherArguments, WorkerVerifyRequest, string, string, int>? runWorker = null)
     {
         if (!LauncherArguments.TryParse(args, out var arguments))
@@ -114,9 +114,10 @@ internal static class Program
         {
             using (runtimeSnapshot)
             {
-                if (computeWorkerSha256(
-                        runtimeSnapshot.ExecutionWorkerPath) !=
-                    runtimeSnapshot.Sha256)
+                var currentWorkerSha256 = computeWorkerSha256 == null
+                    ? runtimeSnapshot.ComputeCurrentSha256()
+                    : computeWorkerSha256(runtimeSnapshot.ExecutionWorkerPath);
+                if (currentWorkerSha256 != runtimeSnapshot.Sha256)
                 {
                     throw new InvalidOperationException(
                         "The staged worker runtime closure changed before launch.");

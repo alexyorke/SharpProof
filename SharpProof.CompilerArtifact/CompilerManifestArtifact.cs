@@ -289,6 +289,28 @@ internal sealed class WorkerRuntimeClosureSnapshot(
     internal string Sha256 { get; } = sha256;
     private IReadOnlyList<FileStream> StagedHandles { get; } = stagedHandles;
 
+    internal string ComputeCurrentSha256()
+    {
+        using var hash = new CanonicalHashWriter();
+        hash.Add("SharpProof.WorkerBinarySet", 1);
+        var stagingDirectory = GetDirectoryName(ExecutionWorkerPath)!;
+        foreach (var component in ComponentPaths
+                     .OrderBy(static path => GetFileName(path),
+                         StringComparer.Ordinal))
+        {
+            var name = GetFileName(component);
+            hash.Add(name);
+            using var stream = new FileStream(
+                Combine(stagingDirectory, name),
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+            hash.Add(stream);
+        }
+
+        return hash.Finish();
+    }
+
     public void Dispose()
     {
         foreach (var handle in StagedHandles)

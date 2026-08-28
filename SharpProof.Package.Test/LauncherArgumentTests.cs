@@ -902,6 +902,18 @@ public sealed class LauncherArgumentTests
         Assert.That(collision?.GetType(), Is.EqualTo(typeof(ArgumentException)));
     }
 
+    [Test]
+    [Platform("Linux")]
+    public void RuntimeClosureSnapshotRehashesItsStagedFiles()
+    {
+        var worker = typeof(SharpProofWorker).Assembly.Location;
+        using var snapshot = WorkerBinaryIdentity.CreateSnapshot(worker);
+
+        Assert.That(
+            snapshot.ComputeCurrentSha256(),
+            Is.EqualTo(snapshot.Sha256));
+    }
+
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(100)]
