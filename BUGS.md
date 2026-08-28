@@ -267,58 +267,6 @@ unsafe cache property target and retain a fully cacheable tuple control.
 **Confidence**: High; self-verified in a canonical exact-source probe with
 positive inline and negative alias/factory controls.
 
-### 443. [CONFIRMED] Signed System.Random seed aliases repeat downstream fuzz cases even when raw case seeds differ
-
-**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 152-155 and
-526-559; Tools/SharpProof.Fuzz/FrontendFuzzing.cs around lines 702-716;
-Tools/SharpProof.Fuzz/WellSortedIrGenerator.cs around lines 43-44; existing
-coverage in SharpProof.Fuzz.Test/FuzzRunnerTests.cs around lines 88-105.
-
-**Description**: The frontend and finite-SMT fuzz generators XOR each raw case
-seed with an oracle salt, cast the result to signed int, and pass it to
-System.Random(int). In the supported .NET 9 runtime, new Random(n) and
-new Random(-n) produce identical streams. Distinct raw case seeds can therefore
-alias after salting and generate the same oracle input. This remains after any
-fix that merely makes CreateCaseSeed itself injective.
-
-**Reproduction evidence**:
-
-- Nightly campaign seed 20260424, frontend indices 6787 and 7525:
-  raw seeds 2135852073 and -2135852075 become salted seeds
-  2138777086 and -2138777086.
-- Nightly campaign seed 20260830, finite-SMT indices 3580 and 7042:
-  raw seeds 1138160897 and -1138160903 become salted seeds
-  794323444 and -794323444.
-
-The canonical .NET 9.0.1 container produced identical first-eight
-Random.Next() streams for both opposite-sign pairs. The finite-SMT pair also
-has the same target index and fallback parity, so it produces structurally
-identical formulas. Frontend generation is likewise deterministic from the
-aliased Random stream.
-
-**Impact**: FrontendAgreements and SmtAgreements can count repeated oracle
-inputs as independent cases even when raw case-seed uniqueness is enforced.
-The existing test checks only distinct CreateCaseSeed integers and cannot see
-effective generator-state aliases.
-
-**Root cause**: System.Random(int) seed initialization does not preserve all
-32 signed seed bit patterns, but the campaign treats those patterns as distinct
-entropy.
-
-**Recommended fix**: Replace System.Random(int) in fuzz generators with a
-deterministic PRNG whose initialization preserves every uint or ulong seed bit.
-Seed it directly from campaign seed, case index, and oracle identifier rather
-than converting through a signed int. Keep the algorithm/version explicit so
-retained-seed reproduction remains stable.
-
-**Regression coverage**: Pin both opposite-sign pairs at the PRNG stream and
-generated-case levels, assert distinct effective generator states for the
-supported campaign range, and retain raw CreateCaseSeed uniqueness and
-cross-seed tests.
-
-**Confidence**: High; exact mappings and runtime streams were reproduced in the
-canonical .NET image and downstream deterministic inputs were traced.
-
 ### 444. [CONFIRMED] Strict protocol deserialization parses every document twice
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around
