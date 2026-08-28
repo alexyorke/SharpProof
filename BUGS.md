@@ -6025,26 +6025,6 @@ evidence policy failures.
 UserAssume or TrustedBoundary only. Test earlier preconditions, both policy kinds,
 console structure, and SARIF URI.
 
-### 698. [CONFIRMED] Banned-symbol inventory test uses overlapping substring matches
-
-**Location**: `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs`, around
-lines 168-201; example exact ID in `BannedSymbols.txt`, around line 13.
-
-**Description**: The architecture test treats BannedSymbols as arbitrary text and
-checks broad substrings. Sibling type/overload entries can satisfy a deleted exact
-documentation ID even though BannedApi matching is exact.
-
-**Reproduction**: Deleting only
-`Compilation.GetSemanticModel(SyntaxTree,bool)` left the inventory test passing.
-A direct compiler probe then built clean; restoring that line produced RS0030.
-
-**Impact**: Exact enforcement can disappear while the claimed inventory backstop
-remains green, particularly in BannedApi-only production projects.
-
-**Recommended fix**: Parse each noncomment line's exact documentation ID into a
-set, reject malformed/duplicate rows, and assert fully qualified IDs. Mutation-
-delete every overload independently and retain compiler probes.
-
 ### 699. [CONFIRMED] Release needs test accepts commented-out dependencies
 
 **Location**: `SharpProof.ArchitectureTest/ReleaseCoverageBaselineTests.cs`,
