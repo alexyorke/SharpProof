@@ -69,6 +69,16 @@ internal sealed class EffectiveContractSourceResolver
         IOperation? implementationBody)
     {
         var direct = _clauses.Create(target, implementationBody);
+        if (direct.HasRejectedContractApiUsage)
+        {
+            return Create(
+                target,
+                direct,
+                direct,
+                usesCompanion: false,
+                ContractBindingFailure.ContractApiUnavailable);
+        }
+
         if (direct.Clauses.Any(static clause => clause.IsValid))
         {
             return Create(
@@ -111,6 +121,8 @@ internal sealed class EffectiveContractSourceResolver
                 var inventory = _clauses.Create(companion.Method);
                 var failure = inventory.ImplementationBody == null
                     ? ContractBindingFailure.CompanionBodyUnavailable
+                    : inventory.HasRejectedContractApiUsage
+                        ? ContractBindingFailure.ContractApiUnavailable
                     : inventory.HasPlacementErrors
                         ? ContractBindingFailure.InvalidClausePlacement
                         : ContractBindingFailure.None;

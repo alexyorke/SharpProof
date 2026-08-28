@@ -169,13 +169,17 @@ internal static partial class AnalyzerFeaturePipeline
         }
         var selection = GetSelection(
             method, session, context.ReportDiagnostic, context.CancellationToken);
+        var resolution = session.ResolveContractSource(method);
         var explicitSelection = session.Attributes.Select(
             method,
             session.Configuration.ContractsEnabled &&
-            session.ResolveContractSource(method).HasSelectedContractIntent);
+            resolution.HasSelectedContractIntent);
         var explicitContractsSelected =
             session.Configuration.ContractsEnabled &&
             (explicitSelection & ContractSelectionFeatures.Contracts) != 0;
+        var rejectedCompanionContractApi =
+            resolution.UsesCompanion &&
+            resolution.Inventory.HasRejectedContractApiUsage;
         if (IsConcreteSemicolonAccessor(method, context.CancellationToken) &&
             selection.Any)
         {
@@ -211,7 +215,7 @@ internal static partial class AnalyzerFeaturePipeline
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
             return;
         }
-        if (rejectedContractApi)
+        if (rejectedContractApi || rejectedCompanionContractApi)
         {
             session.RecordSemanticOutcome(
                 method,

@@ -317,6 +317,58 @@ public sealed class GeneratedContractForAnalyzerTests
     }
 
     [Test]
+    public async Task GeneratedCompanionRejectedContractApiIsReported()
+    {
+        var lookalike = AnalyzerTestHost.EmitReference(
+            """
+            namespace SharpProof.Attributes
+            {
+                public static class Contract
+                {
+                    public static void Ensures(bool condition) { }
+                }
+            }
+            """,
+            "RejectedContractApi").WithAliases(["rejected"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            extern alias rejected;
+            using SharpProof.Attributes;
+
+            public interface IService
+            {
+                int Map(int value);
+            }
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts
+            {
+                public static int Map(IService receiver, int value)
+                {
+                    rejected::SharpProof.Attributes.Contract.Ensures(value > 0);
+                    return value;
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SPCF0001", "SPCF0002", "SPCF0003", "SPCF0004",
+                "SPCF0005", "SPCF0006", "SPCF0007", "SPCF0008", "SP0047"],
+            additionalReferences: [lookalike],
+            profile: "advisory",
+            features: "contracts");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0047"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("ContractApiIdentityRejected"));
+        }
+    }
+
+    [Test]
     public async Task TreeConfigurationDiagnosticDoesNotSkipCompanionReconciliation()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
