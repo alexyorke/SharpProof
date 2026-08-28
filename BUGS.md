@@ -3076,28 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 674. [CONFIRMED] Compact assumption validation rebuilds owner indexes per claim
-
-**Location**: `SharpProof.Worker.Protocol/ProtocolJson.cs`, around lines 595-663
-and 975-1015.
-
-**Description**: For every claim result, validation sorts the same callable's
-full declaration array and, for compact rows, rebuilds declaration and actual
-dictionaries. The expected declaration set is invariant per callable.
-
-**Reproduction**: A valid 1.22 MB response with 2,000 declarations/claims took
-845 ms and allocated 943 MB during public validation. A real serializer compacted
-a valid 25.27 MB response to 534 KB, but validating it still allocated 80.1 MB.
-An indexed control allocated about 386 KB at 2,000.
-
-**Impact**: The size-saving protocol form causes O(claims * declarations log
-declarations) work and extreme transient GC pressure after verification.
-
-**Recommended fix**: Build one duplicate-safe per-callable descriptor containing
-declaration count, ordinal ID/kind map, and trusted IDs, then validate all rows
-against it. Test full/compact/null inheritance, trusted rows, malformed shapes,
-and one-index-build/allocation scaling.
-
 ### 675. [CONFIRMED] Reported suppressed compiler errors poison every callable
 
 **Location**: `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs`,

@@ -664,6 +664,10 @@ public static partial class WorkerProtocolJson
             .Where(static item => item != null && !string.IsNullOrWhiteSpace(item.CallableId))
             .GroupBy(static item => item.CallableId, s_ordinal)
             .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
+        var assumptionIndexes = declaredById.ToDictionary(
+            static pair => pair.Key,
+            static pair => new AssumptionDeclarationIndex(pair.Value.Assumptions),
+            s_ordinal);
         foreach (var value in valid)
         {
             errors.Rules(value, WorkerProtocolMetadata.CallableResultRules);
@@ -672,8 +676,13 @@ public static partial class WorkerProtocolJson
                 declaredById.TryGetValue(value.CallableId!, out var entry)
                 ? entry
                 : null;
+            var assumptionIndex = hasCallableId &&
+                assumptionIndexes.TryGetValue(value.CallableId!, out var index)
+                ? index
+                : null;
             errors.Check(declared != null &&
-                SameAssumptionDeclarations(value.Assumptions, declared.Assumptions),
+                assumptionIndex != null &&
+                assumptionIndex.MatchesDeclarations(value.Assumptions),
                 "response.callable_assumption_set");
         }
         return valid;
@@ -693,9 +702,18 @@ public static partial class WorkerProtocolJson
             .Where(static item => item != null && !string.IsNullOrWhiteSpace(item.CallableId))
             .GroupBy(static item => item.CallableId, s_ordinal)
             .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
+        var assumptionIndexes = callablesById.ToDictionary(
+            static pair => pair.Key,
+            static pair => new AssumptionDeclarationIndex(pair.Value.Assumptions),
+            s_ordinal);
         foreach (var value in valid)
         {
-            ValidateClaimResult(value, claimsById, callablesById, errors);
+            ValidateClaimResult(
+                value,
+                claimsById,
+                callablesById,
+                assumptionIndexes,
+                errors);
         }
 
         return valid;
@@ -704,6 +722,7 @@ public static partial class WorkerProtocolJson
         WorkerClaimResult value,
         Dictionary<string, WorkerClaimManifestEntry> claimsById,
         Dictionary<string, WorkerCallableManifestEntry> callablesById,
+        Dictionary<string, AssumptionDeclarationIndex> assumptionIndexes,
         Validator errors)
     {
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
@@ -747,9 +766,13 @@ public static partial class WorkerProtocolJson
             claim?.Kind ?? WorkerClaimKind.Unspecified, value.Outcome, value.Vacuity),
             "response.vacuity");
         callablesById.TryGetValue(claim?.CallableId ?? string.Empty, out var owner);
+        assumptionIndexes.TryGetValue(
+            owner?.CallableId ?? string.Empty,
+            out var assumptionIndex);
         errors.Check(owner != null &&
                 (value.Assumptions == null ||
-                    MatchesClaimAssumptions(value.Assumptions, owner.Assumptions)),
+                    assumptionIndex != null &&
+                    assumptionIndex.MatchesClaimAssumptions(value.Assumptions)),
             "response.claim_assumption_set");
     }
 
@@ -1140,47 +1163,88 @@ public static partial class WorkerProtocolJson
         return [.. (values ?? []).OrderBy(identity, s_ordinal)];
     }
 
-    private static bool SameAssumptionDeclarations(
-            WorkerAssumptionEvidence[]? actual, WorkerAssumptionEvidence[]? expected)
+    private sealed class AssumptionDeclarationIndex
     {
-        static IEnumerable<(string Id, WorkerAssumptionKind Kind)> Normalize(
-            WorkerAssumptionEvidence[]? values)
+        private readonly Dictionary<string, WorkerAssumptionKind> _kindsById;
+        private readonly HashSet<string> _trustedIds;
+
+        internal AssumptionDeclarationIndex(
+            WorkerAssumptionEvidence[]? expected)
         {
-            return (values ?? []).Where(static value => value != null)
-                .OrderBy(static value => value.Id, s_ordinal)
-                .Select(static value => (value.Id, value.Kind));
+            _kindsById = new Dictionary<string, WorkerAssumptionKind>(s_ordinal);
+            _trustedIds = new HashSet<string>(s_ordinal);
+            foreach (var assumption in expected ?? [])
+            {
+                if (assumption == null ||
+                    assumption.Id == null ||
+                    _kindsById.ContainsKey(assumption.Id))
+                {
+                    continue;
+                }
+
+                _kindsById.Add(assumption.Id, assumption.Kind);
+
+                if (assumption.Kind == WorkerAssumptionKind.TrustedBoundary)
+                {
+                    _trustedIds.Add(assumption.Id);
+                }
+            }
         }
 
-        return Normalize(actual).SequenceEqual(Normalize(expected));
-    }
-
-    private static bool MatchesClaimAssumptions(
-        WorkerAssumptionEvidence[] actual,
-        WorkerAssumptionEvidence[] expected)
-    {
-        if (SameAssumptionDeclarations(actual, expected))
+        internal bool MatchesDeclarations(
+            WorkerAssumptionEvidence[]? actual)
         {
-            return true;
+            var seen = new HashSet<string>(s_ordinal);
+            var count = 0;
+            foreach (var assumption in actual ?? [])
+            {
+                if (assumption == null)
+                {
+                    continue;
+                }
+
+                count++;
+                if (!seen.Add(assumption.Id) ||
+                    !_kindsById.TryGetValue(assumption.Id, out var kind) ||
+                    kind != assumption.Kind)
+                {
+                    return false;
+                }
+            }
+
+            return count == _kindsById.Count;
         }
 
-        var expectedById = expected
-            .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
-            .GroupBy(static value => value.Id, s_ordinal)
-            .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
-        var actualById = actual
-            .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
-            .GroupBy(static value => value.Id, s_ordinal)
-            .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
-        return actual.Length > 0 &&
-            actual.Any(static value => value != null && value.Used) &&
-            actual.All(value => value != null &&
-                expectedById.TryGetValue(value.Id, out var declaration) &&
-                declaration.Kind == value.Kind &&
-                (value.Kind == WorkerAssumptionKind.TrustedBoundary || value.Used)) &&
-            expected.Where(static value => value != null &&
-                    value.Kind == WorkerAssumptionKind.TrustedBoundary)
-                .All(value => actualById.TryGetValue(value.Id, out var actualValue) &&
-                    actualValue.Kind == value.Kind);
+        internal bool MatchesClaimAssumptions(
+            WorkerAssumptionEvidence[] actual)
+        {
+            if (MatchesDeclarations(actual))
+            {
+                return true;
+            }
+
+            var actualById = new Dictionary<string, WorkerAssumptionEvidence>(s_ordinal);
+            foreach (var assumption in actual)
+            {
+                if (assumption != null &&
+                    !string.IsNullOrWhiteSpace(assumption.Id) &&
+                    !actualById.ContainsKey(assumption.Id))
+                {
+                    actualById.Add(assumption.Id, assumption);
+                }
+            }
+
+            return actual.Length > 0 &&
+                actual.Any(static value => value != null && value.Used) &&
+                actual.All(value => value != null &&
+                    !string.IsNullOrWhiteSpace(value.Id) &&
+                    _kindsById.TryGetValue(value.Id, out var kind) &&
+                    kind == value.Kind &&
+                    (value.Kind == WorkerAssumptionKind.TrustedBoundary ||
+                     value.Used)) &&
+                _trustedIds.All(id => actualById.TryGetValue(id, out var value) &&
+                    value.Kind == WorkerAssumptionKind.TrustedBoundary);
+        }
     }
 
     private static string ManifestName<T>(T value) where T : struct, Enum
