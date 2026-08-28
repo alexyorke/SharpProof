@@ -3054,29 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 643. [CONFIRMED] Completed refutations are emitted as failed SARIF invocations
-
-**Location**: `SharpProof.Worker.Launcher/SarifProjection.cs`, around lines
-87-94 and 117-147; `SharpProof.Package.Test/LauncherArgumentTests.cs`, around
-lines 1673-1754.
-
-**Description**: `executionSuccessful` requires that no claim is Refuted. SARIF
-defines this flag as operational tool success; findings belong in `results` and
-do not make a completed analysis invocation fail.
-
-**Reproduction**: A validated Complete response with one ordinary refuted
-postcondition serialized as
-`executionSuccessful=False resultKind=fail resultLevel=error`. The existing test
-pins the false flag.
-
-**Impact**: SARIF consumers conflate valid proof findings with analyzer or
-infrastructure failure, distorting dashboards and CI ingestion.
-
-**Recommended fix**: Base invocation success on operational status and tool
-errors only, retaining refutations as fail/error results. Test Complete
-proven/refuted/unknown as true and failed/timed-out/canceled/tool-error runs as
-false, including one real refuted build.
-
 ### 644. [CONFIRMED] Reused reference awaiters hide caller-owned writes as Fresh
 
 **Location**: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, around
