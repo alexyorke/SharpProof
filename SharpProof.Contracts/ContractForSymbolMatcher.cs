@@ -774,6 +774,11 @@ internal static class ContractForSymbolMatcher
         ISymbol? leftScope,
         ISymbol? rightScope)
     {
+        if (SymbolEqualityComparer.Default.Equals(left, right))
+        {
+            return true;
+        }
+
         if (left is INamedTypeSymbol leftType &&
             right is INamedTypeSymbol rightType)
         {

@@ -1419,60 +1419,6 @@ pin protocol ordering if later edges are modeled.
 **Confidence**: High; executable analyzer/runtime probes isolated the missing
 compiler-hidden call and matched the repository's existing Effects inventory.
 
-### 508. [CONFIRMED] Open-generic companions reject identical caller-owned type parameters after specialization
-
-**Location**: SharpProof.Contracts/ContractForSymbolMatcher.cs, definition match
-around lines 218-234, specialization/recheck around lines 288-316,
-type-parameter matching around lines 558-564, and OwnersMatch around lines
-743-764. Declaration validation occurs in
-SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs
-around lines 30-47.
-
-**Description**: An open-generic companion validates against its target
-definition and specializes correctly for a generic caller. The post-
-specialization recheck then routes identical caller-owned type parameters to
-OwnersMatch. That routine handles mapped target/companion owners but has no
-exact-symbol/equal-owner fast path; a type parameter owned by the external
-caller lies outside both scopes and is falsely rejected.
-
-**Reproduction**: For `IRepository<T>.Read(T,bool)`, an open
-`RepositoryContracts<T>` companion, and a generic forwarding caller, the
-canonical probe reported:
-
-    SPCF_IDS=<none>
-    CALL_TARGET=IRepository<T>.Read(T, bool)
-    MATCH_ORIGINAL=True
-    SPECIALIZED_COMPANION=RepositoryContracts<T>.Read(IRepository<T>, T, bool)
-    VALUE_TYPE_SYMBOL_EQUAL=True
-    MATCH_SPECIALIZED=False
-    RESOLUTION_FAILURE=CompanionSignatureMismatch
-    BIND_SUCCESS=False
-    CLAUSES=-1
-
-The concrete IRepository<string> control matched, bound, used the companion,
-and returned one Requires clause. An open-containing plus generic-member case
-failed the same way.
-
-**Impact**: Valid companion contracts disappear for invocations inside generic
-forwarding code, even though analyzer declaration validation accepts the
-companion and the specialized symbols are identical. The failure is fail-closed
-but source-shape dependent.
-
-**Root cause**: Structural owner mapping is applied before recognizing exact
-type-parameter symbol identity.
-
-**Recommended fix**: In the type-parameter branch, accept
-SymbolEqualityComparer.Default exact identity before ordinal/owner mapping. A
-narrow exact-symbol check avoids weakening structural comparison between target
-and companion parameters.
-
-**Regression coverage**: Bind the generic forwarding invocation and require
-success, UsesCompanion, and one Requires clause. Retain concrete specialization,
-generic-member, mismatched-owner, and ordinal-mismatch controls.
-
-**Confidence**: High; a canonical Linux probe showed symbol equality true at
-the exact point where OwnersMatch returned false.
-
 ### 510. [CONFIRMED] Large string-literal encoding ignores cancellation before solver execution
 
 **Location**: SharpProof.Smt/IrSmtBackend.cs around lines 109-145, 286-301, and

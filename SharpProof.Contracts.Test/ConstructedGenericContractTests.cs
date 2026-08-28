@@ -101,6 +101,38 @@ public sealed class ConstructedGenericContractTests
     }
 
     [Test]
+    public void CallerOwnedTypeParametersRemainValidAfterCompanionSpecialization()
+    {
+        AssertBinds(
+            """
+            using SharpProof.Attributes;
+
+            public interface IRepository<T> where T : class {
+                T Read(T value, bool enabled);
+            }
+
+            [ContractFor(typeof(IRepository<>))]
+            public static class RepositoryContracts<T> where T : class {
+                public static T Read(
+                    IRepository<T> receiver,
+                    T value,
+                    bool enabled) {
+                    Contract.Requires(enabled);
+                    return value;
+                }
+            }
+
+            public static class Caller<U> where U : class {
+                public static U Forward(
+                    IRepository<U> repository,
+                    U value,
+                    bool enabled) => repository.Read(value, enabled);
+            }
+            """,
+            expectedClauses: 1);
+    }
+
+    [Test]
     public void ClosedGenericContractForTargetBindsItsConstructedSignature()
     {
         AssertBinds(
