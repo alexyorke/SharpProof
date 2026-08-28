@@ -2619,29 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 552. [CONFIRMED] JSON exponent overflow disables performance-contract thresholds
-
-**Location**: SharpProof.Gates/Performance/AcceptancePerformanceContract.cs
-around lines 23-49; PerformanceGate.cs around lines 63-72 and 1152-1174.
-
-**Description**: JSON numbers are read with GetDouble and positive thresholds
-are checked only with value > 0. The valid JSON number 1e400 becomes positive
-infinity and is accepted.
-
-**Reproduction**:
-
-    finite control=accepted
-    negative control=rejected
-    1e400=Infinity, IsFinite=false, contract=accepted
-
-**Impact**: Any affected smoke, median, p95, retained-memory, IDE, cancellation,
-or forced-termination threshold becomes impossible for a finite observation to
-exceed, so the corresponding gate can false-pass.
-
-**Recommended fix**: Require double.IsFinite(value) and value > 0 for every
-positive metric. Add NaN/infinity/exponent-overflow, zero, negative, and finite
-boundary tests.
-
 ### 553. [CONFIRMED] Effect replay reserializes and hashes one syntax tree per event
 
 **Location**: CompilerEffectClaimArtifactCodec.cs around lines 61-74;
