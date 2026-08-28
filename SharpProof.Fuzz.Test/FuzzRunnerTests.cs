@@ -845,33 +845,64 @@ public sealed class FuzzRunnerTests
         }
     }
 
-    [TestCase(0, 0, 1, 1)]
-    [TestCase(7, 1, 0, 1)]
-    [TestCase(8, 0, 2, 0)]
-    [TestCase(9, 1, 1, 0)]
-    public async Task PartialTermOracleChecksShortCircuitAndUndefinedArithmetic(
-        int seed,
-        int expectedTrue,
-        int expectedFalse,
-        int expectedUndefined)
+    [Test]
+    public async Task PartialTermOracleChecksShortCircuitAndUndefinedArithmetic()
     {
-        var factory = new IrFactory();
-        var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
-
-        var result = await new PartialTermSmtDifferentialOracle()
-            .CompareAsync(factory, generated);
+        var results = new List<PartialTermSmtDifferentialResult>();
+        foreach (var seed in Enumerable.Range(0, 64))
+        {
+            var factory = new IrFactory();
+            var generated = PartialTermSmtCaseGenerator.Create(factory, seed);
+            results.Add(await new PartialTermSmtDifferentialOracle()
+                .CompareAsync(factory, generated));
+        }
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                result.Status,
-                Is.EqualTo(FuzzOracleStatus.Agreement),
-                result.Detail);
-            Assert.That(result.ScenarioCount, Is.EqualTo(2));
-            Assert.That(result.DefinedTrueCount, Is.EqualTo(expectedTrue));
-            Assert.That(result.DefinedFalseCount, Is.EqualTo(expectedFalse));
-            Assert.That(result.UndefinedCount, Is.EqualTo(expectedUndefined));
+                results,
+                Has.All.Matches<PartialTermSmtDifferentialResult>(
+                    result => result.Status == FuzzOracleStatus.Agreement &&
+                        result.ScenarioCount == PartialTermSmtCaseGenerator.ScenarioCount),
+                string.Join(Environment.NewLine, results.Select(static result => result.Detail)));
+            Assert.That(results.Sum(static result => result.DefinedTrueCount), Is.GreaterThan(0));
+            Assert.That(results.Sum(static result => result.DefinedFalseCount), Is.GreaterThan(0));
+            Assert.That(results.Sum(static result => result.UndefinedCount), Is.GreaterThan(0));
         }
+    }
+
+    [Test]
+    public void PartialTermGeneratorUsesTheFullSeedWidth()
+    {
+        static string Signature(PartialTermSmtCase generated, IrFactory factory)
+        {
+            var printer = new IrPrinter(factory);
+            return printer.Print(generated.Formula) + "|" + string.Join(
+                ";",
+                generated.Scenarios.Select(static scenario => string.Join(
+                    ",",
+                    scenario.OrderBy(static pair => pair.Key.Value).Select(static pair =>
+                        pair.Key + "=" + (pair.Value.Kind switch
+                        {
+                            IrValueKind.Boolean => pair.Value.Boolean.ToString(),
+                            IrValueKind.Integer => pair.Value.Integer.ToString(
+                                System.Globalization.CultureInfo.InvariantCulture),
+                            _ => pair.Value.Kind.ToString()
+                        })))));
+        }
+
+        var signatures = Enumerable.Range(0, 1024)
+            .Select(seed =>
+            {
+                var factory = new IrFactory();
+                return Signature(
+                    PartialTermSmtCaseGenerator.Create(factory, seed),
+                    factory);
+            })
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+
+        Assert.That(signatures, Is.GreaterThanOrEqualTo(128));
     }
 
     [Test]

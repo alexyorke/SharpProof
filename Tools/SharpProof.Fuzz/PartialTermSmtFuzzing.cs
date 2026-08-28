@@ -44,9 +44,25 @@ public static class PartialTermSmtCaseGenerator
         var divisor = factory.CreateVariable(
             "partial-divisor",
             factory.IntegerType);
-        var numerator = (seed & 32) == 0 ? long.MinValue : -5L;
+        // Derive every choice from a full-width mixed seed.  The previous
+        // implementation inspected only six low bits, and several of those
+        // choices were dead once short-circuiting selected a scenario.  A
+        // stable avalanche keeps the campaign reproducible while ensuring
+        // neighbouring and high-bit seeds exercise different bundles.
+        var bits = Mix(unchecked((uint)seed));
+        var numerator = ((bits >> 6) & 7UL) switch
+        {
+            0 => long.MinValue,
+            1 => -5L,
+            2 => long.MaxValue,
+            3 => 5L,
+            4 => -17L,
+            5 => long.MinValue + 1,
+            6 => 0L,
+            _ => 1L
+        };
         var arithmetic = factory.Binary(
-            (seed & 1) == 0
+            (bits & 2UL) == 0
                 ? IrBinaryOperator.Divide
                 : IrBinaryOperator.Remainder,
             factory.Integer(numerator),
@@ -55,7 +71,7 @@ public static class PartialTermSmtCaseGenerator
             IrBinaryOperator.Equal,
             arithmetic,
             factory.Integer(0));
-        var useOrElse = (seed & 2) != 0;
+        var useOrElse = (bits & 4UL) != 0;
         var formula = factory.Binary(
             useOrElse
                 ? IrBinaryOperator.OrElse
@@ -64,10 +80,22 @@ public static class PartialTermSmtCaseGenerator
             comparison);
         var shortCircuitGuard = useOrElse;
         var undefinedGuard = !shortCircuitGuard;
-        var exceptionalDivisor = (seed & 4) == 0 ? 0L : -1L;
-        var evaluatedDivisor = (seed & 8) == 0
+        var exceptionalDivisor = ((bits >> 9) & 3UL) switch
+        {
+            0 => 0L,
+            1 => -1L,
+            2 => 1L,
+            _ => long.MinValue
+        };
+        var evaluatedDivisor = (bits & 16UL) == 0
             ? exceptionalDivisor
-            : (seed & 16) == 0 ? 2L : 3L;
+            : ((bits >> 11) & 3UL) switch
+            {
+                0 => 2L,
+                1 => 3L,
+                2 => 5L,
+                _ => -2L
+            };
 
         return new PartialTermSmtCase(
             formula,
@@ -85,6 +113,14 @@ public static class PartialTermSmtCaseGenerator
                     divisor,
                     evaluatedDivisor)
             ]);
+    }
+
+    private static ulong Mix(uint seed)
+    {
+        var value = (ulong)seed + 0x9E3779B97F4A7C15UL;
+        value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+        value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+        return value ^ (value >> 31);
     }
 
     private static ImmutableDictionary<IrVarId, IrValue> Scenario(

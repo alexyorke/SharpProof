@@ -294,26 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 611. [CONFIRMED] Partial-SMT fuzzing repeats only 32 exact bundles
-
-**Location**: `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs`, around lines
-45-68; `FuzzRunner.cs`, around lines 223-236 and 363.
-
-**Description**: The generator uses only low seed bits, with two conditionally
-dead bits, yielding 32 formula/scenario bundles across the full Int32 space.
-FuzzRunner nevertheless executes/counts one per case.
-
-**Reproduction**: A 1,000-case production-seed campaign had 1,000 distinct raw
-case seeds but only 32 partial bundles and 968 duplicate executions. Seed 0
-equaled 16 and seed 8 equaled 12.
-
-**Impact**: Larger budgets pay linear Z3 cost without increasing semantic
-coverage, while the agreement count overstates breadth.
-
-**Recommended fix**: Either schedule an explicit 32-row matrix once and report
-it separately, or use a deterministic full-width generator. Test uniqueness and
-separate accounting.
-
 ### 612. [CONFIRMED] Call-site contract evaluation cannot evaluate IrLengthTerm
 
 **Location**: `SharpProof.Analyzer.Core/ManagedContractFacts.cs`, around lines
