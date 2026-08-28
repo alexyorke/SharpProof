@@ -2619,29 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 553. [CONFIRMED] Effect replay reserializes and hashes one syntax tree per event
-
-**Location**: CompilerEffectClaimArtifactCodec.cs around lines 61-74;
-CompilerManifestArtifact.cs around lines 955-999;
-EffectCounterexampleReplayer.cs around lines 15-18 and 92-96;
-CompilationFingerprint.cs around lines 32-43.
-
-**Description**: Each replay event serializes the complete immutable syntax-tree
-snapshot and computes SHA-256. Manifest validation and replay repeat the same
-work after codec validation.
-
-**Reproduction**: Codec validation of one valid 10,000-line tree with 128 events
-allocated 269-300 MB and took 238-324 ms; the one-event control allocated about
-6.3 MB. All events referenced the same snapshot and validation returned true.
-
-**Impact**: Generated-code projects can spend hundreds of MB, and potentially
-over a GB across Worker boundaries, revalidating one identity, causing avoidable
-timeouts and memory pressure.
-
-**Recommended fix**: Cache snapshot hashes by tree in the per-operation
-ValidationContext and remove redundant geometry loops. Test 256 same-tree events
-compute one hash, two trees compute two, and changed/hash-mismatch evidence fails.
-
 ### 554. [CONFIRMED] Fuzz evidence attributes dirty working-tree execution to clean HEAD
 
 **Location**: scripts/Invoke-SharpProofFuzzCampaign.ps1 around lines 29-31 and
