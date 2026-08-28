@@ -412,7 +412,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         return true;
     }
 
-    private static bool IsRecordCopyConstructor(
+    internal static bool IsRecordCopyConstructor(
         IMethodSymbol constructor)
     {
         return constructor.ContainingType.IsRecord &&

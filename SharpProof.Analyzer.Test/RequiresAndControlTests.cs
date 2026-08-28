@@ -288,6 +288,31 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task RecordCopyConstructorDoesNotOwnMemberInitializers()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public record Subject {
+                private int _value = Guard.Positive(-1);
+                [SharpProofSuppress("reviewed constructor")]
+                public Subject() { }
+                protected Subject(Subject original) { }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task MemberInitializersStopAfterNonCompletingOperands()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

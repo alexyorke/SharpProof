@@ -551,6 +551,7 @@ internal static partial class AnalyzerFeaturePipeline
             .ThenBy(static candidate => candidate.DeclaringSyntaxReferences
                 .FirstOrDefault()?.Span.Start ?? int.MaxValue)
             .Where(candidate =>
+                !RequiresCallSiteDiscovery.IsRecordCopyConstructor(candidate) &&
                 !AnalyzerGeneratedCodePolicy.IsGenerated(
                     candidate,
                     candidate.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree ??
