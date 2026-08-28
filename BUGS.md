@@ -205,52 +205,6 @@ output and crash controls.
 **Confidence**: High; the agent self-verified the valid failure fixture against
 the current validator and traced the exact campaign branches.
 
-### 457. [CONFIRMED] Failed package-consumers reruns preserve the prior report and qualification receipt
-
-**Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 43-44 and
-161-218; scripts/Write-SharpProofQualificationReceipt.ps1 around
-lines 91-149; scripts/Invoke-SharpProofReleaseContainer.ps1 around
-lines 175-210; persistent artifacts in eng/container/entrypoint.sh around
-lines 76-87 and 178-188.
-
-**Description**: The package-consumers command performs parallelism,
-PackageSource validation, restore, full consumer validation, and minimum-SDK
-validation before it owns package-consumers.json. It writes the report and
-receipt only after both validations succeed. Neither prior artifact is
-invalidated at attempt start, and release qualification validates commit,
-evidence bytes/hash, and package identities without a run-attempt identity.
-
-**Reproduction**: In a temporary canonical fixture, seed both evidence paths
-and invoke the unchanged command without PackageSource:
-
-    EXIT_CODE=1
-    REPORT_SURVIVED=True
-    REPORT_HASH_UNCHANGED=True
-    RECEIPT_SURVIVED=True
-    RECEIPT_HASH_UNCHANGED=True
-
-The failure occurs before either consumer validation runs.
-
-**Impact**: The command correctly fails, but on persistent/self-hosted/local
-workspaces a same-SHA/package retry leaves a passing pair that release
-qualification can still accept. Always-upload steps can misattribute the pair
-to the failed current attempt.
-
-**Root cause**: Report and receipt ownership begins only after all
-failure-prone work, despite persistent artifact storage and no attempt identity.
-
-**Recommended fix**: Initialize or invalidate both paths at package-consumers
-entry before parallelism, restore, and validation. Publish the passing report
-and receipt as an atomic pair only after both runs succeed. Direct receipt
-writes should independently tombstone the old gate receipt before validation.
-
-**Regression coverage**: Seed a valid same-commit/package pair, then fail on
-missing PackageSource, restore, first consumer, and minimum-SDK consumer.
-Require the old pair absent or nonpassing and prove qualification rejects it.
-
-**Confidence**: High; self-verified byte-for-byte in a temp canonical fixture
-and traced through qualification consumption.
-
 ### 478. [CONFIRMED] Abrupt launcher termination strands worker-runtime snapshots in /tmp
 
 **Location**: SharpProof.Worker.Launcher/Program.cs around lines 57 and

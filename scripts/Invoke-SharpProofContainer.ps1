@@ -86,6 +86,16 @@ function Remove-SharpProofPerformanceEvidence {
     }
 }
 
+function Remove-SharpProofEvidencePath([string]$RelativePath) {
+    $path = [IO.Path]::GetFullPath((Join-Path $repositoryRoot $RelativePath))
+    if (Test-Path -LiteralPath $path -PathType Container) {
+        throw "Evidence path is a directory: $path"
+    }
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        Remove-Item -LiteralPath $path -Force
+    }
+}
+
 if ($Command -in @('pr-gates', 'performance')) {
     Remove-SharpProofPerformanceEvidence
 }
@@ -210,6 +220,10 @@ switch ($Command) {
         if ($LASTEXITCODE -ne 0) { throw 'Package tests failed.' }
     }
     'package-consumers' {
+        Remove-SharpProofEvidencePath `
+            'artifacts/release-qualification/package-consumers.json'
+        Remove-SharpProofEvidencePath `
+            'artifacts/release-qualification/qualification-receipts/package-consumers.json'
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
             throw 'package-consumers requires -PackageSource.'
         }

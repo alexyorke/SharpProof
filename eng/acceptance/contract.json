@@ -187,6 +187,7 @@
       "scripts/Test-SharpProofMutationEvidence.ps1",
       "scripts/Test-SharpProofMutationScheduling.ps1",
       "scripts/Test-SharpProofPackageConsumers.ps1",
+      "scripts/Test-SharpProofPackageConsumerEvidenceFixtures.ps1",
       "scripts/Test-SharpProofPortableConsumer.ps1",
       "scripts/Test-SharpProofPackageDependencies.ps1",
       "scripts/Test-SharpProofPackagePayloads.ps1",
@@ -684,6 +685,7 @@
           "scripts/Invoke-SharpProofSemanticTests.ps1",
           "scripts/Test-SharpProofContainerContract.ps1",
           "scripts/Test-SharpProofPackageConsumers.ps1",
+          "scripts/Test-SharpProofPackageConsumerEvidenceFixtures.ps1",
           "scripts/Test-SharpProofPortableConsumer.ps1"
         ]
       },
