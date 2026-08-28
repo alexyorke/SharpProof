@@ -3054,29 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 636. [CONFIRMED] Omitted by-value optional arguments block reusable source summaries
-
-**Location**: `SharpProof.Frontend/RoslynProgramLowerer.cs`, around lines 35-53
-and 294-320; `SharpProof.Worker/CompilerCallableLowerer.cs`, around lines 151-167
-and 305; `CompilerRelationalSummaryProvider.cs`, around line 253.
-
-**Description**: Direct invocation lowering accepts only
-`ArgumentKind.Explicit`. Roslyn represents an omitted optional value parameter
-as `ArgumentKind.DefaultValue`, so an otherwise exact direct source call is
-classified unsupported instead of substituting its compile-time default.
-
-**Reproduction**: `Read(int value, int ignored = 0)` called as `Read(value)` made
-preparation fail with `UnsupportedBody`; spelling `Read(value, 0)` produced a
-reusable relational summary.
-
-**Impact**: Ordinary optional-argument syntax downgrades verifiable call chains
-to Unknown/incomplete.
-
-**Recommended fix**: Admit uniquely bound by-value DefaultValue arguments when
-their constant is exactly lowerable, while retaining fail-closed handling for
-params, reduced extensions, and ref-like arguments. Add omitted/explicit/default
-type-conversion and unsupported-default tests.
-
 ### 637. [CONFIRMED] A safe synchronous using prefix suppresses a later SP0027
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
