@@ -426,6 +426,28 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void BoxingConversionsDoNotShareFreshObjectIdentity()
+    {
+        using var compiled = CompiledMethod.Create(
+            "public static bool Target(long value) => (object)value == (object)value;");
+
+        var result = compiled.Lower();
+        Assert.That(
+            result.Classification.Decision,
+            Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
+        Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
+        var outer = (IrOpaqueTerm)result.Term;
+        Assert.That(outer.Arguments, Has.Length.EqualTo(2));
+        Assert.That(outer.Arguments[0], Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(outer.Arguments[1], Is.TypeOf<IrOpaqueTerm>());
+        var left = (IrOpaqueTerm)outer.Arguments[0];
+        var right = (IrOpaqueTerm)outer.Arguments[1];
+        Assert.That(left.Purity, Is.EqualTo(IrOpaquePurity.Impure));
+        Assert.That(right.Purity, Is.EqualTo(IrOpaquePurity.Impure));
+        Assert.That(left.Id, Is.Not.EqualTo(right.Id));
+    }
+
+    [Test]
     public void AbstractAndInterfaceReferenceEqualityLowersExactly()
     {
         AssertClassification(

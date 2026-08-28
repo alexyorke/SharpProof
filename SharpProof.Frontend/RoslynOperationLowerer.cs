@@ -345,6 +345,7 @@ public sealed class RoslynOperationLowerer
                 ISizeOfOperation => true,
             IConversionOperation conversion =>
                 conversion.OperatorMethod == null &&
+                !IsBoxingConversion(conversion) &&
                 IsDemonstrablyPure(conversion.Operand),
             IUnaryOperation unary =>
                 unary.OperatorMethod == null &&
@@ -367,6 +368,12 @@ public sealed class RoslynOperationLowerer
                     IsDemonstrablyPure(argument.Value)),
             _ => false
         };
+    }
+
+    private static bool IsBoxingConversion(IConversionOperation conversion)
+    {
+        return conversion.Operand.Type?.IsValueType == true &&
+            conversion.Type?.IsValueType != true;
     }
 
     private bool IsRepresentableConstant(IOperation operation)
