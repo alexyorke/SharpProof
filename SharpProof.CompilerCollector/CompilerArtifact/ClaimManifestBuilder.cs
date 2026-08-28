@@ -94,7 +94,8 @@ internal sealed partial class ClaimManifestBuilder(
             seed.Declaration is
                 (MethodDeclarationSyntax or
                  ConstructorDeclarationSyntax or
-                 AccessorDeclarationSyntax) &&
+                 AccessorDeclarationSyntax or
+                 ArrowExpressionClauseSyntax) &&
             target.MethodKind is
                 (MethodKind.Ordinary or
                  MethodKind.Constructor or

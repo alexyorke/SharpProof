@@ -122,6 +122,29 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void ExpressionBodiedPropertyGetterWithContractsLowersAsAnExecutableCallable()
+    {
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            internal sealed class Subject {
+                [DoesNotThrow]
+                internal int Value => 1;
+            }
+            """);
+        var target = new ClaimManifestBuilder(compilation).Build().Targets.Values.Single();
+        Assert.That(target.IsVerifierSupported, Is.True);
+        var preparation = new CompilerCallableLowerer(
+            compilation,
+            new IrFactory()).Prepare(target);
+
+        Assert.That(
+            preparation.IsSuccess,
+            Is.True,
+            preparation.FailureReason.ToString());
+    }
+
+    [Test]
     public void ResolvedSpecCallIsBoundToExactLoweredInstruction()
     {
         var preparation = Prepare(

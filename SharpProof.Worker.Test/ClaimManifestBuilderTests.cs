@@ -614,9 +614,13 @@ public sealed class ClaimManifestBuilderTests
                 result.Manifest.Callables.Select(static callable =>
                     callable.CallableId)));
         Assert.That(
-            result.Targets.Values.All(static target =>
-                !target.IsVerifierSupported),
+            result.Targets.Values.Single(target =>
+                target.Method.Name == "get_Value").IsVerifierSupported,
             Is.True);
+        Assert.That(
+            result.Targets.Values.Count(static target =>
+                !target.IsVerifierSupported),
+            Is.EqualTo(2));
         Assert.That(
             result.Manifest.Claims,
             Has.Length.EqualTo(3));

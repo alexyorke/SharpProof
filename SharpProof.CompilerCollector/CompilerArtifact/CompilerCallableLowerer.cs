@@ -49,7 +49,8 @@ internal sealed class CompilerCallableLowerer
         cancellationToken.ThrowIfCancellationRequested();
         if (!target.IsVerifierSupported ||
             target.Declaration is not
-                (BaseMethodDeclarationSyntax or AccessorDeclarationSyntax) ||
+                (BaseMethodDeclarationSyntax or AccessorDeclarationSyntax or
+                 ArrowExpressionClauseSyntax) ||
             target.SemanticModel == null)
         {
             return Fail(target, WorkerClaimReason.UnsupportedCallable);
@@ -428,6 +429,7 @@ internal sealed class CompilerCallableLowerer
         {
             BaseMethodDeclarationSyntax method => method.ExpressionBody,
             AccessorDeclarationSyntax accessor => accessor.ExpressionBody,
+            ArrowExpressionClauseSyntax arrow => arrow,
             _ => null
         };
         if (expressionBody is { } expression)
@@ -612,6 +614,10 @@ internal sealed class CompilerCallableLowerer
                 IConstructorBodyOperation constructorBody =>
                     Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(
                         constructorBody,
+                        cancellationToken),
+                IBlockOperation { Parent: null } block =>
+                    Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph.Create(
+                        block,
                         cancellationToken),
                 _ => null
             };

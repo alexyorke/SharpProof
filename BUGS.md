@@ -294,27 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 613. [CONFIRMED] Expression-bodied property getters become worker-incomplete
-
-**Location**: `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs`,
-around lines 94-107 and 520-584; `CompilerCallableLowerer.cs`, around lines 46-57.
-
-**Description**: Roslyn gives an expression-bodied property getter an
-`ArrowExpressionClauseSyntax`. The collector admits property getter method kinds
-but rejects that declaration shape and rewrites Proven effect evidence to
-Unknown/UnsupportedContract; the lowerer returns UnsupportedCallable.
-
-**Reproduction**: `[DoesNotThrow] public long Value => 1` produced
-`analyzer=Proven supported=False artifact=Unknown/UnsupportedContract
-preparation=UnsupportedCallable`; an explicit `get => 1` control was fully
-supported and Proven.
-
-**Impact**: A formatting-only syntax choice causes SP0047/strict exit 6.
-
-**Recommended fix**: Centralize callable declaration/operation-root resolution
-and map arrow clauses to their property/indexer owner throughout manifest and
-lowering paths.
-
 ### 616. [CONFIRMED] Canonical pack output depends on its random checkout path
 
 **Location**: `Directory.Build.props`, line 4; `compose.yaml`, around lines
