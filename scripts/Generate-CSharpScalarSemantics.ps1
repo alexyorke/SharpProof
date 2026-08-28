@@ -18,6 +18,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
@@ -192,7 +193,17 @@ function Add-Lines {
     }
 }
 
-$catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json
+$catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
+$catalogDocument = [System.Text.Json.JsonDocument]::Parse($catalogJson)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $catalogDocument.RootElement `
+        -Context 'catalog'
+}
+finally {
+    $catalogDocument.Dispose()
+}
+$catalog = $catalogJson | ConvertFrom-Json
 Assert-Properties `
     -Value $catalog `
     -Allowed @(
