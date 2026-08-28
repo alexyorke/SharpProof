@@ -191,7 +191,15 @@ public sealed class BoundaryEnforcementTests
             "ISymbol.ToDisplayString",
             "ISymbol.ToDisplayParts",
             "ISymbol.ToMinimalDisplayString",
-            "ISymbol.ToMinimalDisplayParts"
+            "ISymbol.ToMinimalDisplayParts",
+            "SymbolDisplay.ToDisplayString(Microsoft.CodeAnalysis.ITypeSymbol,Microsoft.CodeAnalysis.NullableAnnotation,Microsoft.CodeAnalysis.CSharp.SymbolDisplayFormat)",
+            "SymbolDisplay.ToDisplayString(Microsoft.CodeAnalysis.ITypeSymbol,Microsoft.CodeAnalysis.NullableFlowState,Microsoft.CodeAnalysis.CSharp.SymbolDisplayFormat)",
+            "SymbolDisplay.ToDisplayParts(Microsoft.CodeAnalysis.ITypeSymbol,Microsoft.CodeAnalysis.NullableAnnotation,Microsoft.CodeAnalysis.CSharp.SymbolDisplayFormat)",
+            "SymbolDisplay.ToDisplayParts(Microsoft.CodeAnalysis.ITypeSymbol,Microsoft.CodeAnalysis.NullableFlowState,Microsoft.CodeAnalysis.CSharp.SymbolDisplayFormat)",
+            "SymbolDisplay.ToMinimalDisplayString(Microsoft.CodeAnalysis.ITypeSymbol,Microsoft.CodeAnalysis.NullableAnnotation,Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.SymbolDisplayFormat)",
+            "SymbolDisplay.ToMinimalDisplayString(Microsoft.CodeAnalysis.ITypeSymbol,Microsoft.CodeAnalysis.NullableFlowState,Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.SymbolDisplayFormat)",
+            "SymbolDisplay.ToMinimalDisplayParts(Microsoft.CodeAnalysis.ITypeSymbol,Microsoft.CodeAnalysis.NullableAnnotation,Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.SymbolDisplayFormat)",
+            "SymbolDisplay.ToMinimalDisplayParts(Microsoft.CodeAnalysis.ITypeSymbol,Microsoft.CodeAnalysis.NullableFlowState,Microsoft.CodeAnalysis.SemanticModel,System.Int32,Microsoft.CodeAnalysis.CSharp.SymbolDisplayFormat)"
         };
 
         foreach (var member in required)
