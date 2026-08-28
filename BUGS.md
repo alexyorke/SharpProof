@@ -561,46 +561,6 @@ output and exit codes.
 **Confidence**: High; self-verified with exact helper logic in the canonical
 container.
 
-### 468. [CONFIRMED] Boxing conversions are interned as pure and collapse fresh object identities
-
-**Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
-lines 319, 346, and 889.
-
-**Description**: IsDemonstrablyPure treats every built-in conversion with a
-pure operand as pure. Unsupported boxing conversions then use pure opaque
-structural interning. Two identical boxing operations are interned as one term,
-even though C# allocates a fresh box for each conversion.
-
-**Reproduction**:
-
-    public static bool Target(long value) =>
-        (object)value == (object)value;
-
-The compiled result is false. Lowering reports:
-
-    runtime=False
-    exact=False abstention=ConversionMayChangeValue
-    left purity=Pure id=1
-    right purity=Pure id=1
-    same-box-term=True
-
-**Impact**: Although classification stays a closed abstention, retained IR
-falsely correlates separately allocated objects as the same reference.
-Downstream partial analysis can inherit an impossible identity equality.
-
-**Root cause**: Built-in conversion is treated as synonymous with
-allocation-free/deterministic purity; boxing allocation identity is ignored.
-
-**Recommended fix**: Exclude value-type-to-reference-type boxing conversions
-from IsDemonstrablyPure and emit occurrence-specific impure opaque terms.
-
-**Regression coverage**: Lower the expression above, assert runtime false,
-both child conversions impure, and distinct term identities. Retain
-allocation-free numeric conversion interning controls.
-
-**Confidence**: High; runtime and lowerer identities were self-verified in one
-probe.
-
 ### 470. [CONFIRMED] Release-configuration evidence can remain stale and its receipt validates only schema plus commit
 
 **Location**: scripts/Test-SharpProofReleaseConfiguration.ps1 around
