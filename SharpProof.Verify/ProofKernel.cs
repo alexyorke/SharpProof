@@ -37,17 +37,24 @@ public sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        return result.Status switch
+        var outcome = result.Status switch
         {
-            BackendCheckStatus.Unsatisfiable => CreateProven(query, result),
+            BackendCheckStatus.Unsatisfiable => CreateProven(
+                query, result, cancellationToken),
             BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, cancellationToken),
             BackendCheckStatus.Unknown => Unknown(
                 VerificationProjections.MapFailure(result.FailureReason)),
             _ => Unknown(AbstentionReason.MalformedBackendResult)
         };
+        cancellationToken.ThrowIfCancellationRequested();
+        return outcome;
     }
-    private static ProofOutcome CreateProven(VerificationQuery query, BackendCheckResult result)
+    private static ProofOutcome CreateProven(
+        VerificationQuery query,
+        BackendCheckResult result,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (result.Model != null ||
             result.FailureReason != BackendFailureReason.None ||
             result.UnsatCore.IsDefault)
@@ -55,13 +62,24 @@ public sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        if (result.UnsatCore.Any(index => index < 0 || index >= query.Assumptions.Length))
+        var core = ImmutableArray.CreateBuilder<ProofJustification>();
+        var seen = new HashSet<int>();
+        foreach (var index in result.UnsatCore)
         {
-            return Unknown(AbstentionReason.MalformedBackendResult);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (index < 0 || index >= query.Assumptions.Length)
+            {
+                return Unknown(AbstentionReason.MalformedBackendResult);
+            }
+
+            if (seen.Add(index))
+            {
+                core.Add(query.Assumptions[index].Justification);
+            }
         }
 
-        return new ProvenOutcome([.. result.UnsatCore.Distinct()
-            .Select(index => query.Assumptions[index].Justification)]);
+        cancellationToken.ThrowIfCancellationRequested();
+        return new ProvenOutcome(core.ToImmutable());
     }
     private static ProofOutcome ReplayCounterexample(
         VerificationQuery query,

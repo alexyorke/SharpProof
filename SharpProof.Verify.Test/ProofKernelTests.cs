@@ -515,6 +515,20 @@ public sealed class ProofKernelTests
         Assert.ThrowsAsync<OperationCanceledException>(action);
     }
 
+    [Test]
+    public void CancellationDuringUnsatCoreProjectionDoesNotReturnProven()
+    {
+        var fixture = CreateFixture();
+        using var cancellation = new CancellationTokenSource();
+        var result = BackendCheckResult.Unsatisfiable(
+            Enumerable.Repeat(0, 20_000_000));
+        Func<Task> action = () => new ProofKernel(
+                new CancelingUnsatBackend(result, cancellation))
+            .VerifyAsync(fixture.Query, cancellation.Token);
+
+        Assert.ThrowsAsync<OperationCanceledException>(action);
+    }
+
     private static Fixture CreateFixture()
     {
         var factory = new IrFactory();
@@ -551,6 +565,25 @@ public sealed class ProofKernelTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_result);
+        }
+    }
+
+    private sealed class CancelingUnsatBackend(
+        BackendCheckResult result,
+        CancellationTokenSource cancellation) : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            _ = query;
+            _ = cancellationToken;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(100).ConfigureAwait(false);
+                await cancellation.CancelAsync().ConfigureAwait(false);
+            });
+            return Task.FromResult(result);
         }
     }
 
