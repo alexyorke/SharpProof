@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 573. [CONFIRMED] Differential oracle throws on wrong-typed variable bindings
-
-**Location**: SharpProof.Testing/IrCSharpDifferentialOracle.cs around lines
-38-41, 81-91, and 115-123; IrInterpreter.cs around lines 174-187.
-
-**Description**: The oracle checks binding-key presence but not IrValue type.
-Reflection then throws ArgumentException when a Boolean is passed to a generated
-long parameter, while the interpreter returns Unsupported(InvalidVariableValue).
-
-**Reproduction**: Missing binding returned Abstained; the same program with a
-wrong-typed binding made the interpreter return Unsupported but the oracle
-escaped Object of type Boolean cannot be converted to Int64.
-
-**Impact**: One malformed generated environment aborts the differential run and
-prevents structured evidence for later cases.
-
-**Recommended fix**: Validate nonnull binding values and exact declared types
-before CLR conversion, returning a typed Abstained detail. Retain a defensive
-reflection-shape catch. Add wrong type, null, missing, and correct controls.
-
 ### 574. [CONFIRMED] Explicit-interface implementation preconditions are unreachable from calls
 
 **Location**: SharpProof.Contracts/ContractBinder.cs around lines 74-82 and
