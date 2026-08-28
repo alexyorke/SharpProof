@@ -119,6 +119,33 @@ public sealed class StandaloneGateEvidenceTests
         }
     }
 
+    [Test]
+    public void PackInvalidatesCanonicalOutputBeforePreflight()
+    {
+        var script = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var start = script.IndexOf("    'pack' {", StringComparison.Ordinal);
+        var end = script.IndexOf("    'pilots' {", start, StringComparison.Ordinal);
+        Assert.That(start, Is.GreaterThanOrEqualTo(0));
+        Assert.That(end, Is.GreaterThan(start));
+        var pack = script[start..end];
+        var preflight = pack.IndexOf(
+            "Generate-Readme.ps1",
+            StringComparison.Ordinal);
+        var invalidation = pack.IndexOf(
+            "[IO.Directory]::Delete($resolvedOutput, $true)",
+            StringComparison.Ordinal);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preflight, Is.GreaterThanOrEqualTo(0));
+            Assert.That(invalidation, Is.GreaterThanOrEqualTo(0));
+            Assert.That(invalidation, Is.LessThan(preflight));
+        }
+    }
+
     private static string RepositoryRoot()
     {
         var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);

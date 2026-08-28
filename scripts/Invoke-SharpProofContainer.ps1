@@ -376,8 +376,6 @@ switch ($Command) {
                     $Configuration.ToLowerInvariant() + '.json'))
     }
     'pack' {
-        & (Join-Path $repositoryRoot 'scripts/Generate-Readme.ps1') -Verify
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         $output = Join-Path $repositoryRoot 'artifacts/container-packages'
         $artifactsRoot = [IO.Path]::GetFullPath(
             (Join-Path $repositoryRoot 'artifacts'))
@@ -391,6 +389,8 @@ switch ($Command) {
             [IO.Directory]::Delete($resolvedOutput, $true)
         }
         [System.IO.Directory]::CreateDirectory($output) | Out-Null
+        & (Join-Path $repositoryRoot 'scripts/Generate-Readme.ps1') -Verify
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         $manifestText = Get-Content (Join-Path $repositoryRoot 'scripts/package-projects.json') -Raw
         $manifestDocument = [System.Text.Json.JsonDocument]::Parse($manifestText)
         try {
