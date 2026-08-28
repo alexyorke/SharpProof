@@ -173,8 +173,7 @@ public static class CompilerIdentityBridge
 
     private static string SymbolReference(ISymbol symbol)
     {
-        var reference = DocumentationCommentId.CreateDeclarationId(symbol) is
-            { Length: > 0 } id
+        var reference = DocumentationCommentId.CreateDeclarationId(symbol) is { Length: > 0 } id
             ? id
             : FallbackReference(symbol);
         return ContainsStructuralType(symbol)
@@ -184,8 +183,7 @@ public static class CompilerIdentityBridge
 
     private static string TypeReference(ITypeSymbol type)
     {
-        var reference = DocumentationCommentId.CreateReferenceId(type) is
-            { Length: > 0 } id
+        var reference = DocumentationCommentId.CreateReferenceId(type) is { Length: > 0 } id
             ? id
             : FallbackReference(type);
         return ContainsStructuralType(type)
@@ -262,7 +260,7 @@ public static class CompilerIdentityBridge
             IFunctionPointerTypeSymbol functionPointer =>
                 "fnptr[" + functionPointer.Signature.CallingConvention + ";" +
                 string.Join(",", functionPointer.Signature.UnmanagedCallingConventionTypes
-                    .Select(static convention => convention.ToDisplayString())) +
+                    .Select(static convention => NamedTypeFallback(convention))) +
                 "](" +
                 string.Join(",", functionPointer.Signature.Parameters.Select(
                     parameter => parameter.RefKind + ":" +
@@ -280,8 +278,7 @@ public static class CompilerIdentityBridge
                     .Select(property => property.Name + ":" +
                         StructuralTypeIdentity(property.Type, depth + 1))) + "}",
             INamedTypeSymbol named =>
-                (DocumentationCommentId.CreateReferenceId(named) ??
-                    named.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)) +
+                DocumentationCommentId.CreateReferenceId(named) +
                 (named.IsGenericType
                     ? "<" + string.Join(",", named.TypeArguments.Select(
                         argument => StructuralTypeIdentity(argument, depth + 1))) + ">"
@@ -289,7 +286,34 @@ public static class CompilerIdentityBridge
             ITypeParameterSymbol parameter =>
                 "typeparam[" + parameter.TypeParameterKind + ":" +
                 parameter.Ordinal + "]",
-            _ => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            _ => FallbackTypeIdentity(type)
+        };
+    }
+
+    private static string NamedTypeFallback(INamedTypeSymbol type)
+    {
+        return "named:" + ContainingIdentity(type.ContainingSymbol) + ":" +
+            type.MetadataName;
+    }
+
+    private static string FallbackTypeIdentity(ITypeSymbol type)
+    {
+        return "type:" + ContainingIdentity(type.ContainingSymbol) + ":" +
+            type.Kind + ":" + type.MetadataName;
+    }
+
+    private static string ContainingIdentity(ISymbol? symbol)
+    {
+        return symbol switch
+        {
+            null => string.Empty,
+            IAssemblySymbol assembly => "assembly:" + assembly.Identity.Name,
+            INamespaceSymbol namespaceSymbol => namespaceSymbol.IsGlobalNamespace
+                ? string.Empty
+                : ContainingIdentity(namespaceSymbol.ContainingNamespace) +
+                  "/namespace:" + namespaceSymbol.MetadataName,
+            _ => ContainingIdentity(symbol.ContainingSymbol) + "/" +
+                symbol.Kind + ":" + symbol.MetadataName
         };
     }
 
