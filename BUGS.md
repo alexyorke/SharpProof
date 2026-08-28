@@ -2392,43 +2392,6 @@ assert enforced limit equals response/hash budget.
 **Confidence**: High; the exact factory read two values different from both its
 creation-time and verified-request authorities.
 
-### 532. [CONFIRMED] Null SMT options allocate a native Context before validation
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs field initialization around lines
-3 and 6-9.
-
-**Description**: `_context = new()` executes before `_options =
-ArgumentNullGuard.NotNull(...)`. When null options throw, no backend instance is
-returned, so the already-created native Context cannot be explicitly disposed
-and survives until finalization.
-
-**Reproduction**: After draining finalizers, 100 invalid constructions and 100
-valid disposed controls produced:
-
-    invalid-caught=100
-    pending-initial=3
-    pending-before-collect=3
-    pending-after-invalid-collect=102
-    pending-after-disposed-control=3
-
-**Impact**: Repeated invalid DI/configuration calls retain full native contexts
-until GC, creating unmanaged-memory and finalizer latency. Native initialization
-failure can also preempt the promised options ArgumentNullException.
-
-**Root cause**: Resource acquisition occurs in an earlier field initializer than
-argument validation.
-
-**Recommended fix**: Use a conventional constructor body that validates/stores
-options first, then creates Context, or reorder through a safe factory. Ensure
-partial construction disposes any acquired resource.
-
-**Regression coverage**: With an injected/counting context factory, null options
-must throw `options` and create zero contexts; valid construction creates and
-disposes exactly one. Cover native-unavailable ordering.
-
-**Confidence**: High; failed construction added one pending native-context
-finalizer per call while disposed controls did not.
-
 ### 533. [CONFIRMED] Matching timeout/cancel errors legitimize completed proven responses
 
 **Location**: SharpProof.Worker.Protocol/WorkerResultAssembler.cs,
