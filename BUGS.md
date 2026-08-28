@@ -5520,29 +5520,6 @@ can prove the wrong contract for array slicing.
 ArgumentOutOfRangeException and retain IndexOutOfRangeException for integer
 indices. Add valid/invalid range and ordinary-index controls.
 
-### 665. [CONFIRMED] Constant conditionals select a non-returning arm but still cause SP0027
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
-lines 450-460; `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
-2127-2130; `OperationCompletionEvaluator.cs`, around lines 1088-1105.
-
-**Description**: Definite-operation completion combines both conditional arms
-with OR even when the condition has a constant Boolean value. A returning
-unselected arm therefore makes a definitely non-returning selected expression
-appear to complete before a contracted call.
-
-**Reproduction**: Both `true ? Never() : 0` and `false ? 0 : Never()` in the
-first unused argument produced SP0027 for the later invalid call. Runtime recorded
-zero target calls and the selected-arm exception. The two live-arm mirrors
-reached the call and correctly diagnosed.
-
-**Impact**: Literal conditional syntax can create deterministic false Refuted
-diagnostics and warnings-as-errors failures for unreachable calls.
-
-**Recommended fix**: If the condition is a constant bool, recurse only into the
-selected arm; otherwise preserve permissive OR. Share the already-correct strict
-completion logic and test true/false, nonconstant, and nested controls.
-
 ### 666. [CONFIRMED] SPMETA003 trusts CallerCancellationWon by name, not behavior
 
 **Location**: `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs`, around
