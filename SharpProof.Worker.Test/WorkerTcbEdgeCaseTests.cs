@@ -375,6 +375,73 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task ContradictoryEntryProvesAllPostconditionsWithinOneQuery()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var target = new CompilerCallablePreparation(
+            factory,
+            new WorkerCallableManifestEntry
+            {
+                CallableId = "M:Test.Subject.Verify",
+                ClaimIds = ["first", "second"]
+            },
+            [
+                Requires(factory.Binary(
+                    IrBinaryOperator.GreaterThan,
+                    factory.Variable(value),
+                    factory.Integer(0))),
+                Requires(factory.Binary(
+                    IrBinaryOperator.LessThan,
+                    factory.Variable(value),
+                    factory.Integer(0))),
+                new CompilerPreparedClause(
+                    CompilerContractKind.Ensures,
+                    factory.Boolean(true),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    "first",
+                    null),
+                new CompilerPreparedClause(
+                    CompilerContractKind.Ensures,
+                    factory.Boolean(false),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    "second",
+                    null)
+            ],
+            [Parameter(value)],
+            WorkerClaimReason.None,
+            CompilerPreparedBody.Trivial());
+        var backend = new ResourceConsumingBackend(
+            static () => { },
+            BackendCheckResult.Unsatisfiable([0, 1]));
+        var verifier = new CallableVerifier(
+            backend,
+            WorkerBudgets.DefaultMaximumExpressionDepth);
+        var budget = new MethodResourceBudget(
+            null,
+            queryRlimit: 10,
+            methodRlimit: 10);
+
+        var results = await verifier.VerifyAsync(
+            target,
+            budget,
+            CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(results, Has.Length.EqualTo(2));
+            Assert.That(
+                results,
+                Is.All.Matches<WorkerClaimResult>(result =>
+                    result.Outcome == WorkerClaimOutcome.Proven &&
+                    result.Vacuity ==
+                        WorkerVacuityKind.ContradictoryPreconditions &&
+                    result.ProofCore.Length > 0));
+        }
+    }
+
+    [Test]
     public async Task ResultSourceDomainCannotCreatePreconditionVacuity()
     {
         var factory = new IrFactory();

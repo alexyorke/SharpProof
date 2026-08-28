@@ -93,6 +93,14 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             return [];
         }
 
+        if (entryFeasibility.IsContradictory)
+        {
+            return AssembleContradictoryPostconditions(
+                target,
+                ensures.Length,
+                entryFeasibility);
+        }
+
         if (entryFeasibility.IsUnknown)
         {
             return CallableClaimResultAssembler.PostconditionUnknowns(
@@ -299,6 +307,33 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             records.Add(record);
         }
         cancellationToken.ThrowIfCancellationRequested();
+        return records.ToImmutable();
+    }
+
+    private static ImmutableArray<WorkerClaimResult>
+        AssembleContradictoryPostconditions(
+            CompilerCallablePreparation target,
+            int count,
+            CallableEntryFeasibility entryFeasibility)
+    {
+        var records = ImmutableArray.CreateBuilder<WorkerClaimResult>(count);
+        for (var index = 0; index < count; index++)
+        {
+            var result = CallableClaimResultAssembler.Create(
+                target,
+                target.Entry.ClaimIds[index],
+                WorkerClaimOutcome.Proven,
+                WorkerClaimReason.None,
+                WorkerEffectEvidenceCertainty.Unspecified);
+            result.Vacuity = WorkerVacuityKind.ContradictoryPreconditions;
+            result.ProofCore = [.. entryFeasibility.ProofCore];
+            result.Assumptions =
+                CallableClaimResultAssembler.MarkAssumptionsUsed(
+                    target,
+                    entryFeasibility.UsedAssumptionIds);
+            records.Add(result);
+        }
+
         return records.ToImmutable();
     }
 
