@@ -562,6 +562,8 @@ $resolvedOutput = Join-Path ([IO.Path]::GetDirectoryName($finalOutput)) (
     '.' + [IO.Path]::GetFileName($finalOutput) + '.' +
     [Guid]::NewGuid().ToString('N') + '.staging')
 [IO.Directory]::CreateDirectory($resolvedOutput) | Out-Null
+$inPlace = [IO.Path]::GetFullPath($resolvedSource) -ceq
+    [IO.Path]::GetFullPath($finalOutput)
 trap {
     if (-not [string]::IsNullOrWhiteSpace($resolvedOutput) -and
         [IO.Directory]::Exists($resolvedOutput)) {
@@ -580,10 +582,27 @@ $packageFiles = @(
 if ($packageFiles.Count -ne 6) {
     throw "Release evidence requires exactly six NuGet artifacts; found $($packageFiles.Count)."
 }
-Test-SharpProofExactRegularFileSet `
-    -Directory $resolvedSource `
-    -ExpectedFileNames @($packageFiles.Name) `
-    -Owner 'Release package input'
+$expectedPackageNames = @($packageFiles.Name)
+if ($inPlace) {
+    $ownedEvidenceNames = @(
+        'SharpProof.release.json',
+        'SharpProof.spdx.json',
+        'SHA256SUMS')
+    $sourceNames = @(Get-ChildItem -LiteralPath $resolvedSource -Force |
+        ForEach-Object { $_.Name })
+    $hasCompletePriorBundle =
+        $sourceNames.Count -eq ($expectedPackageNames.Count + $ownedEvidenceNames.Count) -and
+        @($ownedEvidenceNames | Where-Object { $sourceNames -notcontains $_ }).Count -eq 0
+    Test-SharpProofReleasePackageInput `
+        -Directory $resolvedSource `
+        -PackageNames $expectedPackageNames `
+        -AllowGeneratedEvidence:$hasCompletePriorBundle
+}
+else {
+    Test-SharpProofReleasePackageInput `
+        -Directory $resolvedSource `
+        -PackageNames $expectedPackageNames
+}
 
 $expectedIds = @(
     'SharpProof',

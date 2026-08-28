@@ -141,6 +141,26 @@ function Test-SharpProofExactRegularFileSet {
     }
 }
 
+function Test-SharpProofReleasePackageInput {
+    param(
+        [Parameter(Mandatory = $true)][string]$Directory,
+        [Parameter(Mandatory = $true)][string[]]$PackageNames,
+        [switch]$AllowGeneratedEvidence
+    )
+
+    $expectedNames = @($PackageNames)
+    if ($AllowGeneratedEvidence) {
+        $expectedNames += @(
+            'SharpProof.release.json',
+            'SharpProof.spdx.json',
+            'SHA256SUMS')
+    }
+    Test-SharpProofExactRegularFileSet `
+        -Directory $Directory `
+        -ExpectedFileNames $expectedNames `
+        -Owner 'Release package input'
+}
+
 function Test-SharpProofReleaseBundleTopology {
     param(
         [Parameter(Mandatory = $true)][string]$Directory,

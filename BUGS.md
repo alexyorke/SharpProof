@@ -3054,28 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 652. [CONFIRMED] Default release-evidence generation cannot rerun in place
-
-**Location**: `scripts/New-SharpProofReleaseEvidence.ps1`, around lines 543-586
-and 751-973; `scripts/SharpProof.ReleaseChecksums.ps1`, around lines 144-187.
-
-**Description**: By default output equals PackageSource. The command requires
-exactly six package inputs, then adds three evidence files and publishes the
-nine-file bundle back into that same directory. Its next default invocation
-rejects its own prior output for having the wrong file count.
-
-**Reproduction**: A valid six-file source was accepted and became a nine-file
-bundle; a second unchanged invocation returned
-`Release package input has an unexpected file or directory count.` Existing
-rerun coverage always supplies a separate output directory.
-
-**Impact**: Direct retries require manual deletion or a full expensive repack.
-
-**Recommended fix**: Default to a separate sibling output, or recognize and
-atomically replace only the exact three owned evidence files when input equals
-output. Test two identical default invocations, unrelated extras, corruption,
-and explicit-output reruns.
-
 ### 653. [CONFIRMED] Supplied SBOMs are rejected unless their input basename is canonical
 
 **Location**: `scripts/New-SharpProofReleaseEvidence.ps1`, around lines 765-769
