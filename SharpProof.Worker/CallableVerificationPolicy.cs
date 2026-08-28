@@ -115,6 +115,12 @@ internal static class CallableVerificationPolicy
         return Result(target, callableReason, CallableClaimResultAssembler.Unknowns(target, claimReason));
     }
 
+    internal static CallableVerificationResult Complete(
+        CompilerCallablePreparation target)
+    {
+        return Result(target, WorkerCallableCoverageReason.None, []);
+    }
+
     private static CallableVerificationResult Result(
         CompilerCallablePreparation target, WorkerCallableCoverageReason reason,
         ImmutableArray<WorkerClaimResult> claims)

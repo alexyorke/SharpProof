@@ -248,9 +248,17 @@ public sealed class SharpProofWorker : IDisposable
                     }
                 }
             }
+            var orderedTargets = targets.OrderBy(
+                static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
+            var solverTargetIndexes = orderedTargets
+                .Select((target, index) => (target, index))
+                .Where(static item => item.target.IsSuccess &&
+                    item.target.Entry.ClaimIds.Length != 0)
+                .Select(static item => item.index)
+                .ToArray();
             if (!TryCreateLanes(
                     request.Budgets,
-                    targets.Length,
+                    solverTargetIndexes.Length,
                     out solverLanes,
                     out var backendError,
                     out var backendException))
@@ -273,9 +281,25 @@ public sealed class SharpProofWorker : IDisposable
                         ? WorkerClaimReason.BackendUnavailable
                         : WorkerClaimReason.InfrastructureFailure);
             }
-            var orderedTargets = targets.OrderBy(
-                static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
             var results = new CallableVerificationResult[orderedTargets.Length];
+            for (var index = 0; index < orderedTargets.Length; index++)
+            {
+                var target = orderedTargets[index];
+                if (!target.IsSuccess)
+                {
+                    results[index] = Unknown(
+                        target,
+                        target.FailureReason,
+                        target.FailureReason ==
+                            WorkerClaimReason.UnsupportedCallable
+                            ? WorkerCallableCoverageReason.UnsupportedCallable
+                            : WorkerCallableCoverageReason.SemanticUnknown);
+                }
+                else if (target.Entry.ClaimIds.Length == 0)
+                {
+                    results[index] = CallableVerificationPolicy.Complete(target);
+                }
+            }
             var nextTarget = -1;
             var retirementSynchronization = new object();
             var retirementCallableReason = WorkerCallableCoverageReason.InfrastructureFailure;
@@ -308,15 +332,16 @@ public sealed class SharpProofWorker : IDisposable
                         }
                     }
                     var index = Interlocked.Increment(ref nextTarget);
-                    if (index >= orderedTargets.Length)
+                    if (index >= solverTargetIndexes.Length)
                     {
                         return;
                     }
 
-                    var result = await VerifyTargetAsync(lane.Verifier, orderedTargets[index], request.Budgets,
+                    var resultIndex = solverTargetIndexes[index];
+                    var result = await VerifyTargetAsync(lane.Verifier, orderedTargets[resultIndex], request.Budgets,
                         lane.ReadConsumedResourceCount, request.Budgets.MethodWallTimeMilliseconds,
                         projectBoundary, cancellationToken).ConfigureAwait(false);
-                    results[index] = result;
+                    results[resultIndex] = result;
                     if (result.Callable.Reason ==
                             WorkerCallableCoverageReason.MethodTimeout &&
                         !projectBoundary.IsCancellationRequested)

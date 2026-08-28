@@ -1280,6 +1280,45 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task SupportedClaimlessCallableDoesNotCreateAnSmtLane()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                public static int Verify(int value) {
+                    Contract.Requires(value >= 0);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var factoryCalls = 0;
+        using var worker = new SharpProofWorker(() =>
+        {
+            Interlocked.Increment(ref factoryCalls);
+            throw new AssertionException("A claimless callable must not create an SMT lane.");
+        });
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factoryCalls, Is.Zero);
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(response.ClaimResults, Is.Empty);
+            Assert.That(response.CallableResults, Has.Length.EqualTo(1));
+            Assert.That(response.CallableResults.Single().Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(response.CallableResults.Single().Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.None));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+    }
+
+    [Test]
     public async Task CompilerEffectWitnessTamperingCannotBypassReplay()
     {
         using var project = TestProject.Create(
