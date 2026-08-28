@@ -369,6 +369,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        if (IsHumanMessageContext(binary))
+        {
+            return;
+        }
+
         // A chained concatenation produces one operation for every `+`. Report
         // the outer expression only so a single source construction does not
         // become a cascade of duplicate diagnostics at the same location.
@@ -397,6 +402,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        if (IsHumanMessageContext(assignment))
+        {
+            return;
+        }
+
         var fragment = GetCSharpExpressionFragment(assignment.Value);
         if (fragment != null)
         {
@@ -416,6 +426,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             invocation.TargetMethod.ContainingType.SpecialType !=
                 SpecialType.System_String ||
             invocation.Type?.SpecialType != SpecialType.System_String)
+        {
+            return;
+        }
+
+        if (IsHumanMessageContext(invocation))
         {
             return;
         }
@@ -440,6 +455,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         var interpolated = (IInterpolatedStringOperation)context.Operation;
         if (!interpolated.Parts.Any(static part =>
                 part is IInterpolationOperation))
+        {
+            return;
+        }
+
+        if (IsHumanMessageContext(interpolated))
         {
             return;
         }
@@ -490,6 +510,39 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         return null;
+    }
+
+    private static bool IsHumanMessageContext(IOperation operation)
+    {
+        for (var parent = operation.Parent; parent != null; parent = parent.Parent)
+        {
+            if (parent is not IArgumentOperation argument)
+            {
+                continue;
+            }
+
+            if (argument.Parameter?.Name is "message" or "format" or "detail" or
+                "text" or "reason")
+            {
+                return true;
+            }
+
+            if (argument.Parent is IObjectCreationOperation creation &&
+                creation.Constructor?.ContainingType.Name.EndsWith(
+                    "Exception", StringComparison.Ordinal) == true)
+            {
+                return true;
+            }
+
+            if (argument.Parent is IInvocationOperation invocation &&
+                invocation.TargetMethod.Name is "ReportDiagnostic" or "Log" or
+                "Write" or "WriteLine" or "Fail")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string? GetSemanticLiteral(

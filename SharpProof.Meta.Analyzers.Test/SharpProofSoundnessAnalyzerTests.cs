@@ -668,6 +668,25 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task AllowsDiagnosticMessageProseContainingExpressionFragments()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            namespace SharpProof.Meta.Analyzers;
+            static class Messages {
+                static Exception Create(string member) =>
+                    new InvalidOperationException(
+                        "Metadata is null for member " + member);
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA009"));
+    }
+
+    [Test]
     public async Task AllowsOrdinaryInterpolatedFormattingAndValueDecoys()
     {
         const string source =
