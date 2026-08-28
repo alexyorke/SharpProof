@@ -1065,43 +1065,6 @@ IsDefined remains unchanged.
 **Confidence**: High; self-verified with exact linear allocation counts and a
 zero-allocation type-specific control.
 
-### 475. [CONFIRMED] Diagnostic-descriptor generation and parity accept duplicate properties
-
-**Location**: scripts/Generate-DiagnosticDescriptors.ps1 around line 77 and
-eng/testing/DiagnosticDescriptorCatalogAssertions.cs around line 208.
-
-**Description**: ConvertFrom-Json collapses duplicate diagnostic properties
-before Assert-ExactMembers runs. The shared parity helper independently reads
-with JsonDocument.GetProperty, selecting the same last value. IDs, severity,
-enabled defaults, messages, and help links can therefore be contradictory while
-all three generated descriptor suites agree.
-
-**Reproduction**: Change the first descriptor to:
-
-    "defaultSeverity": "Error",
-    "defaultSeverity": "Info"
-
-Verification of all three copied outputs exits 0:
-
-    Verified deterministic diagnostic descriptors.
-
-The parity helper independently reports PARITY_VALUE=Info.
-
-**Impact**: A checked-in diagnostic catalog can be ambiguous while generation,
-acceptance, and every descriptor parity suite remain green.
-
-**Root cause**: Generator and parity authority share last-wins JSON behavior
-without a raw duplicate-name check.
-
-**Recommended fix**: Recursively reject duplicate names before conversion and
-reuse the strict reader in DiagnosticDescriptorCatalogAssertions.
-
-**Regression coverage**: Duplicate root schemaVersion, output property, and
-diagnostics[0].defaultSeverity; require path-qualified rejection before
-generated output checks.
-
-**Confidence**: High; self-verified across generator and parity paths.
-
 ### 476. [CONFIRMED] Distinct unsupported parameters and locals collapse to one opaque value
 
 **Location**: SharpProof.Frontend/RoslynOperationLowerer.cs around
