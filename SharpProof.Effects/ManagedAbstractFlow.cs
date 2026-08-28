@@ -1869,6 +1869,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 CompletesPropertyGetNormally(property),
             IEventAssignmentOperation eventAssignment =>
                 CompletesEventAssignmentNormally(eventAssignment),
+            ISwitchOperation @switch =>
+                CompletesSwitchNormally(@switch),
             ILockOperation @lock =>
                 CompletesNormally(@lock.LockedValue) &&
                 !IsDefinitelyNull(@lock.LockedValue) &&
@@ -1936,6 +1938,74 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 IParenthesizedOperation or IConditionalOperation => ChildrenCompleteNormally(operation),
             _ => false
         };
+    }
+
+    private bool CompletesSwitchNormally(ISwitchOperation @switch)
+    {
+        if (!CompletesNormally(@switch.Value) || @switch.Cases.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        foreach (var @case in @switch.Cases)
+        {
+            foreach (var clause in @case.Clauses)
+            {
+                if (clause is IDefaultCaseClauseOperation)
+                {
+                    continue;
+                }
+
+                if (clause is not ISingleValueCaseClauseOperation single ||
+                    !single.Value.ConstantValue.HasValue)
+                {
+                    // Pattern clauses, guards, and non-constant labels need
+                    // path-sensitive matching that this strict prefix fact
+                    // deliberately does not attempt.
+                    return false;
+                }
+            }
+
+            var operations = @case.Body;
+            if (operations.IsDefaultOrEmpty ||
+                operations[operations.Length - 1] is not IBranchOperation branch ||
+                !IsBreakOwnedBy(branch, @switch) ||
+                operations
+                    .Take(operations.Length - 1)
+                    .Any(operation => !CompletesNormally(operation)))
+            {
+                return false;
+            }
+        }
+
+        // An unmatched selector also leaves a switch without a default
+        // normally. Every explicit case above exits through this switch's own
+        // break, so no path can fall through an abrupt section.
+        return true;
+    }
+
+    private static bool IsBreakOwnedBy(
+        IBranchOperation branch,
+        ISwitchOperation @switch)
+    {
+        if (branch.BranchKind != BranchKind.Break)
+        {
+            return false;
+        }
+
+        for (var parent = branch.Parent; parent != null; parent = parent.Parent)
+        {
+            if (ReferenceEquals(parent, @switch))
+            {
+                return true;
+            }
+            if (parent is ILoopOperation or ISwitchOperation)
+            {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     private bool CompletesNormally(IInvocationOperation invocation)

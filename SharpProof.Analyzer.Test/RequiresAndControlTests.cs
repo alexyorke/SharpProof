@@ -51,6 +51,98 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task AllBreakSwitchPrefixRetainsLaterRequiresDiagnostic()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Run(int value) {
+                    switch (value) {
+                        case 0:
+                            break;
+                        default:
+                            break;
+                    }
+                    Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task AllBreakSwitchWithoutDefaultRetainsOneLaterRequiresDiagnostic()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Run(int value) {
+                    switch (value) {
+                        case 0:
+                            break;
+                    }
+                    Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task AllBreakSwitchWithMultipleLabelsDoesNotDuplicateDiagnostic()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Run(int value) {
+                    switch (value) {
+                        case 0:
+                        case 1:
+                            break;
+                        default:
+                            break;
+                    }
+                    Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task PropertyAssignmentRequiresANormallyReturningSetter()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
