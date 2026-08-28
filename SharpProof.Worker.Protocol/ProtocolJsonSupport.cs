@@ -64,25 +64,22 @@ public static partial class WorkerProtocolJson
         {
             throw new JsonException("A JSON object is required.");
         }
-        var properties = value.EnumerateObject().ToArray();
-        if (properties.Length != shape.Properties.Length)
+        if (value.GetPropertyCount() != shape.Properties.Length)
         {
             throw new JsonException(
                 "Every declared JSON property is required exactly once.");
         }
-        for (var index = 0; index < properties.Length; index++)
+        var index = 0;
+        foreach (var property in value.EnumerateObject())
         {
             var expected = shape.Properties[index];
-            var property = properties[index];
-            if (!string.Equals(
-                    property.Name,
-                    expected.Name,
-                    StringComparison.Ordinal))
+            if (!property.NameEquals(expected.Name))
             {
                 throw new JsonException(
                     "JSON properties must use the exact declared name and order.");
             }
             EnsureValueShape(property.Value, expected.Type);
+            index++;
         }
     }
 
