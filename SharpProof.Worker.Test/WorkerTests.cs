@@ -113,6 +113,36 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public void RequestStringEncodingRejectsUnpairedSurrogates()
+    {
+        var request = new WorkerVerifyRequest
+        {
+            CompilerManifest = new WorkerFileReference
+            {
+                Path = "manifest\uD800.json",
+                Sha256 = new string('a', 64)
+            }
+        };
+
+        var invalid = WorkerProtocolJson.Validate(request);
+        Assert.That(invalid.IsValid, Is.False);
+        Assert.That(
+            invalid.Errors.Select(static error => error.Code),
+            Does.Contain("request.utf16"));
+        Assert.Throws<ArgumentException>((Action)(() =>
+            WorkerProtocolJson.SerializeRequest(request)));
+
+        request.CompilerManifest.Path = "manifest\uD83D\uDE00\uFFFD.json";
+        Assert.That(WorkerProtocolJson.Validate(request).IsValid, Is.True);
+        var roundTrip = WorkerProtocolJson.DeserializeRequest(
+            WorkerProtocolJson.SerializeRequest(request));
+        Assert.That(roundTrip, Is.Not.Null);
+        Assert.That(
+            roundTrip!.CompilerManifest.Path,
+            Is.EqualTo(request.CompilerManifest.Path));
+    }
+
+    [Test]
     public void ProtocolDefaultsFailClosedWithoutCompilerManifest()
     {
         var request = new WorkerVerifyRequest();

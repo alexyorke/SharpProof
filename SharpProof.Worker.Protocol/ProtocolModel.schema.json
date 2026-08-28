@@ -288,6 +288,14 @@
           {"op":"nonBlank","property":"CompilerManifest.Path"},
           {"op":"sha256","property":"CompilerManifest.Sha256"}
         ]}},
+        {"code":"request.utf16","condition":{"op":"all","conditions":[
+          {"op":"wellFormedUtf16","property":"ProtocolVersion"},
+          {"op":"implies","if":{"op":"notNull","property":"CompilerManifest"},"then":{"op":"all","conditions":[
+            {"op":"wellFormedUtf16","property":"CompilerManifest.Path"},
+            {"op":"wellFormedUtf16","property":"CompilerManifest.Sha256"}
+          ]}},
+          {"op":"implies","if":{"op":"notNull","property":"Cache"},"then":{"op":"wellFormedUtf16","property":"Cache.Directory"}}
+        ]}},
         {"code":"cache.null","condition":{"op":"notNull","property":"Cache"}},
         {"code":"cache.maximum_bytes","condition":{"op":"implies",
           "if":{"op":"notNull","property":"Cache"},

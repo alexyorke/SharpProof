@@ -227,6 +227,9 @@ function ConvertTo-ValidationConditionSource {
         'sha256' {
             return "WorkerProtocolJson.IsSha256($($property.Source))"
         }
+        'wellFormedUtf16' {
+            return "WorkerProtocolJson.IsWellFormedUtf16($($property.Source))"
+        }
         'equalsMember' {
             $member = [string](
                 Get-RequiredMember $Condition 'member' "validation '$operation'")

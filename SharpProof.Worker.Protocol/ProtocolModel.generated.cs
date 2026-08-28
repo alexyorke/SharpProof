@@ -836,6 +836,13 @@ internal static class WorkerProtocolMetadata
             (value.CompilerManifest != null
             && !string.IsNullOrWhiteSpace(value.CompilerManifest.Path)
             && WorkerProtocolJson.IsSha256(value.CompilerManifest.Sha256))),
+        new("request.utf16", static value =>
+            (WorkerProtocolJson.IsWellFormedUtf16(value.ProtocolVersion)
+            && (!(value.CompilerManifest != null)
+            || ((WorkerProtocolJson.IsWellFormedUtf16(value.CompilerManifest.Path)
+            && WorkerProtocolJson.IsWellFormedUtf16(value.CompilerManifest.Sha256))))
+            && (!(value.Cache != null)
+            || (WorkerProtocolJson.IsWellFormedUtf16(value.Cache.Directory))))),
         new("cache.null", static value => value.Cache != null),
         new("cache.maximum_bytes", static value =>
             (!(value.Cache != null)

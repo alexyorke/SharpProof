@@ -32,7 +32,35 @@ public static partial class WorkerProtocolJson
                     (character >= 'A' && character <= 'Z') ||
                     (character >= 'a' && character <= 'z') ||
                     (character >= '0' && character <= '9') ||
-                    character == '_');
+            character == '_');
+    }
+
+    internal static bool IsWellFormedUtf16(string? value)
+    {
+        if (value == null)
+        {
+            return true;
+        }
+
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (char.IsHighSurrogate(character))
+            {
+                if (index + 1 >= value.Length ||
+                    !char.IsLowSurrogate(value[index + 1]))
+                {
+                    return false;
+                }
+                index++;
+            }
+            else if (char.IsLowSurrogate(character))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     internal static string ReadUtf8File(string path)
@@ -109,7 +137,28 @@ public static partial class WorkerProtocolJson
 
     public static string SerializeRequest(WorkerVerifyRequest request)
     {
-        return JsonSerializer.Serialize(request ?? throw new ArgumentNullException(nameof(request)), s_options);
+        if (request == null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+        if (!IsWellFormedRequest(request))
+        {
+            throw new ArgumentException(
+                "Request strings must contain well-formed UTF-16.",
+                nameof(request));
+        }
+
+        return JsonSerializer.Serialize(request, s_options);
+    }
+
+    private static bool IsWellFormedRequest(WorkerVerifyRequest request)
+    {
+        return IsWellFormedUtf16(request.ProtocolVersion) &&
+            (request.CompilerManifest == null ||
+             IsWellFormedUtf16(request.CompilerManifest.Path) &&
+             IsWellFormedUtf16(request.CompilerManifest.Sha256)) &&
+            (request.Cache == null ||
+             IsWellFormedUtf16(request.Cache.Directory));
     }
 
     public static string ComputeRequestHash(WorkerVerifyRequest request)
