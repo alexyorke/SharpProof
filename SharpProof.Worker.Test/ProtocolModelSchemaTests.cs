@@ -298,6 +298,36 @@ public sealed class ProtocolModelSchemaTests
         Assert.That(allocated, Is.LessThan(4_096));
     }
 
+    [Test]
+    public void DefinedEnumUniquenessDoesNotAllocatePerLookup()
+    {
+        var values = new[] { WorkerSelectedFeature.Contracts, WorkerSelectedFeature.Effects };
+        for (var index = 0; index < 1_000; index++)
+        {
+            _ = WorkerProtocolJson.AreDefinedUnique(
+                values,
+                WorkerSelectedFeature.Unspecified,
+                nonEmpty: true);
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var valid = true;
+        for (var index = 0; index < 100_000; index++)
+        {
+            valid &= WorkerProtocolJson.AreDefinedUnique(
+                values,
+                WorkerSelectedFeature.Unspecified,
+                nonEmpty: true);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.That(valid, Is.True);
+        Assert.That(allocated, Is.LessThan(4_096));
+    }
+
     private static void AssertDefinedEnums(JsonElement schema)
     {
         var defined = schema.GetProperty("definedEnums")
