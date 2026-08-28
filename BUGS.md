@@ -203,53 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 485. [CONFIRMED] Cumulative SMT resource accounting overflows after a valid solver result
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 67-74, 146-147, and
-193-202.
-
-**Description**: Resource accounting adds each fresh solver's `rlimit count` to
-a backend-lifetime signed Int64 with checked arithmetic. If the accumulated
-counter is near Int64.MaxValue, a later query can finish SAT or UNSAT and then
-throw ArithmeticException while recording its statistics. The general backend
-exception path converts that accounting overflow to Unknown /
-InfrastructureFailure and leaves the backend permanently unable to account for
-subsequent work.
-
-**Reproduction**: A reflection probe preloaded the backend counter and ran the
-same trivial unsatisfiable query:
-
-    control:               Unsatisfiable / None, counter=10
-    counter=Int64.MaxValue: Unknown / InfrastructureFailure,
-                            counter=9223372036854775807
-    ProofKernel outcome:    UnknownOutcome / InfrastructureFailure
-
-The solver had already returned the same valid UNSAT answer in both cases; only
-the post-query cumulative addition changed the verdict.
-
-**Impact**: A sufficiently long-lived or heavily reused backend can discard a
-completed proof/refutation as an infrastructure failure. Once the boundary is
-reached, trivial later queries also fail, turning accounting telemetry into an
-availability failure unrelated to solver correctness.
-
-**Root cause**: An unbounded lifetime statistic is stored in a bounded signed
-counter, and overflow is allowed to escape through the query-result exception
-mapping. Simple saturation is insufficient because future per-query deltas
-would become zero and could bypass budgets.
-
-**Recommended fix**: Track fresh-solver deltas with nonthrowing arithmetic and
-an explicit exhausted/overflow state, or use a wider accumulator. Preserve the
-completed solver status for the current query where its own resource budget was
-satisfied, then renew or reject later work with the typed ResourceLimit result.
-Never classify accounting overflow as InfrastructureFailure.
-
-**Regression coverage**: Exercise exact-boundary and one-past-boundary deltas,
-a near-cap trivial SAT and UNSAT query, renewal after exhaustion, and subsequent
-budget enforcement. Assert no wrapped or zero delta and no poisoned backend.
-
-**Confidence**: High; the boundary probe deterministically changed a completed
-UNSAT result solely through the checked accumulator.
-
 ### 486. [CONFIRMED] The fuzz evidence cap can starve every later oracle
 
 **Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around line 117 and

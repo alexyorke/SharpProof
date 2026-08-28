@@ -13,6 +13,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     private readonly int _maximumDecodedStringLength;
     private long _consumedResourceCount;
     private long _lastResourceSnapshot;
+    private bool _resourceAccountingExhausted;
     private int _activeCheckCount;
     private bool _interrupted;
     private bool _disposed;
@@ -93,6 +94,11 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                         if (_disposed || Volatile.Read(ref _interrupted))
                         {
                             return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
+                        }
+
+                        if (_resourceAccountingExhausted)
+                        {
+                            return BackendCheckResult.Unknown(BackendFailureReason.ResourceLimit);
                         }
 
                         using var registration = cancellationToken.Register(
@@ -279,18 +285,50 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 continue;
             }
 
-            _consumedResourceCount = AddResourceSnapshot(
-                _consumedResourceCount,
-                _lastResourceSnapshot,
-                entry.UIntValue);
-            _lastResourceSnapshot = entry.UIntValue;
+            var observed = entry.UIntValue;
+            var delta = observed >= _lastResourceSnapshot
+                ? observed - _lastResourceSnapshot
+                : observed;
+            if (!TryAddResourceCount(_consumedResourceCount, delta, out var total))
+            {
+                _consumedResourceCount = long.MaxValue;
+                _resourceAccountingExhausted = true;
+            }
+            else
+            {
+                _consumedResourceCount = total;
+            }
+
+            _lastResourceSnapshot = observed;
             return;
         }
     }
 
     internal static long AddResourceCount(long consumed, long observed)
     {
-        return checked(consumed + observed);
+        return TryAddResourceCount(consumed, observed, out var total)
+            ? total
+            : long.MaxValue;
+    }
+
+    private static bool TryAddResourceCount(
+        long consumed,
+        long observed,
+        out long total)
+    {
+        if (consumed < 0 || observed < 0)
+        {
+            throw new ArgumentOutOfRangeException();
+        }
+
+        if (observed > long.MaxValue - consumed)
+        {
+            total = long.MaxValue;
+            return false;
+        }
+
+        total = consumed + observed;
+        return true;
     }
 
     internal static long AddResourceSnapshot(

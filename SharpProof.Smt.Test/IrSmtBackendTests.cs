@@ -971,6 +971,9 @@ public sealed class IrSmtBackendTests
         Assert.That(
             IrSmtBackend.AddResourceCount(500L, 10L),
             Is.EqualTo(510L));
+        Assert.That(
+            IrSmtBackend.AddResourceCount(long.MaxValue - 1, 2),
+            Is.EqualTo(long.MaxValue));
     }
 
     [Test]
@@ -991,6 +994,35 @@ public sealed class IrSmtBackendTests
         Assert.That(
             IrSmtBackend.AddResourceSnapshot(60L, 60L, 5L),
             Is.EqualTo(65L));
+    }
+
+    [Test]
+    public async Task ResourceAccountingOverflowPreservesCurrentResultAndRetiresBackend()
+    {
+        var factory = new IrFactory();
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend();
+        var backendType = typeof(IrSmtBackend);
+        backendType.GetField(
+                "_consumedResourceCount",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(backend, long.MaxValue - 1);
+
+        var first = await backend.CheckAsync(query, CancellationToken.None);
+        Assert.That(first.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+        Assert.That(backend.ConsumedResourceCount, Is.EqualTo(long.MaxValue));
+
+        var second = await backend.CheckAsync(query, CancellationToken.None);
+        Assert.That(second.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+        Assert.That(second.FailureReason, Is.EqualTo(BackendFailureReason.ResourceLimit));
     }
 
     [Test]
