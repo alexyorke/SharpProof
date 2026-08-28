@@ -3076,30 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 673. [CONFIRMED] Any explicit static constructor suppresses member SP0027 diagnostics
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
-lines 290-312; reusable completion logic in
-`SharpProof.Effects/OperationCompletionEvaluator.cs`, around lines 576-639 and
-889-966.
-
-**Description**: Call-site analysis returns Unknown for every static target or
-instance constructor whenever the containing type has any static constructor.
-It never asks whether initialization can complete or is already complete.
-
-**Reproduction**: An empty, completing static constructor suppressed SP0027 for
-both a static method call and `new Target(-1)`, although candidates were Complete
-and runtime reached each target. No-cctor controls warned; throwing-cctor controls
-correctly stayed quiet and never reached the target.
-
-**Impact**: Common initialized types lose all call-site precondition diagnostics
-for static members and instance construction.
-
-**Recommended fix**: Replace the syntactic gate with shared static-initialization
-reachability/completion, proceeding only when initialization is complete or can
-complete and retaining Unknown otherwise. Test empty/throwing/mixed initializers,
-same-type contexts, accessors, constructor chains, metadata, and state effects.
-
 ### 674. [CONFIRMED] Compact assumption validation rebuilds owner indexes per claim
 
 **Location**: `SharpProof.Worker.Protocol/ProtocolJson.cs`, around lines 595-663

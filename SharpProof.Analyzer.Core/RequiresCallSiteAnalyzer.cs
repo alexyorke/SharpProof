@@ -1,4 +1,5 @@
 using SharpProof.Dataflow;
+using SharpProof.Effects;
 
 namespace SharpProof.Analyzer;
 
@@ -241,6 +242,14 @@ internal static partial class RequiresCallSiteAnalyzer
         CancellationToken cancellationToken)
     {
         private readonly IrFactory _factory = session.IrFactory;
+        private readonly OperationCompletionEvaluator _completion =
+            new(
+                session.Compilation,
+                session.ApiSpecs,
+                caller,
+                static (IOperation? _, IOperation __) => false,
+                static (IOperation? _, IOperation __) => false,
+                static (IInvocationOperation _) => false);
         private readonly RequiresCallSiteDiscovery _discovery =
             new(
                 caller,
@@ -311,7 +320,10 @@ internal static partial class RequiresCallSiteAnalyzer
                 contractTarget.ContainingType.StaticConstructors is
                 { Length: > 0 })
             {
-                return AnalyzerSemanticOutcome.Unknown;
+                if (!_completion.CanCompleteStaticInitialization(contractTarget))
+                {
+                    return AnalyzerSemanticOutcome.Unknown;
+                }
             }
 
             if (session.HasRejectedMetadataPrecondition(contractTarget))

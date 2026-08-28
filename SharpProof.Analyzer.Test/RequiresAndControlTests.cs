@@ -1854,6 +1854,91 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task CompletingStaticConstructorDoesNotSuppressRequiresDiagnostics()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static class StaticTarget {
+                    static StaticTarget() { }
+
+                    internal static void Positive(int value) {
+                        Contract.Requires(value > 0);
+                    }
+                }
+
+                public static void Call() {
+                    StaticTarget.Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
+    public async Task ThrowingStaticConstructorStillSuppressesRequiresDiagnostics()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static class StaticTarget {
+                    static StaticTarget() => throw new System.Exception();
+
+                    internal static void Positive(int value) {
+                        Contract.Requires(value > 0);
+                    }
+                }
+
+                public static void Call() {
+                    StaticTarget.Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task CompletingStaticConstructorDoesNotSuppressConstructorRequires()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private sealed class ConstructedTarget {
+                    static ConstructedTarget() { }
+
+                    internal ConstructedTarget(int value) {
+                        Contract.Requires(value > 0);
+                    }
+                }
+
+                public static void Call() {
+                    new ConstructedTarget(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task ProvenCheckedOverflowInEarlierArgumentSuppressesLaterRequires()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

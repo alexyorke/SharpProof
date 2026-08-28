@@ -20,15 +20,32 @@ internal sealed class OperationCompletionEvaluator
         Func<IOperation?, IOperation, bool> isProvenNull,
         Func<IOperation?, IOperation, bool> isProvenNonNull,
         Func<IInvocationOperation, bool> isImplicitLockEnterWithNullValue)
-    {
-        _apiSpecs = session.ApiSpecs;
-        _caller = caller;
-        _compilation = session.Compilation;
-        _completionFacts = new DefiniteOperationFacts(
+        : this(
             session.Compilation,
+            session.ApiSpecs,
+            caller,
+            isProvenNull,
+            isProvenNonNull,
+            isImplicitLockEnterWithNullValue)
+    {
+    }
+
+    internal OperationCompletionEvaluator(
+        Compilation compilation,
+        ResolvedApiSpecTable apiSpecs,
+        IMethodSymbol caller,
+        Func<IOperation?, IOperation, bool> isProvenNull,
+        Func<IOperation?, IOperation, bool> isProvenNonNull,
+        Func<IInvocationOperation, bool> isImplicitLockEnterWithNullValue)
+    {
+        _apiSpecs = apiSpecs;
+        _caller = caller;
+        _compilation = compilation;
+        _completionFacts = new DefiniteOperationFacts(
+            compilation,
             CancellationToken.None);
         _staticInitializationFacts = new DefiniteOperationFacts(
-            session.Compilation,
+            compilation,
             CancellationToken.None);
         _isProvenNull = isProvenNull;
         _isProvenNonNull = isProvenNonNull;
@@ -898,10 +915,23 @@ internal sealed class OperationCompletionEvaluator
             CanCompleteNormally(array.Initializer);
     }
 
+    internal bool CanCompleteStaticInitialization(ISymbol member)
+    {
+        return StaticInitializationMayComplete(member, allowCallerAssumption: false);
+    }
+
     private bool StaticInitializationMayComplete(ISymbol member)
+    {
+        return StaticInitializationMayComplete(member, allowCallerAssumption: true);
+    }
+
+    private bool StaticInitializationMayComplete(
+        ISymbol member,
+        bool allowCallerAssumption)
     {
         member = NormalizeStaticInitializationMember(member);
         if (!RequiresStaticInitializationCompletion(member) ||
+            allowCallerAssumption &&
             CanAssumeStaticInitializationComplete(_caller, member) ||
             member.ContainingType is not { } type ||
             !EffectMethodNodeBuilder.HasPotentialStaticInitialization(
