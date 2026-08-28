@@ -355,8 +355,9 @@ internal sealed partial class OperationEffectScanner
         var receiverRegion = _conversionOwnership.ClassifyRegion(
             receiver,
             aliasSource: true);
-        var awaiter = EffectRegionSet.Create(
-            EffectRegionId.Fresh(awaitOperation.Syntax.SpanStart));
+        var awaiter = ClassifyAwaiterRegion(
+            getAwaiter,
+            receiverRegion);
         var result = ResolveAwaitProtocolStep(
             getAwaiter,
             getAwaiter.ReducedFrom != null || !getAwaiter.IsStatic
@@ -402,6 +403,81 @@ internal sealed partial class OperationEffectScanner
             instance: null,
             awaiter,
             awaitOperation));
+    }
+
+    private EffectRegionSet ClassifyAwaiterRegion(
+        IMethodSymbol getAwaiter,
+        EffectRegionSet receiverRegion)
+    {
+        if (getAwaiter.ReturnType.IsValueType &&
+            !getAwaiter.ReturnType.IsRefLikeType)
+        {
+            return EffectRegionSet.Empty;
+        }
+
+        if (getAwaiter.DeclaringSyntaxReferences.Length != 1)
+        {
+            return EffectRegionSet.Unknown;
+        }
+
+        var declaration = getAwaiter.DeclaringSyntaxReferences[0].GetSyntax();
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_session.Compilation, declaration.SyntaxTree);
+        var root = model.GetOperation(declaration);
+        if (root == null)
+        {
+            return EffectRegionSet.Unknown;
+        }
+
+        var returns = root.DescendantsAndSelf()
+            .OfType<IReturnOperation>()
+            .Where(returnOperation =>
+                !ConversionOwnershipClassifier.IsInsideNestedCallable(
+                    returnOperation,
+                    root))
+            .ToArray();
+        if (returns.Length == 0)
+        {
+            return EffectRegionSet.Unknown;
+        }
+
+        var regions = EffectRegionSet.Empty;
+        foreach (var returnOperation in returns)
+        {
+            if (returnOperation.ReturnedValue is not { } value)
+            {
+                return EffectRegionSet.Unknown;
+            }
+
+            value = DefiniteOperationFacts.UnwrapHarmlessValue(value);
+            var valueRegion = IsAwaiterReceiverAlias(value, getAwaiter)
+                ? receiverRegion
+                : _conversionOwnership.ClassifyRegion(value, aliasSource: true);
+            regions = regions.Union(valueRegion);
+        }
+
+        return regions;
+    }
+
+    private static bool IsAwaiterReceiverAlias(
+        IOperation value,
+        IMethodSymbol getAwaiter)
+    {
+        if (value is IInstanceReferenceOperation)
+        {
+            return !getAwaiter.IsStatic;
+        }
+
+        if (value is not IParameterReferenceOperation parameter ||
+            getAwaiter.ReducedFrom is not { } extension ||
+            extension.Parameters.Length == 0)
+        {
+            return false;
+        }
+
+        return SymbolEqualityComparer.Default.Equals(
+            parameter.Parameter,
+            extension.Parameters[0]);
     }
 
     private EffectStep ResolveAwaitProtocolStep(

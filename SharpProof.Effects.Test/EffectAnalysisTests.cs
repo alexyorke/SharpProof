@@ -1438,6 +1438,40 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void AwaiterReturningItsReceiverRetainsCallerOwnership()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+
+            public sealed class SelfAwaitable : INotifyCompletion {
+                private int _state;
+                public SelfAwaitable GetAwaiter() => this;
+                public bool IsCompleted => true;
+                public void OnCompleted(Action continuation) { }
+                public int GetResult() {
+                    _state = 1729;
+                    return _state;
+                }
+            }
+
+            public static class Sample {
+                public static async Task<int> Run(SelfAwaitable awaitable) =>
+                    await awaitable;
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Run"));
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+            Is.True);
+    }
+
+    [Test]
     public void AsyncTaskMethodsAccountForResultAllocation()
     {
         var compilation = EffectTestHost.CreateCompilation(
