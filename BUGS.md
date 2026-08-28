@@ -203,52 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 493. [CONFIRMED] Pattern-based foreach omits the hidden GetEnumerator precondition call
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
-GetCalls around lines 591-624. The analogous semantic inventory exists in
-SharpProof.Effects/ExceptionHandlerReachability.cs around lines 2269-2385.
-
-**Description**: Requires discovery handles explicit invocation, object
-creation, property, event, and list-pattern calls but has no IForEachLoopOperation
-path. Roslyn does not expose pattern-based foreach lowering as child
-IInvocationOperations, so the compiler-emitted GetEnumerator call is absent
-from precondition checking.
-
-**Reproduction**: A custom `Sequence.GetEnumerator()` contains
-`Contract.Requires(false)`. Runtime counters showed:
-
-    generated foreach GetEnumerator calls = 1
-    explicit GetEnumerator calls          = 1
-
-Analyzer output contained one SP0027 only for the explicit call; the foreach
-site produced none. The source compiled without errors in both cases.
-
-**Impact**: A custom enumerator can hide an always-false Requires clause behind
-foreach. Spelling the semantically identical call explicitly changes the
-diagnostic, violating the repository's rule that unsupported foreach effect
-syntax must not suppress concrete precondition violations.
-
-**Root cause**: Call-site discovery relies on the ordinary operation tree and
-does not consult `SemanticModel.GetForEachStatementInfo` for hidden pattern
-methods.
-
-**Recommended fix**: Add a synchronous foreach semantic-call path using
-GetForEachStatementInfo. Materialize the GetEnumerator candidate with the
-collection receiver or mapped reduced-extension argument, after proving the
-collection expression can complete. Report at the foreach collection/location
-through existing replay and flow rules. Share method selection with the Effects
-inventory where practical.
-
-**Regression coverage**: A pattern GetEnumerator with Requires(false) must emit
-one SP0027 from foreach, matching the direct-call control. Add valid-requires,
-non-completing collection-expression, and supported reduced-extension controls.
-Extend MoveNext/Current/Dispose only when synthetic receiver sequencing is
-modeled explicitly.
-
-**Confidence**: High; executable analyzer and runtime differentials isolate the
-missing compiler-hidden call.
-
 ### 494. [CONFIRMED] Cancellation during malformed SAT-model validation returns semantic Unknown
 
 **Location**: SharpProof.Verify/ProofKernel.cs, last common token check around

@@ -51,7 +51,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 semanticModel.Compilation,
                 cancellationToken,
                 semanticModel,
-                caller);
+                caller,
+                includeForEachProtocol: true);
             if (calls.IsDefaultOrEmpty)
             {
                 continue;
@@ -201,6 +202,15 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         ? call.Instance == null ||
                             operationFacts.CompletesNormally(
                                 call.Instance)
+                        : IsForeachGetEnumeratorCall(
+                            call,
+                            operation)
+                            ? HasReplayableBlockPrefix(
+                                operation,
+                                operationFacts) &&
+                                HasReplayableForeachEvaluation(
+                                    operation,
+                                    operationFacts)
                         : (IsAccessorCall(call.TargetMethod) ||
                             operation is IListPatternOperation)
                             ? HasReplayableAccessorEvaluation(
@@ -553,6 +563,44 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
 
         return HasReplayablePrefixCore(callSite, operationFacts);
+    }
+
+    private bool IsForeachGetEnumeratorCall(
+        RequiresCallTarget call,
+        IOperation operation)
+    {
+        if (operation is not IInvocationOperation { IsImplicit: true } ||
+            operation.Syntax.AncestorsAndSelf()
+                .OfType<CommonForEachStatementSyntax>()
+                .FirstOrDefault() is not { } syntax)
+        {
+            return false;
+        }
+
+        var info = semanticModel.GetForEachStatementInfo(syntax);
+        return info.GetEnumeratorMethod is { } getEnumerator &&
+            SymbolEqualityComparer.Default.Equals(
+                call.TargetMethod,
+                getEnumerator);
+    }
+
+    private bool HasReplayableForeachEvaluation(
+        IOperation operation,
+        DefiniteOperationFacts operationFacts)
+    {
+        var syntax = operation.Syntax.AncestorsAndSelf()
+            .OfType<CommonForEachStatementSyntax>()
+            .FirstOrDefault();
+        if (syntax == null)
+        {
+            return false;
+        }
+
+        var collection = semanticModel.GetOperation(
+            syntax.Expression,
+            cancellationToken);
+        return collection != null &&
+            operationFacts.CompletesNormally(collection);
     }
 
     private bool HasReplayablePrefixCore(
@@ -922,10 +970,18 @@ internal sealed partial class RequiresCallSiteDiscovery(
         Compilation? compilation = null,
         CancellationToken cancellationToken = default,
         SemanticModel? semanticModel = null,
-        IMethodSymbol? caller = null)
+        IMethodSymbol? caller = null,
+        bool includeForEachProtocol = false)
     {
         return operation switch
         {
+            IForEachLoopOperation forEach when
+                includeForEachProtocol &&
+                semanticModel != null =>
+                GetForEachCalls(
+                    forEach,
+                    semanticModel,
+                    cancellationToken),
             IUsingOperation @using when
                 compilation != null && caller != null &&
                 !@using.IsAsynchronous =>
@@ -974,6 +1030,38 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 cancellationToken),
             _ => []
         };
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetForEachCalls(
+        IForEachLoopOperation forEach,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (forEach.IsAsynchronous ||
+            forEach.Syntax is not CommonForEachStatementSyntax syntax)
+        {
+            return [];
+        }
+
+        var getEnumerator = semanticModel
+            .GetForEachStatementInfo(syntax)
+            .GetEnumeratorMethod;
+        if (getEnumerator == null)
+        {
+            return [];
+        }
+
+        var instance = !getEnumerator.IsStatic &&
+            getEnumerator.ReducedFrom == null
+                ? forEach.Collection
+                : null;
+        return [new RequiresCallTarget(
+            getEnumerator,
+            instance,
+            [],
+            ImmutableDictionary<int, IOperation>.Empty,
+            ImmutableDictionary<int, long>.Empty,
+            true)];
     }
 
     private static ImmutableArray<RequiresCallTarget> GetInvocationCalls(

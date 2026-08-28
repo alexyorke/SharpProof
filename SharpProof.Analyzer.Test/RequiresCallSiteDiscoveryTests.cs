@@ -227,6 +227,122 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public void PatternForeachProducesGetEnumeratorReplayCandidate()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Sequence
+            {
+                public Enumerator GetEnumerator()
+                {
+                    Contract.Requires(false);
+                    return new Enumerator();
+                }
+
+                public struct Enumerator
+                {
+                    public int Current => 0;
+                    public bool MoveNext() => false;
+                }
+            }
+
+            public static class Subject
+            {
+                public static void Call(Sequence sequence)
+                {
+                    foreach (var item in sequence)
+                    {
+                    }
+                }
+            }
+            """,
+            ["SP0027"]);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Call");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        var getEnumerator = candidates!.Value
+            .Where(static candidate => candidate.TargetMethod.Name == "GetEnumerator")
+            .ToArray();
+        Assert.That(getEnumerator, Has.Length.EqualTo(1));
+        Assert.That(
+            getEnumerator[0].CanReplay,
+            Is.True,
+            $"{getEnumerator[0].Operation.Syntax.Kind()} {getEnumerator[0].Operation.Syntax}");
+    }
+
+    [Test]
+    public void PatternForeachGetEnumeratorRequiresIsReported()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Sequence
+            {
+                public Enumerator GetEnumerator()
+                {
+                    Contract.Requires(false);
+                    return new Enumerator();
+                }
+
+                public struct Enumerator
+                {
+                    public int Current => 0;
+                    public bool MoveNext() => false;
+                }
+            }
+
+            public static class Subject
+            {
+                public static void Call(Sequence sequence)
+                {
+                    foreach (var item in sequence)
+                    {
+                    }
+                }
+            }
+            """,
+            ["SP0027"]);
+
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Call");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+        var session = new AnalyzerSession(
+            compilation,
+            AnalyzerConfiguration.AdvisoryAll,
+            CancellationToken.None);
+        var diagnostics = new List<Diagnostic>();
+        RequiresCallSiteTreeAnalyzer.Analyze(
+            caller,
+            declaration,
+            semanticModel,
+            session,
+            diagnostics.Add,
+            CancellationToken.None);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task UsingDisposalRequiresAreReportedOncePerResource()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
