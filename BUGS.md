@@ -3054,29 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 642. [CONFIRMED] Invalid Ensures or Assume placement poisons BindRequires
-
-**Location**: `SharpProof.Contracts/EffectiveContractSourceResolver.cs`, around
-lines 71-91; `ContractClauseInventory.cs`, around lines 21-24;
-`ContractBinder.cs`, around lines 87-103, 192-195, and 225-240.
-
-**Description**: Mode-specific `BindRequires` fails on the inventory's global
-placement-error bit. A valid leading Requires is therefore discarded when only
-a later Ensures or Assume is misplaced.
-
-**Reproduction**: A valid Requires followed by an ordinary statement and a late
-Ensures/Assume made full binding fail as expected, but also made BindRequires
-fail, suppressing SP0027 at a known-invalid caller. A wrong-signature Ensures
-control still allowed Requires binding.
-
-**Impact**: One postcondition/assumption diagnostic can hide independent,
-definite call-site precondition violations.
-
-**Recommended fix**: Make placement failure mode-specific: BindRequires should
-reject invalid Requires placement while ignoring unrelated clause placement,
-without allowing a bad direct postcondition to expose companion contracts. Add
-full/requires, late-Requires, and direct-plus-companion tests.
-
 ### 643. [CONFIRMED] Completed refutations are emitted as failed SARIF invocations
 
 **Location**: `SharpProof.Worker.Launcher/SarifProjection.cs`, around lines
