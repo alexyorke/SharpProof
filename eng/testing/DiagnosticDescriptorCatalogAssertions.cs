@@ -207,11 +207,55 @@ internal static class DiagnosticDescriptorCatalogAssertions
 
     private static JsonDocument ReadCatalog()
     {
-        return JsonDocument.Parse(File.ReadAllText(Path.Combine(
+        var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             RepositoryRoot(),
             "eng",
             "diagnostics",
             "diagnostic-descriptors.v1.json")));
+        try
+        {
+            AssertUniqueProperties(document.RootElement, "diagnostic catalog");
+            return document;
+        }
+        catch
+        {
+            document.Dispose();
+            throw;
+        }
+    }
+
+    private static void AssertUniqueProperties(
+        JsonElement value,
+        string context)
+    {
+        if (value.ValueKind == JsonValueKind.Array)
+        {
+            var index = 0;
+            foreach (var item in value.EnumerateArray())
+            {
+                AssertUniqueProperties(item, $"{context}[{index}]");
+                index++;
+            }
+            return;
+        }
+
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in value.EnumerateObject())
+        {
+            if (!names.Add(property.Name))
+            {
+                throw new InvalidDataException(
+                    $"{context} contains duplicate property '{property.Name}'.");
+            }
+            AssertUniqueProperties(
+                property.Value,
+                $"{context}.{property.Name}");
+        }
     }
 
     private static string RepositoryRoot()

@@ -8,6 +8,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
@@ -74,8 +75,17 @@ function Resolve-RepositoryOutputPath {
         -ParameterName 'Diagnostic output path'
 }
 
-$catalog = Get-Content -LiteralPath $CatalogPath -Raw |
-    ConvertFrom-Json -Depth 100
+$catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
+$catalogDocument = [System.Text.Json.JsonDocument]::Parse($catalogJson)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $catalogDocument.RootElement `
+        -Context 'catalog'
+}
+finally {
+    $catalogDocument.Dispose()
+}
+$catalog = $catalogJson | ConvertFrom-Json -Depth 100
 Assert-ExactMembers $catalog @('schemaVersion', 'outputs') 'Catalog'
 if ([int](Get-RequiredMember $catalog 'schemaVersion' 'Catalog') -ne 1) {
     throw 'Only diagnostic catalog schema version 1 is supported.'

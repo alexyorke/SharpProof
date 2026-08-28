@@ -98,6 +98,62 @@ public sealed class GeneratorDuplicatePropertyTests
         }
     }
 
+    [Test]
+    public async Task DiagnosticDescriptorGeneratorRejectsDuplicateRootProperties()
+    {
+        var repository = RepositoryRoot();
+        var catalog = await File.ReadAllTextAsync(Path.Combine(
+            repository,
+            "eng",
+            "diagnostics",
+            "diagnostic-descriptors.v1.json"));
+        catalog = catalog.Replace(
+            "\"schemaVersion\": 1,",
+            "\"schemaVersion\": 1,\n  \"schemaVersion\": 1,",
+            StringComparison.Ordinal);
+
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "diagnostic-generator-duplicate-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var catalogPath = Path.Combine(directory, "catalog.json");
+            await File.WriteAllTextAsync(catalogPath, catalog);
+            var startInfo = new ProcessStartInfo("pwsh")
+            {
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            foreach (var argument in new[]
+            {
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                Path.Combine(repository, "scripts", "Generate-DiagnosticDescriptors.ps1"),
+                "-CatalogPath",
+                catalogPath
+            })
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(startInfo) ??
+                throw new InvalidOperationException("PowerShell did not start.");
+            var output = await process.StandardOutput.ReadToEndAsync();
+            output += await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            Assert.That(process.ExitCode, Is.Not.Zero, output);
+            Assert.That(output, Does.Contain("duplicate property 'schemaVersion'"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string RepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
