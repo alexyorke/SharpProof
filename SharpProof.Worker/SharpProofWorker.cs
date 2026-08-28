@@ -639,9 +639,19 @@ public sealed class SharpProofWorker : IDisposable
                     return LaneRenewalResult.Success;
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException and
-                    not StackOverflowException and not OperationCanceledException)
+                    not StackOverflowException)
                 {
-                    replacementOwner?.Dispose();
+                    try
+                    {
+                        replacementOwner?.Dispose();
+                    }
+                    catch (Exception cleanupException) when (
+                        cleanupException is not OutOfMemoryException and
+                        not StackOverflowException)
+                    {
+                        // Renewal is already failing; cleanup must not replace
+                        // the typed lifecycle failure with another exception.
+                    }
                     return Program.IsBackendUnavailable(exception)
                         ? LaneRenewalResult.BackendUnavailable
                         : LaneRenewalResult.InfrastructureFailure;

@@ -5614,6 +5614,8 @@ public sealed class WorkerTests
         WorkerClaimReason.BackendUnavailable, 2)]
     [TestCase("dispose", WorkerRunFailureReason.InfrastructureFailure,
         WorkerClaimReason.InfrastructureFailure, 1)]
+    [TestCase("dispose-canceled", WorkerRunFailureReason.InfrastructureFailure,
+        WorkerClaimReason.InfrastructureFailure, 1)]
     public async Task InvalidRenewalStateFailsClosedWithTypedEvidence(
         string scenario,
         WorkerRunFailureReason expectedFailure,
@@ -5647,6 +5649,8 @@ public sealed class WorkerTests
             {
                 original = scenario == "dispose"
                     ? new ThrowingDisposeDelayingBackend()
+                    : scenario == "dispose-canceled"
+                        ? new ThrowingCancellationDisposeDelayingBackend()
                     : new DelayingBackend();
                 return original;
             }
@@ -6449,6 +6453,25 @@ public sealed class WorkerTests
         public void Dispose()
         {
             throw new InvalidOperationException("backend disposal failed");
+        }
+    }
+
+    private sealed class ThrowingCancellationDisposeDelayingBackend :
+        ISmtBackend,
+        IDisposable
+    {
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return BackendCheckResult.Unknown(
+                BackendFailureReason.InfrastructureFailure);
+        }
+
+        public void Dispose()
+        {
+            throw new OperationCanceledException();
         }
     }
 
