@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 575. [CONFIRMED] Advisory performance validation accepts an effective off profile
-
-**Location**: SharpProof.Gates/Performance/PerformanceGate.cs around lines 101,
-273, 1218-1259, and 1389-1402; package targets around lines 11-20.
-
-**Description**: ValidateAdvisoryPackagePolicy checks that expected XML nodes and
-literal conditions exist, but not assignment uniqueness/order or evaluated
-MSBuild properties/items.
-
-**Reproduction**: Adding an unconditional SharpProofProfile=off after the
-expected default left the validator accepted. MSBuild evaluated baseline as
-advisory with analyzers and mutant as off with an empty Analyzer list.
-
-**Impact**: The performance gate can time two analyzer-free builds, measure
-deceptively low overhead, and publish passing advisory evidence.
-
-**Recommended fix**: Evaluate a minimal imported project and assert effective
-profile/normalized profile plus exact analyzer roles before timing. Also reject
-override assignments. Add the off-override mutation test.
-
 ### 576. [CONFIRMED] Mapped-location collisions prevent compiler-manifest emission
 
 **Location**: CompilerCollector/ClaimManifestBuilder.cs around lines 670-688;
