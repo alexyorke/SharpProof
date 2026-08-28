@@ -51,6 +51,49 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task PropertyAssignmentRequiresANormallyReturningSetter()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class ThrowingTarget {
+                public int Value {
+                    get => 0;
+                    set => throw new System.InvalidOperationException();
+                }
+            }
+
+            public sealed class CompletingTarget {
+                public int Value {
+                    get => 0;
+                    set { }
+                }
+            }
+
+            public static class Subject {
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void ThrowingSetter() {
+                    Positive(new ThrowingTarget().Value = 1, -1);
+                }
+
+                public static void CompletingSetter() {
+                    Positive(new CompletingTarget().Value = 1, -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task CompletingLockAndTryPrefixesRetainConcreteRefutations()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

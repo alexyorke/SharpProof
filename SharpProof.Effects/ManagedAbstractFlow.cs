@@ -2193,9 +2193,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             IBinaryOperation binary =>
                 ChildrenMayCompleteNormally(binary) &&
                 !IsDefinitelyZeroDivision(binary),
+            ISimpleAssignmentOperation assignment =>
+                MayCompleteAssignmentNormally(assignment),
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
-                ISimpleAssignmentOperation or IArrayElementReferenceOperation or
+                IArrayElementReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
                 (operation is not IConversionOperation conversion ||
@@ -2235,6 +2237,35 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             ILoopOperation or ISwitchOperation => true,
             _ => true
         };
+    }
+
+    private bool MayCompleteAssignmentNormally(
+        ISimpleAssignmentOperation assignment)
+    {
+        if (!MayCompleteNormally(assignment.Value))
+        {
+            return false;
+        }
+
+        if (assignment.Target is not IPropertyReferenceOperation property)
+        {
+            return ChildrenMayCompleteNormally(assignment.Target);
+        }
+
+        return MayCompletePropertyReceiverNormally(property) &&
+            (property.Property.SetMethod == null ||
+             MethodCanCompleteNormally(property.Property.SetMethod));
+    }
+
+    private bool MayCompletePropertyReceiverNormally(
+        IPropertyReferenceOperation property)
+    {
+        return (property.Instance == null
+                ? property.Property.IsStatic
+                : MayCompleteNormally(property.Instance) &&
+                  !IsDefinitelyNull(property.Instance)) &&
+            property.Arguments.All(argument =>
+                MayCompleteNormally(argument.Value));
     }
 
     private bool MayCompleteConditional(IConditionalOperation conditional)
