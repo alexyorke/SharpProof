@@ -336,6 +336,28 @@ public sealed class ContractBinder(
             }
         }
 
+        if (!requiresOnly && !variables.Result.HasValue)
+        {
+            var returnResult = ValidateValueAttributes(
+                target.GetReturnTypeAttributes(), target.ReturnType, RefKind.None);
+            if (returnResult != ContractBindingFailure.None)
+            {
+                return ClauseBindingResult.Fail(returnResult);
+            }
+
+            if (usesCompanion)
+            {
+                var companionResult = ValidateValueAttributes(
+                    source.GetReturnTypeAttributes(),
+                    source.ReturnType,
+                    RefKind.None);
+                if (companionResult != ContractBindingFailure.None)
+                {
+                    return ClauseBindingResult.Fail(companionResult);
+                }
+            }
+        }
+
         if (!requiresOnly && variables.Result.HasValue)
         {
             var result = BindValueAttributes(
@@ -363,6 +385,32 @@ public sealed class ContractBinder(
             }
         }
         return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
+    }
+
+    private ContractBindingFailure ValidateValueAttributes(
+        ImmutableArray<AttributeData> attributes,
+        ITypeSymbol sourceType,
+        RefKind refKind)
+    {
+        foreach (var attribute in attributes)
+        {
+            if (_api!.Selections.IsRejectedClosedContract(attribute))
+            {
+                return ContractBindingFailure.InvalidClosedAttribute;
+            }
+
+            var validation = ClosedContractAttributeValidator.Validate(
+                attribute,
+                sourceType,
+                refKind,
+                _api.Selections);
+            if (validation.IsRecognized && !validation.IsValid)
+            {
+                return ContractBindingFailure.InvalidClosedAttribute;
+            }
+        }
+
+        return ContractBindingFailure.None;
     }
 
     private ContractBindingFailure BindValueAttributes(

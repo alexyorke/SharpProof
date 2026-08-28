@@ -1049,6 +1049,27 @@ public sealed class ContractBinderTests
             Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
     }
 
+    [TestCase("[return: NotNull]")]
+    [TestCase("[return: Positive]")]
+    [TestCase("[return: InRange(1, 10)]")]
+    public void ClosedReturnContractsOnVoidAreRejected(string attribute)
+    {
+        var source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                ATTRIBUTE
+                public static void Read() {
+                }
+            }
+            """.Replace("ATTRIBUTE", attribute, StringComparison.Ordinal);
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
     [Test]
     public void ExactGenericCompanionIsDiscoveredAndBound()
     {

@@ -15,15 +15,12 @@ internal static class ClosedContractDiagnostics
                 parameter);
         }
 
-        if (!method.ReturnsVoid)
-        {
-            ValidateValue(
-                method.ReturnType,
-                RefKind.None,
-                method.GetReturnTypeAttributes(),
-                method.Locations.FirstOrDefault() ?? Location.None,
-                method);
-        }
+        ValidateValue(
+            method.ReturnType,
+            RefKind.None,
+            method.GetReturnTypeAttributes(),
+            method.Locations.FirstOrDefault() ?? Location.None,
+            method);
 
         void ValidateValue(
             ITypeSymbol type,
