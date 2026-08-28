@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 598. [CONFIRMED] Legal 513-character source call identity causes fatal SP0049
-
-**Location**: CompilerRelationalSummaryProvider.cs around lines 136-149,
-278-286, and 340-354; CompilerManifestArtifactProducer.cs around lines 69-119;
-CompilationFingerprint.cs around lines 173-180 and 230-254.
-
-**Description**: Summary authority accepts unbounded Roslyn documentation IDs,
-but final compilation evidence rejects identities longer than 512 characters
-and the collector converts the exception to error SP0049.
-
-**Reproduction**: A helper name yielding identity length 512 lowered and emitted
-successfully. One extra character produced compiler errors zero, lowering
-success and one summary authority, then JsonException and no manifest.
-
-**Impact**: Valid source fails verification rather than yielding typed
-UnsupportedBody.
-
-**Recommended fix**: Apply one shared identity validator before summary caching
-and abstain at 513, or consistently raise/remove the schema limit. Do not
-truncate/hash authority identity. Test 512, 513, nested dependency, and no-SP0049.
-
 ### 599. [CONFIRMED] Exact-commit release tasks compile Git-ignored source files
 
 **Location**: .gitignore entry for Generated Files; eng/container/entrypoint.sh
