@@ -982,6 +982,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     forEach,
                     semanticModel,
                     cancellationToken),
+            IAwaitOperation awaitOperation when
+                semanticModel != null =>
+                GetAwaitCalls(
+                    awaitOperation,
+                    semanticModel,
+                    cancellationToken),
             IUsingOperation @using when
                 compilation != null && caller != null &&
                 !@using.IsAsynchronous =>
@@ -1057,6 +1063,36 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 : null;
         return [new RequiresCallTarget(
             getEnumerator,
+            instance,
+            [],
+            ImmutableDictionary<int, IOperation>.Empty,
+            ImmutableDictionary<int, long>.Empty,
+            true)];
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetAwaitCalls(
+        IAwaitOperation awaitOperation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (awaitOperation.Syntax is not AwaitExpressionSyntax syntax)
+        {
+            return [];
+        }
+
+        var getAwaiter = Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+            .GetAwaitExpressionInfo(semanticModel, syntax)
+            .GetAwaiterMethod;
+        if (getAwaiter == null)
+        {
+            return [];
+        }
+
+        var instance = getAwaiter.IsStatic && getAwaiter.ReducedFrom == null
+            ? null
+            : awaitOperation.Operation;
+        return [new RequiresCallTarget(
+            getAwaiter,
             instance,
             [],
             ImmutableDictionary<int, IOperation>.Empty,

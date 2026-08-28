@@ -692,6 +692,38 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task CustomAwaitGetAwaiterRequiresAreReported()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+            using SharpProof.Attributes;
+            public sealed class Awaitable {
+                public Awaiter GetAwaiter() {
+                    Contract.Requires(false);
+                    return new Awaiter();
+                }
+            }
+            public struct Awaiter : INotifyCompletion {
+                public bool IsCompleted => true;
+                public int GetResult() => 0;
+                public void OnCompleted(Action continuation) { }
+            }
+            public static class Subject {
+                public static async Task<int> Call(Awaitable value) => await value;
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task RecordCopyConstructorDoesNotOwnMemberInitializers()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

@@ -203,47 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 505. [CONFIRMED] Custom await omits the hidden GetAwaiter precondition call
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
-GetCalls around lines 591-624. The equivalent semantic protocol is implemented
-in SharpProof.Effects/OperationEffectScanner.Expressions.cs around lines
-216-284 and ExceptionHandlerReachability.cs around lines 856-959.
-
-**Description**: Requires discovery has no IAwaitOperation protocol path, and
-Roslyn does not expose await lowering as ordinary child IInvocationOperations.
-The compiler-selected GetAwaiter method is therefore absent from precondition
-checking, although Effects resolves it through GetAwaitExpressionInfo and
-models the protocol order.
-
-**Reproduction**: A custom Awaitable.GetAwaiter contains
-`Contract.Requires(false)`, with an already-completed awaiter. Runtime counters
-showed generated await and direct invocation each call GetAwaiter exactly once.
-Analyzer output contained one SP0027 only at the explicit call; the await
-expression produced none.
-
-**Impact**: A custom awaitable can hide an always-false precondition behind an
-admitted language construct. Spelling the semantically identical GetAwaiter
-call directly changes the analyzer verdict.
-
-**Root cause**: Hidden await-protocol methods are not included in Requires
-call-site discovery, and the existing Effects semantic inventory is not shared.
-
-**Recommended fix**: Resolve GetAwaitExpressionInfo.GetAwaiterMethod, map the
-await operand as receiver or reduced/static extension argument, and create a
-candidate after operand evaluation can complete. Use the await expression as
-the diagnostic location and existing flow/replay rules. Factor the symbol
-selection with Effects. Add IsCompleted/GetResult only with an explicit
-synthetic awaiter receiver and completion sequence.
-
-**Regression coverage**: Custom GetAwaiter with Requires(false) under await must
-emit one SP0027, matching a direct-call control. Add non-completing operand,
-valid method, reduced extension, and synchronous-completion controls; separately
-pin protocol ordering if later edges are modeled.
-
-**Confidence**: High; executable analyzer/runtime probes isolated the missing
-compiler-hidden call and matched the repository's existing Effects inventory.
-
 ### 510. [CONFIRMED] Large string-literal encoding ignores cancellation before solver execution
 
 **Location**: SharpProof.Smt/IrSmtBackend.cs around lines 109-145, 286-301, and
