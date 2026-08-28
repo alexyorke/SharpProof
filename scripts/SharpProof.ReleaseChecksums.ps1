@@ -1,5 +1,144 @@
 Set-StrictMode -Version Latest
 
+function Convert-SharpProofPackageArchive {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    if (-not [IO.File]::Exists($fullPath)) {
+        throw "Package archive is not a file: $fullPath"
+    }
+    $directory = [IO.Path]::GetDirectoryName($fullPath)
+    $temporaryPath = Join-Path $directory (
+        '.' + [IO.Path]::GetFileName($fullPath) + '.' +
+        [Guid]::NewGuid().ToString('N') + '.tmp')
+    $fixedTimestamp = [DateTimeOffset]::new(
+        1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
+    $canonicalCoreName =
+        'package/services/metadata/core-properties/core-properties.psmdcp'
+    try {
+        $source = [IO.Compression.ZipFile]::OpenRead($fullPath)
+        try {
+            $entries = @($source.Entries)
+            $coreEntries = @($entries | Where-Object {
+                $_.FullName -imatch
+                    '^package/services/metadata/core-properties/[^/]+\.psmdcp$'
+            })
+            if ($coreEntries.Count -gt 1) {
+                throw "Package archive contains multiple core-properties entries: $fullPath"
+            }
+            $coreName = if ($coreEntries.Count -eq 1) {
+                [string]$coreEntries[0].FullName
+            }
+            else {
+                $null
+            }
+            $mappedEntries = @($entries | ForEach-Object {
+                [pscustomobject]@{
+                    Input = $_
+                    OutputName = if ($null -ne $coreName -and
+                        [string]$_.FullName -ceq $coreName) {
+                        $canonicalCoreName
+                    }
+                    else {
+                        [string]$_.FullName
+                    }
+                }
+            })
+            $duplicateNames = @(
+                $mappedEntries |
+                    Group-Object OutputName |
+                    Where-Object Count -ne 1
+            )
+            if ($duplicateNames.Count -ne 0) {
+                throw "Package archive has duplicate canonical entry '$($duplicateNames[0].Name)': $fullPath"
+            }
+            $outputNames = [string[]]@(
+                $mappedEntries | ForEach-Object { [string]$_.OutputName })
+            [Array]::Sort($outputNames, [StringComparer]::Ordinal)
+            $destination = [IO.Compression.ZipFile]::Open(
+                $temporaryPath,
+                [IO.Compression.ZipArchiveMode]::Create)
+            try {
+                foreach ($outputName in $outputNames) {
+                    $mapped = @($mappedEntries | Where-Object {
+                        [string]$_.OutputName -ceq $outputName
+                    })[0]
+                    $entry = $destination.CreateEntry(
+                        $outputName,
+                        [IO.Compression.CompressionLevel]::Optimal)
+                    $entry.LastWriteTime = $fixedTimestamp
+                    $inputStream = $mapped.Input.Open()
+                    try {
+                        $memory = [IO.MemoryStream]::new()
+                        try {
+                            $inputStream.CopyTo($memory)
+                            $bytes = $memory.ToArray()
+                        }
+                        finally {
+                            $memory.Dispose()
+                        }
+                    }
+                    finally {
+                        $inputStream.Dispose()
+                    }
+                    $isCore = $null -ne $coreName -and
+                        $mapped.Input.FullName -ceq $coreName
+                    $isRelationship = $mapped.Input.FullName -imatch (
+                        '(^|/)_rels/.*\.rels$') -or
+                        $mapped.Input.FullName -ceq '[Content_Types].xml'
+                    if ($isCore -or ($isRelationship -and $null -ne $coreName)) {
+                        $text = [Text.UTF8Encoding]::new($false, $true).
+                            GetString($bytes)
+                        $text = $text.Replace(
+                            '/' + $coreName,
+                            '/' + $canonicalCoreName)
+                        $text = $text.Replace($coreName, $canonicalCoreName)
+                        if ($isRelationship) {
+                            $text = [Text.RegularExpressions.Regex]::Replace(
+                                $text,
+                                '(?is)(<Relationship\b(?=[^>]*\bType="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties")[^>]*\bId=")[^"]+(")',
+                                '${1}rIdCoreProperties${2}')
+                        }
+                        if ($isCore) {
+                            $text = [Text.RegularExpressions.Regex]::Replace(
+                                $text,
+                                '(<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?(?:created|modified)\b[^>]*>)[^<]*(</(?:[A-Za-z_][A-Za-z0-9_.-]*:)?(?:created|modified)\s*>)',
+                                '${1}1980-01-01T00:00:00Z${2}')
+                        }
+                        $bytes = [Text.UTF8Encoding]::new($false, $true).
+                            GetBytes($text)
+                    }
+                    $outputStream = $entry.Open()
+                    try {
+                        if ($bytes.Length -ne 0) {
+                            $outputStream.Write($bytes, 0, $bytes.Length)
+                        }
+                    }
+                    finally {
+                        $outputStream.Dispose()
+                    }
+                }
+            }
+            finally {
+                $destination.Dispose()
+            }
+        }
+        finally {
+            $source.Dispose()
+        }
+        [IO.File]::Move($temporaryPath, $fullPath, $true)
+    }
+    finally {
+        if ([IO.File]::Exists($temporaryPath)) {
+            [IO.File]::Delete($temporaryPath)
+        }
+    }
+}
+
 function Get-SharpProofReleaseChecksumBytes {
     param(
         [Parameter(Mandatory = $true)]

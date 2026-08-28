@@ -42,6 +42,35 @@ public sealed class ReleaseChecksumAuthorityTests
         Assert.That(validation, Is.GreaterThan(generation));
     }
 
+    [Test]
+    public async Task PackageArchiveCanonicalizationIsDeterministic()
+    {
+        var root = FindRepositoryRoot();
+        var info = new ProcessStartInfo
+        {
+            FileName = "pwsh",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        info.ArgumentList.Add("-NoLogo");
+        info.ArgumentList.Add("-NoProfile");
+        info.ArgumentList.Add("-File");
+        info.ArgumentList.Add(Path.Combine(
+            root,
+            "scripts",
+            "Test-SharpProofPackageReproducibilityFixtures.ps1"));
+        using var process = Process.Start(info)!;
+        var output = await process.StandardOutput.ReadToEndAsync();
+        var error = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        Assert.That(
+            process.ExitCode,
+            Is.Zero,
+            output + Environment.NewLine + error);
+    }
+
     [TestCase("canonical", true)]
     [TestCase("bom", false)]
     [TestCase("utf16le", false)]

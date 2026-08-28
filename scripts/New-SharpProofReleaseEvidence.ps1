@@ -582,6 +582,7 @@ $packageFiles = @(
 if ($packageFiles.Count -ne 6) {
     throw "Release evidence requires exactly six NuGet artifacts; found $($packageFiles.Count)."
 }
+$sourcePackageFiles = $packageFiles
 $expectedPackageNames = @($packageFiles.Name)
 if ($inPlace) {
     $ownedEvidenceNames = @(
@@ -603,6 +604,18 @@ else {
         -Directory $resolvedSource `
         -PackageNames $expectedPackageNames
 }
+
+foreach ($sourcePackageFile in $packageFiles) {
+    $stagedPackagePath = Join-Path $resolvedOutput $sourcePackageFile.Name
+    [IO.File]::Copy(
+        $sourcePackageFile.FullName,
+        $stagedPackagePath,
+        $false)
+    Convert-SharpProofPackageArchive -Path $stagedPackagePath
+}
+$packageFiles = @($sourcePackageFiles | ForEach-Object {
+    Get-Item -LiteralPath (Join-Path $resolvedOutput $_.Name)
+})
 
 $expectedIds = @(
     'SharpProof',
@@ -976,12 +989,6 @@ $null = Read-SharpProofCanonicalReleaseJson `
 Write-SharpProofReleaseChecksumFile `
     -Path $sumsPath `
     -Artifacts $orderedArtifacts
-foreach ($packageFile in $packageFiles) {
-    [IO.File]::Copy(
-        $packageFile.FullName,
-        (Join-Path $resolvedOutput $packageFile.Name),
-        $false)
-}
 Test-SharpProofReleaseBundleTopology `
     -Directory $resolvedOutput `
     -Artifacts $orderedArtifacts `

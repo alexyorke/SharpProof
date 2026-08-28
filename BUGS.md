@@ -294,28 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 670. [CONFIRMED] NuGet package archives are not byte reproducible
-
-**Location**: `scripts/Invoke-SharpProofContainer.ps1`, around lines 383-393;
-`New-SharpProofReleaseEvidence.ps1`, around lines 732-748, 927-958, and 977.
-
-**Description**: Compiler determinism is enabled, but raw `dotnet pack` OPC/ZIP
-output is hashed without canonicalization. NuGet injects a random core-properties
-part name and pack-time ZIP timestamps.
-
-**Reproduction**: Packing the exact same already-built Attributes DLL/PDB twice
-with `--no-build --no-restore` produced different nupkg and snupkg sizes/hashes.
-Only GUID-named `.psmdcp` paths, their relationship, and timestamps differed.
-
-**Impact**: Retrying a release from the same commit and payload changes packages,
-SHA256SUMS, SBOM hashes, manifests, provenance, and attestations; published bytes
-cannot be reconstructed from recorded inputs.
-
-**Recommended fix**: Canonicalize packages before validation/evidence (stable
-core-properties identity, entry order, timestamps, compression, and ZIP metadata)
-or adopt a tested reproducible pack mode. Pack every project twice from one build
-and require byte-identical packages and evidence; perturb real payload as control.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
