@@ -3054,29 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 644. [CONFIRMED] Reused reference awaiters hide caller-owned writes as Fresh
-
-**Location**: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, around
-lines 238-258 and 280-284; `EffectSummaryOperations.cs`, around lines 149-165;
-`EffectContractMappings.generated.cs`, around line 218.
-
-**Description**: Await lowering always assigns the `GetAwaiter` result a Fresh
-region. The await pattern permits a reference awaiter to return `this`, so later
-`IsCompleted`/`GetResult` receiver effects can mutate the caller-owned operand.
-
-**Reproduction**: A sealed awaiter returned itself and wrote `State=1729` in
-`GetResult`. Runtime observed the argument write; Effects returned Complete and
-nonunknown with only a Fresh write and no WritesArgumentState. A new-awaitable
-control correctly remained Fresh.
-
-**Impact**: Effect contracts can falsely certify custom awaiters as pure or as
-not writing argument state.
-
-**Recommended fix**: Classify the actual GetAwaiter return alias: map `this` and
-reduced-extension receiver returns to the operand, allocations to Fresh, join
-conditional alternatives, and use Unknown when unresolved. Test alias/fresh,
-conditional, and extension controls.
-
 ### 645. [CONFIRMED] Non-returning user binary operators cause a false SP0027
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
