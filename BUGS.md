@@ -5939,27 +5939,6 @@ bytes until manually removed.
 PackageSource or the remote fixture directory before writing. Test new paths,
 case/symlink-resolved containment, disjoint output, and bundle preservation.
 
-### 695. [CONFIRMED] Direct capturing local functions falsely report heap allocation
-
-**Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines 20-29
-and 102-153; `ConversionEffectClassifier.cs`, around lines 70-75.
-
-**Description**: Any captured symbol/receiver unconditionally adds Managed
-allocation, conflating captured-state tracking with delegate/closure
-materialization. A local function invoked directly can be stack-lowered with no
-heap object; actual delegate conversion already has separate allocation logic.
-
-**Reproduction**: 256 direct calls to a capturing local function allocated exactly
-zero bytes, but summary was Managed/Complete with Allocates. Returning the local
-function as Func allocated 5,632 bytes and correctly remained Managed.
-
-**Impact**: Complete summaries reject allocation-free code and produce false
-Allocates contracts.
-
-**Recommended fix**: Retain captured read/write regions but charge allocation only
-at actual anonymous-function/method-group materialization. Correct the stale
-direct-call test and add receiver/parameter plus escaping controls.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
