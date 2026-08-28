@@ -122,52 +122,6 @@ SharpProof.Armed/1 record.
 **Confidence**: High; the agent traced every lifecycle edge and reproduced the
 underlying setsid behavior in the canonical environment.
 
-### 438. [CONFIRMED] IR schema generation and parity accept duplicate JSON properties
-
-**Location**: scripts/Generate-IrModel.ps1 around line 168 and
-SharpProof.Ir.Test/IrModelSchemaTests.cs around line 71.
-
-**Description**: The authoritative IR vocabulary schema is parsed with
-ConvertFrom-Json, and the runtime parity test reads properties with
-JsonDocument.GetProperty. Both silently select the last duplicate object
-property. A contradictory schema can therefore pass both generated-source
-verification and runtime-shape parity.
-
-**Reproduction**: In an ephemeral canonical container, change the schema root
-to:
-
-    "schemaVersion": 999,
-    "schemaVersion": 1,
-
-Generate-IrModel.ps1 -Verify exits 0 and reports:
-
-    Verified SharpProof.Ir/IrModel.generated.cs and IR identifier aliases.
-
-The parity primitive independently returns PARITY_VALUE=1 for the same input.
-Because the last value matches generated output, neither authority detects the
-contradictory review source.
-
-**Impact**: Root or nested IR declarations can be ambiguous while all
-generation and parity gates remain green. Reviewers cannot know which duplicate
-was intended, and a last-wins edit can silently change the generated semantic
-vocabulary.
-
-**Root cause**: Neither PowerShell conversion nor .NET parity loading performs
-a recursive duplicate-property preflight.
-
-**Recommended fix**: Reuse a strict, ordinal JSON reader that walks every
-object and rejects duplicate names before conversion or GetProperty lookup.
-The declarative-model generator already provides a suitable implementation
-pattern.
-
-**Regression coverage**: Run the generator on temporary schemas with duplicate
-root schemaVersion and nested declaration name properties, require nonzero exit
-with path-qualified errors, and add a strict schema-reader parity test that
-fails before value comparison.
-
-**Confidence**: High; the reporting agent reproduced both the green generator
-verify and the green last-wins parity primitive in the canonical container.
-
 ### 439. [CONFIRMED] Record copy constructors are treated as owners of instance member initializers
 
 **Location**: SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
