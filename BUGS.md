@@ -2619,44 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 548. [CONFIRMED] Production fuzz JSON emits coverage properties the strict parser rejects
-
-**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs, FrontendFuzzCoverage around
-lines 38-66; serialization in Tools/SharpProof.Fuzz/Program.cs around lines
-33-60; strict property set in scripts/Assert-SharpProofFuzzRunnerResult.ps1
-around lines 142-149; campaign use around lines 145-149.
-
-**Description**: FrontendFuzzCoverage exposes public read-only derived getters
-HasValidCounts and HasExpandedCategories. Default System.Text.Json serialization
-emits both. The strict schema parser permits exactly the 13 counters and rejects
-those two fields. Fixture JSON is hand-built without the computed properties,
-so tests validate a shape the producer never emits.
-
-**Reproduction**: A real passing FuzzSummary serialized with production options:
-
-    producer Passed=True bytes=749
-    coverage keys=13 counters,HasValidCounts,HasExpandedCategories
-    serialized HasValidCounts=True HasExpandedCategories=True
-    Invalid fuzz runner result: Frontend coverage has an unexpected property set.
-
-**Impact**: Every genuinely passing exit-zero runner result is marked
-validationPassed=false; the campaign becomes failed and throws, so the normal
-campaign cannot succeed.
-
-**Root cause**: Public computed API properties unintentionally became wire
-schema fields while parser fixtures manually encode a narrower schema.
-
-**Recommended fix**: Prefer `[JsonIgnore]` on both derived getters to preserve
-the current 13-counter schema. If they are intentionally serialized, update the
-schema version and verify their consistency instead of trusting them.
-
-**Regression coverage**: Serialize an actual passing FuzzSummary with production
-options and feed the bytes to the PowerShell authority; require acceptance and
-an exact intended property set. Retain malformed/extra-field controls.
-
-**Confidence**: High; production types/options emitted a passing result that the
-production parser deterministically rejected.
-
 ### 549. [CONFIRMED] Definitely nonnull conditional property access remains unreplayable
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
