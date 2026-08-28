@@ -2619,29 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 580. [CONFIRMED] Counterexample replay discards DAG memoization between assumptions
-
-**Location**: SharpProof.Verify/ProofKernel.cs around lines 79-91;
-SharpProof.Ir/IrInterpreter.cs around lines 107-170 and 540-547.
-
-**Description**: ProofKernel reuses one interpreter object but calls Evaluate for
-each assumption and the goal. Every call creates a fresh EvaluationState and
-dictionary, so shared sub-DAGs are re-walked per root.
-
-**Reproduction**: One 8,191-node shared Boolean DAG with one assumption allocated
-1,269,824 bytes in 3 ms. Sixty-four distinct outer assumptions allocated
-81,181,456 bytes in 140 ms, a 63.9x ratio. Both and the real backend returned a
-correct Refuted outcome.
-
-**Impact**: Valid refutations can incur O(assumptions * shared DAG) managed work
-after the solver answers, outside Z3 rlimit accounting, causing avoidable memory
-pressure and timeout/cancellation.
-
-**Recommended fix**: Add a model-bound batch/session evaluator whose memo is
-shared across replay roots, while preserving per-root depth and cancellation and
-never reusing across environments. Add node-count, changed-model, and cached-root
-cancellation tests.
-
 ### 581. [CONFIRMED] A global SARIF path loses earlier projects' evidence
 
 **Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
