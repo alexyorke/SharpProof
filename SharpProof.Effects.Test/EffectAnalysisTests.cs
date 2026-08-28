@@ -1758,6 +1758,74 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ConditionalMemberInitializerRetainsCompletingArmEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Sample {
+                private static bool s_chooseFailure;
+                private readonly int _value =
+                    s_chooseFailure ? Fail() : Mutate();
+
+                public Sample() {
+                }
+
+                private static int Fail() =>
+                    throw new System.InvalidOperationException();
+
+                private static int Mutate() {
+                    s_chooseFailure = false;
+                    return 1729;
+                }
+            }
+            """);
+        var constructor = EffectTestHost.RequireType(compilation, "Sample")
+            .InstanceConstructors
+            .Single(static method =>
+                !method.IsImplicitlyDeclared && method.Parameters.Length == 0);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(constructor);
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
+    public void ConditionalStaticInitializerRetainsCompletingArmEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sink {
+                public static int State;
+
+                public static int Mutate() {
+                    State = 1729;
+                    return State;
+                }
+            }
+
+            public static class Sample {
+                private static bool s_chooseFailure;
+                private static int s_value =
+                    s_chooseFailure ? Fail() : Sink.Mutate();
+
+                private static int Fail() =>
+                    throw new System.InvalidOperationException();
+            }
+            """);
+        var constructor = EffectTestHost.RequireType(compilation, "Sample")
+            .StaticConstructors
+            .Single();
+
+        var result = new EffectAnalysisSession(compilation).Analyze(constructor);
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    [Test]
     public void ThrowingMemberInitializerSuppressesLaterInitializationAndBody()
     {
         var compilation = EffectTestHost.CreateCompilation(

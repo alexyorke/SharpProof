@@ -293,6 +293,7 @@ internal sealed partial class OperationEffectScanner
             IFieldReferenceOperation field => ScanField(field, access),
             IPropertyReferenceOperation property => ScanProperty(property, access),
             IArrayElementReferenceOperation element => ScanArrayElement(element, access),
+            IConditionalOperation conditional => ScanConditional(conditional),
             ICoalesceAssignmentOperation assignment =>
                 ScanCoalesceAssignment(assignment),
             IDeconstructionAssignmentOperation deconstruction =>
@@ -312,6 +313,35 @@ internal sealed partial class OperationEffectScanner
             IArrayCreationOperation array => ScanArrayCreation(array),
             _ => ScanCoreOperationTail(operation)
         };
+    }
+
+    private EffectSummary ScanConditional(IConditionalOperation conditional)
+    {
+        var condition = ScanStep(conditional.Condition);
+        if (!condition.CompletesNormally)
+        {
+            return condition.Summary;
+        }
+
+        if (conditional.Condition.ConstantValue is
+            { HasValue: true, Value: bool constant })
+        {
+            var selected = constant
+                ? conditional.WhenTrue
+                : conditional.WhenFalse;
+            return selected == null
+                ? condition.Summary
+                : condition.Then(ScanStep(selected)).Summary;
+        }
+
+        var whenTrue = ScanStep(conditional.WhenTrue);
+        var whenFalse = conditional.WhenFalse is { } falseArm
+            ? ScanStep(falseArm)
+            : EffectStep.Empty;
+        return EffectSummaryOperations.Join(
+            condition.Summary,
+            whenTrue.Summary,
+            whenFalse.Summary);
     }
 
     private EffectSummary ScanLocalReference(
