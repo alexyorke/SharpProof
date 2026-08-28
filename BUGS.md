@@ -2056,51 +2056,6 @@ Expression<Func<T>> controls. Add field-like event coverage if supported.
 **Confidence**: High; exact-baseline canonical execution held activation and
 configuration constant and failed only the two initializer-lambda sites.
 
-### 503. [CONFIRMED] Reused SMT contexts double-count cumulative Z3 resource snapshots
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 176-196;
-SharpProof.Worker/MethodResourceBudget.cs around lines 12-18, 31, and 40-46;
-lane reuse in SharpProof.Worker/SharpProofWorker.cs around lines 298-300 and
-568-581.
-
-**Description**: Each query creates a new solver on a reused Z3 Context.
-IrSmtBackend treats that solver's `rlimit count` statistic as a fresh per-query
-delta and adds the entire value to its cumulative total. Z3 actually reports a
-context-cumulative snapshot, so successive snapshots are counted repeatedly.
-MethodResourceBudget consumes differences from the inflated backend total.
-
-**Reproduction**: With QueryRlimit=10 and a method limit of 100, identical
-trivial UNSAT queries produced backend totals:
-
-    10, 30, 60, 100
-
-The exact production budget admitted queries 1-4 and refused query 5. Raw Z3
-solvers on one Context reported snapshots `3, 6, 9, 12`, confirming cumulative
-semantics. Correct totals would be `10, 20, 30, 40`, and ten 10-unit queries
-should fit.
-
-**Impact**: ResourceLimit/Unknown results and skipped later claims begin after
-only the second query. A late method on an aged lane can have its first query
-charged for much of the backend's previous lifetime, reducing verification
-coverage nondeterministically by lane history.
-
-**Root cause**: AccountResources assumes fresh-solver statistics are fresh
-deltas, while the native counter belongs to the shared Context. Existing tests
-assert only monotonicity and therefore bless triangular growth.
-
-**Recommended fix**: Retain the previous native context snapshot and add only
-`observed - lastObserved`, or expose the absolute context count directly. Define
-reset, wrap, and backend-renewal behavior explicitly, and compose this with the
-overflow handling in finding 485.
-
-**Regression coverage**: Feed cumulative snapshots 10/20/30 and require public
-total 30. Reused identical queries must grow linearly; a 100-unit method budget
-must admit ten 10-unit queries. Start a new method on an aged lane and charge
-only its new work. Cover context renewal/reset.
-
-**Confidence**: High; raw native statistics and the exact production budget
-reproduced premature exhaustion.
-
 ### 504. [CONFIRMED] Failed pack preflights leave the prior canonical release bundle live
 
 **Location**: scripts/Invoke-SharpProofContainer.ps1 pack branch around lines
