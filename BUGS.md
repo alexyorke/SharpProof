@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 596. [CONFIRMED] Non-completing object initializers lose reached effects
-
-**Location**: EffectMethodNodeBuilder.cs around lines 138-158;
-OperationEffectScanner.cs around lines 838-879;
-OperationCompletionEvaluator.cs around lines 889-902.
-
-**Description**: Direct member-initializer scanning asks whether the whole object
-creation, including initializer, completes while modeling only constructor
-completion. If an initializer setter/RHS fails, it skips the initializer
-entirely, including reached prefix effects.
-
-**Reproduction**: new Value { Property = Mark() } ran Mark, wrote static 1729,
-then setter threw InvalidOperationException. Analysis returned Complete and
-nonunknown but omitted both static write and throw. A constructor-prefix
-completion fix passed the oracle and three nearby tests.
-
-**Impact**: Constructor summaries and callers can be falsely pure/nonthrowing.
-
-**Recommended fix**: Separate constructor-invocation completion from whole
-construction, then scan initializer sequencing independently. Add one- and
-two-member throwing initializer runtime oracles plus a completing control.
-
 ### 597. [CONFIRMED] Canonical container dotnet commands have no internal deadline
 
 **Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 1-40 and
