@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 556. [CONFIRMED] API-spec resolution ignores declared parameter and result types
-
-**Location**: SharpProof.Effects/ApiSpecResolution.cs, MatchesTarget around line
-193; downstream CompilerCallableLowerer.cs around lines 270 and 400-421.
-
-**Description**: Member resolution checks kind, staticness, name, arity, and
-parameter count, but not receiver, parameter, or result IrTypeKind.
-
-**Reproduction**: A Math.Abs(int) spec declaring Boolean result resolved
-complete with one spec and zero failures although Roslyn returned Int32.
-Instantiation of the actual integer result then failed TypeMismatch.
-
-**Impact**: Catalog typos evade cross-TFM resolution, expose incorrect effect
-facets, and later degrade otherwise supported verification bodies to
-UnsupportedBody.
-
-**Recommended fix**: Classify Roslyn receiver, parameters, and return into the
-shared IR type domain during resolution and emit a typed incompatible-shape
-failure. Test wrong/missing/extra result and wrong parameter kinds across TFMs.
-
 ### 557. [CONFIRMED] Known-pure ref/out calls omit havoc for memory locations
 
 **Location**: SharpProof.Frontend/RoslynProgramLowerer.cs around lines 310-321;
