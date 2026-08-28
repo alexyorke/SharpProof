@@ -169,6 +169,21 @@ public sealed class BoundaryEnforcementTests
     {
         var text = File.ReadAllText(
             Path.Combine(RepositoryRoot(), "BannedSymbols.txt"));
+        var ids = text
+            .Split('\n')
+            .Select(static line => line.Trim())
+            .Where(static line => line.Length != 0 && !line.StartsWith('#'))
+            .Select(static line =>
+            {
+                var separator = line.IndexOf(';');
+                Assert.That(separator, Is.GreaterThan(2), line);
+                var id = line[..separator];
+                Assert.That(id, Does.StartWith("M:"), line);
+                Assert.That(id[2..], Does.Contain("."), line);
+                return id;
+            })
+            .ToArray();
+        Assert.That(ids, Is.Unique);
         var required = new[] {
             "Compilation.ReplaceSyntaxTree(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SyntaxTree)",
             "Compilation.AddSyntaxTrees(Microsoft.CodeAnalysis.SyntaxTree[])",
@@ -205,6 +220,17 @@ public sealed class BoundaryEnforcementTests
         foreach (var member in required)
         {
             Assert.That(text, Does.Contain(member), member);
+        }
+
+        var exactRequired = new[] {
+            "M:Microsoft.CodeAnalysis.Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean)",
+            "M:Microsoft.CodeAnalysis.Compilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions)",
+            "M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,System.Boolean)",
+            "M:Microsoft.CodeAnalysis.CSharp.CSharpCompilation.GetSemanticModel(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SemanticModelOptions)"
+        };
+        foreach (var id in exactRequired)
+        {
+            Assert.That(ids, Does.Contain(id), id);
         }
     }
 
