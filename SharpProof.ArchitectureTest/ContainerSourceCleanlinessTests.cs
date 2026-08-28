@@ -119,6 +119,48 @@ public sealed class ContainerSourceCleanlinessTests
     }
 
     [Test]
+    public async Task ExactCommitCommandDoesNotOverlayIgnoredSourceFiles()
+    {
+        var repository = await CreateRepositoryAsync();
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, ".gitignore"),
+                "Project/IgnoredCompileBreak.cs\n" +
+                "nupkgs/\n");
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "scripts", "Invoke-SharpProofContainer.ps1"),
+                "[CmdletBinding()]\n" +
+                "param([Parameter(Mandatory = $true)][string]$Command)\n" +
+                "if (Test-Path -LiteralPath 'Project/IgnoredCompileBreak.cs') { Write-Error 'ignored source was overlaid'; exit 91 }\n" +
+                "Write-Output ('ignored-absent:' + (-not (Test-Path -LiteralPath 'Project/IgnoredCompileBreak.cs')))\n" +
+                "Write-Output ('package-present:' + (Test-Path -LiteralPath 'nupkgs/allowed.nupkg'))\n");
+            await RequireSuccessAsync(repository, "git", "add", "--", ".gitignore", "scripts/Invoke-SharpProofContainer.ps1");
+            await RequireSuccessAsync(repository, "git", "commit", "--quiet", "-m", "fixture allowlist");
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "Project", "IgnoredCompileBreak.cs"),
+                "#error ignored source must not be compiled\n");
+            Directory.CreateDirectory(Path.Combine(repository, "nupkgs"));
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "nupkgs", "allowed.nupkg"),
+                "package\n");
+
+            var result = await RunEntrypointAsync(repository, "pack");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Zero, result.Error);
+                Assert.That(result.Output, Does.Contain("ignored-absent:True"));
+                Assert.That(result.Output, Does.Contain("package-present:True"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(repository, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task GitBoundCommandAcceptsRepositoryWithDifferentOwner()
     {
         var repository = await CreateRepositoryAsync();
@@ -415,6 +457,12 @@ public sealed class ContainerSourceCleanlinessTests
             "--quiet",
             "-m",
             "fixture");
+        await RequireSuccessAsync(
+            repository,
+            "chmod",
+            "-R",
+            "a+rwX",
+            ".");
         return repository;
     }
 

@@ -175,16 +175,26 @@ case "${command_name}" in
       done < "${deleted_file}"
       rm -f -- "${deleted_file}"
     fi
-    tar \
-      --exclude='./artifacts' \
-      --exclude='./.git' \
-      --exclude='*/bin' \
-      --exclude='*/bin/*' \
-      --exclude='*/obj' \
-      --exclude='*/obj/*' \
-      --exclude='./.vs' \
-      --exclude='./.baseline-check' \
-      -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
+    if requires_clean_exact_commit_source "${command_name}"; then
+      # Exact-commit commands run from the detached Git tree above. Only the
+      # explicitly supported package-input directory may be overlaid; using a
+      # whole-worktree tar here would reintroduce ignored source files.
+      if [[ -d "${repo_root}/nupkgs" ]]; then
+        tar -C "${repo_root}" -cf - nupkgs |
+          tar -C "${task_root}" -xf -
+      fi
+    else
+      tar \
+        --exclude='./artifacts' \
+        --exclude='./.git' \
+        --exclude='*/bin' \
+        --exclude='*/bin/*' \
+        --exclude='*/obj' \
+        --exclude='*/obj/*' \
+        --exclude='./.vs' \
+        --exclude='./.baseline-check' \
+        -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
+    fi
     ln -s "${repo_root}/artifacts" "${task_root}/artifacts"
     if [[ "${source_has_git}" = "true" ]] &&
       [[ -d "${task_root}/.git" ]]; then
