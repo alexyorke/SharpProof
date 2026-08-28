@@ -2619,48 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 549. [CONFIRMED] Definitely nonnull conditional property access remains unreplayable
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
-188-208 and HasReplayableAccessorEvaluation around lines 483-492;
-SharpProof.Effects/ManagedAbstractFlow.cs, completion facts around lines
-1842-1917; early Unknown in RequiresCallSiteAnalyzer.cs around lines 339-342.
-
-**Description**: For `receiver?.Value`, the accessor candidate instance is an
-IConditionalAccessInstanceOperation placeholder, not the source receiver.
-CompletesNormally does not recognize that placeholder, so replay is disabled
-before flow can prove the outer receiver nonnull. This occurs even for a fresh
-object or an explicit preceding `receiver != null` guard.
-
-**Reproduction**, all with zero compiler diagnostics and getter
-`Contract.Requires(false)`:
-
-    direct receiver.Value:       one get_Value SP0027
-    unknown nullable receiver:   zero (fail-closed control)
-    definitely null receiver:    zero (getter not executed)
-    new Subject()?.Value:        zero (expected one)
-    guarded subject?.Value:      zero (expected one)
-
-**Impact**: Common guarded nullable code can hide an unconditional getter
-precondition violation; changing only `.` to `?.` changes coverage after
-nonnullness is already proven.
-
-**Root cause**: Replay checks the conditional branch placeholder in isolation
-instead of the outer receiver and pre-split flow state.
-
-**Recommended fix**: Resolve the enclosing IConditionalAccessOperation and prove
-its outer receiver completes and is definitely nonnull at conditional-access
-entry. Only then canonicalize/mark the accessor as definitely executing. Keep
-unknown, null, and non-completing receivers fail-closed; do not use WhenNotNull
-state alone.
-
-**Regression coverage**: Direct, fresh, and branch-refined receivers each report
-exactly one; unknown/null receivers do not. Add a non-completing receiver and
-conditional method-call follow-up only after its semantics are verified.
-
-**Confidence**: High; two independent nonnull forms are missed while direct,
-unknown, and null controls behave as predicted by the placeholder gate.
-
 ### 551. [CONFIRMED] Valid closed attributes on ContractFor companion members are silently discarded
 
 **Location**: SharpProof.Contracts/ContractBinder.cs around lines 154 and
