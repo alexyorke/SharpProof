@@ -2551,43 +2551,6 @@ with matching identities. Retain normal checkout and archive controls.
 **Confidence**: High; exact entrypoint execution against the real worktree mount
 failed solely on its translated Git pointer.
 
-### 540. [CONFIRMED] Direct field loads bypass the supported value-domain gate
-
-**Location**: SharpProof.Frontend/RoslynProgramLowerer.cs around lines 242-255
-and 359-362; unsupported scalar mapping in RoslynOperationLowerer.cs around lines
-101-110; domain authority in CompilerIdentityBridge.cs around lines 97-118.
-
-**Description**: Program lowering special-cases field/array loads, constructs a
-location, emits Load, and returns without Observe or supported-value checking.
-An unsupported scalar field such as double is mapped to IR Reference and the
-whole program is marked Exact.
-
-**Reproduction**: `static double Value; static double Target() => Value;`
-produced:
-
-    expression-exact=False reason=UnsupportedOperationKind
-    program-exact=True program-abstentions=0
-    instructions=Goto,Load,Return,Return
-    field-special-type=System_Double load-ir-type=Reference
-
-**Impact**: The closed Frontend subset is bypassed and downstream consumers
-receive an Exact program with invalid reference/value-domain assumptions.
-
-**Root cause**: Successful location construction is conflated with support for
-the value loaded from that location.
-
-**Recommended fix**: Gate loaded value.Type through IsSupportedValueDomain.
-For unsupported values, preserve receiver/index evaluation, record UnsupportedType,
-and return havoc/opaque rather than an exact load. Keep supported bool/integer/
-reference loads unchanged.
-
-**Regression coverage**: Static-double return must be non-exact with
-UnsupportedType and no accepted reference-typed exact load; supported long field
-remains exact. Add unsupported instance/array element controls.
-
-**Confidence**: High; expression lowering rejected the same double that program
-lowering emitted as an exact Reference.
-
 ### 541. [CONFIRMED] Changed-test planning omits newly added untracked test projects
 
 **Location**: scripts/Invoke-SharpProofChangedTests.ps1 around line 77.
