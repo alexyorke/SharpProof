@@ -51,6 +51,51 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task CompletingLockAndTryPrefixesRetainConcreteRefutations()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Direct() => Positive(-1);
+
+                public static void AfterLock() {
+                    lock (new object()) { }
+                    Positive(-2);
+                }
+
+            public static void AfterTry() {
+                try { }
+                finally { }
+                Positive(-3);
+            }
+
+            public static void AfterNullLock() {
+                lock ((object)null!) { }
+                Positive(-4);
+            }
+
+            public static void AfterThrowingTry() {
+                try { throw new System.InvalidOperationException(); }
+                finally { }
+                Positive(-5);
+            }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027", "SP0027"]));
+    }
+
+    [Test]
     public async Task ParenthesizedDirectCallsReplayPreconditionsInEveryOwnedShape()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

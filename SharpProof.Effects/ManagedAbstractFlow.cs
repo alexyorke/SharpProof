@@ -1869,6 +1869,19 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 CompletesPropertyGetNormally(property),
             IEventAssignmentOperation eventAssignment =>
                 CompletesEventAssignmentNormally(eventAssignment),
+            ILockOperation @lock =>
+                CompletesNormally(@lock.LockedValue) &&
+                !IsDefinitelyNull(@lock.LockedValue) &&
+                CompletesNormally(@lock.Body),
+            ITryOperation @try =>
+                CompletesNormally(@try.Body) &&
+                @try.Catches.All(CompletesNormally) &&
+                (@try.Finally == null ||
+                 CompletesNormally(@try.Finally)),
+            ICatchClauseOperation catchClause =>
+                (catchClause.Filter == null ||
+                 CompletesNormally(catchClause.Filter)) &&
+                CompletesNormally(catchClause.Handler),
             ISimpleAssignmentOperation assignment =>
                 assignment.Target switch
                 {
@@ -2185,8 +2198,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 ISimpleAssignmentOperation or IArrayElementReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
-                operation is not IConversionOperation conversion ||
-                !IsProvenFailingConversion(conversion) &&
+                (operation is not IConversionOperation conversion ||
+                !IsProvenFailingConversion(conversion)) &&
                 ChildrenMayCompleteNormally(operation),
             IFieldReferenceOperation field =>
                 ChildrenMayCompleteNormally(field) &&
