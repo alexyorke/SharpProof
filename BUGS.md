@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 514. [CONFIRMED] Collection-initializer Add calls are found but marked unreplayable
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
-188-208, 425-471, and 538-575; early Unknown mapping in
-RequiresCallSiteAnalyzer.cs around lines 339-342.
-
-**Description**: Roslyn exposes collection-initializer Add as an implicit
-IInvocationOperation and discovery finds it with complete flow state. Candidate
-replayability nevertheless requires the call syntax span to equal the whole
-expression body or top-level statement expression. The hidden Add invocation's
-syntax is only the collection element, nested under object creation, so exact-
-span validation fails and analysis returns Unknown before evaluating Requires.
-
-**Reproduction**: `new Bag { -1 }` uses Bag.Add(int) with
-`Contract.Requires(value > 0)`. Probe output:
-
-    OP/CFG Invocation implicit=True syntax=-1 target=Bag.Add(int)
-    FLOW implicit-add-has-state=True
-    CANDIDATE can-replay=False flow=Complete
-    SP0027 emitted only for explicit bag.Add(-1) control
-    runtime generated=1 explicit=1
-
-Compiler errors and other analyzer diagnostics were zero.
-
-**Impact**: A deterministic hidden Add precondition violation is silently
-missed with no SP0047 fallback, while the equivalent explicit call is reported.
-
-**Root cause**: Replay-prefix logic recognizes only top-level source spans and
-has no collection-initializer evaluation-order model.
-
-**Recommended fix**: Add collection-initializer-aware prefix replayability.
-Walk the owning initializer/object creation in language order and require
-constructor/arguments, all prior elements, receiver, and current arguments to
-complete before admitting the candidate. Reuse DefiniteOperationFacts; do not
-blanket-admit nested invocations.
-
-**Regression coverage**: Invalid Add under collection initializer must emit one
-SP0027 at the element, matching direct call. Cover valid elements, throwing
-constructor/argument, non-completing prior Add, and multiple completing elements
-in left-to-right order.
-
-**Confidence**: High; operation, CFG, flow, candidate, analyzer, and runtime
-probes all isolate the exact false replayability decision.
-
 ### 515. [CONFIRMED] Release regular-file validation accepts FIFOs and hashing can hang
 
 **Location**: scripts/SharpProof.ReleaseChecksums.ps1,

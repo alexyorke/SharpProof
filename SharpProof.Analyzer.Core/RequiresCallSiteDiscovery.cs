@@ -933,13 +933,22 @@ internal sealed partial class RequiresCallSiteDiscovery(
             ExpressionStatementSyntax expression =>
                 IsOwnedCallSiteExpression(
                     expression.Expression,
-                    callSite.Syntax),
+                    callSite.Syntax) ||
+                IsCollectionInitializerCall(
+                    expression.Expression,
+                    callSite,
+                    operationFacts),
             LocalDeclarationStatementSyntax local =>
                 local.Declaration.Variables.Count == 1 &&
                 IsOwnedCallSiteExpression(
                     local.Declaration.Variables[0]
                         .Initializer?.Value,
-                    callSite.Syntax),
+                    callSite.Syntax) ||
+                local.Declaration.Variables.Count == 1 &&
+                IsCollectionInitializerCall(
+                    local.Declaration.Variables[0].Initializer?.Value,
+                    callSite,
+                    operationFacts),
             ReturnStatementSyntax returned =>
                 IsOwnedCallSiteExpression(
                     returned.Expression,
@@ -950,6 +959,53 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     callSite.Syntax),
             _ => false
         };
+    }
+
+    private bool IsCollectionInitializerCall(
+        ExpressionSyntax? statementExpression,
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        if (statementExpression == null ||
+            callSite is not IInvocationOperation { IsImplicit: true } ||
+            callSite.Syntax.AncestorsAndSelf()
+                .OfType<InitializerExpressionSyntax>()
+                .FirstOrDefault(initializer => initializer.IsKind(
+                    SyntaxKind.CollectionInitializerExpression)) is not
+                { } initializer ||
+            !statementExpression.Span.Contains(initializer.Span))
+        {
+            return false;
+        }
+
+        for (var index = 0; index < initializer.Expressions.Count; index++)
+        {
+            var element = initializer.Expressions[index];
+            if (!element.Span.Contains(callSite.Syntax.Span))
+            {
+                continue;
+            }
+
+            for (var prior = 0; prior < index; prior++)
+            {
+                var operation = semanticModel.GetOperation(
+                    initializer.Expressions[prior],
+                    cancellationToken);
+                if (operation == null ||
+                    !operationFacts.CompletesNormally(operation))
+                {
+                    return false;
+                }
+            }
+
+            var construction = semanticModel.GetOperation(
+                statementExpression,
+                cancellationToken);
+            return construction != null &&
+                operationFacts.CompletesNormally(construction);
+        }
+
+        return false;
     }
 
     private static bool IsOwnedCallSiteExpression(

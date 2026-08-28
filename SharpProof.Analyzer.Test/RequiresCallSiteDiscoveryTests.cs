@@ -1402,6 +1402,48 @@ public sealed class RequiresCallSiteDiscoveryTests
         Assert.That(setter.CanReplay, Is.True);
     }
 
+    [Test]
+    public void CollectionInitializerAddProducesReplayableCandidate()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System.Collections;
+            using System.Collections.Generic;
+            using SharpProof.Attributes;
+            public sealed class Bag : IEnumerable<int> {
+                public void Add(int value) {
+                    Contract.Requires(value > 0);
+                }
+                public IEnumerator<int> GetEnumerator() =>
+                    ((IEnumerable<int>)Array.Empty<int>()).GetEnumerator();
+                IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            }
+            public static class Subject {
+                public static void Run() {
+                    var bag = new Bag { 1 };
+                }
+            }
+            """,
+            []);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(method => method.Identifier.ValueText == "Run");
+        var caller = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                model,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        var add = candidates!.Value.Single(candidate =>
+            candidate.TargetMethod.Name == "Add");
+        Assert.That(add.CanReplay, Is.True);
+    }
+
     private static IMethodSymbol GetMethod(
         Compilation compilation,
         string typeName,
