@@ -267,54 +267,6 @@ unsafe cache property target and retain a fully cacheable tuple control.
 **Confidence**: High; self-verified in a canonical exact-source probe with
 positive inline and negative alias/factory controls.
 
-### 444. [CONFIRMED] Strict protocol deserialization parses every document twice
-
-**Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around
-lines 27-35 and SharpProof.Worker.Protocol/ProtocolJson.cs around
-lines 1029-1033.
-
-**Description**: Strict deserialization first parses the entire input into a
-JsonDocument to validate property order, duplicates, token kinds, enums, and
-depth. It disposes that document, then JsonSerializer.Deserialize<T> reparses
-the same full string to materialize the model. This is separate from the
-fixed-size file-read allocation: even an exactly sized input pays for two full
-JSON parses.
-
-**Reproduction**: A protocol-valid request with a 4 MiB nullable
-cache-directory value measured:
-
-    JsonUtf8Bytes         = 4,194,731
-    DirectFirstAllocated  = 67,140,936
-    StrictSecondAllocated = 83,922,360
-    StrictExtraBytes      = 16,781,424
-
-An 8 MiB run allocated 167,817,008 bytes strictly versus 134,240,696 bytes
-directly, an extra 33,576,312 bytes. The strict pre-pass adds approximately
-four allocated bytes per input byte.
-
-**Impact**: A valid document near the 16 MiB limit incurs roughly another
-64 MiB solely for a discarded validation DOM, in addition to file decoding,
-model creation, and the actual deserialization. Worker, launcher, and
-publication validation all use these APIs, increasing GC, timing, and memory
-failure risk.
-
-**Root cause**: Shape validation and model materialization own separate parses
-instead of sharing one parsed representation.
-
-**Recommended fix**: Parse once, validate document.RootElement, and deserialize
-from that same JsonElement while the document remains alive with
-RootElement.Deserialize<T>(options). A single streaming Utf8JsonReader path is
-an alternative, but DOM reuse is the smallest change. Preserve every strict
-duplicate, ordering, token-kind, enum, and depth check.
-
-**Regression coverage**: Add a warmed allocation regression with a large
-sub-limit valid request. Compare strict allocation with deserialization from an
-already parsed root and permit only a small fixed margin. Retain all strict
-shape rejection and canonical round-trip tests.
-
-**Confidence**: High; self-verified with 4 MiB and 8 MiB valid inputs and
-linear allocation measurements.
-
 ### 445. [CONFIRMED] Strict verification silently succeeds for non-C# projects
 
 **Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
