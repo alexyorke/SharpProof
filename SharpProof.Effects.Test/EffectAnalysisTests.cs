@@ -8124,6 +8124,53 @@ public sealed class EffectAnalysisTests
         }
     }
 
+    [Test]
+    public void EventHandlerFactoryRunsBeforeNullReceiverFailure()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global
+            {
+                public static int State;
+            }
+
+            public sealed class EventTarget
+            {
+                public event Action Changed { add { } remove { } }
+            }
+
+            public static class Sample
+            {
+                private static void Handler() { }
+
+                private static Action MakeHandler()
+                {
+                    Global.State = 1729;
+                    return Handler;
+                }
+
+                public static void Add()
+                {
+                    EventTarget target = null!;
+                    target.Changed += MakeHandler();
+                }
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            EffectTestHost.RequireMethod(compilation, "Sample", "Add"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            AssertContainsThrows(result.Summary, "System.NullReferenceException");
+            Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
     private static EffectMethodResult Analyze(
         string source,
         string typeMetadataName,

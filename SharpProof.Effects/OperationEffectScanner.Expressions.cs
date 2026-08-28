@@ -152,18 +152,21 @@ internal sealed partial class OperationEffectScanner
             return result.Summary;
         }
 
+        // C# evaluates the handler expression before dereferencing the event
+        // receiver. Preserve effects from a handler factory even when the
+        // receiver is definitely null and the accessor cannot be reached.
+        result = result.Then(ScanStep(eventAssignment.HandlerValue));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
         var receiverCheck = new EffectStep(
             PotentialNullReceiver(reference.Instance, eventAssignment),
             !_nullnessEvaluator.IsProvenNull(
                 reference.Instance,
                 eventAssignment));
         result = result.Then(receiverCheck);
-        if (!result.CompletesNormally)
-        {
-            return result.Summary;
-        }
-
-        result = result.Then(ScanStep(eventAssignment.HandlerValue));
         if (!result.CompletesNormally)
         {
             return result.Summary;
