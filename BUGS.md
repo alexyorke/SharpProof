@@ -3054,27 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 640. [CONFIRMED] Finite-domain SMT outcome coverage is collapsed and discarded
-
-**Location**: `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs`, around lines
-15-20; `FuzzRunner.cs`, around lines 82-110, 207-220, and 354-365.
-
-**Description**: Each finite-domain result contains expected outcome, actual
-outcome, and assumption count, but the campaign retains only an aggregate
-agreement count. Passing evidence cannot prove that SAT, UNSAT, or nonempty
-finite-domain assumptions were exercised.
-
-**Reproduction**: A one-case seed produced a constant-false UNSAT formula with
-zero assumptions. The campaign still returned `SmtAgreements=1 Passed=True` and
-serialized no outcome/assumption coverage.
-
-**Impact**: The SMT campaign can certify a degenerate generator that exercises
-only one outcome or no finite-domain constraints.
-
-**Recommended fix**: Aggregate and serialize SAT/UNSAT/assumption counts, check
-their exact sum, and require both outcomes plus nonzero assumptions where this
-coverage is claimed. Add deterministic seed and malformed-summary tests.
-
 ### 641. [CONFIRMED] Function-pointer overloads collide in compiler identity
 
 **Location**: `SharpProof.Frontend/CompilerIdentityBridge.cs`, around lines
