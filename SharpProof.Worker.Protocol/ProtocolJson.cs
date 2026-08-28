@@ -1056,8 +1056,8 @@ public static partial class WorkerProtocolJson
     private static T? Deserialize<T>(string json, IEnumerable<string> requiredProperties)
     {
         _ = requiredProperties;
-        EnsureJsonShape(json, typeof(T).Name);
-        return JsonSerializer.Deserialize<T>(json, s_options);
+        using var document = ParseAndEnsureJsonShape(json, typeof(T).Name);
+        return document.RootElement.Deserialize<T>(s_options);
     }
     private static int FindClaimOrdinal(WorkerClaimManifest? manifest, string? id)
     {

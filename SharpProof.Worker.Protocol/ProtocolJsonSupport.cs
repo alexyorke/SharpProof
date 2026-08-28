@@ -24,27 +24,36 @@ internal sealed class WorkerProtocolJsonObjectShape(
 
 public static partial class WorkerProtocolJson
 {
-    private static void EnsureJsonShape(
+    private static JsonDocument ParseAndEnsureJsonShape(
         string json,
         string rootType)
     {
         json = json ?? throw new ArgumentNullException(nameof(json));
 
-        using var document = JsonDocument.Parse(
+        var document = JsonDocument.Parse(
             json,
             new JsonDocumentOptions { MaxDepth = MaximumJsonDepth });
-        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        try
         {
-            throw new JsonException("A JSON object is required.");
-        }
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new JsonException("A JSON object is required.");
+            }
 
-        if (!WorkerProtocolMetadata.JsonObjectShapes.TryGetValue(
-                rootType,
-                out var shape))
-        {
-            throw new JsonException("The JSON root type is not declared.");
+            if (!WorkerProtocolMetadata.JsonObjectShapes.TryGetValue(
+                    rootType,
+                    out var shape))
+            {
+                throw new JsonException("The JSON root type is not declared.");
+            }
+            EnsureObjectShape(document.RootElement, shape);
+            return document;
         }
-        EnsureObjectShape(document.RootElement, shape);
+        catch
+        {
+            document.Dispose();
+            throw;
+        }
     }
 
     private static void EnsureObjectShape(
