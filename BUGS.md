@@ -652,42 +652,6 @@ Cover finite-SMT Unknown and partial-backend unrecognized paths.
 **Confidence**: High; self-verified through focused canonical tests and exact
 result-retention flow.
 
-### 477. [CONFIRMED] Generated enum-array uniqueness validation allocates on every call
-
-**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 874-879
-and generated calls in
-SharpProof.Worker.Protocol/ProtocolModel.generated.cs around lines 845-850.
-
-**Description**: AreDefinedUnique<T> uses a captured All predicate followed by
-Distinct().Count(). This creates closure/LINQ/iterator/hash-set allocations on
-every call and performs two passes. Generated callable validation invokes it
-twice for SelectedFeatures and SelectionReasons.
-
-**Reproduction**:
-
-    100,000 valid two-value checks = 40,000,000 bytes allocated
-    50,000 checks = 20,000,000 bytes allocated
-
-After subtracting the separately reported enum-boxing cost, this pipeline adds
-352 bytes per call. An explicit uniqueness comparison control allocates zero.
-
-**Impact**: Every valid callable pays twice; large manifests create tens of MiB
-of avoidable Gen0 churn. Invalid duplicate arrays are fully scanned before
-rejection.
-
-**Root cause**: General-purpose LINQ is used for tiny generated enum sets.
-
-**Recommended fix**: Replace with one explicit early-exit loop or generated
-bitmask checks that validate definition and uniqueness together. After the
-IsKnown boxing fix this path should be allocation-free.
-
-**Regression coverage**: Cover null/empty, required-nonempty, Unspecified,
-unknown, duplicate, and valid arrays, then require near-zero allocation for
-100,000 warmed two-value checks.
-
-**Confidence**: High; exact linear measurements and a zero-allocation control
-were self-verified.
-
 ### 478. [CONFIRMED] Abrupt launcher termination strands worker-runtime snapshots in /tmp
 
 **Location**: SharpProof.Worker.Launcher/Program.cs around lines 57 and
