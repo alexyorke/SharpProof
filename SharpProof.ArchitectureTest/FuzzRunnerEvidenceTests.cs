@@ -125,6 +125,31 @@ public sealed class FuzzRunnerEvidenceTests
     }
 
     [Test]
+    public void ProtocolResultSetsUseLinearIdentityChecks()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "SharpProof.Worker.Protocol",
+            "ProtocolJson.cs"));
+        var start = source.IndexOf(
+            "private static T[] ValidateResultSet",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "private static bool CompleteUnique",
+            start,
+            StringComparison.Ordinal);
+        var section = start >= 0 && end > start
+            ? source[start..end]
+            : string.Empty;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(section, Does.Contain("HashSet<string?>"));
+            Assert.That(section, Does.Not.Contain(".OrderBy("));
+        }
+    }
+
+    [Test]
     public void FuzzCoverageThresholdIsSynchronizedAcrossAuthorities()
     {
         var root = RepositoryRoot();

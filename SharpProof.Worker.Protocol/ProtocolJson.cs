@@ -985,21 +985,47 @@ public static partial class WorkerProtocolJson
         Validator errors) where T : class
     {
         var present = Present(values, collectionCode, errors);
-        ValidateUniqueIds(present.Select(identity), identityCode, errors);
-        ValidateExactIds(present.Select(identity), expectedIds, setCode, errors);
+        var expected = expectedIds.ToArray();
+        var expectedSet = new HashSet<string?>(expected, s_ordinal);
+        var actualSet = new HashSet<string?>(s_ordinal);
+        var unique = true;
+        var exact = expected.Length == expectedSet.Count &&
+            present.Length == expected.Length;
+        foreach (var value in present.Select(identity))
+        {
+            if (string.IsNullOrWhiteSpace(value) || !actualSet.Add(value))
+            {
+                unique = false;
+            }
+
+            if (!expectedSet.Contains(value))
+            {
+                exact = false;
+            }
+        }
+
+        exact &= actualSet.Count == expectedSet.Count;
+        errors.Check(unique, identityCode)
+            .Check(exact, setCode);
         return present;
     }
-    private static void ValidateUniqueIds(IEnumerable<string?> values, string code, Validator errors)
+
+    private static void ValidateUniqueIds(
+        IEnumerable<string?> values,
+        string code,
+        Validator errors)
     {
-        var items = values.ToArray();
-        errors.Check(items.All(static value => !string.IsNullOrWhiteSpace(value)) &&
-            items.Distinct(s_ordinal).Count() == items.Length, code);
-    }
-    private static void ValidateExactIds(IEnumerable<string?> actual, IEnumerable<string?> expected, string code, Validator errors)
-    {
-        errors.Check(actual.OrderBy(static value => value, s_ordinal)
-            .SequenceEqual(expected.OrderBy(static value => value, s_ordinal),
-                s_ordinal), code);
+        var seen = new HashSet<string?>(s_ordinal);
+        var unique = true;
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value) || !seen.Add(value))
+            {
+                unique = false;
+            }
+        }
+
+        errors.Check(unique, code);
     }
 
     private static bool CompleteUnique<T>(T[]? values, Func<T, bool> complete, Func<T, string?> key) where T : class
