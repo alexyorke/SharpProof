@@ -1066,6 +1066,43 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task DirectSharpProofVerifyCompilesBeforeVerification()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var originalManifest = await File.ReadAllBytesAsync(
+            project.CompilerManifestPath);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(project.Root, "Subject.cs"),
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Ensures(Contract.Result<long>() > value);
+                    return value;
+                }
+            }
+            """,
+            new System.Text.UTF8Encoding(false));
+
+        var direct = await project.RunPublicVerificationTargetAsync();
+
+        Assert.That(direct.ExitCode, Is.Not.Zero, direct.Output);
+        Assert.That(direct.Output, Does.Contain("failed with exit code 5"));
+        Assert.That(
+            await File.ReadAllBytesAsync(project.CompilerManifestPath),
+            Is.Not.EqualTo(originalManifest));
+        var response = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        Assert.That(
+            response.ClaimResults.Single().Outcome,
+            Is.EqualTo(WorkerClaimOutcome.Refuted));
+    }
+
+    [Test]
     public async Task PrepublicationFailuresInvalidatePriorStableResult()
     {
         RequireContainerWorker();
@@ -3280,6 +3317,11 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static target =>
                 target.Attribute("Name")?.Value ==
                 "_SharpProofVerifyCore");
+        var publicVerify = targets
+            .Descendants("Target")
+            .Single(static target =>
+                target.Attribute("Name")?.Value ==
+                "SharpProofVerify");
         var cleanup = targets
             .Descendants("Target")
             .Single(static target =>
@@ -3341,6 +3383,11 @@ public sealed class WorkerMsBuildIntegrationTests
                     .Split(';', StringSplitOptions.RemoveEmptyEntries),
                 Does.Contain(
                     "GenerateMSBuildEditorConfigFileShouldRun"));
+            Assert.That(
+                publicVerify.Attribute("DependsOnTargets")?.Value
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries),
+                Does.Contain("CoreCompile"),
+                "Direct SharpProofVerify must compile the current project first.");
             Assert.That(
                 initialize.Descendants(
                     "_SharpProofCompilerManifestPath"),
@@ -4381,6 +4428,34 @@ public sealed class WorkerMsBuildIntegrationTests
                         "SharpProof",
                         "cache"),
                 "-p:_SharpProofInvocationId=" + invocationId
+            };
+            arguments.AddRange(properties.Select(static property =>
+                "-p:" + property.Name + "=" + property.Value));
+            return RunDotNetAsync(arguments);
+        }
+
+        internal Task<BuildResult> RunPublicVerificationTargetAsync(
+            params (string Name, string Value)[] properties)
+        {
+            var arguments = new List<string> {
+                "msbuild",
+                ProjectPath,
+                "/t:SharpProofVerify",
+                "/nologo",
+                "/nodeReuse:false",
+                "-p:Configuration=Release",
+                "-p:TargetFramework=net8.0",
+                "-p:SharpProofVerify=true",
+                "-p:SharpProofVerifyRequestFile=" + RequestPath,
+                "-p:SharpProofVerifyResultFile=" + ResultPath,
+                "-p:SharpProofVerifyCacheDirectory=" +
+                    Path.Combine(
+                        _root,
+                        "obj",
+                        "Release",
+                        "net8.0",
+                        "SharpProof",
+                        "cache")
             };
             arguments.AddRange(properties.Select(static property =>
                 "-p:" + property.Name + "=" + property.Value));

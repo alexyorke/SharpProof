@@ -326,7 +326,7 @@
 
   <Target Name="SharpProofVerify"
           AfterTargets="CoreCompile"
-          DependsOnTargets="_SharpProofInitializeVerify;_SharpProofVerifyCore"
+          DependsOnTargets="CoreCompile;_SharpProofInitializeVerify;_SharpProofVerifyCore"
           Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
     <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
   </Target>
