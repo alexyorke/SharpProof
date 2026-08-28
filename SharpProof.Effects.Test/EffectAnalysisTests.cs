@@ -2275,6 +2275,41 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ConstrainedGenericThrowsReachMatchingHandlers()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class Global {
+                public static int State;
+            }
+
+            public static class Sample {
+                public static void Probe<TException>(TException error)
+                    where TException : Exception
+                {
+                    try {
+                        throw error;
+                    }
+                    catch (Exception) {
+                        Global.State++;
+                    }
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Probe"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.Contains(EffectRegionId.Static()), Is.True);
+            Assert.That(result.Summary.Throws.IsEmpty, Is.True);
+        }
+    }
+
+    [Test]
     public void StaticMethodsAccountForImplicitAndGenericTypeInitialization()
     {
         var compilation = EffectTestHost.CreateCompilation(

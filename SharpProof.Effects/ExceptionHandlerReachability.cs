@@ -216,6 +216,17 @@ internal sealed class ExceptionHandlerReachability(
                             Unknown: false),
                         thrown);
                 }
+                else if (operandCompletes)
+                {
+                    // A throw expression may have a type parameter (for
+                    // example, TException where TException : Exception) or
+                    // another non-named type.  It still always reaches a
+                    // compatible catch when evaluation completes; dropping
+                    // it would make handler effects disappear from the
+                    // summary.  Keep the exception type unknown so the
+                    // reachability analysis remains conservative.
+                    Add(UnknownPotential, thrown);
+                }
                 continue;
             }
             if (operation is IInvocationOperation invocation)

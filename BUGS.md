@@ -203,60 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 492. [CONFIRMED] Constrained exception type-parameter throws disappear from handler reachability
-
-**Location**: SharpProof.Effects/ExceptionHandlerReachability.cs, the
-IThrowOperation branch around lines 174-204; related throw classification in
-SharpProof.Effects/EffectAnalysisSession.cs around line 251.
-
-**Description**: Catch reachability adds a potential thrown exception only when
-the unwrapped throw operand type is an INamedTypeSymbol. A type parameter such
-as `TException where TException : Exception` is an ITypeParameterSymbol, so the
-throw contributes no potential exception and a matching catch body is skipped.
-Separately, the escaping-throw analysis records an unknown throw and the
-catch-all removes it, producing no escaping throw and no handler effects.
-
-**Reproduction**:
-
-    static int s_state;
-    static void Probe<TException>(TException error)
-        where TException : Exception
-    {
-        try { throw error; }
-        catch (Exception) { s_state++; }
-    }
-
-Runtime always reaches the catch, including null (which throws
-NullReferenceException). Baseline analysis reported:
-
-    Writes.IsUnknown = false
-    Writes = []
-    Throws = []
-    Completeness = Incomplete
-    Termination = Terminates
-    Uncertainty = None
-
-**Impact**: A reachable catch's writes and other effects vanish from the summary
-without making Writes unknown. Consumers can observe an exact empty write set
-for code that deterministically mutates static state.
-
-**Root cause**: The reachability inventory silently drops non-named operand
-types instead of adding an unknown potential exception or resolving effective
-exception constraints.
-
-**Recommended fix**: Minimally add UnknownPotential whenever a completing throw
-operand has no named type. For precision, resolve exception-class constraints in
-both reachability and ResolveThrownException so `TException : Exception` is
-known to match catch(Exception).
-
-**Regression coverage**: The generic example must retain the exact static write
-and no escaping throw. Cover nonnull and null runtime controls, nested/multiple
-constraints, an unconstrained invalid-source control, and the existing
-definitely-null thrown-expression test.
-
-**Confidence**: High; a temporary minimal conservative fix restored the write
-while retaining incompleteness, and the existing null test remained green.
-
 ### 493. [CONFIRMED] Pattern-based foreach omits the hidden GetEnumerator precondition call
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
