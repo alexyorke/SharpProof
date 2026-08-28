@@ -19,6 +19,8 @@ public sealed class PublicationPlanTopologyTests
     [TestCase("symlink-alias", false)]
     [TestCase("hardlink-alias", false)]
     [TestCase("reserved-name", false)]
+    [TestCase("package-subdirectory", false)]
+    [TestCase("fixture-subdirectory", false)]
     [TestCase("writer-failure", false)]
     [TestCase("post-write-mutation", false)]
     public async Task PlanOutputCannotAliasOrInvalidateCertifiedInputs(

@@ -98,6 +98,21 @@ function Assert-SharpProofPublicationPlanTopology {
     if ($reserved -ccontains [IO.Path]::GetFileName($OutputPath)) {
         throw 'PlanOutputPath uses a reserved release-evidence filename.'
     }
+    foreach ($root in @(
+            [string]$InputSnapshot.packageSource,
+            [string]$InputSnapshot.fixtureDirectory) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) {
+        $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd(
+            [IO.Path]::DirectorySeparatorChar,
+            [IO.Path]::AltDirectorySeparatorChar)
+        $rootPrefix = $canonicalRoot + [IO.Path]::DirectorySeparatorChar
+        if ([string]::Equals($OutputPath, $canonicalRoot,
+                [StringComparison]::Ordinal) -or
+            $OutputPath.StartsWith($rootPrefix,
+                [StringComparison]::Ordinal)) {
+            throw 'PlanOutputPath must be outside certified publication input trees.'
+        }
+    }
     $outputIdentity = if (Test-Path -LiteralPath $OutputPath) {
         Get-SharpProofPublicationPlanFileIdentity -Path $OutputPath
     }

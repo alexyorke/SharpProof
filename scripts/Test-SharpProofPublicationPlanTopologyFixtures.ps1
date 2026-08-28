@@ -5,6 +5,7 @@ param(
         'valid-disjoint','existing-output','main-package','symbol-package',
         'manifest','sbom','checksums','fixture-input','relative-dot-alias',
         'absolute-alias','symlink-alias','hardlink-alias','reserved-name',
+        'package-subdirectory','fixture-subdirectory',
         'writer-failure','post-write-mutation')]
     [string]$Mutation
 )
@@ -21,6 +22,8 @@ try {
     [IO.Directory]::CreateDirectory($packages) | Out-Null
     [IO.Directory]::CreateDirectory($fixture) | Out-Null
     [IO.Directory]::CreateDirectory($outputRoot) | Out-Null
+    [IO.Directory]::CreateDirectory((Join-Path $packages 'plans')) | Out-Null
+    [IO.Directory]::CreateDirectory((Join-Path $fixture 'plans')) | Out-Null
     foreach ($name in @(
             'SharpProof.1.0.0-preview.1.nupkg',
             'SharpProof.1.0.0-preview.1.snupkg',
@@ -62,6 +65,12 @@ try {
             if ($LASTEXITCODE -ne 0) { throw 'Could not create hardlink fixture.' }
         }
         'reserved-name' { $planPath = Join-Path $outputRoot 'SharpProof.release.json' }
+        'package-subdirectory' {
+            $planPath = Join-Path $packages 'plans/publication-plan.json'
+        }
+        'fixture-subdirectory' {
+            $planPath = Join-Path $fixture 'plans/publication-plan.json'
+        }
     }
     $resolved = Resolve-SharpProofPublicationPlanOutput -Path $planPath
     $snapshot = New-SharpProofPublicationInputSnapshot `
