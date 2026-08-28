@@ -3054,29 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 656. [CONFIRMED] NoModeledNormalReturn proof is discarded at the query-budget boundary
-
-**Location**: `SharpProof.Worker/CallableVerifier.cs`, around lines 145-184,
-186-237, and 254-276.
-
-**Description**: After proving normal completion UNSAT, the verifier still
-requires a separate per-postcondition query reservation before applying the
-conclusive `NoModeledNormalReturn` vacuity result. Exhausting the budget after
-the completion proof downgrades it to Unknown.
-
-**Reproduction**: For an exact divide body with no modeled normal return, a
-200-unit budget made two queries then returned `Unknown/ResourceLimit`; 300 units
-made a redundant third query then returned `Proven/NoModeledNormalReturn` with
-core `body:normal-completion`.
-
-**Impact**: Completed proofs become strict verification failures and consume
-unnecessary SMT budget.
-
-**Recommended fix**: After clause substitution/domain validation, assemble
-aligned claims directly from the conclusive normal-completion proof without
-reserving another query. Test exact two-call tight budget, reachable-normal
-controls, multiple Ensures, and malformed clauses.
-
 ### 657. [CONFIRMED] Symbol validation accepts Source Link mappings covering no documents
 
 **Location**: `scripts/SharpProof.SymbolPackageValidator.cs`, around lines

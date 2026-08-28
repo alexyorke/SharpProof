@@ -677,6 +677,41 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task NoModeledNormalReturnDoesNotReserveEachPostconditionQuery()
+    {
+        var target = CreateDivisionTarget(
+            IrBinaryOperator.Equal,
+            postcondition: false);
+        var parameter = target.Variables.Single().Variable;
+        var backend = new ScriptedBackend(
+            BackendCheckResult.Satisfiable(
+                new BackendModel(
+                    ImmutableDictionary<IrVarId, IrValue>.Empty.Add(
+                        parameter,
+                        target.Factory.CreateIntegerValue(0)))),
+            BackendCheckResult.Unsatisfiable([1]));
+        var budget = new MethodResourceBudget(
+            null,
+            queryRlimit: 1,
+            methodRlimit: 2);
+
+        var result = (await new CallableVerifier(
+            backend,
+            WorkerBudgets.DefaultMaximumExpressionDepth).VerifyAsync(
+                target,
+                budget,
+                CancellationToken.None)).Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Vacuity, Is.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));
+            Assert.That(result.ProofCore, Does.Contain("body:normal-completion"));
+        }
+    }
+
+    [Test]
     public async Task NormalCompletionProofRequiresItsDedicatedEvidenceLabel()
     {
         var factory = new IrFactory();

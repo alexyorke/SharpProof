@@ -231,9 +231,9 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.UnsupportedExpression));
                 continue;
             }
-            if (condition is IrBooleanTerm { Value: true } &&
-                entryQueryRequired &&
-                normalCompletionUnknown == WorkerClaimReason.None)
+            if (normalCompletionUnknown == WorkerClaimReason.None &&
+                (noModeledNormalReturn ||
+                 condition is IrBooleanTerm { Value: true } && entryQueryRequired))
             {
                 var literalVacuity = entryFeasibility.IsContradictory
                     ? WorkerVacuityKind.ContradictoryPreconditions
