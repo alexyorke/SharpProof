@@ -110,6 +110,20 @@ public sealed class BoundaryEnforcementTests
     }
 
     [Test]
+    public void CanonicalContainerBuildsEnablePathIndependentArtifacts()
+    {
+        var root = RepositoryRoot();
+        var props = XDocument.Load(Path.Combine(root, "Directory.Build.props"));
+        var condition = props
+            .Descendants("ContinuousIntegrationBuild")
+            .Single()
+            .Attribute("Condition")?.Value;
+
+        Assert.That(condition, Does.Contain("$(SHARPPROOF_CONTAINER)"));
+        Assert.That(condition, Does.Contain("'1'"));
+    }
+
+    [Test]
     public void GeneratedProductionFilesAreExplicitlyApproved()
     {
         var root = RepositoryRoot();

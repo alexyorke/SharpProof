@@ -294,27 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 616. [CONFIRMED] Canonical pack output depends on its random checkout path
-
-**Location**: `Directory.Build.props`, line 4; `compose.yaml`, around lines
-16-19; `eng/container/entrypoint.sh`, around line 134; container pack invocation
-around `scripts/Invoke-SharpProofContainer.ps1` lines 383-393.
-
-**Description**: `ContinuousIntegrationBuild` is enabled only through ambient
-`GITHUB_ACTIONS`, which canonical task containers do not forward. Each release
-task builds under a different random `/tmp/sharpproof-task.*` path.
-
-**Reproduction**: Two clean exact-commit builds under different paths produced
-different Attributes DLL/PDB hashes. Adding only
-`ContinuousIntegrationBuild=true` made both DLL and PDB hashes identical.
-
-**Impact**: Same-commit package/SBOM/provenance bytes change across retries,
-preventing byte-for-byte reconstruction.
-
-**Recommended fix**: Explicitly enable CI/deterministic source-path normalization
-for canonical release build and pack, independent of ambient GitHub variables.
-Test two detached clones under distinct absolute paths.
-
 ### 617. [CONFIRMED] Acceptance receipts can certify a failed required phase
 
 **Location**: `scripts/Write-SharpProofQualificationReceipt.ps1`, around lines
