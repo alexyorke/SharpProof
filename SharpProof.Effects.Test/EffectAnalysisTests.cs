@@ -1668,6 +1668,90 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ThrowingObjectInitializerRetainsReachedPrefixEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class Value {
+                public int Property {
+                    set => throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                private static int Mark() {
+                    s_state = 1729;
+                    return 1;
+                }
+
+                public static Value Create() =>
+                    new Value { Property = Mark() };
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Create"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type => type.Name),
+                Does.Contain(nameof(InvalidOperationException)));
+        }
+    }
+
+    [Test]
+    public void ThrowingObjectInitializerRetainsEarlierMemberEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class Value {
+                public int First {
+                    set { }
+                }
+                public int Property {
+                    set { }
+                }
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                private static int Mark() {
+                    s_state = 1729;
+                    return 1;
+                }
+
+                private static int Fail() =>
+                    throw new InvalidOperationException();
+
+                public static Value Create() =>
+                    new Value { First = Mark(), Property = Fail() };
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Create"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type => type.Name),
+                Does.Contain(nameof(InvalidOperationException)));
+        }
+    }
+
+    [Test]
     public void FreshInitializerCaptureSourcesAreCompilerOwnedCreations()
     {
         var compilation = EffectTestHost.CreateCompilation(
