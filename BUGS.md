@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 606. [CONFIRMED] Null and out-of-range array arguments cause false SP0027 reports
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
-lines 450-460; `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
-2178-2184; `OperationCompletionEvaluator.cs`, around lines 721-725.
-
-**Description**: Array element completion checks only child evaluation, not a
-definitely null receiver or proven bounds failure. Analysis then evaluates a
-later independent argument and reports a violation for a call never invoked.
-
-**Reproduction**: `Positive(((int[])null!)[0], -1)` and
-`Positive((new int[0])[0], -1)` each emitted SP0027, while runtime call count was
-zero and the first argument threw. Live-array/direct controls executed and were
-correctly diagnosed.
-
-**Impact**: Deterministic false diagnostics and warnings-as-errors failures.
-
-**Recommended fix**: Split array-element completion from generic child
-completion, reject definitely null and definitely out-of-range accesses, and
-share the rule between the two completion engines. Preserve permissive Unknown.
-
 ### 607. [CONFIRMED] A transient custom SARIF path makes a later plain clean fail
 
 **Location**: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,
