@@ -1857,6 +1857,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                  CompletesNormally(creation.Constructor)),
             IArrayCreationOperation array =>
                 IsDirectArrayCreationComplete(array),
+            IForLoopOperation forLoop =>
+                CompletesLoopNormally(forLoop),
+            IWhileLoopOperation whileLoop =>
+                CompletesLoopNormally(whileLoop),
             IMethodReferenceOperation methodReference =>
                 ChildrenCompleteNormally(methodReference) &&
                 (methodReference.Method.IsStatic ||
@@ -1940,6 +1944,72 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 IParenthesizedOperation or IConditionalOperation => ChildrenCompleteNormally(operation),
             _ => false
         };
+    }
+
+    private bool CompletesLoopNormally(ILoopOperation loop)
+    {
+        if (loop is not IWhileLoopOperation &&
+            loop is not IForLoopOperation)
+        {
+            return false;
+        }
+
+        if (loop is IWhileLoopOperation
+            {
+                ConditionIsTop: false
+            })
+        {
+            return false;
+        }
+
+        var condition = loop switch
+        {
+            IForLoopOperation forLoop => forLoop.Condition,
+            IWhileLoopOperation whileLoop => whileLoop.Condition,
+            _ => null
+        };
+        if (condition is { })
+        {
+            if (!CompletesNormally(condition))
+            {
+                return false;
+            }
+
+            if (condition.ConstantValue is
+                { HasValue: true, Value: false })
+            {
+                return true;
+            }
+        }
+
+        if (loop is IForLoopOperation forOperation &&
+            forOperation.Before.Any(operation => !CompletesNormally(operation)))
+        {
+            return false;
+        }
+
+        if (loop.Body is not IBlockOperation body)
+        {
+            return false;
+        }
+
+        foreach (var operation in body.ChildOperations)
+        {
+            if (operation is IBranchOperation
+                {
+                    BranchKind: BranchKind.Break
+                })
+            {
+                return true;
+            }
+
+            if (!CompletesNormally(operation))
+            {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     private bool CompletesSwitchNormally(ISwitchOperation @switch)

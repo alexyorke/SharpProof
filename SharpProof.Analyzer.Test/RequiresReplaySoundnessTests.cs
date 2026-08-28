@@ -412,6 +412,49 @@ public sealed class RequiresReplaySoundnessTests
     }
 
     [Test]
+    public async Task DirectBreakLoopsRetainFollowingRequiresDiagnostics()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void RequirePositive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void ForLoop() {
+                    for (;;) {
+                        break;
+                    }
+                    RequirePositive(0);
+                }
+
+                public static void WhileLoop(bool selector) {
+                    while (selector) {
+                        break;
+                    }
+                    RequirePositive(0);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+        Assert.That(
+            factory.Outcomes["ForLoop"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+        Assert.That(
+            factory.Outcomes["WhileLoop"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+    }
+
+    [Test]
     public async Task StringDowncastRequiresUsesOnlyDefiniteRuntimeTypeEvidence()
     {
         var factory = new RecordingSessionFactory();
