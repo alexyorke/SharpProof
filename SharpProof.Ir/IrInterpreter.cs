@@ -109,10 +109,19 @@ public sealed class IrInterpreter(IrFactory factory)
         IReadOnlyDictionary<IrVarId, IrValue>? variables = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullGuard.NotNull(term, nameof(term));
+        return CreateSession(variables, cancellationToken).Evaluate(term);
+    }
 
-        _factory.EnsureTerm(term, nameof(term));
-        return EvaluateCore(term, new(variables ?? EmptyEnvironment, cancellationToken));
+    /// <summary>
+    /// Creates an evaluator whose memoization is shared by a sequence of roots
+    /// evaluated against one immutable model. A new session must be created for
+    /// every model or cancellation policy.
+    /// </summary>
+    internal EvaluationSession CreateSession(
+        IReadOnlyDictionary<IrVarId, IrValue>? variables = null,
+        CancellationToken cancellationToken = default)
+    {
+        return new(this, new(variables ?? EmptyEnvironment, cancellationToken));
     }
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)
@@ -537,7 +546,7 @@ public sealed class IrInterpreter(IrFactory factory)
         return IrEvaluationResult.FromException(kind, detail);
     }
 
-    private sealed class EvaluationState(
+    internal sealed class EvaluationState(
         IReadOnlyDictionary<IrVarId, IrValue> variables,
         CancellationToken cancellationToken)
     {
@@ -545,5 +554,24 @@ public sealed class IrInterpreter(IrFactory factory)
         internal CancellationToken CancellationToken { get; } = cancellationToken;
         internal Dictionary<IrId, IrEvaluationResult> Results { get; } = [];
         internal int Depth { get; set; }
+    }
+
+    internal sealed class EvaluationSession
+    {
+        private readonly IrInterpreter _interpreter;
+        private readonly EvaluationState _state;
+
+        internal EvaluationSession(IrInterpreter interpreter, EvaluationState state)
+        {
+            _interpreter = interpreter;
+            _state = state;
+        }
+
+        internal IrEvaluationResult Evaluate(IrTerm term)
+        {
+            ArgumentNullGuard.NotNull(term, nameof(term));
+            _interpreter._factory.EnsureTerm(term, nameof(term));
+            return _interpreter.EvaluateCore(term, _state);
+        }
     }
 }

@@ -100,19 +100,20 @@ public sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.CounterexampleReplayFailed);
         }
 
-        var interpreter = new IrInterpreter(query.Factory);
+        var session = new IrInterpreter(query.Factory).CreateSession(
+            result.Model.Assignments,
+            cancellationToken);
         foreach (var assumption in query.Assumptions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var evaluated = interpreter.Evaluate(assumption.Predicate,
-                result.Model.Assignments, cancellationToken);
+            var evaluated = session.Evaluate(assumption.Predicate);
             if (!IsBoolean(evaluated, expected: true))
             {
                 return Unknown(AbstentionReason.CounterexampleReplayFailed);
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var goal = interpreter.Evaluate(query.Goal.Predicate, result.Model.Assignments, cancellationToken);
+        var goal = session.Evaluate(query.Goal.Predicate);
         if (goal.Status == IrEvaluationStatus.Exception)
         {
             return Unknown(query.Goal.Diagnostic switch

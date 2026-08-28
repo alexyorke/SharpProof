@@ -289,6 +289,42 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void InterpreterSessionSharesMemoAcrossReplayRootsAndModelsStaySeparate()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var shared = factory.Binary(
+            IrBinaryOperator.Add,
+            factory.Variable(variable),
+            factory.Integer(1));
+        var outer = factory.Binary(
+            IrBinaryOperator.Add,
+            shared,
+            factory.Integer(1));
+
+        var firstModel = new Dictionary<IrVarId, IrValue>
+        {
+            [variable] = factory.CreateIntegerValue(1)
+        };
+        var firstSession = new IrInterpreter(factory).CreateSession(firstModel);
+        var outerResult = firstSession.Evaluate(outer);
+        var sharedResult = firstSession.Evaluate(shared);
+
+        Assert.That(outerResult.Value!.Integer, Is.EqualTo(3));
+        Assert.That(sharedResult.Value!.Integer, Is.EqualTo(2));
+        Assert.That(
+            ReferenceEquals(sharedResult, firstSession.Evaluate(shared)),
+            Is.True);
+
+        var secondSession = new IrInterpreter(factory).CreateSession(
+            new Dictionary<IrVarId, IrValue>
+            {
+                [variable] = factory.CreateIntegerValue(9)
+            });
+        Assert.That(secondSession.Evaluate(shared).Value!.Integer, Is.EqualTo(10));
+    }
+
+    [Test]
     public void InterpreterHonorsPreCanceledEvaluation()
     {
         var factory = new IrFactory();
