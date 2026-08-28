@@ -485,49 +485,6 @@ as negative controls.
 **Confidence**: High; canonical exact-source probe included direct and owned
 receiver controls.
 
-### 461. [CONFIRMED] The intentional SMT string materialization ceiling is mislabeled as malformed backend output
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 260-269 and
-478-485; mapping in
-SharpProof.Verify/VerificationProjections.generated.cs around lines 18-23.
-
-**Description**: DecodeString intentionally refuses non-null model strings
-longer than 1,000,000 code units by returning null. CreateSatisfiable maps every
-decode failure, including that explicit resource ceiling, to
-BackendFailureReason.MalformedResult. The projection then escalates it to fatal
-MalformedBackendResult even though ResourceLimit already exists.
-
-**Reproduction**: The agent supplied a well-formed 1,000,001-character string
-and compact ground Z3 sequence:
-
-    IR value length=1000001
-    compact Z3 sequence length=1000001
-    DecodeString returned null=True
-
-IrFactory accepts the same all-'a' value. A public query
-s == null || s.Length <= 1_000_000 has such a valid counterexample; inability
-to materialize it is a backend resource limit, not malformed solver data.
-
-**Impact**: A bounded model policy is reported as backend corruption and can
-turn an otherwise valid unknown result into a fatal worker run. The direction
-is fail-closed, but failure taxonomy and operator remediation are wrong.
-
-**Root cause**: DecodeString returns one untyped null for structural
-malformation and intentional size limits.
-
-**Recommended fix**: Return a typed decode result such as Success,
-ResourceLimit, or Malformed. Map length above MaximumDecodedStringLength to
-ResourceLimit and preserve MalformedResult for invalid native/model structure.
-Do not constrain symbolic strings to the decoder cap, which could exclude real
-counterexamples and create false proofs.
-
-**Regression coverage**: Add a configurable small decoder limit, query a model
-one unit above it, and require backend/kernel ResourceLimit. Add an at-limit
-control that decodes and replays and retain true malformed-value tests.
-
-**Confidence**: High; the exact cap branch was exercised with valid IR and
-compact Z3 values.
-
 ### 462. [CONFIRMED] Strict protocol enum validation allocates hundreds of bytes per token
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around
