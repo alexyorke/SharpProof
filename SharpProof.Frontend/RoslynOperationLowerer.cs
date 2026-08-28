@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace SharpProof.Frontend;
 
 public sealed class RoslynOperationLowerer
@@ -7,8 +9,7 @@ public sealed class RoslynOperationLowerer
     private readonly bool _allowCompilerConstants;
     private readonly Dictionary<ISymbol, IrVarId> _variables =
         new(SymbolEqualityComparer.Default);
-    private readonly Dictionary<ITypeSymbol, IrVarId> _instances =
-        new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<InstanceScopeKey, IrVarId> _instances = [];
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
     private readonly Dictionary<CaptureId, IOperation> _captureStorages = [];
     private readonly HashSet<CaptureId> _boundCaptures = [];
@@ -282,14 +283,35 @@ public sealed class RoslynOperationLowerer
             return GetSyntheticInstance(operation);
         }
 
-        if (!_instances.TryGetValue(type, out var variable))
+        var key = CreateInstanceScopeKey(operation, type);
+        if (!_instances.TryGetValue(key, out var variable))
         {
             variable = _factory.CreateVariable(
                 "instance:" + type.MetadataName,
                 GetTypeId(type));
-            _instances.Add(type, variable);
+            _instances.Add(key, variable);
         }
         return _factory.Variable(variable);
+    }
+
+    private static InstanceScopeKey CreateInstanceScopeKey(
+        IInstanceReferenceOperation operation,
+        ITypeSymbol type)
+    {
+        var scope = operation.ReferenceKind ==
+                InstanceReferenceKind.ImplicitReceiver
+            ? operation.Syntax.AncestorsAndSelf().FirstOrDefault(node =>
+                node is InitializerExpressionSyntax)
+            : operation.Syntax.AncestorsAndSelf().FirstOrDefault(node =>
+                node is BaseMethodDeclarationSyntax or
+                    AccessorDeclarationSyntax or
+                    LocalFunctionStatementSyntax);
+        return new(
+            type,
+            operation.ReferenceKind,
+            scope?.SyntaxTree,
+            scope?.SpanStart ?? -1,
+            scope?.Span.Length ?? 0);
     }
 
     private IrVariableTerm GetSyntheticInstance(IOperation operation)
@@ -308,12 +330,84 @@ public sealed class RoslynOperationLowerer
                 _factory.ObjectType);
             return _factory.Variable(_missingInstance.Value);
         }
-        if (!_instances.TryGetValue(type, out var variable))
+        var key = new InstanceScopeKey(
+            type,
+            InstanceReferenceKind.ContainingTypeInstance,
+            operation.Syntax.SyntaxTree,
+            operation.Syntax.SpanStart,
+            operation.Syntax.Span.Length);
+        if (!_instances.TryGetValue(key, out var variable))
         {
             variable = _factory.CreateVariable("instance:<unknown>", GetTypeId(type));
-            _instances.Add(type, variable);
+            _instances.Add(key, variable);
         }
         return _factory.Variable(variable);
+    }
+
+    private readonly struct InstanceScopeKey : IEquatable<InstanceScopeKey>
+    {
+        internal InstanceScopeKey(
+            ITypeSymbol type,
+            InstanceReferenceKind referenceKind,
+            SyntaxTree? scopeTree,
+            int scopeStart,
+            int scopeLength)
+        {
+            Type = type;
+            ReferenceKind = referenceKind;
+            ScopeTree = scopeTree;
+            ScopeStart = scopeStart;
+            ScopeLength = scopeLength;
+        }
+
+        private ITypeSymbol Type
+        {
+            get;
+        }
+        private InstanceReferenceKind ReferenceKind
+        {
+            get;
+        }
+        private SyntaxTree? ScopeTree
+        {
+            get;
+        }
+        private int ScopeStart
+        {
+            get;
+        }
+        private int ScopeLength
+        {
+            get;
+        }
+
+        public bool Equals(InstanceScopeKey other)
+        {
+            return SymbolEqualityComparer.Default.Equals(Type, other.Type) &&
+                ReferenceKind == other.ReferenceKind &&
+                ReferenceEquals(ScopeTree, other.ScopeTree) &&
+                ScopeStart == other.ScopeStart &&
+                ScopeLength == other.ScopeLength;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is InstanceScopeKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hash = SymbolEqualityComparer.Default.GetHashCode(Type);
+                hash = (hash * 397) ^ (int)ReferenceKind;
+                hash = (hash * 397) ^ (ScopeTree == null
+                    ? 0
+                    : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(ScopeTree));
+                hash = (hash * 397) ^ ScopeStart;
+                return (hash * 397) ^ ScopeLength;
+            }
+        }
     }
 
     private LoweredExpression Opaque(

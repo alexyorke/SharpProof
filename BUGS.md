@@ -203,49 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 491. [CONFIRMED] Separate object-initializer receivers collapse to one exact IR variable
-
-**Location**: SharpProof.Frontend/RoslynOperationLowerer.cs, `_instances` near
-line 10, GetInstance near line 248, and VisitInstanceReference near line 537.
-
-**Description**: RoslynOperationLowerer caches instance variables only by
-`ITypeSymbol`. It ignores `InstanceReferenceKind` and the owning initializer or
-allocation. Reusing the public lowerer for two implicit receivers of the same
-type therefore returns one variable and labels both mappings Exact even though
-the receivers are different objects.
-
-**Reproduction**: Lowering the implicit receivers in two allocations:
-
-    var first  = new Box { Value = 1 };
-    var second = new Box { Value = 2 };
-
-produced:
-
-    implicit-receivers=2
-    receiver[0] span=162 exact=True term=0
-    receiver[1] span=206 exact=True term=0
-    same-receiver-term=True
-
-**Impact**: Clients that reuse the public lowerer across operation subtrees can
-equate state belonging to separate allocations. Because the result is Exact,
-downstream reasoning receives no abstention or uncertainty signal.
-
-**Root cause**: Type identity is used as receiver identity. That is sufficient
-for one containing instance but not for implicit object/collection initializer
-receivers or other semantic receiver scopes.
-
-**Recommended fix**: Key instances by a semantic receiver scope. For
-ImplicitReceiver, anchor identity to the owning object/collection initializer or
-allocation; for containing-instance references, use the enclosing receiver
-context. Include reference kind and retain sharing within one initializer.
-
-**Regression coverage**: Two separate same-type initializers must yield distinct
-exact receiver variables; two member assignments inside one initializer must
-share its variable. Add a containing-instance control and lowerer-reuse test.
-
-**Confidence**: High; the exact production lowerer returned one term for two
-separately allocated runtime objects.
-
 ### 492. [CONFIRMED] Constrained exception type-parameter throws disappear from handler reachability
 
 **Location**: SharpProof.Effects/ExceptionHandlerReachability.cs, the

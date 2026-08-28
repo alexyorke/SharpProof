@@ -534,6 +534,48 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void SeparateObjectInitializersKeepDistinctImplicitReceivers()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            private sealed class Box
+            {
+                public int Value { get; set; }
+                public int Other { get; set; }
+            }
+            public static int Target()
+            {
+                var first = new Box { Value = 1 };
+                var second = new Box { Value = 2 };
+                var shared = new Box { Value = 3, Other = 4 };
+                return first.Value + second.Value + shared.Other;
+            }
+            """,
+            returnExpressionOnly: false);
+        var receivers = compiled.TargetRoot
+            .DescendantsAndSelf()
+            .OfType<IInstanceReferenceOperation>()
+            .Where(static operation =>
+                operation.ReferenceKind == InstanceReferenceKind.ImplicitReceiver)
+            .ToArray();
+        Assert.That(receivers, Has.Length.EqualTo(4));
+
+        var lowerer = new RoslynOperationLowerer(compiled.Factory);
+        var first = lowerer.Lower(receivers[0]);
+        var second = lowerer.Lower(receivers[1]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.IsExact, Is.True);
+            Assert.That(second.IsExact, Is.True);
+            Assert.That(first.Term, Is.Not.EqualTo(second.Term));
+            Assert.That(
+                lowerer.Lower(receivers[2]).Term,
+                Is.EqualTo(lowerer.Lower(receivers[3]).Term));
+        }
+    }
+
+    [Test]
     public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
     {
         var classification = default(FrontendSubsetClassification);
