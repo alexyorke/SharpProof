@@ -617,6 +617,23 @@ internal static class WorkerProtocolMetadata
             ]),
         };
 
+    private static class KnownValues<T> where T : struct, Enum
+    {
+        internal static readonly HashSet<T> Values = Create();
+
+        private static HashSet<T> Create()
+        {
+            var values = new HashSet<T>();
+            foreach (var value in s_knownValues)
+            {
+                if (value is T typed)
+                {
+                    values.Add(typed);
+                }
+            }
+            return values;
+        }
+    }
     private static readonly HashSet<Enum> s_knownValues = [
         WorkerFeatureSet.Unspecified, WorkerFeatureSet.Effects, WorkerFeatureSet.Contracts, WorkerFeatureSet.All,
         WorkerVerifyPolicy.Unspecified, WorkerVerifyPolicy.Advisory, WorkerVerifyPolicy.WarnOnUnknown, WorkerVerifyPolicy.RequireProven,
@@ -649,7 +666,7 @@ internal static class WorkerProtocolMetadata
         WorkerAssumptionKind.NormalCompletion,
     ];
     internal static bool IsKnown<T>(T value) where T : struct, Enum =>
-        s_knownValues.Contains((Enum)(object)value);
+        KnownValues<T>.Values.Contains(value);
     internal static string? GetManifestName(Enum value) => value switch
     {
         WorkerSelectedFeature.Unspecified => nameof(WorkerSelectedFeature.Unspecified),

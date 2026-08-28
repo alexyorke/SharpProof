@@ -720,6 +720,23 @@ foreach ($declaration in $declarations) {
 }
 $lines.Add('        };')
 $lines.Add('')
+$lines.Add('    private static class KnownValues<T> where T : struct, Enum')
+$lines.Add('    {')
+$lines.Add('        internal static readonly HashSet<T> Values = Create();')
+$lines.Add('')
+$lines.Add('        private static HashSet<T> Create()')
+$lines.Add('        {')
+$lines.Add('            var values = new HashSet<T>();')
+$lines.Add('            foreach (var value in s_knownValues)')
+$lines.Add('            {')
+$lines.Add('                if (value is T typed)')
+$lines.Add('                {')
+$lines.Add('                    values.Add(typed);')
+$lines.Add('                }')
+$lines.Add('            }')
+$lines.Add('            return values;')
+$lines.Add('        }')
+$lines.Add('    }')
 $lines.Add('    private static readonly HashSet<Enum> s_knownValues = [')
 $definedEnumNames = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
@@ -752,7 +769,7 @@ foreach ($nameValue in $definedEnums) {
 }
 $lines.Add('    ];')
 $lines.Add('    internal static bool IsKnown<T>(T value) where T : struct, Enum =>')
-$lines.Add('        s_knownValues.Contains((Enum)(object)value);')
+$lines.Add('        KnownValues<T>.Values.Contains(value);')
 $manifestEnumNames = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
 foreach ($nameValue in $manifestNameEnums) {

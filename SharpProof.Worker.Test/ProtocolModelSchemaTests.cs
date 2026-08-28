@@ -275,6 +275,29 @@ public sealed class ProtocolModelSchemaTests
         }
     }
 
+    [Test]
+    public void KnownEnumValidationDoesNotAllocatePerLookup()
+    {
+        for (var index = 0; index < 1_000; index++)
+        {
+            _ = WorkerProtocolMetadata.IsKnown(WorkerSelectedFeature.Effects);
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var known = true;
+        for (var index = 0; index < 100_000; index++)
+        {
+            known &= WorkerProtocolMetadata.IsKnown(WorkerSelectedFeature.Effects);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.That(known, Is.True);
+        Assert.That(allocated, Is.LessThan(4_096));
+    }
+
     private static void AssertDefinedEnums(JsonElement schema)
     {
         var defined = schema.GetProperty("definedEnums")
