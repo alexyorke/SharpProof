@@ -1866,6 +1866,58 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void SarifProjectionMergesRunsByProjectRoot()
+    {
+        var manifest = CreateSarifManifest();
+        var response = new WorkerVerifyResponse
+        {
+            InputHash = new('a', 64),
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
+            {
+                Versions = new WorkerVersionSummary { WorkerVersion = "test" }
+            }
+        };
+        var request = new WorkerVerifyRequest();
+        var firstDirectory = Path.Combine(
+            Path.GetTempPath(), "sharpproof-sarif-first-" +
+            Guid.NewGuid().ToString("N"));
+        var secondDirectory = Path.Combine(
+            Path.GetTempPath(), "sharpproof-sarif-second-" +
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(firstDirectory);
+        Directory.CreateDirectory(secondDirectory);
+        try
+        {
+            var first = SarifProjection.Serialize(
+                request, response, firstDirectory);
+            var second = SarifProjection.Serialize(
+                request, response, secondDirectory);
+            var merged = SarifProjection.MergeRuns(first, second);
+            var replaced = SarifProjection.MergeRuns(merged, first);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    JsonDocument.Parse(merged).RootElement
+                        .GetProperty("runs").GetArrayLength(),
+                    Is.EqualTo(2));
+                Assert.That(
+                    JsonDocument.Parse(replaced).RootElement
+                        .GetProperty("runs").GetArrayLength(),
+                    Is.EqualTo(2));
+            }
+        }
+        finally
+        {
+            Directory.Delete(firstDirectory, recursive: true);
+            Directory.Delete(secondDirectory, recursive: true);
+        }
+    }
+
+    [Test]
     public void SarifProjectionPreservesFilesystemRootAsTheRoot()
     {
         var manifest = CreateSarifManifest();

@@ -638,11 +638,18 @@ internal static class Program
         };
         if (arguments.PublishSarifPath != null)
         {
+            var sarif = SarifProjection.Serialize(
+                request, response, artifact.Compilation.ProjectDirectory);
+            if (LinuxPathIdentity.TryReadRegularFile(
+                    arguments.PublishSarifPath,
+                    out var previousSarif))
+            {
+                sarif = SarifProjection.MergeRuns(
+                    Encoding.UTF8.GetString(previousSarif), sarif);
+            }
             members.Add(new PublicationMember(
                 arguments.PublishSarifPath,
-                Encoding.UTF8.GetBytes(
-                    SarifProjection.Serialize(
-                        request, response, artifact.Compilation.ProjectDirectory))));
+                Encoding.UTF8.GetBytes(sarif)));
         }
         members.Add(new PublicationMember(
             arguments.PublishResultPath!,

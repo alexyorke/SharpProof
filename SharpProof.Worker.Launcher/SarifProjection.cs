@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Launcher;
@@ -101,6 +102,63 @@ internal static class SarifProjection
             ["runs"] = new[] { run }
         };
         return JsonSerializer.Serialize(document, WorkerProtocolJson.Options);
+    }
+
+    internal static string MergeRuns(string existing, string current)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(existing);
+        ArgumentException.ThrowIfNullOrWhiteSpace(current);
+
+        var existingDocument = JsonNode.Parse(existing)?.AsObject();
+        var currentDocument = JsonNode.Parse(current)?.AsObject();
+        if (existingDocument == null || currentDocument == null ||
+            existingDocument["runs"] is not JsonArray existingRuns ||
+            currentDocument["runs"] is not JsonArray { Count: 1 } currentRuns ||
+            currentRuns[0] is not JsonObject currentRun)
+        {
+            throw new InvalidDataException("The existing SARIF document is malformed.");
+        }
+
+        var currentRoot = ProjectRoot(currentRun);
+        if (string.IsNullOrEmpty(currentRoot))
+        {
+            throw new InvalidDataException("The current SARIF run has no project root.");
+        }
+
+        var replacement = -1;
+        for (var index = 0; index < existingRuns.Count; index++)
+        {
+            if (existingRuns[index] is JsonObject run &&
+                string.Equals(ProjectRoot(run), currentRoot,
+                    StringComparison.Ordinal))
+            {
+                replacement = index;
+                break;
+            }
+        }
+
+        var runs = existingRuns
+            .Where(static run => run != null)
+            .Select(static run => run!.DeepClone())
+            .ToList();
+        var currentClone = currentRun.DeepClone();
+        if (replacement >= 0)
+        {
+            runs[replacement] = currentClone;
+        }
+        else
+        {
+            runs.Add(currentClone);
+        }
+
+        existingDocument["runs"] = new JsonArray(
+            [.. runs.OrderBy(ProjectRoot, StringComparer.Ordinal)]);
+        return existingDocument.ToJsonString(WorkerProtocolJson.Options);
+    }
+
+    private static string? ProjectRoot(JsonNode? run)
+    {
+        return run?["originalUriBaseIds"]?["PROJECTROOT"]?["uri"]?.GetValue<string>();
     }
 
     private static string ProjectRootUri(string projectDirectory)
