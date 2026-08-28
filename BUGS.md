@@ -2619,46 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 544. [CONFIRMED] Release-authority closure skips ordinary relative psm1 imports
-
-**Location**: scripts/Get-SharpProofReleaseAuthorityClosure.ps1 around lines
-51-70; a manual module root around line 28 masks one instance.
-
-**Description**: The closure walker can parse queued psm1 files, but its
-path-qualified extension list excludes psm1 and its sibling-literal branch
-recognizes only ps1. A normal `Import-Module (Join-Path $PSScriptRoot
-'Module.psm1')` therefore executes code that the independently derived closure
-omits. One publication module appears only because it is manually rooted.
-
-**Reproduction**: Current omitted imports include ContainerExecution,
-MutationBaselines, MutationEvidence, and MutationScheduling modules. A canonical
-fixture reported:
-
-    ImporterInClosure=true
-    ImportedPsm1InClosure=false
-    ImportedPsm1Tracked=true
-    ModuleChanged=true
-    ClosureDigestUnchangedAfterModuleEdit=true
-
-**Impact**: The closure-specific validator can pass while an executed release
-module changes, disappears, or remains undeclared without affecting its path set
-or digest. Current broader TCB inventory happens to list these examples, but the
-closure invariant does not guarantee that redundancy for future modules.
-
-**Root cause**: Both literal dependency grammars omit `.psm1`; fixture coverage
-uses only ps1 dependencies and an explicit module root.
-
-**Recommended fix**: Recognize canonical psm1 paths in both branches, preferably
-by resolving literal dot-source and Import-Module AST commands rather than regex.
-Queue the module so missing/moved paths use existing validation.
-
-**Regression coverage**: Import a tracked sibling module from a closure member;
-require inclusion, digest change on edit, and failure on move/delete. Retain an
-unimported module decoy.
-
-**Confidence**: High; real and fixture modules are tracked, executed, absent
-from closure, and digest-invisible.
-
 ### 545. [CONFIRMED] Conditional truth-operator exceptions do not make catches reachable
 
 **Location**: SharpProof.Effects/ExceptionHandlerReachability.cs around lines
