@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 562. [CONFIRMED] SP0027 misses implicit synchronous Dispose calls
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
-33-77, 131-228, and 591-624; existing compensation is in
-SharpProof.Effects/UsingDisposalEffectResolver.cs.
-
-**Description**: Roslyn lowers synchronous disposal to IDisposable.Dispose and
-loses the concrete implementation contract. Requires discovery has no source
-using resolution although Effects already reconstructs the actual Dispose.
-
-**Reproduction**: A sealed Resource.Dispose with Requires(false) produced one
-SP0027 when explicit, but zero for using statement and using declaration.
-Runtime executed Dispose once in both using forms; a null resource executed zero.
-
-**Impact**: Concrete disposal preconditions are unenforced for common using
-syntax.
-
-**Recommended fix**: Share source-side disposal target resolution with potential
-and actual call discovery, preserving null guards, exit-time flow, reverse order,
-and uncertain-dispatch fail-closed behavior. Add no-duplicate and multi-resource
-tests.
-
 ### 563. [CONFIRMED] Release-configuration validation ignores rulesets after page one
 
 **Location**: scripts/Test-SharpProofReleaseConfiguration.ps1 around lines
