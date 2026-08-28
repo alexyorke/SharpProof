@@ -472,66 +472,79 @@ public static class IrStructuralShrinker
             throw new ArgumentNullException(nameof(term));
         }
 
-        var candidates = new List<IrTerm>();
-        var seen = new HashSet<IrId>();
-        var originalSize = StructuralSize(term);
+        var memo = new Dictionary<IrId, ImmutableArray<IrTerm>>();
 
-        void Add(IrTerm candidate)
+        return Collect(term);
+
+        ImmutableArray<IrTerm> Collect(IrTerm current)
         {
-            if (candidate.Id == term.Id)
+            if (memo.TryGetValue(current.Id, out var cached))
             {
-                return;
+                return cached;
             }
 
-            if (StructuralSize(candidate) >= originalSize)
-            {
-                return;
-            }
+            var candidates = new List<IrTerm>();
+            var seen = new HashSet<IrId>();
+            var originalSize = StructuralSize(current);
 
-            if (seen.Add(candidate.Id))
+            void Add(IrTerm candidate)
             {
-                candidates.Add(candidate);
-            }
-        }
-
-        foreach (var child in Children(term))
-        {
-            if (child.Type == term.Type)
-            {
-                Add(child);
-            }
-        }
-
-        if (term.Type == factory.BooleanType)
-        {
-            Add(factory.Boolean(false));
-            Add(factory.Boolean(true));
-        }
-        else if (term.Type == factory.IntegerType)
-        {
-            Add(factory.Integer(0));
-            Add(factory.Integer(1));
-        }
-
-        var children = Children(term);
-        for (var index = 0; index < children.Length; index++)
-        {
-            foreach (var childCandidate in GetCandidates(
-                         factory,
-                         children[index]))
-            {
-                var rebuilt = TryReplaceChild(
-                    factory,
-                    term,
-                    index,
-                    childCandidate);
-                if (rebuilt != null)
+                if (candidate.Id == current.Id)
                 {
-                    Add(rebuilt);
+                    return;
+                }
+
+                if (StructuralSize(candidate) >= originalSize)
+                {
+                    return;
+                }
+
+                if (seen.Add(candidate.Id))
+                {
+                    candidates.Add(candidate);
                 }
             }
+
+            var children = Children(current);
+            foreach (var child in children)
+            {
+                if (child.Type == current.Type)
+                {
+                    Add(child);
+                }
+            }
+
+            if (current.Type == factory.BooleanType)
+            {
+                Add(factory.Boolean(false));
+                Add(factory.Boolean(true));
+            }
+            else if (current.Type == factory.IntegerType)
+            {
+                Add(factory.Integer(0));
+                Add(factory.Integer(1));
+            }
+
+            for (var index = 0; index < children.Length; index++)
+            {
+                foreach (var childCandidate in Collect(children[index]))
+                {
+                    var rebuilt = TryReplaceChild(
+                        factory,
+                        current,
+                        index,
+                        childCandidate);
+                    if (rebuilt != null)
+                    {
+                        Add(rebuilt);
+                    }
+                }
+            }
+
+            var result = candidates.ToImmutableArray();
+            memo.Add(current.Id, result);
+            return result;
         }
-        return [.. candidates];
     }
 
     public static int StructuralSize(IrTerm term)
