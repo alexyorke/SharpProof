@@ -244,6 +244,33 @@ if ([string]::IsNullOrWhiteSpace($PackageSource)) {
 }
 [IO.Directory]::CreateDirectory($results) | Out-Null
 $campaign = [Diagnostics.Stopwatch]::StartNew()
+$running = [Collections.Generic.List[object]]::new()
+
+function Stop-SharpProofPackageProcesses {
+    foreach ($active in @($running)) {
+        try {
+            if (-not $active.Process.HasExited) {
+                $active.Process.Kill($true)
+            }
+        }
+        catch {
+            # Cleanup must not replace the setup or test failure that caused
+            # this path.  Wait/dispose below still get a chance to run.
+        }
+        try {
+            $active.Process.WaitForExit(5000) | Out-Null
+        }
+        catch {
+        }
+        try {
+            $active.Process.Dispose()
+        }
+        catch {
+        }
+    }
+    $running.Clear()
+}
+
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $timingOutput = Join-Path $timingDirectory (
@@ -506,7 +533,6 @@ try {
     foreach ($shard in Get-SharpProofPackageShardSchedule -Shards @($shards)) {
         $pending.Enqueue($shard)
     }
-    $running = [Collections.Generic.List[object]]::new()
     $shardTimings = [Collections.Generic.List[object]]::new()
     $failures = [Collections.Generic.List[string]]::new()
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
@@ -556,21 +582,21 @@ try {
                 $process.Dispose()
                 throw "Could not start package test $($shard.Name)."
             }
-            $running.Add([pscustomobject]@{
+            $active = [pscustomobject]@{
                 Shard = $shard
                 Process = $process
-                StartedUtc = $process.StartTime.ToUniversalTime()
-                StandardOutput = $process.StandardOutput.ReadToEndAsync()
-                StandardError = $process.StandardError.ReadToEndAsync()
-            })
+                StartedUtc = [DateTime]::UtcNow
+                StandardOutput = $null
+                StandardError = $null
+            }
+            $running.Add($active)
+            $active.StartedUtc = $process.StartTime.ToUniversalTime()
+            $active.StandardOutput = $process.StandardOutput.ReadToEndAsync()
+            $active.StandardError = $process.StandardError.ReadToEndAsync()
         }
 
         if ([DateTime]::UtcNow -ge $deadline) {
-            foreach ($active in @($running)) {
-                if (-not $active.Process.HasExited) {
-                    $active.Process.Kill($true)
-                }
-            }
+            Stop-SharpProofPackageProcesses
             throw "Parallel package tests exceeded $TimeoutSeconds seconds."
         }
 
@@ -688,6 +714,7 @@ try {
     Write-Host "Timing evidence: $timingOutput"
 }
 finally {
+    Stop-SharpProofPackageProcesses
     if ([IO.Directory]::Exists($root)) {
         [IO.Directory]::Delete($root, $true)
     }

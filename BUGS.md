@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 495. [CONFIRMED] Package-test setup failures leave earlier parallel shards running
-
-**Location**: scripts/Invoke-SharpProofPackageTests.ps1, process creation and
-tracking around lines 337-393, timeout cleanup around lines 396-402, and the
-outer finally around lines 499-506.
-
-**Description**: Parallel package-test processes are cleaned up only on normal
-completion. If a later shard throws during coverage-output setup, Process.Start,
-or stream/metadata initialization, the outer finally deletes directories but
-never terminates, waits for, or disposes processes already in `$running`. A
-process that starts and throws before `$running.Add(...)` is not tracked at all.
-
-**Reproduction**: A canonical-container probe executed the exact baseline
-finalizer after starting a disposable first child and injecting a later-shard
-setup failure:
-
-    {"FinalizerStartLine":499,
-     "InjectedError":"injected-later-shard-setup-failure",
-     "ProcessAliveAfterFinalizer":true,
-     "RunningCountAfterFinalizer":1,
-     "RootExistsAfterFinalizer":false}
-
-**Impact**: The script exits while prior `dotnet test` shards continue consuming
-CPU and memory and accessing result/feed paths that have already been deleted.
-They can contaminate subsequent commands in persistent tooling containers.
-
-**Root cause**: Process lifecycle cleanup lives in the success/timeout loop,
-whereas the exception finalizer owns only filesystem cleanup and runs it in the
-wrong order.
-
-**Recommended fix**: Initialize `$running` before the outer try. Guard or
-register each process immediately after successful start. In finally, kill the
-entire tree, WaitForExit, and dispose every live process before deleting paths;
-have timeout cleanup delegate to the same idempotent routine. Preserve the
-original exception.
-
-**Regression coverage**: Start a long-lived fake first shard and fail second-
-shard preparation; require the original exception, all child PIDs gone before
-return, and directories deleted afterward. Also throw immediately after
-Process.Start to cover the not-yet-registered child.
-
-**Confidence**: High; the exact finalizer left the child alive while deleting
-its root, and the probed blob matched the baseline.
-
 ### 496. [CONFIRMED] Direct SharpProofVerify invocation false-greens on unsupported hosts
 
 **Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets,
