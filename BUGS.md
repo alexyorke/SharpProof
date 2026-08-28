@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 564. [CONFIRMED] Definitely-null instance field reads are treated as completing
-
-**Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184;
-consumer SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs around lines
-450-460.
-
-**Description**: MayCompleteNormally groups IFieldReferenceOperation with
-generic child completion and omits the null-receiver check already used for
-properties and method references.
-
-**Reproduction**: Positive(((Box)null!).Field, -1) emitted SP0027 although
-runtime threw before the call and the call count was zero. Equivalent null
-property access stayed quiet; live-field and direct controls executed and
-reported.
-
-**Impact**: Deterministic false refutations can fail warnings-as-errors builds
-for unreachable calls.
-
-**Recommended fix**: Split field references out and require a completing,
-non-definitely-null instance for nonstatic fields. Preserve permissiveness for
-unknown receivers and test argument-order positions.
-
 ### 565. [CONFIRMED] Request serialization replaces lone UTF-16 surrogates in paths
 
 **Location**: Worker.Protocol/ProtocolModel.generated.cs around lines 816-821;
