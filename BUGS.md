@@ -267,47 +267,6 @@ unsafe cache property target and retain a fully cacheable tuple control.
 **Confidence**: High; self-verified in a canonical exact-source probe with
 positive inline and negative alias/factory controls.
 
-### 447. [CONFIRMED] Scalar-semantics generation accepts duplicate semantic properties
-
-**Location**: scripts/Generate-CSharpScalarSemantics.ps1 around line 195;
-owned outputs SharpProof.Frontend/CSharpScalarSemantics.generated.cs and
-SharpProof.Ir/IrOperatorCatalog.generated.cs.
-
-**Description**: The shared scalar-semantics catalog is parsed with
-ConvertFrom-Json before Assert-Properties and Assert-Boolean run. Duplicate
-properties have already collapsed to their last values, so structural
-validators see an apparently valid single property. Both frontend integer
-semantics and IR operator vocabulary can be generated from an ambiguous review
-source.
-
-**Reproduction**: In an ephemeral canonical container, insert:
-
-    "signed": false,
-    "signed": true,
-
-into the first integer entry. Verification against copied checked-in outputs
-reports NESTED_DUPLICATE_VERIFY_EXIT=0. A duplicate root schemaVersion 999
-followed by schemaVersion 2 also passes -Verify.
-
-**Impact**: Contradictory root or nested semantics can remain in the
-authoritative catalog while both generated outputs and acceptance verification
-stay green. Hard-coded runtime tests cannot detect ambiguity when the last
-value matches current output.
-
-**Root cause**: Property validation occurs after a last-wins JSON conversion and
-there is no raw recursive duplicate-name preflight.
-
-**Recommended fix**: Parse the raw catalog through the shared strict ordinal
-duplicate-property loader before ConvertFrom-Json. Keep current type and
-allowed-property validation after the strict preflight.
-
-**Regression coverage**: Add malformed catalogs with duplicate root
-schemaVersion and nested integers[0].signed, require nonzero exit with
-path-qualified errors, and preserve byte-identical valid output.
-
-**Confidence**: High; both root and nested duplicates were self-verified
-against the generator's -Verify path in the canonical container.
-
 ### 450. [CONFIRMED] Compiler-synthesized record members omit executable base calls from Requires analysis
 
 **Location**: SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
