@@ -883,7 +883,7 @@ $mutations = @(
         Original = '        $requiredGates = @($matrix.releaseQualificationMatrix |'
         Mutated = '        $requiredGates = @() # mutation removes qualification rows'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~WorkflowExecutesTheExactCatalogOwnedQualificationMatrix'
+        Filter = 'FullyQualifiedName~QualificationWriterRevalidatesArtifactsAndGateReceipts'
     },
     [pscustomobject]@{
         Name = 'launcher-timeout-owns-result'

@@ -3076,29 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 677. [CONFIRMED] Release mutation catalog maps a mutation to an unrelated test
-
-**Location**: `scripts/Test-SharpProofTrustedMutations.ps1`, around lines 880-886
-and 2826-2864; mutation target in
-`scripts/Invoke-SharpProofReleaseContainer.ps1`, around lines 165-173.
-
-**Description**: The `release-qualification-matrix-receipt-projection` mutation
-removes `$requiredGates` from the release writer, but its focused filter selects
-a workflow/catalog test that never reads that file. The mutation runner treats
-the resulting green test as a survivor.
-
-**Reproduction**: The catalog's exact mutation left the mapped test passing 1/1.
-The existing `QualificationWriterRevalidatesArtifactsAndGateReceipts` test failed
-on the same mutation and passed again after restoration.
-
-**Impact**: Any mutation shard containing this row fails falsely despite an
-existing test that kills the production mutation, wasting and misattributing the
-release mutation gate.
-
-**Recommended fix**: Map the row to the writer test (and refresh receipts), or
-add a focused behavioral projection test. Regression should require the selected
-test to pass baseline and fail the exact catalog mutation.
-
 ### 678. [CONFIRMED] Meta-analyzer enrollment gate trusts unevaluated project XML
 
 **Location**: `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs`, around
