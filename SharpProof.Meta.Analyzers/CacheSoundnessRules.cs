@@ -46,7 +46,8 @@ internal static class CacheSoundnessRules
                 symbols,
                 deconstruction.Target,
                 deconstruction.Value,
-                Root(assignment));
+                Root(assignment),
+                new HashSet<ISymbol>(SymbolEqualityComparer.Default));
             return;
         }
 
@@ -63,29 +64,156 @@ internal static class CacheSoundnessRules
         SharpProofSoundnessAnalyzer.KnownSymbols symbols,
         IOperation target,
         IOperation value,
-        IOperation root)
+        IOperation root,
+        HashSet<ISymbol> resolving)
     {
         target = UnwrapAssignmentOperation(target);
         value = UnwrapAssignmentOperation(value);
-        if (target is ITupleOperation targetTuple &&
-            value is ITupleOperation valueTuple)
+        if (target is ITupleOperation targetTuple)
         {
-            var count = Math.Min(
-                targetTuple.Elements.Length,
-                valueTuple.Elements.Length);
-            for (var index = 0; index < count; index++)
+            for (var index = 0; index < targetTuple.Elements.Length; index++)
             {
-                AnalyzeDeconstructionTarget(
-                    context,
-                    symbols,
-                    targetTuple.Elements[index],
-                    valueTuple.Elements[index],
-                    root);
+                var element = TryResolveTupleElement(
+                    context, value, index, root, resolving);
+                if (element == null)
+                {
+                    AnalyzeUnknownAssignmentTarget(
+                        context, symbols, targetTuple.Elements[index], root);
+                }
+                else
+                {
+                    AnalyzeDeconstructionTarget(
+                        context,
+                        symbols,
+                        targetTuple.Elements[index],
+                        element,
+                        root,
+                        resolving);
+                }
             }
             return;
         }
 
         AnalyzeAssignmentTarget(context, symbols, target, value, root);
+    }
+
+    private static IOperation? TryResolveTupleElement(
+        OperationAnalysisContext context,
+        IOperation value,
+        int index,
+        IOperation root,
+        HashSet<ISymbol> resolving)
+    {
+        value = UnwrapAssignmentOperation(value);
+        if (value is ITupleOperation tuple)
+        {
+            return index < tuple.Elements.Length
+                ? tuple.Elements[index]
+                : null;
+        }
+
+        if (value is ILocalReferenceOperation local &&
+            resolving.Add(local.Local))
+        {
+            try
+            {
+                var write = root.DescendantsAndSelf()
+                    .Where(candidate =>
+                        candidate.Syntax.SpanStart <= value.Syntax.SpanStart &&
+                        candidate switch
+                        {
+                            IVariableDeclaratorOperation declarator =>
+                                SymbolEqualityComparer.Default.Equals(
+                                    declarator.Symbol, local.Local) &&
+                                declarator.Initializer != null,
+                            ISimpleAssignmentOperation assignment =>
+                                assignment.Target is ILocalReferenceOperation target &&
+                                SymbolEqualityComparer.Default.Equals(
+                                    target.Local, local.Local),
+                            ICompoundAssignmentOperation assignment =>
+                                assignment.Target is ILocalReferenceOperation target &&
+                                SymbolEqualityComparer.Default.Equals(
+                                    target.Local, local.Local),
+                            _ => false
+                        })
+                    .Select(candidate => candidate switch
+                    {
+                        IVariableDeclaratorOperation declarator =>
+                            declarator.Initializer!.Value,
+                        ISimpleAssignmentOperation assignment => assignment.Value,
+                        ICompoundAssignmentOperation assignment => assignment.Value,
+                        _ => null
+                    })
+                    .Where(static candidate => candidate != null)
+                    .Cast<IOperation>()
+                    .OrderBy(static candidate => candidate.Syntax.SpanStart)
+                    .LastOrDefault();
+                return write == null
+                    ? null
+                    : TryResolveTupleElement(
+                        context, write, index, root, resolving);
+            }
+            finally
+            {
+                resolving.Remove(local.Local);
+            }
+        }
+
+        if (value is IInvocationOperation invocation &&
+            resolving.Add(invocation.TargetMethod))
+        {
+            try
+            {
+                foreach (var reference in invocation.TargetMethod.DeclaringSyntaxReferences)
+                {
+                    var syntax = reference.GetSyntax(context.CancellationToken);
+                    var model = context.Compilation.GetSemanticModel(syntax.SyntaxTree);
+                    var expression = syntax switch
+                    {
+                        ArrowExpressionClauseSyntax arrow => arrow.Expression,
+                        MethodDeclarationSyntax method when method.ExpressionBody != null =>
+                            method.ExpressionBody.Expression,
+                        _ => null
+                    };
+                    if (expression == null)
+                    {
+                        continue;
+                    }
+
+                    var returned = model.GetOperation(
+                        expression,
+                        context.CancellationToken);
+                    if (returned != null)
+                    {
+                        var element = TryResolveTupleElement(
+                            context, returned, index, root, resolving);
+                        if (element != null)
+                        {
+                            return element;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                resolving.Remove(invocation.TargetMethod);
+            }
+        }
+
+        return null;
+    }
+
+    private static void AnalyzeUnknownAssignmentTarget(
+        OperationAnalysisContext context,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols,
+        IOperation target,
+        IOperation root)
+    {
+        if (IsCacheType(ResolveCacheOwnerType(target, root), symbols) &&
+            IsSemanticAnswerType(target.Type))
+        {
+            Report(context, target.Syntax.GetLocation());
+        }
     }
 
     private static IOperation UnwrapAssignmentOperation(IOperation operation)

@@ -557,6 +557,34 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.EqualTo(2));
     }
 
+    [Test]
+    public async Task SemanticCacheWritesTrackAliasedDeconstructionValues()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { TimedOut, Proven }
+            sealed class ProofCache : ISemanticCache {
+                internal Answer Latest { get; set; }
+            }
+            sealed class C {
+                static (Answer answer, int stamp) Create() =>
+                    (Answer.TimedOut, 1);
+                void M(ProofCache cache) {
+                    var pair = (Answer.TimedOut, 1);
+                    var stamp = 0;
+                    (cache.Latest, stamp) = pair;
+                    (cache.Latest, stamp) = Create();
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(2));
+    }
+
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
     public async Task ReportsCSharpExpressionTextConstruction(string source)
     {
