@@ -2857,42 +2857,6 @@ Retain ordinary Build parity.
 **Confidence**: High; the direct target preserved the exact stale manifest and
 verdict while a full build immediately refuted current source.
 
-### 547. [CONFIRMED] SPMETA009 classifies ordinary prose as synthesized C# expressions
-
-**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs, fragment
-catalog around lines 70-71, concatenation analysis around lines 343-367, and
-fragment extraction around lines 446-471.
-
-**Description**: Every string concatenation is scanned without sink context, and
-any occurrence of a short fragment such as `" is null"`, `" is not null"`, or
-`"=>"` is treated as C# expression generation. Human-facing exception,
-diagnostic, or log prose therefore triggers Error-level SPMETA009.
-
-**Reproduction**:
-
-    new InvalidOperationException(
-        "Metadata is null for member " + member)
-
-produced one SPMETA009 with zero compiler errors. An actual expression-shaped
-control also reported; benign prose without the fragment did not.
-
-**Impact**: Ordinary dynamic messages are build-blocked and require wording or
-construction workarounds unrelated to source-synthesis soundness.
-
-**Root cause**: Substring presence is accepted as expression identity without
-structural template or destination evidence.
-
-**Recommended fix**: Require evidence that the complete constructed template is
-expression-shaped or flows to a typed source-expression sink/builder. Preserve
-actual expression cases while excluding arbitrary prose.
-
-**Regression coverage**: The exception prose above and `Missing metadata for
-member` remain clean; `"(" + name + ") is null"` reports. Add diagnostic/log
-sinks and common fragment controls.
-
-**Confidence**: High; one common-English substring is the only difference
-between accepted and rejected prose.
-
 ### 548. [CONFIRMED] Production fuzz JSON emits coverage properties the strict parser rejects
 
 **Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs, FrontendFuzzCoverage around
