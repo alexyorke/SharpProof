@@ -203,49 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 533. [CONFIRMED] Matching timeout/cancel errors legitimize completed proven responses
-
-**Location**: SharpProof.Worker.Protocol/WorkerResultAssembler.cs,
-TryProjectRunState around lines 148-168, MatchesCallableProjection around lines
-189-207, and error mapping around lines 248-254; enforced by ProtocolJson.cs
-around lines 741-770.
-
-**Description**: Mapped `worker.timeout` or `worker.canceled` errors
-unconditionally replace result-derived run evidence. Callable projection then
-accepts Complete/None rows for interrupted statuses. Adding the matching error
-therefore makes strict validation accept a fabricated TimedOut/Canceled response
-whose callable and claims are fully completed and Proven.
-
-**Reproduction**:
-
-    COMPLETE_CONTROL IsValid=True
-    TIMED_OUT_NO_ERROR IsValid=False Codes=response.run_projection
-    TIMED_OUT_WITH_ERROR IsValid=True Codes=
-    ROWS Callable=Complete/None Claim=Proven/None
-
-Actual worker behavior emits interruption errors only before manifest load with
-empty results; after loading, it emits incomplete/unknown rows without such an
-error.
-
-**Impact**: A malformed assembled/persisted response can convert completed
-verification into a false timeout/cancel artifact and launcher exit, misleading
-summaries and downstream retry behavior.
-
-**Root cause**: Self-reported errors override evidence instead of being
-reconciled with the producer's permitted result shape.
-
-**Recommended fix**: Permit error-based timeout/cancel only with empty manifest
-and result sets, matching producer behavior. Alternatively require every
-nonempty row to project to the same interruption with appropriate unknown/
-incomplete reasons; never admit resolved claims.
-
-**Regression coverage**: Extend the fabricated-interrupted-status test with
-matching timeout and cancel errors and require response.run_projection. Retain
-empty-manifest interruption positives and legitimate nonempty interrupted rows.
-
-**Confidence**: High; adding one mapped error changes the same completed proven
-response from invalid to valid.
-
 ### 534. [CONFIRMED] SPMETA003 rejects an exhaustive cancellation type guard
 
 **Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs,

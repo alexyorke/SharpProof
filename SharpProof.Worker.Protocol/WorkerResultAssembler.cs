@@ -158,7 +158,9 @@ internal static class WorkerResultAssembler
         out WorkerRunStatus status,
         out WorkerRunFailureReason failure)
     {
-        var evidence = Classify(callables, claims);
+        var callableResults = callables?.OfType<WorkerCallableResult>().ToArray() ?? [];
+        var claimResults = claims?.OfType<WorkerClaimResult>().ToArray() ?? [];
+        var evidence = Classify(callableResults, claimResults);
         var errorStates = (errors ?? [])
             .Select(static error => ProjectError(error.Code))
             .ToArray();
@@ -172,7 +174,26 @@ internal static class WorkerResultAssembler
 
         if (errorStates.Length != 0)
         {
-            (status, failure) = errorStates[0]!.Value;
+            var errorState = errorStates[0]!.Value;
+            if (errorState.Status is WorkerRunStatus.TimedOut or WorkerRunStatus.Canceled &&
+                (callableResults.Length != 0 || claimResults.Length != 0))
+            {
+                var hasResolvedEvidence = callableResults.Any(static result =>
+                        result.Coverage == WorkerCallableCoverage.Complete) ||
+                    claimResults.Any(static result =>
+                        result.Outcome != WorkerClaimOutcome.Unknown);
+                var projectsSameInterruption = errorState.Status == WorkerRunStatus.TimedOut
+                    ? evidence.TimedOut
+                    : evidence.Canceled;
+                if (hasResolvedEvidence || !projectsSameInterruption)
+                {
+                    status = WorkerRunStatus.Unspecified;
+                    failure = WorkerRunFailureReason.Unspecified;
+                    return false;
+                }
+            }
+
+            (status, failure) = errorState;
             return true;
         }
 

@@ -1442,6 +1442,24 @@ public sealed class ProtocolJsonTests
             Does.Contain("response.run_projection"));
     }
 
+    [TestCase("worker.timeout", WorkerRunStatus.TimedOut)]
+    [TestCase("worker.canceled", WorkerRunStatus.Canceled)]
+    public void MatchingInterruptionErrorsCannotOverrideResolvedEvidence(
+        string errorCode, WorkerRunStatus status)
+    {
+        var response = CreateResponse(CreateManifest());
+        response.RunStatus = status;
+        response.Errors = [new WorkerProtocolError
+        {
+            Code = errorCode,
+            Message = "interrupted"
+        }];
+
+        Assert.That(
+            ValidateForRequest(response).Errors.Select(static error => error.Code),
+            Does.Contain("response.run_projection"));
+    }
+
     [Test]
     public void AllProvenEvidenceRejectsFabricatedFailureStatus()
     {
