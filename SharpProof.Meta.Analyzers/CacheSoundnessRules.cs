@@ -17,18 +17,18 @@ internal static class CacheSoundnessRules
         IInvocationOperation invocation,
         SharpProofSoundnessAnalyzer.KnownSymbols symbols)
     {
-        if (!WriteMethods.Contains(invocation.TargetMethod.Name) ||
-            !IsCacheType(
+        if (WriteMethods.Contains(invocation.TargetMethod.Name) &&
+            IsCacheType(
                 invocation.Instance?.Type ?? invocation.TargetMethod.ContainingType,
-                symbols) ||
-            !invocation.Arguments.Any(argument => IsNonCacheableSemanticAnswer(
+                symbols) &&
+            invocation.Arguments.Any(argument => IsNonCacheableSemanticAnswer(
                 argument.Value, Root(argument.Value),
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default))))
         {
-            return;
+            Report(context, invocation.Syntax.GetLocation());
         }
 
-        Report(context, invocation.Syntax.GetLocation());
+        AnalyzeRefArguments(context, invocation, symbols);
     }
 
     internal static void AnalyzeAssignment(
@@ -112,14 +112,7 @@ internal static class CacheSoundnessRules
         IOperation value,
         IOperation root)
     {
-        var cacheType = target switch
-        {
-            IPropertyReferenceOperation property =>
-                property.Instance?.Type ?? property.Property.ContainingType,
-            IFieldReferenceOperation field =>
-                field.Instance?.Type ?? field.Field.ContainingType,
-            _ => null
-        };
+        var cacheType = ResolveCacheOwnerType(target, root);
         if (IsCacheType(cacheType, symbols) &&
             IsNonCacheableSemanticAnswer(
                 value,
@@ -128,6 +121,132 @@ internal static class CacheSoundnessRules
         {
             Report(context, target.Syntax.GetLocation());
         }
+    }
+
+    private static void AnalyzeRefArguments(
+        OperationAnalysisContext context,
+        IInvocationOperation invocation,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
+    {
+        foreach (var argument in invocation.Arguments)
+        {
+            if (argument.Parameter?.RefKind is not (RefKind.Ref or RefKind.Out) ||
+                !IsCacheType(
+                    ResolveCacheOwnerType(
+                        argument.Value,
+                        Root(invocation)),
+                    symbols) ||
+                !ParameterWritesNonCacheableAnswer(
+                    invocation.TargetMethod,
+                    argument.Parameter,
+                    context.CancellationToken))
+            {
+                continue;
+            }
+
+            Report(context, argument.Syntax.GetLocation());
+        }
+    }
+
+    private static bool ParameterWritesNonCacheableAnswer(
+        IMethodSymbol method,
+        IParameterSymbol parameter,
+        CancellationToken cancellationToken)
+    {
+        if (!IsSemanticAnswerType(parameter.Type))
+        {
+            return false;
+        }
+
+        foreach (var syntaxReference in method.DeclaringSyntaxReferences)
+        {
+            var syntax = syntaxReference.GetSyntax(cancellationToken);
+            if (syntax.DescendantNodesAndSelf()
+                .OfType<AssignmentExpressionSyntax>()
+                .Any(assignment =>
+                    assignment.Left is IdentifierNameSyntax identifier &&
+                    string.Equals(
+                        identifier.Identifier.ValueText,
+                        parameter.Name,
+                        StringComparison.Ordinal) &&
+                    IsNonCacheableSyntax(assignment.Right)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsNonCacheableSyntax(ExpressionSyntax expression)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        return expression switch
+        {
+            MemberAccessExpressionSyntax member =>
+                IsNonCacheableName(member.Name.Identifier.ValueText),
+            IdentifierNameSyntax identifier =>
+                IsNonCacheableName(identifier.Identifier.ValueText),
+            InvocationExpressionSyntax invocation =>
+                invocation.Expression switch
+                {
+                    MemberAccessExpressionSyntax member =>
+                        IsNonCacheableName(member.Name.Identifier.ValueText),
+                    IdentifierNameSyntax identifier =>
+                        IsNonCacheableName(identifier.Identifier.ValueText),
+                    _ => false
+                },
+            ObjectCreationExpressionSyntax creation =>
+                IsNonCacheableName(creation.Type.ToString()),
+            ConditionalExpressionSyntax conditional =>
+                IsNonCacheableSyntax(conditional.WhenTrue) ||
+                IsNonCacheableSyntax(conditional.WhenFalse),
+            CastExpressionSyntax cast =>
+                IsNonCacheableSyntax(cast.Expression),
+            _ => false
+        };
+    }
+
+    private static ITypeSymbol? ResolveCacheOwnerType(
+        IOperation target,
+        IOperation root)
+    {
+        target = UnwrapAssignmentOperation(target);
+        return target switch
+        {
+            IPropertyReferenceOperation property =>
+                property.Instance?.Type ?? property.Property.ContainingType,
+            IFieldReferenceOperation field =>
+                field.Instance?.Type ?? field.Field.ContainingType,
+            ILocalReferenceOperation local when local.Local.RefKind != RefKind.None =>
+                ResolveRefLocalOwnerType(local, root),
+            _ => null
+        };
+    }
+
+    private static ITypeSymbol? ResolveRefLocalOwnerType(
+        ILocalReferenceOperation reference,
+        IOperation root)
+    {
+        var initializer = root.DescendantsAndSelf()
+            .OfType<IVariableDeclaratorOperation>()
+            .Where(candidate =>
+                SymbolEqualityComparer.Default.Equals(
+                    candidate.Symbol,
+                    reference.Local) &&
+                candidate.Initializer != null &&
+                candidate.Syntax.SpanStart <= reference.Syntax.SpanStart)
+            .OrderBy(candidate => candidate.Syntax.SpanStart)
+            .LastOrDefault()?
+            .Initializer?
+            .Value;
+        return initializer == null
+            ? null
+            : ResolveCacheOwnerType(initializer, root);
     }
 
     private static void Report(OperationAnalysisContext context, Location? location)
