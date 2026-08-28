@@ -358,49 +358,6 @@ Require the old pair absent or nonpassing and prove qualification rejects it.
 **Confidence**: High; self-verified byte-for-byte in a temp canonical fixture
 and traced through qualification consumption.
 
-### 459. [CONFIRMED] SPMETA010 loses cache ownership for mutation methods on owned child objects
-
-**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
-lines 20-26.
-
-**Description**: AnalyzeWrite recognizes method names such as Add and Write but
-checks only invocation.Instance.Type for ISemanticCache. For
-cache.Items.Add(...) the immediate type is List<Answer>; for
-cache.Partition.Write(...) it is the child helper type. The outer cache owner
-is discarded, including through local aliases.
-
-**Reproduction**:
-
-    cache.Items.Add(Answer.Unknown);
-    cache.Partition.Write(Answer.Unknown);
-
-The exact-source probe reported:
-
-    DIRECT_METHOD_CONTROL_SPMETA010_COUNT=1
-    OWNED_LIST_ADD_SPMETA010_COUNT=0
-    ALIASED_LIST_ADD_SPMETA010_COUNT=0
-    OWNED_CHILD_WRITE_SPMETA010_COUNT=0
-
-All compiler errors were zero, and Add/Write are already in WriteMethods.
-
-**Impact**: Noncacheable answers can be stored through ordinary mutation APIs
-on cache-owned state while the direct equivalent is diagnosed.
-
-**Root cause**: Invocation-side ownership classification uses only the
-receiver's immediate type instead of receiver-operation provenance.
-
-**Recommended fix**: Resolve invocation receiver ownership recursively through
-cache fields/properties and local aliases. Treat mutation on a child rooted at
-an ISemanticCache as cache storage when a recognized answer flows into a
-cataloged write method.
-
-**Regression coverage**: Add owned-list Add, aliased-list Add, and owned-child
-Write cases expecting SPMETA010, with unrelated collections and Answer.Proven
-as negative controls.
-
-**Confidence**: High; canonical exact-source probe included direct and owned
-receiver controls.
-
 ### 462. [CONFIRMED] Strict protocol enum validation allocates hundreds of bytes per token
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around

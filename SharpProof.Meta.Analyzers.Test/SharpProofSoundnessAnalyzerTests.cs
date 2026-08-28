@@ -535,6 +535,41 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesTrackOwnedChildMutationReceivers()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System.Collections.Generic;
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { Unknown, Proven }
+            sealed class Partition {
+                internal void Write(Answer answer) { }
+            }
+            sealed class ProofCache : ISemanticCache {
+                internal List<Answer> Items { get; } = new();
+                internal Partition Partition { get; } = new();
+            }
+            sealed class C {
+                void M(ProofCache cache) {
+                    cache.Items.Add(Answer.Unknown);
+                    var items = cache.Items;
+                    items.Add(Answer.Unknown);
+                    cache.Partition.Write(Answer.Unknown);
+
+                    var unrelated = new List<Answer>();
+                    unrelated.Add(Answer.Unknown);
+                    cache.Items.Add(Answer.Proven);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(3));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesTrackRefStorageAliases()
     {
         var diagnostics = await Analyze(

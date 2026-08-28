@@ -17,12 +17,14 @@ internal static class CacheSoundnessRules
         IInvocationOperation invocation,
         SharpProofSoundnessAnalyzer.KnownSymbols symbols)
     {
+        var root = Root(invocation);
+        var ownerType = invocation.Instance == null
+            ? invocation.TargetMethod.ContainingType
+            : ResolveCacheOwnerType(invocation.Instance, root);
         if (WriteMethods.Contains(invocation.TargetMethod.Name) &&
-            IsCacheType(
-                invocation.Instance?.Type ?? invocation.TargetMethod.ContainingType,
-                symbols) &&
+            IsCacheType(ownerType, symbols) &&
             StoredValueArguments(invocation).Any(argument => IsNonCacheableSemanticAnswer(
-                argument.Value, Root(argument.Value),
+                argument.Value, root,
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default))))
         {
             Report(context, invocation.Syntax.GetLocation());
