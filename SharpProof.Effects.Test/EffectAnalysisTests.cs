@@ -1438,6 +1438,28 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void AsyncTaskMethodsAccountForResultAllocation()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System.Threading.Tasks;
+
+            public static class Sample {
+                public static async Task<int> ReturnConstant() {
+                    return 1729;
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "ReturnConstant"));
+
+        Assert.That(
+            result.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+    }
+
+    [Test]
     public void ObjectAndCollectionInitializersContributeTheirEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(

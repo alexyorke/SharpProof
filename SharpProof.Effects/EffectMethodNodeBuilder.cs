@@ -99,7 +99,35 @@ internal sealed class EffectMethodNodeBuilder
                 _session.ApiSpecs)
                 ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
                 : EffectSummary.Empty);
+        if (IsAsyncTaskReturningMethod(method))
+        {
+            localSummary = EffectSummaryOperations.Join(
+                localSummary,
+                EffectSummaryOperations.Allocate(
+                    EffectAllocationKind.Managed));
+        }
         return new EffectMethodNode(localSummary, [.. calls], scanner.DirectWitnesses);
+    }
+
+    private bool IsAsyncTaskReturningMethod(IMethodSymbol method)
+    {
+        if (!method.IsAsync || method.ReturnType is not INamedTypeSymbol returnType)
+        {
+            return false;
+        }
+
+        var task = _compilation.GetTypeByMetadataName(
+            "System.Threading.Tasks.Task");
+        var taskOfT = _compilation.GetTypeByMetadataName(
+            "System.Threading.Tasks.Task`1");
+        return task != null &&
+            SymbolEqualityComparer.Default.Equals(
+                returnType.OriginalDefinition,
+                task) ||
+            taskOfT != null &&
+            SymbolEqualityComparer.Default.Equals(
+                returnType.OriginalDefinition,
+                taskOfT);
     }
 
     private EffectStep ScanConstructorMemberInitializers(
