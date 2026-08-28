@@ -7,7 +7,7 @@ namespace SharpProof.ArchitectureTest;
 public sealed class StandaloneGateEvidenceTests
 {
     [Test]
-    public void StandaloneGateDecoderRejectsUnauthenticatedEvidence()
+    public async Task StandaloneGateDecoderRejectsUnauthenticatedEvidence()
     {
         var root = RepositoryRoot();
         var start = new ProcessStartInfo
@@ -25,14 +25,13 @@ public sealed class StandaloneGateEvidenceTests
             root,
             "scripts",
             "Test-SharpProofStandaloneGateEvidence.ps1"));
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var result = await ProcessFixtureRunner.RunAsync(
+            start,
+            TimeSpan.FromSeconds(60));
         Assert.That(
-            process.ExitCode,
+            result.ExitCode,
             Is.Zero,
-            output + Environment.NewLine + error);
+            result.StandardOutput + Environment.NewLine + result.StandardError);
     }
 
     [Test]

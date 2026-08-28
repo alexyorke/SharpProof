@@ -203,45 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 520. [CONFIRMED] Architecture-test process harnesses can deadlock on redirected output
-
-**Location**: SharpProof.ArchitectureTest/StandaloneGateEvidenceTests.cs around
-lines 29-31 and SharpProof.ArchitectureTest/FuzzRunnerEvidenceTests.cs around
-lines 31-33 and 72-74.
-
-**Description**: Three PowerShell fixture harnesses redirect stdout and stderr,
-then synchronously read stdout to EOF before reading stderr. If the child fills
-the stderr pipe, it blocks waiting for the parent while the parent waits for
-stdout EOF from a child that cannot exit. WaitForExit is reached only after both
-reads, and no timeout exists.
-
-**Reproduction**: The clean targeted architecture test passed in one second. A
-temporary fixture was changed only to write a large stderr payload. The same
-canonical Linux test reached test execution and then exceeded a 20-second bound
-without an NUnit summary. Changing only the harness to start both ReadToEndAsync
-operations before WaitForExitAsync made the large-stderr case pass in two
-seconds.
-
-**Impact**: A verbose PowerShell error or growing fixture output can hang the
-targeted test and the full architecture suite indefinitely instead of returning
-an attributable assertion failure.
-
-**Root cause**: Redirected process streams are drained sequentially, violating
-the requirement that both bounded pipes be consumed concurrently.
-
-**Recommended fix**: Move all three call sites to a shared async process-fixture
-helper that starts stdout/stderr drains concurrently, waits with a bounded
-token/deadline, kills the full child tree on timeout, performs a final wait, and
-returns complete output plus exit code.
-
-**Regression coverage**: Launch a child that writes more than pipe capacity to
-stderr and a stdout sentinel. Require completion within a short bound, exit zero,
-and complete capture of both streams. Add nonzero-exit, timeout, and child-tree
-cleanup controls.
-
-**Confidence**: High; the exact sequential harness hung under a bounded
-large-stderr fixture, while concurrent draining alone made it pass.
-
 ### 522. [CONFIRMED] Flow nullability falsely invalidates Contract.Result<T> for class? parameters
 
 **Location**: SharpProof.Contracts/ContractIntrinsicValidator.cs around lines

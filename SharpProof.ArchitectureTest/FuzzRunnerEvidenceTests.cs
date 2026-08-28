@@ -9,7 +9,7 @@ namespace SharpProof.ArchitectureTest;
 public sealed class FuzzRunnerEvidenceTests
 {
     [Test]
-    public void FuzzRunnerEvidenceUsesStrictSchemaFourDecoder()
+    public async Task FuzzRunnerEvidenceUsesStrictSchemaFourDecoder()
     {
         var root = RepositoryRoot();
         var start = new ProcessStartInfo
@@ -27,14 +27,13 @@ public sealed class FuzzRunnerEvidenceTests
             root,
             "scripts",
             "Test-SharpProofFuzzRunnerResult.ps1"));
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var result = await ProcessFixtureRunner.RunAsync(
+            start,
+            TimeSpan.FromSeconds(60));
         Assert.That(
-            process.ExitCode,
+            result.ExitCode,
             Is.Zero,
-            output + Environment.NewLine + error);
+            result.StandardOutput + Environment.NewLine + result.StandardError);
 
         var campaign = File.ReadAllText(Path.Combine(
             root,
@@ -50,7 +49,7 @@ public sealed class FuzzRunnerEvidenceTests
     }
 
     [Test]
-    public void FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic()
+    public async Task FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic()
     {
         var root = RepositoryRoot();
         var start = new ProcessStartInfo
@@ -68,14 +67,13 @@ public sealed class FuzzRunnerEvidenceTests
             root,
             "scripts",
             "Test-SharpProofFuzzEvidenceLifecycle.ps1"));
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var result = await ProcessFixtureRunner.RunAsync(
+            start,
+            TimeSpan.FromSeconds(60));
         Assert.That(
-            process.ExitCode,
+            result.ExitCode,
             Is.Zero,
-            output + Environment.NewLine + error);
+            result.StandardOutput + Environment.NewLine + result.StandardError);
 
         var campaign = File.ReadAllText(Path.Combine(
             root,
