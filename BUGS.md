@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 605. [CONFIRMED] Rejected contract API usage is silently accepted in companion bodies
-
-**Location**: `SharpProof.Contracts/ContractClauseInventoryBuilder.cs`, around
-lines 65-73; `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs`,
-around lines 152-195; `EffectiveContractSourceResolver.cs`, around lines 109-122.
-
-**Description**: Companion inventories set `HasRejectedContractApiUsage`, but
-companion validation/resolution/binding never consume it. Ordinary operation
-analysis cannot compensate because companion operation blocks are skipped.
-
-**Reproduction**: An aliased fake exact-metadata-name `Contract.Requires` set
-`companion-rejected=True`, yet emitted no diagnostic and bound successfully with
-zero clauses. A direct fake control emitted SP0047; a genuine companion imported
-one clause.
-
-**Impact**: A companion can appear to contain contracts while rejected clauses
-are silently dropped; mixed bodies can bind only a subset.
-
-**Recommended fix**: Report rejected occurrences at their calls and reject the
-entire selected companion inventory. Test fake, mixed, genuine, direct, and
-unrelated-lookalike controls.
-
 ### 606. [CONFIRMED] Null and out-of-range array arguments cause false SP0027 reports
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
