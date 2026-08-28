@@ -184,28 +184,88 @@ internal static class CancellationBoundaryAnalyzer
             return true;
         }
 
+        if (clause.Declaration == null ||
+            context.SemanticModel.GetDeclaredSymbol(
+                clause.Declaration,
+                context.CancellationToken) is not ILocalSymbol caughtLocal ||
+            !TryGetFilterOperation(context, filter, out var filterOperation) ||
+            !OperationExcludesCancellation(
+                filterOperation,
+                caughtLocal,
+                caughtType,
+                cancellationType))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool OperationExcludesCancellation(
+        IOperation? operation,
+        ILocalSymbol caughtLocal,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        if (operation is IIsPatternOperation patternTest &&
+            Unwrap(patternTest.Value) is ILocalReferenceOperation tested &&
+            SymbolEqualityComparer.Default.Equals(tested.Local, caughtLocal))
+        {
+            return PatternExcludesCancellation(
+                patternTest.Pattern,
+                caughtType,
+                cancellationType);
+        }
+
+        if (operation is not IBinaryOperation binary)
+        {
+            return false;
+        }
+
+        return binary.OperatorKind switch
+        {
+            BinaryOperatorKind.ConditionalAnd or BinaryOperatorKind.And =>
+                OperationExcludesCancellation(
+                    Unwrap(binary.LeftOperand),
+                    caughtLocal,
+                    caughtType,
+                    cancellationType) ||
+                OperationExcludesCancellation(
+                    Unwrap(binary.RightOperand),
+                    caughtLocal,
+                    caughtType,
+                    cancellationType),
+            BinaryOperatorKind.ConditionalOr or BinaryOperatorKind.Or =>
+                OperationExcludesCancellation(
+                    Unwrap(binary.LeftOperand),
+                    caughtLocal,
+                    caughtType,
+                    cancellationType) &&
+                OperationExcludesCancellation(
+                    Unwrap(binary.RightOperand),
+                    caughtLocal,
+                    caughtType,
+                    cancellationType),
+            _ => false
+        };
+    }
+
+    private static bool TryGetFilterOperation(
+        SyntaxNodeAnalysisContext context,
+        ExpressionSyntax filter,
+        out IOperation? operation)
+    {
         ExpressionSyntax patternExpression = filter;
         while (patternExpression is ParenthesizedExpressionSyntax parenthesized)
         {
             patternExpression = parenthesized.Expression;
         }
-        if (clause.Declaration == null ||
-            patternExpression is not IsPatternExpressionSyntax ||
-            context.SemanticModel.GetDeclaredSymbol(
-                clause.Declaration,
-                context.CancellationToken) is not ILocalSymbol caughtLocal ||
-            Unwrap(context.SemanticModel.GetOperation(
-                patternExpression, context.CancellationToken)) is not
-                IIsPatternOperation patternTest ||
-            Unwrap(patternTest.Value) is not ILocalReferenceOperation tested ||
-            !SymbolEqualityComparer.Default.Equals(
-                tested.Local, caughtLocal))
-        {
-            return false;
-        }
 
-        return PatternExcludesCancellation(
-            patternTest.Pattern, caughtType, cancellationType);
+        operation = context.SemanticModel.GetOperation(
+            patternExpression,
+            context.CancellationToken);
+        operation = Unwrap(operation);
+        return operation != null;
     }
 
     private static IOperation? Unwrap(IOperation? operation)

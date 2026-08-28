@@ -1168,6 +1168,52 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 diagnostic.ToString())));
     }
 
+    [Test]
+    public async Task ComposedCancellationFiltersFollowBooleanExclusionRules()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static bool ShouldHandle(Exception exception) => true;
+
+                static void ExclusionFirst(Exception exception) {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is not OperationCanceledException &&
+                            ShouldHandle(caught)) { }
+                }
+
+                static void ExclusionSecond(Exception exception) {
+                    try { }
+                    catch (Exception caught)
+                        when (ShouldHandle(caught) &&
+                            caught is not OperationCanceledException) { }
+                }
+
+                static void UnsafeDisjunction(Exception exception) {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is not OperationCanceledException ||
+                            ShouldHandle(caught)) { }
+                }
+
+                static void UnsafeDisjunctionReversed(Exception exception) {
+                    try { }
+                    catch (Exception caught)
+                        when (ShouldHandle(caught) ||
+                            caught is not OperationCanceledException) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(2));
+    }
+
     [TestCase(
         """
         using System;
