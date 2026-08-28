@@ -2182,6 +2182,30 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task DelegateClosedContractsAreValidatedAndMarkedUnsupported()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public delegate void ValidDelegate([Positive] int value);
+            public delegate void InvalidDelegate([Positive] string value);
+            """,
+            "contracts",
+            ["SP0024", "SP0047"]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Count(diagnostic => diagnostic.Id == "SP0047"),
+                Is.EqualTo(1));
+            Assert.That(
+                diagnostics.Count(diagnostic => diagnostic.Id == "SP0024"),
+                Is.EqualTo(1));
+        }
+    }
+
+    [Test]
     public async Task SelectedNestedCallablesAbstainWhileUnselectedAndSuppressedStayQuiet()
     {
         var factory = new RecordingSessionFactory();

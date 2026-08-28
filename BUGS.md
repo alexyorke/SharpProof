@@ -3076,31 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 676. [CONFIRMED] Delegate signature contracts are selected but silently ignored
-
-**Location**: `SharpProof.Attributes/ClosedContractAttributes.cs`, around lines
-3-16; `ContractSelectionInventory.cs`, around lines 135-146;
-`ContractBinder.cs`, around lines 74-84; `SharpProofAnalyzerEngine.cs`, around
-lines 125-131.
-
-**Description**: Closed-contract attributes legally target delegate parameters
-and returns, and selection sees the synthesized DelegateInvoke method. The binder
-rejects DelegateInvoke, while Roslyn method symbol actions do not visit synthesized
-Invoke methods, so neither validation nor the documented unsupported SP0047 runs.
-
-**Reproduction**: Calls violating `[Positive]` and `[NotNull]` delegate
-signatures emitted nothing. A malformed `[Positive] string` delegate also emitted
-no SP0024. Binder reported `selection=Contracts` then `UnsupportedTarget`; an
-ordinary method control emitted SP0027.
-
-**Impact**: Valid delegate contracts appear supported but are unenforced, and
-malformed attributes are silent.
-
-**Recommended fix**: Analyze delegate declarations/named types explicitly,
-validate DelegateInvoke closed attributes, and under current policy emit SP0047
-at the declaration. Alternatively implement full binder/call-site delegate
-support. Test valid/malformed parameter/return attributes and exactly-once output.
-
 ### 677. [CONFIRMED] Release mutation catalog maps a mutation to an unrelated test
 
 **Location**: `scripts/Test-SharpProofTrustedMutations.ps1`, around lines 880-886

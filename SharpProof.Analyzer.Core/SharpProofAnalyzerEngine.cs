@@ -136,6 +136,12 @@ internal sealed partial class SharpProofAnalyzerEngine
                         symbolContext.ReportDiagnostic,
                         symbolContext.CancellationToken),
                 SymbolKind.NamedType);
+            context.RegisterSymbolAction(
+                symbolContext =>
+                    AnalyzerFeaturePipeline.ValidateDelegateAttributes(
+                        symbolContext,
+                        session),
+                SymbolKind.NamedType);
             context.RegisterCompilationEndAction(
                 compilationContext =>
                     SharpProofControlAttributePolicy.ValidateDeclaredScope(

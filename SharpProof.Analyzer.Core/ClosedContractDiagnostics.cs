@@ -2,9 +2,10 @@ namespace SharpProof.Analyzer;
 
 internal static class ClosedContractDiagnostics
 {
-    internal static void Validate(IMethodSymbol method, AnalyzerSession session,
+    internal static bool Validate(IMethodSymbol method, AnalyzerSession session,
         Action<Diagnostic> reportDiagnostic)
     {
+        var hasValidContract = false;
         foreach (var parameter in method.Parameters)
         {
             ValidateValue(
@@ -36,9 +37,16 @@ internal static class ClosedContractDiagnostics
                     type,
                     refKind,
                     session.Attributes);
-                if (!validation.IsRecognized ||
-                    validation.IsValid ||
-                    !session.TryMarkAttributeValidated(attribute, owner))
+                if (!validation.IsRecognized)
+                {
+                    continue;
+                }
+                if (validation.IsValid)
+                {
+                    hasValidContract = true;
+                    continue;
+                }
+                if (!session.TryMarkAttributeValidated(attribute, owner))
                 {
                     continue;
                 }
@@ -52,5 +60,7 @@ internal static class ClosedContractDiagnostics
                     fallback));
             }
         }
+
+        return hasValidContract;
     }
 }

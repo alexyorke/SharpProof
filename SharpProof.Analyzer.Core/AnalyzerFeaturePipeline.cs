@@ -248,6 +248,36 @@ internal static partial class AnalyzerFeaturePipeline
         session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
     }
 
+    internal static void ValidateDelegateAttributes(
+        SymbolAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.Symbol is not INamedTypeSymbol
+            {
+                TypeKind: TypeKind.Delegate,
+                DelegateInvokeMethod: { } invoke
+            } delegateType)
+        {
+            return;
+        }
+
+        if (!ClosedContractDiagnostics.Validate(
+                invoke,
+                session,
+                context.ReportDiagnostic))
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+            delegateType.Locations.FirstOrDefault(static location =>
+                location.IsInSource) ?? Location.None,
+            delegateType.Name,
+            LanguageSubsetAbstentionReason.UnsupportedCallable));
+    }
+
     internal static void AnalyzeOperationBlock(
         OperationBlockAnalysisContext context,
         AnalyzerSession session)
