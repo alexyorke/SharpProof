@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 584. [CONFIRMED] SPMETA002 whitelists mutable immutable-collection builders
-
-**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs around
-lines 608-640.
-
-**Description**: IsMutableReferenceStorage returns false for every type in
-System.Collections.Immutable before checking mutable collection interfaces.
-Nested Builder types therefore bypass the Error-level state-isolation rule.
-
-**Reproduction**: Static readonly ImmutableArray<int>.Builder emitted zero
-SPMETA002 and runtime Add changed Count from zero to one. A readonly List<int>
-control emitted one diagnostic; an ImmutableArray value emitted zero.
-
-**Impact**: Analyzer/frontend/verifier code can retain mutable process-global
-builder state across compilations without detection.
-
-**Recommended fix**: Recognize exact nested Builder types before the immutable
-namespace exemption, preserving real immutable values. Test Array/List/Dictionary/
-HashSet and sorted builders plus immutable and ordinary mutable controls.
-
 ### 585. [CONFIRMED] WellSortedIrGenerator maximumDepth forces exponential full-depth trees
 
 **Location**: SharpProof.Testing/WellSortedIrGenerator.cs around lines 55-79,
