@@ -3054,26 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 650. [CONFIRMED] API-spec exception sets hash as ordered multisets
-
-**Location**: `SharpProof.Specs/ApiSpecContentDigest.cs`, around lines 33-37;
-`ApiSpecTable.cs`, around lines 280-293.
-
-**Description**: Digest construction hashes exception array length, order, and
-duplicates, while all runtime consumers canonicalize exception names as a set.
-Validation enforces only initialized, nonblank names.
-
-**Reproduction**: Otherwise-identical valid MayThrow tables with forward,
-reversed, and duplicated exception names had three different content hashes,
-although runtime `SetEquals` and effect throw-set semantics were identical.
-
-**Impact**: Semantically identical custom catalogs cause cache/input identity
-churn and reproducibility differences.
-
-**Recommended fix**: Canonicalize once with ordinal distinct/sort (or reject
-duplicates and hash sorted names), then store and hash that representation. Test
-reorder/duplicate equality and real-member changes.
-
 ### 651. [CONFIRMED] API-spec digest variable lookup is quadratic
 
 **Location**: `SharpProof.Specs/ApiSpecContentDigest.cs`, around lines 84-86.

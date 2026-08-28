@@ -304,7 +304,15 @@ public sealed partial class ApiSpecTable
         {
             throw new ArgumentException("Only exact cardinality can carry a count.", nameof(facets));
         }
-        return facets;
+
+        var canonicalExceptions = throws.ExceptionMetadataNames
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToImmutableArray();
+        return facets with
+        {
+            Throws = throws with { ExceptionMetadataNames = canonicalExceptions }
+        };
     }
 
     private static void ValidateEvidence(SpecEvidence? evidence, string parameterName)

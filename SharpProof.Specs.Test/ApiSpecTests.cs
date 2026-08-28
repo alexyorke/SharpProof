@@ -73,6 +73,42 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void ExceptionSetsAreCanonicalizedForContentIdentity()
+    {
+        var declaration = Declaration("throws", "M:Missing.Throws.Run", "Missing.Throws") with
+        {
+            Facets = Declaration("throws", "M:Missing.Throws.Run", "Missing.Throws").Facets with
+            {
+                Throws = new SpecThrowFacet(
+                    SpecThrowBehavior.MayThrow,
+                    ["System.InvalidOperationException", "System.Exception", "System.Exception"],
+                    new SpecEvidence(SpecEvidenceKind.Observed, "test-witness"))
+            }
+        };
+        var reordered = declaration with
+        {
+            Facets = declaration.Facets with
+            {
+                Throws = declaration.Facets.Throws with
+                {
+                    ExceptionMetadataNames = ["System.Exception", "System.InvalidOperationException"]
+                }
+            }
+        };
+
+        var first = ApiSpecTable.Create([declaration]);
+        var second = ApiSpecTable.Create([reordered]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.ContentSha256, Is.EqualTo(second.ContentSha256));
+            Assert.That(
+                first.Templates.Single().Facets.Throws.ExceptionMetadataNames,
+                Is.EqualTo(["System.Exception", "System.InvalidOperationException"]));
+        });
+    }
+
+    [Test]
     public void ApprovedReferenceFamiliesMustBeDefined()
     {
         var declaration = Declaration("row", "M:Missing.Row.Run", "Missing.Row");
