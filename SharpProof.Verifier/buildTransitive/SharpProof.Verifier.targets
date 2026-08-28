@@ -48,6 +48,21 @@
            Text="SharpProof verification supports only C# projects; set SharpProofProfile=off for non-C# projects." />
   </Target>
 
+  <Target Name="_SharpProofRejectSkippedAnalyzers"
+          BeforeTargets="CoreCompile"
+          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <Error Code="SP0054"
+           Condition="'$(RunAnalyzers)' == 'false' OR
+                      ('$(RunAnalyzers)' == '' AND '$(RunAnalyzersDuringBuild)' == 'false') OR
+                      ('$(RunAnalyzers)' == '' AND '$(RunAnalyzersDuringBuild)' == '' AND
+                       '$(IsImplicitlyTriggeredBuild)' == 'true' AND
+                       '$(UsingMicrosoftNETSdk)' == 'true' AND
+                       '$(OptimizeImplicitlyTriggeredBuild)' != 'false' AND
+                       ('$(TreatWarningsAsErrors)' != 'true' OR
+                        '$(OptimizeImplicitlyTriggeredBuild)' == 'true'))"
+           Text="SharpProof verification requires compiler analyzers; RunAnalyzers and RunAnalyzersDuringBuild must remain enabled." />
+  </Target>
+
   <Target Name="_SharpProofInvalidateBeforeDependencies"
           DependsOnTargets="_SharpProofValidateRuntimeClosure"
           BeforeTargets="ResolveReferences"
