@@ -22,13 +22,36 @@ if ($null -eq (Get-Command gh -ErrorAction SilentlyContinue)) {
 }
 
 function Invoke-GitHubJson {
-    param([Parameter(Mandatory = $true)][string]$Endpoint)
+    param(
+        [Parameter(Mandatory = $true)][string]$Endpoint,
+        [switch]$Paginate
+    )
 
-    $output = & gh api $Endpoint 2>&1
+    $arguments = if ($Paginate) {
+        @('api', '--paginate', '--slurp', $Endpoint)
+    }
+    else {
+        @('api', $Endpoint)
+    }
+    $output = & gh @arguments 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "GitHub API request failed for '$Endpoint': $output"
     }
-    return ($output -join "`n") | ConvertFrom-Json
+    $json = ($output -join "`n") | ConvertFrom-Json
+    if (-not $Paginate) {
+        return $json
+    }
+
+    foreach ($page in @($json)) {
+        if ($page -is [Array]) {
+            foreach ($item in $page) {
+                $item
+            }
+        }
+        else {
+            $page
+        }
+    }
 }
 
 function Require-SetMembers {
@@ -172,7 +195,7 @@ $workflowEvidence = @($contract.workflowJobs | ForEach-Object {
         }
         [pscustomobject]@{ id = $jobId; canonicalSha256 = $actualHash }
     })
-$rulesets = @(Invoke-GitHubJson "repos/$repository/rulesets")
+$rulesets = @(Invoke-GitHubJson "repos/$repository/rulesets" -Paginate)
 $activeTagRulesets = @($rulesets |
     Where-Object { $_.target -ceq 'tag' -and $_.enforcement -ceq 'active' })
 if ($activeTagRulesets.Count -ne 1) {

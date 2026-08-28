@@ -31,6 +31,9 @@ function New-State {
         Rulesets = @([pscustomobject]@{
                 id = 7; target = 'tag'; enforcement = 'active'
             })
+        RulesetsFirstPage = @([pscustomobject]@{
+                id = 7; target = 'tag'; enforcement = 'active'
+            })
         Ruleset = [pscustomobject]@{
             id = 7
             bypass_actors = @()
@@ -72,6 +75,7 @@ function Invoke-Case {
         -LiteralPath (Join-Path $fixture 'eng/release/environment-contract.json') `
         -Encoding utf8NoBOM
     Write-Json rulesets $state.Rulesets
+    Write-Json rulesets-first-page $state.RulesetsFirstPage
     Write-Json ruleset $state.Ruleset
     Write-Json private-environment ([pscustomobject]@{
             deployment_branch_policy = [pscustomobject]@{
@@ -142,10 +146,19 @@ try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot '.github/workflows/package-consumers.yml') `
         -Destination (Join-Path $fixture '.github/workflows/package-consumers.yml')
-    @'
+@'
 #!/bin/sh
-case "$2" in
-  repos/alexyorke/SharpProof/rulesets) file="rulesets" ;;
+paginate=0
+endpoint=""
+for argument in "$@"; do
+  case "$argument" in
+    --paginate) paginate=1 ;;
+    repos/*) endpoint="$argument" ;;
+  esac
+done
+case "$endpoint" in
+  repos/alexyorke/SharpProof/rulesets)
+    if [ "$paginate" -eq 1 ]; then file="rulesets"; else file="rulesets-first-page"; fi ;;
   repos/alexyorke/SharpProof/rulesets/7) file="ruleset" ;;
   */environments/nuget.private-preview/deployment-branch-policies) file="private-policies" ;;
   */environments/nuget.org/deployment-branch-policies) file="public-policies" ;;
@@ -225,7 +238,18 @@ cat "$GH_FIXTURE_ROOT/$file.json"
         Invoke-Case duplicate-ruleset-include { param($state) $state.Ruleset.conditions.ref_name.include += $state.Ruleset.conditions.ref_name.include[0] } $false
         Invoke-Case ruleset-case { param($state) $state.Ruleset.conditions.ref_name.include[0] = 'refs/tags/V1.0.0*' } $false
         Invoke-Case include-exclude-conflict { param($state) $state.Ruleset.conditions.ref_name.exclude = @($state.Ruleset.conditions.ref_name.include[0]) } $false
-        Invoke-Case second-active-tag-ruleset { param($state) $state.Rulesets += [pscustomobject]@{ id = 8; target = 'tag'; enforcement = 'active' } } $false
+        Invoke-Case second-active-tag-ruleset { param($state)
+            $state.Rulesets = @(
+                $state.Rulesets
+                1..29 | ForEach-Object {
+                    [pscustomobject]@{
+                        id = 100 + $_; target = 'branch'; enforcement = 'active'
+                    }
+                }
+                [pscustomobject]@{ id = 8; target = 'tag'; enforcement = 'active' }
+            )
+            $state.RulesetsFirstPage = @($state.Rulesets | Select-Object -First 30)
+        } $false
         Invoke-Case bypass-user-always { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 41; actor_type = 'User'; bypass_mode = 'always' }) } $false
         Invoke-Case bypass-team-pull-request { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 42; actor_type = 'Team'; bypass_mode = 'pull_request' }) } $false
         Invoke-Case bypass-app-always { param($state) $state.Ruleset.bypass_actors = @([pscustomobject]@{ actor_id = 49; actor_type = 'Integration'; bypass_mode = 'always' }) } $false
