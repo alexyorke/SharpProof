@@ -56,6 +56,42 @@ public sealed class FrameworkIdentityScannerTests
         Assert.That(violations, Has.One.Contain(
             "<interpolated System.* identity>"));
     }
+
+    [Test]
+    public void NonConstantStringConcatenationPrefixIsStillVisible()
+    {
+        const string source = """
+            internal static class Fixture
+            {
+                private static string Read(string suffix) => "System." + suffix;
+            }
+            """;
+        var violations = FrameworkIdentityScanner.FindViolations(
+            [("fixture.cs", source)],
+            ["System.String"],
+            []);
+        Assert.That(violations, Has.One.Contain(
+            "<concatenated System.* identity>"));
+    }
+
+    [Test]
+    public void ConcatenationRequiresTheLeadingSegmentToBeTheFrameworkPrefix()
+    {
+        const string source = """
+            internal static class Fixture
+            {
+                private static string Leading(string suffix) => "prefix." + suffix;
+                private static string Later(string suffix) => suffix + "System.String";
+                private static object NonString(string suffix) => "System." + suffix;
+            }
+            """;
+        var violations = FrameworkIdentityScanner.FindViolations(
+            [("fixture.cs", source)],
+            ["System.String"],
+            []);
+        Assert.That(violations, Has.One.Contain(
+            "<concatenated System.* identity>"));
+    }
     [Test]
     public void ConstantHostedInAnyScannedSourceFileIsVisible()
     {

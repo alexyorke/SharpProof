@@ -120,6 +120,19 @@ internal static class FrameworkIdentityScanner
                     expression,
                     constant);
             }
+
+            if (expression is BinaryExpressionSyntax binary &&
+                !TryGetConstantString(model, expression, out _) &&
+                HasConcatenatedFrameworkPrefix(model, binary) &&
+                IsOutermostStringConcatenation(model, binary) &&
+                reportedSpans.Add(expression.SpanStart))
+            {
+                AddViolation(
+                    violations,
+                    sourceFile.Path,
+                    expression,
+                    "<concatenated System.* identity>");
+            }
         }
         foreach (var interpolation in root
                      .DescendantNodes()
@@ -203,6 +216,48 @@ internal static class FrameworkIdentityScanner
             return true;
         }
         return LooksLikeMetadataName(value);
+    }
+
+    private static bool HasConcatenatedFrameworkPrefix(
+        SemanticModel model,
+        BinaryExpressionSyntax expression)
+    {
+        if (!expression.IsKind(SyntaxKind.AddExpression) ||
+            model.GetTypeInfo(expression).Type?.SpecialType !=
+            SpecialType.System_String)
+        {
+            return false;
+        }
+
+        var leading = expression.Left;
+        while (leading is ParenthesizedExpressionSyntax parenthesized)
+        {
+            leading = parenthesized.Expression;
+        }
+
+        while (leading is BinaryExpressionSyntax binary &&
+               binary.IsKind(SyntaxKind.AddExpression))
+        {
+            leading = binary.Left;
+            while (leading is ParenthesizedExpressionSyntax parenthesized)
+            {
+                leading = parenthesized.Expression;
+            }
+        }
+
+        return TryGetConstantString(model, leading, out var prefix) &&
+            prefix.StartsWith("System.", StringComparison.Ordinal) &&
+            !prefix.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsOutermostStringConcatenation(
+        SemanticModel model,
+        BinaryExpressionSyntax expression)
+    {
+        return expression.Parent is not BinaryExpressionSyntax parent ||
+            !parent.IsKind(SyntaxKind.AddExpression) ||
+            model.GetTypeInfo(parent).Type?.SpecialType !=
+            SpecialType.System_String;
     }
     private static bool LooksLikeMetadataName(string value)
     {
