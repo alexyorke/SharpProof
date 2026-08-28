@@ -5939,26 +5939,6 @@ bytes until manually removed.
 PackageSource or the remote fixture directory before writing. Test new paths,
 case/symlink-resolved containment, disjoint output, and bundle preservation.
 
-### 694. [CONFIRMED] Async Task result allocation is omitted from complete effects
-
-**Location**: `SharpProof.Effects/EffectMethodNodeBuilder.cs`, around lines 22-102.
-
-**Description**: Source/CFG scanning never models compiler-generated async method
-builder/result allocation. An async Task/Task<T> method with no explicit creation
-can therefore remain Complete with Allocation=None.
-
-**Reproduction**: Sixty-four calls to `async Task<int>` returning noncached 1729
-allocated 4,608 bytes and returned distinct tasks; Effects reported None/Complete
-and a complete no-allocation projection. A non-async Task identity control
-allocated zero and correctly stayed None.
-
-**Impact**: ZeroAllocations/purity contracts can accept ordinary async methods
-that allocate fresh result objects.
-
-**Recommended fix**: Add method-level async lowering effects for canonical Task/
-Task<T>, conservatively Managed unless a proven cache-only case applies. Cover
-suspension, cached constants, ValueTask/custom task-like, async void, and witnesses.
-
 ### 695. [CONFIRMED] Direct capturing local functions falsely report heap allocation
 
 **Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines 20-29
