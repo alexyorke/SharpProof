@@ -712,43 +712,6 @@ numeric, unknown, and flags-canonicalization cases.
 **Confidence**: High; isolated method and full traversal measurements agree,
 with a zero-allocation primitive control.
 
-### 463. [CONFIRMED] Bound-contract schema generation accepts duplicate properties
-
-**Location**: scripts/Generate-BoundContractModel.ps1 around line 21.
-
-**Description**: The documented authoritative bound-contract schema is passed
-directly to ConvertFrom-Json. Earlier duplicate properties are discarded before
-any model validation, so contradictory constructor accessibility, enum
-vocabulary, property types, or projections can pass verification.
-
-**Reproduction**: Change the first class constructor to:
-
-    "access": "public",
-    "access": "internal"
-
-Full verification against copied output exits 0:
-
-    Verified deterministic bound-contract model.
-
-The generator parser reports GENERATOR_PARSE_VALUE=internal.
-
-**Impact**: Public-surface declarations can be ambiguous while acceptance and
-generated-output verification remain green.
-
-**Root cause**: No strict raw JSON duplicate-property check precedes
-ConvertFrom-Json.
-
-**Recommended fix**: Use the shared recursive ordinal duplicate-name loader
-before conversion.
-
-**Regression coverage**: Add duplicate root schemaVersion and nested
-classes[0].constructor.access cases, require nonzero generation with
-path-qualified errors before output writes, and retain byte-identical valid
-output.
-
-**Confidence**: High; nested duplicate verification and selected parse value
-were self-verified.
-
 ### 464. [CONFIRMED] Sample validation accepts timeout parameters but never enforces them
 
 **Location**: scripts/Test-SharpProofSamples.ps1 around lines 43-50, 72,
@@ -839,43 +802,6 @@ assert fail-closed unknown rather than querying Contains(false) on top.
 **Confidence**: High; reproduced in a pinned temp checkout, and a temporary
 tri-state implementation passed the new regression plus existing exception
 escape coverage.
-
-### 466. [CONFIRMED] Operation-support catalog generation accepts duplicate stage tables
-
-**Location**: scripts/Generate-OperationSupportCatalog.ps1 around line 21.
-
-**Description**: The authoritative admission policy for contract-expression
-lowering and effect discovery is parsed directly with ConvertFrom-Json.
-Duplicate stage names collapse to the last array before nonempty and uniqueness
-validation, so contradictory supported-operation sets pass verification.
-
-**Reproduction**: Add an initial:
-
-    "contractExpression": ["Literal"],
-
-followed by the original full contractExpression table. Full verification
-exits 0:
-
-    Verified deterministic operation-support catalog.
-
-A direct parser control confirms the second array replaces the first.
-
-**Impact**: Review source can declare conflicting operation admission policy
-while generated code, stage-specific tests, and acceptance all follow the
-last-wins table and remain green.
-
-**Root cause**: Structural validation occurs after duplicate-destroying JSON
-conversion.
-
-**Recommended fix**: Run the shared recursive ordinal duplicate-property check
-before ConvertFrom-Json.
-
-**Regression coverage**: Duplicate schemaVersion, contractExpression, and
-effectDiscovery in malformed catalog fixtures; require path-qualified rejection
-before output generation and preserve valid byte identity.
-
-**Confidence**: High; duplicate-array -Verify and parser selection were
-self-verified.
 
 ### 467. [CONFIRMED] SPMETA010 treats ConcurrentDictionary.TryUpdate comparisonValue as a stored value
 
@@ -1050,40 +976,6 @@ inside CheckAsync during A renewal.
 
 **Confidence**: High; self-verified through the private lifecycle in the
 canonical container with reference and disposal-count inspection.
-
-### 472. [CONFIRMED] Effect-contract mapping generation accepts duplicate semantic properties
-
-**Location**: scripts/Generate-EffectContractMappings.ps1 around line 21.
-
-**Description**: The authoritative effect-contract vocabulary is parsed
-directly with ConvertFrom-Json. Duplicate enum metadata, numeric values, region
-mappings, or evidence rules collapse before validation.
-
-**Reproduction**: Change the first enum to:
-
-    "flags": false,
-    "flags": true
-
-Full verification exits 0:
-
-    Verified deterministic effect-contract mappings.
-
-The parser control returns GENERATOR_PARSE_VALUE=True.
-
-**Impact**: Contradictory effect semantics can remain in review source while
-generated models and acceptance stay green.
-
-**Root cause**: No strict raw duplicate-property preflight precedes conversion.
-
-**Recommended fix**: Use the shared recursive ordinal duplicate-name loader
-before ConvertFrom-Json.
-
-**Regression coverage**: Duplicate enums, enums[0].flags,
-enums[0].members[0].value, and mapping-entry properties; require path-qualified
-rejection and preserve valid byte identity.
-
-**Confidence**: High; nested duplicate -Verify and parse result were
-self-verified.
 
 ### 473. [CONFIRMED] Campaign-fatal fuzz abstentions retain no case-level evidence
 
@@ -1354,39 +1246,6 @@ method timeout cases.
 
 **Confidence**: High; self-verified in a canonical reflection probe with live
 tokens.
-
-### 480. [CONFIRMED] Analyzer diagnostic-wording generation accepts duplicate properties
-
-**Location**: scripts/Generate-AnalyzerDiagnosticCatalog.ps1 around line 21.
-
-**Description**: The catalog owning intrinsic and clause-placement wording is
-parsed directly with ConvertFrom-Json. Duplicate arguments or reasons disappear
-before mapping validation.
-
-**Reproduction**: Change the first intrinsic entry to:
-
-    "reason": "shadow intrinsic wording",
-    "reason": "Contract.Old cannot be nested inside Contract.Old"
-
-Verification exits 0:
-
-    Verified deterministic analyzer-diagnostic catalog.
-
-The parser selects the second wording.
-
-**Impact**: Contradictory diagnostic explanations can remain in the review
-source while generated runtime tests exercise only the last value.
-
-**Root cause**: No strict duplicate-property preflight precedes conversion.
-
-**Recommended fix**: Apply the shared recursive ordinal strict JSON loader.
-
-**Regression coverage**: Duplicate schemaVersion,
-intrinsicDescriptions[0].reason, placementDescriptions[0].description, and
-fallback properties; require path-qualified rejection before generation.
-
-**Confidence**: High; nested duplicate -Verify and parser selection were
-self-verified.
 
 ### 481. [CONFIRMED] Dependency-audit restore failures preserve stale passing evidence with no freshness identity
 
