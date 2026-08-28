@@ -2056,46 +2056,6 @@ Expression<Func<T>> controls. Add field-like event coverage if supported.
 **Confidence**: High; exact-baseline canonical execution held activation and
 configuration constant and failed only the two initializer-lambda sites.
 
-### 502. [CONFIRMED] Coverage receipts accept JSON string false as a passing result
-
-**Location**: scripts/Write-SharpProofQualificationReceipt.ps1 around lines
-79-82; trusted downstream by scripts/Invoke-SharpProofReleaseContainer.ps1
-around lines 184-197.
-
-**Description**: Coverage evidence is admitted using
-`[bool]$evidence.passed`. PowerShell converts every nonempty string, including
-the JSON string `"false"`, to true. The receipt writer then emits
-`status:"passed"`, and final release qualification trusts the receipt and its
-evidence hash without rechecking the original property's JSON type.
-
-**Reproduction**: A full-script canonical-container fixture supplied otherwise
-valid evidence with `"passed":"false"` and reported:
-
-    EvidencePassedJsonType = System.String
-    EvidencePassedValue    = false
-    PowerShellBooleanCast  = true
-    ReceiptWritten         = true
-    ReceiptStatus          = passed
-    ReceiptGate            = coverage
-
-**Impact**: Malformed failed coverage can satisfy the release qualification
-gate and produce a durable passed receipt.
-
-**Root cause**: Truthiness coercion is used where the evidence schema requires
-an exact JSON Boolean.
-
-**Recommended fix**: Require the property to exist, require its runtime value to
-be System.Boolean, and require that Boolean to equal true. Reject without
-creating or replacing a receipt; never coerce the value.
-
-**Regression coverage**: Accept JSON Boolean true. Reject Boolean false,
-strings `"true"` and `"false"`, numbers, null, and a missing property. Prove
-rejection cannot replace a last-known-good receipt and final qualification
-cannot accept one derived from malformed coverage.
-
-**Confidence**: High; the exact baseline script wrote a passed receipt from a
-string false value in a disposable canonical Git fixture.
-
 ### 503. [CONFIRMED] Reused SMT contexts double-count cumulative Z3 resource snapshots
 
 **Location**: SharpProof.Smt/IrSmtBackend.cs around lines 176-196;
