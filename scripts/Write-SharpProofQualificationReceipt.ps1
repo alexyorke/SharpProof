@@ -98,8 +98,11 @@ $valid = switch -Regex ($Gate) {
         $packageArtifacts.Count -eq 6
     }
     'pilots' {
-        ([string]$evidence.reviewStatus -ceq 'Reviewed' -and -not $Automated -or
-         [string]$evidence.reviewStatus -ceq 'Unreviewed' -and $Automated) -and
+        $humanReview = [string]$evidence.reviewStatus -ceq 'Reviewed' -and
+            -not $Automated
+        $automatedReview = [string]$evidence.reviewStatus -ceq 'Unreviewed' -and
+            $Automated
+        ($humanReview -or $automatedReview) -and
         (Test-SharpProofPilotReport -Report $evidence -ExpectedCommit $commit `
             -RepositoryRoot $repositoryRoot -CatalogPath $CatalogPath) -and
         $packageArtifacts.Count -eq 6

@@ -208,7 +208,7 @@ public sealed partial class ReleaseQualificationMatrixTests
                 sha256 = new string((char)('a' + index), 64)
             }).ToArray();
 
-            async Task<int> WriteAsync(string reviewStatus)
+            async Task<int> WriteAsync(string reviewStatus, bool automated)
             {
                 await File.WriteAllTextAsync(evidence, JsonSerializer.Serialize(new
                 {
@@ -216,19 +216,29 @@ public sealed partial class ReleaseQualificationMatrixTests
                     packageArtifacts = packages,
                     pilots = Array.Empty<object>()
                 }));
-                return await RunExitCodeAsync(
-                    fixture.FullName,
-                    "pwsh", "-NoLogo", "-NoProfile", "-File",
+                var arguments = new List<string> {
+                    "-NoLogo", "-NoProfile", "-File",
                     Path.Combine(
                         scripts.FullName,
                         "Write-SharpProofQualificationReceipt.ps1"),
-                    "-Gate", "pilots", "-EvidencePath", evidence);
+                    "-Gate", "pilots", "-EvidencePath", evidence
+                };
+                if (automated)
+                {
+                    arguments.Add("-Automated");
+                }
+                return await RunExitCodeAsync(
+                    fixture.FullName,
+                    "pwsh",
+                    [.. arguments]);
             }
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(await WriteAsync("Reviewed"), Is.Zero);
-                Assert.That(await WriteAsync("Unreviewed"), Is.Not.Zero);
+                Assert.That(await WriteAsync("Reviewed", automated: false), Is.Zero);
+                Assert.That(await WriteAsync("Unreviewed", automated: true), Is.Zero);
+                Assert.That(await WriteAsync("Reviewed", automated: true), Is.Not.Zero);
+                Assert.That(await WriteAsync("Unreviewed", automated: false), Is.Not.Zero);
             }
         }
         finally
