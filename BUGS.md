@@ -3054,28 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 646. [CONFIRMED] Queued SMT checks delay cancellation and pin worker threads
-
-**Location**: `SharpProof.Smt/IrSmtBackend.cs`, around lines 31-55.
-
-**Description**: `CheckAsync` schedules every request with `Task.Run` before a
-non-cancelable monitor lock. Token checking and cancellation registration happen
-only after gate admission, so each queued request blocks one thread-pool worker
-and cannot finish cancellation behind a slow active query.
-
-**Reproduction**: With the gate held, 32 well-formed queued checks reduced
-available workers by 32. After cancellation, zero completed during 500 ms; all
-canceled immediately after gate release. A healthy reuse query then returned
-Unsatisfiable.
-
-**Impact**: Ordinary concurrent use creates O(waiters) blocked workers, delayed
-cancellation, thread-pool starvation, and avoidable memory pressure.
-
-**Recommended fix**: Use cancellation-aware asynchronous admission before
-assigning the one blocking worker needed for Z3, and coordinate Dispose through
-the same state protocol. Test queued cancellation before active release, worker
-availability, active interruption, and reuse.
-
 ### 647. [CONFIRMED] Frontend fuzz coverage counts unreachable syntax as executed coverage
 
 **Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, around lines 53-66,
