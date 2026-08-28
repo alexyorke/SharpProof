@@ -14,6 +14,7 @@ $ErrorActionPreference = 'Stop'
 $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
+. (Join-Path $repositoryRoot 'scripts\Assert-SharpProofUniqueJsonProperties.ps1')
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = $null
 
@@ -319,8 +320,18 @@ $verifierTargetsPath = Join-Path `
     'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets'
 [xml]$verifierTargets = Get-Content -LiteralPath $verifierTargetsPath -Raw
 $packageManifestPath = Join-Path $repositoryRoot 'scripts\package-projects.json'
-$packageManifest = Get-Content -LiteralPath $packageManifestPath -Raw |
-    ConvertFrom-Json
+$packageManifestText = Get-Content -LiteralPath $packageManifestPath -Raw
+$packageManifestDocument = [System.Text.Json.JsonDocument]::Parse(
+    $packageManifestText)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $packageManifestDocument.RootElement `
+        -Context 'package-projects manifest'
+}
+finally {
+    $packageManifestDocument.Dispose()
+}
+$packageManifest = $packageManifestText | ConvertFrom-Json
 
 function Assert-Equal {
     param(

@@ -21,6 +21,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'Package tests require the canonical Linux container.'
 }
@@ -206,9 +207,19 @@ try {
     }
 
     if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-        $packageManifest = Get-Content -LiteralPath (Join-Path `
-            $repositoryRoot 'scripts/package-projects.json') -Raw |
-            ConvertFrom-Json
+        $packageManifestText = Get-Content -LiteralPath (Join-Path `
+            $repositoryRoot 'scripts/package-projects.json') -Raw
+        $packageManifestDocument = [System.Text.Json.JsonDocument]::Parse(
+            $packageManifestText)
+        try {
+            Assert-SharpProofUniqueJsonProperties `
+                -Value $packageManifestDocument.RootElement `
+                -Context 'package-projects manifest'
+        }
+        finally {
+            $packageManifestDocument.Dispose()
+        }
+        $packageManifest = $packageManifestText | ConvertFrom-Json
         foreach ($project in @($packageManifest.projects)) {
             Invoke-RequiredDotnet @(
                 'pack', [string]$project, '-c', 'Release', '--no-restore',

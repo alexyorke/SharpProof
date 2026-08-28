@@ -77,6 +77,58 @@ public sealed class DevCheckCommandPlanTests
         Assert.That(script, Does.Contain("NoBuild = $packagePlanReuse"));
     }
 
+    [Test]
+    public async Task DuplicatePackageManifestPropertiesAreRejectedBeforePlanning()
+    {
+        var root = FindRepositoryRoot();
+        var path = Path.Combine(root, "scripts", "package-projects.json");
+        var originalBytes = await File.ReadAllBytesAsync(path);
+        try
+        {
+            var text = System.Text.Encoding.UTF8.GetString(originalBytes).Replace(
+                "\"projects\": [",
+                "\"projects\": [],\n  \"projects\": [",
+                StringComparison.Ordinal);
+            await File.WriteAllTextAsync(path, text);
+
+            var info = new ProcessStartInfo
+            {
+                FileName = "pwsh",
+                WorkingDirectory = root,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            foreach (var argument in new[]
+            {
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                Path.Combine(root, "scripts", "Get-SharpProofDevCheckPlan.ps1"),
+                "-Configuration",
+                "Debug"
+            })
+            {
+                info.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(info) ??
+                throw new InvalidOperationException("PowerShell did not start.");
+            var output = await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            Assert.That(process.ExitCode, Is.Not.Zero, output + error);
+            Assert.That(
+                output + error,
+                Does.Contain("duplicate property 'projects'"));
+        }
+        finally
+        {
+            await File.WriteAllBytesAsync(path, originalBytes);
+        }
+    }
+
     private static async Task<JsonDocument> ReadPlan(string configuration)
     {
         var root = FindRepositoryRoot();

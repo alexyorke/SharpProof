@@ -21,6 +21,7 @@ Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
@@ -390,7 +391,17 @@ switch ($Command) {
             [IO.Directory]::Delete($resolvedOutput, $true)
         }
         [System.IO.Directory]::CreateDirectory($output) | Out-Null
-        $manifest = Get-Content (Join-Path $repositoryRoot 'scripts/package-projects.json') -Raw | ConvertFrom-Json
+        $manifestText = Get-Content (Join-Path $repositoryRoot 'scripts/package-projects.json') -Raw
+        $manifestDocument = [System.Text.Json.JsonDocument]::Parse($manifestText)
+        try {
+            Assert-SharpProofUniqueJsonProperties `
+                -Value $manifestDocument.RootElement `
+                -Context 'package-projects manifest'
+        }
+        finally {
+            $manifestDocument.Dispose()
+        }
+        $manifest = $manifestText | ConvertFrom-Json
         $repositoryCommit = (& git rev-parse HEAD).Trim()
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryCommit)) {
             throw 'Could not resolve the repository commit for package provenance.'

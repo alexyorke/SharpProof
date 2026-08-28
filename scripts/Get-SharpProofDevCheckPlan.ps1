@@ -8,9 +8,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$packageManifest = Get-Content -LiteralPath (Join-Path `
-    $repositoryRoot 'scripts/package-projects.json') -Raw |
-    ConvertFrom-Json
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
+$packageManifestText = Get-Content -LiteralPath (Join-Path `
+    $repositoryRoot 'scripts/package-projects.json') -Raw
+$packageManifestDocument = [System.Text.Json.JsonDocument]::Parse(
+    $packageManifestText)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $packageManifestDocument.RootElement `
+        -Context 'package-projects manifest'
+}
+finally {
+    $packageManifestDocument.Dispose()
+}
+$packageManifest = $packageManifestText | ConvertFrom-Json
 if ([int]$packageManifest.schemaVersion -ne 1) {
     throw 'Unsupported package-project manifest schema.'
 }

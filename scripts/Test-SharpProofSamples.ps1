@@ -19,6 +19,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 $samplesRoot = Join-Path $repositoryRoot 'samples'
 $parallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
@@ -293,9 +294,18 @@ function New-LocalPackageFeed {
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not unpack the isolated package-build repository.'
     }
-    $manifest = Get-Content -LiteralPath (
-        Join-Path $repositoryRoot 'scripts\package-projects.json') -Raw |
-        ConvertFrom-Json
+    $manifestText = Get-Content -LiteralPath (
+        Join-Path $repositoryRoot 'scripts\package-projects.json') -Raw
+    $manifestDocument = [System.Text.Json.JsonDocument]::Parse($manifestText)
+    try {
+        Assert-SharpProofUniqueJsonProperties `
+            -Value $manifestDocument.RootElement `
+            -Context 'package-projects manifest'
+    }
+    finally {
+        $manifestDocument.Dispose()
+    }
+    $manifest = $manifestText | ConvertFrom-Json
     if ($manifest.schemaVersion -ne 1) {
         throw 'Unsupported package-project manifest schema.'
     }

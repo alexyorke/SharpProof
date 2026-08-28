@@ -8,6 +8,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 if ([string]::IsNullOrWhiteSpace($DockerfilePath)) {
     $DockerfilePath = Join-Path $repositoryRoot 'eng/container/Dockerfile'
 }
@@ -34,9 +35,19 @@ $directoryBuildTargets = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'Directory.Build.targets') -Raw
 $packages = [xml](Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'Directory.Packages.props') -Raw)
-$packageProjects = Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'scripts/package-projects.json') -Raw |
-    ConvertFrom-Json
+$packageProjectsText = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'scripts/package-projects.json') -Raw
+$packageProjectsDocument = [System.Text.Json.JsonDocument]::Parse(
+    $packageProjectsText)
+try {
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $packageProjectsDocument.RootElement `
+        -Context 'package-projects manifest'
+}
+finally {
+    $packageProjectsDocument.Dispose()
+}
+$packageProjects = $packageProjectsText | ConvertFrom-Json
 
 function Assert-Exact {
     param(
