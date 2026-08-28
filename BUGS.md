@@ -2619,25 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 563. [CONFIRMED] Release-configuration validation ignores rulesets after page one
-
-**Location**: scripts/Test-SharpProofReleaseConfiguration.ps1 around lines
-24-31 and 175-179; fixture around lines 145-160 and 228.
-
-**Description**: The rulesets endpoint is called once without pagination, then
-the exact-one active tag rule is checked only over the default first page.
-
-**Reproduction**: With 30 first-page rows and a second active tag ruleset on page
-two, the script exited zero, wrote evidence, certified ruleset 7, and made one
-non-paginated API call although full state contained two active tag rulesets.
-
-**Impact**: Passing qualification evidence can certify an incomplete and
-contradictory GitHub release configuration.
-
-**Recommended fix**: Use gh api --paginate --slurp, flatten all pages, and check
-the complete list. Extend fixtures with a page-two active-tag failure and a
-branch-only page-two passing control.
-
 ### 564. [CONFIRMED] Definitely-null instance field reads are treated as completing
 
 **Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184;
