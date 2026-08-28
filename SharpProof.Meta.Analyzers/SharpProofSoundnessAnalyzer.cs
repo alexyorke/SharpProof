@@ -855,6 +855,17 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
+        if (string.Equals(named.Name, "Builder", StringComparison.Ordinal) &&
+            named.ContainingType != null &&
+            IsExactNamespace(
+                named.ContainingNamespace,
+                "System",
+                "Collections",
+                "Immutable"))
+        {
+            return true;
+        }
+
         if (IsExactNamespace(
                 named.ContainingNamespace,
                 "System",
