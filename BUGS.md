@@ -14,59 +14,6 @@ The following non-security findings were reproduced by their reporting agents
 before being added here. No production, test, build, or configuration changes
 are included in this audit-only wave.
 
-### 435. [CONFIRMED] SMT string variables admit malformed UTF-16 values that the IR domain rejects
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 117-126, 295-296,
-329-334, and 496-513; SharpProof.Ir/Utf16WellFormedness.cs around lines 11-28.
-
-**Description**: SMT strings are unconstrained Seq<Int> payloads plus null
-tags. Solver constraints do not require code units to be in the UTF-16 range or
-surrogates to form valid pairs. IrFactory and the interpreter reject lone
-surrogates, and model decoding later enforces that restriction. The solver can
-therefore refute a theorem with a value that does not exist in the IR domain,
-then fail while decoding its own model.
-
-**Reproduction theorem**:
-
-    left == null ||
-    right == null ||
-    left.Length != 1 ||
-    right.Length != 1 ||
-    left + right != "\uD83D\uDE00"
-
-No well-formed one-code-unit strings can hold the two isolated halves of the
-emoji surrogate pair, so the theorem is universally true in the IR domain. Z3
-uses left = [0xD83D] and right = [0xDE00], both non-null and length one, then
-concatenates them into the emoji. The canonical probe reported:
-
-    IR rejects isolated surrogate=True
-    backend=Unknown failure=MalformedResult
-    kernel=UnknownOutcome reason=MalformedBackendResult
-
-**Impact**: Supported theorems can become fatal malformed-backend outcomes
-instead of Proven. This is fail-closed, not a false green, but it is a direct
-domain mismatch between the public SMT backend and the IR interpreter.
-
-**Root cause**: String literals and decoded models are validated, but symbolic
-string variables receive no well-formed UTF-16 invariant.
-
-**Recommended fix**: Constrain each non-null symbolic string to the regular
-language:
-
-    ([0000-D7FF] | [E000-FFFF] | [D800-DBFF][DC00-DFFF])*
-
-A Seq<Int> regex-membership assertion guarded by the inverse null tag enforces
-both the 16-bit range and surrogate pairing without quantifiers. Retain decoder
-validation as defense in depth.
-
-**Regression coverage**: Add the theorem above beside the non-BMP UTF-16 length
-tests and require direct backend Unsatisfiable plus kernel Proven. Retain a
-valid emoji literal/model control.
-
-**Confidence**: High; the agent reproduced IR rejection, backend malformed
-result, and kernel outcome in a bounded canonical probe. This is distinct from
-the null-concatenation defect because both null tags are false.
-
 ### 436. [CONFIRMED] Failed pilots reruns preserve a stale passing report and qualification receipt
 
 **Location**: scripts/Test-SharpProofPilots.ps1 around lines 6, 12-19,
