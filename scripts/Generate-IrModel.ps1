@@ -9,6 +9,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
+. (Join-Path $PSScriptRoot 'Assert-SharpProofUniqueJsonProperties.ps1')
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if ([string]::IsNullOrWhiteSpace($SchemaPath))
@@ -165,7 +166,19 @@ function Assert-ConstructorExpression
     }
 }
 
-$schema = Get-Content -LiteralPath $SchemaPath -Raw | ConvertFrom-Json
+$schemaJson = Get-Content -LiteralPath $SchemaPath -Raw
+$schemaDocument = [System.Text.Json.JsonDocument]::Parse($schemaJson)
+try
+{
+    Assert-SharpProofUniqueJsonProperties `
+        -Value $schemaDocument.RootElement `
+        -Context 'IR model schema'
+}
+finally
+{
+    $schemaDocument.Dispose()
+}
+$schema = $schemaJson | ConvertFrom-Json
 if ([int](Get-RequiredMember $schema 'schemaVersion' 'IR model schema') -ne 1)
 {
     throw 'IR model schema version must be 1.'

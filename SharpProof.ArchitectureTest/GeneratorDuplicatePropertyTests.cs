@@ -30,6 +30,12 @@ public sealed class GeneratorDuplicatePropertyTests
         "CatalogPath",
         "OutputPath",
         "schemaVersion")]
+    [TestCase(
+        "Generate-IrModel.ps1",
+        "SharpProof.Ir/IrModel.schema.json",
+        "SchemaPath",
+        "OutputPath",
+        "schemaVersion")]
     public async Task GeneratorRejectsDuplicateRootProperties(
         string generator,
         string relativeCatalog,
