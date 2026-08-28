@@ -1392,6 +1392,41 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task UnannotatedCallerReportsInvalidExternalClosedPreconditions()
+    {
+        var external = AnalyzerTestHost.EmitReference(
+            """
+            using SharpProof.Attributes;
+
+            public static class ExternalFixture {
+                public static void Positive([Positive] string value) {
+                }
+            }
+            """,
+            "ExternalInvalidClosedPrecondition");
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            public static class Fixture {
+                public static void Call(string value) {
+                    ExternalFixture.Positive(value);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024", "SP0047"],
+            additionalReferences: [external]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024"]));
+        Assert.That(
+            diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("[Positive]")
+                .And.Contain("String")
+                .And.Contain("supported integral"));
+    }
+
+    [Test]
     public async Task ExternalMetadataPreconditionEnvelopeCannotBeAssumed()
     {
         var external = AnalyzerTestHost.EmitReference(

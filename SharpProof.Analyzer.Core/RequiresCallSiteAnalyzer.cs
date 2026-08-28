@@ -320,6 +320,20 @@ internal static partial class RequiresCallSiteAnalyzer
                 return AnalyzerSemanticOutcome.Unknown;
             }
 
+            if (session.TryGetInvalidMetadataClosedPrecondition(
+                    contractTarget,
+                    out var attributeName,
+                    out var argument,
+                    out var reason))
+            {
+                reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
+                    attributeName,
+                    argument,
+                    reason,
+                    candidate.Operation.Syntax.GetLocation()));
+                return AnalyzerSemanticOutcome.Unknown;
+            }
+
             var binding = session.BindRequires(contractTarget);
             if (binding is not { IsSuccess: true, Contracts: not null })
             {

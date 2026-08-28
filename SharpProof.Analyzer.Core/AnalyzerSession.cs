@@ -185,6 +185,71 @@ internal sealed class AnalyzerSession
                     Attributes.IsRejectedClosedContract(attribute)));
     }
 
+    internal bool TryGetInvalidMetadataClosedPrecondition(
+        IMethodSymbol method,
+        out string attributeName,
+        out string argument,
+        out string reason)
+    {
+        method = EffectAnalysisSession.NormalizeMethod(method);
+        if (!method.DeclaringSyntaxReferences.IsEmpty)
+        {
+            attributeName = string.Empty;
+            argument = string.Empty;
+            reason = string.Empty;
+            return false;
+        }
+
+        foreach (var parameter in method.Parameters)
+        {
+            if (TryGetInvalid(
+                    parameter.GetAttributes(),
+                    parameter.Type,
+                    parameter.RefKind,
+                    out attributeName,
+                    out argument,
+                    out reason))
+            {
+                return true;
+            }
+        }
+
+        attributeName = string.Empty;
+        argument = string.Empty;
+        reason = string.Empty;
+        return false;
+
+        bool TryGetInvalid(
+            ImmutableArray<AttributeData> attributes,
+            ITypeSymbol type,
+            RefKind refKind,
+            out string invalidAttributeName,
+            out string invalidArgument,
+            out string invalidReason)
+        {
+            foreach (var attribute in attributes)
+            {
+                var validation = ClosedContractAttributeValidator.Validate(
+                    attribute,
+                    type,
+                    refKind,
+                    Attributes);
+                if (validation.IsRecognized && !validation.IsValid)
+                {
+                    invalidAttributeName = validation.AttributeName;
+                    invalidArgument = type.Name;
+                    invalidReason = validation.InvalidReason!;
+                    return true;
+                }
+            }
+
+            invalidAttributeName = string.Empty;
+            invalidArgument = string.Empty;
+            invalidReason = string.Empty;
+            return false;
+        }
+    }
+
     internal bool TryBeginRequiresCallSiteAnalysis(
         IMethodSymbol method)
     {
