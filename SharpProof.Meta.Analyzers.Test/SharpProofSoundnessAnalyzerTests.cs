@@ -1928,6 +1928,72 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsDynamicCallsOnProtectedCompilationReceivers()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Frontend;
+            static class C {
+                static void M(Compilation compilation) {
+                    ((dynamic)compilation).RemoveAllSyntaxTrees();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA001"));
+    }
+
+    [Test]
+    public async Task RejectsDynamicCallsThroughSimpleAliases()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Frontend;
+            static class C {
+                static void M(Compilation compilation) {
+                    dynamic alias = (dynamic)compilation;
+                    alias.RemoveAllSyntaxTrees();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA001"));
+    }
+
+    [Test]
+    public async Task AllowsDynamicCallsOnLookalikeReceivers()
+    {
+        const string source =
+            """
+            namespace Example {
+                sealed class Compilation {
+                    public void RemoveAllSyntaxTrees() { }
+                }
+            }
+            namespace SharpProof.Frontend {
+                static class C {
+                    static void M(Example.Compilation compilation) {
+                        ((dynamic)compilation).RemoveAllSyntaxTrees();
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Where(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.Empty);
+    }
+
+    [Test]
     public async Task RejectsAllSymbolDisplayTextFamilies()
     {
         const string source =

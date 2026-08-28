@@ -109,6 +109,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             var symbols = new KnownSymbols(startContext.Compilation);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
             startContext.RegisterOperationAction(
+                c => AnalyzeDynamicInvocation(c, symbols),
+                OperationKind.DynamicInvocation);
+            startContext.RegisterOperationAction(
                 c => CacheSoundnessRules.AnalyzeAssignment(c, symbols),
                 OperationKind.SimpleAssignment,
                 OperationKind.CoalesceAssignment,
@@ -154,6 +157,166 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         AnalyzeSemanticStringMethod(context, invocation, symbols);
         CacheSoundnessRules.AnalyzeWrite(context, invocation, symbols);
         AnalyzeStringConcatExpressionText(context, invocation);
+    }
+
+    private static void AnalyzeDynamicInvocation(
+        OperationAnalysisContext context,
+        KnownSymbols symbols)
+    {
+        if (context.Operation is not IDynamicInvocationOperation invocation ||
+            GetDynamicMemberName(invocation) is not { } memberName ||
+            !IsForbiddenDynamicMember(
+                GetDynamicReceiver(invocation),
+                memberName,
+                context.Compilation,
+                context.ContainingSymbol,
+                symbols,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        Report(
+            context,
+            MetaDiagnosticDescriptors.ForbiddenRoslynApi,
+            invocation.Syntax.GetLocation(),
+            memberName);
+    }
+
+    private static bool IsForbiddenDynamicMember(
+        IOperation? receiver,
+        string memberName,
+        Compilation compilation,
+        ISymbol containingSymbol,
+        KnownSymbols symbols,
+        CancellationToken cancellationToken)
+    {
+        var receiverType = FindDynamicReceiverType(
+            receiver,
+            compilation,
+            symbols,
+            cancellationToken,
+            []);
+        if (receiverType == null)
+        {
+            return false;
+        }
+
+        foreach (var entry in ForbiddenMethods)
+        {
+            if (IsSameType(receiverType, symbols[entry.Key]) &&
+                entry.Value.Contains(memberName))
+            {
+                return true;
+            }
+        }
+
+        if (memberName == "GetSemanticModel" &&
+            (IsSameType(receiverType, symbols[KnownType.Compilation]) ||
+             IsSameType(receiverType, symbols[KnownType.CSharpCompilation])))
+        {
+            return !IsSameType(
+                containingSymbol.ContainingType,
+                symbols[KnownType.CompilationModelProvider]);
+        }
+
+        return DisplayTextMethods.Contains(memberName) &&
+            (IsSameType(receiverType, symbols[KnownType.Symbol]) ||
+             receiverType.AllInterfaces.Any(value =>
+                 IsSameType(value, symbols[KnownType.Symbol])));
+    }
+
+    private static ITypeSymbol? FindDynamicReceiverType(
+        IOperation? operation,
+        Compilation compilation,
+        KnownSymbols symbols,
+        CancellationToken cancellationToken,
+        HashSet<ISymbol> visited)
+    {
+        if (operation == null)
+        {
+            return null;
+        }
+
+        while (operation is IConversionOperation conversion)
+        {
+            operation = conversion.Operand;
+        }
+
+        if (operation.Type is { } type && IsKnownForbiddenReceiverType(type, symbols))
+        {
+            return type;
+        }
+
+        if (operation is not ILocalReferenceOperation local ||
+            !visited.Add(local.Local))
+        {
+            return null;
+        }
+
+        foreach (var reference in local.Local.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is not VariableDeclaratorSyntax
+                {
+                    Initializer.Value: var initializer
+                })
+            {
+                continue;
+            }
+
+            var model = compilation.GetSemanticModel(initializer.SyntaxTree);
+            var initializerOperation = model.GetOperation(initializer, cancellationToken);
+            var resolved = FindDynamicReceiverType(
+                initializerOperation,
+                compilation,
+                symbols,
+                cancellationToken,
+                visited);
+            if (resolved != null)
+            {
+                return resolved;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsKnownForbiddenReceiverType(
+        ITypeSymbol type,
+        KnownSymbols symbols)
+    {
+        return ForbiddenMethods.Keys.Any(key => IsSameType(type, symbols[key])) ||
+            IsSameType(type, symbols[KnownType.Compilation]) ||
+            IsSameType(type, symbols[KnownType.CSharpCompilation]) ||
+            IsSameType(type, symbols[KnownType.Symbol]);
+    }
+
+    private static string? GetDynamicMemberName(IDynamicInvocationOperation invocation)
+    {
+        if (invocation.Operation is IDynamicMemberReferenceOperation member)
+        {
+            return member.MemberName;
+        }
+
+        return invocation.Syntax switch
+        {
+            InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax memberAccess
+            } => memberAccess.Name.Identifier.ValueText,
+            InvocationExpressionSyntax
+            {
+                Expression: MemberBindingExpressionSyntax memberBinding
+            } => memberBinding.Name.Identifier.ValueText,
+            _ => null
+        };
+    }
+
+    private static IOperation? GetDynamicReceiver(IDynamicInvocationOperation invocation)
+    {
+        return invocation.Operation is IDynamicMemberReferenceOperation member
+            ? member.Instance
+            : null;
     }
 
     private static bool IsForbidden(
