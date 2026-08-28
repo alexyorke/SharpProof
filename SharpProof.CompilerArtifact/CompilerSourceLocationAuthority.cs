@@ -15,8 +15,11 @@ internal static class CompilerSourceLocationAuthority
     {
         private readonly Dictionary<CompilerSyntaxTreeSnapshot, bool> _lineMaps =
             new(ReferenceComparer.Instance);
+        private readonly Dictionary<CompilerSyntaxTreeSnapshot, string>
+            _snapshotHashes = new(ReferenceComparer.Instance);
 
         internal int LineMapValidationCount { get; private set; }
+        internal int SnapshotHashComputeCount { get; private set; }
 
         internal bool HasValidLineMap(CompilerSyntaxTreeSnapshot tree)
         {
@@ -29,6 +32,20 @@ internal static class CompilerSourceLocationAuthority
             valid = HasValidLineMapCore(tree);
             _lineMaps.Add(tree, valid);
             return valid;
+        }
+
+        internal string GetSyntaxTreeSnapshotSha256(
+            CompilerSyntaxTreeSnapshot tree)
+        {
+            if (_snapshotHashes.TryGetValue(tree, out var hash))
+            {
+                return hash;
+            }
+
+            SnapshotHashComputeCount++;
+            hash = CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree);
+            _snapshotHashes.Add(tree, hash);
+            return hash;
         }
     }
 

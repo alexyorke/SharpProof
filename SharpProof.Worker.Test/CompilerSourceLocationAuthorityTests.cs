@@ -212,6 +212,41 @@ public sealed class CompilerSourceLocationAuthorityTests
     }
 
     [Test]
+    public void ValidationContextCachesSnapshotHashPerTree()
+    {
+        var first = CreateArtifact(
+            "internal sealed class First {}\n");
+        var second = CreateArtifact(
+            "internal sealed class Second {}\n");
+        var firstTree = first.Compilation.SyntaxTrees.Single();
+        var secondTree = second.Compilation.SyntaxTrees.Single();
+        var context = new CompilerSourceLocationAuthority.ValidationContext();
+
+        string? firstHash = null;
+        for (var index = 0; index < 256; index++)
+        {
+            var hash = context.GetSyntaxTreeSnapshotSha256(firstTree);
+            firstHash ??= hash;
+            Assert.That(hash, Is.EqualTo(firstHash));
+        }
+
+        var secondHash = context.GetSyntaxTreeSnapshotSha256(secondTree);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(firstHash, Is.EqualTo(
+                CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(
+                    firstTree)));
+            Assert.That(secondHash, Is.EqualTo(
+                CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(
+                    secondTree)));
+            Assert.That(
+                context.SnapshotHashComputeCount,
+                Is.EqualTo(2));
+        }
+    }
+
+    [Test]
     public void LargeLineMapsInternRepeatedMappedPathsOnTheWire()
     {
         var artifact = CreateArtifact(

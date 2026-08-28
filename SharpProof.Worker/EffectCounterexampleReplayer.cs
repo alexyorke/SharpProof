@@ -93,8 +93,8 @@ internal static class EffectCounterexampleReplayer
         if (tree == null ||
             effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
             effectEvent.SyntaxTreeSnapshotSha256 !=
-                CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
-            effectEvent.SyntaxTreeLineMapSha256 != tree.LineMapSha256 ||
+                locationValidation.GetSyntaxTreeSnapshotSha256(tree) ||
+                effectEvent.SyntaxTreeLineMapSha256 != tree.LineMapSha256 ||
             effectEvent.SyntaxStart < 0 ||
             effectEvent.SyntaxLength <= 0 ||
             effectEvent.SyntaxStart > tree.TextLength ||

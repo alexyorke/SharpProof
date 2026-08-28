@@ -71,7 +71,8 @@ internal static class CompilerEffectClaimArtifactCodec
             if (syntaxTree == null ||
                 effectEvent.SyntaxTreeSha256 != syntaxTree.Sha256 ||
                 effectEvent.SyntaxTreeSnapshotSha256 !=
-                    CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(syntaxTree) ||
+                    (context?.GetSyntaxTreeSnapshotSha256(syntaxTree) ??
+                     CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(syntaxTree)) ||
                 effectEvent.SyntaxTreeLineMapSha256 != syntaxTree.LineMapSha256 ||
                 effectEvent.SyntaxStart < 0 ||
                 effectEvent.SyntaxLength <= 0 ||
