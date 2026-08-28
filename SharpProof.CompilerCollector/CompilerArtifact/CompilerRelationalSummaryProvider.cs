@@ -344,7 +344,7 @@ internal sealed class CompilerRelationalSummaryProvider
     {
         var provenance = summary.Signature.Provenance;
         var callIdentity = provenance.EvidenceCallIdentity;
-        if (string.IsNullOrEmpty(callIdentity) ||
+        if (!CompilerIdentityValidation.IsValidCallIdentity(callIdentity) ||
             !string.Equals(
                 callIdentity,
                 method.GetDocumentationCommentId() ?? string.Empty,

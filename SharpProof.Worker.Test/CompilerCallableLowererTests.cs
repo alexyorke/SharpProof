@@ -200,6 +200,57 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void SummaryCallIdentityAtWireLimitRemainsSupported()
+    {
+        const int helperNameLength = 488;
+        var helperName = new string('M', helperNameLength);
+        var (compilation, target, factory) = CreateTarget(
+            SummaryIdentitySource(helperName),
+            "Verify");
+        var helper = compilation.GetSymbolsWithName(helperName)
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        Assert.That(helper.GetDocumentationCommentId(), Has.Length.EqualTo(512));
+        var preparation = new CompilerCallableLowerer(compilation, factory)
+            .Prepare(target);
+
+        Assert.That(
+            preparation.IsSuccess,
+            Is.True,
+            preparation.FailureReason.ToString());
+    }
+
+    [Test]
+    public void SummaryCallIdentityAboveWireLimitAbstainsAsUnsupportedBody()
+    {
+        const int helperNameLength = 489;
+        var helperName = new string('M', helperNameLength);
+        var (compilation, target, factory) = CreateTarget(
+            SummaryIdentitySource(helperName),
+            "Verify");
+        var helper = compilation.GetSymbolsWithName(helperName)
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        Assert.That(helper.GetDocumentationCommentId(), Has.Length.EqualTo(513));
+        var lowerer = new CompilerCallableLowerer(compilation, factory);
+        var preparation = lowerer.Prepare(target);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(
+                lowerer.SummaryEvidenceAuthorities.Select(static authority =>
+                    authority.CallIdentity),
+                Is.Empty);
+        }
+    }
+
+    [Test]
     public void DiscardedSupportedCallsReceiveAReusableSinkTarget()
     {
         var preparation = Prepare(
@@ -588,6 +639,22 @@ public sealed class CompilerCallableLowererTests
         {
             EffectClaims = [.. target.EffectClaims.Select(static claim => claim.Evidence)]
         };
+    }
+
+    private static string SummaryIdentitySource(string helperName)
+    {
+        return $$"""
+            using SharpProof.Attributes;
+            internal static class Subject {
+                private static int {{helperName}}(int value) => value;
+
+                [DoesNotThrow]
+                internal static int Verify(int value) {
+                    Contract.Ensures(true);
+                    return {{helperName}}(value);
+                }
+            }
+            """;
     }
 
     private static async Task<CallableVerificationResult> VerifyCoverageAsync(

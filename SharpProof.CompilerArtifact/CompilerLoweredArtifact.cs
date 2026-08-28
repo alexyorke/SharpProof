@@ -1088,8 +1088,7 @@ internal static class CompilerLoweredArtifact
 
     private static bool ValidSummaryCallIdentity(string? identity)
     {
-        return identity is { Length: > 0 and <= 512 } &&
-            identity.All(static character => !char.IsControl(character));
+        return CompilerIdentityValidation.IsValidCallIdentity(identity);
     }
 
     private static bool ValidSummaryEvidence(

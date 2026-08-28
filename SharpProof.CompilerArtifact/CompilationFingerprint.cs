@@ -350,8 +350,7 @@ internal static class CompilationFingerprint
 
     private static bool ValidIdentity(string? value)
     {
-        return value is { Length: > 0 and <= 512 } &&
-            value.All(static character => !char.IsControl(character));
+        return CompilerIdentityValidation.IsValidCallIdentity(value);
     }
 
     private static bool ValidReferences(
