@@ -267,54 +267,6 @@ unsafe cache property target and retain a fully cacheable tuple control.
 **Confidence**: High; self-verified in a canonical exact-source probe with
 positive inline and negative alias/factory controls.
 
-### 442. [CONFIRMED] SAT string-model decoding does not observe cancellation
-
-**Location**: SharpProof.Smt/IrSmtBackend.cs around lines 59, 247-273,
-422-455, and 457-515.
-
-**Description**: CreateSatisfiable, TryCreateValue, and DecodeString do not
-receive a CancellationToken. DecodeString accepts models with up to 1,000,000
-UTF-16 code units and evaluates every sequence element without a cancellation
-checkpoint. CheckAsync observes the token only after all of CheckCore,
-including model materialization, returns. Solver Context.Interrupt does not
-bound this post-solver managed decoding loop.
-
-**Reproduction**: A canonical immutable-snapshot probe forced a non-null
-1,000,000-code-unit satisfiable model with:
-
-    s == null || s.Length != 1_000_000
-
-Negating this goal requires a non-null string of exactly that length. With
-CancelAfter(10,000), the probe reported:
-
-    canceled; elapsedMs=13315; requested=True
-
-Cancellation overshot by 3.315 seconds while model work continued. A separate
-100,000-unit run under host contention remained active beyond its 60-second
-scheduled cancellation and had to be terminated.
-
-**Impact**: Cancellation of a public IrSmtBackend query is not prompt or
-bounded after SAT. Large symbolic string models can continue consuming CPU
-after the caller's budget expires. Current worker policy rejects string
-variables, so the present reachability is the public backend and direct
-clients, not a worker false verdict.
-
-**Root cause**: Cancellation is threaded through solving but stops at the
-model-construction boundary.
-
-**Recommended fix**: Pass the token through CreateSatisfiable, TryCreateValue,
-and DecodeString. Check it before evaluating length and inside every element
-iteration. Ensure cancellation disposes or abandons model work without
-poisoning the reusable backend/context.
-
-**Regression coverage**: Use a forced exact-length non-null string model and a
-deterministic decoder-entry hook. Cancel after the first decoded element,
-require OperationCanceledException before the second, then run a fresh query
-successfully on the same backend.
-
-**Confidence**: High; self-verified in the canonical Linux-amd64 image against
-an immutable ffe74fff1 snapshot with timed cancellation evidence.
-
 ### 443. [CONFIRMED] Signed System.Random seed aliases repeat downstream fuzz cases even when raw case seeds differ
 
 **Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 152-155 and
