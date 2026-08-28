@@ -201,7 +201,7 @@ public sealed class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.None));
@@ -4564,6 +4564,31 @@ public sealed class WorkerTests
                 ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
                 : [],
             Is.Empty);
+    }
+
+    [Test]
+    public async Task BackendTimeoutProjectsToTypedMethodTimeout()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(
+            new CountingBackend(
+                BackendCheckResult.Unknown(BackendFailureReason.Timeout)));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
+            Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
+            Assert.That(
+                response.CallableResults.Single().Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.MethodTimeout));
+            Assert.That(
+                response.ClaimResults.Single().Reason,
+                Is.EqualTo(WorkerClaimReason.MethodTimeout));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
     }
 
     [TestCase(

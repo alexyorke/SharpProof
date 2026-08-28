@@ -203,54 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 518. [CONFIRMED] Backend-reported timeouts become malformed worker results
-
-**Location**: SharpProof.Worker/CallableVerificationPolicy.cs around lines 43-55;
-lane-renewal decision in SharpProof.Worker/SharpProofWorker.cs around lines
-302-325; malformed fallback around lines 350-367; projection authority in
-SharpProof.Worker.Protocol/WorkerResultAssembler.cs around lines 208-233.
-
-**Description**: BackendCheckResult.Unknown(Timeout) is an explicitly supported
-normal result and maps to an Unknown claim with MethodTimeout. Callable policy
-then labels every set containing an Unknown claim as SemanticUnknown, ignoring
-the typed claim reason. Protocol projection requires callable MethodTimeout when
-an owned unknown claim has MethodTimeout, so the assembled response is rejected
-and replaced with Failed/MalformedResult. The lane also is not renewed because
-renewal looks for callable MethodTimeout.
-
-**Reproduction**: A no-file probe against the built production protocol
-assembly reported:
-
-    classificationStatus=TimedOut
-    classificationFailure=None
-    semanticUnknownProjectionAccepted=False
-    methodTimeoutProjectionAccepted=True
-
-Existing executable coverage independently confirms backend Timeout -> claim
-MethodTimeout; the probe proves the exact producer pair is invalid while the
-correctly typed pair is accepted.
-
-**Impact**: A legitimate backend timeout is laundered into infrastructure-style
-MalformedResult, corrupting cause attribution. A factory-backed timed-out lane
-is reused instead of renewed before remaining targets.
-
-**Root cause**: Producer and validator implement different claim-to-callable
-projection rules; the producer collapses typed unknown reasons too early.
-
-**Recommended fix**: Derive callable reason through one shared projection
-function using validator precedence: at minimum MethodTimeout, ProjectTimeout,
-Canceled, and UnsupportedCallable before generic SemanticUnknown. Use the same
-result for classification and lane renewal.
-
-**Regression coverage**: End-to-end backend Unknown(Timeout) with an unexpired
-wall budget must yield RunStatus TimedOut, FailureReason None, matching callable
-and claim MethodTimeout, and a protocol-valid response. With a factory and more
-work, require backend renewal before the next target.
-
-**Confidence**: High; exact policy output fails the protocol authority while its
-typed correction passes, and the upstream timeout mapping is already executable
-coverage.
-
 ### 519. [CONFIRMED] Conditional encoding leaks two Z3 Sort wrappers until finalization
 
 **Location**: SharpProof.Smt/IrSmtBackend.cs around lines 650-658, especially

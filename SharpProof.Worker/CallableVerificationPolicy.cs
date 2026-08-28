@@ -49,14 +49,7 @@ internal static class CallableVerificationPolicy
                         postProcessingToken)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
-            var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)
-                ? records.Any(static record =>
-                    record.Outcome == WorkerClaimOutcome.Unknown &&
-                    record.Reason is WorkerClaimReason.InfrastructureFailure or
-                        WorkerClaimReason.BackendUnavailable)
-                    ? WorkerCallableCoverageReason.InfrastructureFailure
-                    : WorkerCallableCoverageReason.SemanticUnknown
-                : WorkerCallableCoverageReason.None;
+            var reason = GetCallableCoverageReason(records);
             return Result(target, reason, records);
         }
         catch (OperationCanceledException)
@@ -136,5 +129,50 @@ internal static class CallableVerificationPolicy
                 Assumptions = [.. target.Entry.Assumptions]
             },
             claims);
+    }
+
+    private static WorkerCallableCoverageReason GetCallableCoverageReason(
+        ImmutableArray<WorkerClaimResult> records)
+    {
+        var unknown = records
+            .Where(static record => record.Outcome == WorkerClaimOutcome.Unknown)
+            .ToArray();
+        if (unknown.Length == 0)
+        {
+            return WorkerCallableCoverageReason.None;
+        }
+
+        if (unknown.All(static record =>
+                record.Reason == WorkerClaimReason.UnsupportedCallable))
+        {
+            return WorkerCallableCoverageReason.UnsupportedCallable;
+        }
+
+        if (unknown.Any(static record =>
+                record.Reason == WorkerClaimReason.MethodTimeout))
+        {
+            return WorkerCallableCoverageReason.MethodTimeout;
+        }
+
+        if (unknown.Any(static record =>
+                record.Reason == WorkerClaimReason.ProjectTimeout))
+        {
+            return WorkerCallableCoverageReason.ProjectTimeout;
+        }
+
+        if (unknown.Any(static record =>
+                record.Reason == WorkerClaimReason.Canceled))
+        {
+            return WorkerCallableCoverageReason.Canceled;
+        }
+
+        if (unknown.All(static record =>
+                record.Reason is WorkerClaimReason.InfrastructureFailure or
+                    WorkerClaimReason.BackendUnavailable))
+        {
+            return WorkerCallableCoverageReason.InfrastructureFailure;
+        }
+
+        return WorkerCallableCoverageReason.SemanticUnknown;
     }
 }
