@@ -2619,29 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 576. [CONFIRMED] Mapped-location collisions prevent compiler-manifest emission
-
-**Location**: CompilerCollector/ClaimManifestBuilder.cs around lines 670-688;
-CompilerManifestArtifactProducer.cs around lines 184-253;
-CompilerArtifact/CompilerSourceLocationAuthority.cs around lines 139-170 and
-214-249; FinalCompilationCollector.cs around lines 42-50.
-
-**Description**: Producer discovery drops Roslyn Location.SourceTree and later
-reconstructs authority from mapped geometry. Two physical trees with identical
-#line path, line/column, and physical offset are declared ambiguous.
-
-**Reproduction**: Two clean selected methods mapped to shared.g.cs:102:5 at
-offset 83 caused InvalidDataException, then SP0049/no manifest. Changing only the
-second virtual path yielded four authorities.
-
-**Impact**: Valid generated/Razor-style compilations can fail verification
-solely due to ordinary virtual-coordinate collision.
-
-**Recommended fix**: Carry producer-known SourceTree/ordinal sidecars for
-callables, claims, and diagnostics and geometry-check that exact tree. Retain
-unique rediscovery only when identity is unavailable. Add collision round-trip
-and tamper tests.
-
 ### 577. [CONFIRMED] Contract intrinsics in constructor initializers bypass validation
 
 **Location**: SharpProof.Contracts/ContractClauseInventoryBuilder.cs around
