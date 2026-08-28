@@ -360,49 +360,6 @@ path-qualified errors, and preserve byte-identical valid output.
 **Confidence**: High; both root and nested duplicates were self-verified
 against the generator's -Verify path in the canonical container.
 
-### 448. [CONFIRMED] Initial solver-lane factory faults are always mislabeled as backend unavailable
-
-**Location**: SharpProof.Worker/SharpProofWorker.cs around lines 251-256,
-538-556, and renewal handling around lines 617-623; authoritative exception
-classification in SharpProof.Worker/Program.cs around lines 280-291.
-
-**Description**: TryCreateLanes catches every non-OOM, non-cancellation
-exception from the initial backend factory and returns only false plus an error
-string. Its sole caller unconditionally maps false to BackendUnavailable,
-backend.unavailable, and claim reason BackendUnavailable. Program's
-authoritative classifier explicitly says InvalidOperationException is not
-backend-unavailable, and lane renewal already preserves that distinction.
-
-**Reproduction**: A canonical reflection probe against the built worker
-reported:
-
-    created=False
-    error=ordinary factory failure
-    invalidOperationIsBackendUnavailable=False
-    dllNotFoundIsBackendUnavailable=True
-
-**Impact**: Configuration, implementation, or other ordinary infrastructure
-faults during initial lane creation are reported as missing native backend
-availability. Diagnostics, claim reasons, telemetry, and operator remediation
-all point to the wrong failure class.
-
-**Root cause**: TryCreateLanes erases exception category and the caller assumes
-all creation failures are native-load failures.
-
-**Recommended fix**: Return a typed lane-creation failure or preserve the
-caught exception for Program.IsBackendUnavailable classification. Map ordinary
-faults to worker.infrastructure plus InfrastructureFailure at run and claim
-levels; reserve backend.unavailable and BackendUnavailable for classified
-native availability failures.
-
-**Regression coverage**: Initial InvalidOperationException must produce
-InfrastructureFailure and worker.infrastructure. DllNotFoundException must
-remain BackendUnavailable and backend.unavailable. Both responses should
-retain authoritative manifest shape and pass protocol validation.
-
-**Confidence**: High; self-verified in the canonical container with classifier
-controls and matched against the already-distinct renewal path.
-
 ### 450. [CONFIRMED] Compiler-synthesized record members omit executable base calls from Requires analysis
 
 **Location**: SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
