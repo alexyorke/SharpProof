@@ -2619,48 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 543. [CONFIRMED] A completing local coalesce assignment suppresses later Requires diagnostics
-
-**Location**: SharpProof.Effects/ManagedAbstractFlow.cs,
-DefiniteOperationFacts.CompletesNormally around lines 1842-1917; prefix use in
-SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines 461-471;
-Unknown mapping in RequiresCallSiteAnalyzer.cs around lines 339-342.
-
-**Description**: The strict completion allowlist has no
-ICoalesceAssignmentOperation case. Every preceding `??=` is considered
-non-completing, so a later reachable ordinary call becomes unreplayable even
-when local coalesce assignment definitely completes. Effects has a separate
-completion evaluator that already models the operation.
-
-**Reproduction**:
-
-    string? value = null;
-    value ??= "ok";
-    Positive(-1);
-
-Candidate output was `can-replay=False flow=Complete`; no SP0027 appeared. The
-direct control reported SP0027. Runtime reached the call once. A definitely
-throwing RHS correctly prevented the later call, showing blanket admission would
-be wrong.
-
-**Impact**: One ordinary prior statement silences all later concrete
-precondition refutations in that path without a fallback diagnostic.
-
-**Root cause**: Operation completion semantics are duplicated and the analyzer's
-allowlist omits coalesce assignment entirely.
-
-**Recommended fix**: Add sound coalesce-assignment evaluation order for local,
-parameter, and discard targets when target/RHS/write definitely complete. Keep
-property/index/field shapes conservative until getter/setter/receiver effects
-are modeled, or share the existing completion evaluator if its contract aligns.
-
-**Regression coverage**: Completing local ??= followed by invalid call reports;
-throwing RHS suppresses. Add dependent nonnull/null state, direct control, and
-unknown property target fail-closed cases.
-
-**Confidence**: High; candidate flow was complete and runtime reached the call,
-with the missing operation-kind case isolating replay rejection.
-
 ### 544. [CONFIRMED] Release-authority closure skips ordinary relative psm1 imports
 
 **Location**: scripts/Get-SharpProofReleaseAuthorityClosure.ps1 around lines
