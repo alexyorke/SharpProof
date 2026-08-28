@@ -2561,7 +2561,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
             Is.EqualTo(4),
             string.Join(" | ", diagnostics.Select(static diagnostic =>
-                $"{diagnostic.Id}:{diagnostic.GetMessage()}")));
+                $"{diagnostic.Id}:{diagnostic.GetMessage(CultureInfo.InvariantCulture)}")));
     }
 
     [Test]
