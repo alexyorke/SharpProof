@@ -6,7 +6,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     private const int MaximumMalformedModelRetries = 4;
     private const int WellFormedUtf16PrefixLength = 1;
     internal const int MaximumDecodedStringLength = 1_000_000;
-    private readonly Context _context = new();
+    private readonly Context _context;
     private readonly object _gate = new();
     private readonly IrSmtBackendOptions _options;
     private readonly int _maximumDecodedStringLength;
@@ -29,6 +29,14 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     internal IrSmtBackend(
         IrSmtBackendOptions options,
         int maximumDecodedStringLength)
+        : this(options, maximumDecodedStringLength, static () => new Context())
+    {
+    }
+
+    internal IrSmtBackend(
+        IrSmtBackendOptions options,
+        int maximumDecodedStringLength,
+        Func<Context> contextFactory)
     {
         _options = ArgumentNullGuard.NotNull(options, nameof(options));
         if (maximumDecodedStringLength <= 0)
@@ -37,7 +45,9 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 nameof(maximumDecodedStringLength));
         }
 
+        contextFactory = ArgumentNullGuard.NotNull(contextFactory, nameof(contextFactory));
         _maximumDecodedStringLength = maximumDecodedStringLength;
+        _context = contextFactory();
     }
 
     public long ConsumedResourceCount

@@ -10,6 +10,31 @@ namespace SharpProof.Smt.Test;
 public sealed class IrSmtBackendTests
 {
     [Test]
+    [NonParallelizable]
+    public void NullOptionsAreValidatedBeforeCreatingTheNativeContext()
+    {
+        var creations = 0;
+        Z3Context? created = null;
+        try
+        {
+            Assert.Throws<ArgumentNullException>((Action)(() =>
+                new IrSmtBackend(
+                    null!,
+                    IrSmtBackend.MaximumDecodedStringLength,
+                    () =>
+                    {
+                        creations++;
+                        return created = new Z3Context();
+                    })));
+            Assert.That(creations, Is.Zero);
+        }
+        finally
+        {
+            created?.Dispose();
+        }
+    }
+
+    [Test]
     public async Task UnsatProofReturnsAHygienicCore()
     {
         var factory = new IrFactory();
