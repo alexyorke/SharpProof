@@ -3054,30 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 662. [CONFIRMED] Supervisor control records leak into user-visible verifier output
-
-**Location**: `SharpProof.BuildTasks/VerifierProcessSupervisor.cs`, around lines
-94-105 and 218-225; `RunVerifier.cs`, around lines 342-353 and 607-705.
-
-**Description**: Output draining appends raw chunks before recognizing
-`SharpProof.Armed/1 <nonce>` and `SharpProof.Cleanup/1 <nonce>`. Authentication
-signals are set, but the same internal records remain in returned text and are
-logged at high importance. They also consume the verifier diagnostic-size budget.
-
-**Reproduction**: The exact parser consumed Armed, ordinary output, separator,
-and Cleanup. Both authentication flags were true, while returned log text still
-contained both full nonce records.
-
-**Impact**: Every normal verified build emits random internal protocol frames,
-making logs noisy and nondeterministic; large solutions multiply the noise and
-protocol overhead can prematurely exhaust diagnostic capture.
-
-**Recommended fix**: Parse control-plane lines separately and suppress exact
-authenticated frames plus their inserted separator from visible output. Apply
-the cap to verifier diagnostics only while preserving byte/line-ending behavior.
-Test split chunks, final unterminated lines, near-limit output, and build-engine
-logging.
-
 ### 663. [CONFIRMED] Parameterized array range slices omit mandatory allocation
 
 **Location**: `SharpProof.Effects/OperationEffectScanner.cs`, around lines

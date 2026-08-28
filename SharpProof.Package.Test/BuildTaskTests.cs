@@ -187,6 +187,34 @@ public sealed class BuildTaskTests
 
     [Test]
     public async System.Threading.Tasks.Task
+        VerifierOutputDrainHidesAuthenticatedControlRecordsAndSeparator()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        var input = "ordinary\n" +
+            "SharpProof.Armed/1 " + nonce + "\n" +
+            "child output\n\n" +
+            "SharpProof.Cleanup/1 " + nonce + "\n" +
+            "unterminated";
+
+        var result = await RunVerifier.ReadBoundedOutputAsync(
+            new ChunkedTextReader(input, 3),
+            nonce,
+            static () => { });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Text, Is.EqualTo(
+                "ordinary\nchild output\nunterminated"));
+            Assert.That(result.SupervisorArmed, Is.True);
+            Assert.That(result.CleanupAuthenticated, Is.True);
+            Assert.That(result.LimitExceeded, Is.False);
+        }
+    }
+
+    [Test]
+    public async System.Threading.Tasks.Task
         VerifierArmedStateIsPublishedIndependentlyOfOutputCompletion()
     {
         const string nonce =
@@ -2558,6 +2586,30 @@ public sealed class BuildTaskTests
             }
             await completion.Task.ConfigureAwait(false);
             return 0;
+        }
+    }
+
+    private sealed class ChunkedTextReader(string initialText, int chunkSize)
+        : TextReader
+    {
+        private int position;
+
+        public override System.Threading.Tasks.Task<int> ReadAsync(
+            char[] buffer,
+            int index,
+            int count)
+        {
+            if (position >= initialText.Length)
+            {
+                return System.Threading.Tasks.Task.FromResult(0);
+            }
+
+            var copied = Math.Min(
+                Math.Min(count, chunkSize),
+                initialText.Length - position);
+            initialText.CopyTo(position, buffer, index, copied);
+            position += copied;
+            return System.Threading.Tasks.Task.FromResult(copied);
         }
     }
 }

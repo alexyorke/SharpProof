@@ -619,10 +619,100 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         var captured = new StringBuilder();
         var protocolLine = new StringBuilder();
         var protocolLineTooLong = false;
+        string? pendingBlankLine = null;
         var limitExceeded = false;
         var supervisorArmed = false;
         var cleanupAuthenticated = false;
         var buffer = new char[4096];
+
+        void AppendVisible(string text)
+        {
+            if (text.Length == 0)
+            {
+                return;
+            }
+
+            var available = Math.Max(
+                0,
+                MaximumCapturedOutputCharacters - captured.Length);
+            var count = Math.Min(available, text.Length);
+            if (count > 0)
+            {
+                captured.Append(text, 0, count);
+            }
+            if (count != text.Length && !limitExceeded)
+            {
+                limitExceeded = true;
+                outputLimitReached?.Invoke();
+                signalOutputLimit();
+            }
+        }
+
+        void FlushPendingBlankLine()
+        {
+            if (pendingBlankLine is { } blankLine)
+            {
+                pendingBlankLine = null;
+                AppendVisible(blankLine);
+            }
+        }
+
+        void ProcessCompleteLine()
+        {
+            var line = protocolLine.ToString();
+            var lineWasTooLong = protocolLineTooLong;
+            protocolLine.Clear();
+            protocolLineTooLong = false;
+
+            if (!lineWasTooLong)
+            {
+                var normalizedLine = line.EndsWith('\r')
+                    ? line[..^1]
+                    : line;
+                var armedRecord = string.Equals(
+                    normalizedLine,
+                    SupervisorArmedMessage + " " + supervisorNonce,
+                    StringComparison.Ordinal);
+                if (armedRecord)
+                {
+                    FlushPendingBlankLine();
+                    supervisorArmed = true;
+                    supervisorArmedSignal?.TrySetResult(true);
+                    return;
+                }
+
+                var cleanupRecord = string.Equals(
+                    normalizedLine,
+                    SupervisorCleanupMessage + " " + supervisorNonce,
+                    StringComparison.Ordinal);
+                if (cleanupRecord)
+                {
+                    if (supervisorArmed)
+                    {
+                        pendingBlankLine = null;
+                    }
+                    else
+                    {
+                        FlushPendingBlankLine();
+                    }
+                    cleanupAuthenticated = true;
+                    supervisorCleanupSignal?.TrySetResult(true);
+                    return;
+                }
+
+                if (supervisorArmed && normalizedLine.Length == 0)
+                {
+                    FlushPendingBlankLine();
+                    pendingBlankLine = line + "\n";
+                    return;
+                }
+            }
+
+            FlushPendingBlankLine();
+            AppendVisible(line);
+            AppendVisible("\n");
+        }
+
         while (true)
         {
             var count = await reader.ReadAsync(
@@ -633,20 +723,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 break;
             }
-            var remaining = MaximumCapturedOutputCharacters -
-                captured.Length;
-            if (remaining > 0)
-            {
-                captured.Append(buffer, 0, Math.Min(remaining, count));
-            }
-            if (count > remaining)
-            {
-                limitExceeded = true;
-                outputLimitReached?.Invoke();
-                signalOutputLimit();
-            }
             if (supervisorNonce == null)
             {
+                AppendVisible(new string(buffer, 0, count));
                 continue;
             }
             for (var index = 0; index < count; index++)
@@ -654,34 +733,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 var character = buffer[index];
                 if (character == '\n')
                 {
-                    if (!protocolLineTooLong)
-                    {
-                        var line = protocolLine.ToString();
-                        if (line.EndsWith('\r'))
-                        {
-                            line = line[..^1];
-                        }
-                        var armedRecord = string.Equals(
-                            line,
-                            SupervisorArmedMessage + " " + supervisorNonce,
-                            StringComparison.Ordinal);
-                        supervisorArmed |= armedRecord;
-                        if (armedRecord)
-                        {
-                            supervisorArmedSignal?.TrySetResult(true);
-                        }
-                        var cleanupRecord = string.Equals(
-                            line,
-                            SupervisorCleanupMessage + " " + supervisorNonce,
-                            StringComparison.Ordinal);
-                        cleanupAuthenticated |= cleanupRecord;
-                        if (cleanupRecord)
-                        {
-                            supervisorCleanupSignal?.TrySetResult(true);
-                        }
-                    }
-                    protocolLine.Clear();
-                    protocolLineTooLong = false;
+                    ProcessCompleteLine();
                     continue;
                 }
                 if (!protocolLineTooLong)
@@ -692,12 +744,33 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     }
                     else
                     {
+                        var bufferedPrefix = protocolLine.ToString();
                         protocolLine.Clear();
                         protocolLineTooLong = true;
+                        FlushPendingBlankLine();
+                        AppendVisible(bufferedPrefix);
+                        AppendVisible(character.ToString());
                     }
+                }
+                else
+                {
+                    AppendVisible(character.ToString());
                 }
             }
         }
+
+        if (protocolLineTooLong)
+        {
+            FlushPendingBlankLine();
+            AppendVisible(protocolLine.ToString());
+        }
+        else if (protocolLine.Length > 0)
+        {
+            FlushPendingBlankLine();
+            AppendVisible(protocolLine.ToString());
+        }
+        FlushPendingBlankLine();
+
         return new BoundedProcessOutput(
             captured.ToString(),
             limitExceeded,
