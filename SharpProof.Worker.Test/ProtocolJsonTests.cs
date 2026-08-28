@@ -1278,6 +1278,33 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void CanonicalEnumValidationDoesNotAllocatePerToken()
+    {
+        using var document = JsonDocument.Parse("\"Proven\"");
+        var value = document.RootElement;
+        for (var index = 0; index < 1_000; index++)
+        {
+            WorkerProtocolJson.EnsureCanonicalEnum(
+                value,
+                nameof(WorkerClaimOutcome));
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 100_000; index++)
+        {
+            WorkerProtocolJson.EnsureCanonicalEnum(
+                value,
+                nameof(WorkerClaimOutcome));
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.That(allocated, Is.LessThan(4_096));
+    }
+
+    [Test]
     public void CanonicalProtocolDocumentsStrictlyRoundTrip()
     {
         var requestJson = WorkerProtocolJson.SerializeRequest(CreateRequest());

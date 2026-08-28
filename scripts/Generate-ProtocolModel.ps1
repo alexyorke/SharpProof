@@ -68,19 +68,20 @@ function Add-WrappedAlternatives {
         [string]$Prefix,
         [string]$Continuation,
         [string[]]$Alternatives,
-        [string]$Suffix = '')
+        [string]$Suffix = '',
+        [string]$Operator = 'or')
     if ($Alternatives.Count -eq 0) {
         throw 'A generated alternative list cannot be empty.'
     }
     $current = $Prefix + $Alternatives[0]
     foreach ($alternative in $Alternatives | Select-Object -Skip 1) {
-        $addition = ' or ' + $alternative
+        $addition = " $Operator " + $alternative
         if (($current.Length + $addition.Length + $Suffix.Length) -le 140) {
             $current += $addition
         }
         else {
             $Lines.Add($current)
-            $current = $Continuation + 'or ' + $alternative
+            $current = $Continuation + $Operator + ' ' + $alternative
         }
     }
     $Lines.Add($current + $Suffix)
@@ -721,6 +722,60 @@ foreach ($declaration in $declarations) {
     }
     $lines.Add('            ]),')
 }
+$lines.Add('        };')
+$lines.Add('')
+$lines.Add('    internal static bool TryGetEnumType(string declaredType, out Type enumType)')
+$lines.Add('    {')
+$lines.Add('        switch (declaredType)')
+$lines.Add('        {')
+foreach ($declaration in $declarations) {
+    if ([string](Get-RequiredMember $declaration 'kind' 'enum declaration') -ne 'enum') {
+        continue
+    }
+    $name = [string](Get-RequiredMember $declaration 'name' 'enum declaration')
+    $lines.Add("            case nameof($name):")
+    $lines.Add("                enumType = typeof($name);")
+    $lines.Add('                return true;')
+}
+$lines.Add('            default:')
+$lines.Add('                enumType = null!;')
+$lines.Add('                return false;')
+$lines.Add('        }')
+$lines.Add('    }')
+$lines.Add('    internal static bool IsFlagsEnum(string declaredType) =>')
+$lines.Add('        declaredType switch')
+$lines.Add('        {')
+foreach ($declaration in $declarations) {
+    if ([string](Get-RequiredMember $declaration 'kind' 'enum declaration') -ne 'enum' -or
+        -not [bool](Get-RequiredMember $declaration 'flags' 'enum declaration')) {
+        continue
+    }
+    $name = [string](Get-RequiredMember $declaration 'name' 'enum declaration')
+    $lines.Add("            nameof($name) => true,")
+}
+$lines.Add('            _ => false')
+$lines.Add('        };')
+$lines.Add('    internal static bool IsCanonicalEnumValue(')
+$lines.Add('        JsonElement value, string declaredType) =>')
+$lines.Add('        declaredType switch')
+$lines.Add('        {')
+foreach ($declaration in $declarations) {
+    if ([string](Get-RequiredMember $declaration 'kind' 'enum declaration') -ne 'enum' -or
+        [bool](Get-RequiredMember $declaration 'flags' 'enum declaration')) {
+        continue
+    }
+    $name = [string](Get-RequiredMember $declaration 'name' 'enum declaration')
+    $patterns = @(
+        Get-RequiredMember $declaration 'members' "enum '$name'" |
+        ForEach-Object {
+            $memberName = [string](Get-RequiredMember $_ 'name' "enum '$name' member")
+            "value.ValueEquals(nameof($name.$memberName))"
+        })
+    $lines.Add("            nameof($name) =>")
+    Add-WrappedAlternatives $lines '                ' '                ' $patterns `
+        -Suffix ',' -Operator '||'
+}
+$lines.Add('            _ => false')
 $lines.Add('        };')
 $lines.Add('')
 $lines.Add('    private static class KnownValues<T> where T : struct, Enum')

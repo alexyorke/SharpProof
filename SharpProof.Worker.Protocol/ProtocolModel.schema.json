@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "namespace": "SharpProof.Worker.Protocol",
   "jsonNamingPolicy": "camelCase",
-  "usings": ["System.Collections.Immutable"],
+  "usings": ["System.Collections.Immutable", "System.Text.Json"],
   "versionMembers": {
     "protocol": "WorkerProtocolVersions.Current",
     "manifest": "WorkerManifestVersions.Current",

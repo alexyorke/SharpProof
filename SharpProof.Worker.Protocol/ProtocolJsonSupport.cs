@@ -154,20 +154,34 @@ public static partial class WorkerProtocolJson
         }
     }
 
-    private static void EnsureCanonicalEnum(
+    internal static void EnsureCanonicalEnum(
         JsonElement value,
         string declaredType)
     {
         RequireValueKind(value, JsonValueKind.String);
-        var enumType = typeof(WorkerProtocolJson).Assembly.GetType(
-            typeof(WorkerProtocolJson).Namespace + "." + declaredType,
-            throwOnError: false,
-            ignoreCase: false);
-        var text = value.GetString();
-        if (enumType == null || !enumType.IsEnum || text == null)
+        if (!WorkerProtocolMetadata.TryGetEnumType(
+                declaredType,
+                out var enumType))
         {
             throw new JsonException("The declared JSON enum type is invalid.");
         }
+
+        if (!WorkerProtocolMetadata.IsFlagsEnum(declaredType))
+        {
+            if (!WorkerProtocolMetadata.IsCanonicalEnumValue(value, declaredType))
+            {
+                throw new JsonException("The JSON enum value is invalid.");
+            }
+
+            return;
+        }
+
+        var text = value.GetString();
+        if (text == null)
+        {
+            throw new JsonException("The JSON enum value is invalid.");
+        }
+
         object parsed;
         try
         {

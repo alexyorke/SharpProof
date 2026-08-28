@@ -358,45 +358,6 @@ Require the old pair absent or nonpassing and prove qualification rejects it.
 **Confidence**: High; self-verified byte-for-byte in a temp canonical fixture
 and traced through qualification consumption.
 
-### 462. [CONFIRMED] Strict protocol enum validation allocates hundreds of bytes per token
-
-**Location**: SharpProof.Worker.Protocol/ProtocolJsonSupport.cs around
-lines 151-178.
-
-**Description**: EnsureCanonicalEnum constructs namespace/type-name strings,
-calls Assembly.GetType, materializes JsonElement.GetString, runs reflection
-Enum.Parse with boxing, and calls ToString for every enum token. The same enum
-metadata is rediscovered repeatedly during one shape walk.
-
-**Reproduction**:
-
-- 100,000 WorkerClaimOutcome tokens: 37,601,168 bytes allocated.
-- 50,000-token rerun: 18,800,584 bytes, the same 376 bytes/token.
-- 100,000 WorkerSelectedFeature tokens: 39,201,072 bytes.
-- Full pre-parsed 1,001,137-byte response with 100,000 Effects tokens:
-  39,221,776 shape-walk bytes.
-
-A 100,000-iteration JsonElement.ValueEquals control allocated zero bytes.
-
-**Impact**: A near-16-MiB canonical enum array can drive hundreds of MiB of
-ephemeral allocation before semantic duplicate checks, causing severe GC,
-latency, or memory failure despite the protocol size cap.
-
-**Root cause**: Canonical enum metadata and spelling are resolved through
-reflection and strings per token rather than generated/cached metadata.
-
-**Recommended fix**: Generate or cache canonical enum spellings by declared
-type and validate non-flags tokens with JsonElement.ValueEquals. Use dedicated
-generated flag metadata or a raw-token parser for canonical flags, avoiding
-per-token Enum.Parse/boxing/string round trips.
-
-**Regression coverage**: Shape-walk a pre-parsed large selectedFeatures array
-after warmup and require a small constant allocation ceiling. Retain lowercase,
-numeric, unknown, and flags-canonicalization cases.
-
-**Confidence**: High; isolated method and full traversal measurements agree,
-with a zero-allocation primitive control.
-
 ### 464. [CONFIRMED] Sample validation accepts timeout parameters but never enforces them
 
 **Location**: scripts/Test-SharpProofSamples.ps1 around lines 43-50, 72,

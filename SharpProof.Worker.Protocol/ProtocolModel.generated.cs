@@ -5,6 +5,7 @@
 // </auto-generated>
 #nullable enable
 using System.Collections.Immutable;
+using System.Text.Json;
 
 namespace SharpProof.Worker.Protocol;
 
@@ -615,6 +616,196 @@ internal static class WorkerProtocolMetadata
                 new("errors", "ImmutableArray<WorkerProtocolError>"),
                 new("isValid", "bool"),
             ]),
+        };
+
+    internal static bool TryGetEnumType(string declaredType, out Type enumType)
+    {
+        switch (declaredType)
+        {
+            case nameof(WorkerFeatureSet):
+                enumType = typeof(WorkerFeatureSet);
+                return true;
+            case nameof(WorkerVerifyPolicy):
+                enumType = typeof(WorkerVerifyPolicy);
+                return true;
+            case nameof(WorkerAssumptionPolicy):
+                enumType = typeof(WorkerAssumptionPolicy);
+                return true;
+            case nameof(WorkerSelectedFeature):
+                enumType = typeof(WorkerSelectedFeature);
+                return true;
+            case nameof(WorkerSelectionReason):
+                enumType = typeof(WorkerSelectionReason);
+                return true;
+            case nameof(WorkerClaimKind):
+                enumType = typeof(WorkerClaimKind);
+                return true;
+            case nameof(WorkerClaimEvidence):
+                enumType = typeof(WorkerClaimEvidence);
+                return true;
+            case nameof(WorkerEffectContractKind):
+                enumType = typeof(WorkerEffectContractKind);
+                return true;
+            case nameof(WorkerRunStatus):
+                enumType = typeof(WorkerRunStatus);
+                return true;
+            case nameof(WorkerRunFailureReason):
+                enumType = typeof(WorkerRunFailureReason);
+                return true;
+            case nameof(WorkerCallableCoverage):
+                enumType = typeof(WorkerCallableCoverage);
+                return true;
+            case nameof(WorkerCallableCoverageReason):
+                enumType = typeof(WorkerCallableCoverageReason);
+                return true;
+            case nameof(WorkerClaimOutcome):
+                enumType = typeof(WorkerClaimOutcome);
+                return true;
+            case nameof(WorkerEffectEvidenceCertainty):
+                enumType = typeof(WorkerEffectEvidenceCertainty);
+                return true;
+            case nameof(WorkerEffectSet):
+                enumType = typeof(WorkerEffectSet);
+                return true;
+            case nameof(WorkerEffectCapabilitySet):
+                enumType = typeof(WorkerEffectCapabilitySet);
+                return true;
+            case nameof(WorkerVacuityKind):
+                enumType = typeof(WorkerVacuityKind);
+                return true;
+            case nameof(WorkerClaimReason):
+                enumType = typeof(WorkerClaimReason);
+                return true;
+            case nameof(WorkerAssumptionKind):
+                enumType = typeof(WorkerAssumptionKind);
+                return true;
+            case nameof(WorkerCacheStatus):
+                enumType = typeof(WorkerCacheStatus);
+                return true;
+            default:
+                enumType = null!;
+                return false;
+        }
+    }
+    internal static bool IsFlagsEnum(string declaredType) =>
+        declaredType switch
+        {
+            nameof(WorkerEffectSet) => true,
+            nameof(WorkerEffectCapabilitySet) => true,
+            _ => false
+        };
+    internal static bool IsCanonicalEnumValue(
+        JsonElement value, string declaredType) =>
+        declaredType switch
+        {
+            nameof(WorkerFeatureSet) =>
+                value.ValueEquals(nameof(WorkerFeatureSet.Unspecified)) || value.ValueEquals(nameof(WorkerFeatureSet.Effects))
+                || value.ValueEquals(nameof(WorkerFeatureSet.Contracts)) || value.ValueEquals(nameof(WorkerFeatureSet.All)),
+            nameof(WorkerVerifyPolicy) =>
+                value.ValueEquals(nameof(WorkerVerifyPolicy.Unspecified)) || value.ValueEquals(nameof(WorkerVerifyPolicy.Advisory))
+                || value.ValueEquals(nameof(WorkerVerifyPolicy.WarnOnUnknown))
+                || value.ValueEquals(nameof(WorkerVerifyPolicy.RequireProven)),
+            nameof(WorkerAssumptionPolicy) =>
+                value.ValueEquals(nameof(WorkerAssumptionPolicy.Unspecified)) || value.ValueEquals(nameof(WorkerAssumptionPolicy.Allow))
+                || value.ValueEquals(nameof(WorkerAssumptionPolicy.Warn)) || value.ValueEquals(nameof(WorkerAssumptionPolicy.Error)),
+            nameof(WorkerSelectedFeature) =>
+                value.ValueEquals(nameof(WorkerSelectedFeature.Unspecified)) || value.ValueEquals(nameof(WorkerSelectedFeature.Effects))
+                || value.ValueEquals(nameof(WorkerSelectedFeature.Contracts)),
+            nameof(WorkerSelectionReason) =>
+                value.ValueEquals(nameof(WorkerSelectionReason.Unspecified))
+                || value.ValueEquals(nameof(WorkerSelectionReason.ExplicitAnnotation))
+                || value.ValueEquals(nameof(WorkerSelectionReason.DiscoveredPostcondition)),
+            nameof(WorkerClaimKind) =>
+                value.ValueEquals(nameof(WorkerClaimKind.Unspecified)) || value.ValueEquals(nameof(WorkerClaimKind.Postcondition))
+                || value.ValueEquals(nameof(WorkerClaimKind.Effect)),
+            nameof(WorkerClaimEvidence) =>
+                value.ValueEquals(nameof(WorkerClaimEvidence.Unspecified)) || value.ValueEquals(nameof(WorkerClaimEvidence.DirectClause))
+                || value.ValueEquals(nameof(WorkerClaimEvidence.CompanionClause))
+                || value.ValueEquals(nameof(WorkerClaimEvidence.ReturnAttribute))
+                || value.ValueEquals(nameof(WorkerClaimEvidence.Attribute)),
+            nameof(WorkerEffectContractKind) =>
+                value.ValueEquals(nameof(WorkerEffectContractKind.Unspecified))
+                || value.ValueEquals(nameof(WorkerEffectContractKind.EnforcePure))
+                || value.ValueEquals(nameof(WorkerEffectContractKind.ZeroAllocations))
+                || value.ValueEquals(nameof(WorkerEffectContractKind.AllowedCapabilities))
+                || value.ValueEquals(nameof(WorkerEffectContractKind.DoesNotThrow))
+                || value.ValueEquals(nameof(WorkerEffectContractKind.AllowedExceptions))
+                || value.ValueEquals(nameof(WorkerEffectContractKind.EffectContract)),
+            nameof(WorkerRunStatus) =>
+                value.ValueEquals(nameof(WorkerRunStatus.Unspecified)) || value.ValueEquals(nameof(WorkerRunStatus.Complete))
+                || value.ValueEquals(nameof(WorkerRunStatus.TimedOut)) || value.ValueEquals(nameof(WorkerRunStatus.Canceled))
+                || value.ValueEquals(nameof(WorkerRunStatus.Failed)),
+            nameof(WorkerRunFailureReason) =>
+                value.ValueEquals(nameof(WorkerRunFailureReason.Unspecified)) || value.ValueEquals(nameof(WorkerRunFailureReason.None))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.InvalidRequest))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.InputUnavailable))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.CompilationFailure))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.CompilerManifestMismatch))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.BackendUnavailable))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.InfrastructureFailure))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.MalformedResult))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.CounterexampleReplayFailed))
+                || value.ValueEquals(nameof(WorkerRunFailureReason.ContainmentFailure)),
+            nameof(WorkerCallableCoverage) =>
+                value.ValueEquals(nameof(WorkerCallableCoverage.Unspecified)) || value.ValueEquals(nameof(WorkerCallableCoverage.Complete))
+                || value.ValueEquals(nameof(WorkerCallableCoverage.Incomplete)),
+            nameof(WorkerCallableCoverageReason) =>
+                value.ValueEquals(nameof(WorkerCallableCoverageReason.Unspecified))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.None))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.UnsupportedCallable))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.UnsupportedContract))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.SemanticUnknown))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.MissingClaimResult))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.MethodTimeout))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.ProjectTimeout))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.Canceled))
+                || value.ValueEquals(nameof(WorkerCallableCoverageReason.InfrastructureFailure)),
+            nameof(WorkerClaimOutcome) =>
+                value.ValueEquals(nameof(WorkerClaimOutcome.Unspecified)) || value.ValueEquals(nameof(WorkerClaimOutcome.Proven))
+                || value.ValueEquals(nameof(WorkerClaimOutcome.Refuted)) || value.ValueEquals(nameof(WorkerClaimOutcome.Unknown)),
+            nameof(WorkerEffectEvidenceCertainty) =>
+                value.ValueEquals(nameof(WorkerEffectEvidenceCertainty.Unspecified))
+                || value.ValueEquals(nameof(WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary))
+                || value.ValueEquals(nameof(WorkerEffectEvidenceCertainty.CompleteMayEffectSummary))
+                || value.ValueEquals(nameof(WorkerEffectEvidenceCertainty.TrustedCompleteBoundary))
+                || value.ValueEquals(nameof(WorkerEffectEvidenceCertainty.DefiniteViolation))
+                || value.ValueEquals(nameof(WorkerEffectEvidenceCertainty.Unavailable))
+                || value.ValueEquals(nameof(WorkerEffectEvidenceCertainty.VacuousEntry)),
+            nameof(WorkerVacuityKind) =>
+                value.ValueEquals(nameof(WorkerVacuityKind.None))
+                || value.ValueEquals(nameof(WorkerVacuityKind.ContradictoryPreconditions))
+                || value.ValueEquals(nameof(WorkerVacuityKind.NoModeledNormalReturn)),
+            nameof(WorkerClaimReason) =>
+                value.ValueEquals(nameof(WorkerClaimReason.Unspecified)) || value.ValueEquals(nameof(WorkerClaimReason.None))
+                || value.ValueEquals(nameof(WorkerClaimReason.UnsupportedCallable))
+                || value.ValueEquals(nameof(WorkerClaimReason.UnsupportedContract))
+                || value.ValueEquals(nameof(WorkerClaimReason.UnsupportedBody))
+                || value.ValueEquals(nameof(WorkerClaimReason.UnsupportedExpression))
+                || value.ValueEquals(nameof(WorkerClaimReason.DeepPostcondition))
+                || value.ValueEquals(nameof(WorkerClaimReason.MissingReturnValue))
+                || value.ValueEquals(nameof(WorkerClaimReason.ResourceLimit)) || value.ValueEquals(nameof(WorkerClaimReason.MethodTimeout))
+                || value.ValueEquals(nameof(WorkerClaimReason.ProjectTimeout)) || value.ValueEquals(nameof(WorkerClaimReason.Canceled))
+                || value.ValueEquals(nameof(WorkerClaimReason.BackendUnavailable))
+                || value.ValueEquals(nameof(WorkerClaimReason.InfrastructureFailure))
+                || value.ValueEquals(nameof(WorkerClaimReason.MalformedBackendResult))
+                || value.ValueEquals(nameof(WorkerClaimReason.CounterexampleReplayFailed))
+                || value.ValueEquals(nameof(WorkerClaimReason.PostconditionMayBeUndefined))
+                || value.ValueEquals(nameof(WorkerClaimReason.CounterexampleNotReplayable))
+                || value.ValueEquals(nameof(WorkerClaimReason.EffectSummaryIncomplete))
+                || value.ValueEquals(nameof(WorkerClaimReason.EffectContractNotEstablished)),
+            nameof(WorkerAssumptionKind) =>
+                value.ValueEquals(nameof(WorkerAssumptionKind.Unspecified)) || value.ValueEquals(nameof(WorkerAssumptionKind.Precondition))
+                || value.ValueEquals(nameof(WorkerAssumptionKind.UserAssume))
+                || value.ValueEquals(nameof(WorkerAssumptionKind.TrustedBoundary))
+                || value.ValueEquals(nameof(WorkerAssumptionKind.ApiSpecification))
+                || value.ValueEquals(nameof(WorkerAssumptionKind.SourceDomain))
+                || value.ValueEquals(nameof(WorkerAssumptionKind.NormalCompletion)),
+            nameof(WorkerCacheStatus) =>
+                value.ValueEquals(nameof(WorkerCacheStatus.Unspecified)) || value.ValueEquals(nameof(WorkerCacheStatus.Disabled))
+                || value.ValueEquals(nameof(WorkerCacheStatus.Miss)) || value.ValueEquals(nameof(WorkerCacheStatus.Hit))
+                || value.ValueEquals(nameof(WorkerCacheStatus.Written)) || value.ValueEquals(nameof(WorkerCacheStatus.Rejected))
+                || value.ValueEquals(nameof(WorkerCacheStatus.Unavailable)),
+            _ => false
         };
 
     private static class KnownValues<T> where T : struct, Enum
