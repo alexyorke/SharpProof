@@ -89,6 +89,9 @@ public sealed record FuzzSummary(
     int FrontendAgreements,
     int SmtAgreements,
     int PartialSmtAgreements,
+    int PartialSmtDefinedTrue,
+    int PartialSmtDefinedFalse,
+    int PartialSmtUndefined,
     FrontendFuzzCoverage FrontendCoverage,
     bool CoverageSatisfied,
     ImmutableArray<FuzzFailure> Failures)
@@ -102,6 +105,16 @@ public sealed record FuzzSummary(
         FrontendCoverage != null &&
         FrontendCoverage.HasValidCounts &&
         FrontendCoverage.HasValidExceptionCounts(Cases) &&
+        PartialSmtDefinedTrue >= 0 &&
+        PartialSmtDefinedFalse >= 0 &&
+        PartialSmtUndefined >= 0 &&
+        (long)PartialSmtDefinedTrue +
+            PartialSmtDefinedFalse +
+            PartialSmtUndefined ==
+            (long)Cases * PartialTermSmtCaseGenerator.ScenarioCount &&
+        (Cases < FuzzOptions.DefaultCases ||
+         PartialSmtDefinedTrue + PartialSmtDefinedFalse > 0 &&
+         PartialSmtUndefined > 0) &&
         CoverageSatisfied ==
             (Cases < FuzzOptions.DefaultCases ||
              FrontendCoverage.HasExpandedCategories) &&
@@ -148,6 +161,9 @@ public static class FuzzRunner
         var frontendAgreements = 0;
         var smtAgreements = 0;
         var partialSmtAgreements = 0;
+        var partialSmtDefinedTrue = 0;
+        var partialSmtDefinedFalse = 0;
+        var partialSmtUndefined = 0;
         var frontendCases = new GeneratedCSharpCase[options.Cases];
         for (var index = 0; index < frontendCases.Length; index++)
         {
@@ -238,6 +254,15 @@ public static class FuzzRunner
                 {
                     Interlocked.Increment(ref partialSmtAgreements);
                 }
+                Interlocked.Add(
+                    ref partialSmtDefinedTrue,
+                    partial.DefinedTrueCount);
+                Interlocked.Add(
+                    ref partialSmtDefinedFalse,
+                    partial.DefinedFalseCount);
+                Interlocked.Add(
+                    ref partialSmtUndefined,
+                    partial.UndefinedCount);
 
                 var classification = ClassifyCase(
                     frontend.Status,
@@ -364,6 +389,9 @@ public static class FuzzRunner
             frontendAgreements,
             smtAgreements,
             partialSmtAgreements,
+            partialSmtDefinedTrue,
+            partialSmtDefinedFalse,
+            partialSmtUndefined,
             frontendCoverage,
             coverageSatisfied,
             [.. failures]);

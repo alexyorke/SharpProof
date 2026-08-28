@@ -27,6 +27,8 @@ public sealed record PartialTermSmtCase(
 
 public static class PartialTermSmtCaseGenerator
 {
+    public const int ScenarioCount = 2;
+
     public static PartialTermSmtCase Create(
         IrFactory factory,
         int seed)

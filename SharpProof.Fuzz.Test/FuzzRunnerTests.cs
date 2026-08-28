@@ -24,6 +24,9 @@ public sealed class FuzzRunnerTests
             FrontendAgreements: 1,
             SmtAgreements: 1,
             PartialSmtAgreements: 1,
+            PartialSmtDefinedTrue: 1,
+            PartialSmtDefinedFalse: 0,
+            PartialSmtUndefined: 1,
             FrontendCoverage: coverage,
             CoverageSatisfied: true,
             Failures: []);
@@ -129,6 +132,13 @@ public sealed class FuzzRunnerTests
         Assert.That(
             first.PartialSmtAgreements,
             Is.EqualTo(options.Cases));
+        Assert.That(
+            first.PartialSmtDefinedTrue +
+                first.PartialSmtDefinedFalse +
+                first.PartialSmtUndefined,
+            Is.EqualTo(options.Cases * PartialTermSmtCaseGenerator.ScenarioCount));
+        Assert.That(first.PartialSmtDefinedTrue, Is.GreaterThan(0));
+        Assert.That(first.PartialSmtUndefined, Is.GreaterThan(0));
         Assert.That(first.FrontendCoverage.HasValidCounts, Is.True);
         Assert.That(first.FrontendCoverage.StringCasts, Is.GreaterThan(0));
         Assert.That(first.FrontendCoverage.DivideByZeroExceptions, Is.GreaterThan(0));
@@ -214,6 +224,15 @@ public sealed class FuzzRunnerTests
         Assert.That(
             parallel.PartialSmtAgreements,
             Is.EqualTo(serial.PartialSmtAgreements));
+        Assert.That(
+            parallel.PartialSmtDefinedTrue,
+            Is.EqualTo(serial.PartialSmtDefinedTrue));
+        Assert.That(
+            parallel.PartialSmtDefinedFalse,
+            Is.EqualTo(serial.PartialSmtDefinedFalse));
+        Assert.That(
+            parallel.PartialSmtUndefined,
+            Is.EqualTo(serial.PartialSmtUndefined));
         Assert.That(parallel.Failures, Is.EqualTo(serial.Failures));
     }
 
@@ -232,6 +251,9 @@ public sealed class FuzzRunnerTests
             FrontendAgreements: 1,
             SmtAgreements: 1,
             PartialSmtAgreements: 1,
+            PartialSmtDefinedTrue: 0,
+            PartialSmtDefinedFalse: 0,
+            PartialSmtUndefined: 0,
             FrontendCoverage: coverage,
             CoverageSatisfied: true,
             Failures: []);
@@ -258,6 +280,9 @@ public sealed class FuzzRunnerTests
             FrontendAgreements: cases,
             SmtAgreements: cases,
             PartialSmtAgreements: cases,
+            PartialSmtDefinedTrue: 0,
+            PartialSmtDefinedFalse: 0,
+            PartialSmtUndefined: 0,
             FrontendCoverage: coverage,
             CoverageSatisfied: true,
             Failures: []);
@@ -288,6 +313,9 @@ public sealed class FuzzRunnerTests
             FrontendAgreements: FuzzOptions.DefaultCases,
             SmtAgreements: FuzzOptions.DefaultCases,
             PartialSmtAgreements: FuzzOptions.DefaultCases,
+            PartialSmtDefinedTrue: FuzzOptions.DefaultCases,
+            PartialSmtDefinedFalse: 0,
+            PartialSmtUndefined: FuzzOptions.DefaultCases,
             FrontendCoverage: complete,
             CoverageSatisfied: true,
             Failures: []);
@@ -338,6 +366,12 @@ public sealed class FuzzRunnerTests
                     PartialSmtAgreements = 1,
                     FrontendCoverage = impossibleExceptions
                 }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { PartialSmtUndefined = 0 }).Passed,
+                Is.False);
+            Assert.That(
+                (valid with { PartialSmtDefinedTrue = 0 }).Passed,
                 Is.False);
         }
     }
