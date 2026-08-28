@@ -511,6 +511,34 @@ public sealed class ConstructedGenericContractTests
     }
 
     [Test]
+    public void OpenNullableGenericCompanionRetainsResultSignature()
+    {
+        AssertBinds(
+            """
+            #nullable enable
+            using SharpProof.Attributes;
+
+            public interface ITarget<T> where T : class? {
+                T Read();
+            }
+
+            [ContractFor(typeof(ITarget<>))]
+            public static class TargetContracts<T> where T : class? {
+                public static T Read(ITarget<T> receiver) {
+                    Contract.Ensures(Contract.Result<T>() != null);
+                    return default!;
+                }
+            }
+
+            public static class Caller {
+                public static string? Call(ITarget<string?> target) =>
+                    target.Read();
+            }
+            """,
+            expectedClauses: 1);
+    }
+
+    [Test]
     public void ConstructedPartialCompanionMethodTypeParametersAreSpecialized()
     {
         AssertBinds(

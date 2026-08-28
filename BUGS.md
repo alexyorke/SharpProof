@@ -203,53 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 522. [CONFIRMED] Flow nullability falsely invalidates Contract.Result<T> for class? parameters
-
-**Location**: SharpProof.Contracts/ContractIntrinsicValidator.cs around lines
-60-69, surfaced by SharpProof.Analyzer.Core/ContractForValidation/
-ContractForCompanionValidator.cs around lines 170-185.
-
-**Description**: Result intrinsic validation compares
-`IInvocationOperation.Type` to the owning callable's return type. For an open
-`T where T : class?`, Roslyn flow-projects the invocation expression as
-T/Annotated even though the constructed intrinsic method and owner both declare
-T/NotAnnotated. The valid signature is rejected and the binder drops all
-companion clauses.
-
-**Reproduction**: An open ContractFor companion for `ITarget<T>.Read` used
-`Contract.Result<T>()` and was called as `ITarget<string?>`. Canonical output:
-
-    SP0024 expected a result type matching the callable return type
-    DECLARED_OWNER_RETURN=T/NotAnnotated
-    RESULT_METHOD_RETURN=T/NotAnnotated
-    RESULT_OPERATION_TYPE=T/Annotated
-    DECLARED_SIGNATURE_TYPES_EQUAL=True
-    FLOW_TYPE_EQUAL=False
-    BIND_SUCCESS=False
-    BIND_FAILURE=InvalidIntrinsicSignature
-    CLAUSES=-1
-
-Open nonnullable `where T:class` and closed `string?` controls both bound with
-two clauses.
-
-**Impact**: Users cannot express a valid non-null postcondition over a nullable
-generic return in an open companion, and otherwise valid Requires/Ensures clauses
-are silently lost after the diagnostic.
-
-**Root cause**: Flow-annotated expression type is mistaken for declared generic
-signature identity.
-
-**Recommended fix**: Compare `invocation.TargetMethod.ReturnType` to
-`owner.ReturnType` with IncludeNullability. Retain exact declared-nullability
-checks so genuinely mismatched Result<string> versus string? remains invalid.
-
-**Regression coverage**: Add binder and analyzer cases for `where T:class?`
-requiring success, companion source, two clauses, and no SP0024. Retain the open
-nonnullable, closed nullable, and declared-type-mismatch controls.
-
-**Confidence**: High; the probe shows declared types equal exactly while only
-the flow projection differs.
-
 ### 523. [CONFIRMED] Primary constructors omit their implicit parameterless base call
 
 **Location**: SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs around lines

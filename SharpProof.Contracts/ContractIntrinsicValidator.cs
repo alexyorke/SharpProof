@@ -99,9 +99,9 @@ internal sealed class ContractIntrinsicValidator
             return !context.InsideOld &&
                    invocation.Arguments.Length == 0 && !owner.ReturnsVoid &&
                    owner.MethodKind != MethodKind.Constructor &&
-                   invocation.Type != null &&
+                   invocation.TargetMethod.ReturnType != null &&
                    SymbolEqualityComparer.IncludeNullability.Equals(
-                       invocation.Type, owner.ReturnType)
+                       invocation.TargetMethod.ReturnType, owner.ReturnType)
                 ? ContractBindingFailure.None
                 : ContractBindingFailure.InvalidIntrinsicSignature;
         }
