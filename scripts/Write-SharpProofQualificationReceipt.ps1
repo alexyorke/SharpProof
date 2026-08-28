@@ -77,8 +77,11 @@ $valid = switch -Regex ($Gate) {
         [string]$evidence.commit -ceq $commit
     }
     'coverage' {
+        $passed = $evidence.PSObject.Properties['passed']
         [int]$evidence.schemaVersion -eq 1 -and
-        [bool]$evidence.passed -and
+        $null -ne $passed -and
+        $passed.Value -is [bool] -and
+        [bool]$passed.Value -and
         [string]$evidence.commit -ceq $commit
     }
     'mutation' {

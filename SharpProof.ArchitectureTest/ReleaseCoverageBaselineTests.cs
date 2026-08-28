@@ -328,6 +328,128 @@ public sealed class ReleaseCoverageBaselineTests
     }
 
     [Test]
+    public async Task CoverageReceiptRequiresAJsonBooleanTrue()
+    {
+        var root = RepositoryRoot();
+        var parent = Path.Combine(root, "artifacts", "qualification-fixtures");
+        var workspace = Path.Combine(parent, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workspace);
+        try
+        {
+            await AssertSuccessAsync(RunAsync(
+                root,
+                "git",
+                "-C",
+                workspace,
+                "init",
+                "--object-format=sha1"));
+            await AssertSuccessAsync(RunAsync(
+                root,
+                "git",
+                "-C",
+                workspace,
+                "config",
+                "user.email",
+                "coverage-receipt@example.invalid"));
+            await AssertSuccessAsync(RunAsync(
+                root,
+                "git",
+                "-C",
+                workspace,
+                "config",
+                "user.name",
+                "Coverage Receipt Test"));
+            await File.WriteAllTextAsync(
+                Path.Combine(workspace, "anchor.txt"),
+                "coverage receipt fixture\n");
+            await AssertSuccessAsync(RunAsync(
+                root,
+                "git",
+                "-C",
+                workspace,
+                "add",
+                "."));
+            await AssertSuccessAsync(RunAsync(
+                root,
+                "git",
+                "-C",
+                workspace,
+                "commit",
+                "-m",
+                "anchor"));
+            var head = (await AssertSuccessAsync(RunAsync(
+                root,
+                "git",
+                "-C",
+                workspace,
+                "rev-parse",
+                "HEAD"))).Output.Trim();
+            var evidencePath = Path.Combine(workspace, "coverage.json");
+            var receiptDirectory = Path.Combine(workspace, "receipts");
+            var fixtures = new[]
+            {
+                (Value: $"{{\"schemaVersion\":1,\"passed\":true,\"commit\":\"{head}\"}}", Valid: true),
+                (Value: $"{{\"schemaVersion\":1,\"passed\":false,\"commit\":\"{head}\"}}", Valid: false),
+                (Value: $"{{\"schemaVersion\":1,\"passed\":\"false\",\"commit\":\"{head}\"}}", Valid: false),
+                (Value: $"{{\"schemaVersion\":1,\"passed\":\"true\",\"commit\":\"{head}\"}}", Valid: false),
+                (Value: $"{{\"schemaVersion\":1,\"passed\":1,\"commit\":\"{head}\"}}", Valid: false),
+                (Value: $"{{\"schemaVersion\":1,\"passed\":null,\"commit\":\"{head}\"}}", Valid: false),
+                (Value: $"{{\"schemaVersion\":1,\"commit\":\"{head}\"}}", Valid: false)
+            };
+            string? receiptBytes = null;
+            foreach (var fixture in fixtures)
+            {
+                await File.WriteAllTextAsync(evidencePath, fixture.Value);
+                var result = await RunAsync(
+                    workspace,
+                    "pwsh",
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-File",
+                    Path.Combine(
+                        root,
+                        "scripts",
+                        "Write-SharpProofQualificationReceipt.ps1"),
+                    "-RepositoryRoot",
+                    workspace,
+                    "-Gate",
+                    "coverage",
+                    "-EvidencePath",
+                    evidencePath,
+                    "-ReceiptDirectory",
+                    receiptDirectory);
+                Assert.That(
+                    result.ExitCode == 0,
+                    Is.EqualTo(fixture.Valid),
+                    result.Output + result.Error);
+                var receiptPath = Path.Combine(receiptDirectory, "coverage.json");
+                if (fixture.Valid)
+                {
+                    receiptBytes = await File.ReadAllTextAsync(receiptPath);
+                }
+                else
+                {
+                    Assert.That(
+                        File.Exists(receiptPath),
+                        Is.EqualTo(receiptBytes is not null));
+                    if (receiptBytes is not null)
+                    {
+                        Assert.That(await File.ReadAllTextAsync(receiptPath),
+                            Is.EqualTo(receiptBytes));
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(workspace))
+            {
+                Directory.Delete(workspace, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public void ReleaseWorkflowUsesTheAllowlistedImmutableBaseline()
     {
         var root = RepositoryRoot();
