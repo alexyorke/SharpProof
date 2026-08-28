@@ -312,4 +312,77 @@ public sealed class IrCSharpDifferentialOracleTests
         Assert.That(referenceResult.Status, Is.EqualTo(DifferentialStatus.Agreement));
         Assert.That(sequenceResult.Status, Is.EqualTo(DifferentialStatus.Agreement));
     }
+
+    [Test]
+    public void UnsupportedReferenceCastDirectionsAbstainInsteadOfMismatching()
+    {
+        var factory = new IrFactory();
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var sequence = factory.CreateVariable("sequence", sequenceType);
+        var text = factory.CreateVariable("text", factory.StringType);
+        var oracle = new IrCSharpDifferentialOracle(factory);
+
+        var sequenceToString = oracle.Compare(
+            factory.Cast(factory.StringType, factory.Variable(sequence)),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [sequence] = factory.CreateSequenceValue(
+                    sequenceType,
+                    [factory.CreateIntegerValue(1)])
+            });
+        var stringToSequence = oracle.Compare(
+            factory.Cast(sequenceType, factory.Variable(text)),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [text] = factory.CreateStringValue("sharp")
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(sequenceToString.Status, Is.EqualTo(DifferentialStatus.Abstained));
+            Assert.That(
+                sequenceToString.Interpreted.Unsupported!.Reason,
+                Is.EqualTo(IrUnsupportedReason.UnsupportedCast));
+            Assert.That(stringToSequence.Status, Is.EqualTo(DifferentialStatus.Abstained));
+            Assert.That(
+                stringToSequence.Interpreted.Unsupported!.Reason,
+                Is.EqualTo(IrUnsupportedReason.UnsupportedCast));
+        }
+    }
+
+    [Test]
+    public void ObjectStringCastsRetainValueExceptionAndNullAgreement()
+    {
+        var factory = new IrFactory();
+        var source = factory.CreateVariable("source", factory.ObjectType);
+        var cast = factory.Cast(factory.StringType, factory.Variable(source));
+        var oracle = new IrCSharpDifferentialOracle(factory);
+
+        var value = oracle.Compare(
+            cast,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [source] = factory.CreateReferenceValue(factory.ObjectType, "sharp")
+            });
+        var failure = oracle.Compare(
+            cast,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [source] = factory.CreateReferenceValue(factory.ObjectType, new object())
+            });
+        var nullValue = oracle.Compare(
+            cast,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [source] = factory.CreateNullValue(factory.ObjectType)
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(value.Status, Is.EqualTo(DifferentialStatus.Agreement));
+            Assert.That(failure.Status, Is.EqualTo(DifferentialStatus.Agreement));
+            Assert.That(nullValue.Status, Is.EqualTo(DifferentialStatus.Agreement));
+            Assert.That(nullValue.Interpreted.Value!.Kind, Is.EqualTo(IrValueKind.Null));
+        }
+    }
 }

@@ -3076,29 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 686. [CONFIRMED] Unsupported IR cast pairs become false differential mismatches
-
-**Location**: `SharpProof.Ir/IrTermServices.cs`, around lines 206-214;
-`SharpProof.Testing/IrCSharpDifferentialOracle.cs`, around lines 55-68, 255-265,
-and 302-318.
-
-**Description**: IrFactory accepts broad nullable/reference-like cast pairs, but
-the differential renderer emits every pair as a C# explicit cast without checking
-the common interpreter/C# conversion subset. A generated compiler error is then
-classified as Mismatch.
-
-**Reproduction**: A valid IR `Cast(string, Variable(long[]))` with benign sequence
-data returned interpreter `UnsupportedCast`; the oracle generated `(string)long[]`,
-hit CS0030, and reported Mismatch rather than Abstained.
-
-**Impact**: The public differential oracle produces false reds for factory-valid
-terms where neither implementation semantically disagrees.
-
-**Recommended fix**: Preflight cast source/target pairs and abstain unless both
-the interpreter and C# implement the conversion. Do not blanket-abstain all
-compiler errors. Test sequence/string directions, supported object-to-string
-values/null/failure, and folded identity/null cases.
-
 ### 687. [CONFIRMED] Finite-SMT term generation materializes unused environments
 
 **Location**: `SharpProof.Testing/WellSortedIrGenerator.cs`, around lines 77-121;

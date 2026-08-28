@@ -269,6 +269,11 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 builder.Append(')');
                 break;
             case IrCastTerm cast:
+                if (!CanRenderCast(cast, out reason))
+                {
+                    return false;
+                }
+
                 builder.Append("((");
                 builder.Append(type);
                 builder.Append(')');
@@ -313,6 +318,25 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
 
         reason = "";
         return true;
+    }
+
+    private bool CanRenderCast(IrCastTerm cast, out string reason)
+    {
+        // The interpreter deliberately implements only the object-to-string
+        // runtime relation (plus null and identity casts, which IrFactory
+        // folds before an IrCastTerm can be created).  Keep the differential
+        // oracle in that same subset so a compiler rejection is not reported
+        // as an implementation mismatch for a factory-valid IR cast.
+        if (cast.Type == _factory.StringType &&
+            cast.Operand.Type == _factory.ObjectType)
+        {
+            reason = "";
+            return true;
+        }
+
+        reason =
+            "The cast source/target pair is outside the executable oracle subset.";
+        return false;
     }
 
     private bool TryGetCSharpType(IrTypeId type, out string name)
