@@ -2954,6 +2954,41 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public void SummaryProofLabelsBindTheOwningAuthorityDigest()
+    {
+        const string firstDigest =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string secondDigest =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        var first = CompilerSummaryProofLabel.Create(
+            CompilerSummaryOrigin.ImplementationIl,
+            "M:External.Read(System.Boolean)",
+            firstDigest,
+            string.Empty,
+            []);
+        var second = CompilerSummaryProofLabel.Create(
+            CompilerSummaryOrigin.ImplementationIl,
+            "M:External.Read(System.Boolean)",
+            secondDigest,
+            string.Empty,
+            []);
+        var duplicate = CompilerSummaryProofLabel.Create(
+            CompilerSummaryOrigin.ImplementationIl,
+            "M:External.Read(System.Boolean)",
+            firstDigest,
+            string.Empty,
+            []);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first, Does.Contain(firstDigest));
+            Assert.That(second, Does.Contain(secondDigest));
+            Assert.That(first, Is.Not.EqualTo(second));
+            Assert.That(duplicate, Is.EqualTo(first));
+        }
+    }
+
+    [Test]
     public void ByteIdenticalAliasedReferenceModulesShareIlSummaryAuthority()
     {
         using var project = TestProject.Create(

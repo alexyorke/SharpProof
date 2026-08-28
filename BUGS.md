@@ -294,28 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 627. [CONFIRMED] Proof-core labels collapse distinct IL-summary authorities
-
-**Location**: `SharpProof.Worker/CallableEvidenceBuilder.cs`, around lines
-129-150; `CallableClaimResultAssembler.cs`, around lines 16-28;
-`CompilerResponseEvidenceAuthority.cs`, around lines 436-500 and 605-618.
-
-**Description**: Direct summary labels include origin/call identity but omit the
-evidence digest. The SortedSet merges different modules exposing the same
-documentation ID, and authority validation reconstructs the same lossy label.
-
-**Reproduction**: Two extern-aliased assemblies exposed the same call identity
-with two module SHA-256 values. Both relations were necessary for Proven, yet
-two summary assumptions collapsed to one public core label and validation
-accepted it.
-
-**Impact**: Verdict remains sound, but proof/SARIF/cache provenance cannot name
-the actual two-authority closure.
-
-**Recommended fix**: Include the direct summary digest in one shared canonical
-label builder and reject unexpected full-authority label collisions. Test two
-different and one identical authority tuple.
-
 ### 628. [CONFIRMED] Same-named file-local types collide in callable identity
 
 **Location**: `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs`,

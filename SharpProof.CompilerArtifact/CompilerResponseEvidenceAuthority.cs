@@ -595,13 +595,13 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
             foreach (var summary in body.SummaryCalls.Values)
             {
-                var prefix = SummaryPrefix(summary.Origin);
-                if (prefix == null)
+                var label = CompilerSummaryProofLabel.Create(summary);
+                if (label.Length == 0)
                 {
                     continue;
                 }
 
-                labels.Add(SummaryLabel(summary));
+                labels.Add(label);
             }
 
             labels.Add("body:normal-completion");
@@ -692,59 +692,6 @@ internal sealed class CompilerResponseEvidenceAuthority :
             CompilerVariableRole.Result => "domain:result",
             _ => string.Empty
         };
-    }
-
-    private static string? SummaryPrefix(CompilerSummaryOrigin origin)
-    {
-        return origin switch
-        {
-            CompilerSummaryOrigin.Source => "source-summary",
-            CompilerSummaryOrigin.ImplementationIl => "il-summary",
-            CompilerSummaryOrigin.SpecificationPack => "spec-pack",
-            _ => null
-        };
-    }
-
-    private static string SummaryLabel(CompilerPreparedSummaryCall summary)
-    {
-        var prefix = SummaryPrefix(summary.Origin);
-        if (prefix == null)
-        {
-            return string.Empty;
-        }
-
-        var summaryEvidence = summary.Origin ==
-                CompilerSummaryOrigin.SpecificationPack
-            ? prefix + ":" + summary.EvidenceIdentity
-            : prefix;
-        return summaryEvidence + ":" + summary.CallIdentity +
-            DependencyEvidenceLabel(summary.DependencyEvidence);
-    }
-
-    private static string DependencyEvidenceLabel(
-        ImmutableArray<CompilerPreparedSummaryEvidence> evidence)
-    {
-        if (evidence.IsDefaultOrEmpty)
-        {
-            return string.Empty;
-        }
-
-        var values = evidence.Select(item =>
-        {
-            var prefix = SummaryPrefix(item.Origin);
-            if (prefix == null)
-            {
-                return string.Empty;
-            }
-
-            var evidencePrefix = item.Origin ==
-                    CompilerSummaryOrigin.SpecificationPack
-                ? prefix + ":" + item.EvidenceIdentity
-                : prefix;
-            return evidencePrefix + ":" + item.CallIdentity + ":" +
-                item.EvidenceSha256;
-        });
-        return ":deps=" + string.Join(";", values);
     }
 
     private static bool HasLiteralFalsePrecondition(
