@@ -1054,6 +1054,57 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void YieldBreakIteratorAccountsForCompilerStateMachineAllocation()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System.Collections.Generic;
+
+            public static class Sample {
+                public static IEnumerable<int> EmptyIterator()
+                {
+                    yield break;
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "EmptyIterator"));
+
+        Assert.That(
+            result.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+    }
+
+    [Test]
+    public void NestedYieldBreakDoesNotAttributeAllocationToTheContainingMethod()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System.Collections.Generic;
+
+            public static class Sample {
+                public static int Outer()
+                {
+                    IEnumerable<int> Local()
+                    {
+                        yield break;
+                    }
+
+                    return 1;
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Outer"));
+
+        Assert.That(
+            result.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.None));
+    }
+
+    [Test]
     public void InstanceLocalFunctionWritesRetainTheOwningReceiver()
     {
         var compilation = EffectTestHost.CreateCompilation(

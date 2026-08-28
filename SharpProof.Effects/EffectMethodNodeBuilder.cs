@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace SharpProof.Effects;
 
 /// <summary>
@@ -106,7 +108,37 @@ internal sealed class EffectMethodNodeBuilder
                 EffectSummaryOperations.Allocate(
                     EffectAllocationKind.Managed));
         }
+        if (HasOwnIteratorYield(method, cancellationToken))
+        {
+            localSummary = EffectSummaryOperations.Join(
+                localSummary,
+                EffectSummaryOperations.Allocate(
+                    EffectAllocationKind.Managed));
+        }
         return new EffectMethodNode(localSummary, [.. calls], scanner.DirectWitnesses);
+    }
+
+    private static bool HasOwnIteratorYield(
+        IMethodSymbol method,
+        CancellationToken cancellationToken)
+    {
+        foreach (var syntaxReference in method.DeclaringSyntaxReferences)
+        {
+            var syntax = syntaxReference.GetSyntax(cancellationToken);
+            foreach (var yield in syntax.DescendantNodes()
+                         .OfType<YieldStatementSyntax>())
+            {
+                var owner = yield.Ancestors()
+                    .OfType<BaseMethodDeclarationSyntax>()
+                    .FirstOrDefault();
+                if (owner != null && owner.Span == syntax.Span)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private bool IsAsyncTaskReturningMethod(IMethodSymbol method)

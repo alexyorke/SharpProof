@@ -3076,29 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 671. [CONFIRMED] yield break-only iterators omit state-machine allocation
-
-**Location**: `SharpProof.Effects/EffectMethodNodeBuilder.cs`, around lines
-22-101.
-
-**Description**: Method effects are built from source/CFG operations and never
-recognize iterator lowering. A body containing only `yield break` has no explicit
-creation or unsupported operation, so the hidden iterator object disappears and
-the summary remains Complete/Allocation=None.
-
-**Reproduction**: Repeated `EmptyIterator()` calls returned distinct reference
-objects and 64 calls allocated measurable bytes. Effects reported None/Complete.
-A `yield return` control already abstained Unknown/Incomplete; explicit array
-allocation reported Managed.
-
-**Impact**: ZeroAllocations and effect contracts can accept a method allocating
-a new compiler-generated object on every call.
-
-**Recommended fix**: Detect the method's own iterator semantics (excluding nested
-local/lambda yields) and join Managed allocation with a direct witness. Test
-yield-break, yield-return conservative behavior, explicit allocation, and nested
-iterators.
-
 ### 672. [CONFIRMED] Implicit base calls miss optional-only base constructors
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
