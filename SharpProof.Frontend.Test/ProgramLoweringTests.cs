@@ -115,6 +115,96 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void KnownPureRefCallsToArrayElementsForceMemoryHavoc()
+    {
+        var lowered = Lower(
+            """
+            private static void Change(ref long value) => value++;
+            public static long Target(long[] values) {
+                Change(ref values[0]);
+                return values[0];
+            }
+            """,
+            static method => method.Name == "Change");
+
+        Assert.That(
+            lowered.Result.Program.Blocks
+                .SelectMany(static block => block.Instructions)
+                .OfType<IrHavocInstruction>()
+                .Select(static instruction => instruction.HavocKind),
+            Does.Contain(IrHavocKind.Memory));
+    }
+
+    [Test]
+    public void KnownPureRefCallsToFieldsForceMemoryHavoc()
+    {
+        var lowered = Lower(
+            """
+            private sealed class Box {
+                public long Value;
+            }
+            private static void Change(ref long value) => value++;
+            private static long Target(Box box) {
+                Change(ref box.Value);
+                return box.Value;
+            }
+            """,
+            static method => method.Name == "Change");
+
+        Assert.That(
+            lowered.Result.Program.Blocks
+                .SelectMany(static block => block.Instructions)
+                .OfType<IrHavocInstruction>()
+                .Select(static instruction => instruction.HavocKind),
+            Does.Contain(IrHavocKind.Memory));
+    }
+
+    [Test]
+    public void KnownPureRefCallsToRefReturnLocationsForceMemoryHavoc()
+    {
+        var lowered = Lower(
+            """
+            private sealed class Box {
+                public long Value;
+            }
+            private static ref long Alias(Box box) => ref box.Value;
+            private static void Change(ref long value) => value++;
+            private static long Target(Box box) {
+                Change(ref Alias(box));
+                return box.Value;
+            }
+            """,
+            static method => method.Name is "Alias" or "Change");
+
+        Assert.That(
+            lowered.Result.Program.Blocks
+                .SelectMany(static block => block.Instructions)
+                .OfType<IrHavocInstruction>()
+                .Select(static instruction => instruction.HavocKind),
+            Does.Contain(IrHavocKind.Memory));
+    }
+
+    [Test]
+    public void KnownPureOutCallsToDiscardsDoNotForceMemoryHavoc()
+    {
+        var lowered = Lower(
+            """
+            private static void Change(out long value) => value = 1L;
+            public static long Target() {
+                Change(out _);
+                return 0L;
+            }
+            """,
+            static method => method.Name == "Change");
+
+        Assert.That(
+            lowered.Result.Program.Blocks
+                .SelectMany(static block => block.Instructions)
+                .OfType<IrHavocInstruction>(),
+            Is.Empty);
+    }
+
+    [Test]
     public void OnlySpecBackedPureCallsAvoidMemoryHavoc()
     {
         const string source =

@@ -319,18 +319,37 @@ public sealed class RoslynProgramLowerer(
             var call = _builder.Call(block, operation, target, member, receiver, arguments);
             _calls.Add(call, invocation);
 
-            var mutated = invocation.Arguments
-                .Where(static argument => argument.Parameter?.RefKind is
-                    RefKind.Ref or RefKind.Out)
-                .Select(argument => _expressions.GetReferencedVariable(argument.Value))
-                .Where(static variable => variable.HasValue)
-                .Select(static variable => variable!.Value)
+            var mutated = new List<IrVarId>();
+            var hasMemoryTarget = false;
+            foreach (var argument in invocation.Arguments)
+            {
+                if (argument.Parameter?.RefKind is not (RefKind.Ref or RefKind.Out))
+                {
+                    continue;
+                }
+
+                var variable = _expressions.GetReferencedVariable(argument.Value);
+                if (variable.HasValue)
+                {
+                    mutated.Add(variable.Value);
+                }
+                else if (!IsDiscard(argument.Value))
+                {
+                    hasMemoryTarget = true;
+                }
+            }
+
+            var distinctMutated = mutated
                 .Distinct()
                 .OrderBy(static variable => variable.Value)
                 .ToArray();
-            if (mutated.Length != 0 || !isDirect || !IsStaticallyBound(invocation.TargetMethod) || !_isKnownPure(invocation.TargetMethod))
+            if (distinctMutated.Length != 0 || hasMemoryTarget || !isDirect || !IsStaticallyBound(invocation.TargetMethod) || !_isKnownPure(invocation.TargetMethod))
             {
-                Havoc(block, operation, mutated.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory, mutated);
+                Havoc(
+                    block,
+                    operation,
+                    distinctMutated.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory,
+                    distinctMutated);
             }
 
             if (target.HasValue)
@@ -359,6 +378,16 @@ public sealed class RoslynProgramLowerer(
                     Value: LowerValue(block, operation, argument.Value)))
                 .OrderBy(static argument => argument.Ordinal)
                 .Select(static argument => argument.Value)];
+        }
+
+        private static bool IsDiscard(IOperation operation)
+        {
+            while (operation is IConversionOperation conversion)
+            {
+                operation = conversion.Operand;
+            }
+
+            return operation is IDiscardOperation;
         }
 
         private LocationLowering LowerLocation(
