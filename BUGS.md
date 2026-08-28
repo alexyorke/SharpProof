@@ -294,27 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 612. [CONFIRMED] Call-site contract evaluation cannot evaluate IrLengthTerm
-
-**Location**: `SharpProof.Analyzer.Core/ManagedContractFacts.cs`, around lines
-59-102; `RequiresCallSiteAnalyzer.cs`, around lines 355-433.
-
-**Description**: The frontend lowers array/string Length exactly and managed
-flow tracks exact cardinality, but the contract evaluator has no `IrLengthTerm`
-arm and returns Unknown.
-
-**Reproduction**: A valid ContractFor clause `Requires(values.Length > 0)` bound
-as `(len(v2) > 0)`. Passing `new int[0]` produced no SP0027 (selected caller only
-got SP0047). Direct evaluator input was nonnull with cardinality [0,0] yet
-returned Unknown. Scalar companion control emitted SP0027.
-
-**Impact**: Definite array/string length violations are missed for direct and
-companion contracts.
-
-**Recommended fix**: Evaluate `IrLengthTerm` by projecting known operand
-cardinality to an integer abstract value; otherwise retain Unknown. Test empty,
-nonempty, unknown, selected, and companion cases.
-
 ### 613. [CONFIRMED] Expression-bodied property getters become worker-incomplete
 
 **Location**: `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs`,

@@ -2,6 +2,9 @@ using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.Dataflow;
+using SharpProof.Effects;
+using SharpProof.Ir;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -2425,7 +2428,7 @@ public sealed class RequiresAndControlTests
                 }
 
                 public static void Call() {
-                    var values = Array.Empty<int>();
+                    var values = new int[0];
                     NonNull(values);
                     Empty(values.Length);
                 }
@@ -3745,5 +3748,26 @@ public sealed class RequiresAndControlTests
         Assert.That(
             interval,
             Is.EqualTo(SharpProof.Dataflow.IntervalValue.Constant(3)));
+    }
+
+    [Test]
+    public void ManagedContractFactsEvaluateKnownLengthTerms()
+    {
+        var factory = new IrFactory();
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        var values = factory.CreateVariable("values", sequenceType);
+        var state = new Dictionary<ScopedIrId<IrVariableTag>, ManagedAbstractValue>
+        {
+            [values] = ManagedAbstractValue.Reference(
+                NullnessValue.NonNull,
+                IntervalValue.Constant(0))
+        };
+
+        var evaluated = SharpProof.Analyzer.ManagedContractFacts.Evaluate(
+            factory.Length(factory.Variable(values)),
+            state);
+
+        Assert.That(evaluated.TryGetInteger(out var length), Is.True);
+        Assert.That(length, Is.EqualTo(IntervalValue.Constant(0)));
     }
 }

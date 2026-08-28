@@ -51,6 +51,47 @@ public sealed class GeneratedContractForAnalyzerTests
     }
 
     [Test]
+    public async Task GeneratedCompanionLengthPreconditionRefutesKnownEmptyArray()
+    {
+        var diagnostics = await AnalyzeGeneratedAsync(
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts
+            {
+                public static void Consume(
+                    IService receiver,
+                    int[] values)
+                {
+                    Contract.Requires(values.Length > 0);
+                }
+            }
+            """,
+            inputSource: """
+                using SharpProof.Attributes;
+
+                public interface IService
+                {
+                    void Consume(int[] values);
+                }
+
+                public static class CallSite
+                {
+                    public static void Call(IService service)
+                    {
+                        service.Consume(new int[0]);
+                    }
+                }
+                """,
+            additionalDiagnosticIds: ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task PeerGeneratedRejectedContractForIsReported()
     {
         var diagnostics = await AnalyzeGeneratedAsync(

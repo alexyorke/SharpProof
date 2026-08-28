@@ -77,6 +77,10 @@ internal static class ManagedContractFacts
                 CSharpScalarSemantics.MapBinaryToRoslyn(binary.Operator),
                 Evaluate(binary.Left, variables, definitelyStrings),
                 Evaluate(binary.Right, variables, definitelyStrings)),
+            IrLengthTerm length => EvaluateLength(
+                length.Value,
+                variables,
+                definitelyStrings),
             IrConditionalTerm conditional => Evaluate(
                     conditional.Condition,
                     variables,
@@ -100,6 +104,18 @@ internal static class ManagedContractFacts
                 definitelyStrings),
             _ => ManagedAbstractValue.Unknown
         };
+    }
+
+    private static ManagedAbstractValue EvaluateLength(
+        IrTerm value,
+        IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables,
+        IReadOnlyCollection<IrVarId> definitelyStrings)
+    {
+        var evaluated = Evaluate(value, variables, definitelyStrings);
+        return evaluated.IsDefinitelyNonNull &&
+               evaluated.TryGetCardinality(out var cardinality)
+            ? ManagedAbstractValue.Integer(cardinality)
+            : ManagedAbstractValue.Unknown;
     }
 
     private static ManagedAbstractValue EvaluateCast(
