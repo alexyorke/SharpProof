@@ -2097,50 +2097,6 @@ pin protocol ordering if later edges are modeled.
 **Confidence**: High; executable analyzer/runtime probes isolated the missing
 compiler-hidden call and matched the repository's existing Effects inventory.
 
-### 506. [CONFIRMED] Null claim identities crash public protocol validators
-
-**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 514-520,
-717-721, and 753-756.
-
-**Description**: Manifest validation records null/blank identity errors but then
-continues into GroupBy/ToDictionary indexes keyed by nullable CallableId or
-ClaimId. `Dictionary<string,...>` rejects null keys. ValidateManifest therefore
-throws for a null CallableId; a null ClaimId is initially rejected gracefully,
-but embedding that manifest in WorkerVerifyResponse makes response validation
-throw later.
-
-**Reproduction**: An executable reflection probe bypassed PowerShell's property
-coercion and produced:
-
-    CallableId=null: ValidateManifest threw ArgumentNullException, Param=key
-    CallableId="":   ValidateManifest returned Valid=False,
-                     error=manifest.claim_callable
-    ClaimId=null:    ValidateManifest returned Valid=False
-                     Validate(response) threw ArgumentNullException, Param=key
-
-**Impact**: A malformed in-memory compiler or assembler state escapes the public
-validation boundary as an exception/infrastructure failure instead of stable
-WorkerProtocolValidationResult codes, potentially masking the original failure.
-Strict wire JSON already rejects null strings, but failure-recovery paths can
-construct malformed models directly and CreateIncomplete explicitly tolerates
-such inputs.
-
-**Root cause**: Validation and dependent indexing are not separated. Invalid
-identity fields are diagnosed but still materialized as dictionary keys.
-
-**Recommended fix**: Centralize valid-key indexing and filter null/blank
-CallableId and ClaimId values before GroupBy/ToDictionary. Retain the primary
-identity errors and skip only dependent lookup checks that require an invalid
-key. Do not weaken strict deserialization.
-
-**Regression coverage**: Construct claims with `CallableId = null!` and
-`ClaimId = null!`; both ValidateManifest and Validate(response) must return
-invalid results without throwing and include manifest.claim_callable or
-manifest.claim_id. Retain empty-string and strict JSON-null controls.
-
-**Confidence**: High; exact public validators deterministically threw on null
-keys while empty controls followed the intended error-result path.
-
 ### 507. [CONFIRMED] Decimal optional defaults are not matched by representation
 
 **Location**: SharpProof.Contracts/ContractForSymbolMatcher.cs,
