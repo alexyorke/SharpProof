@@ -5894,29 +5894,6 @@ for out-bool construction gates and bool-returning short-circuit append methods
 unless their branches are proven. Test throwing/short-circuit/order, alignment,
 format overloads, and direct controls.
 
-### 691. [CONFIRMED] Redundant user Assume eclipses authoritative source-domain evidence
-
-**Location**: `SharpProof.Worker/CallableEvidenceBuilder.cs`, around lines 26-76
-and 153-160; `PostconditionObligationBuilder.cs`, around lines 14 and 51-55;
-`CallableClaimResultAssembler.cs`, around lines 39-70.
-
-**Description**: User clauses are interned before source-domain predicates.
-Predicate-ID dedup keeps the first evidence row regardless of provenance, so an
-identical user Assume removes stronger compiler-derived range evidence and is
-then marked Used.
-
-**Reproduction**: A narrow integral source-domain proof had core
-`domain:parameter:0` and no user row. Adding an identical range Assume changed
-the same theorem to core `assume:0` with the user row `Used=true`; both used one
-SMT query and proved.
-
-**Impact**: Public proof provenance falsely claims dependence on user evidence
-when language type semantics alone establish the result.
-
-**Recommended fix**: Make predicate dedup provenance-aware and prefer source
-LoweredJustification over identical UserAssumedJustification, retaining the user
-declaration as unused. Test redundant/nonredundant/mixed evidence controls.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
