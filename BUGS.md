@@ -5727,31 +5727,6 @@ receipt minting, and final qualification, and bind the expected configuration in
 receipt semantics. Test fully valid Debug rejection at all three layers and
 explicit Release success.
 
-### 683. [CONFIRMED] SARIF treats colon-bearing relative source paths as URI schemes
-
-**Location**: `SharpProof.Worker.Launcher/SarifProjection.cs`, around lines
-172-255; source-location validation in
-`SharpProof.Worker.Protocol/ProtocolModel.generated.cs`, around lines 839-844.
-
-**Description**: `LocationUri` first tries absolute generic URI parsing. A legal
-relative Linux/compiler-mapped path such as `generated:Subject.cs` is therefore
-interpreted as an absolute `generated:` scheme, bypassing relative segment
-escaping even though the SARIF location carries `uriBaseId=PROJECTROOT`.
-
-**Reproduction**: A protocol-valid completed response emitted
-`uri=generated:Subject.cs`; resolving it against `file:///tmp/project/` still
-returned the custom scheme. The expected project file was
-`file:///tmp/project/generated%3ASubject.cs`.
-
-**Impact**: Editor/code-scanning navigation, artifact correlation, and baselining
-can fail or split for claim, incomplete-callable, witness, and notification
-locations sharing this helper.
-
-**Recommended fix**: Classify filesystem paths before URI construction: recognize
-Unix-rooted, Windows drive-rooted, and supported UNC forms as absolute file paths;
-otherwise always escape relative segments. Represent intentional non-file URIs
-explicitly. Test first/nested colons and Unix/Windows absolute controls.
-
 ### 684. [CONFIRMED] IrPrinter exponentially expands tiny shared DAGs until OOM
 
 **Location**: `SharpProof.Ir/IrPrinter.cs`, around lines 5-26;
