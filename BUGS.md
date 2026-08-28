@@ -2117,50 +2117,6 @@ generic-member, mismatched-owner, and ordinal-mismatch controls.
 **Confidence**: High; a canonical Linux probe showed symbol equality true at
 the exact point where OwnersMatch returned false.
 
-### 509. [CONFIRMED] Renewal-disposal cancellation is fabricated into ProjectTimeout
-
-**Location**: SharpProof.Worker/SharpProofWorker.cs around lines 298-308,
-597-599, 617-618, 412, and interruption mapping around lines 83-104.
-
-**Description**: After a genuine method timeout, a verification lane renews its
-backend and synchronously disposes the old owner. Dispose receives no
-CancellationToken, yet the renewal catch filter excludes
-OperationCanceledException. Such an unrelated OCE escapes to the worker's
-unconditional outer cancellation catch. With caller and project tokens both
-live, Interrupted() fabricates TimedOut/ProjectTimeout for the whole manifest.
-
-**Reproduction**: An exact-production reflection probe gave the lane an owned
-backend whose Dispose throws a fresh OCE, then invoked Renew:
-
-    ESCAPED_EXCEPTION=OperationCanceledException
-    EXCEPTION_TOKEN_CANCELED=False
-
-The deterministic outer path sees no registered cancellation source and maps
-that exception to ProjectTimeout. The sibling InvalidOperationException test
-already expects InfrastructureFailure from the same disposal point.
-
-**Impact**: One method timeout followed by a backend cleanup failure erases the
-truthful MethodTimeout plus InfrastructureFailure history and mislabels the
-entire project as budget-expired. Retry, telemetry, and evidence attribution
-operate on the wrong terminal cause.
-
-**Root cause**: A tokenless lifecycle callback is allowed to use OCE as an
-untrusted exception type, but the catch filters treat the type alone as proof of
-caller/project cancellation.
-
-**Recommended fix**: Catch OCE from renewal Dispose as InfrastructureFailure,
-retaining only OOM/StackOverflow exclusions. More generally, map an outer OCE to
-Interrupted only when a registered caller/project boundary is actually
-canceled; otherwise return typed InfrastructureFailure.
-
-**Regression coverage**: Extend InvalidRenewalStateFailsClosedWithTypedEvidence
-with an OCE-throwing Dispose after a short method timeout and long live project
-budget. Require RunStatus Failed, reason InfrastructureFailure, evidence reasons
-MethodTimeout plus InfrastructureFailure, and specifically no ProjectTimeout.
-
-**Confidence**: High; the exact private renewal method leaked an OCE carrying an
-uncanceled token, and the outer classification has no alternate branch.
-
 ### 510. [CONFIRMED] Large string-literal encoding ignores cancellation before solver execution
 
 **Location**: SharpProof.Smt/IrSmtBackend.cs around lines 109-145, 286-301, and
