@@ -375,6 +375,46 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public async Task InterpolatedHandlerProtocolCallsReportTheirRequiresClauses()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using System.Runtime.CompilerServices;
+            using SharpProof.Attributes;
+
+            [InterpolatedStringHandler]
+            public ref struct Handler {
+                public Handler(int literalLength, int formattedCount) {
+                    Contract.Requires(false);
+                }
+
+                public void AppendLiteral(string value) {
+                    Contract.Requires(false);
+                }
+
+                public void AppendFormatted<T>(T value) {
+                    Contract.Requires(false);
+                }
+            }
+
+            public static class Subject {
+                private static void Consume(Handler handler) { }
+
+                public static void Call() {
+                    Consume($"literal{1}");
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027", "SP0027"]));
+    }
+
+    [Test]
     public void DefinitelyNullUsingResourceHasNoDisposalCandidate()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(

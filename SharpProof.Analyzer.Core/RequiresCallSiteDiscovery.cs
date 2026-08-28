@@ -215,6 +215,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                                     operationFacts)
                             : (hasFlowState || !flowAnalysis.IsComplete) &&
                                 HasReplayablePrefix(
+                                    call,
                                     operation,
                                     operationFacts);
                     var candidate = new RequiresCallSiteCandidate(
@@ -539,6 +540,22 @@ internal sealed partial class RequiresCallSiteDiscovery(
     }
 
     private bool HasReplayablePrefix(
+        RequiresCallTarget call,
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        if (IsInterpolatedHandlerProtocolCall(call.TargetMethod, callSite))
+        {
+            return HasReplayableInterpolatedHandlerCall(
+                call,
+                callSite,
+                operationFacts);
+        }
+
+        return HasReplayablePrefixCore(callSite, operationFacts);
+    }
+
+    private bool HasReplayablePrefixCore(
         IOperation callSite,
         DefiniteOperationFacts operationFacts)
     {
@@ -582,9 +599,74 @@ internal sealed partial class RequiresCallSiteDiscovery(
                        prior is EmptyStatementSyntax or
                            LocalFunctionStatementSyntax ||
                        operationFacts.CompletesNormally(
-                           semanticModel.GetOperation(
-                               prior,
-                               cancellationToken)));
+                               semanticModel.GetOperation(
+                                   prior,
+                                   cancellationToken)));
+    }
+
+    private bool IsInterpolatedHandlerProtocolCall(
+        IMethodSymbol method,
+        IOperation operation)
+    {
+        if (method.MethodKind != MethodKind.Constructor &&
+            !string.Equals(method.Name, "AppendLiteral", StringComparison.Ordinal) &&
+            !string.Equals(method.Name, "AppendFormatted", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var handlerAttribute = semanticModel.Compilation.GetTypeByMetadataName(
+            "System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute");
+        return handlerAttribute != null &&
+            method.ContainingType.GetAttributes().Any(attribute =>
+                attribute.AttributeClass != null &&
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    handlerAttribute)) &&
+            operation.Syntax.AncestorsAndSelf()
+                .OfType<InterpolatedStringExpressionSyntax>()
+                .Any();
+    }
+
+    private bool HasReplayableInterpolatedHandlerCall(
+        RequiresCallTarget call,
+        IOperation callSite,
+        DefiniteOperationFacts operationFacts)
+    {
+        if (call.TargetMethod.Parameters.Any(static parameter =>
+                parameter.RefKind == RefKind.Out) ||
+            call.TargetMethod.ReturnType.SpecialType ==
+                SpecialType.System_Boolean ||
+            call.Instance != null &&
+            call.Instance is not IFlowCaptureReferenceOperation &&
+            !operationFacts.CompletesNormally(call.Instance) ||
+            call.Arguments.Any(argument =>
+                !operationFacts.CompletesNormally(argument.Value)))
+        {
+            return false;
+        }
+
+        var interpolated = callSite.Syntax.AncestorsAndSelf()
+            .OfType<InterpolatedStringExpressionSyntax>()
+            .FirstOrDefault();
+        if (interpolated == null)
+        {
+            return false;
+        }
+
+        var invocation = interpolated.AncestorsAndSelf()
+            .OfType<InvocationExpressionSyntax>()
+            .FirstOrDefault();
+        if (invocation == null)
+        {
+            return false;
+        }
+
+        var outerCall = semanticModel.GetOperation(
+            invocation,
+            cancellationToken);
+        return outerCall != null &&
+            HasReplayablePrefixCore(outerCall, operationFacts);
     }
 
     private static bool IsAccessorCall(IMethodSymbol method)

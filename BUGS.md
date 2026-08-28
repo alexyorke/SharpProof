@@ -2982,30 +2982,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 690. [CONFIRMED] Custom interpolated-handler calls are discovered but never replayed
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
-lines 178-208, 425-471, and 538-624; `RequiresCallSiteAnalyzer.cs`, around lines
-339-342.
-
-**Description**: Compiler-generated handler construction, AppendLiteral, and
-AppendFormatted calls are discovered with exact targets, arguments, and Complete
-flow, but exact-span replay ownership rejects every nested protocol call.
-
-**Reproduction**: `Consume($"literal{1}")` executed handler ctor, literal append,
-and formatted append once each. All three false Requires candidates had
-`CanReplay=False HasFlow=True Status=Complete` and emitted nothing; direct controls
-emitted three SP0027 diagnostics.
-
-**Impact**: Contracts on custom logging/interpolation handlers are silently
-unenforced at their primary compiler-generated call sites.
-
-**Recommended fix**: Add handler-protocol-aware ordering: admit ungated ctor and
-append calls only after proving all earlier phases complete, while failing closed
-for out-bool construction gates and bool-returning short-circuit append methods
-unless their branches are proven. Test throwing/short-circuit/order, alignment,
-format overloads, and direct controls.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
