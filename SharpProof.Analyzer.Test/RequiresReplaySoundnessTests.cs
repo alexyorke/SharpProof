@@ -468,6 +468,44 @@ public sealed class RequiresReplaySoundnessTests
     }
 
     [Test]
+    public async Task ProvenFailingExplicitCastDoesNotRefuteAFollowingCall()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Positive(string text, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void FailingCast() {
+                    Positive((string)new object(), -1);
+                }
+
+                public static void ValidCast() {
+                    Positive("text", -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics, Has.Length.EqualTo(1));
+            Assert.That(
+                factory.Outcomes["FailingCast"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Assert.That(
+                factory.Outcomes["ValidCast"],
+                Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+        }
+    }
+
+    [Test]
     public async Task SelectedUnknownRequiresAnalysisReportsOneIncompleteDiagnostic()
     {
         var factory = new RecordingSessionFactory();

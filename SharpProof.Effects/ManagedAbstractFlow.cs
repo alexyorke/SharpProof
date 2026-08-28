@@ -1914,6 +1914,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                  increment.Target is IPropertyReferenceOperation property &&
                     CompletesPropertyReadWriteNormally(property, null)),
             IConversionOperation conversion =>
+                !IsProvenFailingConversion(conversion) &&
                 HarmlessConversion(conversion) &&
                 CompletesNormally(conversion.Operand),
             IBlockOperation or IExpressionStatementOperation or IReturnOperation or
@@ -2184,6 +2185,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 ISimpleAssignmentOperation or IArrayElementReferenceOperation or
                 IFlowCaptureOperation or IParenthesizedOperation or
                 IArgumentOperation =>
+                operation is not IConversionOperation conversion ||
+                !IsProvenFailingConversion(conversion) &&
                 ChildrenMayCompleteNormally(operation),
             IFieldReferenceOperation field =>
                 ChildrenMayCompleteNormally(field) &&
@@ -2616,6 +2619,100 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         conversion.Operand.Type?.TypeKind != TypeKind.Dynamic &&
         conversion.Type?.TypeKind != TypeKind.Dynamic &&
         !(conversion.Operand.Type?.IsValueType is true && conversion.Type?.IsReferenceType is true);
+    }
+
+    private bool IsProvenFailingConversion(IConversionOperation conversion)
+    {
+        if (conversion.Conversion.IsImplicit ||
+            conversion.IsTryCast ||
+            conversion.OperatorMethod != null ||
+            conversion.Type == null ||
+            !TryGetExactRuntimeType(conversion.Operand, out var sourceType))
+        {
+            return false;
+        }
+
+        if (!conversion.Conversion.IsReference)
+        {
+            // An exact object creation is never a boxed value of a different
+            // value type, so a direct unboxing cast from it cannot succeed.
+            return sourceType.SpecialType == SpecialType.System_Object &&
+                conversion.Type.IsValueType;
+        }
+
+        // An exact object/array creation cannot have a runtime type outside
+        // its created type. If the compiler cannot make an implicit conversion
+        // from that exact type to the cast target, the explicit cast must throw
+        // before the containing call can execute.
+        return !IsReferenceAssignable(sourceType, conversion.Type);
+    }
+
+    private static bool IsReferenceAssignable(
+        ITypeSymbol source,
+        ITypeSymbol target)
+    {
+        if (SymbolEqualityComparer.Default.Equals(source, target) ||
+            target.SpecialType == SpecialType.System_Object)
+        {
+            return true;
+        }
+
+        if (target.TypeKind == TypeKind.Interface &&
+            source.AllInterfaces.Any(interfaceType =>
+                SymbolEqualityComparer.Default.Equals(interfaceType, target)))
+        {
+            return true;
+        }
+
+        for (var baseType = source.BaseType;
+             baseType != null;
+             baseType = baseType.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(baseType, target))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetExactRuntimeType(
+        IOperation operation,
+        out ITypeSymbol type)
+    {
+        while (operation is IParenthesizedOperation parenthesized)
+        {
+            operation = parenthesized.Operand;
+        }
+
+        while (operation is IConversionOperation conversion &&
+               conversion.OperatorMethod == null &&
+               conversion.Conversion.IsImplicit &&
+               conversion.Conversion.IsReference)
+        {
+            operation = conversion.Operand;
+            while (operation is IParenthesizedOperation parenthesized)
+            {
+                operation = parenthesized.Operand;
+            }
+        }
+
+        switch (operation)
+        {
+            case IObjectCreationOperation { Type: { } createdType }:
+                type = createdType;
+                return true;
+            case IArrayCreationOperation { Type: { } arrayType }:
+                type = arrayType;
+                return true;
+            case IAnonymousObjectCreationOperation { Type: { } anonymousType }:
+                type = anonymousType;
+                return true;
+            default:
+                type = null!;
+                return false;
+        }
     }
 
     private static SyntaxNode? GetBody(SyntaxNode declaration)
