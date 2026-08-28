@@ -539,7 +539,8 @@ public static partial class WorkerProtocolJson
                 .Select(static value => value.CallableId),
             s_ordinal);
         var claimsByCallable = claims
-            .Where(static value => value != null)
+            .Where(static value => value != null &&
+                !string.IsNullOrWhiteSpace(value.CallableId))
             .GroupBy(static value => value.CallableId, s_ordinal)
             .ToDictionary(
                 static group => group.Key,
@@ -551,7 +552,12 @@ public static partial class WorkerProtocolJson
                 .Rules(callable, WorkerProtocolMetadata.ManifestCallableRules, prefix + ".")
                 .Check(HasProducerAssumptionKinds(callable.Assumptions),
                     prefix + ".assumption_kind");
-            claimsByCallable.TryGetValue(callable.CallableId, out var ownedClaims);
+            var callableId = callable.CallableId;
+            var hasCallableId = !string.IsNullOrWhiteSpace(callableId);
+            var ownedClaims = hasCallableId &&
+                claimsByCallable.TryGetValue(callableId!, out var declaredClaims)
+                ? declaredClaims
+                : null;
             ValidateClaimMembership(
                 callable,
                 ownedClaims ?? [],
@@ -612,7 +618,11 @@ public static partial class WorkerProtocolJson
         foreach (var value in valid)
         {
             errors.Rules(value, WorkerProtocolMetadata.CallableResultRules);
-            declaredById.TryGetValue(value.CallableId, out var declared);
+            var hasCallableId = !string.IsNullOrWhiteSpace(value.CallableId);
+            var declared = hasCallableId &&
+                declaredById.TryGetValue(value.CallableId!, out var entry)
+                ? entry
+                : null;
             errors.Check(declared != null &&
                 SameAssumptionDeclarations(value.Assumptions, declared.Assumptions),
                 "response.callable_assumption_set");
@@ -648,7 +658,11 @@ public static partial class WorkerProtocolJson
         Validator errors)
     {
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
-        claimsById.TryGetValue(value.ClaimId, out var claim);
+        var hasClaimId = !string.IsNullOrWhiteSpace(value.ClaimId);
+        var claim = hasClaimId &&
+            claimsById.TryGetValue(value.ClaimId!, out var declaredClaim)
+            ? declaredClaim
+            : null;
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
         errors.Check(claim != null &&
                 WorkerProtocolMetadata.MatchesClaimKindOutcome(
@@ -693,7 +707,8 @@ public static partial class WorkerProtocolJson
     private static void CompactClaimAssumptions(WorkerVerifyResponse response)
     {
         var callables = (response.Manifest?.Callables ?? [])
-            .Where(static callable => callable != null)
+            .Where(static callable => callable != null &&
+                !string.IsNullOrWhiteSpace(callable.CallableId))
             .GroupBy(static callable => callable.CallableId, s_ordinal)
             .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
         var claims = response.Manifest?.Claims ?? [];
@@ -707,6 +722,7 @@ public static partial class WorkerProtocolJson
             var manifestClaim = claims.FirstOrDefault(claim =>
                 claim != null && claim.ClaimId == result.ClaimId);
             if (manifestClaim != null &&
+                !string.IsNullOrWhiteSpace(manifestClaim.CallableId) &&
                 callables.TryGetValue(manifestClaim.CallableId, out var callable) &&
                 callable.Assumptions is { Length: > 0 })
             {
@@ -751,6 +767,7 @@ public static partial class WorkerProtocolJson
                 .Select(static value => value.CallableId),
             s_ordinal);
         errors.Check(!claims.Any(value => value.Outcome == WorkerClaimOutcome.Unknown &&
+            !string.IsNullOrWhiteSpace(value.ClaimId) &&
             owners.TryGetValue(value.ClaimId, out var owner) && !incomplete.Contains(owner)),
             "response.unknown_coverage");
     }
@@ -778,13 +795,15 @@ public static partial class WorkerProtocolJson
         if (response.Manifest != null && projected)
         {
             var manifestClaimsById = response.Manifest.Claims
-                .Where(static claim => claim != null)
+                .Where(static claim => claim != null &&
+                    !string.IsNullOrWhiteSpace(claim.ClaimId))
                 .GroupBy(static claim => claim.ClaimId, s_ordinal)
                 .ToDictionary(static group => group.Key, static group => group.First(), s_ordinal);
             var claimsByCallable = claims
-                .GroupBy(claim => manifestClaimsById.TryGetValue(
-                    claim.ClaimId, out var manifestClaim)
-                    ? manifestClaim.CallableId
+                .GroupBy(claim => !string.IsNullOrWhiteSpace(claim.ClaimId) &&
+                    manifestClaimsById.TryGetValue(
+                    claim.ClaimId!, out var manifestClaim)
+                    ? manifestClaim.CallableId ?? string.Empty
                     : string.Empty, s_ordinal)
                 .ToDictionary(static group => group.Key, static group => group.ToArray(), s_ordinal);
             foreach (var callable in callables)

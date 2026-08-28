@@ -214,6 +214,40 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void NullClaimAndCallableIdentitiesAreReportedWithoutDictionaryExceptions()
+    {
+        var callableManifest = CreateManifest();
+        callableManifest.Callables[0].CallableId = null!;
+        callableManifest.Claims[0].CallableId = null!;
+        var callableResponse = CreateResponse(CreateManifest());
+        callableResponse.Manifest = callableManifest;
+
+        var claimManifest = CreateManifest();
+        claimManifest.Claims[0].ClaimId = null!;
+        var claimResponse = CreateResponse(CreateManifest());
+        claimResponse.Manifest = claimManifest;
+        claimResponse.ClaimResults[0].ClaimId = null!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.DoesNotThrow(
+                (Action)(() => WorkerProtocolJson.ValidateManifest(callableManifest)));
+            Assert.DoesNotThrow(
+                (Action)(() => WorkerProtocolJson.Validate(callableResponse)));
+            Assert.DoesNotThrow(
+                (Action)(() => WorkerProtocolJson.Validate(claimResponse)));
+            Assert.That(
+                WorkerProtocolJson.ValidateManifest(callableManifest).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("manifest.callable_id"));
+            Assert.That(
+                WorkerProtocolJson.Validate(claimResponse).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("response.result_claim_id"));
+        }
+    }
+
+    [Test]
     public void DuplicateCallableIdsDoNotEscapeAsArgumentExceptionsDuringCompaction()
     {
         var manifest = CreateManifest();
