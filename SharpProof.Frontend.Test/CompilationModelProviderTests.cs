@@ -58,6 +58,31 @@ public sealed class CompilationModelProviderTests
         Assert.That(exception!.ParamName, Is.EqualTo("tree"));
     }
 
+    [Test]
+    public void RejectsTreesWithMultipleSemanticOwners()
+    {
+        var sharedTree = CSharpSyntaxTree.ParseText(
+            "internal static class Shared { internal static int Value => 1; }");
+        var firstOwner = CreateCompilation("First", sharedTree);
+        var secondOwner = CreateCompilation("Second", sharedTree);
+        var root = CreateCompilation(
+            "Root",
+            CSharpSyntaxTree.ParseText(
+                "internal static class Root { internal static int Value => 2; }"),
+            firstOwner.ToMetadataReference(),
+            secondOwner.ToMetadataReference());
+
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(() =>
+                CompilationModelProvider.GetSemanticModel(root, sharedTree)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.ParamName, Is.EqualTo("tree"));
+            Assert.That(exception.Message, Does.Contain("multiple"));
+        }
+    }
+
     private static CSharpCompilation CreateCompilation(
         string name,
         SyntaxTree tree,

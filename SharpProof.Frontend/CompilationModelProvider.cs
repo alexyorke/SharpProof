@@ -32,6 +32,7 @@ public static class CompilationModelProvider
     {
         var pending = new Stack<Compilation>();
         var visited = new List<Compilation>();
+        Compilation? owner = null;
         pending.Push(root);
         while (pending.Count != 0)
         {
@@ -46,7 +47,15 @@ public static class CompilationModelProvider
             if (current.SyntaxTrees.Any(candidate =>
                     ReferenceEquals(candidate, tree)))
             {
-                return current;
+                if (owner != null && !ReferenceEquals(owner, current))
+                {
+                    throw new ArgumentException(
+                        "SyntaxTree has multiple semantic owners in the " +
+                        "compilation reference closure.",
+                        nameof(tree));
+                }
+
+                owner = current;
             }
 
             foreach (var reference in current.References
@@ -56,6 +65,6 @@ public static class CompilationModelProvider
             }
         }
 
-        return null;
+        return owner;
     }
 }

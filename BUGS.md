@@ -294,26 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 625. [CONFIRMED] Shared SyntaxTree ownership is reference-order dependent
-
-**Location**: `SharpProof.Frontend/CompilationModelProvider.cs`, around lines
-16-59.
-
-**Description**: `FindOwningCompilation` returns the first DFS match in a LIFO
-reference traversal. If one exact tree instance is legally owned by two source
-compilations, reference order silently chooses the semantic owner.
-
-**Reproduction**: Two owners bound `Dependency.Value` as int versus string.
-Reversing only root compilation-reference order flipped the returned type from
-string to int; direct/unique-owner controls had zero compiler errors.
-
-**Impact**: Collector/analyzer/effects consumers can lower against the wrong
-semantic owner without an ambiguity signal.
-
-**Recommended fix**: Traverse the closure, collect distinct owners by reference,
-return only one, and reject multiple owners consistently. Preserve diamonds
-reaching the same compilation instance.
-
 ### 626. [CONFIRMED] Launcher reparses mount information 36 times per SARIF run
 
 **Location**: `SharpProof.Worker.Launcher/Program.cs`, around lines 55, 59,
