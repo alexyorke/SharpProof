@@ -17,8 +17,10 @@ x-sharpproof-common: &sharpproof-common
     NUGET_PACKAGES: /home/sharpproof/.nuget/packages
     DOTNET_CLI_HOME: /home/sharpproof/.dotnet
     SHARPPROOF_REPO_ROOT: /workspace/SharpProof
+    SHARPPROOF_GIT_PARENT_ROOT: /workspace/SharpProof-host-parent
   volumes:
     - .:/workspace/SharpProof
+    - ..:/workspace/SharpProof-host-parent:ro
     - sharpproof-nuget:/home/sharpproof/.nuget/packages
     - sharpproof-dotnet-home:/home/sharpproof/.dotnet
     - ./artifacts:/workspace/SharpProof/artifacts
@@ -36,6 +38,7 @@ services:
       NUGET_PACKAGES: /home/sharpproof/.nuget/packages
       DOTNET_CLI_HOME: /home/sharpproof/.dotnet
       SHARPPROOF_REPO_ROOT: /workspace/SharpProof
+      SHARPPROOF_GIT_PARENT_ROOT: /workspace/SharpProof-host-parent
       SHARPPROOF_ORIGIN_URL: ${SHARPPROOF_ORIGIN_URL:-https://github.com/alexyorke/SharpProof.git}
       SHARPPROOF_DEV_REF: ${SHARPPROOF_DEV_REF:-}
       SHARPPROOF_DEV_CONTAINER: "1"

@@ -186,6 +186,49 @@ public sealed class ContainerSourceCleanlinessTests
     }
 
     [Test]
+    public async Task LinkedWorktreeWithWindowsGitPointerUsesMountedMetadata()
+    {
+        var repository = await CreateRepositoryAsync();
+        var linked = Path.Combine(
+            Path.GetDirectoryName(repository)!,
+            "SharpProof.Linked." + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await RequireSuccessAsync(
+                repository,
+                "git",
+                "worktree",
+                "add",
+                "--detach",
+                "--quiet",
+                linked,
+                "HEAD");
+
+            var worktreeName = Path.GetFileName(linked);
+            await File.WriteAllTextAsync(
+                Path.Combine(linked, ".git"),
+                "gitdir: C:/w/PurelySharp/.git/worktrees/" +
+                worktreeName + "\n");
+
+            var result = await RunEntrypointAsync(
+                linked,
+                "release-tag",
+                gitParentDirectory: Path.GetDirectoryName(repository)!);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Zero, result.Error);
+                Assert.That(result.Output, Does.Contain("executed:release-tag"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(linked, recursive: true);
+            Directory.Delete(repository, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task DisposableToolingDevRunsInsideStagedWorkspace()
     {
         var repository = await CreateRepositoryAsync();
@@ -545,6 +588,7 @@ public sealed class ContainerSourceCleanlinessTests
         string command,
         bool assumeDifferentOwner = false,
         string? gitWrapperDirectory = null,
+        string? gitParentDirectory = null,
         params string[] commandArguments)
     {
         var environment = new Dictionary<string, string>
@@ -561,6 +605,10 @@ public sealed class ContainerSourceCleanlinessTests
                 Path.PathSeparator,
                 gitWrapperDirectory,
                 Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
+        }
+        if (gitParentDirectory != null)
+        {
+            environment["SHARPPROOF_GIT_PARENT_ROOT"] = gitParentDirectory;
         }
 
         var invocationArguments = new string[commandArguments.Length + 1];

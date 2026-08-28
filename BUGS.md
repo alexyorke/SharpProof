@@ -14,46 +14,6 @@ The following non-security findings were reproduced by their reporting agents
 before being added here. No production, test, build, or configuration changes
 are included in this audit-only wave.
 
-### 539. [CONFIRMED] Canonical release tooling rejects Windows linked worktrees
-
-**Location**: compose.yaml source mount around lines 20-24 and
-eng/container/entrypoint.sh Git detection around lines 42-48, command
-classification around lines 65-88, and rejection around lines 122-125.
-
-**Description**: Docker mounts only the linked worktree directory. Its `.git`
-file points to an absolute Windows path outside that mount. Linux Git interprets
-`C:/...` relative to the container worktree and cannot reach the common metadata,
-so every Git-required release command exits before execution.
-
-**Reproduction**:
-
-    GitPointer=gitdir: C:/w/PurelySharp/.git/worktrees/PurelySharp-bug-hunt
-    git exit=128
-    fatal: not a git repository: /workspace/SharpProof/C:/w/...
-
-The exact baseline entrypoint then returned exit 2:
-
-    SharpProof release-tag requires a Git checkout with an exact commit...
-
-**Impact**: pack, acceptance, pilots, release commands, and other Git-bound gates
-cannot run through canonical Docker Desktop from a Windows linked worktree,
-although normal in-tree CI clones work.
-
-**Root cause**: Host Git indirection is neither resolved nor mounted into fixed
-container-visible paths.
-
-**Recommended fix**: Add a cross-platform tooling launcher that resolves host
-worktree Git dir/common dir, mounts both at fixed paths, and supplies GIT_DIR,
-GIT_COMMON_DIR, and GIT_WORK_TREE. Preserve in-tree checkout/archive behavior
-and emit a specific diagnostic when required mounts are absent.
-
-**Regression coverage**: Create a Windows linked worktree with an annotated
-release tag and external common metadata; canonical release-tag must succeed
-with matching identities. Retain normal checkout and archive controls.
-
-**Confidence**: High; exact entrypoint execution against the real worktree mount
-failed solely on its translated Git pointer.
-
 ## Deferred by explicit scope
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.

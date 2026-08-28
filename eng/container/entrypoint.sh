@@ -39,12 +39,75 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
   exit 125
 fi
 
+resolve_linked_worktree_git_directory() {
+  local dot_git_file="${repo_root}/.git"
+  [[ -f "${dot_git_file}" ]] || return 1
+
+  local git_pointer
+  git_pointer="$(sed -n 's/^[[:space:]]*gitdir:[[:space:]]*//p' \
+    "${dot_git_file}" | head -n 1 | tr -d '\r')"
+  [[ -n "${git_pointer}" ]] || return 1
+
+  if [[ "${git_pointer}" = /* && -d "${git_pointer}" ]]; then
+    (cd "${git_pointer}" && pwd -P)
+    return 0
+  fi
+  if [[ "${git_pointer}" != /* && -d "${repo_root}/${git_pointer}" ]]; then
+    (cd "${repo_root}/${git_pointer}" && pwd -P)
+    return 0
+  fi
+
+  local worktree_name="${git_pointer##*/}"
+  [[ "${worktree_name}" =~ ^[A-Za-z0-9._-]+$ ]] || return 1
+  local parent_root="${SHARPPROOF_GIT_PARENT_ROOT:-}"
+  [[ -n "${parent_root}" && -d "${parent_root}" ]] || return 1
+
+  local candidate
+  candidate="$(find "${parent_root}" -xdev -type d \
+    -path "*/.git/worktrees/${worktree_name}" -print -quit 2>/dev/null || true)"
+  [[ -n "${candidate}" && -d "${candidate}" ]] || return 1
+  (cd "${candidate}" && pwd -P)
+}
+
 source_has_git=false
-if git_directory="$(git -c safe.directory="${repo_root}" -C "${repo_root}" \
-  rev-parse --absolute-git-dir 2>/dev/null)"; then
+linked_worktree=false
+linked_git_directory=""
+linked_common_directory=""
+if [[ -f "${repo_root}/.git" ]]; then
+  linked_worktree=true
+  if linked_git_directory="$(resolve_linked_worktree_git_directory)"; then
+    linked_common_directory="${linked_git_directory}"
+    if [[ -f "${linked_git_directory}/commondir" ]]; then
+      linked_common_pointer="$(tr -d '\r' < "${linked_git_directory}/commondir")"
+      if [[ -n "${linked_common_pointer}" ]]; then
+        if [[ "${linked_common_pointer}" = /* ]]; then
+          linked_common_directory="${linked_common_pointer}"
+        elif linked_common_directory="$(cd "${linked_git_directory}/${linked_common_pointer}" && pwd -P)"; then
+          :
+        else
+          linked_common_directory=""
+        fi
+      fi
+    fi
+  fi
+fi
+
+git_source() {
+  if [[ -n "${linked_git_directory}" && -n "${linked_common_directory}" ]]; then
+    git --git-dir="${linked_git_directory}" \
+      --work-tree="${repo_root}" "$@"
+  else
+    git -c safe.directory="${repo_root}" -C "${repo_root}" "$@"
+  fi
+}
+
+if git_directory="$(git_source rev-parse --absolute-git-dir 2>/dev/null)"; then
   source_has_git=true
-  git config --global --add safe.directory "${repo_root}"
-  git config --global --add safe.directory "${git_directory}"
+  git -C / config --global --add safe.directory "${repo_root}"
+  git -C / config --global --add safe.directory "${git_directory}"
+  if [[ -n "${linked_common_directory}" ]]; then
+    git -C / config --global --add safe.directory "${linked_common_directory}"
+  fi
 fi
 
 if [[ "${command_name}" = "dev" &&
@@ -88,8 +151,8 @@ requires_git_source() {
 }
 
 assert_clean_exact_commit_source() {
-  if ! git -C "${repo_root}" diff --quiet --ignore-submodules=none -- ||
-    ! git -C "${repo_root}" diff --cached --quiet \
+  if ! git_source diff --quiet --ignore-submodules=none -- ||
+    ! git_source diff --cached --quiet \
       --ignore-submodules=none HEAD --; then
     echo "SharpProof ${command_name} requires clean exact-commit source; tracked index or working-tree changes were found." >&2
     exit 2
@@ -97,7 +160,7 @@ assert_clean_exact_commit_source() {
 
   local untracked_file
   untracked_file="$(mktemp /tmp/sharpproof-untracked.XXXXXXXX)"
-  if ! git -C "${repo_root}" ls-files \
+  if ! git_source ls-files \
     --others --exclude-standard -z -- > "${untracked_file}"; then
     rm -f -- "${untracked_file}"
     echo "SharpProof ${command_name} could not inspect Git untracked paths." >&2
@@ -121,7 +184,11 @@ assert_clean_exact_commit_source() {
 
 if requires_git_source "${command_name}" &&
   [[ "${source_has_git}" != "true" ]]; then
-  echo "SharpProof ${command_name} requires a Git checkout with an exact commit for source comparison or certifying evidence." >&2
+  if [[ "${linked_worktree}" = "true" ]]; then
+    echo "SharpProof ${command_name} could not resolve linked-worktree Git metadata; mount the host repository's common .git directory at ${SHARPPROOF_GIT_PARENT_ROOT:-/workspace/SharpProof-host-parent}." >&2
+  else
+    echo "SharpProof ${command_name} requires a Git checkout with an exact commit for source comparison or certifying evidence." >&2
+  fi
   exit 2
 fi
 
@@ -134,9 +201,15 @@ case "${command_name}" in
     task_root="$(mktemp -d /tmp/sharpproof-task.XXXXXXXX)"
     mkdir -p "${repo_root}/artifacts"
     if [[ "${source_has_git}" = "true" ]]; then
-      git clone --quiet --shared --no-checkout "${repo_root}" "${task_root}"
-      git config --global --add safe.directory "${task_root}"
-      source_origin="$(git -C "${repo_root}" remote get-url origin 2>/dev/null || true)"
+      git_clone_source="${repo_root}"
+      if [[ "${linked_worktree}" = "true" &&
+        -n "${linked_common_directory}" ]]; then
+        git_clone_source="${linked_common_directory}"
+      fi
+      git clone --quiet --shared --no-checkout \
+        "${git_clone_source}" "${task_root}"
+      git -C / config --global --add safe.directory "${task_root}"
+      source_origin="$(git_source remote get-url origin 2>/dev/null || true)"
       if [[ -n "${source_origin}" ]]; then
         git -C "${task_root}" remote set-url origin "${source_origin}"
       fi
@@ -145,7 +218,7 @@ case "${command_name}" in
       # not copy those refs, so preserve the source ref namespace explicitly
       # without fetching from the network.
       refs_file="$(mktemp /tmp/sharpproof-refs.XXXXXXXX)"
-      if ! git -C "${repo_root}" for-each-ref \
+      if ! git_source for-each-ref \
         --format='%(refname) %(objectname)' refs/remotes/ > "${refs_file}"; then
         rm -f -- "${refs_file}"
         echo "SharpProof ${command_name} could not inspect Git remote refs." >&2
@@ -158,13 +231,13 @@ case "${command_name}" in
       done < "${refs_file}"
       rm -f -- "${refs_file}"
       git -C "${task_root}" checkout --quiet --detach \
-        "$(git -C "${repo_root}" rev-parse HEAD)"
+        "$(git_source rev-parse HEAD)"
       # Docker Desktop bind mounts do not preserve meaningful Git executable
       # bits. Ignore their synthetic working-tree modes in the disposable clone;
       # real mode changes committed between Git trees remain part of comparisons.
       git -C "${task_root}" config core.filemode false
       deleted_file="$(mktemp /tmp/sharpproof-deleted.XXXXXXXX)"
-      if ! git -C "${repo_root}" diff \
+      if ! git_source diff \
         --no-renames --name-only --diff-filter=D -z HEAD -- > "${deleted_file}"; then
         rm -f -- "${deleted_file}"
         echo "SharpProof ${command_name} could not inspect Git deleted paths." >&2

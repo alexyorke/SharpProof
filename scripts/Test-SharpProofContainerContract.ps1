@@ -306,6 +306,16 @@ function Assert-ComposeAuthority {
         '^    SHARPPROOF_REPO_ROOT:' `
         '    SHARPPROOF_REPO_ROOT: /workspace/SharpProof' `
         'Compose repository root'
+    Assert-SingleMatchingLine `
+        $commonLines `
+        '^    SHARPPROOF_GIT_PARENT_ROOT:' `
+        '    SHARPPROOF_GIT_PARENT_ROOT: /workspace/SharpProof-host-parent' `
+        'Compose Git metadata parent'
+    Assert-SingleMatchingLine `
+        $commonLines `
+        '^    - \.\.:/workspace/SharpProof-host-parent:ro$' `
+        '    - ..:/workspace/SharpProof-host-parent:ro' `
+        'Compose Git metadata mount'
     Assert-SingleMatchingLine $commonLines '^  build:' '  build:' 'Compose build mapping'
 
     $buildStart = [array]::IndexOf($commonLines, '  build:')
