@@ -25,6 +25,10 @@
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
   <UsingTask TaskName="SharpProof.BuildTasks.PersistPublishedVerification"
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
+  <UsingTask TaskName="SharpProof.BuildTasks.WriteInvocationRunLease"
+             AssemblyFile="$(_SharpProofBuildTasksPath)" />
+  <UsingTask TaskName="SharpProof.BuildTasks.ReclaimInvocationRuns"
+             AssemblyFile="$(_SharpProofBuildTasksPath)" />
 
   <PropertyGroup>
     <SharpProofVerifyPolicy Condition="'$(SharpProofVerifyPolicy)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">require-proven</SharpProofVerifyPolicy>
@@ -180,6 +184,10 @@
            Text="SharpProof invocation ID must be an exact safe identifier of 32 lowercase hexadecimal characters." />
     <Error Code="SP0054" Condition="'$(_SharpProofInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofInvocationDirectoryIsContained)' != 'True'"
            Text="SharpProof invocation directory must resolve canonically to a direct child of the package-owned runs directory." />
+    <SharpProof.BuildTasks.ReclaimInvocationRuns
+        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
+        RunsDirectory="$(_SharpProofInvocationRunsDirectory)"
+        CurrentInvocationId="$(_SharpProofInvocationId)" />
     <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
       <_SharpProofCompilerManifestPath Condition="$(_SharpProofCompilerManifestPathConfigured) == ''">$([System.IO.Path]::Combine("$(_SharpProofInvocationDirectory)", 'compiler-manifest.json'))</_SharpProofCompilerManifestPath>
@@ -268,6 +276,8 @@
     <Error Code="SP0054" Condition="!Exists($(_SharpProofWorkerPath))"
            Text="SharpProof verifier worker was not found at '$(_SharpProofWorkerPath)'." />
      <MakeDir Directories="$([MSBuild]::Escape(&quot;$(_SharpProofInvocationDirectory)&quot;))" />
+    <SharpProof.BuildTasks.WriteInvocationRunLease
+        InvocationDirectory="$(_SharpProofInvocationDirectory)" />
      <Copy Condition="'$(_SharpProofCompilerManifestSourcePath)' != '$(_SharpProofCompilerManifestPath)'"
            SourceFiles="$(_SharpProofCompilerManifestSourcePath)"
            DestinationFiles="$(_SharpProofCompilerManifestPath)"
@@ -392,6 +402,9 @@
       <_SharpProofCleanConfiguredSarifFullPath Condition="$(SharpProofVerifySarifFile) != '' AND $(TargetFrameworks) != ''">$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine("$(MSBuildProjectDirectory)", "$(SharpProofVerifySarifFile)"))))</_SharpProofCleanConfiguredSarifFullPath>
       <_SharpProofCleanSarifFile Condition="$(SharpProofVerifySarifFile) != '' AND $(TargetFrameworks) != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName("$(_SharpProofCleanConfiguredSarifFullPath)")), '$(TargetFramework)', $([System.IO.Path]::GetFileName("$(_SharpProofCleanConfiguredSarifFullPath)"))))</_SharpProofCleanSarifFile>
     </PropertyGroup>
+    <SharpProof.BuildTasks.ReclaimInvocationRuns
+        RunsDirectory="$([System.IO.Path]::Combine(&quot;$(_SharpProofCleanVerifyDirectory)&quot;, 'runs'))"
+        CurrentInvocationId="$(_SharpProofInvocationId)" />
     <SharpProof.BuildTasks.ResetPublishedVerification
         RequestPath="$(_SharpProofCleanEffectiveRequestFile)"
         ResultPath="$(_SharpProofCleanEffectiveResultFile)"

@@ -48,6 +48,70 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void InvocationRunLeaseReclaimsDeadOwnersOnly()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-run-leases-");
+        try
+        {
+            var runs = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "runs"));
+            var dead = Directory.CreateDirectory(
+                Path.Combine(runs.FullName,
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+            var live = Directory.CreateDirectory(
+                Path.Combine(runs.FullName,
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"));
+            var malformed = Directory.CreateDirectory(
+                Path.Combine(runs.FullName, "not-an-invocation"));
+            File.WriteAllText(Path.Combine(dead.FullName, "payload"), "dead");
+            File.WriteAllText(Path.Combine(live.FullName, "payload"), "live");
+            File.WriteAllText(Path.Combine(malformed.FullName, "payload"), "keep");
+
+            InvocationRunLeaseStore.WriteForTest(
+                dead.FullName,
+                Environment.ProcessId,
+                DateTimeOffset.UtcNow.AddDays(-1));
+            Assert.That(
+                new WriteInvocationRunLease
+                {
+                    BuildEngine = new RecordingBuildEngine(),
+                    InvocationDirectory = live.FullName
+                }.Execute(),
+                Is.True);
+
+            var task = new ReclaimInvocationRuns
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                RunsDirectory = runs.FullName,
+                CurrentInvocationId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            };
+
+            Assert.That(task.Execute(), Is.True);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Directory.Exists(dead.FullName), Is.True);
+                Assert.That(Directory.Exists(live.FullName), Is.True);
+                Assert.That(Directory.Exists(malformed.FullName), Is.True);
+            }
+
+            task.CurrentInvocationId = null;
+            Assert.That(task.Execute(), Is.True);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Directory.Exists(dead.FullName), Is.False);
+                Assert.That(Directory.Exists(live.FullName), Is.True);
+                Assert.That(Directory.Exists(malformed.FullName), Is.True);
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void SupervisorCleanupReceiptsRequireAnExactNonceAndRecord()
     {
         const string nonce =

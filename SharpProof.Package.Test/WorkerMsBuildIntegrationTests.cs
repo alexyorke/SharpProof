@@ -3460,6 +3460,12 @@ public sealed class WorkerMsBuildIntegrationTests
         var persistTopology = verifyCore
             .Descendants("SharpProof.BuildTasks.PersistPublishedVerification")
             .Single();
+        var reclaimRuns = targets
+            .Descendants("SharpProof.BuildTasks.ReclaimInvocationRuns")
+            .ToArray();
+        var writeLease = verifyCore
+            .Descendants("SharpProof.BuildTasks.WriteInvocationRunLease")
+            .Single();
         var cleanupElements = cleanup.Elements().ToList();
         var cleanupRemove = cleanup.Elements("RemoveDir").Single();
         var cleanupSafetyErrors = cleanup.Elements("Error").ToArray();
@@ -3516,6 +3522,16 @@ public sealed class WorkerMsBuildIntegrationTests
                 initialize.Descendants(
                     "_SharpProofCompilerManifestSourcePath"),
                 Is.Not.Empty);
+            Assert.That(
+                reclaimRuns,
+                Has.Length.EqualTo(2),
+                "Initialization and Clean must both reclaim dead invocation leases.");
+            Assert.That(
+                reclaimRuns.Select(task => task.Parent?.Attribute("Name")?.Value),
+                Is.EquivalentTo(["_SharpProofInitializeVerify", "SharpProofResetPublishedVerification"]));
+            Assert.That(
+                writeLease.Attribute("InvocationDirectory")?.Value,
+                Is.EqualTo("$(_SharpProofInvocationDirectory)"));
             Assert.That(
                 cleanReset.Attribute("CompilerManifestSourcePath")?.Value,
                 Is.EqualTo("$(_SharpProofCleanCompilerManifestSourceFile)"));
@@ -3608,6 +3624,13 @@ public sealed class WorkerMsBuildIntegrationTests
                         .Select(element => verifyCoreElements.IndexOf(element))
                         .Single()),
                 "The successful publication topology must be recorded after validation.");
+            Assert.That(
+                verifyCoreElements.IndexOf(writeLease),
+                Is.GreaterThan(
+                    verifyCore.Elements("MakeDir")
+                        .Select(element => verifyCoreElements.IndexOf(element))
+                        .Single()),
+                "The lease must be written only after the invocation directory exists.");
             Assert.That(
                 verifierExitError.Attribute("Condition")?.Value,
                 Does.Contain(

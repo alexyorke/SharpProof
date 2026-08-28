@@ -14,54 +14,6 @@ The following non-security findings were reproduced by their reporting agents
 before being added here. No production, test, build, or configuration changes
 are included in this audit-only wave.
 
-### 484. [CONFIRMED] Abrupt MSBuild termination permanently strands per-invocation run directories
-
-**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets
-around lines 136-147, 202-220, 239-243, and 316-317.
-
-**Description**: Every verification invocation creates a private
-`runs/<32-hex-guid>` directory and copies its compiler manifest into that
-directory. Normal target cleanup removes only the current invocation ID. There
-is no initialization-time, next-run, or Clean-time sweep for older run
-directories whose owning MSBuild process disappeared.
-
-**Reproduction**: The production target contains one removal of the current
-invocation directory and no removal or recovery reference for the runs root:
-
-    CurrentInvocationRemoveCount: 1
-    RunsRootRemoveCount:          0
-    RecoveryOrSweepReferences:   0
-
-The existing interrupted-cleanup package fixture demonstrates that a run
-directory persists when the current cleanup hook is prevented, but no later
-production target knows that abandoned GUID. Terminating MSBuild after run
-creation and starting another build leaves the old directory byte-for-byte
-unchanged while a new sibling is created and later removed.
-
-**Impact**: Repeated CI cancellation, host termination, or machine restart can
-grow `obj/.../SharpProof/runs` without bound. Each orphan may contain the
-compiler manifest and up to three protocol/evidence files whose individual
-limits reach 16 MiB, so ordinary interrupted builds can consume substantial
-workspace or cache storage.
-
-**Root cause**: Cleanup ownership is represented only by the in-memory current
-GUID. The on-disk directory has no lease, owner liveness record, age policy, or
-recovery authority that a later process can safely use.
-
-**Recommended fix**: Publish an invocation lease containing the authenticated
-owner/process identity and creation time. During initialization and Clean,
-perform a bounded scan of well-formed 32-hex child directories, reclaim only
-leases proven inactive, and preserve current concurrent invocations. Keep the
-normal exact-current-ID cleanup fast path.
-
-**Regression coverage**: Kill an owner after private files are published, run a
-new initialization, and require the inactive directory to be removed. Run two
-concurrent owners and prove neither reclaims the other. Cover malformed names,
-fresh leases, expired inactive leases, and Clean.
-
-**Confidence**: High; target inventory and an interrupted-cleanup fixture both
-confirm persistence, and the complete target has no stale-run recovery path.
-
 ### 539. [CONFIRMED] Canonical release tooling rejects Windows linked worktrees
 
 **Location**: compose.yaml source mount around lines 20-24 and
