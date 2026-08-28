@@ -106,8 +106,11 @@ internal static class SarifProjection
 
     private static string ProjectRootUri(string projectDirectory)
     {
-        var path = Path.GetFullPath(projectDirectory) +
-            Path.DirectorySeparatorChar;
+        var path = Path.GetFullPath(projectDirectory);
+        if (!Path.EndsInDirectorySeparator(path))
+        {
+            path += Path.DirectorySeparatorChar;
+        }
         return new UriBuilder(Uri.UriSchemeFile, string.Empty)
         {
             Path = path

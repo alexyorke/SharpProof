@@ -1853,6 +1853,36 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void SarifProjectionPreservesFilesystemRootAsTheRoot()
+    {
+        var manifest = CreateSarifManifest();
+        var response = new WorkerVerifyResponse
+        {
+            InputHash = new('a', 64),
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
+            {
+                Versions = new WorkerVersionSummary { WorkerVersion = "test" }
+            }
+        };
+
+        using var document = JsonDocument.Parse(
+            SarifProjection.Serialize(
+                new WorkerVerifyRequest(), response, Path.DirectorySeparatorChar.ToString()));
+        var uri = document.RootElement
+            .GetProperty("runs")[0]
+            .GetProperty("originalUriBaseIds")
+            .GetProperty("PROJECTROOT")
+            .GetProperty("uri")
+            .GetString();
+
+        Assert.That(uri, Is.EqualTo(new Uri(
+            Path.DirectorySeparatorChar.ToString(), UriKind.Absolute).AbsoluteUri));
+    }
+
+    [Test]
     public void SarifProjectionEscapesSpecialCharactersInTheProjectRoot()
     {
         var manifest = CreateSarifManifest();
