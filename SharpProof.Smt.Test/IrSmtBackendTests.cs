@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Z3Ast = Microsoft.Z3.AST;
 using Z3Context = Microsoft.Z3.Context;
 using Z3Expr = Microsoft.Z3.Expr;
@@ -331,6 +332,60 @@ public sealed class IrSmtBackendTests
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
             Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
+    public async Task CancellationDuringStringModelMaterializationIsPrompt()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("text", factory.StringType);
+        var variableTerm = factory.Variable(variable);
+        var isNull = factory.Binary(
+            IrBinaryOperator.Equal,
+            variableTerm,
+            factory.Null(factory.StringType));
+        var hasUnexpectedLength = factory.Binary(
+            IrBinaryOperator.NotEqual,
+            factory.Length(variableTerm),
+            factory.Integer(1_000_000));
+        var goal = factory.Binary(
+            IrBinaryOperator.OrElse,
+            isNull,
+            hasUnexpectedLength);
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        using var cancellation = new CancellationTokenSource();
+        var started = Stopwatch.GetTimestamp();
+        cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
+
+        Func<Task> check = async () =>
+            await backend.CheckAsync(query, cancellation.Token);
+        Assert.That(Assert.ThrowsAsync<OperationCanceledException>(check), Is.Not.Null);
+
+        var elapsed = Stopwatch.GetElapsedTime(started);
+        Assert.That(
+            elapsed,
+            Is.LessThan(TimeSpan.FromSeconds(5)),
+            "String model decoding should observe cancellation without a long post-solver tail.");
+
+        var healthyQuery = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        var healthy = await backend.CheckAsync(healthyQuery, CancellationToken.None);
+        Assert.That(healthy.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
     }
 
     [Test]

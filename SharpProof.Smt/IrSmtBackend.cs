@@ -174,6 +174,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 query,
                 encoder,
                 solver,
+                cancellationToken,
                 out var excludedMalformedModel);
             if (!excludedMalformedModel)
             {
@@ -282,6 +283,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         VerificationQuery query,
         QueryEncoder encoder,
         Solver solver,
+        CancellationToken cancellationToken,
         out bool excludedMalformedModel)
     {
         excludedMalformedModel = false;
@@ -289,6 +291,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         var assignments = ImmutableArray.CreateBuilder<KeyValuePair<IrVarId, IrValue>>();
         foreach (var variable in encoder.Variables)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             using var evaluated = model.Evaluate(encoder.GetVariable(variable), true);
             using var evaluatedNull = encoder.GetNullVariable(variable) is { } nullVariable
                 ? model.Evaluate(nullVariable, true)
@@ -299,6 +302,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                     evaluated,
                     evaluatedNull,
                     model,
+                    cancellationToken,
                     out var value))
             {
                 if (query.Factory.GetVariableInfo(variable).Type ==
@@ -526,6 +530,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             Expr expression,
             Expr? nullExpression,
             Model model,
+            CancellationToken cancellationToken,
             out IrValue? value)
         {
             var type = factory.GetVariableInfo(variable).Type;
@@ -545,7 +550,12 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                      expression is SeqExpr sequence &&
                      nullExpression is BoolExpr nullTag)
             {
-                value = DecodeString(factory, sequence, nullTag, model);
+                value = DecodeString(
+                    factory,
+                    sequence,
+                    nullTag,
+                    model,
+                    cancellationToken);
             }
             else
             {
@@ -584,8 +594,10 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             IrFactory factory,
             SeqExpr sequence,
             BoolExpr nullTag,
-            Model model)
+            Model model,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             using var evaluatedNullExpression = model.Evaluate(nullTag, true);
             if (evaluatedNullExpression is not BoolExpr evaluatedNull)
             {
@@ -597,6 +609,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 return factory.CreateNullValue(factory.StringType);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             using var lengthExpression = _context.MkLength(sequence);
             using var evaluatedLengthExpression = model.Evaluate(
                 lengthExpression,
@@ -614,6 +627,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             var chars = new char[length];
             for (var index = 0; index < chars.Length; index++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 using var indexExpression = _context.MkInt(index);
                 using var element = _context.MkNth(sequence, indexExpression);
                 using var evaluatedElementExpression = model.Evaluate(
