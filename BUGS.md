@@ -2619,29 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 582. [CONFIRMED] Property-assignment arguments ignore non-returning setters
-
-**Location**: SharpProof.Effects/ManagedAbstractFlow.cs around lines 2178-2184
-and 1872-1886; consumer RequiresCallSiteAnalyzer.cs around lines 450-460.
-
-**Description**: MayCompleteNormally handles ISimpleAssignmentOperation through
-generic child traversal. For a property target that observes the read/getter
-shape and never checks the setter actually invoked by assignment.
-
-**Reproduction**: Positive(new ThrowingTarget().Value = 1, -1) emitted SP0027,
-but the setter threw before invocation and runtime call count was zero. A
-completing setter and direct call executed and correctly emitted SP0027.
-
-**Impact**: Deterministic false refutations and warnings-as-errors failures are
-reported for unreachable calls.
-
-**Recommended fix**: Classify assignment write targets explicitly. Property and
-indexer assignments must check receiver/index/RHS completion, nullness, static
-initialization, and setter normal exit without consulting the getter. Preserve
-permissiveness for unknown metadata setters; treat compound assignment
-separately because it invokes both accessors. Add setter/getter, set-only,
-static, indexer, null-receiver, and argument-position controls.
-
 ### 583. [CONFIRMED] Callable projection validation is quadratic
 
 **Location**: Worker.Protocol/ProtocolJson.cs around lines 751-773;
