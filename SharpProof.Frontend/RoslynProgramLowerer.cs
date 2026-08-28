@@ -250,6 +250,16 @@ public sealed class RoslynProgramLowerer(
                     var location = LowerLocation(block, operation, value);
                     if (location.Location != null)
                     {
+                        if (!CompilerIdentityBridge.IsSupportedValueDomain(value.Type))
+                        {
+                            Abstain(operation, FrontendAbstention.UnsupportedType);
+                            return CreateHavocTemporary(
+                                block,
+                                operation,
+                                "unsupported-load",
+                                _expressions.GetTypeId(value.Type));
+                        }
+
                         var target = CreateTemporary("load", location.Location.Type);
                         _builder.Load(block, operation, target, location.Location);
                         return _factory.Variable(target);

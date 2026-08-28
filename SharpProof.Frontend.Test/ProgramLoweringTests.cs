@@ -398,6 +398,40 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void UnsupportedFieldLoadsAbstainInsteadOfCreatingExactReferenceValues()
+    {
+        var lowered = Lower(
+            """
+            private static double Value;
+            public static double Target() => Value;
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedType));
+            Assert.That(instructions.OfType<IrLoadInstruction>(), Is.Empty);
+        }
+
+        var supported = Lower(
+            """
+            private static long Value;
+            public static long Target() => Value;
+            """);
+        Assert.That(supported.Result.IsExact, Is.True);
+        Assert.That(
+            supported.Result.Program.Blocks
+                .SelectMany(static block => block.Instructions)
+                .OfType<IrLoadInstruction>(),
+            Has.One.Items);
+    }
+
+    [Test]
     public void RejectedPropertyAssignmentStillEvaluatesTheValue()
     {
         var lowered = Lower(
