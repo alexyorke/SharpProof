@@ -42,11 +42,11 @@ internal static class ApiSpecTermValidator
                          SpecCardinality.Empty or
                          SpecCardinality.NonEmpty or
                          SpecCardinality.Exact);
-                return new(info.Type, true, nonNull, null);
+                return new(info.Type, true, nonNull, null, null);
             case SpecBooleanDeclaration boolean:
-                return new(boolean.Type, true, false, null);
+                return new(boolean.Type, true, false, null, boolean.Value);
             case SpecIntegerDeclaration integer:
-                return new(integer.Type, true, false, integer.Value);
+                return new(integer.Type, true, false, integer.Value, null);
             case SpecStringDeclaration text:
                 if (text.Value == null)
                 {
@@ -55,7 +55,7 @@ internal static class ApiSpecTermValidator
                         nameof(declaration));
                 }
 
-                return new(text.Type, true, true, null);
+                return new(text.Type, true, true, null, null);
             case SpecNullDeclaration nullValue:
                 if (!IrTermServices.IsNullable(nullValue.Type))
                 {
@@ -64,7 +64,7 @@ internal static class ApiSpecTermValidator
                         nameof(declaration));
                 }
 
-                return new(nullValue.Type, true, false, null);
+                return new(nullValue.Type, true, false, null, null);
             case SpecUnaryDeclaration unary:
                 return ValidateUnary(unary, variables, facets);
             case SpecBinaryDeclaration binary:
@@ -85,6 +85,7 @@ internal static class ApiSpecTermValidator
                     length.Type,
                     value.IsTotal && value.IsNonNull,
                     false,
+                    null,
                     null);
             default:
                 throw new ArgumentException(
@@ -121,7 +122,12 @@ internal static class ApiSpecTermValidator
                 ? operand.IsTotal
                 : integer.HasValue,
             false,
-            integer);
+            integer,
+            unary.Operator == IrUnaryOperator.Not
+                ? operand.Boolean is { } booleanValue
+                    ? !booleanValue
+                    : null
+                : null);
     }
 
     private static TermFacts ValidateBinary(
@@ -162,11 +168,25 @@ internal static class ApiSpecTermValidator
             integer = result;
         }
 
+        var isTotal = arithmetic
+            ? integer.HasValue
+            : left.IsTotal && right.IsTotal;
+        if (binary.Operator is IrBinaryOperator.AndAlso or IrBinaryOperator.OrElse)
+        {
+            isTotal = left.Boolean is { } leftBoolean
+                ? left.IsTotal &&
+                  (binary.Operator == IrBinaryOperator.AndAlso
+                      ? !leftBoolean || right.IsTotal
+                      : leftBoolean || right.IsTotal)
+                : left.IsTotal && right.IsTotal;
+        }
+
         return new(
             shape.Result,
-            arithmetic ? integer.HasValue : left.IsTotal && right.IsTotal,
+            isTotal,
             binary.Operator == IrBinaryOperator.StringConcat,
-            integer);
+            integer,
+            TryBoolean(binary.Operator, left, right));
     }
 
     private static TermFacts ValidateConditional(
@@ -186,11 +206,73 @@ internal static class ApiSpecTermValidator
                 nameof(conditional));
         }
 
-        return new(
-            conditional.Type,
-            condition.IsTotal && whenTrue.IsTotal && whenFalse.IsTotal,
-            whenTrue.IsNonNull && whenFalse.IsNonNull,
-            null);
+        return condition.Boolean switch
+        {
+            true => new(
+                conditional.Type,
+                condition.IsTotal && whenTrue.IsTotal,
+                whenTrue.IsNonNull,
+                whenTrue.Integer,
+                whenTrue.Boolean),
+            false => new(
+                conditional.Type,
+                condition.IsTotal && whenFalse.IsTotal,
+                whenFalse.IsNonNull,
+                whenFalse.Integer,
+                whenFalse.Boolean),
+            _ => new(
+                conditional.Type,
+                condition.IsTotal && whenTrue.IsTotal && whenFalse.IsTotal,
+                whenTrue.IsNonNull && whenFalse.IsNonNull,
+                null,
+                whenTrue.Boolean == whenFalse.Boolean
+                    ? whenTrue.Boolean
+                    : null)
+        };
+    }
+
+    private static bool? TryBoolean(
+        IrBinaryOperator @operator,
+        TermFacts left,
+        TermFacts right)
+    {
+        if (@operator == IrBinaryOperator.AndAlso && left.Boolean is { } leftAnd)
+        {
+            return leftAnd ? right.Boolean : false;
+        }
+
+        if (@operator == IrBinaryOperator.OrElse && left.Boolean is { } leftOr)
+        {
+            return leftOr ? true : right.Boolean;
+        }
+
+        if (left.Boolean is { } leftBoolean &&
+            right.Boolean is { } rightBoolean)
+        {
+            return @operator switch
+            {
+                IrBinaryOperator.Equal => leftBoolean == rightBoolean,
+                IrBinaryOperator.NotEqual => leftBoolean != rightBoolean,
+                _ => null
+            };
+        }
+
+        if (left.Integer is { } leftInteger &&
+            right.Integer is { } rightInteger)
+        {
+            return @operator switch
+            {
+                IrBinaryOperator.Equal => leftInteger == rightInteger,
+                IrBinaryOperator.NotEqual => leftInteger != rightInteger,
+                IrBinaryOperator.LessThan => leftInteger < rightInteger,
+                IrBinaryOperator.LessThanOrEqual => leftInteger <= rightInteger,
+                IrBinaryOperator.GreaterThan => leftInteger > rightInteger,
+                IrBinaryOperator.GreaterThanOrEqual => leftInteger >= rightInteger,
+                _ => null
+            };
+        }
+
+        return null;
     }
 
     private static bool TryNegate(long value, out long result)
@@ -222,5 +304,6 @@ internal static class ApiSpecTermValidator
         IrTypeKind Type,
         bool IsTotal,
         bool IsNonNull,
-        long? Integer);
+        long? Integer,
+        bool? Boolean);
 }

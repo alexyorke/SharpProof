@@ -653,6 +653,100 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void LazyTotalityAcceptsUnselectedPartialBranches()
+    {
+        var partial = PartialDivisionPredicate();
+        var conditions = new (SpecTermDeclaration Condition, bool Expected)[]
+        {
+            (new SpecBinaryDeclaration(
+                IrBinaryOperator.OrElse,
+                new SpecBooleanDeclaration(true),
+                partial,
+                IrTypeKind.Boolean),
+                true),
+            (new SpecBinaryDeclaration(
+                IrBinaryOperator.AndAlso,
+                new SpecBooleanDeclaration(false),
+                partial,
+                IrTypeKind.Boolean),
+                false),
+            (new SpecConditionalDeclaration(
+                new SpecBooleanDeclaration(true),
+                new SpecBooleanDeclaration(true),
+                partial,
+                IrTypeKind.Boolean),
+                true)
+        };
+
+        foreach (var ((condition, expected), index) in conditions.Select((value, index) =>
+                     (value, index)))
+        {
+            var table = ApiSpecTable.Create([
+                Declaration("lazy-" + Guid.NewGuid().ToString("N"),
+                    "M:Missing.Lazy.Run", "Missing.Lazy") with
+                {
+                    Postconditions = [new SpecPostconditionDeclaration(
+                        condition,
+                        new SpecEvidence(
+                            SpecEvidenceKind.Documented,
+                            "lazy-totality"))]
+                }]);
+            var factory = new IrFactory();
+            var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
+                table.Templates.Single(),
+                factory,
+                new Dictionary<SpecVarId, IrTerm>());
+
+            Assert.That(instantiated.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
+            Assert.That(
+                new IrInterpreter(factory)
+                    .Evaluate(instantiated.Postconditions[0]).Value?.Boolean,
+                Is.EqualTo(expected),
+                "accepted lazy condition " + index.ToString());
+        }
+    }
+
+    [Test]
+    public void LazyTotalityRejectsSelectedPartialBranches()
+    {
+        var partial = PartialDivisionPredicate();
+        var conditions = new SpecTermDeclaration[]
+        {
+            new SpecBinaryDeclaration(
+                IrBinaryOperator.OrElse,
+                new SpecBooleanDeclaration(false),
+                partial,
+                IrTypeKind.Boolean),
+            new SpecBinaryDeclaration(
+                IrBinaryOperator.AndAlso,
+                new SpecBooleanDeclaration(true),
+                partial,
+                IrTypeKind.Boolean),
+            new SpecConditionalDeclaration(
+                new SpecBooleanDeclaration(true),
+                partial,
+                new SpecBooleanDeclaration(true),
+                IrTypeKind.Boolean)
+        };
+
+        foreach (var condition in conditions)
+        {
+            var exception = Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([
+                    Declaration("lazy-reject-" + Guid.NewGuid().ToString("N"),
+                        "M:Missing.LazyReject.Run", "Missing.LazyReject") with
+                    {
+                        Postconditions = [new SpecPostconditionDeclaration(
+                            condition,
+                            new SpecEvidence(
+                                SpecEvidenceKind.Documented,
+                                "lazy-totality"))]
+                    }]));
+            Assert.That(exception!.Message, Does.Contain("must be total"));
+        }
+    }
+
+    [Test]
     public void ConstantArithmeticPostconditionsAreAcceptedOnlyWhenDefined()
     {
         var evidence = new SpecEvidence(SpecEvidenceKind.Documented, "totality-test");
@@ -934,6 +1028,20 @@ public sealed class ApiSpecTests
                 new SpecNullnessFacet(SpecNullness.Unknown, evidence),
                 new SpecCardinalityFacet(SpecCardinality.Unknown, null, evidence)),
             []);
+    }
+
+    private static SpecTermDeclaration PartialDivisionPredicate()
+    {
+        var quotient = new SpecBinaryDeclaration(
+            IrBinaryOperator.Divide,
+            new SpecIntegerDeclaration(1),
+            new SpecIntegerDeclaration(0),
+            IrTypeKind.Integer);
+        return new SpecBinaryDeclaration(
+            IrBinaryOperator.Equal,
+            quotient,
+            new SpecIntegerDeclaration(0),
+            IrTypeKind.Boolean);
     }
 
     private static ApiSpecAssemblyIdentity RuntimeAssemblyIdentity()

@@ -203,48 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 525. [CONFIRMED] API-spec totality analysis treats lazy branches as eagerly evaluated
-
-**Location**: SharpProof.Specs/ApiSpecTermValidator.cs around lines 127-193;
-rejection in SharpProof.Specs/ApiSpecTable.cs around lines 131-145; canonical lazy
-semantics in SharpProof.Ir/IrInterpreter.cs around lines 127-129, 251-278, and
-374-387.
-
-**Description**: Totality validation requires both operands of AndAlso/OrElse
-and both conditional branches to be total, regardless of a constant condition
-that makes one side unreachable. The IR interpreter evaluates only the selected
-side. Consequently a type-correct, semantically total guarded partial term is
-rejected from an audited API spec.
-
-**Reproduction**: A valid declaration used the postcondition
-`true || ((1 / 0) == 0)`. Exact paths reported:
-
-    API_SPEC_TABLE=REJECTED
-    ArgumentException: Trusted postconditions must be total...
-    IR_RUNTIME=VALUE
-    TERM_TYPE=IrBooleanTerm
-    STATUS=Value BOOLEAN=True
-
-**Impact**: Legitimate specs cannot guard division, overflow, length, or other
-partial terms with lazy Boolean/conditional control. A catalog update can break
-table initialization despite matching runtime semantics.
-
-**Root cause**: TermFacts tracks integer constants but not Boolean constants or
-selected-path reachability, so definedness is folded eagerly.
-
-**Recommended fix**: Track `bool? Boolean` in TermFacts. For AndAlso/OrElse,
-require right totality only when the known left value evaluates it. For
-conditionals, require only the known selected branch; require both when unknown.
-Continue type-checking unreachable children without counting their definedness.
-
-**Regression coverage**: Accept true-or-partial, false-and-partial, and constant
-conditional with unselected partial branch. Reject false-or-partial,
-true-and-partial, selected partial branch, and unknown condition with partial
-branch. Evaluate accepted instances through IrInterpreter.
-
-**Confidence**: High; the same typed term is rejected as non-total by Specs and
-evaluated to a defined true value by the canonical interpreter.
-
 ### 526. [CONFIRMED] Enhanced #line character offsets are lost from compiler artifacts
 
 **Location**: SharpProof.CompilerCollector/CompilerArtifact/
