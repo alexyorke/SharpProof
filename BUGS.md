@@ -155,40 +155,6 @@ controls.
 **Confidence**: High; all eight edges were independently tested with analyzer
 differentials and runtime counters.
 
-### 478. [CONFIRMED] Abrupt launcher termination strands worker-runtime snapshots in /tmp
-
-**Location**: SharpProof.Worker.Launcher/Program.cs around lines 57 and
-115-130; SharpProof.CompilerArtifact/CompilerManifestArtifact.cs around
-lines 53-104, 257-274, and 292-299;
-SharpProof.BuildTasks/VerifierProcessSupervisor.cs around lines 324-338.
-
-**Description**: The launcher creates a WorkerRuntimeClosureSnapshot before
-starting the worker. Snapshot creation copies up to 64 MiB into a random
-/tmp/SharpProof.Worker.Runtime.* directory, and the only deletion path is
-Dispose. Supervisor cleanup uses SIGSTOP then uncatchable SIGKILL. Abrupt
-launcher death bypasses the using/finally path, and repository-wide search finds
-no sweep or recovery for orphan snapshot directories.
-
-**Impact**: Cancellation, output-limit cleanup, OOM, or other abrupt launcher
-termination can strand one full runtime closure per invocation. Reused
-development containers can accumulate these until /tmp or Docker storage is
-exhausted.
-
-**Root cause**: Crash recovery relies solely on process-local Dispose even
-though the supported containment path deliberately uses SIGKILL.
-
-**Recommended fix**: Add owner leases and bounded startup reclamation for
-SharpProof.Worker.Runtime.* directories. Delete only snapshots whose owner is
-provably dead; keep Dispose as the normal fast path.
-
-**Regression coverage**: A helper creates a real snapshot, reports its path,
-then self-SIGKILLs. Confirm current debris, start a new snapshot and require
-reclamation, and prove a concurrently live helper's snapshot is never removed.
-Add a supervisor-cancellation integration case.
-
-**Confidence**: High source-closure evidence: the random directory has one
-normal deletion path, no scavenger, and production cleanup uses SIGKILL.
-
 ### 481. [CONFIRMED] Dependency-audit restore failures preserve stale passing evidence with no freshness identity
 
 **Location**: scripts/Invoke-SharpProofContainer.ps1 around lines 43-44 and

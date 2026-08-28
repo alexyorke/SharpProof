@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -39,17 +40,20 @@ internal static class CompilerArtifactInputHash
 
 internal static class WorkerBinaryIdentity
 {
+    internal const string OwnerLeaseFileName = ".owner";
     internal const int MaximumComponentKeyCharacters = 256;
     internal const int MaximumRuntimeComponents = 64;
     internal const int MaximumComponentBytes = 32 * 1024 * 1024;
     internal const long MaximumClosureBytes = 64L * 1024 * 1024;
     internal const long MaximumDependenciesBytes = 1024L * 1024;
     internal const long MaximumRuntimeConfigBytes = 64L * 1024;
+    internal const int MaximumReclaimDirectories = 64;
 
     internal static WorkerRuntimeClosureSnapshot CreateSnapshot(
         string workerPath)
     {
         var path = NormalizeWorkerPath(workerPath);
+        ReclaimOrphanedStagingDirectories();
         var stagingDirectory = CreateStagingDirectory();
         FileStream[] stagedHandles = [];
         var stagedCount = 0;
@@ -57,6 +61,7 @@ internal static class WorkerBinaryIdentity
         try
         {
             Directory.CreateDirectory(stagingDirectory);
+            WriteOwnerLease(stagingDirectory);
             using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
             var components = RuntimeComponents(path, dependency);
             stagedHandles = new FileStream[components.Count];
@@ -270,6 +275,114 @@ internal static class WorkerBinaryIdentity
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException)
         {
+        }
+    }
+
+    internal static void ReclaimOrphanedStagingDirectories(
+        string? temporaryRoot = null)
+    {
+        temporaryRoot ??= GetTempPath();
+        string[] directories;
+        try
+        {
+            directories = Directory
+                .EnumerateDirectories(
+                    temporaryRoot,
+                    "SharpProof.Worker.Runtime.*")
+                .Take(MaximumReclaimDirectories)
+                .ToArray();
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        foreach (var directory in directories)
+        {
+            if (!TryReadOwnerLease(directory, out var processId, out var startTicks) ||
+                IsOwnerAlive(processId, startTicks))
+            {
+                continue;
+            }
+
+            DeleteStagingDirectory(directory);
+        }
+    }
+
+    private static void WriteOwnerLease(string directory)
+    {
+        var process = Process.GetCurrentProcess();
+        var startTicks = process.StartTime.ToUniversalTime().Ticks;
+        var leasePath = Combine(directory, OwnerLeaseFileName);
+        using var stream = new FileStream(
+            leasePath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.Read,
+            bufferSize: 256,
+            options: FileOptions.WriteThrough);
+        var payload =
+            "{\"pid\":" + process.Id.ToString(CultureInfo.InvariantCulture) +
+            ",\"startTimeUtcTicks\":" +
+            startTicks.ToString(CultureInfo.InvariantCulture) + "}";
+        var bytes = Encoding.UTF8.GetBytes(payload);
+        stream.Write(bytes, 0, bytes.Length);
+        stream.Flush(flushToDisk: true);
+    }
+
+    private static bool TryReadOwnerLease(
+        string directory,
+        out int processId,
+        out long startTicks)
+    {
+        processId = 0;
+        startTicks = 0;
+        var leasePath = Combine(directory, OwnerLeaseFileName);
+        try
+        {
+            using var stream = new FileStream(
+                leasePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 256,
+                options: FileOptions.SequentialScan);
+            if (stream.Length <= 0 || stream.Length > 512)
+            {
+                return false;
+            }
+
+            using var document = JsonDocument.Parse(stream);
+            var root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("pid", out var pid) &&
+                root.TryGetProperty("startTimeUtcTicks", out var ticks) &&
+                pid.TryGetInt32(out processId) &&
+                ticks.TryGetInt64(out startTicks) &&
+                processId > 0 &&
+                startTicks > 0;
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+                JsonException or InvalidOperationException or FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsOwnerAlive(int processId, long startTicks)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return process.StartTime.ToUniversalTime().Ticks == startTicks;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidOperationException or
+                System.ComponentModel.Win32Exception or UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 

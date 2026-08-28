@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
@@ -7,6 +8,60 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class WorkerBinaryIdentityTests
 {
+    [Test]
+    public void StartupReclaimsDeadRuntimeOwnersButPreservesLiveAndUnownedDirectories()
+    {
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.RuntimeReclaim." + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+        try
+        {
+            var dead = Path.Combine(
+                temporaryDirectory,
+                "SharpProof.Worker.Runtime.dead");
+            var live = Path.Combine(
+                temporaryDirectory,
+                "SharpProof.Worker.Runtime.live");
+            var unowned = Path.Combine(
+                temporaryDirectory,
+                "SharpProof.Worker.Runtime.unowned");
+            foreach (var directory in new[] { dead, live, unowned })
+            {
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(Path.Combine(directory, "marker"), "marker");
+            }
+
+            var currentProcess = Process.GetCurrentProcess();
+            var liveTicks = currentProcess.StartTime.ToUniversalTime().Ticks;
+            File.WriteAllText(
+                Path.Combine(dead, WorkerBinaryIdentity.OwnerLeaseFileName),
+                "{\"pid\":" + currentProcess.Id +
+                ",\"startTimeUtcTicks\":" + (liveTicks + 1) + "}");
+            File.WriteAllText(
+                Path.Combine(live, WorkerBinaryIdentity.OwnerLeaseFileName),
+                "{\"pid\":" + currentProcess.Id +
+                ",\"startTimeUtcTicks\":" + liveTicks + "}");
+
+            WorkerBinaryIdentity.ReclaimOrphanedStagingDirectories(
+                temporaryDirectory);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Directory.Exists(dead), Is.False);
+                Assert.That(Directory.Exists(live), Is.True);
+                Assert.That(Directory.Exists(unowned), Is.True);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryDirectory))
+            {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
+    }
+
     [Test]
     public void StagedComponentConsistencyIsFailClosed()
     {
