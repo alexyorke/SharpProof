@@ -47,6 +47,43 @@ $repositoryPrefix = $repositoryRoot + [IO.Path]::DirectorySeparatorChar
 if (-not $output.StartsWith($repositoryPrefix, [StringComparison]::Ordinal)) {
     throw "OutputPath must be inside the repository: $output"
 }
+$timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
+$timingOutput = Join-Path $timingDirectory (
+    'mutation-' + $Configuration.ToLowerInvariant() + '.json')
+
+function Write-ReusedMutationTiming {
+    [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
+    $temporaryTiming = $timingOutput + '.' +
+        [Guid]::NewGuid().ToString('N') + '.tmp'
+    try {
+        [pscustomobject]@{
+            schemaVersion = 1
+            command = 'mutation'
+            commit = $ExpectedCommit
+            configuration = $Configuration
+            strategy = 'weighted-longest-processing-time-first-focused-baseline-v3'
+            parallelism = $parallelism
+            totalElapsedMilliseconds = 0L
+            reused = $true
+            baseline = [ordered]@{
+                reused = $true
+                elapsedMilliseconds = 0L
+                restoreElapsedMilliseconds = 0L
+                baselineElapsedMilliseconds = 0L
+                baselineInvocationCount = 0
+                testCount = 0
+            }
+            shards = @()
+        } | ConvertTo-Json -Depth 5 |
+            Set-Content -LiteralPath $temporaryTiming -Encoding utf8NoBOM
+        Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryTiming -PathType Leaf) {
+            Remove-Item -LiteralPath $temporaryTiming -Force
+        }
+    }
+}
 
 if (Test-Path -LiteralPath $output -PathType Leaf) {
     $existing = Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
@@ -57,6 +94,7 @@ if (Test-Path -LiteralPath $output -PathType Leaf) {
         & (Join-Path $PSScriptRoot 'Test-SharpProofMutationCatalog.ps1') `
             -EvidencePath $output `
             -ExpectedCommit $ExpectedCommit
+        Write-ReusedMutationTiming
         Write-Host "Mutation evidence is already complete: $output"
         return
     }
@@ -367,10 +405,7 @@ $temporaryOutput = $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
     Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
 Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
 $campaignTimer.Stop()
-$timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
-$timingOutput = Join-Path $timingDirectory (
-    'mutation-' + $Configuration.ToLowerInvariant() + '.json')
 $temporaryTiming = $timingOutput + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
 [pscustomobject]@{
     schemaVersion = 1

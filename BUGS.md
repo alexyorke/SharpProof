@@ -274,43 +274,6 @@ only discovery must fail.
 **Confidence**: High; the plan omitted a solution-listed project whose direct
 test failed, and the broadened inventory selected it.
 
-### 542. [CONFIRMED] Successful mutation-result reuse preserves stale timing evidence
-
-**Location**: scripts/Invoke-SharpProofTrustedMutationsParallel.ps1, reuse fast
-path around lines 51-61 and timing derivation/write around lines 370-397.
-
-**Description**: A valid complete mutation result causes immediate successful
-return before the timing path is derived or owned. A canonical
-mutation-release.json from another commit therefore survives unchanged while
-the command reports the current commit's evidence already complete.
-
-**Reproduction**: Canonical fixture output:
-
-    exit_code=0
-    AUDIT_EVIDENCE_COMMIT=a7200d525bef268af1a34560288f555579b04e46
-    AUDIT_TIMING_COMMIT=0000000000000000000000000000000000000000
-    AUDIT_TIMING_HASH_UNCHANGED=True
-    Mutation evidence behavioral fixtures passed.
-
-**Impact**: Operators following documented timing records can attribute duration,
-parallelism, shard reuse, and lanes to the current mutation command when they
-describe an older campaign. Qualification uses separate result evidence, so the
-impact is performance evidence correctness rather than release acceptance.
-
-**Root cause**: Result completeness is treated as completeness of both canonical
-outputs, while timing lifecycle starts only after the reuse branch.
-
-**Recommended fix**: Own the timing path before reuse. On reuse, atomically write
-a current-commit envelope explicitly marked `reused=true` and zero work, or
-remove prior timing. If timing itself is reused, validate commit/config/schema.
-
-**Regression coverage**: Seed old timing and current valid result; success must
-produce current reused timing or no timing. Cover missing/malformed timing and
-normal execution.
-
-**Confidence**: High; a successful current-commit command left a byte-identical
-older-commit timing artifact.
-
 ### 607. [CONFIRMED] A transient custom SARIF path makes a later plain clean fail
 
 **Location**: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,

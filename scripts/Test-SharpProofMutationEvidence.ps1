@@ -116,6 +116,7 @@ function Test-MutationReuseValidation {
             'SharpProof.MutationEvidence.psm1',
             'SharpProof.MutationBaselines.psm1',
             'SharpProof.ContainerExecution.psm1',
+            'SharpProof.ReleaseConfigurationEvidence.psm1',
             'Write-SharpProofQualificationReceipt.ps1',
             'Test-SharpProofPilotReport.ps1')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) `
@@ -419,10 +420,26 @@ function Test-MutationReuseValidation {
         -Name dirty-tree `
         -Evidence (New-CompleteEvidence) `
         -Dirty $true
+    $timingPath = Join-Path $repository 'artifacts/timings/mutation-release.json'
+    [IO.Directory]::CreateDirectory((Split-Path -Parent $timingPath)) | Out-Null
+    [pscustomobject]@{
+        schemaVersion = 1
+        command = 'mutation'
+        commit = '0' * 40
+        configuration = 'Release'
+        reused = $false
+    } | ConvertTo-Json | Set-Content -LiteralPath $timingPath -Encoding utf8NoBOM
     Invoke-ReuseCase `
         -Name valid-complete `
         -Evidence (New-CompleteEvidence) `
         -ExpectSuccess $true
+    $reusedTiming = Get-Content -LiteralPath $timingPath -Raw |
+        ConvertFrom-Json
+    if ([string]$reusedTiming.commit -cne $commit -or
+        -not [bool]$reusedTiming.reused -or
+        [long]$reusedTiming.totalElapsedMilliseconds -ne 0) {
+        throw 'Valid mutation reuse did not replace stale timing evidence.'
+    }
 
     Remove-Item -LiteralPath $evidencePath -Force
     $shardRoot = Join-Path $evidenceDirectory (
