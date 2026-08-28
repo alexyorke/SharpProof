@@ -203,42 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 537. [CONFIRMED] Deconstruction property targets are analyzed as getters, not setters
-
-**Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
-GetPropertyCalls around lines 1544-1595.
-
-**Description**: A property reference is classified as a setter only when its
-immediate parent is a recognized assignment/compound/increment operation. In a
-deconstruction assignment the property is nested under the target ITupleOperation,
-so it falls through to the getter branch. The runtime invokes only the setter.
-
-**Reproduction**, with zero compiler diagnostics:
-
-    simple invalid write:                 one set_Value SP0027
-    simple invalid read:                  one get_Value SP0027
-    deconstruction invalid setter value:  zero (expected one)
-    deconstruction safe setter,
-      getter Requires(false):             one false get_Value SP0027
-
-**Impact**: Property/indexer setter preconditions are missed while getter
-preconditions can be reported for accessors that never execute, producing both
-false negatives and false positives.
-
-**Root cause**: Accessor role is inferred only from the immediate parent, with no
-IDeconstructionAssignmentOperation target-subtree handling.
-
-**Recommended fix**: Walk transparent/tuple parents to detect property/indexer
-references in the deconstruction Target. Classify them setter-only and map the
-tuple path to the corresponding RHS element when replayable. If mapping is
-unknown, emit an unreplayable setter candidate, never a getter.
-
-**Regression coverage**: Invalid and safe setter cases, nested tuples, indexer
-targets, and an RHS property read that remains a getter; require no duplicates.
-
-**Confidence**: High; runtime accessor identity and analyzer diagnostics are
-inverted only for the tuple target shape.
-
 ### 539. [CONFIRMED] Canonical release tooling rejects Windows linked worktrees
 
 **Location**: compose.yaml source mount around lines 20-24 and

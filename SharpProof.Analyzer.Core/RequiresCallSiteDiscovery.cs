@@ -2626,6 +2626,29 @@ internal sealed partial class RequiresCallSiteDiscovery(
     {
         var getter = property.Property.GetMethod;
         var setter = property.Property.SetMethod;
+        if (IsDeconstructionTarget(
+                property,
+                semanticModel,
+                cancellationToken))
+        {
+            if (setter == null)
+            {
+                return [];
+            }
+
+            var canReplay = TryGetDeconstructionSetterValue(
+                property,
+                semanticModel,
+                cancellationToken,
+                out var value);
+            return [CreateSetterCall(
+                property,
+                setter,
+                value,
+                canReplay,
+                semanticModel,
+                cancellationToken)];
+        }
         if (property.Parent is ISimpleAssignmentOperation assignment &&
             ReferenceEquals(assignment.Target, property))
         {
@@ -2693,6 +2716,136 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
         return [CreateGetterCall(
             property, getter, semanticModel, cancellationToken)];
+    }
+
+    private static bool IsDeconstructionTarget(
+        IPropertyReferenceOperation property,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (semanticModel == null)
+        {
+            return false;
+        }
+
+        var assignment = property.Syntax.AncestorsAndSelf()
+            .OfType<AssignmentExpressionSyntax>()
+            .FirstOrDefault(candidate =>
+                candidate.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                candidate.Left.Span.Contains(property.Syntax.Span));
+        if (assignment == null ||
+            semanticModel.GetOperation(assignment, cancellationToken) is not
+                IDeconstructionAssignmentOperation deconstruction)
+        {
+            return false;
+        }
+
+        return ContainsOperationSyntax(
+            deconstruction.Target,
+            property.Syntax);
+    }
+
+    private static bool TryGetDeconstructionSetterValue(
+        IPropertyReferenceOperation property,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken,
+        out IOperation? value)
+    {
+        value = null;
+        if (semanticModel == null)
+        {
+            return false;
+        }
+
+        var assignment = property.Syntax.AncestorsAndSelf()
+            .OfType<AssignmentExpressionSyntax>()
+            .FirstOrDefault(candidate =>
+                candidate.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                candidate.Left.Span.Contains(property.Syntax.Span));
+        if (assignment == null ||
+            semanticModel.GetOperation(assignment, cancellationToken) is not
+                IDeconstructionAssignmentOperation deconstruction)
+        {
+            return false;
+        }
+
+        return TryFindDeconstructionValue(
+            deconstruction.Target,
+            deconstruction.Value,
+            property.Syntax,
+            out value);
+    }
+
+    private static bool TryFindDeconstructionValue(
+        IOperation target,
+        IOperation value,
+        SyntaxNode propertySyntax,
+        out IOperation? matchedValue)
+    {
+        target = UnwrapDeconstructionOperation(target);
+        value = UnwrapDeconstructionOperation(value);
+        if (SameOperationSyntax(target.Syntax, propertySyntax))
+        {
+            matchedValue = value;
+            return true;
+        }
+
+        if (target is not ITupleOperation targetTuple ||
+            value is not ITupleOperation valueTuple ||
+            targetTuple.Elements.Length != valueTuple.Elements.Length)
+        {
+            matchedValue = null;
+            return false;
+        }
+
+        for (var index = 0; index < targetTuple.Elements.Length; index++)
+        {
+            if (TryFindDeconstructionValue(
+                    targetTuple.Elements[index],
+                    valueTuple.Elements[index],
+                    propertySyntax,
+                    out matchedValue))
+            {
+                return true;
+            }
+        }
+
+        matchedValue = null;
+        return false;
+    }
+
+    private static IOperation UnwrapDeconstructionOperation(IOperation operation)
+    {
+        while (true)
+        {
+            switch (operation)
+            {
+                case IConversionOperation conversion:
+                    operation = conversion.Operand;
+                    continue;
+                case IParenthesizedOperation parenthesized:
+                    operation = parenthesized.Operand;
+                    continue;
+                default:
+                    return operation;
+            }
+        }
+    }
+
+    private static bool ContainsOperationSyntax(
+        IOperation operation,
+        SyntaxNode syntax)
+    {
+        return operation.DescendantsAndSelf().Any(candidate =>
+            SameOperationSyntax(candidate.Syntax, syntax));
+    }
+
+    private static bool SameOperationSyntax(
+        SyntaxNode left,
+        SyntaxNode right)
+    {
+        return left.SyntaxTree == right.SyntaxTree &&
+            left.Span == right.Span;
     }
 
     private enum CoalesceGetterResult

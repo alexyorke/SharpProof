@@ -587,6 +587,38 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task DeconstructionPropertyTargetsReplaySetterRequiresOnly()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public sealed class Box {
+                public int Value {
+                    get { Contract.Requires(false); return 0; }
+                    set { Contract.Requires(value > 0); }
+                }
+            }
+            public static class Subject {
+                public static void Invalid(Box box) {
+                    (box.Value, _) = (-1, 0);
+                }
+                public static void Valid(Box box) {
+                    (box.Value, _) = (1, 0);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+        Assert.That(
+            diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("set_Value"));
+    }
+
+    [Test]
     public async Task StaticAccessorsCheckRequiresAndConditionalAccessFailsClosed()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
