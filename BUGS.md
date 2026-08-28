@@ -453,47 +453,6 @@ negative controls.
 **Confidence**: High; all variants and a direct-indexer positive control were
 self-verified in a compiler-clean canonical probe.
 
-### 454. [CONFIRMED] Protocol model generation and schema parity accept duplicate properties
-
-**Location**: scripts/Generate-ProtocolModel.ps1 around line 358 and
-SharpProof.Worker.Test/ProtocolModelSchemaTests.cs around line 25.
-
-**Description**: ConvertFrom-Json collapses duplicate protocol-schema
-properties before validation, while schema parity independently uses
-JsonDocument.GetProperty and selects the same last value. The authoritative
-source for protocol, manifest, cache versions, model declarations, and
-validation tables can therefore be contradictory while generation,
-acceptance, and parity all pass.
-
-**Reproduction**: Change versionMembers to:
-
-    "protocol": "RetiredProtocolVersion.Current",
-    "protocol": "WorkerProtocolVersions.Current"
-
-Full verification against copied checked-in outputs exits 0:
-
-    Verified deterministic worker protocol model.
-
-The parity primitive returns WorkerProtocolVersions.Current.
-
-**Impact**: Generated protocol code and analyzer effect-certainty tables can
-silently follow a last duplicate property while the review source remains
-ambiguous and every authority gate is green.
-
-**Root cause**: Both generator and parity consumer share last-wins JSON
-semantics without a raw recursive duplicate-name check.
-
-**Recommended fix**: Apply the shared strict ordinal duplicate-property reader
-before conversion and reuse it in ReadSchema and every other consumer of
-ProtocolModel.schema.json.
-
-**Regression coverage**: Add duplicate root schemaVersion, nested
-versionMembers.protocol, and validation-table property cases. Require nonzero
-generation and path-qualified errors; parity must reject before GetProperty.
-
-**Confidence**: High; generator verification and parity last-wins behavior were
-self-verified independently.
-
 ### 455. [CONFIRMED] Fuzz campaigns discard valid semantic-failure JSON before parsing and accounting
 
 **Location**: Tools/SharpProof.Fuzz/Program.cs around lines 31-37;
