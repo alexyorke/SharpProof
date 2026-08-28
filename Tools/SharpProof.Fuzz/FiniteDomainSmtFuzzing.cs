@@ -14,7 +14,7 @@ public enum FiniteDomainSatisfiability
 
 public sealed record FiniteDomainDifferentialResult(
     FuzzOracleStatus Status,
-    FiniteDomainSatisfiability Expected,
+    FiniteDomainSatisfiability? Expected,
     FiniteDomainSatisfiability? Actual,
     int FiniteDomainAssumptions,
     string Detail);
@@ -149,7 +149,7 @@ public sealed class FiniteDomainSmtDifferentialOracle
             {
                 return new FiniteDomainDifferentialResult(
                     FuzzOracleStatus.Abstained,
-                    FiniteDomainSatisfiability.Unsatisfiable,
+                    null,
                     null,
                     assumptions.Count,
                     "The generated formula contains a variable outside the " +

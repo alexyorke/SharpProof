@@ -3054,26 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 667. [CONFIRMED] Unsupported finite-domain formulas fabricate Expected=Unsatisfiable
-
-**Location**: `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs`, around lines
-15-20 and 139-166.
-
-**Description**: Expected is nonnullable, so the early unsupported-domain
-abstention stamps Unsatisfiable before any enumeration. The value is a placeholder
-but is exposed as an actual oracle verdict.
-
-**Reproduction**: A well-typed string equality was true under a concrete binding,
-yet the finite result was
-`Status=Abstained Expected=Unsatisfiable Actual=null Assumptions=0`.
-
-**Impact**: Reports, tests, or minimizers consuming Expected receive a false
-semantic assertion on ordinary abstentions.
-
-**Recommended fix**: Make Expected nullable or add an explicit not-computed
-state, returning no expectation until enumeration completes. Test satisfying and
-false unsupported formulas plus supported SAT/UNSAT controls.
-
 ### 668. [CONFIRMED] Accepted finite-domain formulas are enumerated twice
 
 **Location**: `Tools/SharpProof.Fuzz/FuzzRunner.cs`, around lines 534-556;

@@ -637,6 +637,29 @@ public sealed class FuzzRunnerTests
         Assert.That(unsat.FiniteDomainAssumptions, Is.EqualTo(1));
     }
 
+    [Test]
+    public async Task UnsupportedFiniteDomainFormulaDoesNotInventAnExpectation()
+    {
+        var factory = new IrFactory();
+        var text = factory.CreateVariable("text", factory.StringType);
+        var formula = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Variable(text),
+            factory.String("value"));
+
+        var result = await new FiniteDomainSmtDifferentialOracle()
+            .CompareAsync(factory, formula);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Abstained));
+            Assert.That(result.Expected, Is.Null);
+            Assert.That(result.Actual, Is.Null);
+            Assert.That(result.FiniteDomainAssumptions, Is.Zero);
+            Assert.That(result.Detail, Does.Contain("outside"));
+        }
+    }
+
     [TestCase(0, 0, 1, 1)]
     [TestCase(7, 1, 0, 1)]
     [TestCase(8, 0, 2, 0)]

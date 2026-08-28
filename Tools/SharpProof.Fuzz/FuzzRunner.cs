@@ -261,7 +261,7 @@ public static class FuzzRunner
                 {
                     Interlocked.Increment(ref finiteSmtSatisfiable);
                 }
-                else
+                else if (smt.Expected == FiniteDomainSatisfiability.Unsatisfiable)
                 {
                     Interlocked.Increment(ref finiteSmtUnsatisfiable);
                 }
