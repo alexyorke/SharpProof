@@ -3054,28 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 639. [CONFIRMED] Successful dotnet clean leaves compiler-manifest.input.json
-
-**Location**: `SharpProof.CompilerCollector/FinalCompilationCollector.cs`, around
-lines 7 and 19-35; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,
-around lines 148-149, 178, 193, and 327-359; `ResetPublishedVerification.cs`,
-around lines 11-48.
-
-**Description**: The stable compiler-manifest source is generated beside the
-project and consumed by verification, but neither the clean target nor reset
-logic removes it or records it in MSBuild `@(FileWrites)`.
-
-**Reproduction**: A verification build created the default file. `dotnet clean`
-with verification both disabled and enabled returned zero and removed bin/obj
-and publications, but the source manifest survived byte-for-byte.
-
-**Impact**: Clean is incomplete and leaves derived compiler input in source
-trees, creating stale artifacts and dirty checkouts.
-
-**Recommended fix**: Add the stable manifest to `@(FileWrites)` and explicitly
-remove legacy/untracked copies during reset. Test build-clean in both profiles,
-failed builds, custom paths, and repeated clean.
-
 ### 640. [CONFIRMED] Finite-domain SMT outcome coverage is collapsed and discarded
 
 **Location**: `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs`, around lines
