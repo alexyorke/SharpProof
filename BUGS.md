@@ -3030,27 +3030,6 @@ using Linux; all three portability rows can come from one host.
 **Recommended fix**: Derive the OS family from runtime APIs or reject mismatch
 before work/output; record OS/architecture provenance. Test all cross-OS pairs.
 
-### 632. [CONFIRMED] Partial-SMT outcome coverage is computed then discarded
-
-**Location**: `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs`, around lines
-16-22; `FuzzRunner.cs`, around lines 82-110, 223-236, and 354-365.
-
-**Description**: The oracle exposes defined-true, defined-false, and undefined
-counts, but FuzzRunner retains only one Agreement counter. Passed/Coverage cannot
-establish that the undefined path ran.
-
-**Reproduction**: Production seed/case reconstruction produced two defined-true
-scenarios and zero undefined, yet a one-case campaign returned
-`PartialSmtAgreements=1 Passed=True`; the summary had no other partial fields.
-
-**Impact**: Accepted campaign evidence can be green with zero partiality
-coverage, and future generator regressions eliminating undefined scenarios stay
-invisible.
-
-**Recommended fix**: Aggregate/serialize exact scenario outcome counts, validate
-their sum, and require at least one defined and one undefined outcome wherever
-coverage is claimed. Add malformed/round-trip/default-seed tests.
-
 ### 634. [CONFIRMED] A failed same-OS portable rerun preserves a prior passing receipt
 
 **Location**: `scripts/Test-SharpProofPortableConsumer.ps1`, around lines 12-43;
