@@ -10,10 +10,26 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+
+$resolvedOutput = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
+$pilotReceipt = Resolve-SharpProofContainedPath `
+    -Root $repositoryRoot `
+    -Path 'artifacts/release-qualification/qualification-receipts/pilots.json' `
+    -ParameterName 'Pilot receipt path'
+foreach ($path in @($resolvedOutput, $pilotReceipt)) {
+    if (Test-Path -LiteralPath $path -PathType Container) {
+        throw "Pilot evidence path is a directory: $path"
+    }
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        Remove-Item -LiteralPath $path -Force
+    }
+}
+
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 . (Join-Path $PSScriptRoot 'Get-SharpProofPilotPackageAuthority.ps1')
-. (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 $parallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
@@ -368,8 +384,6 @@ if (-not (Test-SharpProofPilotReport `
         -CatalogPath (Join-Path $pilotRoot 'catalog.json'))) {
     throw 'Pilot evidence does not satisfy the catalog and category authority.'
 }
-$resolvedOutput = Resolve-SharpProofContainedPath `
-    -Root $repositoryRoot -Path $OutputPath -ParameterName 'OutputPath'
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($resolvedOutput)) | Out-Null
 [IO.File]::WriteAllText(
     $resolvedOutput,

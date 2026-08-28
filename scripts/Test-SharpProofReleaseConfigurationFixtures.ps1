@@ -198,6 +198,41 @@ function Invoke-QualificationTombstoneCase {
     }
 }
 
+function Invoke-PilotTombstoneCase {
+    $reportDirectory = Join-Path $fixture 'artifacts/pilots'
+    $receiptDirectory = Join-Path $fixture `
+        'artifacts/release-qualification/qualification-receipts'
+    [IO.Directory]::CreateDirectory($reportDirectory) | Out-Null
+    [IO.Directory]::CreateDirectory($receiptDirectory) | Out-Null
+    $reportPath = Join-Path $reportDirectory 'report.json'
+    $receiptPath = Join-Path $receiptDirectory 'pilots.json'
+    [IO.File]::WriteAllText(
+        $reportPath,
+        '{"status":"passed","commit":"stale"}',
+        [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText(
+        $receiptPath,
+        '{"status":"passed","commit":"stale"}',
+        [Text.UTF8Encoding]::new($false))
+    $oldContainer = $env:SHARPPROOF_CONTAINER
+    try {
+        $env:SHARPPROOF_CONTAINER = '1'
+        $output = & pwsh -NoLogo -NoProfile -File (
+            Join-Path $fixture 'scripts/Test-SharpProofPilots.ps1') `
+            -PackageSource artifacts/missing 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            throw 'Pilot tombstone fixture unexpectedly succeeded.'
+        }
+        if ((Test-Path -LiteralPath $reportPath -PathType Leaf) -or
+            (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+            throw "Pilot tombstone fixture preserved stale evidence: $output"
+        }
+    }
+    finally {
+        $env:SHARPPROOF_CONTAINER = $oldContainer
+    }
+}
+
 try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/Test-SharpProofReleaseConfiguration.ps1') `
@@ -226,6 +261,27 @@ try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/Get-SharpProofReleaseVersion.ps1') `
         -Destination (Join-Path $fixture 'scripts/Get-SharpProofReleaseVersion.ps1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Test-SharpProofPilots.ps1') `
+        -Destination (Join-Path $fixture 'scripts/Test-SharpProofPilots.ps1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/Get-SharpProofPilotPackageAuthority.ps1') `
+        -Destination (Join-Path $fixture 'scripts/Get-SharpProofPilotPackageAuthority.ps1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'scripts/SharpProof.ContainerExecution.psm1') `
+        -Destination (Join-Path $fixture 'scripts/SharpProof.ContainerExecution.psm1')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'SharpProof.Release.props') `
+        -Destination (Join-Path $fixture 'SharpProof.Release.props')
+    New-Item -ItemType Directory -Path (
+        Join-Path $fixture 'eng/acceptance'), (
+        Join-Path $fixture 'eng/pilots') -Force | Out-Null
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'eng/pilots/catalog.json') `
+        -Destination (Join-Path $fixture 'eng/pilots/catalog.json')
+    Copy-Item -LiteralPath (
+        Join-Path $repositoryRoot 'eng/acceptance/contract.json') `
+        -Destination (Join-Path $fixture 'eng/acceptance/contract.json')
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/Test-SharpProofPilotReport.ps1') `
         -Destination (Join-Path $fixture 'scripts/Test-SharpProofPilotReport.ps1')
@@ -378,6 +434,7 @@ cat "$GH_FIXTURE_ROOT/$file.json"
         Set-Content -LiteralPath $minimalEvidence -Encoding utf8NoBOM
     Invoke-ReceiptCase minimal-schema $minimalEvidence $false
     Invoke-QualificationTombstoneCase
+    Invoke-PilotTombstoneCase
     Write-Host 'Release configuration exact-ref fixtures passed.'
 }
 finally {

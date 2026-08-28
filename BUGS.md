@@ -14,65 +14,6 @@ The following non-security findings were reproduced by their reporting agents
 before being added here. No production, test, build, or configuration changes
 are included in this audit-only wave.
 
-### 436. [CONFIRMED] Failed pilots reruns preserve a stale passing report and qualification receipt
-
-**Location**: scripts/Test-SharpProofPilots.ps1 around lines 6, 12-19,
-92-106, and 371-377; scripts/Invoke-SharpProofContainer.ps1 around
-lines 411-422; scripts/Write-SharpProofQualificationReceipt.ps1 around
-lines 24-27, 97-106, and 120-149; persistent artifact setup in
-eng/container/entrypoint.sh around lines 178-188; release consumption in
-scripts/Invoke-SharpProofReleaseContainer.ps1 around lines 175-210.
-
-**Description**: Test-SharpProofPilots owns its report only at the end of a
-successful run. Imports, parallelism, catalog loading, package-source
-validation, clean-tree checks, and all pilot work can fail before the old report
-is touched. The container wrapper invokes the receipt writer only after the
-pilot script succeeds, and the receipt writer validates before overwriting.
-Consequently, a failed retry leaves both the previous passing pilot report and
-its qualification receipt intact.
-
-**Reproduction**: In a disposable fixture, seed the pilot report with
-stale-passing-report and the pilots qualification receipt with
-stale-passing-receipt, then invoke Test-SharpProofPilots.ps1 with a missing
-package source. The reporting agent observed:
-
-    EXIT_CODE=1
-    REPORT_SURVIVED=True
-    REPORT_CONTENT=stale-passing-report
-    RECEIPT_SURVIVED=True
-
-The failure occurred at package-source validation before either evidence file
-was owned by the new attempt.
-
-**Impact**: The retry correctly exits nonzero, but artifact presence and
-content still describe the previous passing attempt. On the same commit and
-package set, release qualification accepts a receipt whose commit, evidence
-hash, and package identity match; it has no attempt-recency field. A later or
-manual qualification can therefore accept the stale pair as if it represented
-the latest pilots attempt. Persistent container artifacts and always-upload CI
-steps expose the stale evidence even when fresh hosted runners reduce
-cross-workflow frequency.
-
-**Root cause**: Pilot report and receipt ownership is split across scripts, and
-both use publish-only-on-success without command-entry invalidation or an
-attempt-bound pending/failure state.
-
-**Recommended fix**: At pilots command entry, before parallelism, package, and
-clean-tree checks, atomically remove or replace both the report and receipt with
-pending/failure tombstones bound to the current commit and attempt identifier.
-Publish the passing report/receipt pair atomically only after all pilots
-succeed. Direct Test-SharpProofPilots.ps1 invocation must apply equivalent
-report invalidation.
-
-**Regression coverage**: In a persistent-artifacts fixture, create a valid
-same-commit report and receipt, rerun with a missing package source and
-separately with a child-pilot failure, require the old pair to be absent or
-failure-tombstoned, and prove release qualification rejects it.
-
-**Confidence**: High; reproduced in a temp-only fixture and traced through
-report production, receipt production, persistent storage, and release
-consumption.
-
 ### 437. [CONFIRMED] The verifier supervisor outlives an abruptly terminated MSBuild host
 
 **Location**: SharpProof.BuildTasks/RunVerifier.cs around lines 205-225 and
