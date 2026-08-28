@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 559. [CONFIRMED] Package-test shards can execute zero tests and report success
-
-**Location**: scripts/Invoke-SharpProofPackageTests.ps1 around lines 295-313,
-421-425, and 491-496.
-
-**Description**: Fixture classes are hard-coded. VSTest exits zero when a filter
-matches nothing, and the scheduler checks only process exit codes, not TRX
-executed counts or discovered-test coverage.
-
-**Reproduction**: A renamed failing fixture yielded No test matches the filter,
-then Package tests passed. Directly targeting the renamed fixture failed 1/1. A
-temporary TRX executed-count guard correctly rejected the empty shard.
-
-**Impact**: Added or renamed package fixtures can be omitted entirely while
-developer and qualification commands remain green.
-
-**Recommended fix**: Discover the complete inventory, partition every identity
-exactly once, and reconcile TRX execution. At minimum reject missing TRX and
-zero-test default shards. Test rename/add/remove mutations.
-
 ### 560. [CONFIRMED] SkipCompilerExecution can republish stale Proven evidence
 
 **Location**: SharpProof.Package/buildTransitive/SharpProof.targets around lines
