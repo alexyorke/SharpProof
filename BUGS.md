@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 593. [CONFIRMED] Invalid closed attributes in referenced metadata are silent
-
-**Location**: ContractBinder.cs around lines 249-301; AnalyzerSession.cs around
-lines 154-185; RequiresCallSiteAnalyzer.cs around lines 314-326;
-AnalyzerFeaturePipeline.cs around lines 345-356.
-
-**Description**: A genuine metadata attribute that is recognized but
-semantically invalid makes binding fail. Only identity-rejected metadata gets an
-unconditional call-site diagnostic; other failures become Unknown and are
-reported only when the caller is independently selected.
-
-**Reproduction**: External Read([Positive] string) was recognized invalid and
-bound InvalidClosedAttribute, yet an unannotated consumer call emitted nothing.
-Positive int emitted SP0027; selecting the caller produced only vague SP0047.
-
-**Impact**: Dependencies built without the analyzer can ship malformed
-preconditions that consumers neither enforce nor diagnose.
-
-**Recommended fix**: Validate genuine metadata attributes at call targets and
-emit SP0024 with type/reason, or an unconditional typed SP0047. Retain identity
-rejection, valid external, no-attribute, and selected-caller controls.
-
 ### 594. [CONFIRMED] SMT depth prevalidation re-walks shared DAGs per assumption
 
 **Location**: SharpProof.Smt/IrSmtBackend.cs around lines 297-301 and 346-364.
