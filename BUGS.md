@@ -1510,55 +1510,6 @@ Linux, Windows, and macOS runners.
 **Confidence**: High; the exact helper blocked under an executable probe, its
 blob matched the assigned baseline, and no outer workflow timeout exists.
 
-### 488. [CONFIRMED] Documentation verification accepts duplicate acceptance-contract properties
-
-**Location**: scripts/Generate-Readme.ps1 around line 725 while reading
-eng/acceptance/contract.json.
-
-**Description**: README generation and its verification mode parse the
-checked-in acceptance contract directly with ConvertFrom-Json. PowerShell keeps
-the last occurrence of a duplicate property, so a contradictory resource or
-concurrency authority can still produce documentation that the verifier
-certifies as current.
-
-**Reproduction**: In an isolated tracked-file copy, the acceptance contract was
-changed to contain:
-
-    "mutationParallelism": 99,
-    "mutationParallelism": 4
-
-The full documentation verification returned success:
-
-    DUPLICATE_AUTHORITY_VERIFY_EXIT=0
-    SharpProof documentation matches ... acceptance-contract versions ...
-    DOCUMENTATION_PARSE_VALUE=4
-
-The generated claim therefore described four deterministic lanes while the
-same authoritative object also declared 99.
-
-**Impact**: Documentation and container-documentation gates can publish a green
-receipt for an ambiguous acceptance authority. Operators cannot know which
-duplicate value reviewers intended, and future parsers with different duplicate
-handling can enforce a different resource contract than the README states.
-
-**Root cause**: The documentation generator trusts ConvertFrom-Json's
-last-property-wins behavior and performs claim comparison only after the
-ambiguous object has already been collapsed.
-
-**Recommended fix**: Parse every checked-in JSON authority consumed by the
-documentation validator with the repository's recursive duplicate-property
-detector before materialization. Include the JSON path and both property
-locations in the failure.
-
-**Regression coverage**: Run documentation verification against fixtures that
-duplicate `automation.mutationParallelism` and
-`container.defaultMemoryMiB`, including case variants, and require
-path-qualified rejection before any README claim comparison. Retain a valid
-contract control.
-
-**Confidence**: High; the full production verification command accepted the
-duplicate fixture and the parser control showed the selected last value.
-
 ### 489. [CONFIRMED] Ordinary test fixtures require checkout Git metadata despite the archive-test contract
 
 **Location**: SharpProof.ArchitectureTest release-authority, qualification-
