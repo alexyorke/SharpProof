@@ -161,6 +161,20 @@ function Test-SharpProofReleasePackageInput {
         -Owner 'Release package input'
 }
 
+function Copy-SharpProofReleaseSbom {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourcePath,
+        [Parameter(Mandatory = $true)][string]$StagingDirectory
+    )
+
+    if (-not [IO.File]::Exists($SourcePath)) {
+        throw "SBOM source is not a file: $SourcePath"
+    }
+    $destination = Join-Path $StagingDirectory 'SharpProof.spdx.json'
+    [IO.File]::Copy($SourcePath, $destination, $false)
+    return $destination
+}
+
 function Test-SharpProofReleaseBundleTopology {
     param(
         [Parameter(Mandatory = $true)][string]$Directory,

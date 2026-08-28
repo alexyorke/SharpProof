@@ -41,6 +41,24 @@ try {
         -PackageNames $packages `
         -AllowGeneratedEvidence
 
+    $customSbom = Join-Path $root 'custom-name.spdx.json'
+    [IO.File]::WriteAllText(
+        $customSbom,
+        '{"spdxVersion":"SPDX-2.3"}',
+        [Text.UTF8Encoding]::new($false))
+    $sbomStaging = Join-Path $root 'sbom-staging'
+    [IO.Directory]::CreateDirectory($sbomStaging) | Out-Null
+    $canonicalSbom = Copy-SharpProofReleaseSbom `
+        -SourcePath $customSbom `
+        -StagingDirectory $sbomStaging
+    if ([IO.Path]::GetFileName($canonicalSbom) -cne 'SharpProof.spdx.json' -or
+        -not [IO.File]::Exists($canonicalSbom) -or
+        [IO.File]::ReadAllText($canonicalSbom) -cne
+            [IO.File]::ReadAllText($customSbom)) {
+        throw 'A supplied SBOM was not copied to the canonical release name.'
+    }
+    [IO.File]::Delete($customSbom)
+
     try {
         Test-SharpProofReleasePackageInput `
             -Directory $root `

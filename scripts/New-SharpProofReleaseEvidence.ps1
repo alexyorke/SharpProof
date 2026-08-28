@@ -784,8 +784,9 @@ else {
     $suppliedSbom = (Resolve-Path `
         -LiteralPath $SbomPath `
         -ErrorAction Stop).Path
-    $resolvedSbom = Join-Path $resolvedOutput ([IO.Path]::GetFileName($suppliedSbom))
-    [IO.File]::Copy($suppliedSbom, $resolvedSbom, $false)
+    $resolvedSbom = Copy-SharpProofReleaseSbom `
+        -SourcePath $suppliedSbom `
+        -StagingDirectory $resolvedOutput
 }
 if (-not (Test-Path -LiteralPath $resolvedSbom -PathType Leaf)) {
     throw "SbomPath is not a file: $resolvedSbom"

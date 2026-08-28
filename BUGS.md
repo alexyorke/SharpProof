@@ -3054,25 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 653. [CONFIRMED] Supplied SBOMs are rejected unless their input basename is canonical
-
-**Location**: `scripts/New-SharpProofReleaseEvidence.ps1`, around lines 765-769
-and 901-910; `scripts/SharpProof.ReleaseChecksums.ps1`, around lines 152-160.
-
-**Description**: `-SbomPath` preserves the supplied basename in staging and the
-manifest, while final topology requires the SBOM artifact to be named exactly
-`SharpProof.spdx.json`.
-
-**Reproduction**: Identical valid SPDX bytes named `custom.spdx.json` failed the
-exact bundle authority; the canonical basename passed.
-
-**Impact**: The public path parameter rejects ordinary externally generated
-SBOM filenames late after expensive validation.
-
-**Recommended fix**: Always copy supplied bytes to the canonical staging name
-and record that name. Test arbitrary input names, byte identity, malformed
-content, and exact manifest topology.
-
 ### 654. [CONFIRMED] Framework interpolation fallback reports a later System. segment as a prefix
 
 **Location**: `SharpProof.ArchitectureTest/FrameworkIdentityScanner.cs`, around
