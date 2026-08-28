@@ -94,6 +94,40 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public void ImplicitBaseConstructorResolvesOptionalParametersAndDefaults()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            public class Base {
+                protected Base(int value = -1) { }
+            }
+            public sealed class Derived : Base {
+                public Derived() { }
+            }
+            """,
+            []);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<ConstructorDeclarationSyntax>()
+            .Single(static constructor =>
+                constructor.Identifier.ValueText == "Derived");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        Assert.That(candidates!.Value, Has.Length.EqualTo(1));
+        var candidate = candidates.Value[0];
+        Assert.That(candidate.TargetMethod.Parameters, Has.Length.EqualTo(1));
+        Assert.That(candidate.SyntheticArguments[0], Is.EqualTo(-1));
+    }
+
+    [Test]
     public void UsingStatementsProduceConcreteDisposeReplayCandidates()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(

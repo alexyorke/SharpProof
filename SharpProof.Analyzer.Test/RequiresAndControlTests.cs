@@ -2532,6 +2532,29 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ImplicitBaseInitializerReplaysOptionalDefaultPrecondition()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public class Base {
+                protected Base(int value = -1) {
+                    Contract.Requires(value > 0);
+                }
+            }
+            public sealed class Derived : Base {
+                public Derived() { }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public async Task ImplicitBaseInitializerControlsRemainExact()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

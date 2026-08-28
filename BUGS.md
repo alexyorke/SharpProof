@@ -3076,28 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 672. [CONFIRMED] Implicit base calls miss optional-only base constructors
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
-lines 79-126 and 382-412; `RequiresCallSiteAnalyzer.cs`, around lines 570-593.
-
-**Description**: Implicit base-call discovery equates an empty argument list with
-a constructor declaring zero parameters. C# can select a constructor whose every
-parameter is optional, and compiler-synthesized default actuals are also missing.
-
-**Reproduction**: `Base(int value=-1)` with `Requires(value>0)` was invoked by an
-ordinary derived constructor with no initializer, but discovery returned zero
-candidates and zero SP0027. Writing explicit `: base()` produced one default-
-argument candidate and SP0027. Runtime values were identical.
-
-**Impact**: Adding or omitting syntactically redundant `: base()` changes
-precondition coverage across ordinary and record constructors.
-
-**Recommended fix**: Resolve the compiler-selected empty-argument base overload
-and carry typed synthesized defaults, rather than choosing any all-optional
-member. Test overload preference, multiple defaults, enums/null, this-chains,
-records, metadata, and inaccessible/error cases.
-
 ### 673. [CONFIRMED] Any explicit static constructor suppresses member SP0027 diagnostics
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around

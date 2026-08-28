@@ -111,7 +111,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var reachableOperationSites = new HashSet<(
             SyntaxTree Tree, int Start, int Length)>();
         var initializer = (operationRoot as IConstructorBodyOperation)?.Initializer;
-        if (TryGetImplicitParameterlessBaseConstructor(out var baseConstructor))
+        if (TryGetImplicitParameterlessBaseConstructor(
+                out var baseConstructor,
+                out var syntheticArguments))
         {
             var constructorBody = operationRoot as IConstructorBodyOperation;
             var origin = (IOperation?)constructorBody?.BlockBody ??
@@ -123,7 +125,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 Instance: null,
                 Arguments: [],
                 ImmutableDictionary<int, IOperation>.Empty,
-                ImmutableDictionary<int, long>.Empty,
+                syntheticArguments,
                 CanReplay: true,
                 Flow: null,
                 ManagedFlowStatus.BudgetExceeded));
@@ -438,7 +440,17 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private bool TryGetImplicitParameterlessBaseConstructor(
         out IMethodSymbol baseConstructor)
     {
+        return TryGetImplicitParameterlessBaseConstructor(
+            out baseConstructor,
+            out _);
+    }
+
+    private bool TryGetImplicitParameterlessBaseConstructor(
+        out IMethodSymbol baseConstructor,
+        out ImmutableDictionary<int, long> syntheticArguments)
+    {
         baseConstructor = null!;
+        syntheticArguments = ImmutableDictionary<int, long>.Empty;
         if (declaration is not ConstructorDeclarationSyntax
             {
                 Initializer: null
@@ -457,7 +469,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var candidates = caller.ContainingType.BaseType?
             .InstanceConstructors
             .Where(static constructor =>
-                constructor.Parameters.IsEmpty)
+                constructor.Parameters.IsEmpty ||
+                constructor.Parameters.All(static parameter =>
+                    parameter.IsOptional))
             .ToImmutableArray() ?? [];
         if (candidates.Length != 1)
         {
@@ -465,7 +479,53 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
 
         baseConstructor = candidates[0];
+        if (baseConstructor.Parameters.IsEmpty)
+        {
+            return true;
+        }
+
+        var defaults = ImmutableDictionary.CreateBuilder<int, long>();
+        foreach (var parameter in baseConstructor.Parameters)
+        {
+            if (!parameter.HasExplicitDefaultValue ||
+                !TryGetIntegerDefault(parameter.ExplicitDefaultValue,
+                    out var value))
+            {
+                baseConstructor = null!;
+                return false;
+            }
+
+            defaults.Add(parameter.Ordinal, value);
+        }
+
+        syntheticArguments = defaults.ToImmutable();
         return true;
+    }
+
+    private static bool TryGetIntegerDefault(
+        object? value,
+        out long result)
+    {
+        result = 0;
+        if (value == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            result = Convert.ToInt64(
+                value,
+                System.Globalization.CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is FormatException or
+                InvalidCastException or
+                OverflowException)
+        {
+            return false;
+        }
     }
 
     internal static bool IsRecordCopyConstructor(
