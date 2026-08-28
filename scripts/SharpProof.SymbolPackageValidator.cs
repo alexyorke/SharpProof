@@ -291,6 +291,77 @@ internal static class SharpProofSymbolPackageValidator
                 $"Portable PDB '{pdbEntry.FullName}' Source Link does not " +
                 "name the canonical repository commit.");
         }
+
+        var sourceLinkMappings = mappings
+            .Select(mapping => (Pattern: mapping.Name, Url: mapping.Value.GetString()!))
+            .ToArray();
+        var documentNames = reader.Documents
+            .Select(handle => reader.GetString(reader.GetDocument(handle).Name))
+            .ToArray();
+        ValidateSourceLinkCoverage(
+            pdbEntry.FullName,
+            documentNames,
+            sourceLinkMappings,
+            expectedSourceUrl);
+    }
+
+    internal static void ValidateSourceLinkCoverage(
+        string pdbName,
+        IReadOnlyList<string> documentNames,
+        IReadOnlyList<(string Pattern, string Url)> mappings,
+        string expectedSourceUrl)
+    {
+        var normalizedDocuments = documentNames
+            .Select(static name => name.Replace('\\', '/'))
+            .ToArray();
+        var used = new bool[mappings.Count];
+        var normalizedPatterns = new string[mappings.Count];
+        var seenPatterns = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < mappings.Count; index++)
+        {
+            var mapping = mappings[index];
+            var pattern = mapping.Pattern.Replace('\\', '/');
+            if (!pattern.EndsWith("/*", StringComparison.Ordinal) ||
+                pattern.Length < 2 ||
+                !seenPatterns.Add(pattern) ||
+                !string.Equals(mapping.Url, expectedSourceUrl, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"Portable PDB '{pdbName}' Source Link mapping is invalid.");
+            }
+
+            normalizedPatterns[index] = pattern[..^1];
+        }
+
+        foreach (var document in normalizedDocuments)
+        {
+            var matched = false;
+            for (var index = 0; index < normalizedPatterns.Length; index++)
+            {
+                if (!document.StartsWith(
+                        normalizedPatterns[index],
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                used[index] = true;
+                matched = true;
+            }
+
+            if (!matched)
+            {
+                throw new InvalidDataException(
+                    $"Portable PDB '{pdbName}' Source Link does not cover " +
+                    $"document '{document}'.");
+            }
+        }
+
+        if (used.Any(static value => !value))
+        {
+            throw new InvalidDataException(
+                $"Portable PDB '{pdbName}' Source Link contains an unused mapping.");
+        }
     }
 
     private static MemoryStream CopyToMemory(ZipArchiveEntry entry)

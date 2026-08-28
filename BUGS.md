@@ -3054,28 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 657. [CONFIRMED] Symbol validation accepts Source Link mappings covering no documents
-
-**Location**: `scripts/SharpProof.SymbolPackageValidator.cs`, around lines
-258-293.
-
-**Description**: Validation checks that mappings are nonempty, wildcard-shaped,
-and point to the expected commit URL, but never applies mapping keys to the
-portable PDB document table.
-
-**Reproduction**: In a valid Attributes symbol package, changing the same-length
-mapping key from `/_/*` to `/x/*` left identifiers and URL intact. Production
-validation accepted it although all 17 documents began `/_/` and zero were
-covered.
-
-**Impact**: Release validation can certify a symbol package from which debuggers
-cannot resolve any source document.
-
-**Recommended fix**: Require exactly one applicable Source Link mapping for
-every PDB document using Source Link wildcard semantics. Reject uncovered,
-ambiguous, malformed, and unused mappings; test full, partial, and overlapping
-coverage.
-
 ### 658. [CONFIRMED] Self-targeting ContractFor suppresses executable method analysis
 
 **Location**: `SharpProof.Contracts/ContractForSymbolMatcher.cs`, around lines

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
@@ -9,6 +10,34 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class ProgramTests
 {
+    [Test]
+    public void SourceLinkMappingsMustCoverEveryPortablePdbDocument()
+    {
+        const string expected = "https://raw.githubusercontent.com/alexyorke/SharpProof/" +
+            "0123456789012345678901234567890123456789/*";
+
+        Assert.DoesNotThrow((Action)(() => SharpProofSymbolPackageValidator.ValidateSourceLinkCoverage(
+            "test.pdb",
+            ["/_/src/One.cs", "/_/src/Two.cs"],
+            [("/_/*", expected)],
+            expected)));
+        Assert.DoesNotThrow((Action)(() => SharpProofSymbolPackageValidator.ValidateSourceLinkCoverage(
+            "test.pdb",
+            ["/_/src/One.cs", "/_/src/Two.cs"],
+            [("/_/*", expected), ("/_/src/*", expected)],
+            expected)));
+        Assert.Throws<InvalidDataException>((Action)(() => SharpProofSymbolPackageValidator.ValidateSourceLinkCoverage(
+            "test.pdb",
+            ["/_/src/One.cs"],
+            [("/x/*", expected)],
+            expected)));
+        Assert.Throws<InvalidDataException>((Action)(() => SharpProofSymbolPackageValidator.ValidateSourceLinkCoverage(
+            "test.pdb",
+            ["/_/src/One.cs"],
+            [("/_/*", expected), ("/unused/*", expected)],
+            expected)));
+    }
+
     [Test]
     public async Task AllGateReportsInfrastructureFailureWhenCorpusPhaseCrashes()
     {
