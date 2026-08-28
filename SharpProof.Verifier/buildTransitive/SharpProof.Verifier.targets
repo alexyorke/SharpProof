@@ -109,6 +109,9 @@
         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
         CompilerOutputPaths="@(_SharpProofEarlyCompilerOwnedOutput)"
         CachePath="$(_SharpProofEarlyActiveCacheDirectory)" />
+    <Error Code="SP0054"
+           Condition="'$(SkipCompilerExecution)' == 'true' AND '$(DesignTimeBuild)' != 'true'"
+           Text="SharpProof verification cannot run when SkipCompilerExecution=true; compiler execution is required to produce current evidence." />
   </Target>
 
   <Target Name="_SharpProofInitializeVerify"
@@ -327,7 +330,7 @@
   <Target Name="SharpProofVerify"
           AfterTargets="CoreCompile"
           DependsOnTargets="CoreCompile;_SharpProofInitializeVerify;_SharpProofVerifyCore"
-          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false' AND '$(SkipCompilerExecution)' != 'true'">
     <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
   </Target>
 

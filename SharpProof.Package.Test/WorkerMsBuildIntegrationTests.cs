@@ -1103,6 +1103,45 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task CompilerSuppressionCannotReusePriorVerification()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(project.Root, "Subject.cs"),
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long Identity(long value) {
+                    Contract.Ensures(Contract.Result<long>() > value);
+                    return value;
+                }
+            }
+            """,
+            new System.Text.UTF8Encoding(false));
+
+        var suppressed = await project.BuildAsync(
+            verify: true,
+            ("SkipCompilerExecution", "true"),
+            ("ProvideCommandLineArgs", "true"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(suppressed.ExitCode, Is.Not.Zero, suppressed.Output);
+            Assert.That(
+                suppressed.Output,
+                Does.Contain("SkipCompilerExecution"));
+            Assert.That(
+                suppressed.Output,
+                Does.Not.Contain("SharpProof verifier result"));
+            Assert.That(File.Exists(project.ResultPath), Is.False);
+        }
+    }
+
+    [Test]
     public async Task PrepublicationFailuresInvalidatePriorStableResult()
     {
         RequireContainerWorker();
