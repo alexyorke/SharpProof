@@ -1231,6 +1231,9 @@ internal static class PerformanceGate
                         (string?)element.Attribute("Condition"),
                         "'$(SharpProofProfile)' == ''",
                         StringComparison.Ordinal));
+        var profileAssignments = portableTargets
+            .Descendants("SharpProofProfile")
+            .ToArray();
         var features = portableTargets
             .Descendants("SharpProofFeatures")
             .SingleOrDefault(
@@ -1397,6 +1400,8 @@ internal static class PerformanceGate
         if (!visibleProperties.Contains("SharpProofProfile") ||
             !visibleProperties.Contains("SharpProofFeatures") ||
             !string.Equals(profile?.Value, "advisory", StringComparison.Ordinal) ||
+            profileAssignments.Length != 1 ||
+            !ReferenceEquals(profileAssignments[0], profile) ||
             !string.Equals(features?.Value, "all", StringComparison.Ordinal) ||
             !string.Equals(verify?.Value, "false", StringComparison.Ordinal) ||
             portableContainsVerifierWork ||

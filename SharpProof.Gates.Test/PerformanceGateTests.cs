@@ -624,6 +624,44 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public void AdvisoryPolicyRejectsAnUnconditionalOffProfileOverride()
+    {
+        var root = RepositoryLayout.FindRoot();
+        var portableProps = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.props"));
+        var portableTargets = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.targets"));
+        var verifierProps = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Verifier",
+            "buildTransitive",
+            "SharpProof.Verifier.props"));
+        var verifierTargets = XDocument.Load(Path.Combine(
+            root,
+            "SharpProof.Verifier",
+            "buildTransitive",
+            "SharpProof.Verifier.targets"));
+        portableTargets.Root!.Add(
+            new XElement(
+                "PropertyGroup",
+                new XElement("SharpProofProfile", "off")));
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() =>
+                PerformanceGate.ValidateAdvisoryPackagePolicy(
+                    portableProps,
+                    portableTargets,
+                    verifierProps,
+                    verifierTargets)));
+    }
+
+    [Test]
     [Category("Performance")]
     [NonParallelizable]
     public async Task ForcedTerminationDeadlineIsStableAcrossLaunches()
