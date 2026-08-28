@@ -403,10 +403,12 @@ public sealed class RequiresReplaySoundnessTests
             ["SP0027"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
         Assert.That(
             factory.Outcomes["Call"],
-            Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
+            Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
     }
 
     [Test]

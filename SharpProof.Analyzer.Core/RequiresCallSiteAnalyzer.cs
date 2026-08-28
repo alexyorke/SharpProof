@@ -700,9 +700,7 @@ internal static partial class RequiresCallSiteAnalyzer
                 continue;
             }
 
-            if (argument.ArgumentKind ==
-                    ArgumentKind.ParamArray ||
-                result != null)
+            if (result != null)
             {
                 return null;
             }

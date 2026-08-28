@@ -1855,6 +1855,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 (creation.Constructor == null ||
                  creation.Constructor.DeclaringSyntaxReferences.Length != 1 ||
                  CompletesNormally(creation.Constructor)),
+            IArrayCreationOperation array =>
+                IsDirectArrayCreationComplete(array),
             IMethodReferenceOperation methodReference =>
                 ChildrenCompleteNormally(methodReference) &&
                 (methodReference.Method.IsStatic ||
