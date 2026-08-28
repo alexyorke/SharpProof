@@ -406,6 +406,30 @@ public sealed class RequiresAndControlTests
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [TestCase("true ? throw new System.Exception() : 0")]
+    [TestCase("false ? 0 : throw new System.Exception()")]
+    public async Task ConstantConditionalNonCompletingArmSuppressesLaterRequires(
+        string expression)
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            $$"""
+            using SharpProof.Attributes;
+            public static class Fixture {
+                private static void Positive(int ignored, int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call() {
+                    Positive({{expression}}, -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
     [Test]
     public async Task PartialTypeInitializersRespectCompilationOrder()
     {

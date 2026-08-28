@@ -2125,9 +2125,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             IBlockOperation block =>
                 SequenceMayCompleteNormally(block.ChildOperations),
             IConditionalOperation conditional =>
-                MayCompleteNormally(conditional.Condition) &&
-                (MayCompleteNormally(conditional.WhenTrue) ||
-                 MayCompleteNormally(conditional.WhenFalse)),
+                MayCompleteConditional(conditional),
             IConditionalAccessOperation conditionalAccess =>
                 MayCompleteNormally(conditionalAccess.Operation) &&
                 (MayCompleteNormally(conditionalAccess.WhenNotNull) ||
@@ -2211,6 +2209,24 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             ILoopOperation or ISwitchOperation => true,
             _ => true
         };
+    }
+
+    private bool MayCompleteConditional(IConditionalOperation conditional)
+    {
+        if (!MayCompleteNormally(conditional.Condition))
+        {
+            return false;
+        }
+
+        if (conditional.Condition.ConstantValue is
+            { HasValue: true, Value: bool condition })
+        {
+            return MayCompleteNormally(
+                condition ? conditional.WhenTrue : conditional.WhenFalse);
+        }
+
+        return MayCompleteNormally(conditional.WhenTrue) ||
+            MayCompleteNormally(conditional.WhenFalse);
     }
 
     private bool MayCompleteSwitchExpression(
