@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 561. [CONFIRMED] Conditional member initializers lose viable-arm effects
-
-**Location**: SharpProof.Effects/EffectMethodNodeBuilder.cs around lines 134-162;
-OperationEffectScanner.Expressions.cs around lines 548-598;
-OperationEffectScanner.cs around lines 1080-1101.
-
-**Description**: Member initializers are scanned outside the constructor CFG.
-IConditionalOperation falls through to sequential child scanning, which stops
-when the first arm cannot complete instead of joining alternatives.
-
-**Reproduction**: Runtime selected Mutate in chooseFailure ? Fail() : Mutate(),
-wrote static state 1729, and completed construction. Analysis returned Complete,
-Writes.IsUnknown=false, but omitted the static write. A temporary independent-arm
-join fixed the oracle and existing initializer tests.
-
-**Impact**: Complete constructor/static-constructor summaries can omit writes,
-calls, or allocations from a runtime-viable alternative.
-
-**Recommended fix**: Scan the condition once; choose a constant arm when known,
-otherwise scan arms independently and join. Add instance and static initializer
-runtime oracles.
-
 ### 562. [CONFIRMED] SP0027 misses implicit synchronous Dispose calls
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines
