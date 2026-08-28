@@ -3076,30 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 681. [CONFIRMED] Debug mutation campaigns can satisfy Release qualification
-
-**Location**: `scripts/Invoke-SharpProofContainer.ps1`, around lines 7-8 and
-298-313; `Test-SharpProofMutationCatalog.ps1`, around lines 44-55 and 108-112;
-`Write-SharpProofQualificationReceipt.ps1`, around lines 84-90;
-`Invoke-SharpProofReleaseContainer.ps1`, around lines 184-209.
-
-**Description**: Mutation evidence serializes its configuration but validators
-derive identities from that value and never require Release. Receipt generation
-and final qualification likewise ignore it. The dispatcher default is Debug;
-only current workflow wiring happens to pass Release explicitly.
-
-**Reproduction**: Exact authorities accepted a complete 2/2 Debug campaign,
-minted a passed mutation receipt, and accepted that receipt in a ten-gate final
-qualification with `status=passed`.
-
-**Impact**: A default/manual mutation run or workflow drift can certify Debug-only
-mutation kills for Release artifacts.
-
-**Recommended fix**: Require exact Release configuration in catalog validation,
-receipt minting, and final qualification, and bind the expected configuration in
-receipt semantics. Test fully valid Debug rejection at all three layers and
-explicit Release success.
-
 ### 684. [CONFIRMED] IrPrinter exponentially expands tiny shared DAGs until OOM
 
 **Location**: `SharpProof.Ir/IrPrinter.cs`, around lines 5-26;

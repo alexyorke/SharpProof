@@ -23,6 +23,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $resolvedEvidence = (Resolve-Path -LiteralPath $EvidencePath).Path
 $relativeEvidence = [IO.Path]::GetRelativePath(
@@ -85,6 +86,7 @@ $valid = switch -Regex ($Gate) {
         [string]$evidence.commit -ceq $commit
     }
     'mutation' {
+        Assert-SharpProofReleaseMutationConfiguration -Evidence $evidence
         [int]$evidence.schemaVersion -eq 2 -and
         [string]$evidence.selection -ceq 'full' -and
         [string]$evidence.commit -ceq $commit -and
@@ -139,6 +141,9 @@ $receipt = [ordered]@{
 }
 if ($packageArtifacts.Count -ne 0) {
     $receipt.packageArtifacts = $packageArtifacts
+}
+if ($Gate -eq 'mutation') {
+    $receipt['configuration'] = 'Release'
 }
 if ($Gate -eq 'pilots') {
     $receipt.review = [ordered]@{

@@ -115,7 +115,9 @@ function Test-MutationReuseValidation {
             'Test-SharpProofMutationCatalog.ps1',
             'SharpProof.MutationEvidence.psm1',
             'SharpProof.MutationBaselines.psm1',
-            'SharpProof.ContainerExecution.psm1')) {
+            'SharpProof.ContainerExecution.psm1',
+            'Write-SharpProofQualificationReceipt.ps1',
+            'Test-SharpProofPilotReport.ps1')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) `
             -Destination (Join-Path $scripts $name)
     }
@@ -318,6 +320,52 @@ function Test-MutationReuseValidation {
         if (Test-Path -LiteralPath $campaignSentinel) {
             throw "Mutation campaign launched while validating '$Name'."
         }
+    }
+
+    $debugEvidence = New-CompleteEvidence
+    $debugEvidence.configuration = 'Debug'
+    foreach ($mutation in @($debugEvidence.mutations)) {
+        $debugInvocation = Get-SharpProofMutationBaselineInvocation `
+            -Project ([string]$mutation.project) `
+            -Filter ([string]$mutation.test) `
+            -Configuration Debug
+        $mutation.baselineInvocationSha256 = $debugInvocation.Sha256
+    }
+    $debugEvidence | ConvertTo-Json -Depth 6 | Set-Content `
+        -LiteralPath $evidencePath -Encoding utf8NoBOM
+    $debugCatalogOutput = & pwsh -NoLogo -NoProfile -File (
+        Join-Path $scripts 'Test-SharpProofMutationCatalog.ps1') `
+        -EvidencePath $evidencePath `
+        -ExpectedCommit $commit 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        throw 'Debug mutation evidence was accepted by catalog validation.'
+    }
+
+    $debugReceiptOutput = & pwsh -NoLogo -NoProfile -File (
+        Join-Path $scripts 'Write-SharpProofQualificationReceipt.ps1') `
+        -Gate mutation `
+        -EvidencePath $evidencePath `
+        -ReceiptDirectory 'artifacts/mutation/receipts' 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        throw 'Debug mutation evidence was accepted by receipt minting.'
+    }
+
+    $releaseEvidence = New-CompleteEvidence
+    $releaseEvidence | ConvertTo-Json -Depth 6 | Set-Content `
+        -LiteralPath $evidencePath -Encoding utf8NoBOM
+    $releaseReceiptOutput = & pwsh -NoLogo -NoProfile -File (
+        Join-Path $scripts 'Write-SharpProofQualificationReceipt.ps1') `
+        -Gate mutation `
+        -EvidencePath $evidencePath `
+        -ReceiptDirectory 'artifacts/mutation/receipts' 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Release mutation evidence could not mint a receipt: $releaseReceiptOutput"
+    }
+    $releaseReceipt = Get-Content -LiteralPath (
+        Join-Path $repository 'artifacts/mutation/receipts/mutation.json') -Raw |
+        ConvertFrom-Json
+    if ([string]$releaseReceipt.configuration -cne 'Release') {
+        throw 'Release mutation receipt did not bind Release configuration.'
     }
 
     $empty = New-CompleteEvidence

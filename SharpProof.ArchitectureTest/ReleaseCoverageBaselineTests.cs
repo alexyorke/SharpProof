@@ -214,8 +214,16 @@ public sealed class ReleaseCoverageBaselineTests
             Assert.That(
                 writer,
                 Does.Contain("targets different packages"));
+            Assert.That(
+                writer,
+                Does.Contain("Assert-SharpProofReleaseMutationConfiguration")
+                    .And.Contain("receipt.configuration -cne 'Release'"));
             Assert.That(receiptWriter, Does.Contain("status -ceq 'passed'"));
             Assert.That(receiptWriter, Does.Contain("mutationCount"));
+            Assert.That(
+                receiptWriter,
+                Does.Contain("Assert-SharpProofReleaseMutationConfiguration")
+                    .And.Contain("$receipt['configuration'] = 'Release'"));
             Assert.That(
                 receiptWriter,
                 Does.Contain("Test-SharpProofPilotReport")

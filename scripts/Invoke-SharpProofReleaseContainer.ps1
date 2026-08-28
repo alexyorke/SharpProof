@@ -22,6 +22,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 
 function Require-Environment([string]$Name) {
     $value = [Environment]::GetEnvironmentVariable($Name)
@@ -203,6 +204,16 @@ switch ($Mode) {
                     Sort-Object fileName |
                     ConvertTo-Json -Compress) -cne $packageArtifactJson) {
                 throw "Qualification gate receipt targets different packages: '$gate'."
+            }
+            if ($gate -eq 'mutation') {
+                if ([string]$receipt.configuration -cne 'Release') {
+                    throw 'Mutation qualification receipt is not bound to Release configuration.'
+                }
+                $mutationEvidence = Get-Content -LiteralPath $evidencePath -Raw |
+                    ConvertFrom-Json -ErrorAction Stop
+                Assert-SharpProofReleaseMutationConfiguration `
+                    -Evidence $mutationEvidence `
+                    -Context 'Mutation qualification evidence'
             }
             $gateReceipts[$gate] = (Get-FileHash `
                 -LiteralPath $receiptPath `

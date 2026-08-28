@@ -39,6 +39,7 @@ if (-not [IO.File]::Exists($resolvedEvidence)) {
 }
 $evidence = Get-Content -LiteralPath $resolvedEvidence -Raw |
     ConvertFrom-Json
+Assert-SharpProofReleaseMutationConfiguration -Evidence $evidence
 $mutations = @($evidence.mutations)
 
 if ([int]$evidence.schemaVersion -ne 2 -or

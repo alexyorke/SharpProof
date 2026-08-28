@@ -1,6 +1,21 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Assert-SharpProofReleaseMutationConfiguration {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Evidence,
+
+        [string]$Context = 'Mutation evidence'
+    )
+
+    $configuration = $Evidence.PSObject.Properties['configuration']
+    if ($null -eq $configuration -or
+        [string]$configuration.Value -cne 'Release') {
+        throw "$Context must use the exact Release configuration."
+    }
+}
+
 function Get-SharpProofMutationCatalogSha256 {
     param(
         [Parameter(Mandatory = $true)]
@@ -694,6 +709,7 @@ function Read-SharpProofMutationTestEvidence {
 }
 
 Export-ModuleMember -Function @(
+    'Assert-SharpProofReleaseMutationConfiguration',
     'Get-SharpProofMutationCatalogSha256',
     'Read-SharpProofMutationTestEvidence'
 )
