@@ -115,10 +115,26 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         orderedVariables = [.. variables.Values];
         foreach (var variable in orderedVariables)
         {
-            if (!values.ContainsKey(variable))
+            if (!values.TryGetValue(variable, out var value))
             {
                 program = "";
                 reason = "A referenced variable has no concrete value.";
+                return false;
+            }
+
+            if (value is null)
+            {
+                program = "";
+                reason = "A referenced variable has a null value.";
+                return false;
+            }
+
+            var expectedType = _factory.GetVariableInfo(variable).Type;
+            if (value.Type != expectedType)
+            {
+                program = "";
+                reason =
+                    "A referenced variable has a value of the wrong IR type.";
                 return false;
             }
         }
