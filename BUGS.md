@@ -203,50 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 498. [CONFIRMED] Same-seed fuzz runs duplicate a prefix while campaign totals count it twice
-
-**Location**: scripts/Invoke-SharpProofFuzzCampaign.ps1 around lines 65-73 and
-182-206; Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 149-155 and 191-198.
-
-**Description**: The campaign skips a retained seed only when the rotating run
-has at least as many cases. When the retained run is larger, it schedules both
-roles. Every runner starts at index zero and derives cases from the same
-`(seed,index)` pair, so the smaller rotating run is a byte-for-byte prefix of
-the retained run. Requested and observed totals nevertheless sum both runs.
-
-**Reproduction**: Checked-in retained seed 23063 has 1,000 cases. The supported
-arguments `-RotatingSeed 23063 -RotatingCases 10` produced:
-
-    scheduled runs=rotating-23063:10,retained-23063:1000
-    reported requested/observed-on-pass=1010
-    unique seed:index coordinates=1000
-    duplicated scheduled coordinates=10
-    prefix identical=true
-
-With 999 rotating cases, the campaign would claim 1,999 executions while
-covering only 1,000 distinct case coordinates.
-
-**Impact**: Campaign evidence overstates distinct fuzz coverage and wastes a
-large fraction of its time budget. A seed collision can satisfy or approach
-case-count targets with nearly half of the claimed diversity.
-
-**Root cause**: Seed deduplication is asymmetric and aggregation counts run
-observations rather than unique planned coordinates.
-
-**Recommended fix**: Group the plan by seed and run each seed once with the
-maximum requested count, or reject rotating/retained collisions. If provenance
-matters, annotate the merged run as satisfying both roles. Compute reported
-totals from the unique plan.
-
-**Regression coverage**: Same-seed rotating counts smaller than, equal to, and
-larger than retained must each yield one max-count run; distinct seeds yield two
-and sum. Assert unique `(seed,index)` coordinates and matching requested/actual
-totals.
-
-**Confidence**: High; generated case-seed prefixes were identical and the
-production planning arithmetic reported the duplicated work as additional
-coverage.
-
 ### 500. [CONFIRMED] Synchronous using omits the hidden concrete Dispose precondition call
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,

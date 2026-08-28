@@ -30,6 +30,15 @@ try {
         -Destination (Join-Path $fixture 'eng/fuzz/retained-seeds.json')
 
     @'
+{
+  "schemaVersion": 1,
+  "casesPerSeed": 3,
+  "seeds": [123, 456]
+}
+'@ | Set-Content -LiteralPath (
+        Join-Path $fixture 'eng/fuzz/retained-seeds.json') -Encoding utf8NoBOM
+
+    @'
 [CmdletBinding()]
 param(
     [int]$TimeoutSeconds,
@@ -81,7 +90,7 @@ exit 1
     $output = & pwsh -NoLogo -NoProfile -File (
         Join-Path $fixture 'scripts/Invoke-SharpProofFuzzCampaign.ps1') `
         -OutputDirectory artifacts/fuzz `
-        -RotatingSeed 123 -RotatingCases 1 -RetainedCases 1 2>&1
+        -RotatingSeed 123 -RotatingCases 1 -RetainedCases 3 2>&1
     if ($LASTEXITCODE -eq 0) {
         throw 'Fuzz campaign semantic-failure fixture unexpectedly passed.'
     }
@@ -91,11 +100,16 @@ exit 1
     }
     $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
     if ([string]$summary.status -cne 'failed' -or
-        [bool]$summary.passed -or [int]$summary.totalCases -ne 2 -or
+        [bool]$summary.passed -or [int]$summary.totalCases -ne 6 -or
+        @($summary.runs).Count -ne 2 -or
+        [string]$summary.runs[0].name -cne 'rotating-retained-123' -or
+        [int]$summary.runs[0].requestedCases -ne 3 -or
+        [string]$summary.runs[1].name -cne 'retained-456' -or
+        [int]$summary.runs[1].requestedCases -ne 3 -or
         @($summary.runs | Where-Object {
                 [int]$_.exitCode -ne 1 -or
                 -not [bool]$_.validationPassed -or
-                [int]$_.observedCases -ne 1 -or
+                [int]$_.observedCases -ne 3 -or
                 [int]$_.runnerSchemaVersion -ne 6 -or
                 [string]::IsNullOrWhiteSpace([string]$_.resultSha256)
             }).Count -ne 0) {

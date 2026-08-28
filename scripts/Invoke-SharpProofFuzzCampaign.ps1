@@ -71,11 +71,19 @@ $maximumCampaignCases = Assert-SharpProofFuzzCaseBudget `
     -Value $contract.fuzz.maximumCampaignCases `
     -Name 'contract.fuzz.maximumCampaignCases'
 $retainedRunSeeds = @($retainedSeeds | Where-Object {
-        [int]$_ -ne $RotatingSeed -or
-        $effectiveRotatingCases -lt $effectiveRetainedCases
+        [int]$_ -ne $RotatingSeed
     })
+$sameSeedRetained = @($retainedSeeds | Where-Object {
+        [int]$_ -eq $RotatingSeed
+    }).Count -gt 0
+$rotatingRunCases = if ($sameSeedRetained) {
+    [Math]::Max($effectiveRotatingCases, $effectiveRetainedCases)
+}
+else {
+    $effectiveRotatingCases
+}
 $requestedCampaignCases = Assert-SharpProofFuzzCampaignBudget `
-    -RotatingCases $effectiveRotatingCases `
+    -RotatingCases $rotatingRunCases `
     -RetainedCases $effectiveRetainedCases `
     -RetainedRunCount $retainedRunSeeds.Count `
     -MaximumCases $maximumCampaignCases
@@ -193,8 +201,12 @@ function Invoke-FuzzRun {
 
 $runs = [Collections.Generic.List[object]]::new()
 $runs.Add((Invoke-FuzzRun `
-    -Name "rotating-$RotatingSeed" `
-    -Cases $effectiveRotatingCases `
+    -Name $(if ($sameSeedRetained) {
+            "rotating-retained-$RotatingSeed"
+        } else {
+            "rotating-$RotatingSeed"
+        }) `
+    -Cases $rotatingRunCases `
     -Seed $RotatingSeed))
 foreach ($seed in $retainedRunSeeds) {
     $runs.Add((Invoke-FuzzRun `
