@@ -335,6 +335,41 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task OversizedStringModelsReportResourceLimit()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("text", factory.StringType);
+        var variableTerm = factory.Variable(variable);
+        var notNull = factory.Binary(
+            IrBinaryOperator.NotEqual,
+            variableTerm,
+            factory.Null(factory.StringType));
+        var goal = factory.Binary(
+            IrBinaryOperator.NotEqual,
+            factory.Length(variableTerm),
+            factory.Integer(1_000_001));
+        var query = new VerificationQuery(
+            factory,
+            [new Assumption(
+                factory,
+                notNull,
+                new LoweredJustification(factory.CreateOperation("not-null")))],
+            new Goal(
+                factory,
+                goal,
+                ProofDiagnosticKind.Postcondition,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+        Assert.That(
+            result.FailureReason,
+            Is.EqualTo(BackendFailureReason.ResourceLimit));
+    }
+
+    [Test]
     public async Task CancellationDuringStringModelMaterializationIsPrompt()
     {
         var factory = new IrFactory();

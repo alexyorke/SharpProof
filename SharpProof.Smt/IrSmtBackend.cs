@@ -1,14 +1,15 @@
 namespace SharpProof.Smt;
 
-public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDisposable
+public sealed class IrSmtBackend : ISmtBackend, IDisposable
 {
     private const int MaximumEncodingDepth = 256;
     private const int MaximumMalformedModelRetries = 4;
     private const int WellFormedUtf16PrefixLength = 1;
+    internal const int MaximumDecodedStringLength = 1_000_000;
     private readonly Context _context = new();
     private readonly object _gate = new();
-    private readonly IrSmtBackendOptions _options =
-        ArgumentNullGuard.NotNull(options, nameof(options));
+    private readonly IrSmtBackendOptions _options;
+    private readonly int _maximumDecodedStringLength;
     private long _consumedResourceCount;
     private long _lastResourceSnapshot;
     private int _activeCheckCount;
@@ -16,8 +17,27 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
     private bool _disposed;
 
     public IrSmtBackend()
-        : this(new IrSmtBackendOptions())
+        : this(new IrSmtBackendOptions(), MaximumDecodedStringLength)
     {
+    }
+
+    public IrSmtBackend(IrSmtBackendOptions options)
+        : this(options, MaximumDecodedStringLength)
+    {
+    }
+
+    internal IrSmtBackend(
+        IrSmtBackendOptions options,
+        int maximumDecodedStringLength)
+    {
+        _options = ArgumentNullGuard.NotNull(options, nameof(options));
+        if (maximumDecodedStringLength <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumDecodedStringLength));
+        }
+
+        _maximumDecodedStringLength = maximumDecodedStringLength;
     }
 
     public long ConsumedResourceCount
@@ -112,7 +132,11 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
     {
         using var owner = new Z3ExpressionOwner();
         var encoder = new QueryEncoder(
-            _context, query, owner, cancellationToken);
+            _context,
+            query,
+            owner,
+            cancellationToken,
+            _maximumDecodedStringLength);
         using var solver = _context.MkSolver();
         using var parameters = _context.MkParams();
         parameters.Add("rlimit", _options.QueryRlimit);
@@ -315,17 +339,19 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                     variable,
                     evaluated,
                     evaluatedNull,
-                    model,
-                    cancellationToken,
-                    out var value))
+                model,
+                cancellationToken,
+                out var value,
+                out var failureReason))
             {
-                if (query.Factory.GetVariableInfo(variable).Type ==
+                if (failureReason == BackendFailureReason.MalformedResult &&
+                    query.Factory.GetVariableInfo(variable).Type ==
                     query.Factory.StringType)
                 {
                     encoder.ExcludeModel(solver, model);
                     excludedMalformedModel = true;
                 }
-                return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
+                return BackendCheckResult.Unknown(failureReason);
             }
 
             assignments.Add(new KeyValuePair<IrVarId, IrValue>(variable, value!));
@@ -342,16 +368,19 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         private readonly Dictionary<IrVarId, BoolExpr> _nullVariables = [];
         private readonly IrFactory _factory;
         private readonly SeqSort _stringSort;
+        private readonly int _maximumDecodedStringLength;
 
         internal QueryEncoder(
             Context context,
             VerificationQuery query,
             Z3ExpressionOwner owner,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            int maximumDecodedStringLength)
         {
             _context = context;
             _owner = owner;
             _factory = query.Factory;
+            _maximumDecodedStringLength = maximumDecodedStringLength;
             _stringSort = owner.OwnSort(
                 (SeqSort)_context.MkSeqSort(_context.IntSort));
             foreach (var assumption in query.Assumptions)
@@ -545,8 +574,10 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             Expr? nullExpression,
             Model model,
             CancellationToken cancellationToken,
-            out IrValue? value)
+            out IrValue? value,
+            out BackendFailureReason failureReason)
         {
+            failureReason = BackendFailureReason.MalformedResult;
             var type = factory.GetVariableInfo(variable).Type;
             if (type == factory.BooleanType)
             {
@@ -570,6 +601,23 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                     nullTag,
                     model,
                     cancellationToken);
+                if (value == null)
+                {
+                    using var lengthExpression = _context.MkLength(sequence);
+                    using var evaluatedLengthExpression = model.Evaluate(
+                        lengthExpression,
+                        true);
+                    if (evaluatedLengthExpression is IntNum lengthValue &&
+                        int.TryParse(
+                            lengthValue.ToString(),
+                            NumberStyles.None,
+                            CultureInfo.InvariantCulture,
+                            out var length) &&
+                        length > _maximumDecodedStringLength)
+                    {
+                        failureReason = BackendFailureReason.ResourceLimit;
+                    }
+                }
             }
             else
             {
@@ -633,7 +681,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 !int.TryParse(lengthValue.ToString(), NumberStyles.None,
                     CultureInfo.InvariantCulture, out var length) ||
                 length < 0 ||
-                length > 1_000_000)
+                length > _maximumDecodedStringLength)
             {
                 return null;
             }
