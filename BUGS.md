@@ -3088,42 +3088,6 @@ conditional method-call follow-up only after its semantics are verified.
 **Confidence**: High; two independent nonnull forms are missed while direct,
 unknown, and null controls behave as predicted by the placeholder gate.
 
-### 550. [CONFIRMED] SPMETA006 skips const string fields in SharpProof.Ir
-
-**Location**: SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs,
-AnalyzeField around lines 552-570.
-
-**Description**: AnalyzeField returns immediately for every const field before
-the independent SharpProof.Ir string-field prohibition. The const exemption is
-appropriate for SPMETA002 mutable-state analysis but unintentionally suppresses
-SPMETA006's typed-identity boundary.
-
-**Reproduction**:
-
-    const string in SharpProof.Ir:      SPMETA006 count=0
-    static readonly string in Ir:      SPMETA006 count=1
-    const string outside Ir:           SPMETA006 count=0
-
-Compiler error counts were zero.
-
-**Impact**: IR code can encode semantic identity/provenance as embedded raw
-strings and evade the Error-level boundary merely by changing static readonly to
-const.
-
-**Root cause**: One global const early return conflates the mutable-state and
-string-identity rules.
-
-**Recommended fix**: Keep early return for enum members, but apply
-`!field.IsConst` only to the SPMETA002 branch. Always execute SPMETA006
-type/namespace analysis.
-
-**Regression coverage**: Const and readonly strings in SharpProof.Ir each report
-once; const string outside Ir stays clean; const scalar in mutable-state
-namespaces remains exempt from SPMETA002; enum members remain clean.
-
-**Confidence**: High; const is the only semantic difference between the missed
-field and reporting control.
-
 ### 551. [CONFIRMED] Valid closed attributes on ContractFor companion members are silently discarded
 
 **Location**: SharpProof.Contracts/ContractBinder.cs around lines 154 and
