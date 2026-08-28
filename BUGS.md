@@ -3076,29 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 679. [CONFIRMED] Verifier-only policies force full C# recompilation
-
-**Location**: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props`,
-around lines 31-32; `SharpProof.AnalyzerConsumer.props`, around lines 18-19;
-consumption in `SharpProof.Verifier.targets`, around lines 262-265.
-
-**Description**: VerifyPolicy and AssumptionPolicy are registered as
-CompilerVisibleProperty even though no analyzer/collector reads them. Changing
-either rewrites generated editorconfig and invalidates CoreCompile.
-
-**Reproduction**: Changing only `require-proven` to `advisory` ran Csc once and
-changed editorconfig, while assembly and compiler manifest hashes stayed
-identical; the request policy correctly changed. Same-policy and worker-query-
-budget controls skipped CoreCompile.
-
-**Impact**: Solution-wide policy changes needlessly rerun Csc, analyzers, and
-generators for every affected project.
-
-**Recommended fix**: Remove both compiler-visible registrations in package and
-self-apply props while continuing direct target normalization/forwarding. Test
-both policy changes skip Csc but update request/result behavior; retain real
-compiler-semantic property controls.
-
 ### 680. [CONFIRMED] Z3 rlimit setup leaves one StringSymbol finalizer per query
 
 **Location**: `SharpProof.Smt/IrSmtBackend.cs`, around lines 112-115.

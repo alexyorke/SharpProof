@@ -22,8 +22,6 @@ public sealed class WorkerMsBuildIntegrationTests
     private static readonly string[] s_publicPolicyProperties = [
         "SharpProofProfile",
         "SharpProofFeatures",
-        "SharpProofVerifyPolicy",
-        "SharpProofAssumptionPolicy",
         "SharpProofSpecificationPacks"
     ];
     private static readonly string[] s_compilerManifestProperties = [
@@ -3299,13 +3297,18 @@ public sealed class WorkerMsBuildIntegrationTests
             .Concat(verifierProps.Descendants("CompilerVisibleProperty"))
             .Select(static element =>
                 element.Attribute("Include")?.Value)
-            .Where(static value => value != null);
+            .Where(static value => value != null)
+            .ToArray();
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 compilerVisible,
                 Is.SupersetOf(s_publicPolicyProperties));
+            Assert.That(compilerVisible,
+                Does.Not.Contain("SharpProofVerifyPolicy"));
+            Assert.That(compilerVisible,
+                Does.Not.Contain("SharpProofAssumptionPolicy"));
             Assert.That(
                 uint.Parse(
                     properties["SharpProofVerifyQueryRlimit"],
