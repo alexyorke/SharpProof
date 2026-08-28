@@ -620,6 +620,49 @@ public sealed class ContractApiIdentityAnalyzerTests
             Does.Not.Contain("SP0047"));
     }
 
+    [Test]
+    public async Task RejectedResultAndOldIntrinsicsAreReported()
+    {
+        var lookalike = AnalyzerTestHost.EmitReference(
+            """
+            namespace SharpProof.Attributes
+            {
+                public static class Contract
+                {
+                    public static T Result<T>() => default!;
+                    public static T Old<T>(T value) => value;
+                }
+            }
+            """,
+            "RejectedIntrinsics").WithAliases(["rejected"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            extern alias rejected;
+
+            public static class Subject
+            {
+                public static int Read(int value)
+                {
+                    var result = rejected::SharpProof.Attributes.Contract.Result<int>();
+                    return result + rejected::SharpProof.Attributes.Contract.Old(value);
+                }
+            }
+            """,
+            mode: null,
+            enabledIds: ["SP0047"],
+            additionalReferences: [lookalike],
+            profile: "advisory",
+            features: "contracts");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        Assert.That(
+            diagnostics.Single().GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("ContractApiIdentityRejected"));
+    }
+
     private static IEnumerable<MetadataReference> GetPlatformReferences()
     {
         var trustedPlatformAssemblies =

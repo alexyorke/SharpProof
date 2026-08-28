@@ -120,7 +120,9 @@ internal sealed class ContractApiIdentityResolver
         return definition.Name is
             ContractApiMetadata.RequiresMethodName or
             ContractApiMetadata.EnsuresMethodName or
-            ContractApiMetadata.AssumeMethodName &&
+            ContractApiMetadata.AssumeMethodName or
+            ContractApiMetadata.ResultMethodName or
+            ContractApiMetadata.OldMethodName &&
             HasMetadataName(
                 definition.ContainingType,
                 ContractApiMetadata.Contract) &&
