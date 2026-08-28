@@ -1542,6 +1542,69 @@ public sealed class SharpProofSoundnessAnalyzerTests
         Assert.That(diagnostics, Is.Empty);
     }
 
+    [TestCase("false")]
+    [TestCase("CancellationToken.None.IsCancellationRequested")]
+    public async Task RejectsNameOnlyCallerCancellationWonHelpers(
+        string helperExpression)
+    {
+        var source =
+            $$"""
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyRequest { }
+                sealed class WorkerVerifyResponse { }
+                enum WorkerRunStatus { Canceled, TimedOut }
+                enum WorkerCallableCoverageReason { Canceled, ProjectTimeout }
+                enum WorkerClaimReason { Canceled, ProjectTimeout }
+                static class WorkerResultAssembler {
+                    internal static WorkerVerifyResponse CreateIncomplete(
+                        WorkerRunStatus status,
+                        WorkerCallableCoverageReason callableReason,
+                        WorkerClaimReason claimReason) => new();
+                }
+            }
+
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+
+                sealed class SharpProofWorker {
+                    internal async Task<WorkerVerifyResponse> VerifyAsync(
+                        WorkerVerifyRequest request,
+                        CancellationToken cancellationToken) {
+                        bool CallerCancellationWon() => {{helperExpression}};
+                        WorkerVerifyResponse Interrupted(object input = null) {
+                            var canceled = CallerCancellationWon();
+                            return WorkerResultAssembler.CreateIncomplete(
+                                canceled
+                                    ? WorkerRunStatus.Canceled
+                                    : WorkerRunStatus.TimedOut,
+                                canceled
+                                    ? WorkerCallableCoverageReason.Canceled
+                                    : WorkerCallableCoverageReason.ProjectTimeout,
+                                canceled
+                                    ? WorkerClaimReason.Canceled
+                                    : WorkerClaimReason.ProjectTimeout);
+                        }
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return Interrupted();
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
+    }
+
     [Test]
     public async Task RejectsReadonlyMutableStaticCollections()
     {

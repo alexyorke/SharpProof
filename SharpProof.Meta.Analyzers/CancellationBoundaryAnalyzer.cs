@@ -681,7 +681,12 @@ internal static class CancellationBoundaryAnalyzer
             } &&
             SymbolEqualityComparer.Default.Equals(
                 helper.TargetMethod.ContainingSymbol,
-                method);
+                method) &&
+            IsCallerCancellationWonHelper(
+                helper.TargetMethod,
+                context,
+                method,
+                symbols);
         if (!directCancellation && !latchedCancellation)
         {
             return false;
@@ -710,6 +715,117 @@ internal static class CancellationBoundaryAnalyzer
                        SharpProofSoundnessAnalyzer.KnownType.WorkerClaimReason],
                    "Canceled",
                    "ProjectTimeout");
+    }
+
+    private static bool IsCallerCancellationWonHelper(
+        IMethodSymbol helper,
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol owner,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
+    {
+        var syntax = helper.DeclaringSyntaxReferences
+            .SingleOrDefault()?
+            .GetSyntax(context.CancellationToken) as
+            LocalFunctionStatementSyntax;
+        if (syntax == null)
+        {
+            return false;
+        }
+
+        var returnExpressions = new List<ExpressionSyntax>();
+        if (syntax.ExpressionBody is { Expression: { } expression })
+        {
+            returnExpressions.Add(expression);
+        }
+        else if (syntax.Body is { } body)
+        {
+            returnExpressions.AddRange(
+                body.DescendantNodes()
+                    .OfType<ReturnStatementSyntax>()
+                    .Where(returnStatement =>
+                        returnStatement.Ancestors()
+                            .OfType<LocalFunctionStatementSyntax>()
+                            .FirstOrDefault() == syntax)
+                    .Select(static returnStatement => returnStatement.Expression)
+                    .OfType<ExpressionSyntax>());
+        }
+
+        if (returnExpressions.Count == 0)
+        {
+            return false;
+        }
+
+        var cancellationTokenType =
+            symbols[SharpProofSoundnessAnalyzer.KnownType.CancellationToken];
+        return cancellationTokenType != null &&
+            returnExpressions.All(expression =>
+            {
+                var operation = Unwrap(context.SemanticModel.GetOperation(
+                    expression,
+                    context.CancellationToken));
+                return operation != null &&
+                    IsPositiveCallerCancellationPredicate(
+                        operation,
+                        owner.Parameters[1],
+                        cancellationTokenType);
+            });
+    }
+
+    private static bool IsPositiveCallerCancellationPredicate(
+        IOperation operation,
+        IParameterSymbol callerCancellation,
+        INamedTypeSymbol cancellationTokenType)
+    {
+        var callerCheck = operation.DescendantsAndSelf()
+            .OfType<IPropertyReferenceOperation>()
+            .Where(property =>
+                string.Equals(
+                    property.Property.Name,
+                    "IsCancellationRequested",
+                    StringComparison.Ordinal) &&
+                IsSameType(property.Property.ContainingType, cancellationTokenType))
+            .ToArray();
+        if (callerCheck.Length == 0 ||
+            callerCheck.Any(property =>
+                !ReferencesParameter(property.Instance, callerCancellation)))
+        {
+            return false;
+        }
+
+        if (operation.DescendantsAndSelf()
+                .OfType<ILiteralOperation>()
+                .Any(literal => literal.ConstantValue is
+                    { HasValue: true, Value: bool }))
+        {
+            return false;
+        }
+
+        if (operation.DescendantsAndSelf()
+                .OfType<IUnaryOperation>()
+                .Any(unary =>
+                    unary.OperatorKind == UnaryOperatorKind.Not &&
+                    unary.Operand.DescendantsAndSelf()
+                        .OfType<IPropertyReferenceOperation>()
+                        .Any(property => callerCheck.Contains(property))))
+        {
+            return false;
+        }
+
+        return !operation.DescendantsAndSelf()
+            .OfType<IBinaryOperation>()
+            .Any(binary =>
+                binary.OperatorKind is BinaryOperatorKind.Equals or
+                    BinaryOperatorKind.NotEquals &&
+                (binary.LeftOperand.DescendantsAndSelf()
+                     .OfType<IPropertyReferenceOperation>()
+                     .Any(property => callerCheck.Contains(property)) ||
+                 binary.RightOperand.DescendantsAndSelf()
+                     .OfType<IPropertyReferenceOperation>()
+                     .Any(property => callerCheck.Contains(property))) &&
+                (binary.LeftOperand.ConstantValue is
+                     { HasValue: true, Value: bool } ||
+                 binary.RightOperand.ConstantValue is
+                     { HasValue: true, Value: bool }));
     }
 
     private static bool IsCancellationProjection(

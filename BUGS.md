@@ -3054,30 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 666. [CONFIRMED] SPMETA003 trusts CallerCancellationWon by name, not behavior
-
-**Location**: `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs`, around
-lines 490-603; production helper in `SharpProof.Worker/SharpProofWorker.cs`,
-around lines 83-113.
-
-**Description**: The exact Worker cancellation rule accepts any zero-parameter
-Boolean local function named `CallerCancellationWon`. It never inspects the
-helper body, captured token, returned values, or interruption cause.
-
-**Reproduction**: `CallerCancellationWon() => false` and a same-named helper
-checking `CancellationToken.None` both emitted zero SPMETA003. Renaming only the
-false helper emitted the error. Executing the false-helper version with a
-canceled caller returned `TimedOut` instead of `Canceled`.
-
-**Impact**: A name-preserving typo/refactor can misclassify every caller
-cancellation while SharpProof's self-application remains green.
-
-**Recommended fix**: Prefer an inline, symbol-bound exact caller-token predicate.
-If helper support remains, analyze all normal returns and require derivation from
-the exact token and audited interruption/deadline state. Test constants, wrong
-tokens, early returns, correct latch formulas, and runtime Canceled/TimedOut
-projection.
-
 ### 667. [CONFIRMED] Unsupported finite-domain formulas fabricate Expected=Unsatisfiable
 
 **Location**: `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs`, around lines
