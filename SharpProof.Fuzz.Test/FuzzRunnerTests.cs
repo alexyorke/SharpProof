@@ -198,6 +198,44 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void FailureEvidenceReservesCapacityForEachOracle()
+    {
+        var finite = Enumerable.Repeat(
+                FuzzOracleStatus.Mismatch,
+                FuzzRunner.MaximumRetainedFailures)
+            .Append(FuzzOracleStatus.Agreement)
+            .ToArray();
+        var frontend = Enumerable.Repeat(
+                FuzzOracleStatus.Agreement,
+                FuzzRunner.MaximumRetainedFailures)
+            .Append(FuzzOracleStatus.Mismatch)
+            .ToArray();
+        var partial = Enumerable.Repeat(
+                FuzzOracleStatus.Agreement,
+                FuzzRunner.MaximumRetainedFailures + 1)
+            .ToArray();
+
+        var keys = FuzzRunner.SelectFailureKeys(frontend, finite, partial);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(keys, Has.Length.EqualTo(FuzzRunner.MaximumRetainedFailures));
+            Assert.That(keys, Does.Contain(new FuzzFailureKey(
+                FuzzRunner.MaximumRetainedFailures,
+                "frontend")));
+            Assert.That(
+                keys.Count(static key => key.Oracle == "finite-domain-smt"),
+                Is.EqualTo(FuzzRunner.MaximumRetainedFailures - 1));
+            Assert.That(
+                keys.Count(static key => key.Oracle == "frontend"),
+                Is.EqualTo(1));
+            Assert.That(
+                keys.Count(static key => key.Oracle == "partial-term-smt"),
+                Is.Zero);
+        }
+    }
+
+    [Test]
     public void PartialAbstentionIsNotClassifiedAsMismatchEvidence()
     {
         var classification = FuzzRunner.ClassifyCase(

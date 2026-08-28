@@ -203,51 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 486. [CONFIRMED] The fuzz evidence cap can starve every later oracle
-
-**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around line 117 and
-SelectFailureKeys around lines 369-405.
-
-**Description**: Failure evidence is capped at 64 entries by scanning cases in
-ascending order, and each case's oracles in fixed finite-domain-SMT, frontend,
-then partial-SMT order. Selection stops globally as soon as 64 keys have been
-retained. There is no reservation or fairness rule per active oracle.
-
-**Reproduction**: An exact production-method probe supplied 64 early
-finite-domain mismatches followed by one independent frontend mismatch:
-
-    input finite mismatches=64 frontend mismatches=1 partial mismatches=0
-    retained total=64
-    retained finite=64
-    retained frontend=0
-    retained partial=0
-    last retained case=63 oracle=finite-domain-smt
-    omitted distinct failure case=64 oracle=frontend
-
-The frontend failure is reproducible and has a distinct key, but the selector
-emits neither its case evidence nor a count showing that it was omitted.
-
-**Impact**: One frequent early defect can make independent frontend or
-partial-SMT defects invisible in campaign artifacts. The campaign still records
-failures, but downstream triage lacks the input, oracle, and minimized evidence
-needed to reproduce the starved defect.
-
-**Root cause**: A single deterministic prefix cap is applied across heterogeneous
-oracles without stratification or omission accounting.
-
-**Recommended fix**: First reserve the earliest mismatch for every active
-oracle, then fill the remaining capacity with a deterministic round-robin or
-stratified selection. Publish total and omitted distinct-failure counts per
-oracle so the cap cannot silently erase a failure class.
-
-**Regression coverage**: Use the exact 65-case shape and require the retained
-set to contain the late frontend case plus at most 63 finite-domain cases. Add a
-late partial-SMT mismatch, deterministic ordering checks, fewer-than-cap and
-over-cap controls, and per-oracle omitted counts.
-
-**Confidence**: High; the production selector itself produced the raw starvation
-trace above.
-
 ### 487. [CONFIRMED] Package-consumer validation bypasses all command timeouts
 
 **Location**: scripts/Test-SharpProofPackageConsumers.ps1, especially

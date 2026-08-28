@@ -670,6 +670,15 @@ public static class FuzzRunner
 
         var keys = ImmutableArray.CreateBuilder<FuzzFailureKey>(
             MaximumRetainedFailures);
+        var retained = new HashSet<FuzzFailureKey>();
+
+        // Keep one deterministic representative for every oracle before the
+        // shared cap is filled. A frequent early failure must not hide a
+        // distinct failure from a later oracle.
+        AddFirst("finite-domain-smt", smt);
+        AddFirst("frontend", frontend);
+        AddFirst("partial-term-smt", partial);
+
         for (var index = 0; index < frontend.Count; index++)
         {
             Add(index, "finite-domain-smt",
@@ -687,9 +696,25 @@ public static class FuzzRunner
         keys.Capacity = keys.Count;
         return keys.MoveToImmutable();
 
+        void AddFirst(
+            string oracle,
+            IReadOnlyList<FuzzOracleStatus> statuses)
+        {
+            for (var index = 0; index < statuses.Count; index++)
+            {
+                if (statuses[index] == FuzzOracleStatus.Mismatch)
+                {
+                    Add(index, oracle, failed: true);
+                    return;
+                }
+            }
+        }
+
         void Add(int index, string oracle, bool failed)
         {
-            if (failed && keys.Count < MaximumRetainedFailures)
+            if (failed &&
+                keys.Count < MaximumRetainedFailures &&
+                retained.Add(new FuzzFailureKey(index, oracle)))
             {
                 keys.Add(new FuzzFailureKey(index, oracle));
             }
