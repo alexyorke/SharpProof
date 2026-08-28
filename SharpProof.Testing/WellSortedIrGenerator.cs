@@ -43,7 +43,9 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     ];
 
     private readonly IrFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
-    private readonly DeterministicRandom _random = new(seed);
+    private readonly DeterministicRandom _termRandom = new(seed);
+    private readonly DeterministicRandom _environmentRandom =
+        new(unchecked(seed ^ 0x51ED270B));
     private readonly IrVarId _left = factory.CreateVariable("left", factory.IntegerType);
     private readonly IrVarId _right = factory.CreateVariable("right", factory.IntegerType);
     private readonly IrVarId _condition = factory.CreateVariable("condition", factory.BooleanType);
@@ -62,7 +64,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         ArgumentOutOfRangeException.ThrowIfNegative(maximumDepth);
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumNodes, 3);
         _remainingNodes = maximumNodes;
-        var category = (GeneratedIrCategory)_random.Next(7);
+        var category = (GeneratedIrCategory)_termRandom.Next(7);
         var term = category switch
         {
             GeneratedIrCategory.Arithmetic => Integer(maximumDepth),
@@ -81,36 +83,44 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         int maximumDepth = 4,
         int maximumNodes = DefaultMaximumNodes)
     {
+        var generated = NextArithmeticOrBooleanTerm(maximumDepth, maximumNodes);
+        return CreateCase(generated.Term, generated.Category);
+    }
+
+    public (IrTerm Term, GeneratedIrCategory Category) NextArithmeticOrBooleanTerm(
+        int maximumDepth = 4,
+        int maximumNodes = DefaultMaximumNodes)
+    {
         ArgumentOutOfRangeException.ThrowIfNegative(maximumDepth);
         ArgumentOutOfRangeException.ThrowIfLessThan(maximumNodes, 1);
         _remainingNodes = maximumNodes;
-        var category = _random.Next(2) == 0
+        var category = _termRandom.Next(2) == 0
             ? GeneratedIrCategory.Arithmetic
             : GeneratedIrCategory.Boolean;
         var term = category == GeneratedIrCategory.Arithmetic
             ? Integer(maximumDepth)
             : Boolean(maximumDepth);
-        return CreateCase(term, category);
+        return (term, category);
     }
 
     private GeneratedIrCase CreateCase(
         IrTerm term,
         GeneratedIrCategory category)
     {
-        var text = _random.Next(4) switch
+        var text = _environmentRandom.Next(4) switch
         {
             0 => (IrValue)_factory.CreateNullValue(_factory.StringType),
             1 => _factory.CreateStringValue(""),
             2 => _factory.CreateStringValue("sharp"),
             _ => _factory.CreateStringValue("proof")
         };
-        var sequence = _random.Next(4) == 0
+        var sequence = _environmentRandom.Next(4) == 0
             ? _factory.CreateNullValue(_integerSequence)
             : _factory.CreateSequenceValue(
                 _integerSequence,
-                Enumerable.Range(0, _random.Next(4))
-                    .Select(_ => _factory.CreateIntegerValue(NextInteger())));
-        var reference = _random.Next(3) switch
+                Enumerable.Range(0, _environmentRandom.Next(4))
+                    .Select(_ => _factory.CreateIntegerValue(NextEnvironmentInteger())));
+        var reference = _environmentRandom.Next(3) switch
         {
             0 => _factory.CreateNullValue(_factory.ObjectType),
             1 => _factory.CreateReferenceValue(_factory.ObjectType, "sharp"),
@@ -118,9 +128,9 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         };
         var variables = new Dictionary<IrVarId, IrValue>
         {
-            [_left] = _factory.CreateIntegerValue(NextInteger()),
-            [_right] = _factory.CreateIntegerValue(NextInteger()),
-            [_condition] = _factory.CreateBooleanValue(_random.Next(2) == 0),
+            [_left] = _factory.CreateIntegerValue(NextEnvironmentInteger()),
+            [_right] = _factory.CreateIntegerValue(NextEnvironmentInteger()),
+            [_condition] = _factory.CreateBooleanValue(_environmentRandom.Next(2) == 0),
             [_text] = text,
             [_reference] = reference,
             [_values] = sequence
@@ -135,7 +145,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
             return IntegerLeaf();
         }
 
-        var choice = _random.Next(5);
+        var choice = _termRandom.Next(5);
         var childCount = choice switch
         {
             0 => 1,
@@ -168,7 +178,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
             return BooleanLeaf();
         }
 
-        var choice = _random.Next(5);
+        var choice = _termRandom.Next(5);
         var childCount = choice switch
         {
             0 => 1,
@@ -184,7 +194,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         {
             0 => _factory.Unary(IrUnaryOperator.Not, Boolean(depth - 1)),
             1 => _factory.Binary(
-                _random.Next(2) == 0
+                _termRandom.Next(2) == 0
                     ? IrBinaryOperator.AndAlso
                     : IrBinaryOperator.OrElse,
                 Boolean(depth - 1),
@@ -207,7 +217,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
             return StringLeaf();
         }
 
-        var choice = _random.Next(3);
+        var choice = _termRandom.Next(3);
         var childCount = choice == 0 ? 3 : choice == 1 ? 2 : 1;
         if (!ReserveExpansion(childCount))
         {
@@ -273,7 +283,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         // small slack slot for factory canonicalization and mixed-type
         // branches so the public budget remains a hard cap on the resulting
         // graph, not just on recursive calls.
-        if (_remainingNodes < childCount + 2 || _random.Next(5) == 0)
+        if (_remainingNodes < childCount + 2 || _termRandom.Next(5) == 0)
         {
             return false;
         }
@@ -296,7 +306,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     private IrTerm IntegerLeaf()
     {
         ConsumeLeaf();
-        return _random.Next(3) switch
+        return _termRandom.Next(3) switch
         {
             0 => _factory.Variable(_left),
             1 => _factory.Variable(_right),
@@ -307,7 +317,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     private IrTerm BooleanLeaf()
     {
         ConsumeLeaf();
-        return _random.Next(3) switch
+        return _termRandom.Next(3) switch
         {
             0 => _factory.Variable(_condition),
             1 => _factory.Boolean(false),
@@ -318,7 +328,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
     private IrTerm StringLeaf()
     {
         ConsumeLeaf();
-        return _random.Next(5) switch
+        return _termRandom.Next(5) switch
         {
             0 => _factory.Variable(_text),
             1 => _factory.Null(_factory.StringType),
@@ -338,7 +348,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 
     private IrBinaryOperator RandomIntegerOperator()
     {
-        return _random.Next(5) switch
+        return _termRandom.Next(5) switch
         {
             0 => IrBinaryOperator.Add,
             1 => IrBinaryOperator.Subtract,
@@ -350,7 +360,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 
     private IrBinaryOperator RandomComparisonOperator()
     {
-        return _random.Next(6) switch
+        return _termRandom.Next(6) switch
         {
             0 => IrBinaryOperator.Equal,
             1 => IrBinaryOperator.NotEqual,
@@ -363,6 +373,12 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 
     private long NextInteger()
     {
-        return InterestingIntegers[_random.Next(InterestingIntegers.Length)];
+        return InterestingIntegers[_termRandom.Next(InterestingIntegers.Length)];
+    }
+
+    private long NextEnvironmentInteger()
+    {
+        return InterestingIntegers[
+            _environmentRandom.Next(InterestingIntegers.Length)];
     }
 }

@@ -3076,27 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 687. [CONFIRMED] Finite-SMT term generation materializes unused environments
-
-**Location**: `SharpProof.Testing/WellSortedIrGenerator.cs`, around lines 77-121;
-`Tools/SharpProof.Fuzz/FuzzRunner.cs`, around lines 526-559.
-
-**Description**: The finite-SMT candidate loop needs only `generated.Term`, but
-`NextArithmeticOrBoolean` always creates a full GeneratedIrCase, six concrete
-bindings, a dictionary, and unrelated random values before returning the term.
-
-**Reproduction**: 100,000 fixed-term calls materialized 600,000 bindings and
-allocated 123,775,944 bytes, about 1,238 bytes per discarded case. Replaying the
-term-only path with the same seed changed the next term because discarded
-environment draws also consume the shared RNG stream.
-
-**Impact**: Up to roughly 79 KB per 64-attempt case is irrelevant allocation, and
-environment refactors perturb formula coverage for the same seed.
-
-**Recommended fix**: Split term generation from environment materialization and
-use independent/versioned deterministic PRNG streams. Test no binding allocations,
-stable term fingerprints across environment-only changes, and full-case controls.
-
 ### 688. [CONFIRMED] Seven CSharp speculative-binding APIs bypass both enforcement layers
 
 **Location**: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around

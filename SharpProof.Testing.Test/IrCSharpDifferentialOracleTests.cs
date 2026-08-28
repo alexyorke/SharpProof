@@ -110,6 +110,30 @@ public sealed class IrCSharpDifferentialOracleTests
     }
 
     [Test]
+    public void ArithmeticTermGenerationDoesNotMaterializeOrPerturbEnvironments()
+    {
+        var termFactory = new IrFactory();
+        var fullFactory = new IrFactory();
+        var termOnly = new WellSortedIrGenerator(termFactory, seed: 0x2A19);
+        var full = new WellSortedIrGenerator(fullFactory, seed: 0x2A19);
+
+        for (var index = 0; index < 100; index++)
+        {
+            var term = termOnly.NextArithmeticOrBooleanTerm(
+                maximumDepth: 4,
+                maximumNodes: 31);
+            var generated = full.NextArithmeticOrBoolean(
+                maximumDepth: 4,
+                maximumNodes: 31);
+
+            Assert.That(term.Category, Is.EqualTo(generated.Category));
+            Assert.That(
+                new IrPrinter(termFactory).Print(term.Term),
+                Is.EqualTo(new IrPrinter(fullFactory).Print(generated.Term)));
+        }
+    }
+
+    [Test]
     public void ShortCircuitSkipsDivisionByZero()
     {
         var factory = new IrFactory();

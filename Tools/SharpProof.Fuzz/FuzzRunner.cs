@@ -817,7 +817,7 @@ public static class FuzzRunner
         for (var attempt = 0; attempt < 64; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var generated = generator.NextArithmeticOrBoolean(maximumDepth: 3);
+            var generated = generator.NextArithmeticOrBooleanTerm(maximumDepth: 3);
             var formula = generated.Term.Type == factory.BooleanType
                 ? generated.Term
                 : factory.Binary(
