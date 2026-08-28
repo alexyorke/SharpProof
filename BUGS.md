@@ -267,50 +267,6 @@ unsafe cache property target and retain a fully cacheable tuple control.
 **Confidence**: High; self-verified in a canonical exact-source probe with
 positive inline and negative alias/factory controls.
 
-### 441. [CONFIRMED] ProofKernel swallows cancellation when a backend returns a null task
-
-**Location**: SharpProof.Verify/ProofKernel.cs around lines 13-30; existing
-tests in SharpProof.Verify.Test/ProofKernelTests.cs around lines 343 and 465.
-
-**Description**: The null-task guard returns
-Unknown(MalformedBackendResult) immediately, before the common
-cancellationToken.ThrowIfCancellationRequested checkpoint. If a backend
-cancels the supplied token during CheckAsync and then returns null, ProofKernel
-reports an ordinary semantic outcome after cancellation has already been
-requested.
-
-**Reproduction**: A disposable compiled probe used two backends that cancel the
-captured CancellationTokenSource during CheckAsync. The null-task backend
-returned null; the control returned a completed result:
-
-    NULL_TASK:RETURNED=UnknownOutcome
-    NULL_TASK:REASON=MalformedBackendResult
-    NULL_TASK:TOKEN_CANCELED=True
-    COMPLETED_TASK:THREW=OperationCanceledException
-
-**Impact**: Public ISmtBackend and ProofKernel callers can receive malformed
-semantic evidence instead of OperationCanceledException, violating the
-kernel's cancellation invariant. Current worker callers add cancellation
-checks, reducing the shipped worker impact, but the public kernel behavior is
-wrong.
-
-**Root cause**: Null-task mapping was implemented as an early return instead of
-flowing through the shared post-backend cancellation checkpoint.
-
-**Recommended fix**: Assign a null result when CheckAsync returns a null task,
-then execute the existing cancellation check and common null-result mapping.
-For example, await only when backendTask is non-null, call
-ThrowIfCancellationRequested, then map result == null to
-MalformedBackendResult.
-
-**Regression coverage**: Add a backend that cancels its source and returns
-null, expecting OperationCanceledException. Retain uncanceled-null-task
-coverage expecting Unknown(MalformedBackendResult) and pre-canceled-token
-coverage expecting cancellation.
-
-**Confidence**: High; reproduced with a compiled throwaway probe and a
-completed-task control that differs only in the return shape.
-
 ### 442. [CONFIRMED] SAT string-model decoding does not observe cancellation
 
 **Location**: SharpProof.Smt/IrSmtBackend.cs around lines 59, 247-273,
@@ -642,44 +598,6 @@ retain authoritative manifest shape and pass protocol validation.
 
 **Confidence**: High; self-verified in the canonical container with classifier
 controls and matched against the already-distinct renewal path.
-
-### 449. [CONFIRMED] ProofKernel also swallows cancellation when a backend throws ArgumentException
-
-**Location**: SharpProof.Verify/ProofKernel.cs around lines 26-30.
-
-**Description**: The catch (ArgumentException) branch returns
-Unknown(MalformedBackendResult) before the shared post-backend cancellation
-checkpoint. A backend that cancels during CheckAsync and then throws
-ArgumentException converts cancellation into a semantic outcome. This is a
-separate early-return branch from the null-task defect.
-
-**Reproduction**: A compiled probe compared an ArgumentException backend with
-a backend that cancels identically but returns a completed result:
-
-    ARGUMENT_EXCEPTION:RETURNED=UnknownOutcome
-    ARGUMENT_EXCEPTION:REASON=MalformedBackendResult
-    ARGUMENT_EXCEPTION:TOKEN_CANCELED=True
-    COMPLETED_RESULT:THREW=OperationCanceledException
-
-**Impact**: Public ProofKernel/ISmtBackend consumers lose cancellation and
-receive misleading malformed evidence. Worker callers add later cancellation
-checks and the outcome is not cacheable, but the kernel contract is violated.
-
-**Root cause**: ArgumentException mapping is an early semantic return rather
-than a value routed through the common cancellation checkpoint.
-
-**Recommended fix**: In the catch, assign a null or typed malformed result,
-then execute ThrowIfCancellationRequested before mapping it to
-Unknown(MalformedBackendResult). Apply the same control-flow shape to the
-null-task case so no malformed backend branch bypasses cancellation.
-
-**Regression coverage**: Add CancellationDuringBackendArgumentFailurePropagates
-with a backend that cancels its source then throws ArgumentException. Retain an
-uncanceled ArgumentException control expecting MalformedBackendResult and
-parameterize both malformed branches.
-
-**Confidence**: High; self-verified with a compiled probe and a completed-result
-control differing only in backend termination shape.
 
 ### 450. [CONFIRMED] Compiler-synthesized record members omit executable base calls from Requires analysis
 
