@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 554. [CONFIRMED] Fuzz evidence attributes dirty working-tree execution to clean HEAD
-
-**Location**: scripts/Invoke-SharpProofFuzzCampaign.ps1 around lines 29-31 and
-193-205; Invoke-SharpProofContainer.ps1 around lines 319-325.
-
-**Description**: Campaign identity uses only git rev-parse HEAD. The supported
-tooling path restores and builds live working files without requiring a clean
-tree, then publishes the unchanged commit as exact source identity.
-
-**Reproduction**: In an isolated repository a tracked source blob differed from
-HEAD while campaign identity remained accepted and a passing schema-3 result
-published the unchanged commit.
-
-**Impact**: Passing evidence can conceal uncommitted fixes or regressions and is
-not reproducible from its declared commit.
-
-**Recommended fix**: Reject relevant staged, unstaged, and untracked inputs
-before build/publication, or explicitly bind a dirty-source digest. Test clean,
-tracked-dirty, SDK-included untracked source, and ignored-artifact controls.
-
 ### 555. [CONFIRMED] Exact Worker result-set validation sorts sets after uniqueness work
 
 **Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 918-937;
