@@ -2668,41 +2668,6 @@ with existing SPCF diagnostics.
 **Confidence**: High; two different globally invalid surfaces both supplied a
 successful companion clause.
 
-### 536. [CONFIRMED] FuzzSummary.Passed accepts an impossible case count
-
-**Location**: Tools/SharpProof.Fuzz/FuzzRunner.cs around lines 93-110 and
-127-133; authoritative maximum in FuzzOptions.cs around lines 7-8.
-
-**Description**: FuzzSummary.Passed checks only `Cases > 0`, whereas options and
-RunAsync cap cases at 1,000,000. A deserialized/constructed summary with
-1,000,001 cases, matching agreement counters, complete coverage, and no failures
-self-certifies even though the runner refuses to execute that domain.
-
-**Reproduction**:
-
-    MaximumCases=1000000
-    Summary.Cases=1000001
-    Summary.Passed=True
-    Runner accepted out-of-domain cases=False
-    Runner exception=ArgumentOutOfRangeException
-
-**Impact**: Callers or evidence tests trusting Passed can accept impossible fuzz
-evidence that no conforming runner could have produced.
-
-**Root cause**: The upper-domain invariant is duplicated in parsing/execution but
-omitted from result self-validation.
-
-**Recommended fix**: Require `Cases <= FuzzOptions.MaximumCases` in Passed and
-mirror it in the PowerShell result authority if that authority also accepts only
-positive counts.
-
-**Regression coverage**: MaximumCases+1 must fail; exactly MaximumCases can pass
-when all other invariants hold. Retain zero, parallelism, counter, and coverage
-invalid cases.
-
-**Confidence**: High; production summary and runner disagree on the same exact
-case count under an executable probe.
-
 ### 537. [CONFIRMED] Deconstruction property targets are analyzed as getters, not setters
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
