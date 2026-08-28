@@ -1835,6 +1835,56 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void ExtraCompanionMemberInvalidatesTheEntireSurface()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public class Target {
+                public int Read(int value) => value;
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver, int value) => value;
+                public static int Ghost(Target receiver, int value) => value;
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    [Test]
+    public void MissingCompanionMemberInvalidatesTheEntireSurface()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public class Target {
+                public int Read(int value) => value;
+                public int Write(int value) => value;
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver, int value) => value;
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var result = subject.Bind("Target", "Read");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    [Test]
     public void SelfTargetingContractForCannotBindAsACompanion()
     {
         const string source =

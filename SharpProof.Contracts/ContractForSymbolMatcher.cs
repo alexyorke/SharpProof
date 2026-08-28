@@ -226,7 +226,6 @@ internal static class ContractForSymbolMatcher
         {
             return CompanionResolution.Fail(ContractBindingFailure.CompanionSignatureMismatch);
         }
-
         var signatureTarget = companion.ContractTarget.IsOpen
             ? target.OriginalDefinition
             : SymbolEqualityComparer.Default.Equals(
@@ -243,6 +242,13 @@ internal static class ContractForSymbolMatcher
             MemberSignaturesMatch(signatureTarget, candidate)).ToImmutableArray();
         if (matches.Length == 1)
         {
+            if (!HasCompleteSurface(
+                    companion.Target,
+                    companion.Type))
+            {
+                return CompanionResolution.Fail(
+                    ContractBindingFailure.CompanionSignatureMismatch);
+            }
             return HasUniqueTarget(signatureTarget, matches[0])
                 ? SpecializeCompanion(companion, matches[0], target)
                 : CompanionResolution.Fail(ContractBindingFailure.AmbiguousCompanion);
@@ -253,6 +259,20 @@ internal static class ContractForSymbolMatcher
             : named.IsDefaultOrEmpty
                 ? ContractBindingFailure.MissingCompanion
                 : ContractBindingFailure.CompanionSignatureMismatch);
+    }
+
+    private static bool HasCompleteSurface(
+        INamedTypeSymbol target,
+        INamedTypeSymbol companion)
+    {
+        var targets = GetOrdinaryMethods(target);
+        var candidates = GetOrdinaryMethods(companion);
+        return targets.All(targetMethod =>
+                   candidates.Count(candidate =>
+                       MemberSignaturesMatch(targetMethod, candidate)) == 1) &&
+               candidates.All(candidate =>
+                   targets.Count(targetMethod =>
+                       MemberSignaturesMatch(targetMethod, candidate)) == 1);
     }
 
     internal static bool IsCompanionType(

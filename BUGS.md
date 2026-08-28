@@ -203,48 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 535. [CONFIRMED] Invalid ContractFor surfaces still contribute partial companion facts
-
-**Location**: whole-surface validation in
-SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs
-around lines 30-132; per-member resolution in
-SharpProof.Contracts/ContractForSymbolMatcher.cs around lines 187-241 and
-HasUniqueTarget around lines 390-394.
-
-**Description**: The validator requires a global one-to-one target/companion
-member surface and emits SPCF0004/0005 for missing or extra members. The binder
-filters to only the requested target name and checks uniqueness for that pair,
-never the rest of the surface. It therefore trusts the matching member of a
-companion already declared invalid.
-
-**Reproduction**: A companion added unmatched Ghost beside a matching Read:
-
-    SPCF=SPCF0005 ... Ghost does not exactly match a target overload
-    UNMATCHED_CANDIDATES=Ghost
-    RESOLUTION_FAILURE=None
-    BIND_SUCCESS=True USES_COMPANION=True CLAUSES=1
-
-A missing target-member variant emitted SPCF0004 yet Read still bound; a complete
-surface control validated and bound normally.
-
-**Impact**: Suppressed/skipped validator diagnostics or direct public binder use
-can consume proof/precondition facts from a malformed companion, breaking
-validator/binder fail-closed parity.
-
-**Root cause**: Global surface bijection and per-member resolution are separate
-algorithms with different acceptance criteria.
-
-**Recommended fix**: Share the validator's full surface-bijection calculation
-with ResolveCompanion and reject every member when any target/candidate lacks
-exactly one match, before specialization.
-
-**Regression coverage**: Binder tests for extra Ghost and missing target member
-must refuse the otherwise matching Read; complete surface succeeds. Pair them
-with existing SPCF diagnostics.
-
-**Confidence**: High; two different globally invalid surfaces both supplied a
-successful companion clause.
-
 ### 537. [CONFIRMED] Deconstruction property targets are analyzed as getters, not setters
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs,
