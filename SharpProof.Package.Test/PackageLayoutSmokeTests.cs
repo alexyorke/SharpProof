@@ -756,6 +756,23 @@ public sealed class PackageLayoutSmokeTests
             unsupported.Output,
             Does.Contain(
                 "supported only by Core MSBuild inside the canonical Linux amd64 container"));
+
+        var directUnsupported = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            workspace.ConsumerProject,
+            "-target:SharpProofVerify",
+            "-p:Configuration=Release",
+            "-p:SharpProofVerify=true",
+            "-p:_SharpProofVerifierHostSupported=false",
+            "-p:UseSharedCompilation=false",
+            "/nodeReuse:false");
+        Assert.That(directUnsupported.ExitCode, Is.Not.Zero,
+            directUnsupported.Output);
+        Assert.That(
+            directUnsupported.Output,
+            Does.Contain(
+                "supported only by Core MSBuild inside the canonical Linux amd64 container"));
     }
 
     [Test]

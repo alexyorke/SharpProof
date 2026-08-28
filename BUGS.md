@@ -203,51 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 496. [CONFIRMED] Direct SharpProofVerify invocation false-greens on unsupported hosts
-
-**Location**: SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets,
-public SharpProofVerify target around lines 320-323, intended core rejection
-around line 226, and AfterTargets rejection around lines 362-365.
-
-**Description**: The public target's own Condition requires
-`_SharpProofVerifierHostSupported == true`. MSBuild evaluates that condition
-before DependsOnTargets, so on an unsupported host it skips both the public
-target and `_SharpProofVerifyCore`, even though the core target contains the
-intended SP0054 error. The alternative rejection is scheduled only after
-CoreCompile and does not run for direct target invocation.
-
-**Reproduction**: A packed ephemeral C# consumer used identical strict,
-verify=true, host=false properties:
-
-    TARGET=SharpProofVerify EXIT=0
-    Target "SharpProofVerify" skipped, due to false condition
-    Build succeeded; 0 errors
-    request/result/compiler-manifest/SARIF: all absent
-
-Controls:
-
-    TARGET=_SharpProofVerifyCore EXIT=1; SP0054 at line 226
-    TARGET=Build                 EXIT=1; SP0054 at line 365
-
-**Impact**: Automation explicitly invoking the advertised public verification
-target on Windows, macOS, ARM64, or another unsupported host can record success
-although no verifier ran and no evidence was produced.
-
-**Root cause**: Unsupported-host rejection is placed behind the same condition
-that prevents the rejection dependency from executing.
-
-**Recommended fix**: Remove only the host-supported conjunct from the public
-target condition so direct invocation reaches `_SharpProofVerifyCore` and its
-existing SP0054. Preserve verification, profile, design-time, and
-building-project gates.
-
-**Regression coverage**: Directly invoke SharpProofVerify in a packed C#
-consumer with host support forced false; require nonzero exit, SP0054, and no
-evidence. Retain private-core and ordinary Build controls.
-
-**Confidence**: High; the canonical probe isolated target scheduling with two
-failing controls under identical properties.
-
 ### 497. [CONFIRMED] Claim canonicalization performs quadratic manifest scans
 
 **Location**: SharpProof.Worker.Protocol/ProtocolManifest.cs around lines 31-37;
