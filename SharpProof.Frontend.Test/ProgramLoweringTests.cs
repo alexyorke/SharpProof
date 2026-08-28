@@ -70,6 +70,22 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void OmittedOptionalArgumentLowersExactly()
+    {
+        var lowered = Lower(
+            """
+            private static int Read(int value, int ignored = 7) => value;
+            public static int Target(int value) => Read(value);
+            """);
+        Assert.That(
+            lowered.Result.IsExact,
+            Is.True,
+            string.Join(
+                ",",
+                lowered.Result.Abstentions.Select(value => value.Reason)));
+    }
+
+    [Test]
     public void CfgLowersAssignmentsBranchesCallsAndReturns()
     {
         var lowered = Lower(

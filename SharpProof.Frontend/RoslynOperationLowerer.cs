@@ -417,19 +417,54 @@ public sealed class RoslynOperationLowerer
                 sbyte or byte or short or ushort or int or uint or long or char;
     }
 
-    private LoweredExpression LowerConstant(IOperation operation)
+    internal LoweredExpression LowerOptionalDefault(
+        IOperation operation,
+        IParameterSymbol? parameter)
     {
-        // An absent constant is not a null constant. Without this guard the
-        // null-valued branch below would turn "Roslyn folded nothing here" into
-        // an exact null term.
-        if (!operation.ConstantValue.HasValue)
+        if (parameter is not
+            {
+                RefKind: RefKind.None,
+                IsOptional: true,
+                HasExplicitDefaultValue: true
+            })
         {
             return Opaque(operation, FrontendAbstention.UnsupportedType);
         }
 
-        var value = operation.ConstantValue.Value;
-        var type = GetTypeId(operation.Type);
-        if (operation.Type is { IsValueType: true, SpecialType: SpecialType.None })
+        return LowerConstant(
+            operation,
+            parameter.ExplicitDefaultValue,
+            hasConstant: true,
+            typeOverride: parameter.Type);
+    }
+
+    private LoweredExpression LowerConstant(IOperation operation)
+    {
+        return LowerConstant(
+            operation,
+            operation.ConstantValue.HasValue
+                ? operation.ConstantValue.Value
+                : null,
+            operation.ConstantValue.HasValue);
+    }
+
+    private LoweredExpression LowerConstant(
+        IOperation operation,
+        object? value,
+        bool hasConstant = true,
+        ITypeSymbol? typeOverride = null)
+    {
+        // An absent constant is not a null constant. Without this guard the
+        // null-valued branch below would turn "Roslyn folded nothing here" into
+        // an exact null term.
+        if (!hasConstant)
+        {
+            return Opaque(operation, FrontendAbstention.UnsupportedType);
+        }
+
+        var sourceType = typeOverride ?? operation.Type;
+        var type = GetTypeId(sourceType);
+        if (sourceType is { IsValueType: true, SpecialType: SpecialType.None })
         {
             return Opaque(operation, FrontendAbstention.UnsupportedType);
         }
@@ -1061,7 +1096,7 @@ public sealed class RoslynOperationLowerer
 
     private readonly struct LoweringContext;
 
-    private sealed class LoweredExpression(
+    internal sealed class LoweredExpression(
         IrTerm term,
         FrontendSubsetClassification classification)
     {

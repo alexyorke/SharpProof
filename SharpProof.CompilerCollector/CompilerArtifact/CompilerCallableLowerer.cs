@@ -280,7 +280,6 @@ internal sealed class CompilerCallableLowerer
             !TryGetSpecResultType(invocation.Type, resolved.Template.Target.ResultType,
                 _factory.GetVariableInfo(call.Target.Value).Type, out var resultType) ||
             _factory.GetVariableInfo(call.Target.Value).Type != resultType ||
-            invocation.Arguments.Length != resolved.Template.Parameters.Length ||
             resolved.Template.Target.DocumentationCommentId != callIdentity ||
             resolved.Template.Receiver.HasValue != (call.Receiver != null) ||
             call.Arguments.Length != resolved.Template.Parameters.Length)

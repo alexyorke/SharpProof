@@ -313,6 +313,16 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         ITypeSymbol? actual,
         IrTypeKind expected)
     {
+        // A generic API declaration uses Reference as the catalog's
+        // placeholder kind for its caller-owned type parameter. The
+        // constructed call is validated separately by the lowering/type
+        // domain gates, so the declaration itself must not be rejected just
+        // because Roslyn exposes its open return/parameter as a type parameter.
+        if (actual is ITypeParameterSymbol)
+        {
+            return expected == IrTypeKind.Reference;
+        }
+
         return ClassifyType(actual) == expected;
     }
 

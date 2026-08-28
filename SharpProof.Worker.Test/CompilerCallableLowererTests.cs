@@ -281,6 +281,30 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void OmittedByValueOptionalArgumentCarriesItsDefaultIntoSummary()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                private static int Read(int value, int ignored = 7) => value;
+
+                internal static int Verify(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Read(value);
+                }
+            }
+            """,
+            "Verify");
+
+        Assert.That(
+            preparation.IsSuccess,
+            Is.True,
+            preparation.FailureReason.ToString());
+        Assert.That(preparation.Body?.SummaryCalls, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public void SummaryDependencyDepthLimitFailsClosedWithoutStackOverflow()
     {
         var methods = string.Concat(Enumerable.Range(0, 300).Select(index =>

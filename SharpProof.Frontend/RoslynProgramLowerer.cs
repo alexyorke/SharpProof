@@ -34,7 +34,8 @@ public sealed class RoslynProgramLowerer(
 
     internal static bool IsDirectInvocation(IInvocationOperation invocation)
     {
-        if (invocation.TargetMethod.ReducedFrom != null || invocation.Arguments.Length != invocation.TargetMethod.Parameters.Length)
+        if (invocation.TargetMethod.ReducedFrom != null ||
+            invocation.Arguments.Length > invocation.TargetMethod.Parameters.Length)
         {
             return false;
         }
@@ -43,16 +44,39 @@ public sealed class RoslynProgramLowerer(
         foreach (var argument in invocation.Arguments)
         {
             var ordinal = argument.Parameter?.Ordinal ?? -1;
-            if (argument.ArgumentKind != ArgumentKind.Explicit ||
-                ordinal < 0 ||
+            if (ordinal < 0 ||
                 ordinal >= invocation.TargetMethod.Parameters.Length ||
-                !ordinals.Add(ordinal))
+                !ordinals.Add(ordinal) ||
+                argument.ArgumentKind is not (
+                    ArgumentKind.Explicit or ArgumentKind.DefaultValue) ||
+                argument.ArgumentKind == ArgumentKind.DefaultValue &&
+                !IsLowerableDefault(argument.Parameter))
             {
                 return false;
             }
         }
 
-        return ordinals.Count == invocation.TargetMethod.Parameters.Length;
+        return invocation.TargetMethod.Parameters.All(parameter =>
+            ordinals.Contains(parameter.Ordinal) || IsLowerableDefault(parameter));
+    }
+
+    private static bool IsLowerableDefault(IParameterSymbol? parameter)
+    {
+        if (parameter is not
+            {
+                RefKind: RefKind.None,
+                IsOptional: true,
+                HasExplicitDefaultValue: true
+            })
+        {
+            return false;
+        }
+
+        return parameter.ExplicitDefaultValue != null
+            ? parameter.Type.SpecialType == SpecialType.System_Boolean ||
+              parameter.Type.SpecialType == SpecialType.System_String ||
+              CSharpScalarSemantics.IsSupportedInteger(parameter.Type.SpecialType)
+            : parameter.Type.IsReferenceType;
     }
 
     private sealed class LoweringSession(
@@ -380,10 +404,30 @@ public sealed class RoslynProgramLowerer(
             OperationId operation,
             IInvocationOperation invocation)
         {
-            return [.. invocation.Arguments
+            var lowered = invocation.Arguments
                 .Select(argument => (
                     Ordinal: argument.Parameter?.Ordinal ?? int.MaxValue,
-                    Value: LowerValue(block, operation, argument.Value)))
+                    Value: argument.ArgumentKind == ArgumentKind.DefaultValue
+                        ? _expressions.LowerOptionalDefault(
+                            argument.Value,
+                            argument.Parameter).Term
+                        : LowerValue(block, operation, argument.Value)))
+                .ToList();
+            var present = new HashSet<int>(
+                lowered.Select(static argument => argument.Ordinal));
+            foreach (var parameter in invocation.TargetMethod.Parameters)
+            {
+                if (!present.Contains(parameter.Ordinal))
+                {
+                    lowered.Add((
+                        Ordinal: parameter.Ordinal,
+                        Value: _expressions.LowerOptionalDefault(
+                            invocation,
+                            parameter).Term));
+                }
+            }
+
+            return [.. lowered
                 .OrderBy(static argument => argument.Ordinal)
                 .Select(static argument => argument.Value)];
         }

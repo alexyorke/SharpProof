@@ -83,6 +83,61 @@ public sealed class ApiSpecResolutionCoverageTests
     }
 
     [Test]
+    public void ResolutionAcceptsCallerOwnedGenericTypeParameters()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static T Identity<T>(T value) => value;
+            }
+            """);
+        var evidence = new SpecEvidence(
+            SpecEvidenceKind.Observed,
+            "generic-resolution-test");
+        var resolved = new ApiSpecResolver(
+            ApiSpecTable.Create([
+                new ApiSpecDeclaration(
+                    new ApiSpecTarget(
+                        "resolution.generic",
+                        "M:Sample.Identity``1(``0)",
+                        "Sample",
+                        SpecTargetMemberKind.Method,
+                        "Identity",
+                        true,
+                        1,
+                        null,
+                        [IrTypeKind.Reference],
+                        IrTypeKind.Reference,
+                        [new ApiSpecAssemblyIdentity(
+                            "EffectsTest",
+                            string.Empty)]),
+                    new ApiSpecFacets(
+                        new SpecEffectFacet(SpecEffect.None, evidence),
+                        new SpecAllocationFacet(
+                            SpecAllocationBehavior.None,
+                            evidence),
+                        new SpecThrowFacet(
+                            SpecThrowBehavior.DoesNotThrow,
+                            [],
+                            evidence),
+                        new SpecNullnessFacet(
+                            SpecNullness.NotApplicable,
+                            evidence),
+                        new SpecCardinalityFacet(
+                            SpecCardinality.NotApplicable,
+                            null,
+                            evidence)),
+                    [])]))
+            .Resolve(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(resolved.IsComplete, Is.True);
+            Assert.That(resolved.Specs, Has.Length.EqualTo(1));
+        }
+    }
+
+    [Test]
     public void NuGetRestoredFrameworkReferencePackIsApproved()
     {
         Assert.That(
