@@ -2619,29 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 588. [CONFIRMED] Disabling analyzers republishes stale Proven evidence
-
-**Location**: CompilerCollector/FinalCompilationCollectorAnalyzer.cs around
-lines 3-31; SharpProof.Package/buildTransitive/SharpProof.targets around lines
-47-50; SharpProof.Verifier.targets around lines 232-234 and 320-323.
-
-**Description**: The collector is a DiagnosticAnalyzer. When the SDK sets
-_SkipAnalyzers, Csc emits the changed assembly but leaves the prior stable
-manifest, and verification consumes it.
-
-**Reproduction**: Identity first built Proven; source changed to negation.
-RunAnalyzersDuringBuild=false exited zero, kept manifest unchanged, changed the
-assembly, and republished Proven. A normal build regenerated the manifest,
-returned Refuted, and failed SP0051.
-
-**Impact**: A strict build can certify a previous source while shipping the
-changed refuted assembly.
-
-**Recommended fix**: When verification is enabled, force analyzer execution
-before _ComputeSkipAnalyzers or fail explicitly with SP0054; do not merely skip
-verification. Test RunAnalyzersDuringBuild, RunAnalyzers, implicit skip, and
-normal controls.
-
 ### 589. [CONFIRMED] ConstrainSuccessfulEvaluation bypasses sort and ownership checks
 
 **Location**: SharpProof.Ir/IrSemanticTerms.cs around lines 21-32.
