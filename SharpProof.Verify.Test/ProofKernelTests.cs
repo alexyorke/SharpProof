@@ -340,7 +340,7 @@ public sealed class ProofKernelTests
     }
 
     [Test]
-    public async Task ForeignBackendCancellationBecomesMalformedResult()
+    public async Task ForeignBackendCancellationBecomesInfrastructureFailure()
     {
         var fixture = CreateFixture();
         using var foreignCancellation = new CancellationTokenSource();
@@ -353,7 +353,7 @@ public sealed class ProofKernelTests
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.MalformedBackendResult));
+            Is.EqualTo(AbstentionReason.InfrastructureFailure));
     }
 
     [Test]

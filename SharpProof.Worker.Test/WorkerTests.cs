@@ -4468,6 +4468,30 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task UnattributedBackendCancellationBecomesInfrastructureFailure()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = new SharpProofWorker(new ThrowingCancellationBackend());
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
+            Assert.That(
+                response.CallableResults.Single().Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.InfrastructureFailure));
+            Assert.That(
+                response.ClaimResults.Single().Reason,
+                Is.EqualTo(WorkerClaimReason.InfrastructureFailure));
+        }
+    }
+
+    [Test]
     public async Task UnexpectedCounterexampleReplayFailureStillFailsTheRun()
     {
         using var project = TestProject.Create(TautologySource);
@@ -6508,6 +6532,16 @@ public sealed class WorkerTests
         {
             throw new NotSupportedException(
                 "Injected unexpected backend failure.");
+        }
+    }
+
+    private sealed class ThrowingCancellationBackend : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            throw new OperationCanceledException();
         }
     }
 

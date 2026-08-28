@@ -27,9 +27,11 @@ public sealed class ProofKernel(ISmtBackend backend)
             !cancellationToken.IsCancellationRequested)
         {
             // A backend must not be able to manufacture caller cancellation
-            // with a task canceled by an unrelated token. Treat that task as
-            // malformed and let the common validation below classify it.
-            result = null;
+            // with a task canceled by an unrelated token. Preserve the
+            // distinction from malformed data so callers can report an
+            // infrastructure failure and avoid fabricating a timeout.
+            result = BackendCheckResult.Unknown(
+                BackendFailureReason.InfrastructureFailure);
         }
         cancellationToken.ThrowIfCancellationRequested();
         if (result == null)
