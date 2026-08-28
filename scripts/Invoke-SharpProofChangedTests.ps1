@@ -74,7 +74,13 @@ if ($changedPaths.Count -eq 0) {
     return
 }
 
-$projectPaths = @(Invoke-GitLines @('ls-files', '*.csproj'))
+$projectPaths = @(Invoke-GitLines @(
+        'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.csproj') |
+    Sort-Object -Unique | Where-Object {
+        $candidate = [IO.Path]::GetFullPath(
+            (Join-Path $repositoryRoot $_.Replace('\', '/')))
+        Test-Path -LiteralPath $candidate -PathType Leaf
+    })
 $projects = @{}
 foreach ($relativePath in $projectPaths) {
     $relative = $relativePath.Replace('\', '/')

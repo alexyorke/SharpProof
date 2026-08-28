@@ -243,37 +243,6 @@ with matching identities. Retain normal checkout and archive controls.
 **Confidence**: High; exact entrypoint execution against the real worktree mount
 failed solely on its translated Git pointer.
 
-### 541. [CONFIRMED] Changed-test planning omits newly added untracked test projects
-
-**Location**: scripts/Invoke-SharpProofChangedTests.ps1 around line 77.
-
-**Description**: Changed paths include untracked files, but project inventory
-uses `git ls-files '*.csproj'`, which lists only indexed projects. A new
-untracked Test.csproj already added to the solution never enters the project or
-test-project set, so test-changed can green without running it.
-
-**Reproduction**: A fixture showed modified solution plus untracked test project.
-`dotnet sln list` contained it, baseline PlanOnly selected 18 projects and omitted
-it, while direct execution failed one test. Changing only discovery to
-`git ls-files --cached --others --exclude-standard -- '*.csproj'` selected 19
-including the failing project.
-
-**Impact**: During normal pre-commit development, newly added failing test
-assemblies can be completely skipped by the changed-test command.
-
-**Root cause**: The changed-file and project-inventory authorities have different
-tracked/untracked scopes.
-
-**Recommended fix**: Inventory cached plus untracked nonignored project files,
-deduplicate, and exclude cached paths deleted from the worktree.
-
-**Regression coverage**: In a fixture repository, add an untracked test project
-and modify the solution; PlanOnly must select it. A mutation restoring cached-
-only discovery must fail.
-
-**Confidence**: High; the plan omitted a solution-listed project whose direct
-test failed, and the broadened inventory selected it.
-
 ### 607. [CONFIRMED] A transient custom SARIF path makes a later plain clean fail
 
 **Location**: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`,
