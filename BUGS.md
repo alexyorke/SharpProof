@@ -2619,30 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 551. [CONFIRMED] Valid closed attributes on ContractFor companion members are silently discarded
-
-**Location**: SharpProof.Contracts/ContractBinder.cs around lines 154 and
-243-271; AnalyzerFeaturePipeline.cs around lines 207-210;
-ContractForCompanionValidator.cs around lines 134-201.
-
-**Description**: A matched companion parameter or return value can carry a
-recognized and valid closed attribute such as Positive. Validation emits no
-diagnostic, but binding produces no clause because only executable companion
-clauses are imported.
-
-**Reproduction**: A companion parameter Positive was recognized and valid,
-analyzer diagnostics were empty, resolver/binder succeeded, and clause count was
-zero. The same attribute on the target produced one ClosedAttribute clause; a
-companion Contract.Requires produced one Companion clause.
-
-**Impact**: A declaration that appears to strengthen the generated contract is
-accepted but has no effect, allowing callers and implementation analysis to
-silently disagree with author intent.
-
-**Recommended fix**: Bind companion attributes with receiver-offset parameter
-mapping. If that surface is unsupported, reject it with an enabled placement
-diagnostic rather than accepting it. Add parameter and return Positive controls.
-
 ### 552. [CONFIRMED] JSON exponent overflow disables performance-contract thresholds
 
 **Location**: SharpProof.Gates/Performance/AcceptancePerformanceContract.cs
