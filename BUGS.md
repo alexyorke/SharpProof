@@ -3076,31 +3076,6 @@ core-properties identity, entry order, timestamps, compression, and ZIP metadata
 or adopt a tested reproducible pack mode. Pack every project twice from one build
 and require byte-identical packages and evidence; perturb real payload as control.
 
-### 689. [CONFIRMED] Inline method-group delegate calls omit the exact target contract
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
-lines 44-75 and 591-624; `RequiresCallSiteTreeAnalyzer.cs`, around lines 35-64;
-`RequiresCallSiteAnalyzer.cs`, around lines 302-337.
-
-**Description**: For `((Action<int>)Positive)(-1)`, discovery records only
-`Action<int>.Invoke`. It ignores the child DelegateCreation/MethodReference that
-statically identifies `Positive`, so potential-owner screening drops the caller
-and the target's Requires is never bound.
-
-**Reproduction**: Roslyn exposed exact `MethodReference=Fixture.Positive(int)`;
-the candidate remained `Action<int>.Invoke`, potential owners excluded the caller,
-and no SP0027 appeared. Runtime invoked Positive with -1. A direct-call control
-produced one replayable candidate and SP0027.
-
-**Impact**: A definite precondition violation disappears solely because the
-exact method group is invoked through an inline delegate conversion.
-
-**Recommended fix**: When DelegateInvoke's instance is an inline delegate creation
-with an exact static method reference, add a second target and map arguments by
-ordinal/ref-kind. Preserve ordinary DelegateInvoke and fail closed for locals,
-parameters, multicast, lambdas, and uncertain closed-instance receivers. Test
-positive/negative/direct/unknown/null-receiver controls.
-
 ### 690. [CONFIRMED] Custom interpolated-handler calls are discovered but never replayed
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around

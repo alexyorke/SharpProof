@@ -870,13 +870,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     caller,
                     semanticModel,
                     cancellationToken),
-            IInvocationOperation invocation => [new(
-                invocation.TargetMethod,
-                invocation.Instance,
-                invocation.Arguments,
-                ImmutableDictionary<int, IOperation>.Empty,
-                ImmutableDictionary<int, long>.Empty,
-                true)],
+            IInvocationOperation invocation => GetInvocationCalls(invocation),
             IObjectCreationOperation
             {
                 Constructor: { } constructor
@@ -898,6 +892,78 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 cancellationToken),
             _ => []
         };
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetInvocationCalls(
+        IInvocationOperation invocation)
+    {
+        var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>(2);
+        calls.Add(new RequiresCallTarget(
+            invocation.TargetMethod,
+            invocation.Instance,
+            invocation.Arguments,
+            ImmutableDictionary<int, IOperation>.Empty,
+            ImmutableDictionary<int, long>.Empty,
+            true));
+
+        if (TryGetInlineStaticMethodGroup(
+                invocation.Instance,
+                out var method) &&
+            HasCompatibleDelegateArguments(invocation, method))
+        {
+            calls.Add(new RequiresCallTarget(
+                method,
+                null,
+                invocation.Arguments,
+                ImmutableDictionary<int, IOperation>.Empty,
+                ImmutableDictionary<int, long>.Empty,
+                true));
+        }
+
+        return calls.ToImmutable();
+    }
+
+    private static bool TryGetInlineStaticMethodGroup(
+        IOperation? instance,
+        out IMethodSymbol method)
+    {
+        while (instance is IConversionOperation conversion)
+        {
+            instance = conversion.Operand;
+        }
+
+        if (instance is IDelegateCreationOperation
+            {
+                Target: IMethodReferenceOperation reference
+            } &&
+            reference.Method is
+            {
+                IsStatic: true,
+                MethodKind: MethodKind.Ordinary
+            } candidate)
+        {
+            method = candidate;
+            return true;
+        }
+
+        method = null!;
+        return false;
+    }
+
+    private static bool HasCompatibleDelegateArguments(
+        IInvocationOperation invocation,
+        IMethodSymbol method)
+    {
+        if (invocation.Arguments.Length != method.Parameters.Length)
+        {
+            return false;
+        }
+
+        return invocation.Arguments.All(argument =>
+            argument.Parameter is { } parameter &&
+            parameter.Ordinal >= 0 &&
+            parameter.Ordinal < method.Parameters.Length &&
+            parameter.RefKind == method.Parameters[parameter.Ordinal].RefKind);
     }
 
     private static ImmutableArray<RequiresCallTarget> GetUsingCalls(

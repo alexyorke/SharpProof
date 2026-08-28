@@ -307,6 +307,74 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public void InlineStaticMethodGroupAddsTheConcreteTargetCandidate()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call() {
+                    ((Action<int>)Positive)(-1);
+                }
+            }
+            """,
+            ["SP0027"]);
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = tree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method => method.Identifier.ValueText == "Call");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+
+        Assert.That(candidates, Is.Not.Null);
+        var concrete = candidates!.Value
+            .Where(static candidate => candidate.TargetMethod.Name == "Positive")
+            .ToArray();
+        Assert.That(concrete, Has.Length.EqualTo(1));
+        Assert.That(concrete[0].CanReplay, Is.True);
+        Assert.That(concrete[0].Arguments, Has.Length.EqualTo(1));
+    }
+
+    [Test]
+    public async Task InlineStaticMethodGroupReportsTheTargetRequiresClause()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call() {
+                    ((Action<int>)Positive)(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
+    [Test]
     public void DefinitelyNullUsingResourceHasNoDisposalCandidate()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
