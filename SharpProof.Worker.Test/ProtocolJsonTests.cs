@@ -1837,6 +1837,26 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void NullManifestClaimsAreRejectedWithoutThrowing()
+    {
+        var response = CreateResponse(CreateManifest());
+        response.Manifest.Claims = null!;
+
+        WorkerProtocolValidationResult? validation = null;
+        Assert.DoesNotThrow((Action)(() =>
+            validation = WorkerProtocolJson.Validate(response)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(validation, Is.Not.Null);
+            Assert.That(validation!.IsValid, Is.False);
+            Assert.That(
+                validation.Errors.Select(static error => error.Code),
+                Does.Contain("manifest.claims"));
+        }
+    }
+
+    [Test]
     public void RequestBoundValidationRequiresAndTotallyComparesManifests()
     {
         var request = CreateRequest();

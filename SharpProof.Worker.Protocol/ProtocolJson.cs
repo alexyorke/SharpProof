@@ -794,7 +794,7 @@ public static partial class WorkerProtocolJson
             "response.run_projection");
         if (response.Manifest != null && projected)
         {
-            var manifestClaimsById = response.Manifest.Claims
+            var manifestClaimsById = (response.Manifest.Claims ?? [])
                 .Where(static claim => claim != null &&
                     !string.IsNullOrWhiteSpace(claim.ClaimId))
                 .GroupBy(static claim => claim.ClaimId, s_ordinal)
