@@ -150,6 +150,9 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 ? ImmutableArray.Create("body:normal-completion")
                 : [];
         var noModeledNormalReturn = normalCompletion is IrBooleanTerm { Value: false };
+        var entryQueryRequired = target.Clauses.Any(static clause =>
+            clause.Kind == CompilerContractKind.Requires &&
+            clause.Condition is not IrBooleanTerm { Value: true });
         if (!entryFeasibility.IsContradictory &&
             normalCompletion is not IrBooleanTerm)
         {
@@ -226,6 +229,51 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 !IsSupportedProofDomain(factory, condition))
             {
                 records.Add(CallableClaimResultAssembler.Unknown(target, index, WorkerClaimReason.UnsupportedExpression));
+                continue;
+            }
+            if (condition is IrBooleanTerm { Value: true } &&
+                entryQueryRequired &&
+                normalCompletionUnknown == WorkerClaimReason.None)
+            {
+                var literalVacuity = entryFeasibility.IsContradictory
+                    ? WorkerVacuityKind.ContradictoryPreconditions
+                    : noModeledNormalReturn
+                        ? WorkerVacuityKind.NoModeledNormalReturn
+                        : WorkerVacuityKind.None;
+                var literalRecord = CallableClaimResultAssembler.Create(
+                    target,
+                    target.Entry.ClaimIds[index],
+                    WorkerClaimOutcome.Proven,
+                    WorkerClaimReason.None,
+                    WorkerEffectEvidenceCertainty.Unspecified);
+                literalRecord.Vacuity = literalVacuity;
+                literalRecord.ProofCore = CallableProofCore.Merge(
+                    literalRecord.ProofCore,
+                    literalVacuity switch
+                    {
+                        WorkerVacuityKind.ContradictoryPreconditions =>
+                            entryFeasibility.ProofCore,
+                        WorkerVacuityKind.NoModeledNormalReturn =>
+                            normalCompletionProofCore,
+                        _ => []
+                    });
+                if (literalVacuity != WorkerVacuityKind.None &&
+                    literalRecord.ProofCore.Length == 0)
+                {
+                    literalRecord = CallableClaimResultAssembler.Unknown(
+                        target,
+                        index,
+                        WorkerClaimReason.MalformedBackendResult);
+                }
+                else if (literalVacuity == WorkerVacuityKind.ContradictoryPreconditions)
+                {
+                    literalRecord.Assumptions =
+                        CallableClaimResultAssembler.MarkAssumptionsUsed(
+                            target,
+                            entryFeasibility.UsedAssumptionIds);
+                }
+
+                records.Add(literalRecord);
                 continue;
             }
             if (!resourceBudget.TryStartQuery())

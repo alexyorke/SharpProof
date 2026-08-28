@@ -537,6 +537,49 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task LiteralTruePostconditionDoesNotConsumeSecondQueryReservation()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var target = CreateTarget(
+            factory,
+            [
+                Requires(factory.Binary(
+                    IrBinaryOperator.GreaterThan,
+                    factory.Variable(value),
+                    factory.Integer(0))),
+                Ensures(factory.Boolean(true))
+            ],
+            [Parameter(value)],
+            CompilerPreparedBody.Trivial());
+        var backend = new ScriptedBackend(
+            BackendCheckResult.Satisfiable(
+                new BackendModel(
+                    ImmutableDictionary<IrVarId, IrValue>.Empty.Add(
+                        value,
+                        factory.CreateIntegerValue(1)))));
+        var budget = new MethodResourceBudget(
+            null,
+            queryRlimit: 1,
+            methodRlimit: 1);
+
+        var result = (await new CallableVerifier(
+            backend,
+            WorkerBudgets.DefaultMaximumExpressionDepth).VerifyAsync(
+                target,
+                budget,
+                CancellationToken.None)).Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(result.ProofCore, Is.Empty);
+        }
+    }
+
+    [Test]
     public async Task SatisfiablePreconditionDoesNotHideFalsePostcondition()
     {
         var factory = new IrFactory();
