@@ -560,36 +560,11 @@ internal static class Program
         }
 
         var total = assumptions.User + assumptions.Trusted;
-        ReportDiagnostic(FindAssumptionLocation(response),
+        ReportDiagnostic(AssumptionEvidenceLocation.Find(response),
             LauncherPresentation.Level(policy, "info"), "SP0048",
             FormattableString.Invariant(
                 $"User assumption/trusted evidence declared: total={total}, user={assumptions.User}, trusted={assumptions.Trusted}."));
         return policy == WorkerAssumptionPolicy.Error;
-    }
-
-    private static WorkerSourceLocation FindAssumptionLocation(
-        WorkerVerifyResponse response)
-    {
-        var callable = response.Manifest.Callables.FirstOrDefault(
-            static candidate => candidate.Assumptions.Length != 0);
-        if (callable != null)
-        {
-            return callable.Location;
-        }
-
-        var claimIds = response.ClaimResults
-            .Where(static result => (result.Assumptions ?? []).Length != 0)
-            .Select(static result => result.ClaimId)
-            .ToHashSet(StringComparer.Ordinal);
-        var claim = response.Manifest.Claims.FirstOrDefault(
-            candidate => claimIds.Contains(candidate.ClaimId));
-        if (claim != null)
-        {
-            return response.Manifest.Callables.First(
-                candidate => candidate.CallableId == claim.CallableId).Location;
-        }
-
-        return response.Manifest.Callables.FirstOrDefault()?.Location ?? new();
     }
 
     private static void ReportDiagnostic(

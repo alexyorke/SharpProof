@@ -43,8 +43,7 @@ internal static class SarifProjection
         var assumptions = summary.Assumptions;
         if (assumptions.User + assumptions.Trusted != 0)
         {
-            var assumptionLocation = manifest.Callables.FirstOrDefault(
-                static callable => callable.Assumptions.Length != 0)?.Location;
+            var assumptionLocation = AssumptionEvidenceLocation.Find(response);
             notifications.Add(Notification(
                 "SP0048",
                 "User assumption/trusted evidence declared: total=" +

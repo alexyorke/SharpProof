@@ -1554,7 +1554,13 @@ public sealed class LauncherArgumentTests
             Line = 17,
             Column = 4
         };
-        manifest.Callables[0].Assumptions = [];
+        manifest.Callables[0].Assumptions = [
+            new WorkerAssumptionEvidence
+            {
+                Id = "precondition-1",
+                Kind = WorkerAssumptionKind.Precondition
+            }
+        ];
         manifest.Callables[0].ClaimIds = [];
         manifest.Callables[1].Location = lateLocation;
         manifest.Callables[1].Assumptions = [
@@ -1577,7 +1583,14 @@ public sealed class LauncherArgumentTests
                 new WorkerCallableResult {
                     CallableId = "C.M",
                     Coverage = WorkerCallableCoverage.Complete,
-                    Reason = WorkerCallableCoverageReason.None
+                    Reason = WorkerCallableCoverageReason.None,
+                    Assumptions = [
+                        new WorkerAssumptionEvidence
+                        {
+                            Id = "precondition-1",
+                            Kind = WorkerAssumptionKind.Precondition
+                        }
+                    ]
                 },
                 new WorkerCallableResult {
                     CallableId = "C.Unsupported",
@@ -1620,7 +1633,7 @@ public sealed class LauncherArgumentTests
                 ],
                 Assumptions = new WorkerAssumptionSummary
                 {
-                    Total = 1,
+                    Total = 2,
                     Used = 1,
                     User = 1
                 },
