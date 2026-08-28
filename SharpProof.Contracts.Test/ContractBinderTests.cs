@@ -783,6 +783,49 @@ public sealed class ContractBinderTests
             Is.True);
     }
 
+    [Test]
+    public void CompanionClosedAttributesBindToTargetVariables()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public interface Target {
+                int Read(int value);
+                string Echo(string value);
+            }
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(
+                    Target receiver,
+                    [Positive] int value) => value;
+                [return: NotNull]
+                public static string Echo(
+                    Target receiver,
+                    string value) => value;
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var read = subject.Bind("Target", "Read");
+        var echo = subject.Bind("Target", "Echo");
+
+        Assert.That(read.IsSuccess, Is.True, read.Failure.ToString());
+        Assert.That(echo.IsSuccess, Is.True, echo.Failure.ToString());
+        Assert.That(read.Contracts!.Clauses, Has.Length.EqualTo(1));
+        Assert.That(
+            read.Contracts.Clauses.Single().Kind,
+            Is.EqualTo(BoundContractKind.Requires));
+        Assert.That(echo.Contracts!.Clauses, Has.Length.EqualTo(1));
+        Assert.That(
+            echo.Contracts.Clauses.Single().Kind,
+            Is.EqualTo(BoundContractKind.Ensures));
+        Assert.That(
+            read.Contracts.Clauses.Concat(echo.Contracts.Clauses)
+                .All(static clause =>
+                    clause.Evidence == BoundContractEvidence.ClosedAttribute),
+            Is.True);
+    }
+
     [TestCase("sbyte")]
     [TestCase("byte")]
     [TestCase("short")]

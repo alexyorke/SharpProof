@@ -151,7 +151,12 @@ public sealed class ContractBinder(
                 clause.Kind, condition, clause.SourceOperation, clause.Evidence));
         }
 
-        var attributeResult = BindClosedAttributes(target, canonical, requiresOnly);
+        var attributeResult = BindClosedAttributes(
+            target,
+            source,
+            usesCompanion,
+            canonical,
+            requiresOnly);
         if (attributeResult.Failure != ContractBindingFailure.None)
         {
             return ContractBindingResult.Fail(attributeResult.Failure);
@@ -242,6 +247,8 @@ public sealed class ContractBinder(
 
     private ClauseBindingResult BindClosedAttributes(
         IMethodSymbol target,
+        IMethodSymbol source,
+        bool usesCompanion,
         ContractCanonicalVariables variables,
         bool requiresOnly)
     {
@@ -257,6 +264,50 @@ public sealed class ContractBinder(
                 return ClauseBindingResult.Fail(result);
             }
         }
+
+        if (usesCompanion)
+        {
+            var offset = variables.Receiver.HasValue ? 1 : 0;
+            if (variables.Receiver is { } receiver &&
+                source.Parameters.Length > 0)
+            {
+                var result = BindValueAttributes(
+                    source.Parameters[0].GetAttributes(),
+                    source.Parameters[0].Type,
+                    source.Parameters[0].RefKind,
+                    _factory.Variable(receiver),
+                    BoundContractKind.Requires,
+                    clauses);
+                if (result != ContractBindingFailure.None)
+                {
+                    return ClauseBindingResult.Fail(result);
+                }
+            }
+
+            for (var index = 0; index < target.Parameters.Length; index++)
+            {
+                var sourceIndex = index + offset;
+                if (sourceIndex >= source.Parameters.Length)
+                {
+                    return ClauseBindingResult.Fail(
+                        ContractBindingFailure.CompanionSignatureMismatch);
+                }
+
+                var parameter = source.Parameters[sourceIndex];
+                var result = BindValueAttributes(
+                    parameter.GetAttributes(),
+                    parameter.Type,
+                    parameter.RefKind,
+                    _factory.Variable(variables.Parameters[index]),
+                    BoundContractKind.Requires,
+                    clauses);
+                if (result != ContractBindingFailure.None)
+                {
+                    return ClauseBindingResult.Fail(result);
+                }
+            }
+        }
+
         if (!requiresOnly && variables.Result.HasValue)
         {
             var result = BindValueAttributes(
@@ -266,6 +317,21 @@ public sealed class ContractBinder(
             if (result != ContractBindingFailure.None)
             {
                 return ClauseBindingResult.Fail(result);
+            }
+
+            if (usesCompanion)
+            {
+                var companionResult = BindValueAttributes(
+                    source.GetReturnTypeAttributes(),
+                    source.ReturnType,
+                    RefKind.None,
+                    _factory.Variable(variables.Result.Value),
+                    BoundContractKind.Ensures,
+                    clauses);
+                if (companionResult != ContractBindingFailure.None)
+                {
+                    return ClauseBindingResult.Fail(companionResult);
+                }
             }
         }
         return new ClauseBindingResult(clauses.ToImmutable(), ContractBindingFailure.None);
