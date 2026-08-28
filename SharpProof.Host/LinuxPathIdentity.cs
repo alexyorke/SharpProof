@@ -78,6 +78,60 @@ public static partial class LinuxPathIdentity
         set;
     }
 
+    // A launcher invocation qualifies the same publication paths through
+    // several validation and publication phases.  Keep the expensive,
+    // read-only filesystem classification in this short-lived cache while
+    // still re-running Canonicalize at every boundary and the post-lock
+    // identity confirmation without the cache.
+    internal sealed class PathQualificationCache
+    {
+        private readonly Dictionary<string, bool> _caseFoldedParents = [];
+        private readonly Dictionary<string, string> _fileSystemTypes = [];
+        private readonly Dictionary<string, string> _mountTypes = [];
+
+        internal List<(string Mount, string Type)>? MountInfo
+        {
+            get;
+            set;
+        }
+
+        internal bool TryGetCaseFoldedParent(
+            string path,
+            out bool isCaseFolded)
+        {
+            return _caseFoldedParents.TryGetValue(path, out isCaseFolded);
+        }
+
+        internal void SetCaseFoldedParent(string path, bool isCaseFolded)
+        {
+            _caseFoldedParents[path] = isCaseFolded;
+        }
+
+        internal bool TryGetFileSystemType(
+            string path,
+            out string fileSystemType)
+        {
+            return _fileSystemTypes.TryGetValue(path, out fileSystemType!);
+        }
+
+        internal void SetFileSystemType(string path, string fileSystemType)
+        {
+            _fileSystemTypes[path] = fileSystemType;
+        }
+
+        internal bool TryGetMountType(
+            string path,
+            out string fileSystemType)
+        {
+            return _mountTypes.TryGetValue(path, out fileSystemType!);
+        }
+
+        internal void SetMountType(string path, string fileSystemType)
+        {
+            _mountTypes[path] = fileSystemType;
+        }
+    }
+
     public static string Canonicalize(string path)
     {
         EnsureLinux();
@@ -151,14 +205,23 @@ public static partial class LinuxPathIdentity
 
     public static string RequireLocalPath(string path)
     {
+        return RequireLocalPath(path, qualificationCache: null);
+    }
+
+    internal static string RequireLocalPath(
+        string path,
+        PathQualificationCache? qualificationCache)
+    {
         var canonical = Canonicalize(path);
-        if (IsCaseFoldedParent(canonical))
+        if (IsCaseFoldedParent(canonical, qualificationCache))
         {
             throw new ArgumentException(
                 "SharpProof publication paths on case-folding directories are unsupported.",
                 nameof(path));
         }
-        var fileSystem = FindVisibleFileSystemType(canonical);
+        var fileSystem = FindVisibleFileSystemType(
+            canonical,
+            qualificationCache);
         if (UnsupportedRemoteFileSystems.Contains(fileSystem))
         {
             throw new ArgumentException(
@@ -168,11 +231,27 @@ public static partial class LinuxPathIdentity
         return canonical;
     }
 
-    private static bool IsCaseFoldedParent(string canonicalPath)
+    private static bool IsCaseFoldedParent(
+        string canonicalPath,
+        PathQualificationCache? qualificationCache = null)
     {
         var parent = Path.GetDirectoryName(canonicalPath);
         while (!string.IsNullOrEmpty(parent))
         {
+            if (qualificationCache is not null &&
+                qualificationCache.TryGetCaseFoldedParent(
+                    parent,
+                    out var cachedCaseFolded))
+            {
+                if (cachedCaseFolded)
+                {
+                    return true;
+                }
+
+                parent = Path.GetDirectoryName(parent);
+                continue;
+            }
+
             if (CaseFoldedParentProbeOverrideForTest is { } probe)
             {
                 var result = probe(parent);
@@ -181,6 +260,7 @@ public static partial class LinuxPathIdentity
                     throw new IOException(
                         "SharpProof could not inspect case-folding flags.");
                 }
+                qualificationCache?.SetCaseFoldedParent(parent, result.Value);
                 if (result.Value)
                 {
                     return true;
@@ -218,8 +298,10 @@ public static partial class LinuxPathIdentity
                     {
                         if ((flags & Ext4CasefoldFlag) != 0)
                         {
+                            qualificationCache?.SetCaseFoldedParent(parent, true);
                             return true;
                         }
+                        qualificationCache?.SetCaseFoldedParent(parent, false);
                     }
                     else
                     {
@@ -409,17 +491,46 @@ public static partial class LinuxPathIdentity
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
+        InvalidatePublicationSetCore(
+            publicationPaths,
+            timeout,
+            cancellationToken,
+            qualificationCache: null);
+    }
+
+    internal static void InvalidatePublicationSet(
+        IEnumerable<string> publicationPaths,
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        PathQualificationCache qualificationCache)
+    {
+        InvalidatePublicationSetCore(
+            publicationPaths,
+            timeout,
+            cancellationToken,
+            qualificationCache);
+    }
+
+    private static void InvalidatePublicationSetCore(
+        IEnumerable<string> publicationPaths,
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        PathQualificationCache? qualificationCache)
+    {
         ArgumentNullException.ThrowIfNull(publicationPaths);
         var requestedPaths = publicationPaths
             .Where(static path => !string.IsNullOrWhiteSpace(path))
             .ToArray();
-        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
+        var canonicalPaths = CanonicalPublicationPaths(
+            requestedPaths,
+            qualificationCache);
         ValidatePublicationTopology(canonicalPaths);
         ValidatePublicationMetadataAliases(canonicalPaths);
         using var lease = AcquirePublicationLocks(
             canonicalPaths,
             timeout,
-            cancellationToken);
+            cancellationToken,
+            qualificationCache: qualificationCache);
 
         var marker = PublicationMarkerHeader +
             PublicationSetId(canonicalPaths) + "\n";
@@ -562,6 +673,20 @@ public static partial class LinuxPathIdentity
             bind: true);
     }
 
+    internal static IDisposable AcquirePublicationSet(
+        IEnumerable<string> publicationPaths,
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        PathQualificationCache qualificationCache)
+    {
+        return AcquirePublicationLocks(
+            publicationPaths,
+            timeout,
+            cancellationToken,
+            bind: true,
+            qualificationCache: qualificationCache);
+    }
+
     public static IDisposable AcquirePublicationSetLease(
         IEnumerable<string> publicationPaths,
         TimeSpan timeout,
@@ -578,7 +703,8 @@ public static partial class LinuxPathIdentity
         IEnumerable<string> publicationPaths,
         TimeSpan timeout,
         CancellationToken cancellationToken,
-        bool bind = false)
+        bool bind = false,
+        PathQualificationCache? qualificationCache = null)
     {
         ArgumentNullException.ThrowIfNull(publicationPaths);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
@@ -609,7 +735,9 @@ public static partial class LinuxPathIdentity
                 nameof(publicationPaths));
         }
 
-        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
+        var canonicalPaths = CanonicalPublicationPaths(
+            requestedPaths,
+            qualificationCache);
         ValidatePublicationTopology(canonicalPaths);
         ValidatePublicationMetadataAliases(canonicalPaths);
         var lockPaths = canonicalPaths
@@ -765,10 +893,11 @@ public static partial class LinuxPathIdentity
     }
 
     private static string[] CanonicalPublicationPaths(
-        IEnumerable<string> publicationPaths)
+        IEnumerable<string> publicationPaths,
+        PathQualificationCache? qualificationCache = null)
     {
         return publicationPaths
-            .Select(RequireLocalPath)
+            .Select(path => RequireLocalPath(path, qualificationCache))
             .OrderBy(static path => path, StringComparer.Ordinal)
             .ToArray();
     }
@@ -1279,12 +1408,24 @@ public static partial class LinuxPathIdentity
         return left.Device == right.Device && left.Inode == right.Inode;
     }
 
-    private static string FindFileSystemType(string canonicalPath)
+    private static string FindFileSystemType(
+        string canonicalPath,
+        PathQualificationCache? qualificationCache = null)
     {
+        if (qualificationCache is not null &&
+            qualificationCache.TryGetMountType(
+                canonicalPath,
+                out var cachedMountType))
+        {
+            return cachedMountType;
+        }
+
         if (MountInfoFileSystemTypeProbeOverrideForTest is { } probe)
         {
-            return probe(canonicalPath) ?? throw new IOException(
+            var fileSystemType = probe(canonicalPath) ?? throw new IOException(
                 "SharpProof could not identify the publication filesystem.");
+            qualificationCache?.SetMountType(canonicalPath, fileSystemType);
+            return fileSystemType;
         }
 
         const string mountInfoPath = "/proc/self/mountinfo";
@@ -1296,6 +1437,32 @@ public static partial class LinuxPathIdentity
 
         string? bestMount = null;
         string? bestType = null;
+        foreach (var (mount, type) in ReadMountInfo(qualificationCache, mountInfoPath))
+        {
+            if (!IsPathWithin(canonicalPath, mount) ||
+                bestMount != null && mount.Length < bestMount.Length)
+            {
+                continue;
+            }
+            bestMount = mount;
+            bestType = type;
+        }
+        var result = bestType ?? throw new IOException(
+            "SharpProof could not identify the publication filesystem.");
+        qualificationCache?.SetMountType(canonicalPath, result);
+        return result;
+    }
+
+    private static IEnumerable<(string Mount, string Type)> ReadMountInfo(
+        PathQualificationCache? qualificationCache,
+        string mountInfoPath)
+    {
+        if (qualificationCache?.MountInfo is { } cached)
+        {
+            return cached;
+        }
+
+        var entries = new List<(string Mount, string Type)>();
         foreach (var line in File.ReadLines(mountInfoPath))
         {
             var separator = line.IndexOf(" - ", StringComparison.Ordinal);
@@ -1309,20 +1476,20 @@ public static partial class LinuxPathIdentity
             {
                 continue;
             }
-            var mount = DecodeMountPath(left[4]);
-            if (!IsPathWithin(canonicalPath, mount) ||
-                bestMount != null && mount.Length < bestMount.Length)
-            {
-                continue;
-            }
-            bestMount = mount;
-            bestType = right[0];
+            entries.Add((DecodeMountPath(left[4]), right[0]));
         }
-        return bestType ?? throw new IOException(
-            "SharpProof could not identify the publication filesystem.");
+
+        if (qualificationCache is not null)
+        {
+            qualificationCache.MountInfo = entries;
+        }
+
+        return entries;
     }
 
-    private static string FindVisibleFileSystemType(string canonicalPath)
+    private static string FindVisibleFileSystemType(
+        string canonicalPath,
+        PathQualificationCache? qualificationCache = null)
     {
         var existing = canonicalPath;
         while (NativeMethods.LStat(existing, out _) != 0)
@@ -1339,36 +1506,56 @@ public static partial class LinuxPathIdentity
             }
         }
 
+        if (qualificationCache is not null &&
+            qualificationCache.TryGetFileSystemType(
+                existing,
+                out var cachedFileSystemType))
+        {
+            return cachedFileSystemType;
+        }
+
         if (StatFsTypeProbeOverrideForTest is { } probe)
         {
             var type = probe(existing);
             if (type is null)
             {
-                return FindFileSystemType(canonicalPath);
+                var fileSystemType = FindFileSystemType(
+                    canonicalPath,
+                    qualificationCache);
+                qualificationCache?.SetFileSystemType(existing, fileSystemType);
+                return fileSystemType;
             }
 
-            return type.Value switch
+            var fileSystemTypeFromMagic = type.Value switch
             {
                 0x6969 => "nfs",
                 unchecked((long)0xFF534D42) => "cifs",
                 unchecked((long)0xFE534D42) => "smb3",
                 0x65735546 => "fuse",
-                _ => FindFileSystemType(canonicalPath)
+                _ => FindFileSystemType(canonicalPath, qualificationCache)
             };
+            qualificationCache?.SetFileSystemType(existing, fileSystemTypeFromMagic);
+            return fileSystemTypeFromMagic;
         }
 
         if (NativeMethods.StatFs(existing, out var stats) == 0)
         {
-            return stats.Type switch
+            var fileSystemTypeFromStats = stats.Type switch
             {
                 0x6969 => "nfs",
                 unchecked((long)0xFF534D42) => "cifs",
                 unchecked((long)0xFE534D42) => "smb3",
                 0x65735546 => "fuse",
-                _ => FindFileSystemType(canonicalPath)
+                _ => FindFileSystemType(canonicalPath, qualificationCache)
             };
+            qualificationCache?.SetFileSystemType(existing, fileSystemTypeFromStats);
+            return fileSystemTypeFromStats;
         }
-        return FindFileSystemType(canonicalPath);
+        var fileSystemTypeFromMount = FindFileSystemType(
+            canonicalPath,
+            qualificationCache);
+        qualificationCache?.SetFileSystemType(existing, fileSystemTypeFromMount);
+        return fileSystemTypeFromMount;
     }
 
     private static bool IsPathWithin(string path, string directory)

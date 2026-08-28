@@ -39,6 +39,9 @@ internal static class Program
             return 2;
         }
 
+        var qualificationCache =
+            new LinuxPathIdentity.PathQualificationCache();
+
         WorkerVerifyRequest request;
         CompilerManifestArtifact artifact;
         byte[] artifactBytes;
@@ -52,13 +55,20 @@ internal static class Program
             // Reject path aliases before opening the worker dependency closure.
             // A colliding output can otherwise make closure staging fail first
             // with an unrelated missing-component error.
-            arguments.ValidateDistinctPaths(null);
-            InvalidatePreviousPublication(arguments);
+            arguments.ValidateDistinctPaths(
+                null,
+                qualificationCache: qualificationCache);
+            InvalidatePreviousPublication(arguments, qualificationCache);
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
-            arguments.ValidateDistinctPaths(runtimeSnapshot);
+            arguments.ValidateDistinctPaths(
+                runtimeSnapshot,
+                qualificationCache: qualificationCache);
             request = arguments.CreateRequest(
-                runtimeSnapshot, out artifact, out artifactBytes);
+                runtimeSnapshot,
+                out artifact,
+                out artifactBytes,
+                qualificationCache);
             expectedInputHash = ComputeExpectedInputHash(
                 request,
                 artifactBytes,
@@ -239,7 +249,10 @@ internal static class Program
             try
             {
                 PublishOutputs(arguments, request, artifact, artifactBytes, expectedInputHash,
-                    expectedVersions, validatedResponse!, responseAuthority);
+                    expectedVersions,
+                    validatedResponse!,
+                    responseAuthority,
+                    qualificationCache);
             }
             catch (Exception exception) when (
                 exception is IOException or InvalidDataException or
@@ -598,7 +611,8 @@ internal static class Program
         CompilerManifestArtifact artifact, byte[] artifactBytes, string expectedInputHash,
         WorkerVersionSummary expectedVersions,
         WorkerVerifyResponse response,
-        IWorkerResponseEvidenceAuthority responseAuthority)
+        IWorkerResponseEvidenceAuthority responseAuthority,
+        LinuxPathIdentity.PathQualificationCache qualificationCache)
     {
         if (arguments.PublishRequestPath == null)
         {
@@ -613,7 +627,9 @@ internal static class Program
                 arguments.PublishCompilerManifestPath,
                 arguments.PublishSarifPath
             }.OfType<string>(),
-            TimeSpan.FromSeconds(30));
+            TimeSpan.FromSeconds(30),
+            CancellationToken.None,
+            qualificationCache);
 
         request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
         response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
@@ -845,7 +861,8 @@ internal static class Program
     }
 
     private static void InvalidatePreviousPublication(
-        LauncherArguments arguments)
+        LauncherArguments arguments,
+        LinuxPathIdentity.PathQualificationCache qualificationCache)
     {
         if (arguments.PublishRequestPath == null)
         {
@@ -860,7 +877,9 @@ internal static class Program
                 arguments.PublishCompilerManifestPath,
                 arguments.PublishSarifPath
             }.OfType<string>(),
-            TimeSpan.FromSeconds(30));
+            TimeSpan.FromSeconds(30),
+            CancellationToken.None,
+            qualificationCache);
     }
 
     private sealed class PublicationMember
@@ -1187,12 +1206,29 @@ internal sealed partial class LauncherArguments
     internal WorkerVerifyRequest CreateRequest(
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
     {
-        return CreateRequest(null, out artifact, out artifactBytes);
+        return CreateRequest(
+            null,
+            out artifact,
+            out artifactBytes,
+            qualificationCache: null);
     }
 
     internal WorkerVerifyRequest CreateRequest(
         WorkerRuntimeClosureSnapshot? runtimeSnapshot,
         out CompilerManifestArtifact artifact, out byte[] artifactBytes)
+    {
+        return CreateRequest(
+            runtimeSnapshot,
+            out artifact,
+            out artifactBytes,
+            qualificationCache: null);
+    }
+
+    internal WorkerVerifyRequest CreateRequest(
+        WorkerRuntimeClosureSnapshot? runtimeSnapshot,
+        out CompilerManifestArtifact artifact,
+        out byte[] artifactBytes,
+        LinuxPathIdentity.PathQualificationCache? qualificationCache)
     {
         var cacheEnabled = Boolean("cache-enabled", true);
         var earlyCacheDirectory = cacheEnabled &&
@@ -1202,7 +1238,8 @@ internal sealed partial class LauncherArguments
                 : null;
         ValidateDistinctPaths(
             runtimeSnapshot,
-            earlyCacheDirectory);
+            earlyCacheDirectory,
+            qualificationCache);
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
@@ -1213,13 +1250,15 @@ internal sealed partial class LauncherArguments
                 ? WorkerCachePath.Resolve(
                     Optional("cache-directory"),
                     artifact.Compilation.ProjectDirectory)
-                : null);
+                : null,
+            qualificationCache);
         return request;
     }
 
     internal void ValidateDistinctPaths(
         WorkerRuntimeClosureSnapshot? runtimeSnapshot,
-        string? cacheDirectory = null)
+        string? cacheDirectory = null,
+        LinuxPathIdentity.PathQualificationCache? qualificationCache = null)
     {
         var workerPath = WorkerPath;
         var runtimeRoots = new[] {
@@ -1233,7 +1272,9 @@ internal sealed partial class LauncherArguments
         }.OfType<string>().ToArray();
         foreach (var publicationPath in publicationPaths)
         {
-            LinuxPathIdentity.RequireLocalPath(publicationPath);
+            LinuxPathIdentity.RequireLocalPath(
+                publicationPath,
+                qualificationCache);
         }
         var runtimeDirectories = runtimeRoots
             .Concat(LauncherArguments.LauncherRuntimePaths)

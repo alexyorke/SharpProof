@@ -60,6 +60,58 @@ public sealed class LinuxPublicationSetTests
         }
     }
 
+    [Test]
+    [NonParallelizable]
+    public void RepeatedPathQualificationParsesMountInfoOncePerBatch()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var paths = Enumerable.Range(0, 4)
+            .Select(index => Path.Combine(
+                directory.Path,
+                "publication-" + index.ToString() + ".json"))
+            .ToArray();
+        var caseFoldProbes = 0;
+        var statFsProbes = 0;
+        var mountInfoProbes = 0;
+        try
+        {
+            var qualificationCache =
+                new LinuxPathIdentity.PathQualificationCache();
+            LinuxPathIdentity.CaseFoldedParentProbeOverrideForTest = _ =>
+            {
+                caseFoldProbes++;
+                return false;
+            };
+            LinuxPathIdentity.StatFsTypeProbeOverrideForTest = _ =>
+            {
+                statFsProbes++;
+                return 0x1021997L;
+            };
+            LinuxPathIdentity.MountInfoFileSystemTypeProbeOverrideForTest = _ =>
+            {
+                mountInfoProbes++;
+                return "overlay";
+            };
+
+            foreach (var path in paths)
+            {
+                _ = LinuxPathIdentity.RequireLocalPath(
+                    path,
+                    qualificationCache);
+            }
+
+            Assert.That(mountInfoProbes, Is.EqualTo(1));
+            Assert.That(statFsProbes, Is.EqualTo(1));
+            Assert.That(caseFoldProbes, Is.LessThan(paths.Length * 2));
+        }
+        finally
+        {
+            LinuxPathIdentity.CaseFoldedParentProbeOverrideForTest = null;
+            LinuxPathIdentity.StatFsTypeProbeOverrideForTest = null;
+            LinuxPathIdentity.MountInfoFileSystemTypeProbeOverrideForTest = null;
+        }
+    }
+
     [TestCase(false, false)]
     [TestCase(true, false)]
     [TestCase(false, true)]

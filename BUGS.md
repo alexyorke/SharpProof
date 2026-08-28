@@ -294,27 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 626. [CONFIRMED] Launcher reparses mount information 36 times per SARIF run
-
-**Location**: `SharpProof.Worker.Launcher/Program.cs`, around lines 55, 59,
-620-640, 864-880, and 1220-1254; `SharpProof.Host/LinuxPathIdentity.cs`, around
-lines 152-243 and 1282-1371.
-
-**Description**: The same four publication paths are requalified nine times
-through validation, invalidation, and acquisition. Each local classification
-opens/parses `/proc/self/mountinfo`.
-
-**Reproduction**: Exact flow instrumentation counted 36 RequireLocalPath calls,
-36 mount scans, 36 statfs calls, and 144 parent probes. Real warm run cost 27.9
-ms, 2.04 MB allocated, and 195.6 KB read on a 5.35 KB mount table.
-
-**Impact**: Unconditional per-project overhead scales to seconds/large GC load
-on solutions and larger mount tables.
-
-**Recommended fix**: Carry one invocation-scoped prequalified publication set
-through all phases and bulk-parse mountinfo once per batch. Add deterministic
-counter tests with/without SARIF.
-
 ### 627. [CONFIRMED] Proof-core labels collapse distinct IL-summary authorities
 
 **Location**: `SharpProof.Worker/CallableEvidenceBuilder.cs`, around lines
