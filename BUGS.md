@@ -5727,31 +5727,6 @@ receipt minting, and final qualification, and bind the expected configuration in
 receipt semantics. Test fully valid Debug rejection at all three layers and
 explicit Release success.
 
-### 682. [CONFIRMED] BannedSymbols omits eight nullable-aware SymbolDisplay overloads
-
-**Location**: `BannedSymbols.txt`, around lines 48-53; policy catalog in
-`SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`, around lines 75-79
-and 179-187.
-
-**Description**: The inventory bans reduced ISymbol display APIs but omits all
-public CSharp `SymbolDisplay` overloads taking `ITypeSymbol` plus
-`NullableFlowState` or `NullableAnnotation` across ToDisplayString,
-ToDisplayParts, ToMinimalDisplayString, and ToMinimalDisplayParts.
-
-**Reproduction**: The real BannedApi analyzer emitted RS0030 for ordinary
-ISymbol.ToDisplayString and AddSyntaxTrees controls but zero diagnostics for all
-eight exact candidates. Adding their static documentation IDs produced exactly
-eight warnings, one per call.
-
-**Impact**: Production projects outside the Meta-analyzer subset can use nullable-
-aware presentation strings as semantic identities while the repo-wide banned-API
-layer stays green.
-
-**Recommended fix**: Add the eight exact
-`Microsoft.CodeAnalysis.CSharp.SymbolDisplay.*` documentation IDs. Add a compile
-fixture/inventory test that enumerates every public pinned-Roslyn overload in the
-four policy families, plus lookalike and warnings-as-errors controls.
-
 ### 683. [CONFIRMED] SARIF treats colon-bearing relative source paths as URI schemes
 
 **Location**: `SharpProof.Worker.Launcher/SarifProjection.cs`, around lines
