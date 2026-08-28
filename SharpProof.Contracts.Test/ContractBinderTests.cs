@@ -307,6 +307,47 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void ConstructorInitializerIntrinsicsFailClosed()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public class Base {
+                protected Base(long value) { }
+            }
+            public sealed class Target : Base {
+                public Target() : base(Contract.Result<long>()) { }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.BindConstructor("Target", 0).Failure,
+            Is.EqualTo(ContractBindingFailure.ResultOutsideEnsures));
+    }
+
+    [Test]
+    public void ThisConstructorInitializerIntrinsicsFailClosed()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public class Base {
+                protected Base(long value) { }
+            }
+            public sealed class Target : Base {
+                public Target() : this(Contract.Old(1L), true) { }
+                private Target(long value, bool marker) : base(value) { }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.BindConstructor("Target", 0).Failure,
+            Is.EqualTo(ContractBindingFailure.OldOutsideEnsures));
+    }
+
+    [Test]
     public void TypeCompanionDoesNotHijackConstructorClosedContracts()
     {
         const string source =
@@ -1812,6 +1853,18 @@ public sealed class ContractBinderTests
                        throw new InvalidOperationException(typeName);
             var constructor = type.InstanceConstructors.Single(
                 static method => !method.IsImplicitlyDeclared);
+            return _binder.Bind(constructor);
+        }
+
+        internal ContractBindingResult BindConstructor(
+            string typeName,
+            int parameterCount)
+        {
+            var type = Compilation.GetTypeByMetadataName(typeName) ??
+                       throw new InvalidOperationException(typeName);
+            var constructor = type.InstanceConstructors.Single(
+                method => !method.IsImplicitlyDeclared &&
+                    method.Parameters.Length == parameterCount);
             return _binder.Bind(constructor);
         }
 

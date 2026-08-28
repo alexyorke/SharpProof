@@ -2,11 +2,12 @@ namespace SharpProof.Contracts;
 
 internal sealed class ContractIntrinsicValidator
 {
+    private readonly Compilation _compilation;
     private readonly ContractApiSymbols? _api;
     internal ContractIntrinsicValidator(Compilation compilation)
     {
-        _api = ContractApiSymbols.TryCreate(
-            ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
+        _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        _api = ContractApiSymbols.TryCreate(_compilation);
     }
 
     internal ImmutableArray<ContractIntrinsicViolation> Validate(
@@ -20,30 +21,66 @@ internal sealed class ContractIntrinsicValidator
         }
 
         var violations = ImmutableArray.CreateBuilder<ContractIntrinsicViolation>();
-        foreach (var invocation in body.DescendantsAndSelf().OfType<IInvocationOperation>()
-                     .OrderBy(static value => value.Syntax.SpanStart))
+        foreach (var root in GetRoots(callable, body))
         {
-            var isResult = _api.IsResult(invocation.TargetMethod);
-            if (!isResult && !_api.IsOld(invocation.TargetMethod))
+            foreach (var invocation in root.DescendantsAndSelf()
+                         .OfType<IInvocationOperation>()
+                         .OrderBy(static value => value.Syntax.SpanStart))
             {
-                continue;
-            }
+                var isResult = _api.IsResult(invocation.TargetMethod);
+                if (!isResult && !_api.IsOld(invocation.TargetMethod))
+                {
+                    continue;
+                }
 
-            var owner = GetOwner(invocation);
-            if (owner == null || !includeNestedCallables &&
-                !SameCallable(owner, callable))
-            {
-                continue;
-            }
+                var owner = GetOwner(invocation);
+                if (owner == null || !includeNestedCallables &&
+                    !SameCallable(owner, callable))
+                {
+                    continue;
+                }
 
-            var context = GetContext(invocation, owner);
-            var failure = Classify(invocation, owner, context, isResult);
-            if (failure != ContractBindingFailure.None)
-            {
-                violations.Add(new(invocation, context.Clause, failure));
+                var context = GetContext(invocation, owner);
+                var failure = Classify(invocation, owner, context, isResult);
+                if (failure != ContractBindingFailure.None)
+                {
+                    violations.Add(new(invocation, context.Clause, failure));
+                }
             }
         }
         return violations.ToImmutable();
+    }
+
+    private IEnumerable<IOperation> GetRoots(IMethodSymbol callable, IOperation body)
+    {
+        yield return body;
+
+        if (callable.MethodKind != MethodKind.Constructor)
+        {
+            yield break;
+        }
+
+        foreach (var reference in callable.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax() is not ConstructorDeclarationSyntax
+                {
+                    Initializer: { } initializer
+                })
+            {
+                continue;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(_compilation, initializer.SyntaxTree);
+            var operation = model.GetOperation(initializer.ArgumentList) ??
+                model.GetOperation(initializer);
+            if (operation != null &&
+                (operation.Syntax.SyntaxTree != body.Syntax.SyntaxTree ||
+                 operation.Syntax.Span != body.Syntax.Span))
+            {
+                yield return operation;
+            }
+        }
     }
 
     private static ContractBindingFailure Classify(
