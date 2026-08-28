@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
@@ -41,6 +42,69 @@ public sealed class ProtocolModelSchemaTests
             Assert.That(WorkerProtocolVersions.Current, Is.EqualTo("11"));
             Assert.That(WorkerManifestVersions.Current, Is.EqualTo(4));
             Assert.That(WorkerCacheVersions.Current, Is.EqualTo(13));
+        }
+    }
+
+    [Test]
+    public async Task ProtocolModelGeneratorRejectsDuplicateProperties()
+    {
+        var repository = FindRepositoryRoot();
+        var schema = await File.ReadAllTextAsync(Path.Combine(
+            repository,
+            "SharpProof.Worker.Protocol",
+            "ProtocolModel.schema.json"));
+        schema = schema.Replace(
+            "\"schemaVersion\": 1,",
+            "\"schemaVersion\": 1,\n  \"schemaVersion\": 1,",
+            StringComparison.Ordinal);
+
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "protocol-model-schema-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var schemaPath = Path.Combine(directory, "schema.json");
+            var outputPath = Path.Combine(directory, "protocol.generated.cs");
+            var analyzerOutputPath = Path.Combine(directory, "effects.generated.cs");
+            await File.WriteAllTextAsync(schemaPath, schema);
+            var startInfo = new ProcessStartInfo("pwsh")
+            {
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            foreach (var argument in new[]
+            {
+                "-NoLogo",
+                "-NoProfile",
+                "-File",
+                Path.Combine(repository, "scripts", "Generate-ProtocolModel.ps1"),
+                "-SchemaPath",
+                schemaPath,
+                "-OutputPath",
+                outputPath,
+                "-AnalyzerOutputPath",
+                analyzerOutputPath
+            })
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(startInfo) ??
+                throw new InvalidOperationException("PowerShell did not start.");
+            var output = await process.StandardOutput.ReadToEndAsync();
+            output += await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            Assert.That(process.ExitCode, Is.Not.Zero, output);
+            Assert.That(output, Does.Contain("duplicate property 'schemaVersion'"));
+            Assert.That(File.Exists(outputPath), Is.False);
+            Assert.That(File.Exists(analyzerOutputPath), Is.False);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 
