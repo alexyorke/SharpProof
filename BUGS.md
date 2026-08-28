@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 579. [CONFIRMED] ICancelableTask exempts every helper from SPMETA003
-
-**Location**: SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs around
-lines 317-339.
-
-**Description**: The cancellation-translation exemption checks only whether a
-method's containing type implements ICancelableTask. It does not restrict the
-exemption to the actual ITask.Execute protocol boundary.
-
-**Reproduction**: A real Execute translation emitted zero diagnostics, as
-intended. A private static helper in the same task type swallowed
-OperationCanceledException and also emitted zero, while the identical helper on
-an unrelated type emitted one Error-level SPMETA003.
-
-**Impact**: Private, static, or asynchronous helpers in shipped MSBuild tasks can
-turn cancellation into ordinary success without the soundness boundary noticing.
-
-**Recommended fix**: Exempt only the exact instance bool Execute()
-implementation/override of Microsoft.Build.Framework.ITask.Execute. Test Execute,
-static/instance helpers, Cancel, unrelated Execute, and immediate bare rethrow.
-
 ### 580. [CONFIRMED] Counterexample replay discards DAG memoization between assumptions
 
 **Location**: SharpProof.Verify/ProofKernel.cs around lines 79-91;
