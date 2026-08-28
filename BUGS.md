@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 567. [CONFIRMED] Contradictory entry proof is discarded at the query-budget boundary
-
-**Location**: SharpProof.Worker/CallableEntryFeasibility.cs around lines 115-152;
-CallableVerifier.cs around lines 91-102, 145-160, 223-237, and 254-276.
-
-**Description**: Entry analysis can spend the final query proving preconditions
-contradictory. CallableVerifier then requires another postcondition query and
-returns Unknown(ResourceLimit), although contradiction already proves every
-postcondition vacuously. Effects short-circuit correctly.
-
-**Reproduction**: With method limit one, the backend was called once, entry was
-Contradictory, and outcome became Unknown/ResourceLimit. Limit two made a
-redundant second call and returned Proven/ContradictoryPreconditions.
-
-**Impact**: A conclusive proof is downgraded, strict builds fail, and effect and
-postcondition claims disagree for identical entry evidence.
-
-**Recommended fix**: After claim alignment, immediately assemble all
-postconditions as proven vacuity with the entry core and used assumptions. Test
-one-call multiple Ensures and a feasible-entry resource-limit control.
-
 ### 568. [CONFIRMED] Conditional assignments write a flow-capture temporary instead of the lvalue
 
 **Location**: SharpProof.Frontend/RoslynProgramLowerer.cs around lines 197-220;
