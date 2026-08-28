@@ -203,48 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 527. [CONFIRMED] Changed-TCB coverage accepts HEAD as its own comparison baseline
-
-**Location**: scripts/Test-SharpProofCoverage.ps1, comparison resolution around
-lines 110-157, diff around lines 649-676, zero-line scoring around lines 814-840,
-and overall pass around lines 844-869; orchestration in
-scripts/Invoke-SharpProofContainer.ps1 around lines 256-296.
-
-**Description**: The resolver rejects textual `HEAD` and `@` but accepts the
-exact current 40/64-hex commit without requiring it to precede HEAD. Three-dot
-diff against the same commit is empty; zero coverable changed lines are assigned
-100%, feeding a passed coverage receipt.
-
-**Reproduction**: A two-commit canonical fixture changed one trusted, uncovered
-line. With the real ancestor SHA, changed files=1, coverable=1, percent=0, pass
-false. With exact HEAD SHA:
-
-    ChangedFiles=0 CoverableLines=0 LinePercent=100.0
-    SummaryPassed=true CoverageExit=0
-    ReceiptStatus=passed ReceiptGate=coverage
-
-The receipt was exact-commit and hashed the passing summary.
-
-**Impact**: A stale or miswired baseline can certify 100% changed trusted-code
-coverage while examining none of the release/PR delta. Aggregate floors remain,
-but the dedicated changed-TCB guarantee and release matrix row false-green.
-
-**Root cause**: Durable commit identity is mistaken for a valid temporal/
-topological baseline; equality/descendant checks are absent.
-
-**Recommended fix**: Resolve HEAD and merge-base once. Reject comparison equal
-to HEAD or any comparison whose merge-base is HEAD; for release require a strict
-ancestor and bind the chosen tag/baseline tuple into evidence. Reuse the
-validated merge-base for diff.
-
-**Regression coverage**: Exact ancestor with uncovered change fails coverage;
-exact HEAD and descendant refs fail validation rather than yield 100%; valid
-divergent/base semantics remain. Orchestration must not mint a receipt from a
-HEAD comparison SHA.
-
-**Confidence**: High; canonical A/B execution turned the same uncovered change
-from failed 0% to passed 100% solely by supplying current HEAD's hex identity.
-
 ### 530. [CONFIRMED] Explicit Requires calls in nested blocks are marked unreplayable
 
 **Location**: SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs around lines

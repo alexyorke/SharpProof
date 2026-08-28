@@ -233,6 +233,23 @@ $comparisonCommit = if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
 else {
     Resolve-DurableComparisonCommit -Reference $ComparisonRef
 }
+$comparisonMergeBase = ''
+if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
+    $headCommit = (Invoke-GitText `
+        -Arguments @('rev-parse', '--verify', 'HEAD^{commit}') `
+        -FailureMessage 'Could not resolve HEAD as one exact commit.').Trim()
+    $comparisonMergeBase = (Invoke-GitText `
+        -Arguments @('merge-base', $comparisonCommit, $headCommit) `
+        -FailureMessage (
+            "Could not resolve the merge base for comparison ref '$ComparisonRef'.")).Trim()
+    if ([string]::IsNullOrWhiteSpace($comparisonMergeBase) -or
+        $comparisonCommit -ceq $headCommit -or
+        $comparisonMergeBase -cne $comparisonCommit) {
+        throw (
+            "ComparisonRef '$ComparisonRef' must resolve to a strict ancestor " +
+            'of HEAD.')
+    }
+}
 
 $coverageAuthorityPath = Join-Path `
     $resolvedCoverageRoot `
@@ -646,20 +663,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
             throw "Declaration-only TCB coverage path is not canonical: '$declarationOnlyPath'."
         }
     }
-    $diffTarget = "$comparisonCommit...HEAD"
-    if ($IncludeWorkingTree) {
-        $mergeBaseOutput = Invoke-GitText `
-            -Arguments @('merge-base', $comparisonCommit, 'HEAD') `
-            -FailureMessage (
-                "Could not resolve the merge base for comparison ref '$ComparisonRef'.")
-        $mergeBase = $mergeBaseOutput.Trim()
-        if ([string]::IsNullOrWhiteSpace($mergeBase) -or
-            $mergeBase.Contains("`n") -or
-            $mergeBase.Contains("`r")) {
-            throw "Could not resolve the merge base for comparison ref '$ComparisonRef'."
-        }
-        $diffTarget = $mergeBase
-    }
+    $diffTarget = $comparisonMergeBase
     $changedTcbFiles = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
     $changedFileArguments = @(

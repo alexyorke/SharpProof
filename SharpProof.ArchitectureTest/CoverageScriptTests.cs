@@ -87,6 +87,33 @@ public sealed class CoverageScriptTests
     }
 
     [Test]
+    public async Task ExactHeadComparisonFailsClosed()
+    {
+        var repository = await CreateMultiCommitFixtureAsync();
+        try
+        {
+            var head = (await AssertSuccessAsync(RunAsync(
+                repository,
+                "git",
+                "rev-parse",
+                "HEAD"))).Output.Trim();
+            var result = await RunCoverageAsync(
+                repository,
+                comparisonRef: head,
+                reportOnly: true);
+
+            Assert.That(result.ExitCode, Is.Not.Zero);
+            Assert.That(
+                result.Output + result.Error,
+                Does.Contain("strict ancestor"));
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    [Test]
     public async Task MissingAndUnusableComparisonAuthoritiesFailClosed()
     {
         var repository = await CreateSingleCommitFixtureAsync();
