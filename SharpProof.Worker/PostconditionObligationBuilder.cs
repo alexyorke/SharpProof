@@ -9,7 +9,8 @@ internal static class PostconditionObligationBuilder
         ImmutableDictionary<IrVarId, SpecResultProjection> projections,
         ImmutableArray<Assumption>.Builder assumptions,
         ImmutableArray<Assumption>.Builder entryDomainAssumptions,
-        Dictionary<ProofJustification, string> assumptionLabels)
+        Dictionary<ProofJustification, string> assumptionLabels,
+        Dictionary<ProofJustification, string> userAssumptionIds)
     {
         var seenPredicates = assumptions.Select(static assumption => assumption.Predicate.Id).ToHashSet();
         foreach (var variable in variables
@@ -50,7 +51,13 @@ internal static class PostconditionObligationBuilder
 
         void AddDomainAssumption(IrTerm predicate, CompilerCanonicalVariable variable)
         {
-            if (predicate is IrBooleanTerm { Value: true } || !seenPredicates.Add(predicate.Id))
+            if (predicate is IrBooleanTerm { Value: true })
+            {
+                return;
+            }
+
+            if (!seenPredicates.Add(predicate.Id) &&
+                !ReplaceUserAssumptions(predicate.Id))
             {
                 return;
             }
@@ -67,6 +74,27 @@ internal static class PostconditionObligationBuilder
                 entryDomainAssumptions.Add(assumption);
             }
             assumptionLabels.Add(justification, label);
+        }
+
+        bool ReplaceUserAssumptions(IrId predicateId)
+        {
+            var replaced = false;
+            for (var index = assumptions.Count - 1; index >= 0; index--)
+            {
+                var existing = assumptions[index];
+                if (existing.Predicate.Id != predicateId ||
+                    existing.Justification is not UserAssumedJustification)
+                {
+                    continue;
+                }
+
+                assumptions.RemoveAt(index);
+                assumptionLabels.Remove(existing.Justification);
+                userAssumptionIds.Remove(existing.Justification);
+                replaced = true;
+            }
+
+            return replaced;
         }
     }
 

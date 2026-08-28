@@ -157,7 +157,8 @@ internal static class CallableEvidenceBuilder
                 body.SpecResultProjections,
                 assumptions,
                 entryDomainAssumptions,
-                labels))
+                labels,
+                userAssumptionIds))
         {
             return CallableEvidenceBuildResult.Fail(
                 WorkerClaimReason.UnsupportedExpression);

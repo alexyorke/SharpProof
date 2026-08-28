@@ -2084,6 +2084,40 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task RedundantUserAssumptionKeepsSourceDomainProvenance()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static byte Identity(byte value) {
+                    Contract.Assume(
+                        value >= byte.MinValue && value <= byte.MaxValue);
+                    Contract.Ensures(
+                        Contract.Result<byte>() >= byte.MinValue &&
+                        Contract.Result<byte>() <= byte.MaxValue);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var backend = new CapturingBackend(
+            BackendCheckResult.Unsatisfiable([0]));
+        using var worker = new SharpProofWorker(backend);
+
+        var response = await worker.VerifyAsync(request);
+
+        var record = response.ClaimResults.Single();
+        Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+        Assert.That(record.ProofCore, Does.Contain("domain:parameter:0"));
+        Assert.That(record.ProofCore, Does.Not.Contain("assume:0"));
+        Assert.That(
+            record.Assumptions!.Single(static assumption =>
+                assumption.Kind == WorkerAssumptionKind.UserAssume).Used,
+            Is.False);
+    }
+
+    [Test]
     public async Task ContradictoryLiteralPreconditionIsExplicitVacuityEvidence()
     {
         using var project = TestProject.Create(
