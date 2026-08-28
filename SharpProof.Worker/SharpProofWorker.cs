@@ -9,6 +9,7 @@ public sealed class SharpProofWorker : IDisposable
     private readonly ISmtBackend? _backend;
     private readonly Func<ISmtBackend>? _backendFactory;
     private readonly Func<long>? _readConsumedResourceCount;
+    private readonly long? _creationQueryRlimit;
     private bool _disposed;
     public SharpProofWorker(ISmtBackend backend) : this(
         backend, backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null)
@@ -20,22 +21,27 @@ public sealed class SharpProofWorker : IDisposable
         _backend = backend;
         _readConsumedResourceCount = readConsumedResourceCount;
     }
-    internal SharpProofWorker(Func<ISmtBackend> backendFactory)
+    internal SharpProofWorker(
+        Func<ISmtBackend> backendFactory,
+        long? creationQueryRlimit = null)
     {
         ArgumentNullException.ThrowIfNull(backendFactory);
         _backendFactory = backendFactory;
+        _creationQueryRlimit = creationQueryRlimit;
     }
     public static SharpProofWorker Create(WorkerBudgets budgets)
     {
         ArgumentNullException.ThrowIfNull(budgets);
+        var queryRlimit = budgets.QueryRlimit;
         return new SharpProofWorker(
             () =>
             {
                 ContainerNativeLibrary.InstallZ3ResolverRequired(
                     typeof(Microsoft.Z3.Context).Assembly);
                 return new IrSmtBackend(
-                    new IrSmtBackendOptions(budgets.QueryRlimit));
-            });
+                    new IrSmtBackendOptions(queryRlimit));
+            },
+            queryRlimit);
     }
     public async Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request, CancellationToken cancellationToken = default)
@@ -47,6 +53,18 @@ public sealed class SharpProofWorker : IDisposable
         if (!validation.IsValid)
         {
             return Failure(string.Empty, WorkerRunFailureReason.InvalidRequest, new WorkerBudgets(), started, validation.Errors);
+        }
+        if (_creationQueryRlimit is { } creationQueryRlimit &&
+            request.Budgets.QueryRlimit != creationQueryRlimit)
+        {
+            return Failure(
+                string.Empty,
+                WorkerRunFailureReason.InvalidRequest,
+                new WorkerBudgets(),
+                started,
+                Error(
+                    "budgets.query_rlimit",
+                    "The request QueryRlimit does not match the worker creation authority."));
         }
 
         const int CallerCancellation = 1;

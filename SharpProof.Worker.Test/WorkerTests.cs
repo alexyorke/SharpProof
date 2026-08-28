@@ -177,6 +177,30 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task WorkerCreationSnapshotsQueryRlimitAuthority()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var creationBudgets = new WorkerBudgets { QueryRlimit = 11 };
+        using var worker = SharpProofWorker.Create(creationBudgets);
+        creationBudgets.QueryRlimit = 17;
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.QueryRlimit = 17;
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("budgets.query_rlimit"));
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+    }
+
+    [Test]
     public async Task ClosedCompilerManifestDoesNotRereadChangedSourceFiles()
     {
         using var project = TestProject.Create(TautologySource);

@@ -203,48 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 531. [CONFIRMED] Worker creation and request verification use different QueryRlimit authorities
-
-**Location**: SharpProof.Worker/SharpProofWorker.cs around lines 28-38;
-request accounting in CallableVerificationPolicy.cs around lines 27-30; actual
-solver option in SharpProof.Smt/IrSmtBackend.cs around lines 108-115; hashed
-request identity in CompilerManifestArtifact.cs around lines 24-36.
-
-**Description**: SharpProofWorker.Create closes over the caller-supplied mutable
-budgets DTO and reads its QueryRlimit later when a backend is created.
-VerifyAsync accepts requests with a separate budgets object and never binds or
-compares the two. Accounting and input/cache identity use the request value,
-while Z3 enforces the captured creation value.
-
-**Reproduction**:
-
-    distinct.creationQueryRlimit=11
-    distinct.requestQueryRlimit=29
-    distinct.factoryBackendQueryRlimit=11
-    distinct.mismatch=True
-    mutation.valueAtCreate=11
-    mutation.valueBeforeLaneCreation=17
-    mutation.factoryBackendQueryRlimit=17
-    mutation.deferredCapture=True
-
-**Impact**: Z3 can abstain prematurely under a hidden smaller cap or accept and
-cache a proof/refutation after work exceeds the request's attested cap. Response
-and cache identity still claim the request value.
-
-**Root cause**: Two unsynchronized configuration authorities plus a deferred
-closure over mutable request-shaped data.
-
-**Recommended fix**: Make backend creation request-scoped and pass the validated
-current QueryRlimit, or snapshot the creation limit and reject every mismatched
-request explicitly. Never retain a mutable DTO as long-lived configuration.
-
-**Regression coverage**: Create with A and verify request B, then mutate A after
-Create. Require backend option B or an explicit invalid-request result, and
-assert enforced limit equals response/hash budget.
-
-**Confidence**: High; the exact factory read two values different from both its
-creation-time and verified-request authorities.
-
 ### 533. [CONFIRMED] Matching timeout/cancel errors legitimize completed proven responses
 
 **Location**: SharpProof.Worker.Protocol/WorkerResultAssembler.cs,
