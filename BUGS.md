@@ -122,54 +122,6 @@ SharpProof.Armed/1 record.
 **Confidence**: High; the agent traced every lifecycle edge and reproduced the
 underlying setsid behavior in the canonical environment.
 
-### 440. [CONFIRMED] SPMETA010 misses semantic-cache writes through tuple deconstruction aliases
-
-**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
-lines 61-88 and 115-122.
-
-**Description**: Deconstruction analysis recurses element-by-element only when
-both the assignment target and right-hand side are ITupleOperation. When the
-right-hand side is a tuple-typed local reference or an invocation, the rule
-falls through with the whole tuple target. AnalyzeAssignmentTarget recognizes
-only property and field targets, so it never identifies the semantic-cache
-element inside the tuple.
-
-**Reproduction**: Assign a tuple containing Answer.TimedOut through either a
-local alias or factory:
-
-    (cache.Latest, stamp) = pair;
-    (cache.Latest, stamp) = Create();
-
-The receiver is ProofCache : ISemanticCache and Latest has the recognized
-SharpProof.Verify.Answer type. The canonical exact-source probe reported:
-
-    INLINE_TUPLE_CONTROL_SPMETA010_COUNT=1
-    LOCAL_TUPLE_ALIAS_SPMETA010_COUNT=0
-    FACTORY_TUPLE_ALIAS_SPMETA010_COUNT=0
-
-Compiler error counts were zero in all three cases. The inline tuple control
-proves the rule and vocabulary were active.
-
-**Impact**: A transient or abstaining answer can be stored in a semantic cache
-with no SPMETA010 by introducing a tuple local or tuple-returning factory. This
-is independent of the local reaching-write defect and survives a fix to the
-answer vocabulary.
-
-**Root cause**: Tuple target decomposition is coupled to one syntactic shape of
-the source value instead of the target's conversion/deconstruction mapping.
-
-**Recommended fix**: Decompose tuple targets regardless of whether the source
-is an inline tuple. Map source tuple elements through conversions, locals, and
-invocation return types; when an element value cannot be resolved, conservatively
-classify recognized semantic-answer storage as potentially noncacheable.
-
-**Regression coverage**: Add inline tuple, tuple-local alias, and factory-return
-cases with the same Answer.TimedOut element. Require one SPMETA010 for every
-unsafe cache property target and retain a fully cacheable tuple control.
-
-**Confidence**: High; self-verified in a canonical exact-source probe with
-positive inline and negative alias/factory controls.
-
 ### 450. [CONFIRMED] Compiler-synthesized record members omit executable base calls from Requires analysis
 
 **Location**: SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around
