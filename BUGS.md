@@ -2619,28 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 600. [CONFIRMED] Expanded params arrays are discarded before Requires evaluation
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
-lines 642-669 (`GetArgument`).
-
-**Description**: Roslyn represents an expanded `params` call as one implicit
-`IArrayCreationOperation`, but `GetArgument` returns null for
-`ArgumentKind.ParamArray`. Contracts over the array therefore become Unknown
-even when zero or several expanded elements create a definitely non-null array.
-
-**Reproduction**: Temp analyzer/runtime controls compared `MustBeNull()` and
-`MustBeNull(1, 2)` against explicit null and explicit non-null arrays. Expanded
-calls ran with non-null arrays but emitted no definite violation; explicit
-controls emitted SP0027.
-
-**Impact**: Definite call-site contract violations disappear solely because C#
-uses expanded `params` syntax.
-
-**Recommended fix**: Admit the implicit params aggregate, snapshot its array
-value, and preserve element evaluation/completion. Test zero/two elements,
-throwing elements, explicit null, and named/optional controls.
-
 ### 601. [CONFIRMED] Direct-break loops suppress diagnostics on later reachable calls
 
 **Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
@@ -2804,25 +2782,6 @@ returning an attributable validation error.
 **Recommended fix**: Add iterative structure/depth/node prevalidation and make
 validator, digest, and instantiation iterative or consistently bounded. Use a
 child-process boundary/over-limit regression.
-
-### 609. [CONFIRMED] Harmless array creation suppresses later SP0027 diagnostics
-
-**Location**: `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
-1842-1917 and 2501-2507; `RequiresCallSiteDiscovery.cs`, around lines 425-471.
-
-**Description**: Strict prefix completion lacks an `IArrayCreationOperation`
-arm even though the same class has a conservative direct-array predicate.
-
-**Reproduction**: Fixed-size, literal-initialized, and rectangular arrays all
-had Complete flow and `IsDirectArrayCreationComplete=True`, runtime reached the
-invalid call, but `CanReplay=False` and SP0027=0. Negative-length and throwing
-element controls did not reach it.
-
-**Impact**: An irrelevant safe allocation erases later definite violations.
-
-**Recommended fix**: Route `IArrayCreationOperation` through
-`IsDirectArrayCreationComplete`. Test safe forms and negative/nonconstant/
-throwing controls.
 
 ### 610. [CONFIRMED] Default self-application excludes Meta.Analyzers from itself
 
