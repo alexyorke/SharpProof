@@ -319,54 +319,6 @@ evidence; profile off should remain a successful control.
 **Confidence**: High; self-verified with executable canonical MSBuild target
 graphs and two controls that activate the existing rejection path.
 
-### 446. [CONFIRMED] SPMETA010 loses semantic-cache identity through ref and out storage aliases
-
-**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
-lines 108-129.
-
-**Description**: Assignment-target analysis recognizes only immediate field or
-property targets. A ref local that aliases a semantic-cache field appears as an
-ILocalReferenceOperation at the write, and an out helper writes through an
-IParameterReferenceOperation. Neither target is traced back to the cache
-storage.
-
-**Reproduction**:
-
-    ref var slot = ref cache.Latest;
-    slot = Answer.Unknown;
-
-and:
-
-    AssignUnknown(out cache.Latest);
-
-where ProofCache implements ISemanticCache and Latest has recognized
-SharpProof.Verify.Answer type. The exact-source probe reported:
-
-    DIRECT_FIELD_CONTROL_SPMETA010_COUNT=1
-    REF_LOCAL_ALIAS_SPMETA010_COUNT=0
-    OUT_ARGUMENT_ALIAS_SPMETA010_COUNT=0
-
-All compiler error counts were zero.
-
-**Impact**: Transient semantic answers can be written to marked cache storage
-without SPMETA010 by using standard ref aliases or out parameters. This is
-distinct from value-flow and tuple-deconstruction blind spots.
-
-**Root cause**: The rule resolves value aliases but not storage-location
-aliases.
-
-**Recommended fix**: Resolve ref local declarations and ref reassignments back
-to their underlying field/property storage before classifying writes.
-Supporting arbitrary out/ref helpers additionally needs a callee storage-write
-summary or a documented conservative policy for marked cache destinations.
-
-**Regression coverage**: Extend direct-field tests with ref-local Unknown and
-Proven controls. Add the out-helper case if interprocedural storage writes are
-within the rule's contract, plus ref reassignment and ref-return controls.
-
-**Confidence**: High; exact-source canonical probe included direct, ref-local,
-and out-argument cases with compiler-clean inputs.
-
 ### 447. [CONFIRMED] Scalar-semantics generation accepts duplicate semantic properties
 
 **Location**: scripts/Generate-CSharpScalarSemantics.ps1 around line 195;
