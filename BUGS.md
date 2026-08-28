@@ -14,55 +14,6 @@ The following non-security findings were reproduced by their reporting agents
 before being added here. No production, test, build, or configuration changes
 are included in this audit-only wave.
 
-### 437. [CONFIRMED] The verifier supervisor outlives an abruptly terminated MSBuild host
-
-**Location**: SharpProof.BuildTasks/RunVerifier.cs around lines 205-225 and
-269-271; SharpProof.BuildTasks/VerifierProcessSupervisor.cs around lines 77-91
-and 140-143; contrast with worker-only parent protection in
-SharpProof.Host/LinuxWorkerProcess.cs around lines 146-166.
-
-**Description**: RunVerifier starts the supervisor under setsid but passes no
-expected parent PID. After sending the nonce gate it deliberately closes
-stdin, so later pipe EOF cannot represent MSBuild host death. The supervisor
-handles explicit SIGTERM and SIGINT, then waits for its direct child
-indefinitely. It neither installs PR_SET_PDEATHSIG nor checks getppid. Existing
-parent-death protection covers the worker when the launcher dies, not the full
-supervisor tree when MSBuild itself disappears.
-
-**Reproduction evidence**: A bounded canonical Linux lifecycle probe launched
-setsid sleep 15 from a short-lived parent shell. After the parent exited, the
-child remained alive:
-
-    setsid_child_survived_parent_exit=1
-
-This confirms that setsid supplies session isolation rather than
-parent-lifetime coupling, matching the supervisor's source path.
-
-**Impact**: An MSBuild crash, OOM, or forced termination can leave the
-supervisor, wrapper, launcher, and worker alive. They may continue consuming
-CPU and memory for the remaining project budget, or longer if the launcher
-wedges, after the owning build no longer exists.
-
-**Root cause**: The containment protocol authenticates and cleans descendants
-after task-directed termination but has no authenticated parent-liveness
-contract for abrupt host death.
-
-**Recommended fix**: Pass Environment.ProcessId to the supervisor separately
-from verifier arguments. Before arming, install prctl(PR_SET_PDEATHSIG,
-SIGTERM), register termination handling, then verify getppid still equals the
-supplied expected parent to close the setup race. If the parent is already
-gone, enter the existing cancellation/descendant-cleanup path without spawning
-the verifier child.
-
-**Regression coverage**: Add a Linux integration fixture whose short-lived
-parent arms a supervisor around a long-running helper, records supervisor and
-descendant PIDs, and exits abruptly. Require both PIDs to disappear within the
-cleanup bound. Add a parent-already-gone race case expecting exit 125 and no
-SharpProof.Armed/1 record.
-
-**Confidence**: High; the agent traced every lifecycle edge and reproduced the
-underlying setsid behavior in the canonical environment.
-
 ### 450. [CONFIRMED] Compiler-synthesized record members omit executable base calls from Requires analysis
 
 **Location**: SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs around

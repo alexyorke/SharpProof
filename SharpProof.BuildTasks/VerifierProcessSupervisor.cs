@@ -12,8 +12,10 @@ internal static partial class VerifierProcessSupervisor
     private const int PidFdOpenSystemCall = 434;
     private const int PidFdSendSignalSystemCall = 424;
     private const int SignalKill = 9;
+    private const int SignalTerminate = 15;
     private const int SignalNone = 0;
     private const int SignalStop = 19;
+    private const int ParentDeathSignal = 1;
     private const int ProcessNotFound = 3;
     private const string StartMessage = "SharpProof.Start/1";
     private const string ArmedMessage = "SharpProof.Armed/1";
@@ -32,7 +34,20 @@ internal static partial class VerifierProcessSupervisor
         set;
     }
 
+    internal static Func<int, bool>? ParentDeathBoundaryOverrideForTest
+    {
+        get;
+        set;
+    }
+
     internal static int Run(string[] command)
+    {
+        return Run(command, expectedParentProcessId: null);
+    }
+
+    internal static int Run(
+        string[] command,
+        int? expectedParentProcessId)
     {
         if (!OperatingSystem.IsLinux() ||
             RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
@@ -42,6 +57,11 @@ internal static partial class VerifierProcessSupervisor
                 0,
                 0,
                 0) != 0)
+        {
+            return 125;
+        }
+        if (expectedParentProcessId is { } parentProcessId &&
+            !EnterParentDeathBoundary(parentProcessId))
         {
             return 125;
         }
@@ -194,6 +214,25 @@ internal static partial class VerifierProcessSupervisor
     {
         return nonce.Length == 64 && nonce.All(static character =>
             character is >= '0' and <= '9' or >= 'A' and <= 'F');
+    }
+
+    private static bool EnterParentDeathBoundary(int expectedParentProcessId)
+    {
+        if (ParentDeathBoundaryOverrideForTest is { } overrideForTest)
+        {
+            return overrideForTest(expectedParentProcessId);
+        }
+        if (expectedParentProcessId < 1 ||
+            NativeMethods.ControlProcess(
+                ParentDeathSignal,
+                SignalTerminate,
+                0,
+                0,
+                0) != 0)
+        {
+            return false;
+        }
+        return NativeMethods.GetParentProcessId() == expectedParentProcessId;
     }
 
     private static DescendantStopResult StopDescendantsForRun(
@@ -519,6 +558,10 @@ internal static partial class VerifierProcessSupervisor
         [LibraryImport("libc", EntryPoint = "close", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int Close(int descriptor);
+
+        [LibraryImport("libc", EntryPoint = "getppid")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int GetParentProcessId();
 
         [LibraryImport("libc", EntryPoint = "prctl", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]

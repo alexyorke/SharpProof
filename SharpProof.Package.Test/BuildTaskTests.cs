@@ -133,6 +133,132 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void SupervisorParentBoundaryStopsTheVerifierWhenItsOwnerDies()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-supervisor-parent-death-");
+        Process? owner = null;
+        var supervisorId = 0;
+        var childId = 0;
+        try
+        {
+            var ownerPidPath = Path.Combine(directory.FullName, "owner.pid");
+            var supervisorPidPath = Path.Combine(
+                directory.FullName,
+                "supervisor.pid");
+            var childPidPath = Path.Combine(directory.FullName, "child.pid");
+            var childDirectory = Directory.CreateDirectory(
+                Path.Combine(directory.FullName, "child"));
+            var child = CreateTimedProcessAssembly(
+                childDirectory.FullName,
+                "System.IO.File.WriteAllText(" +
+                CSharpStringLiteral(childPidPath) +
+                ", System.Environment.ProcessId.ToString()); " +
+                "System.Threading.Thread.Sleep(30000);");
+            var supervisorAssembly =
+                typeof(VerifierProcessSupervisor).Assembly.Location;
+            var dotnet = Environment.GetEnvironmentVariable(
+                "DOTNET_HOST_PATH") ?? "dotnet";
+            var ownerSource =
+                "using System; using System.Diagnostics; using System.IO; using System.Threading; " +
+                "File.WriteAllText(" + CSharpStringLiteral(ownerPidPath) +
+                ", Environment.ProcessId.ToString()); " +
+                "var start = new ProcessStartInfo(" +
+                CSharpStringLiteral(dotnet) + "); " +
+                "start.ArgumentList.Add(" +
+                CSharpStringLiteral(supervisorAssembly) + "); " +
+                "start.ArgumentList.Add(\"--supervise-verifier\"); " +
+                "start.ArgumentList.Add(\"--supervisor-parent-pid\"); " +
+                "start.ArgumentList.Add(Environment.ProcessId.ToString()); " +
+                "start.ArgumentList.Add(" + CSharpStringLiteral(dotnet) +
+                "); start.ArgumentList.Add(" + CSharpStringLiteral(child) +
+                "); start.UseShellExecute = false; " +
+                "start.RedirectStandardInput = true; " +
+                "var supervisor = Process.Start(start)!; " +
+                "File.WriteAllText(" +
+                CSharpStringLiteral(supervisorPidPath) +
+                ", supervisor.Id.ToString()); " +
+                "supervisor.StandardInput.WriteLine(\"SharpProof.Start/1 " +
+                CreateSupervisorNonceLiteral() +
+                "\"); supervisor.StandardInput.Close(); " +
+                "Thread.Sleep(30000);";
+            var ownerAssembly = CreateTimedProcessAssembly(
+                directory.FullName,
+                ownerSource);
+            owner = Process.Start(new ProcessStartInfo
+            {
+                FileName = dotnet,
+                WorkingDirectory = directory.FullName,
+                UseShellExecute = false,
+                ArgumentList = { ownerAssembly }
+            });
+            Assert.That(owner, Is.Not.Null);
+
+            var ready = SpinWait.SpinUntil(
+                () => TryReadProcessId(supervisorPidPath, out _) &&
+                    TryReadProcessId(childPidPath, out _),
+                TimeSpan.FromSeconds(5));
+            if (!ready)
+            {
+                var ownerState = owner!.HasExited
+                    ? "owner exited with " + owner.ExitCode
+                    : "owner is still running";
+                Assert.Fail(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Supervisor fixture did not start ({0}). Owner PID: {1}",
+                    ownerState,
+                    File.Exists(ownerPidPath)
+                        ? File.ReadAllText(ownerPidPath)
+                        : "missing"));
+            }
+            Assert.That(
+                TryReadProcessId(supervisorPidPath, out supervisorId),
+                Is.True);
+            Assert.That(
+                TryReadProcessId(childPidPath, out childId),
+                Is.True);
+            owner!.Kill(entireProcessTree: false);
+            owner.WaitForExit();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    SpinWait.SpinUntil(
+                        () => !IsProcessRunning(supervisorId),
+                        TimeSpan.FromSeconds(5)),
+                    Is.True,
+                    "The supervisor survived owner termination.");
+                Assert.That(
+                    SpinWait.SpinUntil(
+                        () => !IsProcessRunning(childId),
+                        TimeSpan.FromSeconds(5)),
+                    Is.True,
+                    "The verifier child survived owner termination.");
+            }
+        }
+        finally
+        {
+            if (owner is { HasExited: false })
+            {
+                owner.Kill(entireProcessTree: false);
+                owner.WaitForExit();
+            }
+            if (supervisorId > 0 && IsProcessRunning(supervisorId))
+            {
+                Process.GetProcessById(supervisorId)
+                    .Kill(entireProcessTree: true);
+            }
+            if (childId > 0 && IsProcessRunning(childId))
+            {
+                Process.GetProcessById(childId)
+                    .Kill(entireProcessTree: true);
+            }
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void MissingCleanupReceiptInvokesContainmentFailureDecision()
     {
         var failure = string.Empty;
@@ -1873,6 +1999,17 @@ public sealed class BuildTaskTests
         return assemblyPath;
     }
 
+    private static string CSharpStringLiteral(string value)
+    {
+        return JsonSerializer.Serialize(value);
+    }
+
+    private static string CreateSupervisorNonceLiteral()
+    {
+        return "0123456789ABCDEF0123456789ABCDEF" +
+            "0123456789ABCDEF0123456789ABCDEF";
+    }
+
     private static bool IsProcessRunning(int processId)
     {
         try
@@ -1901,6 +2038,15 @@ public sealed class BuildTaskTests
         {
             return false;
         }
+    }
+
+    private static bool TryReadProcessId(string path, out int processId)
+    {
+        return int.TryParse(
+            File.Exists(path) ? File.ReadAllText(path) : null,
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out processId) && processId > 0;
     }
 
     [Platform("Linux")]
