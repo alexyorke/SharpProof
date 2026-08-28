@@ -3054,28 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 641. [CONFIRMED] Function-pointer overloads collide in compiler identity
-
-**Location**: `SharpProof.Frontend/CompilerIdentityBridge.cs`, around lines
-146-194; `SharpProof.Effects/EffectValues.cs`, around lines 225-270.
-
-**Description**: Documentation IDs omit function-pointer parameter structure,
-and the fallback display identity does too. Overloads that differ only by
-`delegate*` signature therefore compare equal and become order-dependent.
-
-**Reproduction**: `Pick(delegate*<int, void>)` and
-`Pick(delegate*<string, void>)` both produced `M:Subject.Pick()` and identical
-fallback text; metadata comparison returned zero despite distinct interned
-types. Anonymous structural types have the same fallback weakness.
-
-**Impact**: Deterministic ordering, hashing, and identity-based evidence can
-collapse distinct legal compiler symbols.
-
-**Recommended fix**: Add a stable structural encoder for doc-ID-inexpressible
-types, including function-pointer calling convention, return/ref shape,
-parameters/ref kinds, and anonymous ordered properties. Test overload order and
-round-trip stability.
-
 ### 642. [CONFIRMED] Invalid Ensures or Assume placement poisons BindRequires
 
 **Location**: `SharpProof.Contracts/EffectiveContractSourceResolver.cs`, around
