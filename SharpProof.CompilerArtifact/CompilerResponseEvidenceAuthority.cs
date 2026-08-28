@@ -11,6 +11,20 @@ internal sealed class CompilerResponseEvidenceAuthority :
 {
     private readonly ImmutableArray<CompilerCallablePreparation> _targets;
 
+    private sealed class TargetClaimIndexes
+    {
+        internal Dictionary<string, CompilerEffectClaimArtifact> Effects { get; } =
+            new(StringComparer.Ordinal);
+        internal Dictionary<string, CompilerPreparedClause> Postconditions { get; } =
+            new(StringComparer.Ordinal);
+        internal Dictionary<string, string> AssumptionIdsByLabel { get; } =
+            new(StringComparer.Ordinal);
+        internal HashSet<string> AllLabels { get; } =
+            new(StringComparer.Ordinal);
+        internal HashSet<string> EntryLabels { get; } =
+            new(StringComparer.Ordinal);
+    }
+
     internal CompilerResponseEvidenceAuthority(
         ImmutableArray<CompilerCallablePreparation> targets)
     {
@@ -61,6 +75,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 continue;
             }
 
+            var indexes = BuildTargetClaimIndexes(target, errors);
             ValidateCallableAssumptions(target, callable, errors);
             if (target.Entry.ClaimIds.Length == 0)
             {
@@ -70,12 +85,69 @@ internal sealed class CompilerResponseEvidenceAuthority :
             {
                 if (claims.TryGetValue(claimId, out var claim))
                 {
-                    ValidateClaim(target, claim, errors);
+                    ValidateClaim(target, claim, indexes, errors);
                 }
             }
         }
 
         return errors.OrderBy(static code => code, StringComparer.Ordinal);
+    }
+
+    private static TargetClaimIndexes BuildTargetClaimIndexes(
+        CompilerCallablePreparation target,
+        HashSet<string> errors)
+    {
+        var indexes = new TargetClaimIndexes();
+        foreach (var evidence in target.EffectClaims)
+        {
+            if (evidence == null || string.IsNullOrWhiteSpace(evidence.ClaimId) ||
+                indexes.Effects.ContainsKey(evidence.ClaimId))
+            {
+                errors.Add("response.evidence_authority");
+                continue;
+            }
+
+            indexes.Effects.Add(evidence.ClaimId, evidence);
+        }
+
+        foreach (var clause in target.Clauses.Where(static clause =>
+                     clause.Kind == CompilerContractKind.Ensures))
+        {
+            if (string.IsNullOrWhiteSpace(clause.ClaimId) ||
+                indexes.Postconditions.ContainsKey(clause.ClaimId!))
+            {
+                errors.Add("response.evidence_authority");
+                continue;
+            }
+
+            indexes.Postconditions.Add(clause.ClaimId!, clause);
+        }
+
+        var labels = ClauseLabels(target);
+        foreach (var (label, clause) in labels)
+        {
+            if (clause.AssumptionId != null &&
+                clause.Kind is CompilerContractKind.Requires or
+                    CompilerContractKind.Assume)
+            {
+                if (!indexes.AssumptionIdsByLabel.ContainsKey(label))
+                {
+                    indexes.AssumptionIdsByLabel.Add(label, clause.AssumptionId);
+                }
+            }
+        }
+
+        foreach (var label in AllLabels(target, labels))
+        {
+            indexes.AllLabels.Add(label);
+        }
+
+        foreach (var label in EntryLabels(target, labels))
+        {
+            indexes.EntryLabels.Add(label);
+        }
+
+        return indexes;
     }
 
     private static void ValidateClaimlessCallable(
@@ -114,19 +186,17 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static void ValidateClaim(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
+        TargetClaimIndexes indexes,
         HashSet<string> errors)
     {
         if (!target.IsSuccess)
         {
-            ValidateFailedTargetClaim(target, result, errors);
+            ValidateFailedTargetClaim(target, result, indexes, errors);
             return;
         }
 
-        var effect = target.EffectClaims.FirstOrDefault(
-            evidence => evidence.ClaimId == result.ClaimId);
-        var postcondition = target.Clauses.FirstOrDefault(
-            clause => clause.Kind == CompilerContractKind.Ensures &&
-                      clause.ClaimId == result.ClaimId);
+        indexes.Effects.TryGetValue(result.ClaimId, out var effect);
+        indexes.Postconditions.TryGetValue(result.ClaimId, out var postcondition);
         if (effect == null && postcondition == null ||
             effect != null && postcondition != null)
         {
@@ -137,19 +207,25 @@ internal sealed class CompilerResponseEvidenceAuthority :
         var expectedUsed = new HashSet<string>(StringComparer.Ordinal);
         if (result.Vacuity == WorkerVacuityKind.ContradictoryPreconditions)
         {
-            if (!HasAdmissibleEntryCore(target, result.ProofCore))
+            if (!HasAdmissibleEntryCore(indexes, result.ProofCore))
             {
                 errors.Add("response.vacuity_authority");
             }
 
             expectedUsed.UnionWith(
-                AssumptionIdsForCore(target, result.ProofCore, requiresOnly: true));
+                AssumptionIdsForCore(
+                    result.ProofCore,
+                    requiresOnly: true,
+                    indexes.AssumptionIdsByLabel));
         }
         else if (postcondition != null &&
                  result.Outcome == WorkerClaimOutcome.Proven)
         {
             expectedUsed.UnionWith(
-                AssumptionIdsForCore(target, result.ProofCore, requiresOnly: false));
+                AssumptionIdsForCore(
+                    result.ProofCore,
+                    requiresOnly: false,
+                    indexes.AssumptionIdsByLabel));
         }
 
         if (effect != null &&
@@ -171,21 +247,21 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
         if (effect != null)
         {
-            ValidateEffectClaim(target, effect, result, errors);
+            ValidateEffectClaim(target, effect, result, indexes, errors);
         }
         else
         {
-            ValidatePostconditionClaim(target, result, errors);
+            ValidatePostconditionClaim(target, result, postcondition!, indexes, errors);
         }
     }
 
     private static void ValidateFailedTargetClaim(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
+        TargetClaimIndexes indexes,
         HashSet<string> errors)
     {
-        var isEffect = target.EffectClaims.Any(
-            evidence => evidence.ClaimId == result.ClaimId);
+        var isEffect = indexes.Effects.ContainsKey(result.ClaimId);
         var expectedCertainty = isEffect
             ? WorkerEffectEvidenceCertainty.Unavailable
             : WorkerEffectEvidenceCertainty.Unspecified;
@@ -352,6 +428,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         CompilerCallablePreparation target,
         CompilerEffectClaimArtifact evidence,
         WorkerClaimResult result,
+        TargetClaimIndexes indexes,
         HashSet<string> errors)
     {
         if (!IsCanonicalProofCore(result.ProofCore) ||
@@ -362,7 +439,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
         if (result.Vacuity == WorkerVacuityKind.ContradictoryPreconditions)
         {
-            ValidateProofCore(target, result, errors, entryOnly: true);
+            ValidateProofCore(indexes, result, errors, entryOnly: true);
             return;
         }
 
@@ -402,6 +479,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static void ValidatePostconditionClaim(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
+        CompilerPreparedClause postcondition,
+        TargetClaimIndexes indexes,
         HashSet<string> errors)
     {
         if (!IsCanonicalProofCore(result.ProofCore) ||
@@ -414,7 +493,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         {
             if (result.ProofCore is { Length: > 0 } ||
                 result.Vacuity != WorkerVacuityKind.None ||
-                !TryReplayPostcondition(target, result, out _))
+                !TryReplayPostcondition(target, result, postcondition, out _))
             {
                 errors.Add("response.model_authority");
             }
@@ -425,7 +504,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         if (result.Outcome == WorkerClaimOutcome.Proven)
         {
             ValidateProofCore(
-                target,
+                indexes,
                 result,
                 errors,
                 entryOnly: result.Vacuity ==
@@ -459,12 +538,12 @@ internal sealed class CompilerResponseEvidenceAuthority :
     }
 
     private static void ValidateProofCore(
-        CompilerCallablePreparation target,
+        TargetClaimIndexes indexes,
         WorkerClaimResult result,
         HashSet<string> errors,
         bool entryOnly)
     {
-        var allowed = entryOnly ? EntryLabels(target) : AllLabels(target);
+        var allowed = entryOnly ? indexes.EntryLabels : indexes.AllLabels;
         if ((result.ProofCore ?? []).Any(label => !allowed.Contains(label)))
         {
             errors.Add("response.proof_core_authority");
@@ -472,7 +551,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
     }
 
     private static bool HasAdmissibleEntryCore(
-        CompilerCallablePreparation target,
+        TargetClaimIndexes indexes,
         string[]? proofCore)
     {
         if (!IsCanonicalProofCore(proofCore) || proofCore is not { Length: > 0 })
@@ -480,18 +559,18 @@ internal sealed class CompilerResponseEvidenceAuthority :
             return false;
         }
 
-        var labels = EntryLabels(target);
-        return proofCore.All(labels.Contains) &&
+        return proofCore.All(indexes.EntryLabels.Contains) &&
             proofCore.Any(static label =>
                 label.StartsWith("requires:", StringComparison.Ordinal) ||
                 label.StartsWith("domain:", StringComparison.Ordinal));
     }
 
     private static HashSet<string> AllLabels(
-        CompilerCallablePreparation target)
+        CompilerCallablePreparation target,
+        (string Label, CompilerPreparedClause Clause)[]? clauseLabels = null)
     {
         var labels = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (label, _) in ClauseLabels(target))
+        foreach (var (label, _) in clauseLabels ?? ClauseLabels(target))
         {
             labels.Add(label);
         }
@@ -532,10 +611,11 @@ internal sealed class CompilerResponseEvidenceAuthority :
     }
 
     private static HashSet<string> EntryLabels(
-        CompilerCallablePreparation target)
+        CompilerCallablePreparation target,
+        (string Label, CompilerPreparedClause Clause)[]? clauseLabels = null)
     {
         var labels = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (label, clause) in ClauseLabels(target))
+        foreach (var (label, clause) in clauseLabels ?? ClauseLabels(target))
         {
             if (clause.Kind == CompilerContractKind.Requires &&
                 clause.Condition is not IrBooleanTerm { Value: true })
@@ -558,20 +638,17 @@ internal sealed class CompilerResponseEvidenceAuthority :
     }
 
     private static IEnumerable<string> AssumptionIdsForCore(
-        CompilerCallablePreparation target,
         IEnumerable<string>? proofCore,
-        bool requiresOnly)
+        bool requiresOnly,
+        IReadOnlyDictionary<string, string> assumptionIdsByLabel)
     {
-        var ids = ClauseLabels(target)
-            .Where(item => item.Clause.AssumptionId != null &&
-                (requiresOnly
-                    ? item.Clause.Kind == CompilerContractKind.Requires
-                    : item.Clause.Kind == CompilerContractKind.Assume))
-            .ToDictionary(static item => item.Label, static item => item.Clause.AssumptionId!,
-                StringComparer.Ordinal);
         return (proofCore ?? [])
-            .Where(ids.ContainsKey)
-            .Select(label => ids[label]);
+            .Where(assumptionIdsByLabel.ContainsKey)
+            .Where(label => !requiresOnly || label.StartsWith(
+                "requires:", StringComparison.Ordinal))
+            .Where(label => requiresOnly || label.StartsWith(
+                "assume:", StringComparison.Ordinal))
+            .Select(label => assumptionIdsByLabel[label]);
     }
 
     private static (string Label, CompilerPreparedClause Clause)[] ClauseLabels(
@@ -782,6 +859,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static bool TryReplayPostcondition(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
+        CompilerPreparedClause postcondition,
         out ImmutableDictionary<IrVarId, IrValue> model)
     {
         model = ImmutableDictionary<IrVarId, IrValue>.Empty;
@@ -879,18 +957,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 final[variable.Variable] = value;
             }
 
-            var ensures = target.Clauses.Where(static clause =>
-                clause.Kind == CompilerContractKind.Ensures).ToArray();
-            var ordinal = Array.FindIndex(
-                ensures,
-                clause => clause.ClaimId == result.ClaimId);
-            if (ordinal < 0)
-            {
-                return false;
-            }
-
             var evaluated = new IrInterpreter(target.Factory).Evaluate(
-                ensures[ordinal].Condition, final);
+                postcondition.Condition, final);
             return evaluated.Status == IrEvaluationStatus.Value &&
                 evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: false };
         }

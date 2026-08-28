@@ -203,46 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 524. [CONFIRMED] Compiler response authority performs quadratic claim-to-clause matching
-
-**Location**: SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs,
-outer claim iteration around lines 57-72 and per-claim FirstOrDefault scans
-around lines 100-104.
-
-**Description**: Every target claim invokes ValidateClaim, which linearly scans
-the target's effect claims and postcondition clauses to resolve its evidence.
-A callable with N Ensures claims therefore performs N full clause scans before
-label/evidence checks.
-
-**Reproduction**: Ordinary protocol-valid and authority-valid responses measured:
-
-    claims    minimum run  independent rerun
-     3,000       64 ms           81 ms
-     6,000      192 ms          241 ms
-    12,000      740 ms        1,272 ms
-
-The 12k response was 5.26 MiB, below the 16 MiB cap, and had zero authority
-errors. Unknown results isolated the base lookup cost from Proven-label work.
-
-**Impact**: Large valid contract sets spend seconds in each authority pass after
-verification, consuming budgets and adding latency independently of protocol
-canonicalization finding 497.
-
-**Root cause**: Claim IDs are resolved by repeated linear FirstOrDefault rather
-than a target-local index.
-
-**Recommended fix**: Build `effectByClaimId` and `postconditionByClaimId` once per
-target, rejecting duplicate IDs with the existing authority error, and pass
-resolved entries into ValidateClaim. Preindex labels/assumptions if profiling
-shows further repeated scans.
-
-**Regression coverage**: Validate a dense large callable with zero errors and
-add deterministic enumeration-count/index tests plus missing and duplicate-ID
-controls. A generous warmed scaling check may supplement functional coverage.
-
-**Confidence**: High; two independent valid-response timing series show
-quadratic growth.
-
 ### 525. [CONFIRMED] API-spec totality analysis treats lazy branches as eagerly evaluated
 
 **Location**: SharpProof.Specs/ApiSpecTermValidator.cs around lines 127-193;

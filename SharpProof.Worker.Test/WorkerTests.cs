@@ -1319,6 +1319,65 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public void ResponseAuthorityIndexesDenseClaimEvidence()
+    {
+        const int claimCount = 30_000;
+        var factory = new IrFactory();
+        var claimIds = Enumerable.Range(0, claimCount)
+            .Select(static index => "claim-" + index.ToString(CultureInfo.InvariantCulture))
+            .ToArray();
+        var entry = new WorkerCallableManifestEntry
+        {
+            CallableId = "M:Subject.Dense",
+            SelectedFeatures = [WorkerSelectedFeature.Contracts],
+            ClaimIds = claimIds
+        };
+        var clauses = ImmutableArray.CreateRange(
+            claimIds.Select(claimId => new CompilerPreparedClause(
+                CompilerContractKind.Ensures,
+                factory.Boolean(true),
+                CompilerContractEvidence.CompilerBoundInvocation,
+                claimId,
+                null)));
+        var target = new CompilerCallablePreparation(
+            factory,
+            entry,
+            clauses,
+            [],
+            WorkerClaimReason.None,
+            CompilerPreparedBody.Trivial());
+        var response = new WorkerVerifyResponse
+        {
+            CallableResults = [new WorkerCallableResult
+            {
+                CallableId = entry.CallableId,
+                Coverage = WorkerCallableCoverage.Complete,
+                Reason = WorkerCallableCoverageReason.None,
+                Assumptions = []
+            }],
+            ClaimResults = claimIds.Select(claimId => new WorkerClaimResult
+            {
+                ClaimId = claimId,
+                Outcome = WorkerClaimOutcome.Proven,
+                Reason = WorkerClaimReason.None,
+                Assumptions = []
+            }).ToArray()
+        };
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var errors = new CompilerResponseEvidenceAuthority([target])
+            .Validate(response)
+            .ToArray();
+        stopwatch.Stop();
+
+        Assert.That(errors, Is.Empty);
+        Assert.That(
+            stopwatch.Elapsed,
+            Is.LessThan(TimeSpan.FromSeconds(5)),
+            "Dense authority validation regressed to quadratic claim matching.");
+    }
+
+    [Test]
     public async Task CompilerEffectWitnessTamperingCannotBypassReplay()
     {
         using var project = TestProject.Create(
