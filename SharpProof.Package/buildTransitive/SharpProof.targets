@@ -64,21 +64,21 @@
   <Target Name="_SharpProofValidateConfiguration"
           BeforeTargets="CoreCompile"
           Condition="'$(DesignTimeBuild)' != 'true'">
-    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '9.0.300'))"
+    <Error Code="SP0025" Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '9.0.300'))"
            Text="SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer on an older compiler host." />
-    <Error Condition="'$(SharpProofMode)' != ''"
+    <Error Code="SP0025" Condition="'$(SharpProofMode)' != ''"
            Text="SharpProofMode was removed before preview.1. Use SharpProofProfile and SharpProofFeatures." />
-    <Error Condition="'$(SharpProofPortableAnalyzerPath)' != ''"
+    <Error Code="SP0025" Condition="'$(SharpProofPortableAnalyzerPath)' != ''"
            Text="SharpProofPortableAnalyzerPath was removed before preview.1. Analyzer layout is package-owned; use SharpProofAnalyzerDirectory only for package testing." />
-    <Error Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
+    <Error Code="SP0025" Condition="'$(_SharpProofProfileNormalized)' != 'advisory' AND '$(_SharpProofProfileNormalized)' != 'strict' AND '$(_SharpProofProfileNormalized)' != 'off'"
            Text="SharpProofProfile must be advisory, strict, or off." />
-    <Error Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"
+    <Error Code="SP0025" Condition="'$(_SharpProofFeaturesNormalized)' != 'effects' AND '$(_SharpProofFeaturesNormalized)' != 'contracts' AND '$(_SharpProofFeaturesNormalized)' != 'all'"
            Text="SharpProofFeatures must be effects, contracts, or all." />
-    <Error Condition="'$(SharpProofVerify)' != 'true' AND '$(SharpProofVerify)' != 'false'"
+    <Error Code="SP0025" Condition="'$(SharpProofVerify)' != 'true' AND '$(SharpProofVerify)' != 'false'"
            Text="SharpProofVerify must be true or false." />
-    <Error Condition="'$(_SharpProofProfileNormalized)' == 'strict' AND '$(SharpProofVerify)' != 'true'"
+    <Error Code="SP0025" Condition="'$(_SharpProofProfileNormalized)' == 'strict' AND '$(SharpProofVerify)' != 'true'"
            Text="SharpProofProfile=strict requires SharpProofVerify=true; use the advisory profile to make verification optional." />
-    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofContractsRuntimeEnabled)' == 'true'"
+    <Error Code="SP0025" Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofContractsRuntimeEnabled)' == 'true'"
            Text="SHARPPROOF_CONTRACTS enables runtime evaluation of ghost contracts and is not supported while SharpProof analysis is enabled. Remove it from DefineConstants or set SharpProofProfile=off." />
   </Target>
 
@@ -86,6 +86,6 @@
           BeforeTargets="CoreCompile"
           DependsOnTargets="_SharpProofValidateConfiguration"
           Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierPackagePresent)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
-    <Error Text="SharpProof verification requires the matching SharpProof.Verifier package. Portable advisory analysis remains available without the verifier package." />
+    <Error Code="SP0054" Text="SharpProof verification requires the matching SharpProof.Verifier package. Portable advisory analysis remains available without the verifier package." />
   </Target>
 </Project>

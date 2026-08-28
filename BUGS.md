@@ -3054,27 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 669. [CONFIRMED] Package configuration failures have no stable diagnostic code
-
-**Location**: `SharpProof.Package/buildTransitive/SharpProof.targets`, around
-lines 64-89.
-
-**Description**: All nine MSBuild `<Error>` tasks omit `Code=`. Because the
-configuration target runs before CoreCompile, the analyzer cannot emit its
-documented SP0025 replacement; users receive bare `error :` messages.
-
-**Reproduction**: Building with `SharpProofProfile=invalid` exited 1 with
-`error : SharpProofProfile must be advisory, strict, or off` and zero SharpProof
-codes. An invalid verifier policy correctly emitted SP0054.
-
-**Impact**: IDEs, CI parsers, documentation links, and support tooling cannot
-classify or group nine public configuration failures.
-
-**Recommended fix**: Assign SP0025 to analyzer profile/features/mode/runtime
-configuration errors and SP0054 to verifier/package integration errors. Require
-allowed codes on every Error element in both target files and add consumer
-integration tests.
-
 ### 670. [CONFIRMED] NuGet package archives are not byte reproducible
 
 **Location**: `scripts/Invoke-SharpProofContainer.ps1`, around lines 383-393;

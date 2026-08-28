@@ -145,6 +145,40 @@ public sealed class PackageLayoutSmokeTests
     }
 
     [Test]
+    public void PortableConfigurationErrorsHaveStableDiagnosticCodes()
+    {
+        var repository = FindRepositoryRoot();
+        var targets = XDocument.Load(Path.Combine(
+            repository,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.targets"));
+        var configuration = targets.Descendants("Target").Single(target =>
+            target.Attribute("Name")?.Value ==
+            "_SharpProofValidateConfiguration");
+        var requireVerifier = targets.Descendants("Target").Single(target =>
+            target.Attribute("Name")?.Value ==
+            "_SharpProofRequireVerifierPackage");
+        var configurationErrors = configuration.Elements("Error").ToArray();
+        var requireVerifierErrors = requireVerifier.Elements("Error").ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                configurationErrors,
+                Has.Length.EqualTo(8));
+            Assert.That(
+                configurationErrors
+                    .Select(static error => error.Attribute("Code")?.Value),
+                Is.All.EqualTo("SP0025"));
+            Assert.That(
+                requireVerifierErrors
+                    .Select(static error => error.Attribute("Code")?.Value),
+                Is.EqualTo(["SP0054"]));
+        }
+    }
+
+    [Test]
     public async Task VerifierNativeToolDoesNotBecomeApplicationRuntimeAsset()
     {
         var feed = await PackagedProductFeed.GetAsync();
