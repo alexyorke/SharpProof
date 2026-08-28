@@ -41,6 +41,13 @@
            Text="SharpProof verifier package native payload is missing from its build-tool closure." />
   </Target>
 
+  <Target Name="SharpProofRejectUnsupportedProjectLanguage"
+          BeforeTargets="CoreCompile"
+          Condition="'$(_SharpProofProjectLanguageSupported)' != 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <Error Code="SP0054"
+           Text="SharpProof verification supports only C# projects; set SharpProofProfile=off for non-C# projects." />
+  </Target>
+
   <Target Name="_SharpProofInvalidateBeforeDependencies"
           DependsOnTargets="_SharpProofValidateRuntimeClosure"
           BeforeTargets="ResolveReferences"

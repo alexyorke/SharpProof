@@ -724,6 +724,36 @@ public sealed class PackageLayoutSmokeTests
     }
 
     [Test]
+    public async Task StrictVerifierRejectsNonCSharpProjects()
+    {
+        var feed = await PackagedProductFeed.GetAsync();
+        using var workspace = PackageWorkspace.Create();
+        workspace.WriteVisualBasicVerifierConsumer(feed.Version);
+
+        var restore = await RestoreConsumerAsync(
+            workspace,
+            feed,
+            projectPath: workspace.VisualBasicProject);
+        Assert.That(restore.ExitCode, Is.Zero, restore.Output);
+
+        var build = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "build",
+            workspace.VisualBasicProject,
+            "-c",
+            "Release",
+            "--no-restore",
+            "--nologo",
+            "/nodeReuse:false",
+            "-p:UseSharedCompilation=false");
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(
+            build.Output,
+            Does.Contain(
+                "SharpProof verification supports only C# projects"));
+    }
+
+    [Test]
     public async Task SourceConsumerAnalyzerItemsFollowVerificationPolicy()
     {
         using var workspace = PackageWorkspace.Create();
@@ -1382,7 +1412,8 @@ public sealed class PackageLayoutSmokeTests
         PackageWorkspace workspace,
         PackagedProductFeed feed,
         bool includeNetStandardFrameworkPackages = false,
-        bool includeNet472ReferenceAssemblies = false)
+        bool includeNet472ReferenceAssemblies = false,
+        string? projectPath = null)
     {
         var offlineFrameworkSource = includeNetStandardFrameworkPackages ||
             includeNet472ReferenceAssemblies
@@ -1396,7 +1427,7 @@ public sealed class PackageLayoutSmokeTests
             offlineFrameworkSource);
         var arguments = new List<string> {
             "restore",
-            workspace.ConsumerProject,
+            projectPath ?? workspace.ConsumerProject,
             "--nologo",
             "/nodeReuse:false",
             "--configfile",
@@ -2429,6 +2460,9 @@ public sealed class PackageLayoutSmokeTests
             ConsumerProject = Path.Combine(
                 ConsumerDirectory,
                 "Consumer.csproj");
+            VisualBasicProject = Path.Combine(
+                ConsumerDirectory,
+                "Consumer.vbproj");
             ResultPath = Path.Combine(
                 ConsumerDirectory,
                 "obj",
@@ -2476,6 +2510,10 @@ public sealed class PackageLayoutSmokeTests
             get;
         }
         internal string ConsumerProject
+        {
+            get;
+        }
+        internal string VisualBasicProject
         {
             get;
         }
@@ -2558,6 +2596,33 @@ public sealed class PackageLayoutSmokeTests
                 """,
                 "all",
                 "SP0045");
+        }
+
+        internal void WriteVisualBasicVerifierConsumer(string version)
+        {
+            File.WriteAllText(
+                Path.Combine(ConsumerDirectory, "Subject.vb"),
+                "Public Module Subject\n    Public Function Identity(value As Integer) As Integer\n        Return value\n    End Function\nEnd Module\n",
+                new System.Text.UTF8Encoding(false));
+            var escapedVersion = SecurityElement.Escape(version);
+            File.WriteAllText(
+                VisualBasicProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <SharpProofProfile>strict</SharpProofProfile>
+                    <SharpProofFeatures>all</SharpProofFeatures>
+                    <NuGetAudit>false</NuGetAudit>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="SharpProof.Verifier"
+                                      Version="{escapedVersion}"
+                                      PrivateAssets="all" />
+                  </ItemGroup>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
         }
 
         internal void WriteRuntimeAssetIsolationConsumer(string version)
