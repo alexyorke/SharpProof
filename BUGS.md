@@ -203,56 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 516. [CONFIRMED] Congruence-implied Int64 endpoints are treated as infinities
-
-**Location**: SharpProof.Dataflow/IntervalDomain.cs, construction around lines
-61-96, LessThanOrEqual around lines 111-118, and Add overflow handling around
-lines 277-287.
-
-**Description**: Create computes the first and last signed-Int64 values matching
-a congruence but retains null when the caller supplied an unbounded marker.
-Ordering compares those raw nullable bounds, and arithmetic substitutes
-Int64.MinValue/MaxValue for null. For nontrivial congruences those extremes may
-not be members, so semantically identical domains behave differently depending
-on whether effective endpoints were written explicitly.
-
-**Reproduction**:
-
-    implicit = Create(null, null, 10, 0)
-    explicit = Create(-9223372036854775800,
-                       9223372036854775800, 10, 0)
-
-Fresh-source container output:
-
-    boundary-witnesses=9 membership-mismatches=0
-    implicit<=explicit=False explicit<=implicit=True equivalent=False
-    implicit+1=[-inf, +inf]
-    explicit+1=[-9223372036854775799, 9223372036854775801] mod 10 = 1
-    bug-reproduced=True
-
-Both inputs denote exactly all representable multiples of ten.
-
-**Impact**: Lattice ordering and transfer precision depend on representation.
-Equivalent states can trigger needless dataflow changes, and safe arithmetic
-widens to Top, losing proofs and creating avoidable warnings/abstentions.
-
-**Root cause**: Nullable storage serves both as a widening marker and as semantic
-infinity. LessThanOrEqual and overflow analysis ignore the congruence's already-
-known effective signed endpoints.
-
-**Recommended fix**: Add helpers returning effective first/last congruent Int64
-endpoints and use them for semantic ordering and TryAddBounds. Retain nullable
-storage only as representation/widening metadata. Alternatively canonicalize
-all nontrivial congruence bounds in Create after auditing widening behavior.
-
-**Regression coverage**: Require bidirectional LessThanOrEqual and equivalence
-for the pair above; AddConstant(...,1) must yield equivalent, non-Top results
-with the exact two shifted endpoints. Cover negative residues, modulus one,
-near-boundary overflow, and widening controls.
-
-**Confidence**: High; a source-compiled container probe proved equal membership
-and divergent lattice/arithmetic results against the exact baseline blob.
-
 ### 517. [CONFIRMED] Manifest hashing materializes multiple full payload copies
 
 **Location**: SharpProof.Worker.Protocol/ProtocolManifest.cs around lines 44-50

@@ -41,6 +41,41 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
+    public void UnboundedCongruenceUsesEffectiveInt64Endpoints()
+    {
+        var implicitBounds = _domain.Create(null, null, 10, 0);
+        var explicitBounds = _domain.Create(
+            -9223372036854775800L,
+            9223372036854775800L,
+            10,
+            0);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(implicitBounds, Is.EqualTo(explicitBounds));
+            Assert.That(
+                _domain.LessThanOrEqual(implicitBounds, explicitBounds),
+                Is.True);
+            Assert.That(
+                _domain.LessThanOrEqual(explicitBounds, implicitBounds),
+                Is.True);
+            Assert.That(
+                _domain.AddConstant(implicitBounds, 1),
+                Is.EqualTo(_domain.AddConstant(explicitBounds, 1)));
+            Assert.That(
+                _domain.AddConstant(implicitBounds, 1),
+                Is.EqualTo(_domain.Create(
+                    -9223372036854775799L,
+                    9223372036854775801L,
+                    10,
+                    1)));
+            Assert.That(
+                _domain.AddConstant(implicitBounds, 1),
+                Is.Not.EqualTo(_domain.Top));
+        }
+    }
+
+    [Test]
     public void JoinComputesCongruenceHull()
     {
         var joined = _domain.Join(_domain.Constant(2), _domain.Constant(6));

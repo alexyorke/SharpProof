@@ -67,7 +67,7 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
             return Bottom;
         }
 
-        if (adjustedLower.HasValue)
+        if (adjustedLower.HasValue || !modulus.IsOne)
         {
             adjustedLower = first;
         }
@@ -78,7 +78,7 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
             return Bottom;
         }
 
-        if (adjustedUpper.HasValue)
+        if (adjustedUpper.HasValue || !modulus.IsOne)
         {
             adjustedUpper = last;
         }
