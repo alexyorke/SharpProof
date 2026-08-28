@@ -19,6 +19,8 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
 
     public string? SarifPath { get; set; }
 
+    public string? CompilerManifestSourcePath { get; set; }
+
     public string? ProjectDirectory { get; set; }
 
     public override bool Execute()
@@ -46,6 +48,14 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
                 paths,
                 TimeSpan.FromSeconds(30),
                 cancellation.Token);
+            if (!string.IsNullOrWhiteSpace(CompilerManifestSourcePath))
+            {
+                var sourcePath = Path.GetFullPath(Path.IsPathRooted(
+                        CompilerManifestSourcePath)
+                    ? CompilerManifestSourcePath
+                    : Path.Combine(projectDirectory, CompilerManifestSourcePath));
+                File.Delete(sourcePath);
+            }
             return true;
         }
         catch (OperationCanceledException) when (

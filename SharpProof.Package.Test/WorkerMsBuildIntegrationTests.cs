@@ -3402,6 +3402,11 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static target =>
                 target.Attribute("Name")?.Value ==
                 "_SharpProofCleanupInvocation");
+        var clean = targets
+            .Descendants("Target")
+            .Single(static target =>
+                target.Attribute("Name")?.Value ==
+                "SharpProofResetPublishedVerification");
         var invocation = verifyCore
             .Descendants("SharpProof.BuildTasks.RunVerifier")
             .Single();
@@ -3415,6 +3420,9 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static onError =>
                 onError.Attribute("ExecuteTargets")?.Value ==
                 "_SharpProofCleanupInvocation");
+        var cleanReset = clean
+            .Descendants("SharpProof.BuildTasks.ResetPublishedVerification")
+            .Single();
         var cleanupElements = cleanup.Elements().ToList();
         var cleanupRemove = cleanup.Elements("RemoveDir").Single();
         var cleanupSafetyErrors = cleanup.Elements("Error").ToArray();
@@ -3471,6 +3479,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 initialize.Descendants(
                     "_SharpProofCompilerManifestSourcePath"),
                 Is.Not.Empty);
+            Assert.That(
+                cleanReset.Attribute("CompilerManifestSourcePath")?.Value,
+                Is.EqualTo("$(_SharpProofCleanCompilerManifestSourceFile)"));
             Assert.That(
                 initialize.Descendants(
                     "_SharpProofCompilationTargetFramework"),

@@ -366,6 +366,8 @@
       <_SharpProofCleanEffectiveRequestFile>$(_SharpProofCleanRequestFile)</_SharpProofCleanEffectiveRequestFile>
       <_SharpProofCleanEffectiveResultFile>$(_SharpProofCleanResultFile)</_SharpProofCleanEffectiveResultFile>
       <_SharpProofCleanEffectiveManifestFile>$(_SharpProofCleanManifestFile)</_SharpProofCleanEffectiveManifestFile>
+      <_SharpProofCleanCompilerManifestSourceFile Condition="$(_SharpProofCompilerManifestPathConfigured) == ''">$([System.IO.Path]::Combine("$(_SharpProofCleanVerifyDirectory)", 'compiler-manifest.input.json'))</_SharpProofCleanCompilerManifestSourceFile>
+      <_SharpProofCleanCompilerManifestSourceFile Condition="$(_SharpProofCompilerManifestPathConfigured) != ''">$(_SharpProofCompilerManifestPathConfigured)</_SharpProofCleanCompilerManifestSourceFile>
       <_SharpProofCleanConfiguredRequestFullPath Condition="$(_SharpProofCleanConfiguredRequestFile) != '' AND $(TargetFrameworks) != ''">$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine("$(MSBuildProjectDirectory)", "$(_SharpProofCleanConfiguredRequestFile)"))))</_SharpProofCleanConfiguredRequestFullPath>
       <_SharpProofCleanConfiguredResultFullPath Condition="$(_SharpProofCleanConfiguredResultFile) != '' AND $(TargetFrameworks) != ''">$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine("$(MSBuildProjectDirectory)", "$(_SharpProofCleanConfiguredResultFile)"))))</_SharpProofCleanConfiguredResultFullPath>
       <_SharpProofCleanConfiguredManifestFullPath Condition="$(_SharpProofCleanConfiguredManifestFile) != '' AND $(TargetFrameworks) != ''">$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine("$(MSBuildProjectDirectory)", "$(_SharpProofCleanConfiguredManifestFile)"))))</_SharpProofCleanConfiguredManifestFullPath>
@@ -381,7 +383,8 @@
         ResultPath="$(_SharpProofCleanEffectiveResultFile)"
         ManifestPath="$(_SharpProofCleanEffectiveManifestFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
-        SarifPath="$(_SharpProofCleanSarifFile)" />
+        SarifPath="$(_SharpProofCleanSarifFile)"
+        CompilerManifestSourcePath="$(_SharpProofCleanCompilerManifestSourceFile)" />
   </Target>
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
