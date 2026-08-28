@@ -503,6 +503,38 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesTrackArrayAndCollectionOwnership()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System.Collections.Generic;
+            namespace SharpProof.Verify;
+            internal interface ISemanticCache { }
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache : ISemanticCache {
+                internal Answer[] Slots { get; } = new Answer[1];
+                internal Dictionary<string, Answer> Map { get; } = new();
+            }
+            sealed class C {
+                void M(ProofCache cache) {
+                    cache.Slots[0] = Answer.Unknown;
+                    var slots = cache.Slots;
+                    slots[0] = Answer.Unknown;
+                    cache.Map["answer"] = Answer.Unknown;
+
+                    var unrelated = new Answer[1];
+                    unrelated[0] = Answer.Unknown;
+                    cache.Slots[0] = Answer.Proven;
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(3));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesTrackRefStorageAliases()
     {
         var diagnostics = await Analyze(

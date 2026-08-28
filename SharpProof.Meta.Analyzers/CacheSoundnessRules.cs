@@ -360,23 +360,47 @@ internal static class CacheSoundnessRules
         IOperation target,
         IOperation root)
     {
+        return ResolveCacheOwnerType(
+            target,
+            root,
+            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+    }
+
+    private static ITypeSymbol? ResolveCacheOwnerType(
+        IOperation target,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
+    {
         target = UnwrapAssignmentOperation(target);
         return target switch
         {
+            IArrayElementReferenceOperation array =>
+                ResolveCacheOwnerType(array.ArrayReference, root, resolving),
             IPropertyReferenceOperation property =>
-                property.Instance?.Type ?? property.Property.ContainingType,
+                property.Instance == null
+                    ? property.Property.ContainingType
+                    : ResolveCacheOwnerType(property.Instance, root, resolving),
             IFieldReferenceOperation field =>
-                field.Instance?.Type ?? field.Field.ContainingType,
-            ILocalReferenceOperation local when local.Local.RefKind != RefKind.None =>
-                ResolveRefLocalOwnerType(local, root),
-            _ => null
+                field.Instance == null
+                    ? field.Field.ContainingType
+                    : ResolveCacheOwnerType(field.Instance, root, resolving),
+            ILocalReferenceOperation local =>
+                ResolveLocalOwnerType(local, root, resolving),
+            IParameterReferenceOperation parameter => parameter.Type,
+            _ => target.Type
         };
     }
 
-    private static ITypeSymbol? ResolveRefLocalOwnerType(
+    private static ITypeSymbol? ResolveLocalOwnerType(
         ILocalReferenceOperation reference,
-        IOperation root)
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
     {
+        if (!resolving.Add(reference.Local))
+        {
+            return reference.Type;
+        }
+
         var initializer = root.DescendantsAndSelf()
             .OfType<IVariableDeclaratorOperation>()
             .Where(candidate =>
@@ -389,9 +413,16 @@ internal static class CacheSoundnessRules
             .LastOrDefault()?
             .Initializer?
             .Value;
-        return initializer == null
-            ? null
-            : ResolveCacheOwnerType(initializer, root);
+        try
+        {
+            return initializer == null
+                ? reference.Type
+                : ResolveCacheOwnerType(initializer, root, resolving);
+        }
+        finally
+        {
+            resolving.Remove(reference.Local);
+        }
     }
 
     private static void Report(OperationAnalysisContext context, Location? location)

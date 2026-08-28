@@ -262,52 +262,6 @@ validator to reject it.
 **Confidence**: High; reproduced with unchanged production scripts in the
 canonical Linux image and traced through persistence and upload paths.
 
-### 452. [CONFIRMED] SPMETA010 ignores writes into cache-owned arrays and collections
-
-**Location**: SharpProof.Meta.Analyzers/CacheSoundnessRules.cs around
-lines 115-122.
-
-**Description**: Array assignments use IArrayElementReferenceOperation, which
-assignment-target analysis does not handle. Collection indexers appear as
-IPropertyReferenceOperation, but their immediate receiver is the array or
-Dictionary rather than the outer ISemanticCache. Cache ownership is discarded
-instead of being traced through a cache member and optional local alias.
-
-**Reproduction**:
-
-    cache.Slots[0] = Answer.Unknown;
-    var slots = cache.Slots;
-    slots[0] = Answer.Unknown;
-    cache.Slots["answer"] = Answer.Unknown;
-
-with ProofCache : ISemanticCache. The canonical probe reported:
-
-    CACHE_INDEXER_CONTROL_SPMETA010_COUNT=1
-    OWNED_ARRAY_ELEMENT_SPMETA010_COUNT=0
-    ALIASED_ARRAY_ELEMENT_SPMETA010_COUNT=0
-    OWNED_DICTIONARY_INDEXER_SPMETA010_COUNT=0
-
-All compiler-error counts were zero.
-
-**Impact**: Noncacheable answers can be stored in aggregates owned by a marked
-semantic cache without SPMETA010. The direct cache indexer control is detected,
-so equivalent policy depends on storage shape.
-
-**Root cause**: Storage ownership resolution stops at the immediate assignment
-operation and immediate receiver type.
-
-**Recommended fix**: Resolve ownership recursively through array element
-references, collection indexer receivers, cache field/property accesses, and
-local aliases to those members. Diagnose when the root owner implements
-ISemanticCache and the stored value is noncacheable.
-
-**Regression coverage**: Add cache-owned array, aliased array, and dictionary
-writes expecting SPMETA010, with unrelated aggregates and Answer.Proven as
-negative controls.
-
-**Confidence**: High; all variants and a direct-indexer positive control were
-self-verified in a compiler-clean canonical probe.
-
 ### 455. [CONFIRMED] Fuzz campaigns discard valid semantic-failure JSON before parsing and accounting
 
 **Location**: Tools/SharpProof.Fuzz/Program.cs around lines 31-37;
