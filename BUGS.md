@@ -3054,31 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 645. [CONFIRMED] Non-returning user binary operators cause a false SP0027
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, around
-lines 450-460; `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
-2053-2103 and 2175-2177; `OperationCompletionEvaluator.cs`, around lines
-1059-1075.
-
-**Description**: Permissive binary-operation completion checks children and
-division-by-zero only, never `IBinaryOperation.OperatorMethod`. A source-defined
-operator that always throws is therefore treated as completing before a later
-contract-bearing call.
-
-**Reproduction**: A throwing `operator +` in the first unused argument produced
-SP0027 for the following invalid call. Runtime recorded zero target calls and the
-operator exception. Returning operator, built-in operator, and direct controls
-correctly reached the call and diagnosed it.
-
-**Impact**: Deterministic false Refuted diagnostics and warnings-as-errors build
-failures arise for unreachable calls.
-
-**Recommended fix**: Share the stricter binary completion logic and require
-`OperatorMethod == null || MethodCanCompleteNormally(OperatorMethod)`, while
-preserving conditional-operator truth/short-circuit semantics. Add source,
-metadata, built-in, and throwing-operand controls.
-
 ### 646. [CONFIRMED] Queued SMT checks delay cancellation and pin worker threads
 
 **Location**: `SharpProof.Smt/IrSmtBackend.cs`, around lines 31-55.
