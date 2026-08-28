@@ -207,7 +207,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             operation)
                             ? HasReplayableBlockPrefix(
                                 operation,
-                                operationFacts) &&
+                                operationFacts,
+                                flowResult) &&
                                 HasReplayableForeachEvaluation(
                                     operation,
                                     operationFacts)
@@ -220,14 +221,16 @@ internal sealed partial class RequiresCallSiteDiscovery(
                                 flowResult,
                                 semanticModel,
                                 cancellationToken) &&
-                                HasReplayableBlockPrefix(
-                                    operation,
-                                    operationFacts)
-                            : (hasFlowState || !flowAnalysis.IsComplete) &&
+                            HasReplayableBlockPrefix(
+                                operation,
+                                operationFacts,
+                                flowResult)
+                        : (hasFlowState || !flowAnalysis.IsComplete) &&
                                 HasReplayablePrefix(
                                     call,
                                     operation,
-                                    operationFacts);
+                                    operationFacts,
+                                    flowResult);
                     var candidate = new RequiresCallSiteCandidate(
                         operation,
                         call.TargetMethod,
@@ -563,7 +566,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private bool HasReplayablePrefix(
         RequiresCallTarget call,
         IOperation callSite,
-        DefiniteOperationFacts operationFacts)
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult = null)
     {
         if (IsInterpolatedHandlerProtocolCall(call.TargetMethod, callSite))
         {
@@ -573,7 +577,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationFacts);
         }
 
-        return HasReplayablePrefixCore(callSite, operationFacts);
+        return HasReplayablePrefixCore(callSite, operationFacts, flowResult);
     }
 
     private bool IsForeachGetEnumeratorCall(
@@ -616,7 +620,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private bool HasReplayablePrefixCore(
         IOperation callSite,
-        DefiniteOperationFacts operationFacts)
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult = null)
     {
         var body =
             ContractClauseInventoryBuilder.GetBody(
@@ -644,14 +649,16 @@ internal sealed partial class RequiresCallSiteDiscovery(
             callSite.Syntax,
             block,
             operationFacts,
-            callSite);
+            callSite,
+            flowResult);
     }
 
     private bool HasReplayableStatementPath(
         SyntaxNode callSite,
         BlockSyntax block,
         DefiniteOperationFacts operationFacts,
-        IOperation? callOperation)
+        IOperation? callOperation,
+        ManagedFlowResult? flowResult = null)
     {
         var statement = callSite.AncestorsAndSelf()
             .OfType<StatementSyntax>()
@@ -664,22 +671,24 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 .All(prior =>
                     prior is EmptyStatementSyntax or
                         LocalFunctionStatementSyntax ||
-                    operationFacts.CompletesNormally(
-                        semanticModel.GetOperation(
-                            prior,
-                            cancellationToken))) &&
+                    CompletesReplayablePriorStatement(
+                        prior,
+                        operationFacts,
+                        flowResult)) &&
             HasReplayableStatement(
                 statement,
                 callSite,
                 operationFacts,
-                callOperation);
+                callOperation,
+                flowResult);
     }
 
     private bool HasReplayableStatement(
         StatementSyntax statement,
         SyntaxNode callSite,
         DefiniteOperationFacts operationFacts,
-        IOperation? callOperation)
+        IOperation? callOperation,
+        ManagedFlowResult? flowResult = null)
     {
         if (!statement.Span.Contains(callSite.Span))
         {
@@ -690,7 +699,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 statement,
                 callSite,
                 callOperation,
-                operationFacts))
+                operationFacts,
+                flowResult))
         {
             return true;
         }
@@ -702,7 +712,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     callSite,
                     block,
                     operationFacts,
-                    callOperation);
+                    callOperation,
+                    flowResult);
             case IfStatementSyntax conditional:
                 if (conditional.Condition.Span.Contains(callSite.Span))
                 {
@@ -724,14 +735,16 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         conditional.Statement,
                         callSite,
                         operationFacts,
-                        callOperation)
+                        callOperation,
+                        flowResult)
                     : conditional.Else?.Statement is { } alternate &&
                         alternate.Span.Contains(callSite.Span) &&
                         HasReplayableNestedBody(
                             alternate,
                             callSite,
                             operationFacts,
-                            callOperation);
+                            callOperation,
+                            flowResult);
             case TryStatementSyntax @try:
                 if (@try.Block.Span.Contains(callSite.Span))
                 {
@@ -739,7 +752,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         @try.Block,
                         callSite,
                         operationFacts,
-                        callOperation);
+                        callOperation,
+                        flowResult);
                 }
 
                 foreach (var clause in @try.Catches)
@@ -757,7 +771,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             clause.Block,
                             callSite,
                             operationFacts,
-                            callOperation);
+                            callOperation,
+                            flowResult);
                 }
 
                 return @try.Finally?.Span.Contains(callSite.Span) == true &&
@@ -765,7 +780,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         @try.Finally.Block,
                         callSite,
                         operationFacts,
-                        callOperation);
+                        callOperation,
+                        flowResult);
             case SwitchStatementSyntax @switch:
                 if (!CompletesSyntaxNormally(@switch.Expression, operationFacts))
                 {
@@ -783,7 +799,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         section.Statements,
                         callSite,
                         operationFacts,
-                        callOperation);
+                        callOperation,
+                        flowResult);
                 }
 
                 return false;
@@ -793,13 +810,15 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         @while.Statement,
                         callSite,
                         operationFacts,
-                        callOperation);
+                        callOperation,
+                        flowResult);
             case DoStatementSyntax @do:
                 return HasReplayableNestedBody(
                         @do.Statement,
                         callSite,
                         operationFacts,
-                        callOperation) &&
+                        callOperation,
+                        flowResult) &&
                     CompletesSyntaxNormally(@do.Condition, operationFacts);
             case ForStatementSyntax @for:
                 return @for.Initializers.All(initializer =>
@@ -810,14 +829,16 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         @for.Statement,
                         callSite,
                         operationFacts,
-                        callOperation);
+                        callOperation,
+                        flowResult);
             case ForEachStatementSyntax @foreach:
                 return CompletesSyntaxNormally(@foreach.Expression, operationFacts) &&
                     HasReplayableNestedBody(
                         @foreach.Statement,
                         callSite,
                         operationFacts,
-                        callOperation);
+                        callOperation,
+                        flowResult);
             case UsingStatementSyntax @using:
                 return (@using.Expression == null ||
                         CompletesSyntaxNormally(@using.Expression, operationFacts)) &&
@@ -825,26 +846,30 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         @using.Statement,
                         callSite,
                         operationFacts,
-                        callOperation);
+                        callOperation,
+                        flowResult);
             case LockStatementSyntax @lock:
                 return CompletesSyntaxNormally(@lock.Expression, operationFacts) &&
                     HasReplayableNestedBody(
                         @lock.Statement,
                         callSite,
                         operationFacts,
-                        callOperation);
+                        callOperation,
+                        flowResult);
             case CheckedStatementSyntax @checked:
                 return HasReplayableNestedBody(
                     @checked.Block,
                     callSite,
                     operationFacts,
-                    callOperation);
+                    callOperation,
+                    flowResult);
             case UnsafeStatementSyntax @unsafe:
                 return HasReplayableNestedBody(
                     @unsafe.Block,
                     callSite,
                     operationFacts,
-                    callOperation);
+                    callOperation,
+                    flowResult);
             default:
                 return false;
         }
@@ -854,7 +879,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         SyntaxList<StatementSyntax> statements,
         SyntaxNode callSite,
         DefiniteOperationFacts operationFacts,
-        IOperation? callOperation)
+        IOperation? callOperation,
+        ManagedFlowResult? flowResult = null)
     {
         var statement = statements.FirstOrDefault(
             candidate => candidate.Span.Contains(callSite.Span));
@@ -864,34 +890,70 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 .All(prior =>
                     prior is EmptyStatementSyntax or
                         LocalFunctionStatementSyntax ||
-                    operationFacts.CompletesNormally(
-                        semanticModel.GetOperation(
-                            prior,
-                            cancellationToken))) &&
+                    CompletesReplayablePriorStatement(
+                        prior,
+                        operationFacts,
+                        flowResult)) &&
             HasReplayableStatement(
                 statement,
                 callSite,
                 operationFacts,
-                callOperation);
+                callOperation,
+                flowResult);
     }
 
     private bool HasReplayableNestedBody(
         StatementSyntax body,
         SyntaxNode callSite,
         DefiniteOperationFacts operationFacts,
-        IOperation? callOperation)
+        IOperation? callOperation,
+        ManagedFlowResult? flowResult = null)
     {
         return body is BlockSyntax block
             ? HasReplayableStatementPath(
                 callSite,
                 block,
                 operationFacts,
-                callOperation)
+                callOperation,
+                flowResult)
             : HasReplayableStatement(
                 body,
                 callSite,
                 operationFacts,
-                callOperation);
+                callOperation,
+                flowResult);
+    }
+
+    private bool CompletesReplayablePriorStatement(
+        StatementSyntax statement,
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult)
+    {
+        var operation = semanticModel.GetOperation(
+            statement,
+            cancellationToken);
+        if (operationFacts.CompletesNormally(operation))
+        {
+            return true;
+        }
+
+        if (flowResult == null)
+        {
+            return false;
+        }
+
+        var assignment = operation switch
+        {
+            IExpressionStatementOperation
+            {
+                Operation: ISimpleAssignmentOperation simple
+            } => simple,
+            ISimpleAssignmentOperation simple => simple,
+            _ => null
+        };
+        return assignment?.Target is IArrayElementReferenceOperation element &&
+            flowResult.ProvesArrayAccess(element) &&
+            operationFacts.CompletesNormally(assignment.Value);
     }
 
     private bool HasReplayableExpression(
@@ -1055,7 +1117,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private bool HasReplayableBlockPrefix(
         IOperation callSite,
-        DefiniteOperationFacts operationFacts)
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult = null)
     {
         var body = ContractClauseInventoryBuilder.GetBody(declaration);
         if (body is not BlockSyntax block)
@@ -1079,10 +1142,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 .All(prior =>
                     prior is EmptyStatementSyntax or
                         LocalFunctionStatementSyntax ||
-                    operationFacts.CompletesNormally(
-                        semanticModel.GetOperation(
-                            prior,
-                            cancellationToken)) ||
+                    CompletesReplayablePriorStatement(
+                        prior,
+                        operationFacts,
+                        flowResult) ||
                     IsConditionalAccessorPrefixStatement(
                         prior,
                         callSite));
@@ -1189,7 +1252,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         StatementSyntax statement,
         SyntaxNode callSite,
         IOperation? callOperation,
-        DefiniteOperationFacts operationFacts)
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult = null)
     {
         return statement switch
         {
@@ -1201,10 +1265,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 IsOwnedCallSiteExpression(
                     assignment.Right,
                     callSite) &&
-                operationFacts.CompletesNormally(
-                    semanticModel.GetOperation(
-                        assignment.Left,
-                        cancellationToken)),
+                CompletesReplayableAssignmentTarget(
+                    assignment,
+                    operationFacts,
+                    flowResult),
             ExpressionStatementSyntax expression =>
                 IsOwnedCallSiteExpression(
                     expression.Expression,
@@ -1234,6 +1298,19 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     callSite),
             _ => false
         };
+    }
+
+    private bool CompletesReplayableAssignmentTarget(
+        AssignmentExpressionSyntax assignment,
+        DefiniteOperationFacts operationFacts,
+        ManagedFlowResult? flowResult)
+    {
+        var target = semanticModel.GetOperation(
+            assignment.Left,
+            cancellationToken);
+        return target is IArrayElementReferenceOperation element
+            ? flowResult?.ProvesArrayAccess(element) == true
+            : operationFacts.CompletesNormally(target);
     }
 
     private bool IsCollectionInitializerCall(

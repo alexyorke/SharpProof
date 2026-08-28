@@ -294,25 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 622. [CONFIRMED] Provably in-bounds array writes suppress later SP0027
-
-**Location**: `SharpProof.Effects/ManagedAbstractFlow.cs`, around lines
-1872-1887 and 1319-1328; `RequiresCallSiteDiscovery.cs`, around lines 425-471.
-
-**Description**: Strict assignment completion omits array-element targets and
-cannot consume the already-computed `ManagedFlowResult.ProvesArrayAccess` fact.
-
-**Reproduction**: `(new int[1])[0] = 1` before a known-invalid call had Complete
-flow and `FlowProvesAccess=True`, runtime reached the call, but `CanReplay=False`
-and no SP0027. Out-of-bounds/null/throwing-RHS controls did not reach it.
-
-**Impact**: A safe ordinary array store erases later definite violations. This
-remains after fixing #609's separate allocation arm.
-
-**Recommended fix**: Make prefix completion flow-aware for array writes,
-requiring completing receiver/index/RHS and proven bounds. Preserve unknown,
-multidimensional, null, and OOB fail-closed cases.
-
 ### 623. [CONFIRMED] Oversized-response assumption compaction is quadratic
 
 **Location**: `SharpProof.Worker.Protocol/ProtocolJson.cs`, around lines 666-695.

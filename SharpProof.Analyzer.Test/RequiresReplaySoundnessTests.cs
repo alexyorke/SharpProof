@@ -484,6 +484,37 @@ public sealed class RequiresReplaySoundnessTests
     }
 
     [Test]
+    public async Task InBoundsArrayStoreDoesNotHideALaterRequiresViolation()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Positive(int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Call() {
+                    (new int[1])[0] = 1;
+                    Positive(-1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+        Assert.That(
+            factory.Outcomes["Call"],
+            Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
+    }
+
+    [Test]
     public async Task DirectBreakLoopsRetainFollowingRequiresDiagnostics()
     {
         var factory = new RecordingSessionFactory();
