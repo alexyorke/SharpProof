@@ -2619,27 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 555. [CONFIRMED] Exact Worker result-set validation sorts sets after uniqueness work
-
-**Location**: SharpProof.Worker.Protocol/ProtocolJson.cs around lines 918-937;
-callable and claim consumers around lines 573-601.
-
-**Description**: ValidateResultSet materializes and uniqueness-checks identities,
-then ValidateExactIds independently sorts both actual and expected streams for
-set equality.
-
-**Reproduction**: The isolated exact-membership stage allocated 1,072,512 bytes
-for 25,000 IDs, 2,003,128 for 50,000, and 4,003,032 for 100,000: roughly 40
-bytes per ID after inputs were already materialized.
-
-**Impact**: Large valid responses pay O(N log N) comparison and multi-megabyte
-temporary allocations at several validation boundaries.
-
-**Recommended fix**: Combine uniqueness and exact membership into one ordinal
-HashSet pass while preserving collection, identity, and set errors. Retain
-reordered, duplicate, blank, missing, extra, and invalid-manifest tests plus a
-warmed allocation bound.
-
 ### 556. [CONFIRMED] API-spec resolution ignores declared parameter and result types
 
 **Location**: SharpProof.Effects/ApiSpecResolution.cs, MatchesTarget around line
