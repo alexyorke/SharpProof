@@ -26,6 +26,7 @@ $repositoryRoot = [IO.Path]::GetFullPath($RepositoryRoot)
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
+$runtimePlatform = Get-SharpProofRuntimePlatform
 $expectedAcceptancePhases = @()
 if ($Gate -in @('acceptance-debug', 'acceptance-release')) {
     Import-Module (Join-Path `
@@ -67,6 +68,19 @@ if ($relativeEvidence.StartsWith('../', [StringComparison]::Ordinal) -or
 }
 $evidence = Get-Content -LiteralPath $resolvedEvidence -Raw |
     ConvertFrom-Json -ErrorAction Stop
+$portableGate = $Gate -in @(
+    'portable-linux', 'portable-windows', 'portable-macos')
+if ($portableGate) {
+    $expectedOsFamily = $Gate.Substring(9)
+    if ($expectedOsFamily -cne $runtimePlatform.OsFamily -or
+        [string]$evidence.osFamily -cne $runtimePlatform.OsFamily) {
+        throw "Portable receipt '$Gate' does not match runtime OS '$($runtimePlatform.OsFamily)'."
+    }
+    if (-not $evidence.PSObject.Properties['architecture'] -or
+        [string]$evidence.architecture -cne $runtimePlatform.Architecture) {
+        throw "Portable receipt '$Gate' does not record the runtime architecture."
+    }
+}
 $packageArtifacts = @()
 if ($Gate -in @(
         'package-consumers', 'pilots', 'portable-linux',

@@ -294,26 +294,6 @@ old SARIF property made clean exit 0 and remove them.
 project/TFM-owned metadata and have Clean authenticate/reset that recorded set.
 Test transient request/result/manifest/SARIF paths and multi-target builds.
 
-### 630. [CONFIRMED] Any host OS can mint another OS's portable receipt
-
-**Location**: `scripts/Test-SharpProofPortableConsumer.ps1`, around lines 6-18
-and 34-43; receipt checks around `Write-SharpProofQualificationReceipt.ps1`
-lines 68-74.
-
-**Description**: Caller-supplied `OsFamily` controls evidence filename,
-osFamily, and receipt gate. Neither producer nor downstream authority compares
-it with the actual runtime OS.
-
-**Reproduction**: Canonical Linux amd64 invoked with `-OsFamily windows`, exited
-0, and minted passed `portable-windows` evidence/receipt. Matching Linux control
-also passed.
-
-**Impact**: Matrix/wiring mistakes can satisfy Windows or macOS release rows
-using Linux; all three portability rows can come from one host.
-
-**Recommended fix**: Derive the OS family from runtime APIs or reject mismatch
-before work/output; record OS/architecture provenance. Test all cross-OS pairs.
-
 ### 634. [CONFIRMED] A failed same-OS portable rerun preserves a prior passing receipt
 
 **Location**: `scripts/Test-SharpProofPortableConsumer.ps1`, around lines 12-43;

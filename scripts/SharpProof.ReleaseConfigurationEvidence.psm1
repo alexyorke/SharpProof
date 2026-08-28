@@ -1,6 +1,30 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-SharpProofRuntimePlatform {
+    $runtimeInformation = [Runtime.InteropServices.RuntimeInformation]
+    if ($runtimeInformation::IsOSPlatform(
+            [Runtime.InteropServices.OSPlatform]::Linux)) {
+        $osFamily = 'linux'
+    }
+    elseif ($runtimeInformation::IsOSPlatform(
+            [Runtime.InteropServices.OSPlatform]::Windows)) {
+        $osFamily = 'windows'
+    }
+    elseif ($runtimeInformation::IsOSPlatform(
+            [Runtime.InteropServices.OSPlatform]::OSX)) {
+        $osFamily = 'macos'
+    }
+    else {
+        throw 'SharpProof cannot identify the current operating system.'
+    }
+    return [pscustomobject]@{
+        OsFamily = $osFamily
+        Architecture = $runtimeInformation::OSArchitecture.ToString().
+            ToLowerInvariant()
+    }
+}
+
 function Get-SharpProofReleaseAttemptId {
     $runId = [Environment]::GetEnvironmentVariable('GITHUB_RUN_ID')
     $attempt = [Environment]::GetEnvironmentVariable('GITHUB_RUN_ATTEMPT')
@@ -103,5 +127,6 @@ function Assert-SharpProofReleaseConfigurationEvidence {
 }
 
 Export-ModuleMember -Function @(
+    'Get-SharpProofRuntimePlatform',
     'Get-SharpProofReleaseAttemptId',
     'Assert-SharpProofReleaseConfigurationEvidence')

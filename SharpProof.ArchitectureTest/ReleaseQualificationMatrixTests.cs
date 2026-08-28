@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
@@ -96,7 +97,9 @@ public sealed partial class ReleaseQualificationMatrixTests
             foreach (var name in new[]
                      {
                          "Write-SharpProofQualificationReceipt.ps1",
-                         "Test-SharpProofPilotReport.ps1"
+                         "Test-SharpProofPilotReport.ps1",
+                         "SharpProof.MutationEvidence.psm1",
+                         "SharpProof.ReleaseConfigurationEvidence.psm1"
                      })
             {
                 File.Copy(
@@ -129,6 +132,7 @@ public sealed partial class ReleaseQualificationMatrixTests
                     status = "passed",
                     commit,
                     osFamily,
+                    architecture = RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(),
                     packageArtifacts = packages.Take(count)
                 }));
                 return await RunExitCodeAsync(
@@ -173,6 +177,16 @@ public sealed partial class ReleaseQualificationMatrixTests
                 Path.Combine(
                     scripts.FullName,
                     "Write-SharpProofQualificationReceipt.ps1"));
+            foreach (var name in new[]
+                     {
+                         "SharpProof.MutationEvidence.psm1",
+                         "SharpProof.ReleaseConfigurationEvidence.psm1"
+                     })
+            {
+                File.Copy(
+                    Path.Combine(sourceRoot, "scripts", name),
+                    Path.Combine(scripts.FullName, name));
+            }
             await File.WriteAllTextAsync(
                 Path.Combine(scripts.FullName, "Test-SharpProofPilotReport.ps1"),
                 "function Test-SharpProofPilotReport { return $true }\n");
