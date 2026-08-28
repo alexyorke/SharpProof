@@ -3292,6 +3292,16 @@
           "default": {
             "kind": "implicit"
           }
+        },
+        {
+          "name": "CharacterOffset",
+          "jsonName": "characterOffset",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
         }
       ]
     },

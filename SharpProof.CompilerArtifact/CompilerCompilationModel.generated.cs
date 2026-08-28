@@ -77,6 +77,7 @@ internal sealed class CompilerSourceLineMapEntry
     public string MappedPath { get; set; } = string.Empty;
     public int MappedLine { get; set; }
     public int MappedColumn { get; set; }
+    public int CharacterOffset { get; set; }
 }
 
 internal sealed class CompilerSyntaxTreeSnapshot

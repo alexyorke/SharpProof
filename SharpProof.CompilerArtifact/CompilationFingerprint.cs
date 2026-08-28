@@ -12,7 +12,7 @@ internal static class CompilationFingerprint
     private const int SyntaxTreeSnapshotVersion = 1;
     private const string SourceLineMapDomain =
         "SharpProof.CompilerSourceLineMap";
-    private const int SourceLineMapVersion = 1;
+    private const int SourceLineMapVersion = 2;
 
     internal static string ComputeLineMapSha256(
         CompilerSourceLineMapEntry[] entries)

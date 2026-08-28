@@ -629,6 +629,7 @@ internal static class CompilerManifestArtifactJson
                     }
                     writer.WriteNumber("mappedLine", entry.MappedLine);
                     writer.WriteNumber("mappedColumn", entry.MappedColumn);
+                    writer.WriteNumber("characterOffset", entry.CharacterOffset);
                     writer.WriteEndObject();
                 }
                 writer.WriteEndArray();

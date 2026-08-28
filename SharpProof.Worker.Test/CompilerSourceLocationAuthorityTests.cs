@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
@@ -161,6 +162,46 @@ public sealed class CompilerSourceLocationAuthorityTests
                 exactEnd,
                 tree),
             Is.True);
+    }
+
+    [Test]
+    public void EnhancedLineMappingUsesRoslynCharacterOffset()
+    {
+        const string source =
+            "#line (2,8)-(2,70) 15 \"page.razor\"\n" +
+            "                   [EnforcePure] static int Identity(int value) => value;\n";
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.Preview),
+            Path.Combine(TestContext.CurrentContext.WorkDirectory, "Enhanced.cs"));
+        var captured = CompilerCompilationCapture.CaptureTree(
+            tree,
+            CancellationToken.None);
+
+        var mismatches = Enumerable.Range(0, source.Length + 1)
+            .Select(position =>
+            {
+                var expected = tree.GetMappedLineSpan(new TextSpan(position, 0));
+                var mapped = CompilerSourceLocationAuthority.TryMap(
+                    captured.LineMap,
+                    position,
+                    out var mappedPath,
+                    out var mappedLine,
+                    out var mappedColumn);
+                return new { position, expected, mapped, mappedPath, mappedLine, mappedColumn };
+            })
+            .Where(value => value.mapped &&
+                (value.mappedPath != value.expected.Path ||
+                 value.mappedLine != value.expected.StartLinePosition.Line ||
+                 value.mappedColumn != value.expected.StartLinePosition.Character))
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(mismatches, Is.Empty);
+            Assert.That(
+                captured.LineMap.Any(static entry => entry.CharacterOffset > 0),
+                Is.True);
+        }
     }
 
     [Test]

@@ -203,51 +203,6 @@ fresh leases, expired inactive leases, and Clean.
 **Confidence**: High; target inventory and an interrupted-cleanup fixture both
 confirm persistence, and the complete target has no stale-run recovery path.
 
-### 526. [CONFIRMED] Enhanced #line character offsets are lost from compiler artifacts
-
-**Location**: SharpProof.CompilerCollector/CompilerArtifact/
-CompilerCompilationCapture.cs around lines 157-169; model
-SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs around lines
-73-80; replay in CompilerSourceLocationAuthority.cs around lines 313-351.
-
-**Description**: Capture samples GetMappedLineSpan only at each physical line
-start and stores no enhanced-line CharacterOffset. Replay assumes mapped columns
-are `MappedColumn + delta`. C# enhanced mappings require subtracting/clamping the
-first-line character offset. Callable and diagnostic authorities therefore
-reconstruct the wrong column and reject otherwise valid generated/Razor-style
-source.
-
-**Reproduction**:
-
-    #line (2,8)-(2,70) 15 "page.razor"
-                   [EnforcePure] static int Identity(int value) => value;
-
-Compilation had zero errors. Roslyn/manifest mapped the callable to zero-based
-1:7, authority replay produced 1:22, and artifact creation threw:
-
-    InvalidDataException: A compiler source location is not bound to one
-    physical tree.
-
-A mapped CS0103 diagnostic failed through the same Bind/CreateDiagnostic path.
-
-**Impact**: Compiler mode rejects selected members in valid enhanced-line source,
-and mapped compiler diagnostics crash artifact production instead of preserving
-evidence.
-
-**Root cause**: The snapshot format assumes every mapping is affine from column
-zero and omits Roslyn LineMapping.CharacterOffset.
-
-**Recommended fix**: Capture SyntaxTree.GetLineMappings(), persist/validate/hash
-the offset in a schema/fingerprint update, and replay the first mapped line with
-`MappedColumn + max(delta - offset, 0)`; later lines use offset zero.
-
-**Regression coverage**: A clean mapped claim and mapped CS0103 diagnostic must
-produce/round-trip an artifact with exact Roslyn start coordinates. Cover
-ordinary directives and multi-line enhanced mappings.
-
-**Confidence**: High; both claim and diagnostic artifact paths reproduced the
-same exact 15-column authority error.
-
 ### 527. [CONFIRMED] Changed-TCB coverage accepts HEAD as its own comparison baseline
 
 **Location**: scripts/Test-SharpProofCoverage.ps1, comparison resolution around

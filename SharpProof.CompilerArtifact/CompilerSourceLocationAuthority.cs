@@ -115,6 +115,7 @@ internal static class CompilerSourceLocationAuthority
                 entry.SourceLength > tree.TextLength - entry.SourceStart ||
                 entry.MappedLine < 0 ||
                 entry.MappedColumn < 0 ||
+                entry.CharacterOffset < 0 ||
                 string.IsNullOrWhiteSpace(entry.MappedPath))
             {
                 return false;
@@ -402,7 +403,8 @@ internal static class CompilerSourceLocationAuthority
 
         var delta = (long)sourceStart - selected.SourceStart;
         var line = (long)selected.MappedLine;
-        var column = (long)selected.MappedColumn + delta;
+        var column = (long)selected.MappedColumn +
+            Math.Max(delta - selected.CharacterOffset, 0);
         if (delta < 0 || line < 0 || column < 0 ||
             line >= int.MaxValue || column >= int.MaxValue)
         {

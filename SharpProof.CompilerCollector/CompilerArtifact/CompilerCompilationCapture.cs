@@ -154,6 +154,7 @@ internal static class CompilerCompilationCapture
         cancellationToken.ThrowIfCancellationRequested();
         var parse = (CSharpParseOptions)tree.Options;
         var text = tree.GetText(cancellationToken);
+        var lineMappings = tree.GetLineMappings(cancellationToken);
         CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select(line =>
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -165,7 +166,11 @@ internal static class CompilerCompilationCapture
                 SourceLength = line.Span.Length,
                 MappedPath = MappedPath(tree, mapped),
                 MappedLine = mapped.StartLinePosition.Line,
-                MappedColumn = mapped.StartLinePosition.Character
+                MappedColumn = mapped.StartLinePosition.Character,
+                CharacterOffset = lineMappings
+                    .Where(mapping => mapping.Span.Start.Line == line.LineNumber)
+                    .Select(static mapping => mapping.CharacterOffset)
+                    .FirstOrDefault() ?? 0
             };
         })];
         return new CompilerSyntaxTreeSnapshot
