@@ -569,6 +569,35 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void FrontendCoverageCountsOnlyEvaluatedBranches()
+    {
+        var deadBranch = GeneratedCSharpExpression.Conditional(
+            GeneratedCSharpExpression.Boolean(false),
+            GeneratedCSharpExpression.Length(
+                GeneratedCSharpExpression.String("dead")),
+            GeneratedCSharpExpression.Integer(1));
+        var liveBranch = GeneratedCSharpExpression.Conditional(
+            GeneratedCSharpExpression.Boolean(true),
+            GeneratedCSharpExpression.Length(
+                GeneratedCSharpExpression.Text()),
+            GeneratedCSharpExpression.Integer(1));
+        var cases = new[]
+        {
+            new GeneratedCSharpCase(deadBranch, 0, 0, false),
+            new GeneratedCSharpCase(liveBranch, 0, 0, false) { Text = "live" }
+        };
+        var results = Enumerable.Repeat(
+            new FrontendDifferentialResult(FuzzOracleStatus.Agreement, ""),
+            cases.Length).ToArray();
+
+        var coverage = FuzzRunner.CreateFrontendCoverage(cases, results);
+
+        Assert.That(coverage.StringLiterals, Is.Zero);
+        Assert.That(coverage.StringLengths, Is.EqualTo(1));
+        Assert.That(coverage.TextParameters, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task FiniteDomainOracleChecksSatAndUnsatWithExplicitAssumptions()
     {
         var factory = new IrFactory();
