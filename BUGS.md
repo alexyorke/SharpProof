@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 589. [CONFIRMED] ConstrainSuccessfulEvaluation bypasses sort and ownership checks
-
-**Location**: SharpProof.Ir/IrSemanticTerms.cs around lines 21-32.
-
-**Description**: When evaluated is atomic and needs no definedness witness, the
-fast path returns predicate directly without validating Boolean sort, factory
-ownership, or evaluated ownership.
-
-**Reproduction**: A foreign Boolean predicate returned the same instance, an
-Integer predicate was accepted, and a later consumer rejected the foreign term.
-The composite evaluated control rejected immediately because factory.Binary
-incidentally performed validation.
-
-**Impact**: A public canonical-term helper can leak wrong-sort or foreign-factory
-terms and move failure to a distant interpreter/query boundary.
-
-**Recommended fix**: Validate predicate ownership and Boolean type plus evaluated
-ownership before the fast path. Test integer, foreign predicate/evaluated,
-same-factory atomic identity, and composite behavior.
-
 ### 590. [CONFIRMED] Zero-claim unsupported callables are rewritten as MalformedResult
 
 **Location**: Worker.Protocol/WorkerResultAssembler.cs around lines 195-202;
