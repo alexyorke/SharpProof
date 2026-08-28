@@ -3054,26 +3054,6 @@ fallible work, bind evidence and receipt to one attempt ID, and make receipt
 generation independently invalidate stale output on failure. Test pass-then-fail,
 receipt-writer failure, and interrupted pair publication.
 
-### 654. [CONFIRMED] Framework interpolation fallback reports a later System. segment as a prefix
-
-**Location**: `SharpProof.ArchitectureTest/FrameworkIdentityScanner.cs`, around
-lines 124-140 and 234-246.
-
-**Description**: For nonconstant interpolation, the fallback selects the first
-text node anywhere with `OfType<InterpolatedStringTextSyntax>().FirstOrDefault()`.
-It ignores preceding holes, so a later `System.` text segment is mistaken for the
-produced string's prefix.
-
-**Reproduction**: `$"{intPrefix}System.String"` produced a violation although
-the runtime value always starts with the formatted integer. A leading-content
-fix made all six scanner fixtures pass; `$"System.{suffix}"` remained caught.
-
-**Impact**: Benign logging/composition can falsely fail the architecture gate.
-
-**Recommended fix**: Require the interpolation's first content item itself to
-be a qualifying text node, or explicitly model possibly empty leading holes.
-Test leading text, leading int hole, later System text, and constants.
-
 ### 655. [CONFIRMED] Package scheduler governance stays green after queue sorting is deleted
 
 **Location**: `scripts/Invoke-SharpProofPackageTests.ps1`, around lines 331-335;

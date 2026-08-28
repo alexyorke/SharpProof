@@ -58,6 +58,22 @@ public sealed class FrameworkIdentityScannerTests
     }
 
     [Test]
+    public void LaterInterpolatedTextAfterAHoleIsNotTreatedAsAPrefix()
+    {
+        const string source = """
+            internal static class Fixture
+            {
+                private static string Read(int prefix) => $"{prefix}System.String";
+            }
+            """;
+        var violations = FrameworkIdentityScanner.FindViolations(
+            [("fixture.cs", source)],
+            ["System.String"],
+            []);
+        Assert.That(violations, Is.Empty);
+    }
+
+    [Test]
     public void NonConstantStringConcatenationPrefixIsStillVisible()
     {
         const string source = """

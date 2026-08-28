@@ -289,10 +289,12 @@ internal static class FrameworkIdentityScanner
     private static bool HasFrameworkPrefix(
         InterpolatedStringExpressionSyntax interpolation)
     {
-        var firstText = interpolation.Contents
-            .OfType<InterpolatedStringTextSyntax>()
-            .FirstOrDefault();
-        return firstText != null &&
+        if (interpolation.Contents.FirstOrDefault() is not InterpolatedStringTextSyntax firstText)
+        {
+            return false;
+        }
+
+        return
             firstText.TextToken.ValueText.StartsWith(
                 "System.",
                 StringComparison.Ordinal) &&
