@@ -15,17 +15,13 @@ public sealed class ProofKernel(ISmtBackend backend)
         try
         {
             var backendTask = _backend.CheckAsync(query, cancellationToken);
-            if (backendTask is null)
-            {
-                return Unknown(AbstentionReason.MalformedBackendResult);
-            }
-
-            result = await backendTask
-                .ConfigureAwait(false);
+            result = backendTask is null
+                ? null
+                : await backendTask.ConfigureAwait(false);
         }
         catch (ArgumentException)
         {
-            return Unknown(AbstentionReason.MalformedBackendResult);
+            result = null;
         }
         cancellationToken.ThrowIfCancellationRequested();
         if (result == null)

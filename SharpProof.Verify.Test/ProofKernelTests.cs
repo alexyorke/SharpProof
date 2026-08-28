@@ -340,6 +340,18 @@ public sealed class ProofKernelTests
     }
 
     [Test]
+    public void CancellationDuringBackendArgumentFailurePropagates()
+    {
+        var fixture = CreateFixture();
+        using var cancellation = new CancellationTokenSource();
+        Func<Task> action = () => new ProofKernel(
+                new CancelingThrowingBackend(cancellation))
+            .VerifyAsync(fixture.Query, cancellation.Token);
+
+        Assert.ThrowsAsync<OperationCanceledException>(action);
+    }
+
+    [Test]
     public async Task NullBackendTaskBecomesMalformedResult()
     {
         var fixture = CreateFixture();
@@ -350,6 +362,18 @@ public sealed class ProofKernelTests
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
             Is.EqualTo(AbstentionReason.MalformedBackendResult));
+    }
+
+    [Test]
+    public void CancellationDuringNullBackendTaskPropagates()
+    {
+        var fixture = CreateFixture();
+        using var cancellation = new CancellationTokenSource();
+        Func<Task> action = () => new ProofKernel(
+                new CancelingNullTaskBackend(cancellation))
+            .VerifyAsync(fixture.Query, cancellation.Token);
+
+        Assert.ThrowsAsync<OperationCanceledException>(action);
     }
 
     [Test]
@@ -532,6 +556,30 @@ public sealed class ProofKernelTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return null!;
+        }
+    }
+
+    private sealed class CancelingNullTaskBackend(
+        CancellationTokenSource cancellation) : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            _ = cancellation.CancelAsync();
+            return null!;
+        }
+    }
+
+    private sealed class CancelingThrowingBackend(
+        CancellationTokenSource cancellation) : ISmtBackend
+    {
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            await cancellation.CancelAsync();
+            throw new ArgumentException("malformed backend result");
         }
     }
 
