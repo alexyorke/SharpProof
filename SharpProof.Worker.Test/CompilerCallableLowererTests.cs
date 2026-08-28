@@ -200,6 +200,36 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void DiscardedSupportedCallsReceiveAReusableSinkTarget()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                private static int Read(int value) => value;
+
+                internal static int Verify(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    Read(value);
+                    return value;
+                }
+            }
+            """,
+            "Verify");
+
+        Assert.That(
+            preparation.IsSuccess,
+            Is.True,
+            preparation.FailureReason.ToString());
+        var call = preparation.Body!.Program!.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrCallInstruction>()
+            .Single();
+        Assert.That(call.Target, Is.Not.Null);
+        Assert.That(preparation.Body.SummaryCalls, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public void SummaryDependencyDepthLimitFailsClosedWithoutStackOverflow()
     {
         var methods = string.Concat(Enumerable.Range(0, 300).Select(index =>

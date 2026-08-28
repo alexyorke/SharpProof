@@ -298,10 +298,12 @@ public sealed class RoslynProgramLowerer(
             }
 
             IrVarId? target = null;
-            if (wantsResult && !invocation.TargetMethod.ReturnsVoid &&
+            if (!invocation.TargetMethod.ReturnsVoid &&
                 hasSupportedResult)
             {
-                target = CreateTemporary("call", resultType);
+                target = CreateTemporary(
+                    wantsResult ? "call" : "discarded-call",
+                    resultType);
             }
 
             var call = _builder.Call(block, operation, target, member, receiver, arguments);
