@@ -2341,7 +2341,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 ChildrenMayCompleteNormally(binary) &&
                 !IsDefinitelyZeroDivision(binary) &&
                 !IsDefinitelyCheckedOverflow(binary) &&
-                !IsDefinitelySignedDivisionOverflow(binary),
+                !IsDefinitelySignedDivisionOverflow(binary) &&
+                (binary.OperatorMethod == null ||
+                 MethodCanCompleteNormally(binary.OperatorMethod)),
             ISimpleAssignmentOperation assignment =>
                 MayCompleteAssignmentNormally(assignment),
             IArrayElementReferenceOperation element =>

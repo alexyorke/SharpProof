@@ -51,6 +51,38 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task NonReturningBinaryOperatorSuppressesLaterRequires()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public readonly struct ThrowingValue {
+                public static ThrowingValue operator +(
+                    ThrowingValue left,
+                    ThrowingValue right) =>
+                    throw new System.InvalidOperationException();
+            }
+
+            public static class Subject {
+                private static void Positive(
+                    ThrowingValue ignored,
+                    int value) {
+                    Contract.Requires(value > 0);
+                }
+
+                public static void Run() {
+                    Positive(new ThrowingValue() + new ThrowingValue(), -1);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task AllBreakSwitchPrefixRetainsLaterRequiresDiagnostic()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
