@@ -2619,26 +2619,6 @@ normal execution.
 **Confidence**: High; a successful current-commit command left a byte-identical
 older-commit timing artifact.
 
-### 601. [CONFIRMED] Direct-break loops suppress diagnostics on later reachable calls
-
-**Location**: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, around
-lines 188-208 and 425-471; `SharpProof.Effects/ManagedAbstractFlow.cs`, around
-lines 1842-1917.
-
-**Description**: Strict prefix completion has no loop/branch model. A direct
-`break` leaves managed flow Complete but makes the following candidate
-unreplayable.
-
-**Reproduction**: `for (;;) { break; }` and `while (selector) { break; }`
-followed by a known-invalid direct call both reached the call at runtime and
-emitted zero SP0027. Direct and empty-block controls emitted one; a throwing
-condition correctly did not reach the call.
-
-**Impact**: Harmless finite loop syntax erases definite precondition failures.
-
-**Recommended fix**: Conservatively model direct-break `for` and top-tested
-`while` completion, retaining rejection for nested/conditional/goto/do shapes.
-
 ### 602. [CONFIRMED] Supported claimless callables unnecessarily require an SMT backend
 
 **Location**: `SharpProof.Worker/SharpProofWorker.cs`, around lines 251-256 and
