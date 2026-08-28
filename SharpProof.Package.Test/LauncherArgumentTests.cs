@@ -1883,6 +1883,49 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void SarifProjectionEscapesColonBearingRelativePaths()
+    {
+        var manifest = CreateSarifManifest();
+        manifest.Callables[0].Location.Path = "generated:Subject.cs";
+        manifest.Claims[0].Location.Path = "generated:Subject.cs";
+        var response = new WorkerVerifyResponse
+        {
+            InputHash = new('a', 64),
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            Summary = new WorkerVerificationSummary
+            {
+                Versions = new WorkerVersionSummary { WorkerVersion = "test" }
+            },
+            ClaimResults = [
+                new WorkerClaimResult
+                {
+                    ClaimId = "claim-1",
+                    Outcome = WorkerClaimOutcome.Proven,
+                    Reason = WorkerClaimReason.None
+                }
+            ]
+        };
+
+        using var document = JsonDocument.Parse(
+            SarifProjection.Serialize(
+                new WorkerVerifyRequest(),
+                response,
+                Path.GetTempPath()));
+        var uri = document.RootElement
+            .GetProperty("runs")[0]
+            .GetProperty("results")[0]
+            .GetProperty("locations")[0]
+            .GetProperty("physicalLocation")
+            .GetProperty("artifactLocation")
+            .GetProperty("uri")
+            .GetString();
+
+        Assert.That(uri, Is.EqualTo("generated%3ASubject.cs"));
+    }
+
+    [Test]
     public void SarifProjectionEscapesSpecialCharactersInTheProjectRoot()
     {
         var manifest = CreateSarifManifest();

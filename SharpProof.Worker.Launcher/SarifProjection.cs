@@ -242,7 +242,8 @@ internal static class SarifProjection
 
     private static string LocationUri(string path)
     {
-        if (Uri.TryCreate(path, UriKind.Absolute, out var uri))
+        if (IsAbsoluteFilePath(path) &&
+            Uri.TryCreate(path, UriKind.Absolute, out var uri))
         {
             return uri.AbsoluteUri;
         }
@@ -254,6 +255,17 @@ internal static class SarifProjection
             "/",
             path.Replace('\\', '/')
                 .Split('/')
-                .Select(Uri.EscapeDataString));
+            .Select(Uri.EscapeDataString));
+    }
+
+    private static bool IsAbsoluteFilePath(string path)
+    {
+        return Path.IsPathFullyQualified(path) ||
+            path.StartsWith("\\\\", StringComparison.Ordinal) ||
+            path.StartsWith("//", StringComparison.Ordinal) ||
+            path.Length >= 3 &&
+            char.IsLetter(path[0]) &&
+            path[1] == ':' &&
+            (path[2] == '/' || path[2] == '\\');
     }
 }
