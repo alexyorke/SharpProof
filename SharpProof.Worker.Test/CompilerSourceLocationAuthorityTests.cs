@@ -79,6 +79,34 @@ public sealed class CompilerSourceLocationAuthorityTests
     }
 
     [Test]
+    public void ProducerUsesTheKnownTreeForMappedLocationCollisions()
+    {
+        var first = CSharpSyntaxTree.ParseText(
+            "#line 102 \"shared.g.cs\"\n" +
+            "using SharpProof.Attributes;\n" +
+            "public static class First { [EnforcePure] public static int M() => 1; }\n",
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            Path.Combine(TestContext.CurrentContext.WorkDirectory, "First.cs"));
+        var second = CSharpSyntaxTree.ParseText(
+            "#line 102 \"shared.g.cs\"\n" +
+            "using SharpProof.Attributes;\n" +
+            "public static class Second { [EnforcePure] public static int M() => 1; }\n",
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            Path.Combine(TestContext.CurrentContext.WorkDirectory, "Second.cs"));
+        var compilation = CreateCompilation([first, second], includeContractReference: true);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactProducer.Create(
+                compilation,
+                TestContext.CurrentContext.WorkDirectory,
+                "net8.0",
+                WorkerFeatureSet.All,
+                new ClaimManifestBuilder(compilation).Build(),
+                WorkerBudgets.DefaultMaximumExpressionDepth,
+                CancellationToken.None)));
+    }
+
+    [Test]
     public void HydrationRejectsGenericLocationAuthorityGeometryTampering()
     {
         var artifact = CreateContractArtifact();
@@ -408,6 +436,20 @@ public sealed class CompilerSourceLocationAuthorityTests
         string source,
         bool includeContractReference)
     {
+        return CreateCompilation(
+            [CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.CSharp12),
+                Path.Combine(
+                    TestContext.CurrentContext.WorkDirectory,
+                    "SourceAuthoritySubject.cs"))],
+            includeContractReference);
+    }
+
+    private static CSharpCompilation CreateCompilation(
+        IEnumerable<SyntaxTree> trees,
+        bool includeContractReference)
+    {
         var paths = ((string)AppContext.GetData(
                 "TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
@@ -422,12 +464,7 @@ public sealed class CompilerSourceLocationAuthorityTests
             .Distinct(StringComparer.OrdinalIgnoreCase);
         return CSharpCompilation.Create(
             "CompilerSourceLocationAuthorityTest",
-            [CSharpSyntaxTree.ParseText(
-                source,
-                new CSharpParseOptions(LanguageVersion.CSharp12),
-                Path.Combine(
-                    TestContext.CurrentContext.WorkDirectory,
-                    "SourceAuthoritySubject.cs"))],
+            trees,
             paths.Select(static path => MetadataReference.CreateFromFile(path)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }

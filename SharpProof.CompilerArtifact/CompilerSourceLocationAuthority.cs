@@ -235,6 +235,23 @@ internal static class CompilerSourceLocationAuthority
         CompilerCompilationSnapshot compilation,
         ValidationContext? context = null)
     {
+        return CreateAuthority(
+            ownerKind,
+            ownerId,
+            location,
+            compilation,
+            FindUniqueTree(location, compilation, context),
+            context);
+    }
+
+    internal static CompilerLocationAuthorityArtifact CreateAuthority(
+        CompilerSourceLocationOwnerKind ownerKind,
+        string ownerId,
+        WorkerSourceLocation location,
+        CompilerCompilationSnapshot compilation,
+        int sourceTreeOrdinal,
+        ValidationContext? context = null)
+    {
         if (!Enum.IsDefined(typeof(CompilerSourceLocationOwnerKind), ownerKind) ||
             string.IsNullOrWhiteSpace(ownerId) ||
             location == null ||
@@ -258,20 +275,21 @@ internal static class CompilerSourceLocationAuthority
             };
         }
 
-        var ordinal = FindUniqueTree(location, compilation, context);
-        if (ordinal < 0)
+        if (sourceTreeOrdinal < 0 ||
+            sourceTreeOrdinal >= compilation.SyntaxTrees.Length ||
+            compilation.SyntaxTrees[sourceTreeOrdinal] is not { } tree ||
+            !HasValidLocationGeometry(location, tree, context))
         {
             throw new InvalidDataException(
                 "A compiler source location is not bound to one physical tree.");
         }
 
-        var tree = compilation.SyntaxTrees[ordinal]!;
         return new CompilerLocationAuthorityArtifact
         {
             OwnerKind = ownerKind,
             OwnerId = ownerId,
             Location = CopyLocation(location),
-            SourceTreeOrdinal = ordinal,
+            SourceTreeOrdinal = sourceTreeOrdinal,
             SourceTreePath = tree.Path,
             SourceTreeSha256 = tree.Sha256,
             SourceLineMapSha256 = tree.LineMapSha256
@@ -296,6 +314,31 @@ internal static class CompilerSourceLocationAuthority
 
         var tree = compilation.SyntaxTrees[ordinal]!;
         sourceTreeOrdinal = ordinal;
+        sourceTreePath = tree.Path;
+        sourceTreeSha256 = tree.Sha256;
+        sourceLineMapSha256 = tree.LineMapSha256;
+    }
+
+    internal static void Bind(
+        WorkerSourceLocation location,
+        CompilerCompilationSnapshot compilation,
+        int sourceTreeOrdinal,
+        out string sourceTreePath,
+        out string sourceTreeSha256,
+        out string sourceLineMapSha256,
+        ValidationContext? context = null)
+    {
+        if (location == null ||
+            compilation is not { SyntaxTrees: not null } ||
+            sourceTreeOrdinal < 0 ||
+            sourceTreeOrdinal >= compilation.SyntaxTrees.Length ||
+            compilation.SyntaxTrees[sourceTreeOrdinal] is not { } tree ||
+            !HasValidLocationGeometry(location, tree, context))
+        {
+            throw new InvalidDataException(
+                "A compiler source location is not bound to one physical tree.");
+        }
+
         sourceTreePath = tree.Path;
         sourceTreeSha256 = tree.Sha256;
         sourceLineMapSha256 = tree.LineMapSha256;

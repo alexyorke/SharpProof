@@ -14,6 +14,7 @@ internal static class CompilerManifestArtifactProducer
         var specificationPackAuthority =
             CompilerSpecificationPackProvider.ResolveAuthority(
                 specificationPacks.IsDefault ? [] : specificationPacks);
+        var sourceTrees = compilation.SyntaxTrees.ToArray();
         var snapshot = CompilerCompilationCapture.Capture(
             compilation, projectDirectory, targetFramework, additionalFiles, cancellationToken);
         snapshot.SpecificationPackIds = [.. specificationPackAuthority.SpecificationPackIds];
@@ -25,7 +26,11 @@ internal static class CompilerManifestArtifactProducer
             new CompilerSourceLocationAuthority.ValidationContext();
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
             .Where(static item => item.Severity == DiagnosticSeverity.Error)
-            .Select(item => CreateDiagnostic(item, snapshot, locationValidation));
+            .Select(item => CreateDiagnostic(
+                item,
+                sourceTrees,
+                snapshot,
+                locationValidation));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
         var targets = discovery.Targets.Values.OrderBy(static item => item.Entry.CallableId, StringComparer.Ordinal);
@@ -84,7 +89,8 @@ internal static class CompilerManifestArtifactProducer
             Manifest = discovery.Manifest,
             MaximumExpressionDepth = maximumExpressionDepth,
             LocationAuthorities = CreateLocationAuthorities(
-                discovery.Manifest,
+                discovery,
+                sourceTrees,
                 snapshot,
                 locationValidation),
             CompilerDiagnostics = diagnosticArtifacts,
@@ -182,32 +188,80 @@ internal static class CompilerManifestArtifactProducer
     }
 
     private static CompilerLocationAuthorityArtifact[] CreateLocationAuthorities(
-        WorkerClaimManifest manifest,
+        ClaimManifestBuildResult discovery,
+        IReadOnlyList<SyntaxTree> sourceTrees,
         CompilerCompilationSnapshot compilation,
         CompilerSourceLocationAuthority.ValidationContext locationValidation)
     {
         return [
-            .. manifest.Callables
-                .Select(entry => CompilerSourceLocationAuthority.CreateAuthority(
+            .. discovery.Targets.Values.Select(target =>
+                CreateLocationAuthority(
                     CompilerSourceLocationOwnerKind.Callable,
-                    entry.CallableId,
-                    entry.Location,
+                    target.Entry.CallableId,
+                    target.Entry.Location,
+                    FindSourceTreeOrdinal(
+                        target.Declaration?.SyntaxTree ??
+                        target.Method.Locations.FirstOrDefault(
+                            static location => location.IsInSource)?.SourceTree,
+                        sourceTrees),
                     compilation,
                     locationValidation))
-                .Concat(manifest.Claims.Select(entry =>
-                    CompilerSourceLocationAuthority.CreateAuthority(
-                        CompilerSourceLocationOwnerKind.Claim,
-                        entry.ClaimId,
-                        entry.Location,
-                        compilation,
-                        locationValidation)))
+                .Concat(discovery.Targets.Values.SelectMany(target =>
+                    target.Claims.Select(claim =>
+                        CreateLocationAuthority(
+                            CompilerSourceLocationOwnerKind.Claim,
+                            claim.Entry.ClaimId,
+                            claim.Entry.Location,
+                            FindSourceTreeOrdinal(
+                                claim.SourceOperation?.Syntax.SyntaxTree ??
+                                claim.SourceAttribute?.ApplicationSyntaxReference?.SyntaxTree ??
+                                target.Declaration?.SyntaxTree,
+                                sourceTrees),
+                            compilation,
+                            locationValidation))))
+                .Concat(discovery.Targets.Values.SelectMany(target =>
+                    target.EffectClaims.Select(claim =>
+                        CreateLocationAuthority(
+                            CompilerSourceLocationOwnerKind.Claim,
+                            claim.Entry.ClaimId,
+                            claim.Entry.Location,
+                            FindSourceTreeOrdinalByPath(
+                                claim.Authority.SourceTreePath,
+                                sourceTrees),
+                            compilation,
+                            locationValidation))))
                 .OrderBy(static value => value.OwnerKind)
                 .ThenBy(static value => value.OwnerId, StringComparer.Ordinal)
         ];
     }
 
+    private static CompilerLocationAuthorityArtifact CreateLocationAuthority(
+        CompilerSourceLocationOwnerKind ownerKind,
+        string ownerId,
+        WorkerSourceLocation location,
+        int sourceTreeOrdinal,
+        CompilerCompilationSnapshot compilation,
+        CompilerSourceLocationAuthority.ValidationContext locationValidation)
+    {
+        return sourceTreeOrdinal >= 0
+            ? CompilerSourceLocationAuthority.CreateAuthority(
+                ownerKind,
+                ownerId,
+                location,
+                compilation,
+                sourceTreeOrdinal,
+                locationValidation)
+            : CompilerSourceLocationAuthority.CreateAuthority(
+                ownerKind,
+                ownerId,
+                location,
+                compilation,
+                locationValidation);
+    }
+
     private static CompilerDiagnosticArtifact CreateDiagnostic(
         Diagnostic diagnostic,
+        IReadOnlyList<SyntaxTree> sourceTrees,
         CompilerCompilationSnapshot compilation,
         CompilerSourceLocationAuthority.ValidationContext locationValidation)
     {
@@ -239,18 +293,97 @@ internal static class CompilerManifestArtifactProducer
             return result;
         }
 
-        CompilerSourceLocationAuthority.Bind(
-            location,
-            compilation,
-            out var sourceTreeOrdinal,
-            out var sourceTreePath,
-            out var sourceTreeSha256,
-            out var sourceLineMapSha256,
-            locationValidation);
+        var sourceTreeOrdinal = FindSourceTreeOrdinal(
+            diagnostic.Location.SourceTree,
+            sourceTrees);
+        string sourceTreePath;
+        string sourceTreeSha256;
+        string sourceLineMapSha256;
+        if (sourceTreeOrdinal >= 0)
+        {
+            CompilerSourceLocationAuthority.Bind(
+                location,
+                compilation,
+                sourceTreeOrdinal,
+                out sourceTreePath,
+                out sourceTreeSha256,
+                out sourceLineMapSha256,
+                locationValidation);
+        }
+        else
+        {
+            CompilerSourceLocationAuthority.Bind(
+                location,
+                compilation,
+                out sourceTreeOrdinal,
+                out sourceTreePath,
+                out sourceTreeSha256,
+                out sourceLineMapSha256,
+                locationValidation);
+        }
         result.SourceTreeOrdinal = sourceTreeOrdinal;
         result.SourceTreePath = sourceTreePath;
         result.SourceTreeSha256 = sourceTreeSha256;
         result.SourceLineMapSha256 = sourceLineMapSha256;
         return result;
+    }
+
+    private static int FindSourceTreeOrdinal(
+        SyntaxTree? sourceTree,
+        IReadOnlyList<SyntaxTree> sourceTrees)
+    {
+        if (sourceTree == null)
+        {
+            return -1;
+        }
+
+        for (var index = 0; index < sourceTrees.Count; index++)
+        {
+            if (ReferenceEquals(sourceTree, sourceTrees[index]))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindSourceTreeOrdinalByPath(
+        string? sourceTreePath,
+        IReadOnlyList<SyntaxTree> sourceTrees)
+    {
+        if (sourceTreePath is not { } candidatePath ||
+            string.IsNullOrWhiteSpace(candidatePath))
+        {
+            return -1;
+        }
+
+        var normalizedPath = CompilerCaptureAuthority.NormalizePath(
+            candidatePath);
+        var ordinal = -1;
+        for (var index = 0; index < sourceTrees.Count; index++)
+        {
+            if (sourceTrees[index].FilePath is not { } sourcePath)
+            {
+                continue;
+            }
+
+            if (!string.Equals(
+                    CompilerCaptureAuthority.NormalizePath(sourcePath),
+                    normalizedPath,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (ordinal >= 0)
+            {
+                return -1;
+            }
+
+            ordinal = index;
+        }
+
+        return ordinal;
     }
 }
