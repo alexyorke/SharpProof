@@ -2,15 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 3. HIGH - Implemented partial target methods falsely treated as ambiguous ContractFor members
-
-- File: `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs`
-- Member: `Validate`
-- Lines: 28-45, 110-129, 132-147
-- Mechanism: The target inventory does not normalize partial definition/implementation pairs. Both Roslyn symbols match one companion, `byCandidate` length becomes 2, SPCF0006 is emitted, and body validation is skipped.
-- Impact: A valid companion is rejected and its contracts remain unvalidated.
-- Safe reproduction/evidence: Define a partial `Service.Check` declaration plus implementation and one matching `[ContractFor]` companion `Check`.
-
 ## 4. LOW - Blank legacy editorconfig alias masks retired MSBuild alias
 
 - File: `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs`

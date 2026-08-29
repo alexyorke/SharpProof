@@ -25,8 +25,8 @@ internal static class ContractForCompanionValidator
             return;
         }
 
-        var targets = ContractForSymbolMatcher.GetOrdinaryMethods(companion.Target);
-        var candidates = ContractForSymbolMatcher.GetOrdinaryMethods(companion.Companion);
+        var targets = GetLogicalMethods(companion.Target);
+        var candidates = GetLogicalMethods(companion.Companion);
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
         var byTarget = targets.ToDictionary(
             static target => target,
@@ -145,6 +145,14 @@ internal static class ContractForCompanionValidator
                 companion.AttributeLocation,
                 cancellationToken);
         }
+    }
+
+    private static ImmutableArray<IMethodSymbol> GetLogicalMethods(
+        INamedTypeSymbol type)
+    {
+        return [.. ContractForSymbolMatcher.GetOrdinaryMethods(type)
+            .Select(ContractClauseInventoryBuilder.NormalizeCallable)
+            .Distinct((IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default)];
     }
 
     private static void ValidateBody(

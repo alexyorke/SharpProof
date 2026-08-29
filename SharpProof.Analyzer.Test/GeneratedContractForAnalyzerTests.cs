@@ -49,6 +49,35 @@ public sealed class GeneratedContractForAnalyzerTests
     }
 
     [Test]
+    public async Task ImplementedPartialTargetIsMatchedAsOneLogicalMember()
+    {
+        var diagnostics = await AnalyzeGeneratedAcrossInputFilesAsync(
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(Service))]
+            public static class ServiceContracts
+            {
+                public static int Check(Service receiver, int value) => value;
+            }
+            """,
+            ("""
+             public partial class Service
+             {
+                 public partial int Check(int value);
+             }
+             """, "Service.Definition.cs"),
+            ("""
+             public partial class Service
+             {
+                 public partial int Check(int value) => value;
+             }
+             """, "Service.Implementation.cs"));
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task PeerGeneratedRejectedContractForIsReported()
     {
         var diagnostics = await AnalyzeGeneratedAsync(
@@ -394,6 +423,40 @@ public sealed class GeneratedContractForAnalyzerTests
             mode: null,
             profile: profile,
             features: features);
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>>
+        AnalyzeGeneratedAcrossInputFilesAsync(
+            string generatedSource,
+            params (string Source, string FilePath)[] inputFiles)
+    {
+        var diagnosticIds = Enumerable.Range(1, 8)
+            .Select(static index => $"SPCF{index:D4}")
+            .ToArray();
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            inputFiles[0].Source,
+            diagnosticIds,
+            filePath: inputFiles[0].FilePath);
+        compilation = compilation.AddSyntaxTrees(inputFiles.Skip(1).Select(
+            input => CSharpSyntaxTree.ParseText(
+                input.Source,
+                (CSharpParseOptions)compilation.SyntaxTrees[0].Options,
+                input.FilePath)));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            [new GeneratedCompanionSourceGenerator(
+                generatedSource,
+                "GeneratedContracts.g.cs").AsSourceGenerator()],
+            parseOptions: (CSharpParseOptions)compilation.SyntaxTrees[0].Options);
+        driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var output,
+            out var generatorDiagnostics);
+        Assert.That(generatorDiagnostics, Is.Empty);
+        return await AnalyzerTestHost.AnalyzeAsync(
+            (CSharpCompilation)output,
+            mode: null,
+            profile: "advisory",
+            features: "contracts");
     }
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeGeneratedInOrderAsync(
