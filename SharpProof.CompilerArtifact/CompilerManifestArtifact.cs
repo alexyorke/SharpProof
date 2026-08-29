@@ -53,7 +53,13 @@ internal static class WorkerBinaryIdentity
         string workerPath)
     {
         var path = NormalizeWorkerPath(workerPath);
-        ReclaimOrphanedStagingDirectories();
+        // A worker may itself be running from a parent snapshot's staging
+        // directory.  That directory is still part of the live process's
+        // runtime closure, so never let this nested identity calculation
+        // reclaim its source directory even if the owner lease cannot be
+        // observed across the process boundary.
+        ReclaimOrphanedStagingDirectories(
+            protectedDirectory: GetDirectoryName(path));
         var stagingDirectory = CreateStagingDirectory();
         FileStream[] stagedHandles = [];
         var stagedCount = 0;
@@ -279,9 +285,15 @@ internal static class WorkerBinaryIdentity
     }
 
     internal static void ReclaimOrphanedStagingDirectories(
-        string? temporaryRoot = null)
+        string? temporaryRoot = null,
+        string? protectedDirectory = null)
     {
         temporaryRoot ??= GetTempPath();
+        var protectedPath = protectedDirectory is null
+            ? null
+            : GetFullPath(protectedDirectory).TrimEnd(
+                DirectorySeparatorChar,
+                AltDirectorySeparatorChar);
         string[] directories;
         try
         {
@@ -300,6 +312,16 @@ internal static class WorkerBinaryIdentity
 
         foreach (var directory in directories)
         {
+            if (protectedPath is not null &&
+                string.Equals(
+                    GetFullPath(directory).TrimEnd(
+                        DirectorySeparatorChar,
+                        AltDirectorySeparatorChar),
+                    protectedPath,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
             if (!TryReadOwnerLease(directory, out var processId, out var startTicks) ||
                 IsOwnerAlive(processId, startTicks))
             {
