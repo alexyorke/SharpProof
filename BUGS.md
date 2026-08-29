@@ -2,13 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 9. HIGH - Await protocol calls omitted from effect summaries
-
-- Files and members: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, `ScanAwait`, lines 90-102; `SharpProof.Effects/OperationEffectScanner.cs`, `ScanCoreOperation` dispatch, lines 256-257.
-- Mechanism: The scanner processes only the awaitable expression and null possibility, not `GetAwaiter`, `IsCompleted`, `OnCompleted`/`UnsafeOnCompleted`, or `GetResult`, and does not mark the summary incomplete.
-- Impact: Complete summaries omit custom awaiter writes, allocations, capabilities, divergence, and exceptions; an async method may be accepted as pure or nonthrowing.
-- Safe reproduction/evidence: Use a custom awaiter whose protocol members update a static counter and whose `GetResult` throws.
-
 ## 10. HIGH - Lock null fallback ignores intervening assignments
 
 - Files and members: `SharpProof.Effects/OperationNullnessEvaluator.cs`, `IsProvenNull` and `IsSourceDefinitelyNull`, lines 22-27 and 42-100, especially 71-74; downstream `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, `ScanLock`, lines 135-154; `IsImplicitLockEnterWithNullValue`, lines 30-40; `OperationCompletionEvaluator` invocation, lines 48-64.

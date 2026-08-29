@@ -9,6 +9,108 @@ namespace SharpProof.Effects.Test;
 public sealed class EffectAnalysisTests
 {
     [Test]
+    public void AwaitProtocolEffectsAreIncludedInTheSummary()
+    {
+        var result = Analyze(
+            """
+            using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+
+            public static class Sample {
+                private static int state;
+
+                public static async Task Run() {
+                    await new Awaitable();
+                }
+
+                public sealed class Awaitable {
+                    public Awaiter GetAwaiter() => new();
+                }
+
+                public sealed class Awaiter : INotifyCompletion {
+                    public bool IsCompleted {
+                        get { state++; return true; }
+                    }
+
+                    public void OnCompleted(Action continuation) {
+                        state++;
+                    }
+
+                    public void GetResult() {
+                        state++;
+                        throw new InvalidOperationException();
+                    }
+                }
+            }
+            """,
+            "Sample",
+            "Run");
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+        Assert.That(
+            result.Summary.Throws.Types.Select(static type =>
+                type.ToDisplayString()),
+            Does.Contain("System.InvalidOperationException"));
+    }
+
+    [Test]
+    public void CriticalAwaitProtocolUsesUnsafeContinuationEffects()
+    {
+        var result = Analyze(
+            """
+            using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+
+            public static class Sample {
+                private static int state;
+
+                public static async Task Run() {
+                    await new Awaitable();
+                }
+
+                public sealed class Awaitable {
+                    public Awaiter GetAwaiter() => new();
+                }
+
+                public sealed class Awaiter : ICriticalNotifyCompletion {
+                    public bool IsCompleted {
+                        get { state++; return true; }
+                    }
+
+                    public void OnCompleted(Action continuation) {
+                        throw new InvalidOperationException();
+                    }
+
+                    public void UnsafeOnCompleted(Action continuation) {
+                        state++;
+                    }
+
+                    public void GetResult() {
+                        state++;
+                    }
+                }
+            }
+            """,
+            "Sample",
+            "Run");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type =>
+                    type.ToDisplayString()),
+                Does.Not.Contain("System.InvalidOperationException"));
+        }
+    }
+
+    [Test]
     public void MetadataListPatternAccessorsRemainConservative()
     {
         var external = EffectTestHost.EmitImage(

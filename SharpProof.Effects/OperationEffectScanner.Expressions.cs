@@ -1,3 +1,6 @@
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace SharpProof.Effects;
 
 internal sealed partial class OperationEffectScanner
@@ -89,17 +92,177 @@ internal sealed partial class OperationEffectScanner
 
     private EffectSummary ScanAwait(IAwaitOperation awaitOperation)
     {
+        if (awaitOperation.Syntax is not AwaitExpressionSyntax awaitSyntax)
+        {
+            return EffectSummaryOperations.Join(
+                ScanStep(awaitOperation.Operation).Summary,
+                EffectSummaryOperations.Unsupported());
+        }
+
         var operand = ScanStep(awaitOperation.Operation);
         if (!operand.CompletesNormally)
         {
             return operand.Summary;
         }
 
-        var receiver = awaitOperation.Operation;
-        var nullCheck = new EffectStep(
-            PotentialNullReceiver(receiver, awaitOperation),
-            _nullnessEvaluator.IsProvenNonNull(receiver, awaitOperation));
-        return operand.Then(nullCheck).Summary;
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(_session.Compilation, awaitSyntax.SyntaxTree);
+        var info = Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+            .GetAwaitExpressionInfo(
+            model,
+            awaitSyntax);
+        if (info.GetAwaiterMethod is not { } getAwaiter)
+        {
+            return EffectSummaryDomain.Instance.Join(
+                operand.Summary,
+                EffectSummaryOperations.Unsupported());
+        }
+
+        var awaitableReceiver = _conversionOwnership.ClassifyRegion(
+            awaitOperation.Operation);
+        var awaitableCheck = getAwaiter.IsStatic ||
+            getAwaiter.ReducedFrom != null
+                ? EffectStep.Empty
+                : new EffectStep(
+                    PotentialNullReceiver(
+                        awaitOperation.Operation,
+                        awaitOperation),
+                    !_nullnessEvaluator.IsProvenNull(
+                        awaitOperation.Operation,
+                        awaitOperation));
+        var getAwaiterSummary = _callResolver.Resolve(
+            getAwaiter,
+            awaitableReceiver,
+            awaitableReceiver,
+            [],
+            [],
+            dispatchUncertain: getAwaiter.IsVirtual || getAwaiter.IsAbstract,
+            awaitOperation,
+            awaitOperation.Operation);
+        var getAwaiterStep = awaitableCheck.Then(new EffectStep(
+            getAwaiterSummary,
+            _completionEvaluator.CanCompleteInvocation(
+                getAwaiter,
+                awaitOperation.Operation,
+                awaitOperation)));
+        var result = operand.Then(getAwaiterStep);
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        var awaiter = EffectRegionSet.Create(
+            EffectRegionId.Fresh(awaitOperation.Syntax.SpanStart));
+        if (info.IsCompletedProperty?.GetMethod is not { } isCompleted ||
+            info.GetResultMethod is not { } getResult)
+        {
+            return result.WithSummary(
+                EffectSummaryDomain.Instance.Join(
+                    result.Summary,
+                    EffectSummaryOperations.Unsupported())).Summary;
+        }
+
+        var isCompletedStep = ScanAwaitProtocolCall(
+            isCompleted,
+            awaiter,
+            awaitOperation);
+        result = result.Then(isCompletedStep);
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        // The continuation registration is conditional on IsCompleted.  Its
+        // effects are therefore possible, rather than an unconditional step.
+        // Join its summary without making a possibly skipped throw block the
+        // path that resumes directly to GetResult.
+        var continuation = FindAwaitContinuationMethod(
+            getAwaiter.ReturnType);
+        if (continuation == null)
+        {
+            return result.WithSummary(
+                EffectSummaryDomain.Instance.Join(
+                    result.Summary,
+                    EffectSummaryOperations.Unsupported())).Summary;
+        }
+
+        var continuationStep = ScanAwaitProtocolCall(
+            continuation,
+            awaiter,
+            awaitOperation);
+        result = result.WithSummary(
+            EffectSummaryDomain.Instance.Join(
+                result.Summary,
+                continuationStep.Summary));
+
+        return result.Then(ScanAwaitProtocolCall(
+            getResult,
+            awaiter,
+            awaitOperation)).Summary;
+    }
+
+    private IMethodSymbol? FindAwaitContinuationMethod(
+        ITypeSymbol awaiterType)
+    {
+        if (awaiterType is not INamedTypeSymbol namedAwaiter)
+        {
+            return null;
+        }
+
+        var critical = FindInterfaceImplementation(
+            namedAwaiter,
+            "System.Runtime.CompilerServices.ICriticalNotifyCompletion",
+            "UnsafeOnCompleted");
+        if (critical != null)
+        {
+            return critical;
+        }
+
+        return FindInterfaceImplementation(
+            namedAwaiter,
+            "System.Runtime.CompilerServices.INotifyCompletion",
+            "OnCompleted");
+    }
+
+    private IMethodSymbol? FindInterfaceImplementation(
+        INamedTypeSymbol awaiterType,
+        string interfaceMetadataName,
+        string methodName)
+    {
+        var interfaceType = _session.Compilation.GetTypeByMetadataName(
+            interfaceMetadataName);
+        var interfaceMethod = interfaceType?.GetMembers(methodName)
+            .OfType<IMethodSymbol>()
+            .SingleOrDefault();
+        if (interfaceMethod == null)
+        {
+            return null;
+        }
+
+        return awaiterType.FindImplementationForInterfaceMember(
+            interfaceMethod) as IMethodSymbol;
+    }
+
+    private EffectStep ScanAwaitProtocolCall(
+        IMethodSymbol method,
+        EffectRegionSet receiver,
+        IOperation origin)
+    {
+        var effectiveReceiver = method.IsStatic
+            ? EffectRegionSet.Empty
+            : receiver;
+        var summary = _callResolver.Resolve(
+            method,
+            effectiveReceiver,
+            effectiveReceiver,
+            [],
+            [],
+            dispatchUncertain: method.IsVirtual || method.IsAbstract,
+            origin,
+            instance: null);
+        return new EffectStep(
+            summary,
+            _completionEvaluator.CanMethodCompleteNormally(method));
     }
 
     private EffectSummary ScanWith(IWithOperation withOperation)
