@@ -9,6 +9,67 @@ namespace SharpProof.Effects.Test;
 public sealed class EffectAnalysisTests
 {
     [Test]
+    public void ReassignedLockUsesTheCurrentNonNullValue()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                private static int state;
+
+                public static void Run() {
+                    object gate = null!;
+                    gate = new object();
+                    lock (gate) {
+                        state++;
+                    }
+                }
+            }
+            """,
+            "Sample",
+            "Run");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Regions,
+                Has.Some.EqualTo(EffectRegionId.Static()));
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type =>
+                    type.ToDisplayString()),
+                Does.Not.Contain("System.ArgumentNullException"));
+        }
+    }
+
+    [Test]
+    public void NullnessFallbackChecksAssignmentsBeforeTreatingLockAsNull()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static void Run() {
+                    object gate = null!;
+                    gate = new object();
+                    lock (gate) { }
+                }
+            }
+            """);
+        var method = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
+        var operation = compilation.GetSemanticModel(syntax.SyntaxTree)
+            .GetOperation(syntax);
+        var @lock = operation!.DescendantsAndSelf()
+            .OfType<ILockOperation>()
+            .Single();
+        var evaluator = new OperationNullnessEvaluator(
+            new EffectAnalysisSession(compilation),
+            operation!,
+            abstractFlow: null,
+            monitorType: null);
+
+        Assert.That(evaluator.IsProvenNull(@lock.LockedValue, @lock), Is.False);
+    }
+
+    [Test]
     public void AwaitProtocolEffectsAreIncludedInTheSummary()
     {
         var result = Analyze(

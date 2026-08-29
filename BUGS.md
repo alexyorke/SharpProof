@@ -2,13 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 10. HIGH - Lock null fallback ignores intervening assignments
-
-- Files and members: `SharpProof.Effects/OperationNullnessEvaluator.cs`, `IsProvenNull` and `IsSourceDefinitelyNull`, lines 22-27 and 42-100, especially 71-74; downstream `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, `ScanLock`, lines 135-154; `IsImplicitLockEnterWithNullValue`, lines 30-40; `OperationCompletionEvaluator` invocation, lines 48-64.
-- Mechanism: The lock-origin shortcut returns true from a declaration initializer of null before checking a later reassignment, overriding the managed-flow nonnull fact.
-- Impact: The analysis creates a spurious `ArgumentNullException` and suppresses the reachable lock body and its effects.
-- Safe reproduction/evidence: `object gate=null!; gate=new object(); lock(gate){State++;}`.
-
 ## 11. HIGH - Invalid direct clauses silently ignored when a companion exists
 
 - File: `SharpProof.Contracts/EffectiveContractSourceResolver.cs`
