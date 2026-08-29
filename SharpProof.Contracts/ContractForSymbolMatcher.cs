@@ -242,12 +242,12 @@ internal static class ContractForSymbolMatcher
             MemberSignaturesMatch(signatureTarget, candidate)).ToImmutableArray();
         if (matches.Length == 1)
         {
-            if (!HasCompleteSurface(
-                    companion.Target,
-                    companion.Type))
+            var surfaceFailure = GetSurfaceFailure(
+                companion.Target,
+                companion.Type);
+            if (surfaceFailure != ContractBindingFailure.None)
             {
-                return CompanionResolution.Fail(
-                    ContractBindingFailure.CompanionSignatureMismatch);
+                return CompanionResolution.Fail(surfaceFailure);
             }
             return HasUniqueTarget(signatureTarget, matches[0])
                 ? SpecializeCompanion(companion, matches[0], target)
@@ -261,18 +261,28 @@ internal static class ContractForSymbolMatcher
                 : ContractBindingFailure.CompanionSignatureMismatch);
     }
 
-    private static bool HasCompleteSurface(
+    private static ContractBindingFailure GetSurfaceFailure(
         INamedTypeSymbol target,
         INamedTypeSymbol companion)
     {
         var targets = GetOrdinaryMethods(target);
         var candidates = GetOrdinaryMethods(companion);
-        return targets.All(targetMethod =>
-                   candidates.Count(candidate =>
-                       MemberSignaturesMatch(targetMethod, candidate)) == 1) &&
-               candidates.All(candidate =>
-                   targets.Count(targetMethod =>
-                       MemberSignaturesMatch(targetMethod, candidate)) == 1);
+        var targetMatchCounts = targets.Select(targetMethod =>
+            candidates.Count(candidate =>
+                MemberSignaturesMatch(targetMethod, candidate))).ToArray();
+        var candidateMatchCounts = candidates.Select(candidate =>
+            targets.Count(targetMethod =>
+                MemberSignaturesMatch(targetMethod, candidate))).ToArray();
+        if (targetMatchCounts.Any(static count => count > 1) ||
+            candidateMatchCounts.Any(static count => count > 1))
+        {
+            return ContractBindingFailure.AmbiguousCompanion;
+        }
+
+        return targetMatchCounts.All(static count => count == 1) &&
+               candidateMatchCounts.All(static count => count == 1)
+            ? ContractBindingFailure.None
+            : ContractBindingFailure.CompanionSignatureMismatch;
     }
 
     internal static bool IsCompanionType(
