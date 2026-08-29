@@ -54,6 +54,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     private bool _canceled;
     private bool _disposed;
     private bool _executionActive;
+    private string? _retainedContainmentFailure;
 
     internal Func<int, int>? OpenPidFdOverride { get; set; }
     internal Func<Process?, int, int, bool>? TryTerminateOverride { get; set; }
@@ -62,6 +63,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     internal static int RetainedCleanupAnchorCount =>
         RetainedCleanupAnchors.Count;
+
+    internal string? RetainedContainmentFailure =>
+        Volatile.Read(ref _retainedContainmentFailure);
 
     [Required]
     public string Executable { get; set; } = string.Empty;
@@ -135,6 +139,16 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         Justification = "The MSBuild boundary reports every launch failure as a classified task result.")]
     public override bool Execute()
     {
+        if (Volatile.Read(ref _retainedContainmentFailure) is { } retainedFailure)
+        {
+            ExitCode = -1;
+            Log.LogError(
+                "SharpProof verifier cannot execute after a retained " +
+                "containment failure: {0}",
+                retainedFailure);
+            return false;
+        }
+
         Process? process = null;
         var processGroupId = 0;
         System.Threading.Tasks.Task<BoundedProcessOutput>? standardOutput = null;
@@ -443,7 +457,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                             ref _terminalCause) ==
                             VerifierTerminalCause.Canceled
                             ? null
-                            : HandleContainmentAuthenticationFailure;
+                            : HandleRetainedContainmentFailure;
                     RetainCleanupAnchor(
                         process,
                         processGroupPidFd,
@@ -805,6 +819,26 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         Environment.FailFast(message);
     }
 
+    private void HandleRetainedContainmentFailure(string message)
+    {
+        if (ContainmentAuthenticationFailureOverride is { } handler)
+        {
+            handler(message);
+            return;
+        }
+
+        // A retained anchor is deliberately observed after Execute has
+        // returned.  Never call Environment.FailFast from that callback: the
+        // MSBuild node may already be running unrelated work.  Poison this
+        // task instance instead; any attempted reuse fails synchronously at
+        // the next Execute boundary while the anchor has already been
+        // terminated by the observer.
+        Interlocked.CompareExchange(
+            ref _retainedContainmentFailure,
+            message,
+            comparand: null);
+    }
+
     internal static void RetainCleanupAnchorForTest(Process process)
     {
         RetainCleanupAnchor(process, -1, null, null, null, null, null);
@@ -827,6 +861,24 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             supervisorNonce,
             null,
             authenticationFailure);
+    }
+
+    internal void RetainCleanupAnchorWithoutFailFastForTest(
+        Process process,
+        System.Threading.Tasks.Task<string> standardOutput,
+        string supervisorNonce)
+    {
+        var boundedOutput = ConvertTestOutputAsync(
+            standardOutput,
+            supervisorNonce);
+        RetainCleanupAnchor(
+            process,
+            -1,
+            boundedOutput,
+            null,
+            supervisorNonce,
+            null,
+            HandleRetainedContainmentFailure);
     }
 
     private static async System.Threading.Tasks.Task<BoundedProcessOutput>

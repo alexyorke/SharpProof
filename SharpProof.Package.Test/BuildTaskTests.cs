@@ -1576,6 +1576,44 @@ public sealed class BuildTaskTests
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
+    public void RetainedCleanupFailureDoesNotTerminateTheHostAfterExecute()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef" +
+            "0123456789abcdef0123456789abcdef";
+        using var task = new RunVerifier
+        {
+            BuildEngine = new RecordingBuildEngine()
+        };
+        using var process = Process.Start("/bin/true");
+        Assert.That(process, Is.Not.Null);
+
+        task.RetainCleanupAnchorWithoutFailFastForTest(
+            process!,
+            System.Threading.Tasks.Task.FromResult(
+                "SharpProof.Armed/1 " + nonce + "\n"),
+            nonce);
+
+        Assert.That(
+            SpinWait.SpinUntil(
+                () => task.RetainedContainmentFailure != null,
+                TimeSpan.FromSeconds(2)),
+            Is.True);
+        Assert.That(
+            task.RetainedContainmentFailure,
+            Does.Contain("cleanup receipt"));
+        Assert.That(task.Execute(), Is.False);
+        Assert.That(task.ExitCode, Is.EqualTo(-1));
+        Assert.That(
+            SpinWait.SpinUntil(
+                () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                TimeSpan.FromSeconds(2)),
+            Is.True);
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
     public void VerifierExecutionRetainsLiveIncompleteCleanupAnchor()
     {
         var directory = Directory.CreateTempSubdirectory(
