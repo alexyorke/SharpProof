@@ -10,7 +10,7 @@ namespace SharpProof.Specs.Test;
 public sealed class DefaultApiSpecCatalogGenerationTests
 {
     private const string ExpectedContentSha256 =
-        "c0f4a6b09d7efdb66ac11457ae4d80345c9a977286118058ae67750961a3342e";
+        "a393c14e085caee77b5220eba56ac07663bd5e7349ad2248df1cbc7cba877943";
 
     [Test]
     public void GeneratedCatalogPreservesEveryReviewedWitness()
