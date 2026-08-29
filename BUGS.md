@@ -2,13 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 13. HIGH - Production package test hook bypasses verifier runtime-closure expectation
-
-- Files: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props`, lines 11-17; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`, lines 12-13, 15-22, 33-39.
-- Mechanism: An externally supplied `_SharpProofTestBuildTasksPath` replaces both the effective build-task path and expected package path. Validation compares the same substituted value and accepts it; the hook is not limited to test builds or independently authenticated.
-- Impact: Consumer configuration can substitute an unintended task implementation controlling invalidation, launch, validation, and cleanup, undermining package-owned closure and require-proven behavior.
-- Safe reproduction/evidence: In an isolated package test, set the property to a benign fixture assembly exposing the expected task types and observe that closure validation accepts the substituted path. No production or system modification is needed.
-
 ## 14. MEDIUM - Host support detection omits Linux check
 
 - Files: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props`, lines 4-8; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`, lines 33-39 and 138-152; `SharpProof.Verifier/SharpProof.Verifier.nuspec`, lines 28 and 57.
