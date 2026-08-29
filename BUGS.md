@@ -6,7 +6,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 The latest audit wave ran against exact baseline
 `ffe74fff1c852d073610cfbebc54c141521a25fb`. Its ten subsystem reports contain
-42 candidate findings below. Each candidate remains open until the main agent
+41 candidate findings below. Each candidate remains open until the main agent
 independently reproduces it, adds a regression test, implements the fix, and
 removes the detailed entry in the corresponding fix commit.
 
@@ -105,7 +105,7 @@ The deferred security/containment findings addressed in this branch have dedicat
 
 ## Active, deferred, and rejected findings
 
-The 42 detailed findings below are pending independent reproduction and TDD
+The 41 detailed findings below are pending independent reproduction and TDD
 resolution. Historical findings remain represented by the compact resolution
 and reclassification ledgers above.
 
@@ -113,25 +113,6 @@ and reclassification ledgers above.
 
 Scout 1 clean areas (verified, no bugs): SharpProofAnalyzer.cs registration; AnalyzerSession.cs; AnalyzerGeneratedCodePolicy.cs; ManagedContractFacts.cs; CallArgumentAliasPolicy.cs; ClosedContractDiagnostics.cs; InvalidContractArgumentDiagnostics.cs; ContractRuntimePolicy.cs; EffectEvaluationTypes.cs; generated catalogs (EffectEvaluationProjections, EffectEvaluationProducerTupleCatalog, AnalyzerDiagnosticCatalog, DeclarativeModels); both descriptor tables (SP0002…SP0050, SPCF0001…SPCF0008); CompilerExceptionTypeIdentity.cs; Configuration/AnalyzerConfiguration*.cs; ContractForValidation/*; SynthesizedRecordCallAnalysis.cs; PrimaryConstructorCallableInventory.cs; EffectContractDiagnostics.cs; LanguageSubsetGate.cs; AnalyzerFeaturePipeline.cs; SharpProofControlAttributePolicy.cs; remainder of RequiresCallSiteDiscovery.cs / RequiresCallSiteTreeAnalyzer.cs.
 ## [Bug hunt 2026-08-29T18:41:58Z] Scout 2 — Dataflow & IR (SharpProof.Dataflow, SharpProof.Ir)
-
-## Finding 1 — Non-canonical lattice representations break `IntervalValue` equality/hash contract
-- **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Dataflow\IntervalDomain.cs` (lines 34–46, `Create`; line 285, `TryAddBounds` caller in `Add`) and `C:\w\PurelySharp-bug-hunt\SharpProof.Dataflow\IntervalValue.cs` (lines 98–129, `Equals`/`GetHashCode`)
-- **Function/method + containing type:** `IntervalDomain.Create` / `IntervalValue.Equals(IntervalValue)` / `IntervalValue.GetHashCode`
-- **Line number(s):** IntervalDomain.cs 34–40 (canonicalization guard), 277–288 (`TryAddBounds`); IntervalValue.cs 98–129
-- **Bug description:** `[long.MinValue, k]` and `(-∞, k]` denote the *same* set of 64-bit integers, but `Create` only canonicalizes bounds to `null` when **both** bounds are null-or-extreme simultaneously (lines 34–40). The two representations are lattice-equivalent — `LessThanOrEqual` holds in both directions, so `ClosedAbstractDomain.AreEquivalent` (ClosedAbstractDomain.cs lines 21–24) returns `true` — yet `IntervalValue.Equals` compares raw nullable bounds, so they are unequal with different hash codes. Reachable at runtime: `IntervalDomain.Add(Range(long.MinValue, 0), Range(0, 5))` produces lower bound exactly `long.MinValue` via `TryAddBounds` (BigInteger sum lands in range, lines 284–286), yielding `[long.MinValue, 5]` mod 1, while `Range(null, 5)` yields `[null, 5]` — two keys for one abstract fact. Any consumer deduplicating/caching by `IntervalValue` (or `SequenceCardinalityValue`, which embeds `Length`) splits or duplicates state; only the fixpoint engine is immune because `ForwardDataflowAnalysis` uses `AreEquivalent` (ForwardDataflowAnalysis.cs lines 145, 178, 203) rather than `Equals`. Tests exercise `Range(long.MinValue, long.MaxValue)`, confirming extreme-bound values occur.
-- **Code excerpt:**
-```csharp
-// IntervalDomain.Create, lines 34–40 — both bounds must qualify or neither is canonicalized
-if (modulus.IsOne &&
-    (!lowerBound.HasValue || lowerBound == long.MinValue) &&
-    (!upperBound.HasValue || upperBound == long.MaxValue))
-{ lowerBound = null; upperBound = null; }
-...
-// IntervalValue.Equals, lines 100–105 — raw bound comparison
-return _hasValue == other._hasValue &&
-       (!_hasValue || LowerBound == other.LowerBound && ...);
-```
-- **Category:** logic — **Severity:** low — **Confidence:** 0.55
 
 ## Finding 2 — All malformed-operand evaluation failures reported as `InvalidVariableValue`
 - **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Ir\IrInterpreter.cs`

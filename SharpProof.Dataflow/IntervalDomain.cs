@@ -31,12 +31,17 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
             throw new ArgumentOutOfRangeException(nameof(modulus));
         }
 
-        if (modulus.IsOne &&
-            (!lowerBound.HasValue || lowerBound == long.MinValue) &&
-            (!upperBound.HasValue || upperBound == long.MaxValue))
+        if (modulus.IsOne)
         {
-            lowerBound = null;
-            upperBound = null;
+            if (!lowerBound.HasValue || lowerBound == long.MinValue)
+            {
+                lowerBound = null;
+            }
+
+            if (!upperBound.HasValue || upperBound == long.MaxValue)
+            {
+                upperBound = null;
+            }
         }
 
         if (lowerBound.HasValue && upperBound.HasValue &&
