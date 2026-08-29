@@ -3,10 +3,43 @@ using System.Runtime.InteropServices;
 
 namespace SharpProof.Host;
 
+internal sealed class Z3ResolverGate
+{
+    private readonly TaskCompletionSource<IntPtr> _publication =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal void Publish(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero)
+        {
+            throw new ArgumentException(
+                "The Z3 resolver cannot publish a null native handle.",
+                nameof(handle));
+        }
+        _publication.TrySetResult(handle);
+    }
+
+    internal void Fail(Exception failure)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        _publication.TrySetException(failure);
+    }
+
+    internal IntPtr Resolve()
+    {
+        var handle = _publication.Task.GetAwaiter().GetResult();
+        return handle == IntPtr.Zero
+            ? throw new DllNotFoundException(
+                "The verified Z3 native handle was not published.")
+            : handle;
+    }
+}
+
 public static class ContainerNativeLibrary
 {
     private const string Z3ImportName = "libz3";
     private static readonly object Synchronization = new();
+    private static readonly Z3ResolverGate ResolverGate = new();
     private static Assembly? _z3Assembly;
     private static IntPtr _z3Handle;
 
@@ -34,17 +67,26 @@ public static class ContainerNativeLibrary
                     ResolveZ3Import);
                 _z3Assembly = z3Assembly;
                 Volatile.Write(ref _z3Handle, handle);
+                ResolverGate.Publish(handle);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException exception) when (
+                FailInstallationAndFree(handle, exception))
             {
                 throw;
             }
-            catch
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                NativeLibrary.Free(handle);
+                _ = FailInstallationAndFree(handle, exception);
                 throw;
             }
         }
+    }
+
+    private static bool FailInstallationAndFree(IntPtr handle, Exception failure)
+    {
+        ResolverGate.Fail(failure);
+        NativeLibrary.Free(handle);
+        return true;
     }
 
     private static IntPtr ResolveZ3Import(
@@ -62,6 +104,6 @@ public static class ContainerNativeLibrary
             throw new DllNotFoundException(
                 "The SharpProof verifier refuses ambient native libraries.");
         }
-        return Volatile.Read(ref _z3Handle);
+        return ResolverGate.Resolve();
     }
 }

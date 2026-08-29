@@ -63,6 +63,37 @@ public sealed class ContainerNativeLibrarySetupTests
         }
     }
 
+    [Test]
+    [NonParallelizable]
+    public void Z3ResolverWaitsForVerifiedHandlePublication()
+    {
+        var gate = new Z3ResolverGate();
+        var resolution = System.Threading.Tasks.Task.Run(() => gate.Resolve());
+
+        Assert.That(
+            resolution.Wait(TimeSpan.FromMilliseconds(100)),
+            Is.False,
+            "A resolver callback must not return a zero handle before publication.");
+
+        var expected = new IntPtr(1234);
+        gate.Publish(expected);
+        Assert.That(
+            resolution.GetAwaiter().GetResult(),
+            Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void Z3ResolverPropagatesInstallationFailure()
+    {
+        var gate = new Z3ResolverGate();
+        var failure = new InvalidOperationException("installation failed");
+        gate.Fail(failure);
+
+        var observed = Assert.Throws<InvalidOperationException>(
+            (Action)(() => _ = gate.Resolve()));
+        Assert.That(observed, Is.SameAs(failure));
+    }
+
     private static string FindUnrelatedNativeLibrary()
     {
         var candidates = new[]
