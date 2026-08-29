@@ -231,7 +231,12 @@ function Write-AcceptanceTimingEvidence {
 }
 
 trap {
-    if ($null -ne $activeTimingStopwatch) {
+    $activeTiming = Get-Variable `
+        -Name activeTimingStopwatch `
+        -Scope Script `
+        -ValueOnly `
+        -ErrorAction SilentlyContinue
+    if ($null -ne $activeTiming) {
         Complete-AcceptanceTimingPhase -Status failed
     }
     Write-AcceptanceTimingEvidence `
