@@ -72,6 +72,7 @@ Resolved reports are removed after reproduction, implementation, regression test
 | 317 | `8127933fc` (stable compiler-visible manifest source path and incremental regression) |
 | 369 | `fa58c7533` (explicit-interface implementation boundary; static constructors remain fail-closed) |
 | 364 | `02a645e69` (regular-file validation for private verifier paths) |
+| 337 | `cc0f2bc6b` (validated recovery for interrupted release-bundle swaps) |
 | 202 | `0a2c179f9` (runtime companion path validation and generated launcher coverage) |
 | 257-262 | `68afb8ca1`, `c3ab72290`, `8bd08c6e0` |
 | 263-270 | `0c9e0ec0d`, `0c95dad38`, `0a2c179f9`, `a7b99ca24` |
@@ -110,16 +111,6 @@ Historical resolved reports are intentionally removed from this file; the compac
 2. Let the wall budget expire: RunVerifier logs timeout, sets ExitCode=124, the targets raise their error, and the build finishes failing normally - but the pipes were open at decision time, so the anchor was retained with a non-null callback.
 3. Within <=30 s the anchor observes the supervisor's receipt-less 125 exit (or hits the retention deadline) and Environment.FailFast terminates the MSBuild node after completion - observable as abrupt node death while other work runs on it; replacing the callback body with logging removes the crash, proving the anchor path fired.
 **Confidence**: High (every cited branch read; trigger chain statically complete; frequency depends on launcher/descendant slow-fail timing that CI load routinely produces).
-
-### 337. [DEFERRED INTEGRITY] Release-Evidence Publication Swaps Directories With Two Non-Crash-Safe Moves - Process Death Between Them Deletes PackageSource and Strands the Previous Bundle in an Unreferenced Hidden Backup Until Manual Recovery
-
-**Location**: `scripts\SharpProof.ReleaseChecksums.ps1` (Publish-SharpProofReleaseBundleAtomically Lines 190-234: backup move at ~Line 219, staging move at ~Line 221, catch-only restore at Lines 226-234); caller `scripts\New-SharpProofReleaseEvidence.ps1` (staging sibling creation, trap, swap invocation ~Lines 969-973, destination DEFAULTING TO THE PACKAGE SOURCE ITSELF at Lines 543-544); no recovery consumer repo-wide (the only `.backup` reference is the creation site).
-**Description**: The atomic commit is implemented as two separate renames: move the live destination aside to a hidden GUID-named .backup sibling, then move the validated staging directory into place. The catch restores the backup only for in-process exceptions; SIGKILL/OOM/container teardown between the two moves leaves (a) destination absent, (b) the previous good bundle parked in .<name>.<guid>.backup, and (c) no code anywhere that knows about that pattern. The primary caller makes this worse by defaulting the destination to the package source itself: the pack command's artifacts/container-packages directory - the exact -PackageSource that pack's subsequent steps and the pilots/package-consumers commands require - is the directory being swapped underneath the pipeline. After such a crash, every rerun fails at Resolve-Path ("path does not exist"), the orphaned .backup accumulates beside it, and nothing distinguishes recoverable state from corruption; the operator must notice and hand-move the hidden directory. The repo treats crash-window publication as a defect class elsewhere (#281 generator WriteAllText, #134/#219 AtomicFile durability, #242/#273 marker durability); this is the release-packaging member of that family. Distinct from all of those: a PowerShell directory-swap with missing-backup-recovery consequence for PackageSource.
-**Reproduction Steps**:
-1. Run `docker compose run --rm tooling pack -Configuration Release` and SIGKILL the container in the window between entering Publish-SharpProofReleaseBundleAtomically's first and second Directory.Move (easily widened by inserting a delay).
-2. Observe artifacts/container-packages gone and artifacts/.container-packages.<guid>.backup present.
-3. Rerun any dependent command (pack/pilots/package-consumers): fails at Resolve-Path with "PackageSource is not a directory"; grep confirms no script ever references *.backup to self-heal.
-**Confidence**: High mechanics (both move sites, catch-only restoration, absence of recovery consumer, destination==source default all verified line-by-line); Low-Medium likelihood/severity (kill window is narrow, but the result bricks the release pipeline's input directory until manual recovery).
 
 ### 406. [DEFERRED SECURITY] The Worker's `--request`/`--result` Distinctness Guard Is Ordinal-String-Only - Symlink/Hardlink Aliases Bypass It While the Launcher's Own Path-Conflict Machinery Classifies the Identical Layout as a Conflict
 
