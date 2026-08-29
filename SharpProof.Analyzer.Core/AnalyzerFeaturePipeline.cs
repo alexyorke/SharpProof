@@ -706,7 +706,7 @@ internal static partial class AnalyzerFeaturePipeline
         CancellationToken cancellationToken)
     {
         var expression = semanticModel.Compilation.GetTypeByMetadataName(
-            "System.Linq.Expressions.Expression`1");
+            FrameworkTypeMetadataNames.ExpressionOfT);
         return expression != null &&
             semanticModel.GetTypeInfo(syntax, cancellationToken).ConvertedType is
             INamedTypeSymbol converted &&

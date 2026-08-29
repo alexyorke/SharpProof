@@ -265,7 +265,7 @@ internal static class StringConcatenationEffectResolver
         }
 
         var spanFormattable = compilation.GetTypeByMetadataName(
-            "System.ISpanFormattable");
+            FrameworkTypeMetadataNames.ISpanFormattable);
         if (spanFormattable != null &&
             named.AllInterfaces.Any(@interface =>
                 SymbolEqualityComparer.Default.Equals(
@@ -280,7 +280,7 @@ internal static class StringConcatenationEffectResolver
         }
 
         var formattable = compilation.GetTypeByMetadataName(
-            "System.IFormattable");
+            FrameworkTypeMetadataNames.IFormattable);
         if (formattable != null &&
             named.AllInterfaces.Any(@interface =>
                 SymbolEqualityComparer.Default.Equals(
@@ -288,7 +288,7 @@ internal static class StringConcatenationEffectResolver
                     formattable)))
         {
             var formatProvider = compilation.GetTypeByMetadataName(
-                "System.IFormatProvider");
+                FrameworkTypeMetadataNames.IFormatProvider);
             var interfaceMethod = formattable.GetMembers("ToString")
                 .OfType<IMethodSymbol>()
                 .SingleOrDefault(method => IsFormattableToString(

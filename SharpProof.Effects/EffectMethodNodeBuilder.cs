@@ -149,9 +149,9 @@ internal sealed class EffectMethodNodeBuilder
         }
 
         var task = _compilation.GetTypeByMetadataName(
-            "System.Threading.Tasks.Task");
+            FrameworkTypeMetadataNames.Task);
         var taskOfT = _compilation.GetTypeByMetadataName(
-            "System.Threading.Tasks.Task`1");
+            FrameworkTypeMetadataNames.TaskOfT);
         return task != null &&
             SymbolEqualityComparer.Default.Equals(
                 returnType.OriginalDefinition,

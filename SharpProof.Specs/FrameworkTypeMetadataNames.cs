@@ -18,6 +18,9 @@ public static class FrameworkTypeMetadataNames
     public const string Exception = "System.Exception";
     public const string ExpressionOfT =
         "System.Linq.Expressions.Expression`1";
+    public const string IFormattable = "System.IFormattable";
+    public const string IFormatProvider = "System.IFormatProvider";
+    public const string ISpanFormattable = "System.ISpanFormattable";
     public const string GeneratedCodeAttribute =
         "System.CodeDom.Compiler.GeneratedCodeAttribute";
     public const string IndexOutOfRangeException =
@@ -26,6 +29,8 @@ public static class FrameworkTypeMetadataNames
     public const string InvalidOperationException =
         "System.InvalidOperationException";
     public const string IDisposable = "System.IDisposable";
+    public const string InterpolatedStringHandlerAttribute =
+        "System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute";
     public const string ModuleInitializerAttribute =
         "System.Runtime.CompilerServices.ModuleInitializerAttribute";
     public static readonly string Monitor = "System.Threading.Monitor";
@@ -33,8 +38,11 @@ public static class FrameworkTypeMetadataNames
         "System.NullReferenceException";
     public const string OverflowException = "System.OverflowException";
     public const string ReferenceAssemblyAttribute = "System.Runtime.CompilerServices.ReferenceAssemblyAttribute";
+    public const string Range = "System.Range";
     public const string SwitchExpressionException =
         "System.Runtime.CompilerServices.SwitchExpressionException";
     public const string TypeInitializationException =
         "System.TypeInitializationException";
+    public const string Task = "System.Threading.Tasks.Task";
+    public const string TaskOfT = "System.Threading.Tasks.Task`1";
 }

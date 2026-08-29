@@ -1000,7 +1000,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
 
         var handlerAttribute = semanticModel.Compilation.GetTypeByMetadataName(
-            "System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute");
+            FrameworkTypeMetadataNames.InterpolatedStringHandlerAttribute);
         return handlerAttribute != null &&
             method.ContainingType.GetAttributes().Any(attribute =>
                 attribute.AttributeClass != null &&

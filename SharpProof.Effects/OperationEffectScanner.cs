@@ -62,7 +62,8 @@ internal sealed partial class OperationEffectScanner
         _directSyntax = GetDirectSyntax(root.Syntax);
         _exceptionType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         _monitorType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Monitor);
-        _rangeType = session.Compilation.GetTypeByMetadataName("System.Range");
+        _rangeType = session.Compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.Range);
         _nullnessEvaluator = new OperationNullnessEvaluator(
             session,
             _root,
