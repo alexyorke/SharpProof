@@ -2661,6 +2661,51 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    public void PublicationResetAllowsMissingCompilerManifestSource()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-missing-manifest-");
+        try
+        {
+            var request = Path.Combine(directory.FullName, "request.json");
+            var result = Path.Combine(directory.FullName, "result.json");
+            var manifest = Path.Combine(directory.FullName, "manifest.json");
+            var source = Path.Combine(
+                directory.FullName,
+                "obj",
+                "SharpProof",
+                "compiler-manifest.input.json");
+            var publication = new[] { request, result, manifest };
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       publication,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in publication)
+            {
+                File.WriteAllText(path, path);
+            }
+
+            var reset = new ResetPublishedVerification
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                RequestPath = request,
+                ResultPath = result,
+                ManifestPath = manifest,
+                CompilerManifestSourcePath = source
+            };
+
+            Assert.That(reset.Execute(), Is.True);
+            Assert.That(File.Exists(source), Is.False);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public void PublicationResetRejectsPartialOwnershipWithoutDeletingMembers()
     {
         var directory = Directory.CreateTempSubdirectory(

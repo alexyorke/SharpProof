@@ -40,7 +40,7 @@
   </PropertyGroup>
 
   <Target Name="_SharpProofValidateRuntimeClosure"
-          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true')">
     <Error Code="SP0054" Condition="$(_SharpProofToolsDirectory) != $(_SharpProofPackageToolsDirectory) OR $(_SharpProofWorkerPath) != $(_SharpProofPackageWorkerPath) OR $(_SharpProofLauncherPath) != $(_SharpProofPackageLauncherPath) OR $(_SharpProofWorkerProtocolPath) != $(_SharpProofPackageWorkerProtocolPath) OR $(_SharpProofBuildTasksPath) != $(_SharpProofPackageBuildTasksPath)"
            Text="SharpProof verifier runtime paths must resolve to the exact package-owned runtime closure." />
     <Error Code="SP0054" Condition="!Exists($(_SharpProofPackageNativeZ3Path))"
@@ -56,7 +56,7 @@
 
   <Target Name="_SharpProofRejectSkippedAnalyzers"
           BeforeTargets="CoreCompile"
-          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true')">
     <Error Code="SP0054"
            Condition="'$(RunAnalyzers)' == 'false' OR
                       ('$(RunAnalyzers)' == '' AND '$(RunAnalyzersDuringBuild)' == 'false') OR
@@ -72,7 +72,7 @@
   <Target Name="_SharpProofInvalidateBeforeDependencies"
           DependsOnTargets="_SharpProofValidateRuntimeClosure"
           BeforeTargets="ResolveReferences"
-          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false' AND ('$(TargetFrameworks)' == '' OR '$(TargetFramework)' != '')">
+          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true') AND ('$(TargetFrameworks)' == '' OR '$(TargetFramework)' != '')">
     <PropertyGroup>
       <_SharpProofEarlyVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine("$(MSBuildProjectDirectory)", "$(IntermediateOutputPath)SharpProof"))))</_SharpProofEarlyVerifyDirectory>
       <_SharpProofEarlyRequestFile Condition="$(SharpProofVerifyRequestFile) == ''">$([System.IO.Path]::Combine("$(_SharpProofEarlyVerifyDirectory)", 'request.json'))</_SharpProofEarlyRequestFile>
@@ -185,15 +185,17 @@
     <Error Code="SP0054" Condition="'$(_SharpProofInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofInvocationDirectoryIsContained)' != 'True'"
            Text="SharpProof invocation directory must resolve canonically to a direct child of the package-owned runs directory." />
     <SharpProof.BuildTasks.ReclaimInvocationRuns
-        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
+        Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true')"
         RunsDirectory="$(_SharpProofInvocationRunsDirectory)"
         CurrentInvocationId="$(_SharpProofInvocationId)" />
-    <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true')">
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
-      <_SharpProofCompilerManifestPath Condition="$(_SharpProofCompilerManifestPathConfigured) == ''">$([System.IO.Path]::Combine("$(_SharpProofInvocationDirectory)", 'compiler-manifest.json'))</_SharpProofCompilerManifestPath>
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
-    <ItemGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true')">
+      <_SharpProofCompilerManifestPath Condition="$(_SharpProofCompilerManifestPathConfigured) == ''">$([System.IO.Path]::Combine("$(_SharpProofInvocationDirectory)", 'compiler-manifest.json'))</_SharpProofCompilerManifestPath>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true')">
       <_SharpProofCompilerOwnedOutput Remove="@(_SharpProofCompilerOwnedOutput)" />
       <_SharpProofCompilerOwnedOutput Include="$(TargetPath)" Condition="'$(TargetPath)' != ''" />
       <_SharpProofCompilerOwnedOutput Include="@(IntermediateAssembly)" />
@@ -217,10 +219,9 @@
       <_SharpProofCompilerOwnedOutput Include="$(ProjectRuntimeConfigDevFilePath)" Condition="'$(ProjectRuntimeConfigDevFilePath)' != ''" />
       <CustomAdditionalCompileOutputs Include="$(_SharpProofCompilerManifestSourcePath)" />
       <FileWrites Include="$(_SharpProofCompilerManifestSourcePath)" />
-      <FileWrites Include="$(_SharpProofPublicationTopologyPath)" />
     </ItemGroup>
     <SharpProof.BuildTasks.InvalidatePublishedResult
-        Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
+        Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true')"
         ResultPath="$(_SharpProofEffectiveResultFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
         RequestPath="$(_SharpProofEffectiveRequestFile)"
@@ -365,9 +366,21 @@
     <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
   </Target>
 
+  <Target Name="_SharpProofPrepareExplicitVerify">
+    <PropertyGroup>
+      <_SharpProofExplicitVerifyInvocation>true</_SharpProofExplicitVerifyInvocation>
+    </PropertyGroup>
+  </Target>
+
   <Target Name="SharpProofVerify"
+          DependsOnTargets="_SharpProofPrepareExplicitVerify;SharpProofRejectUnsupportedWorkerHost;_SharpProofInitializeVerify;ResolveReferences;CoreCompile;_SharpProofVerifyCore"
+          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(DesignTimeBuild)' != 'true'">
+    <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
+  </Target>
+
+  <Target Name="_SharpProofVerifyAfterCompile"
           AfterTargets="CoreCompile"
-          DependsOnTargets="CoreCompile;_SharpProofInitializeVerify;_SharpProofVerifyCore"
+          DependsOnTargets="SharpProofRejectUnsupportedWorkerHost;_SharpProofInitializeVerify;_SharpProofVerifyCore"
           Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false' AND '$(SkipCompilerExecution)' != 'true'">
     <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
   </Target>
@@ -417,7 +430,7 @@
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"
-          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+          Condition="'$(_SharpProofProjectLanguageSupported)' == 'true' AND '$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND ('$(BuildingProject)' != 'false' OR '$(_SharpProofExplicitVerifyInvocation)' == 'true')">
     <Error Code="SP0054" Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
   </Target>
 </Project>

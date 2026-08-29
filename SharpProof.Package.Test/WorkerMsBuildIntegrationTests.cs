@@ -534,16 +534,18 @@ public sealed class WorkerMsBuildIntegrationTests
             }
             """);
 
-        var disabledBuild = await project.BuildAsync(verify: true);
-        Assert.That(disabledBuild.ExitCode, Is.Zero, disabledBuild.Output);
-        var disabled = WorkerProtocolJson.DeserializeResponse(
-            await File.ReadAllTextAsync(project.ResultPath))!;
-
         var enabledBuild = await project.BuildAsync(
             verify: true,
             ("SharpProofSpecificationPacks", "dotnet.scalar"));
         Assert.That(enabledBuild.ExitCode, Is.Zero, enabledBuild.Output);
         var enabled = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(project.ResultPath))!;
+        var enabledManifest = await File.ReadAllTextAsync(
+            project.CompilerManifestPath);
+
+        var disabledBuild = await project.BuildAsync(verify: true);
+        Assert.That(disabledBuild.ExitCode, Is.Zero, disabledBuild.Output);
+        var disabled = WorkerProtocolJson.DeserializeResponse(
             await File.ReadAllTextAsync(project.ResultPath))!;
 
         using (Assert.EnterMultipleScope())
@@ -556,7 +558,10 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(
                 enabled.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
+                Is.EqualTo(WorkerClaimOutcome.Proven),
+                enabledBuild.Output + Environment.NewLine +
+                enabledManifest + Environment.NewLine +
+                WorkerProtocolJson.SerializeResponse(enabled));
             Assert.That(
                 enabled.ClaimResults.Single().ProofCore.Any(
                     static item => item.StartsWith(
@@ -613,6 +618,18 @@ public sealed class WorkerMsBuildIntegrationTests
         var requestPath = Path.Combine(publicationDirectory, "request.json");
         var resultPath = Path.Combine(publicationDirectory, "result.json");
         var manifestPath = Path.Combine(publicationDirectory, "manifest.json");
+        var effectiveRequestPath = Path.Combine(
+            publicationDirectory,
+            "netstandard2.0",
+            Path.GetFileName(requestPath));
+        var effectiveResultPath = Path.Combine(
+            publicationDirectory,
+            "netstandard2.0",
+            Path.GetFileName(resultPath));
+        var effectiveManifestPath = Path.Combine(
+            publicationDirectory,
+            "netstandard2.0",
+            Path.GetFileName(manifestPath));
         var sarifPath = Path.Combine(publicationDirectory, "result.sarif");
         var effectiveSarifPath = Path.Combine(
             publicationDirectory,
@@ -631,9 +648,9 @@ public sealed class WorkerMsBuildIntegrationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(dotnet.ExitCode, Is.Zero, dotnet.Output);
-            Assert.That(File.Exists(requestPath), Is.True);
-            Assert.That(File.Exists(resultPath), Is.True);
-            Assert.That(File.Exists(manifestPath), Is.True);
+            Assert.That(File.Exists(effectiveRequestPath), Is.True);
+            Assert.That(File.Exists(effectiveResultPath), Is.True);
+            Assert.That(File.Exists(effectiveManifestPath), Is.True);
             Assert.That(File.Exists(effectiveSarifPath), Is.True);
         }
     }
@@ -676,6 +693,18 @@ public sealed class WorkerMsBuildIntegrationTests
             publicationDirectory.FullName, "result.json");
         var manifestPath = Path.Combine(
             publicationDirectory.FullName, "compiler-manifest.json");
+        var effectiveRequestPath = Path.Combine(
+            publicationDirectory.FullName,
+            "netstandard2.0",
+            Path.GetFileName(requestPath));
+        var effectiveResultPath = Path.Combine(
+            publicationDirectory.FullName,
+            "netstandard2.0",
+            Path.GetFileName(resultPath));
+        var effectiveManifestPath = Path.Combine(
+            publicationDirectory.FullName,
+            "netstandard2.0",
+            Path.GetFileName(manifestPath));
         var sarifPath = Path.Combine(
             publicationDirectory.FullName,
             new string('s', 220) + ".sarif");
@@ -702,16 +731,16 @@ public sealed class WorkerMsBuildIntegrationTests
         {
             Assert.That(first.ExitCode, Is.Zero, first.Output);
             Assert.That(second.ExitCode, Is.Zero, second.Output);
-            Assert.That(File.Exists(requestPath), Is.True, second.Output);
-            Assert.That(File.Exists(resultPath), Is.True, second.Output);
-            Assert.That(File.Exists(manifestPath), Is.True, second.Output);
+            Assert.That(File.Exists(effectiveRequestPath), Is.True, second.Output);
+            Assert.That(File.Exists(effectiveResultPath), Is.True, second.Output);
+            Assert.That(File.Exists(effectiveManifestPath), Is.True, second.Output);
             Assert.That(File.Exists(effectiveSarifPath), Is.True, second.Output);
         }
 
         var request = WorkerProtocolJson.DeserializeRequest(
-            await File.ReadAllTextAsync(requestPath))!;
+            await File.ReadAllTextAsync(effectiveRequestPath))!;
         var response = WorkerProtocolJson.DeserializeResponse(
-            await File.ReadAllTextAsync(resultPath))!;
+            await File.ReadAllTextAsync(effectiveResultPath))!;
         await AssertPublicationBindingAsync(request, response);
     }
 
@@ -2184,9 +2213,6 @@ public sealed class WorkerMsBuildIntegrationTests
         {
         }
         await File.WriteAllTextAsync(publishRequestPath, stableRequest);
-        File.SetUnixFileMode(
-            publicationDirectory,
-            UnixFileMode.UserRead | UnixFileMode.UserExecute);
         try
         {
             var exitCode = await Program.RunMain(
@@ -2205,6 +2231,9 @@ public sealed class WorkerMsBuildIntegrationTests
                 static path => WorkerBinaryIdentity.ComputeSha256(path),
                 (arguments, _, _, _) =>
                 {
+                    File.SetUnixFileMode(
+                        publicationDirectory,
+                        UnixFileMode.UserRead | UnixFileMode.UserExecute);
                     var request = WorkerProtocolJson.DeserializeRequest(
                         File.ReadAllText(arguments.RequestPath))!;
                     var response = WorkerProtocolJson.DeserializeResponse(
@@ -2223,10 +2252,9 @@ public sealed class WorkerMsBuildIntegrationTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exitCode, Is.EqualTo(3));
-                Assert.That(
-                    await File.ReadAllTextAsync(publishRequestPath),
-                    Is.EqualTo(stableRequest));
+                Assert.That(File.Exists(publishRequestPath), Is.False);
                 Assert.That(File.Exists(publishResultPath), Is.False);
+                Assert.That(File.Exists(publishManifestPath), Is.False);
             }
         }
         finally
@@ -2468,7 +2496,7 @@ public sealed class WorkerMsBuildIntegrationTests
 
     [Test]
     [SupportedOSPlatform("linux")]
-    public async Task PublicationFailureLeavesStableResultAbsent()
+    public async Task UnwritablePublicationIsRejectedBeforeVerification()
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
@@ -2515,7 +2543,8 @@ public sealed class WorkerMsBuildIntegrationTests
         }
 
         Assert.That(failed.ExitCode, Is.Not.Zero);
-        Assert.That(failed.Output, Does.Contain("could not be published"));
+        Assert.That(failed.Output, Does.Contain("launcher input is invalid"));
+        Assert.That(failed.Output, Does.Contain("failed with exit code 2"));
         Assert.That(
             await File.ReadAllTextAsync(project.RequestPath),
             Is.EqualTo(request));
@@ -3431,6 +3460,16 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static target =>
                 target.Attribute("Name")?.Value ==
                 "SharpProofVerify");
+        var automaticVerify = targets
+            .Descendants("Target")
+            .Single(static target =>
+                target.Attribute("Name")?.Value ==
+                "_SharpProofVerifyAfterCompile");
+        var prepareExplicitVerify = targets
+            .Descendants("Target")
+            .Single(static target =>
+                target.Attribute("Name")?.Value ==
+                "_SharpProofPrepareExplicitVerify");
         var cleanup = targets
             .Descendants("Target")
             .Single(static target =>
@@ -3512,8 +3551,24 @@ public sealed class WorkerMsBuildIntegrationTests
             Assert.That(
                 publicVerify.Attribute("DependsOnTargets")?.Value
                     .Split(';', StringSplitOptions.RemoveEmptyEntries),
-                Does.Contain("CoreCompile"),
+                Does.Contain("_SharpProofPrepareExplicitVerify")
+                    .And.Contain("_SharpProofInitializeVerify")
+                    .And.Contain("ResolveReferences")
+                    .And.Contain("CoreCompile")
+                    .And.Contain("_SharpProofVerifyCore"),
                 "Direct SharpProofVerify must compile the current project first.");
+            Assert.That(publicVerify.Attribute("AfterTargets"), Is.Null);
+            Assert.That(
+                automaticVerify.Attribute("AfterTargets")?.Value,
+                Is.EqualTo("CoreCompile"));
+            Assert.That(
+                automaticVerify.Attribute("Condition")?.Value,
+                Does.Contain("$(BuildingProject)"));
+            Assert.That(
+                prepareExplicitVerify
+                    .Descendants("_SharpProofExplicitVerifyInvocation")
+                    .Single().Value,
+                Is.EqualTo("true"));
             Assert.That(
                 initialize.Descendants(
                     "_SharpProofCompilerManifestPath"),

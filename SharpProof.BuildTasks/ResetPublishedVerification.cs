@@ -80,7 +80,14 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task,
                         CompilerManifestSourcePath)
                     ? CompilerManifestSourcePath
                     : Path.Combine(projectDirectory, CompilerManifestSourcePath));
-                File.Delete(sourcePath);
+                // File.Delete throws when the intermediate directory has not
+                // been created yet. A first clean/build is a valid no-op for
+                // this derived compiler output, so only delete it when it is
+                // present.
+                if (File.Exists(sourcePath))
+                {
+                    File.Delete(sourcePath);
+                }
             }
             return true;
         }
