@@ -8,6 +8,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     internal const int MaximumDecodedStringLength = 1_000_000;
     private readonly Context _context;
     private readonly object _gate = new();
+    private readonly object _checkGateLifecycleGate = new();
     private readonly SemaphoreSlim _checkGate = new(1, 1);
     private readonly IrSmtBackendOptions _options;
     private readonly int _maximumDecodedStringLength;
@@ -18,7 +19,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     private int _activeCheckCount;
     private int _pendingCheckCount;
     private bool _interrupted;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public IrSmtBackend()
         : this(new IrSmtBackendOptions(), MaximumDecodedStringLength)
@@ -82,7 +83,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                     BackendCheckResult.Unknown(BackendFailureReason.Unavailable));
             }
 
-            _pendingCheckCount++;
+            lock (_checkGateLifecycleGate)
+            {
+                _pendingCheckCount++;
+            }
         }
 
         return CheckAsyncCore(query, cancellationToken);
@@ -158,7 +162,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
         finally
         {
-            lock (_gate)
+            lock (_checkGateLifecycleGate)
             {
                 _pendingCheckCount--;
                 if (_disposed && _pendingCheckCount == 0)
@@ -186,9 +190,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
             _disposed = true;
             _context.Dispose();
-            if (_pendingCheckCount == 0)
+            lock (_checkGateLifecycleGate)
             {
-                _checkGate.Dispose();
+                if (_pendingCheckCount == 0)
+                {
+                    _checkGate.Dispose();
+                }
             }
         }
     }
