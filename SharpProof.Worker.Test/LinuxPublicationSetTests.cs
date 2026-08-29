@@ -883,6 +883,59 @@ public sealed class LinuxPublicationSetTests
     }
 
     [Test]
+    [NonParallelizable]
+    public void SecurePublicationReadRejectsAncestorReplacementAfterQualification()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var real = Directory.CreateDirectory(
+            Path.Combine(directory.Path, "real")).FullName;
+        var replacement = Directory.CreateDirectory(
+            Path.Combine(directory.Path, "replacement")).FullName;
+        var path = Path.Combine(real, "result.json");
+        var replacementPath = Path.Combine(replacement, "result.json");
+        File.WriteAllText(path, "validated");
+        File.WriteAllText(replacementPath, "replacement");
+        var moved = real + ".original";
+        var swapped = false;
+        try
+        {
+            LinuxPathIdentity.SecureOpenOverrideForTest = canonical =>
+            {
+                if (swapped || !string.Equals(
+                        canonical,
+                        path,
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                Directory.Move(real, moved);
+                Directory.CreateSymbolicLink(real, replacement);
+                swapped = true;
+            };
+
+            Assert.Throws<IOException>((Action)(() =>
+            {
+                _ = LinuxPathIdentity.TryReadRegularFile(
+                    path,
+                    out _);
+            }));
+            Assert.That(
+                File.ReadAllText(replacementPath),
+                Is.EqualTo("replacement"));
+        }
+        finally
+        {
+            LinuxPathIdentity.SecureOpenOverrideForTest = null;
+            if (swapped)
+            {
+                File.Delete(real);
+                Directory.Move(moved, real);
+            }
+        }
+    }
+
+    [Test]
     public void LocalPathsSupportSpacesPercentUnicodeAndLongNames()
     {
         using var directory = TemporaryDirectory.Create();

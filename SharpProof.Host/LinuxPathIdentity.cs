@@ -84,6 +84,15 @@ public static partial class LinuxPathIdentity
         set;
     }
 
+    // Test-only race injection runs after lexical qualification and before
+    // the descriptor walk.  The secure open must reject any topology change
+    // introduced at this boundary rather than following a replacement link.
+    internal static Action<string>? SecureOpenOverrideForTest
+    {
+        get;
+        set;
+    }
+
     // A launcher invocation qualifies the same publication paths through
     // several validation and publication phases.  Keep the expensive,
     // read-only filesystem classification in this short-lived cache while
@@ -1367,33 +1376,103 @@ public static partial class LinuxPathIdentity
         out LinuxStat information)
     {
         information = default;
-        var descriptor = NativeMethods.Open(
-            path,
-            flags | OpenNoFollow | OpenCloseOnExec,
-            mode);
-        if (descriptor < 0)
+        EnsureLinux();
+        if (path.Split('/').Any(static segment => segment is "." or ".."))
+        {
+            throw new ArgumentException(
+                "SharpProof paths must not contain dot segments.",
+                nameof(path));
+        }
+        var canonical = Path.GetFullPath(path);
+        if (!Path.IsPathFullyQualified(canonical) || canonical[0] != '/')
+        {
+            throw new ArgumentException(
+                "SharpProof paths must be absolute Linux paths.",
+                nameof(path));
+        }
+        SecureOpenOverrideForTest?.Invoke(canonical);
+        var components = canonical.Split(
+            '/',
+            StringSplitOptions.RemoveEmptyEntries);
+        if (components.Length == 0)
         {
             throw new IOException(
-                $"SharpProof could not open a {description} (errno {Marshal.GetLastPInvokeError()}).");
+                $"SharpProof could not open a {description}.");
         }
 
-        var handle = new SafeFileHandle(
-            new IntPtr(descriptor),
-            ownsHandle: true);
-        if (NativeMethods.FStat(descriptor, out information) != 0)
+        SafeFileHandle? parent = null;
+        try
         {
-            var error = Marshal.GetLastPInvokeError();
-            handle.Dispose();
-            throw new IOException(
-                $"SharpProof could not inspect a {description} (errno {error}).");
+            var rootDescriptor = NativeMethods.Open(
+                "/",
+                OpenReadOnly | OpenDirectory | OpenNoFollow | OpenCloseOnExec,
+                mode: 0);
+            if (rootDescriptor < 0)
+            {
+                throw new IOException(
+                    $"SharpProof could not open a {description} ancestor " +
+                    $"(errno {Marshal.GetLastPInvokeError()}).");
+            }
+            parent = new SafeFileHandle(
+                new IntPtr(rootDescriptor),
+                ownsHandle: true);
+
+            for (var index = 0; index < components.Length - 1; index++)
+            {
+                var directoryDescriptor = NativeMethods.OpenAt(
+                    parent.DangerousGetHandle().ToInt32(),
+                    components[index],
+                    OpenReadOnly | OpenDirectory | OpenNoFollow |
+                        OpenCloseOnExec,
+                    mode: 0);
+                if (directoryDescriptor < 0)
+                {
+                    throw new IOException(
+                        $"SharpProof could not open a {description} ancestor " +
+                        $"(errno {Marshal.GetLastPInvokeError()}).");
+                }
+
+                var next = new SafeFileHandle(
+                    new IntPtr(directoryDescriptor),
+                    ownsHandle: true);
+                parent.Dispose();
+                parent = next;
+            }
+
+            var descriptor = NativeMethods.OpenAt(
+                parent.DangerousGetHandle().ToInt32(),
+                components[^1],
+                flags | OpenNoFollow | OpenCloseOnExec,
+                mode);
+            if (descriptor < 0)
+            {
+                throw new IOException(
+                    $"SharpProof could not open a {description} " +
+                    $"(errno {Marshal.GetLastPInvokeError()}).");
+            }
+
+            var handle = new SafeFileHandle(
+                new IntPtr(descriptor),
+                ownsHandle: true);
+            if (NativeMethods.FStat(descriptor, out information) != 0)
+            {
+                var error = Marshal.GetLastPInvokeError();
+                handle.Dispose();
+                throw new IOException(
+                    $"SharpProof could not inspect a {description} (errno {error}).");
+            }
+            if ((information.Mode & FileTypeMask) != FileTypeRegular)
+            {
+                handle.Dispose();
+                throw new IOException(
+                    $"SharpProof {description}s must be regular files.");
+            }
+            return handle;
         }
-        if ((information.Mode & FileTypeMask) != FileTypeRegular)
+        finally
         {
-            handle.Dispose();
-            throw new IOException(
-                $"SharpProof {description}s must be regular files.");
+            parent?.Dispose();
         }
-        return handle;
     }
 
     private static void EnsurePublicationMetadataDirectory(
@@ -1912,6 +1991,15 @@ public static partial class LinuxPathIdentity
             StringMarshalling = StringMarshalling.Utf8)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int Open(string path, int flags, uint mode);
+
+        [LibraryImport("libc", EntryPoint = "openat", SetLastError = true,
+            StringMarshalling = StringMarshalling.Utf8)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+        internal static partial int OpenAt(
+            int directoryDescriptor,
+            string path,
+            int flags,
+            uint mode);
 
         [LibraryImport("libc", EntryPoint = "statfs", SetLastError = true,
             StringMarshalling = StringMarshalling.Utf8)]

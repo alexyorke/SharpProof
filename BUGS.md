@@ -18,12 +18,6 @@ are included in this audit-only wave.
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
 
-### 272. Publication-path validation versus use
-
-**Status:** Deferred security review.
-
-Path identity is checked by a userspace walk and is not kernel-enforced against a concurrent symlink replacement.
-
 ## Rejected or reclassified leads
 
 - **1-3:** `ArgumentNullGuard` assignments are intentional null-state narrowing/field initialization patterns, not correctness bugs.
