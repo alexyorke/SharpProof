@@ -6,7 +6,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 The latest audit wave ran against exact baseline
 `ffe74fff1c852d073610cfbebc54c141521a25fb`. Its ten subsystem reports contain
-47 candidate findings below. Each candidate remains open until the main agent
+46 candidate findings below. Each candidate remains open until the main agent
 independently reproduces it, adds a regression test, implements the fix, and
 removes the detailed entry in the corresponding fix commit.
 
@@ -34,6 +34,10 @@ The following findings concern cybersecurity, raceable trust decisions, or files
   analyzer regression reports exactly the receiver and declared-argument
   violations while accepting the satisfied call; the reported shift was not
   reproduced.
+- **Latest Scout 1, Finding 2:** Effects call contexts use the same reduced
+  invocation convention. A focused `[DoesNotThrow]` regression proves the
+  satisfied receiver/argument pair and rejects each invalid actual separately;
+  the alleged argument shift was not reproduced.
 
 ## Resolved in this branch
 
@@ -84,36 +88,11 @@ The deferred security/containment findings addressed in this branch have dedicat
 
 ## Active, deferred, and rejected findings
 
-The 47 detailed findings below are pending independent reproduction and TDD
+The 46 detailed findings below are pending independent reproduction and TDD
 resolution. Historical findings remain represented by the compact resolution
 and reclassification ledgers above.
 
 ## [Bug hunt 2026-08-29T18:40:38Z] Scout 1 — Core analyzer logic (SharpProof.Analyzer.Core, SharpProof.Analyzer)
-
-## Finding 2 — Same extension-argument convention error in the effect call-precondition policy (wrong actual values / shifted indices)
-- **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\EffectCallPreconditionPolicy.cs`
-- **Function/method + containing type:** `Assess`, `GetArgumentEvaluation`, `FindArgument` in class `AnalyzerEffectCallPreconditionPolicy`
-- **Line number(s):** 76–84 (`Assess`, raw index into `context.Arguments`), 153–204 (`GetArgumentEvaluation`, esp. 174–199), 206–231 (`FindArgument`, esp. 211–217)
-- **Bug description:** Same wrong model of reduced extension invocations as Finding 1, mirrored across two inconsistent access paths:
-  - `Assess` picks the actual by raw index: `context.Arguments[variable.Ordinal]` (lines 79–84). But the context builder (`EffectAnalysisSession.ResolveCall`, SharpProof.Effects) first aligns arguments by `argument.Parameter.Ordinal` (receiver already lands in slot 0 for reduced calls) and then — because `TargetMethod.ReducedFrom != null` — does `actualArguments.Insert(0, instance)` where `instance` is `null` for extension calls. Every declared argument is therefore shifted one slot later, so `context.Arguments[1]` (first declared parameter) yields the **receiver's value**, `context.Arguments[2]` yields the first declared parameter's value, etc. A `Requires` clause on a declared parameter can thus be evaluated against the wrong value (false `Proven` → missed violation, or wrong `NotProven` → spurious `CallPreconditionNotProven` incompleteness).
-  - `FindArgument` (used for alias classification) subtracts 1 for reduced extensions (`ordinal = normalizedOrdinal - 1`, lines 211–213) and matches `argument.Parameter?.Ordinal == ordinal` (line 229) — for the first declared parameter this returns the **receiver argument** (ordinal 0), i.e. the wrong argument's syntax. (For by-value parameters this happens to be masked because `Classify` returns `Snapshot` for `RefKind.None`, but for `ref`/`in` extension parameters it returns the wrong argument's syntax and mis-classifies.)
-  - The receiver-role variable reads `context.Receiver`, which `ResolveCall` set to `null` after the mis-guided insert, so receiver contracts on extension calls always evaluate `NotProven`.
-- **Code excerpt:**
-```csharp
-var actual = variable.Role ==
-    BoundContractVariableRole.Receiver
-        ? context.Receiver
-        : variable.Ordinal >= 0 &&
-          variable.Ordinal < context.Arguments.Length
-            ? context.Arguments[variable.Ordinal]   // shifted by the receiver insert
-            : null;
-```
-```csharp
-var ordinal = isReducedExtension
-    ? normalizedOrdinal - 1                          // off-by-one vs Parameter.Ordinal
-    : normalizedOrdinal;
-```
-- **Category:** logic / api-misuse — **Severity:** high — **Confidence:** 0.75
 
 ## Finding 3 — Inverted receiver condition for pattern-based `foreach` over an extension `GetEnumerator`
 - **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs`
