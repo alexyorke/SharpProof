@@ -184,11 +184,21 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         out string value)
     {
-        return (options.TryGetValue("sharpproof_mode", out value!) ||
-                options.TryGetValue(
-                    "build_property.SharpProofMode",
-                    out value!)) &&
-            !string.IsNullOrWhiteSpace(value);
+        foreach (var key in new[] {
+                     "sharpproof_mode",
+                     "build_property.SharpProofMode"
+                 })
+        {
+            if (options.TryGetValue(key, out var candidate) &&
+                !string.IsNullOrWhiteSpace(candidate))
+            {
+                value = candidate;
+                return true;
+            }
+        }
+
+        value = string.Empty;
+        return false;
     }
 
     private static bool TryGet(

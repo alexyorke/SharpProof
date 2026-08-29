@@ -2,15 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 4. LOW - Blank legacy editorconfig alias masks retired MSBuild alias
-
-- File: `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs`
-- Member: `TryGetRetiredMode`
-- Lines: 183-191
-- Mechanism: Short-circuit OR treats a present whitespace `sharpproof_mode` as successful, never reads nonempty `build_property.SharpProofMode`, and then rejects the whitespace value.
-- Impact: The removed setting escapes SP0025.
-- Safe reproduction/evidence: Use an options provider with whitespace `sharpproof_mode` and `build_property.SharpProofMode` set to `strict`.
-
 ## 5. HIGH - Inherited instance members receive receiver-dependent identities, breaking aliasing
 
 - File: `SharpProof.Frontend/RoslynOperationLowerer.cs`

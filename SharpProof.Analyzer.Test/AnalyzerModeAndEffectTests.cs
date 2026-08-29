@@ -259,6 +259,34 @@ public sealed class AnalyzerModeAndEffectTests
         }
     }
 
+    [Test]
+    public async Task BlankRetiredEditorConfigAliasDoesNotHideMsBuildAlias()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            ModeFixture,
+            ["SP0025"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["sharpproof_mode"] = "  ",
+                ["build_property.SharpProofMode"] = "strict"
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0025"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("option was removed"));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("strict"));
+        }
+    }
+
     [TestCase("off", "all", new string[0])]
     [TestCase("advisory", "effects", new[] { "SP0045" })]
     [TestCase("strict", "contracts", new[] { "SP0027" })]
