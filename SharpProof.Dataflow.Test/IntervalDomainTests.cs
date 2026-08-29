@@ -72,6 +72,31 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
+    public void Int64BoundaryRangesHaveOneCanonicalRepresentation()
+    {
+        var implicitLower = _domain.Range(null, 5);
+        var explicitLower = _domain.Range(long.MinValue, 5);
+        var implicitUpper = _domain.Range(-5, null);
+        var explicitUpper = _domain.Range(-5, long.MaxValue);
+        var addedLower = _domain.Add(
+            _domain.Range(long.MinValue, 0),
+            _domain.Range(0, 5));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(explicitLower, Is.EqualTo(implicitLower));
+            Assert.That(
+                explicitLower.GetHashCode(),
+                Is.EqualTo(implicitLower.GetHashCode()));
+            Assert.That(explicitUpper, Is.EqualTo(implicitUpper));
+            Assert.That(
+                explicitUpper.GetHashCode(),
+                Is.EqualTo(implicitUpper.GetHashCode()));
+            Assert.That(addedLower, Is.EqualTo(implicitLower));
+        }
+    }
+
+    [Test]
     public void JoinComputesCongruenceHull()
     {
         var joined = _domain.Join(_domain.Constant(2), _domain.Constant(6));
