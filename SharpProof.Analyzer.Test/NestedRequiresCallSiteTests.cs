@@ -421,6 +421,36 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task GenericOuterMethodReachesConstructedLocalFunction()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer<T>(T value) {
+                    return Local(value);
+
+                    int Local<TLocal>(TLocal item) => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-1)", StringComparison.Ordinal)));
+    }
+
+    [Test]
     public async Task OverwrittenMethodGroupsDoNotReachLocalFunctions()
     {
         const string source =

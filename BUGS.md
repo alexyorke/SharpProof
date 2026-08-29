@@ -6,7 +6,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 The latest audit wave ran against exact baseline
 `ffe74fff1c852d073610cfbebc54c141521a25fb`. Its ten subsystem reports contain
-44 candidate findings below. Each candidate remains open until the main agent
+43 candidate findings below. Each candidate remains open until the main agent
 independently reproduces it, adds a regression test, implements the fix, and
 removes the detailed entry in the corresponding fix commit.
 
@@ -47,6 +47,10 @@ The following findings concern cybersecurity, raceable trust decisions, or files
   analysis: package targets omit analyzer/generator items, no session is
   constructed, and existing generated-companion coverage requires silence. The
   adjacent comment now explicitly limits its invariant to later non-Off exits.
+- **Latest Scout 1, Finding 5:** A generic outer method invoking an inferred
+  generic local function is analyzed successfully and reports its nested
+  precondition violation. Together with the existing generic-local and method-
+  group coverage, this disproves the claimed template/constructed-symbol miss.
 
 ## Resolved in this branch
 
@@ -97,32 +101,11 @@ The deferred security/containment findings addressed in this branch have dedicat
 
 ## Active, deferred, and rejected findings
 
-The 44 detailed findings below are pending independent reproduction and TDD
+The 43 detailed findings below are pending independent reproduction and TDD
 resolution. Historical findings remain represented by the compact resolution
 and reclassification ledgers above.
 
 ## [Bug hunt 2026-08-29T18:40:38Z] Scout 1 — Core analyzer logic (SharpProof.Analyzer.Core, SharpProof.Analyzer)
-
-## Finding 5 — `OriginalDefinition` vs. constructed-symbol mismatch breaks nested generic local-function analysis
-- **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\RequiresCallSiteTreeAnalyzer.cs`
-- **Function/method + containing type:** `GetNestedCallables`, `TryCollectLocalReferences`, `GetReachableLocalFunctions`, `AnalyzeGraph` in nested class `TreeAnalysis`
-- **Line number(s):** 343–347 and 350–368 (`GetNestedCallables`), 490–497 (`TryCollectLocalReferences`), 439–447 (`GetReachableLocalFunctions`), 196–198 (`AnalyzeGraph` ownership check)
-- **Bug description:** `GetNestedCallables` normalizes local functions to their **templates**: `ContractClauseInventoryBuilder.NormalizeCallable(method).OriginalDefinition` (lines 345–347, 492–493). But `potentialOwners` is built from `NormalizeCallable(owner)` **without** `OriginalDefinition` (`RequiresCallSiteDiscovery.GetPotentialCallOwners`, lines 75–77), where `owner` comes from `GetEnclosingSymbol` and is the *constructed* symbol for local functions inside generic methods. `SymbolEqualityComparer.Default` does not equate `LocalFunc<int>` with the `LocalFunc<T>` template, so:
-  - `potentialOwners.Contains(caller)` fails in `AnalyzeGraph` for generic local functions (the nested callable is never analyzed), and
-  - `graph.GetLocalFunctionControlFlowGraph(method)` is called with the template (line 439), which Roslyn rejects for a graph whose `LocalFunctions` are constructed — throwing `ArgumentException`, caught at lines 442–447 which silently degrades to "all candidates reachable".
-  Net effect: for generic local functions, nested requires-call-site analysis never runs and the owner is recorded `Unknown` by the leftover-owners loop (lines 160–175) — a conservative miss (never a wrong Proven/Refuted), plus `_visitedPotentialOwners` is seeded with templates (lines 352–354) that can never match the constructed owners it is meant to deduplicate against.
-- **Code excerpt:**
-```csharp
-var localMethods = ImmutableHashSet.CreateRange<IMethodSymbol>(
-    SymbolEqualityComparer.Default,
-    graph.LocalFunctions.Select(
-        static method => ContractClauseInventoryBuilder
-            .NormalizeCallable(method).OriginalDefinition));   // template
-...
-child = graph.GetLocalFunctionControlFlowGraph(
-    method, cancellationToken);                                // template vs constructed
-```
-- **Category:** logic / api-misuse — **Severity:** low — **Confidence:** 0.6
 
 ## Finding 6 — Unreachable switch arm: `ConversionOperatorDeclarationSyntax` case can never execute
 - **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\AnalyzerSyntaxHelpers.cs`
