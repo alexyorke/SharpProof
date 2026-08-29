@@ -355,30 +355,89 @@ try {
         [StringComparer]::Ordinal)
 
     if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-        $selectedListPath = Join-Path $root 'selected-test-list.txt'
-        $selectedTests = @(Get-ListedTestNames `
-            -DotNetWrapper $dotnetWrapper `
-            -TimeoutSeconds $TimeoutSeconds `
-            -TestProject $testProject `
-            -Configuration $Configuration `
-            -Filter $TestFilter `
-            -OutputPath $selectedListPath)
-        if ($selectedTests.Count -eq 0) {
+        $fixtureClasses = @(Get-TestFixtureClassNames $packageTestRoot)
+        if ($fixtureClasses.Count -eq 0) {
+            throw 'Package test discovery found no TestFixture classes.'
+        }
+        $selectedCount = 0
+        $selectedWorkerIndex = 0
+        foreach ($fixtureClass in $fixtureClasses) {
+            $fixtureFilter =
+                "($TestFilter)&FullyQualifiedName~SharpProof.Package.Test.$fixtureClass"
+            $selectedListPath = Join-Path $root (
+                'selected-test-list-' + $fixtureClass + '.txt')
+            $selectedTests = @(Get-ListedTestNames `
+                -DotNetWrapper $dotnetWrapper `
+                -TimeoutSeconds $TimeoutSeconds `
+                -TestProject $testProject `
+                -Configuration $Configuration `
+                -Filter $fixtureFilter `
+                -OutputPath $selectedListPath)
+            if ($selectedTests.Count -eq 0) {
+                continue
+            }
+            $selectedCount += $selectedTests.Count
+            if ($fixtureClass -cne 'WorkerMsBuildIntegrationTests') {
+                $shards.Add([pscustomobject]@{
+                    Name = 'selected-fixture-' +
+                        $fixtureClass.ToLowerInvariant()
+                    Filter = $fixtureFilter
+                    ExpectedTests = $selectedTests
+                    ExpectedCount = $selectedTests.Count
+                    Exclusive =
+                        $fixtureClass -ceq 'LauncherArgumentTests'
+                    EstimatedMilliseconds =
+                        $(if ($priorFilterMilliseconds.ContainsKey(
+                                    $fixtureFilter)) {
+                            [long]$priorFilterMilliseconds[$fixtureFilter]
+                        }
+                        else {
+                            1L
+                        })
+                })
+                continue
+            }
+
+            $selectedTestsByMethod = @{}
+            foreach ($test in $selectedTests) {
+                $method = Get-TestMethodName $test
+                if (-not $selectedTestsByMethod.ContainsKey($method)) {
+                    $selectedTestsByMethod[$method] =
+                        [Collections.Generic.List[string]]::new()
+                }
+                $selectedTestsByMethod[$method].Add($test)
+            }
+            foreach ($method in @($selectedTestsByMethod.Keys | Sort-Object)) {
+                $selectedWorkerIndex++
+                $methodFilter =
+                    "($TestFilter)&FullyQualifiedName~$workerClass.$method"
+                $methodTests = @($selectedTestsByMethod[$method])
+                $shards.Add([pscustomobject]@{
+                    Name = 'selected-worker-' +
+                        $selectedWorkerIndex.ToString(
+                            'D2',
+                            [Globalization.CultureInfo]::InvariantCulture)
+                    Filter = $methodFilter
+                    ExpectedTests = $methodTests
+                    ExpectedCount = $methodTests.Count
+                    Exclusive = $false
+                    EstimatedMilliseconds =
+                        $(if ($priorMethodMilliseconds.ContainsKey($method)) {
+                            [long]$priorMethodMilliseconds[$method]
+                        }
+                        elseif ($priorFilterMilliseconds.ContainsKey(
+                                    $methodFilter)) {
+                            [long]$priorFilterMilliseconds[$methodFilter]
+                        }
+                        else {
+                            1L
+                        })
+                })
+            }
+        }
+        if ($selectedCount -eq 0) {
             throw "The package test filter matched no tests: $TestFilter"
         }
-        $shards.Add([pscustomobject]@{
-            Name = 'selected'
-            Filter = $TestFilter
-            ExpectedTests = $selectedTests
-            ExpectedCount = $selectedTests.Count
-            EstimatedMilliseconds =
-                $(if ($priorFilterMilliseconds.ContainsKey($TestFilter)) {
-                    [long]$priorFilterMilliseconds[$TestFilter]
-                }
-                else {
-                    1L
-                })
-        })
     }
     else {
         $fixtureClasses = @(Get-TestFixtureClassNames $packageTestRoot)
@@ -489,6 +548,8 @@ try {
                 Filter = $fixture.Filter
                 ExpectedTests = $fixture.Tests
                 ExpectedCount = $fixture.Tests.Count
+                Exclusive =
+                    $fixture.ClassName -ceq 'LauncherArgumentTests'
                 EstimatedMilliseconds =
                     $(if ($priorFilterMilliseconds.ContainsKey($fixture.Filter)) {
                         [long]$priorFilterMilliseconds[$fixture.Filter]
@@ -509,6 +570,7 @@ try {
                     }) -join '|'
                 ExpectedTests = @($bucket.Tests)
                 ExpectedCount = $bucket.Tests.Count
+                Exclusive = $false
                 EstimatedMilliseconds = $bucket.EstimatedMilliseconds
             })
         }
@@ -539,6 +601,13 @@ try {
 
     while ($pending.Count -gt 0 -or $running.Count -gt 0) {
         while ($pending.Count -gt 0 -and $running.Count -lt $parallelism) {
+            $runningExclusive = @($running | Where-Object {
+                    $_.Shard.Exclusive
+                }).Count -gt 0
+            if ($runningExclusive -or
+                ($pending.Peek().Exclusive -and $running.Count -gt 0)) {
+                break
+            }
             $shard = $pending.Dequeue()
             $startInfo = [Diagnostics.ProcessStartInfo]::new()
             $startInfo.FileName = 'dotnet'

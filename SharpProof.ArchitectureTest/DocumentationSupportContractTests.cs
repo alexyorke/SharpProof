@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
-[NonParallelizable]
+[Parallelizable(ParallelScope.All)]
 public sealed class DocumentationSupportContractTests
 {
     [TestCase("clean", true)]
@@ -35,21 +35,24 @@ public sealed class DocumentationSupportContractTests
         var root = FindRepositoryRoot();
         var info = new ProcessStartInfo
         {
-            FileName = "pwsh",
+            FileName = "bash",
             WorkingDirectory = root,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
         };
-        info.ArgumentList.Add("-NoLogo");
-        info.ArgumentList.Add("-NoProfile");
-        info.ArgumentList.Add("-File");
         info.ArgumentList.Add(Path.Combine(
             root,
-            "scripts",
-            "Test-SharpProofDocumentationSupportFixtures.ps1"));
-        info.ArgumentList.Add("-Mutation");
-        info.ArgumentList.Add(mutation);
+            "eng",
+            "container",
+            "entrypoint.sh"));
+        info.ArgumentList.Add("dev");
+        info.ArgumentList.Add("-lc");
+        info.ArgumentList.Add(
+            "pwsh -NoLogo -NoProfile -File " +
+            "./scripts/Test-SharpProofDocumentationSupportFixtures.ps1 " +
+            "-Mutation " + mutation);
+        info.Environment["SHARPPROOF_REPO_ROOT"] = root;
         using var process = Process.Start(info)!;
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();

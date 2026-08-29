@@ -39,6 +39,12 @@ if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
   exit 125
 fi
 
+# Every invocation gets a private protected-scope Git configuration. This
+# keeps different-owner allowances exact without serializing parallel tasks on
+# /home/sharpproof/.gitconfig.
+git_config_global="$(mktemp /tmp/sharpproof-gitconfig.XXXXXXXX)"
+export GIT_CONFIG_GLOBAL="${git_config_global}"
+
 resolve_linked_worktree_git_directory() {
   local dot_git_file="${repo_root}/.git"
   [[ -f "${dot_git_file}" ]] || return 1
@@ -63,6 +69,27 @@ resolve_linked_worktree_git_directory() {
   [[ -n "${parent_root}" && -d "${parent_root}" ]] || return 1
 
   local candidate
+  local worktree_suffix="/.git/worktrees/${worktree_name}"
+  if [[ "${git_pointer}" = *"${worktree_suffix}" ]]; then
+    local repository_path="${git_pointer%"${worktree_suffix}"}"
+    local repository_name="${repository_path##*/}"
+    if [[ "${repository_name}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      candidate="${parent_root}/${repository_name}${worktree_suffix}"
+      if [[ -d "${candidate}" ]]; then
+        (cd "${candidate}" && pwd -P)
+        return 0
+      fi
+    fi
+  fi
+  candidate="${parent_root}${worktree_suffix}"
+  if [[ -d "${candidate}" ]]; then
+    (cd "${candidate}" && pwd -P)
+    return 0
+  fi
+
+  # Unusual layouts can keep the common repository deeper below the mounted
+  # parent. Preserve that compatibility path, but avoid the recursive scan for
+  # the ordinary sibling-checkout layout used by Git worktree and the docs.
   candidate="$(find "${parent_root}" -xdev -type d \
     -path "*/.git/worktrees/${worktree_name}" -print -quit 2>/dev/null || true)"
   [[ -n "${candidate}" && -d "${candidate}" ]] || return 1
@@ -94,7 +121,10 @@ fi
 
 git_source() {
   if [[ -n "${linked_git_directory}" && -n "${linked_common_directory}" ]]; then
-    git --git-dir="${linked_git_directory}" \
+    git -c safe.directory="${repo_root}" \
+      -c safe.directory="${linked_git_directory}" \
+      -c safe.directory="${linked_common_directory}" \
+      --git-dir="${linked_git_directory}" \
       --work-tree="${repo_root}" "$@"
   else
     git -c safe.directory="${repo_root}" -C "${repo_root}" "$@"
@@ -236,17 +266,6 @@ case "${command_name}" in
       # bits. Ignore their synthetic working-tree modes in the disposable clone;
       # real mode changes committed between Git trees remain part of comparisons.
       git -C "${task_root}" config core.filemode false
-      deleted_file="$(mktemp /tmp/sharpproof-deleted.XXXXXXXX)"
-      if ! git_source diff \
-        --no-renames --name-only --diff-filter=D -z HEAD -- > "${deleted_file}"; then
-        rm -f -- "${deleted_file}"
-        echo "SharpProof ${command_name} could not inspect Git deleted paths." >&2
-        exit 2
-      fi
-      while IFS= read -r -d '' deleted_path; do
-        rm -f -- "${task_root}/${deleted_path}"
-      done < "${deleted_file}"
-      rm -f -- "${deleted_file}"
     fi
     if requires_clean_exact_commit_source "${command_name}"; then
       # Exact-commit commands run from the detached Git tree above. Only the
@@ -256,6 +275,45 @@ case "${command_name}" in
         tar -C "${repo_root}" -cf - nupkgs |
           tar -C "${task_root}" -xf -
       fi
+    elif [[ "${source_has_git}" = "true" ]]; then
+      # The detached clone already contains every unchanged tracked file. A
+      # single status scan is enough to reproduce the mounted working tree;
+      # copying the whole checkout made every disposable test pay for hundreds
+      # of unchanged files plus ignored editor and diagnostic state.
+      status_file="$(mktemp /tmp/sharpproof-status.XXXXXXXX)"
+      overlay_file="$(mktemp /tmp/sharpproof-overlay.XXXXXXXX)"
+      if ! git_source status \
+        --porcelain=v1 -z --untracked-files=all --no-renames -- \
+        > "${status_file}"; then
+        rm -f -- "${status_file}" "${overlay_file}"
+        echo "SharpProof ${command_name} could not inspect Git worktree changes." >&2
+        exit 2
+      fi
+      while IFS= read -r -d '' status_record; do
+        status_path="${status_record:3}"
+        case "${status_path}" in
+          ''|/*|..|../*|*/../*|*/..)
+            rm -f -- "${status_file}" "${overlay_file}"
+            echo "SharpProof ${command_name} found an invalid Git status path." >&2
+            exit 2
+            ;;
+        esac
+        source_path="${repo_root}/${status_path}"
+        destination_path="${task_root}/${status_path}"
+        if [[ -e "${source_path}" || -L "${source_path}" ]]; then
+          printf '%s\0' "${status_path}" >> "${overlay_file}"
+        elif [[ -d "${destination_path}" && ! -L "${destination_path}" ]]; then
+          rm -rf -- "${destination_path}"
+        else
+          rm -f -- "${destination_path}"
+        fi
+      done < "${status_file}"
+      if [[ -s "${overlay_file}" ]]; then
+        tar --null -C "${repo_root}" -cf - \
+          --files-from="${overlay_file}" |
+          tar -C "${task_root}" -xf -
+      fi
+      rm -f -- "${status_file}" "${overlay_file}"
     else
       tar \
         --exclude='./artifacts' \

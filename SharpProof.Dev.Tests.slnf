@@ -12,7 +12,6 @@
       "SharpProof.Frontend.Test\\SharpProof.Frontend.Test.csproj",
       "SharpProof.Ir.Test\\SharpProof.Ir.Test.csproj",
       "SharpProof.Meta.Analyzers.Test\\SharpProof.Meta.Analyzers.Test.csproj",
-      "SharpProof.Package.Test\\SharpProof.Package.Test.csproj",
       "SharpProof.Smt.Test\\SharpProof.Smt.Test.csproj",
       "SharpProof.Specs.Test\\SharpProof.Specs.Test.csproj",
       "SharpProof.Summaries.Test\\SharpProof.Summaries.Test.csproj",

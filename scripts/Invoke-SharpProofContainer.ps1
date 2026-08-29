@@ -166,15 +166,33 @@ switch ($Command) {
             "/m:$testProjectParallelism",
             '--filter',
             'TestCategory!=Performance&TestCategory!=Coverage')
+        & (Join-Path `
+            $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
+            -Configuration $Configuration `
+            -NoBuild
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Sharded PR package tests failed.'
+        }
     }
     'test' {
-        Invoke-DotNet @('restore', $Target, '--locked-mode')
-        $arguments = @(
-            'test', $Target, '--configuration', $Configuration, '--no-restore',
-            "/m:$testProjectParallelism")
         $sourceHasGit = @(
             & git -C $repositoryRoot rev-parse --is-inside-work-tree 2>$null
         ).Count -eq 1
+        $useShardedPackageTests =
+            $sourceHasGit -and
+            [string]::IsNullOrWhiteSpace($TestFilter) -and
+            $Target -ceq 'SharpProof.sln'
+        $managedTarget = if ($useShardedPackageTests) {
+            'SharpProof.Dev.Tests.slnf'
+        }
+        else {
+            $Target
+        }
+        Invoke-DotNet @('restore', $managedTarget, '--locked-mode')
+        $arguments = @(
+            'test', $managedTarget,
+            '--configuration', $Configuration, '--no-restore',
+            "/m:$testProjectParallelism")
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $filter = $TestFilter
             if (-not $sourceHasGit) {
@@ -186,6 +204,14 @@ switch ($Command) {
             $arguments += @('--filter', 'TestCategory!=GitBound')
         }
         Invoke-DotNet $arguments
+        if ($useShardedPackageTests) {
+            & (Join-Path `
+                $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
+                -Configuration $Configuration
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Sharded package tests failed.'
+            }
+        }
     }
     'test-changed' {
         & (Join-Path `

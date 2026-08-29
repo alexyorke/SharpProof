@@ -5,7 +5,7 @@ namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
 [Platform("Linux")]
-[NonParallelizable]
+[Parallelizable(ParallelScope.All)]
 public sealed class ContainerSourceCleanlinessTests
 {
     private static readonly string[] s_exactCommitCommands =
@@ -398,12 +398,12 @@ public sealed class ContainerSourceCleanlinessTests
     }
 
     [Test]
-    public async Task DevelopmentCommandRejectsGitDeletedScanFailure()
+    public async Task DevelopmentCommandRejectsGitStatusScanFailure()
     {
         var repository = await CreateRepositoryAsync();
         var wrapperDirectory = await CreateGitFailureWrapperAsync(
             repository,
-            "[[ \"$*\" == *\"--diff-filter=D\"* ]]",
+            "[[ \"$*\" == *\"status --porcelain=v1 -z --untracked-files=all --no-renames --\"* ]]",
             74);
         try
         {
@@ -418,7 +418,7 @@ public sealed class ContainerSourceCleanlinessTests
                 Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
                 Assert.That(
                     result.Error,
-                    Does.Contain("could not inspect Git deleted paths"));
+                    Does.Contain("could not inspect Git worktree changes"));
                 Assert.That(result.Output, Does.Not.Contain("executed:build"));
             }
         }

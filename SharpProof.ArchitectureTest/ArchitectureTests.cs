@@ -1989,6 +1989,9 @@ public sealed class ArchitectureTests
         var broadTestsIndex = containerCommands.IndexOf(
             "SharpProof.Dev.Tests.slnf",
             StringComparison.Ordinal);
+        var devTests = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Dev.Tests.slnf"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -2016,6 +2019,12 @@ public sealed class ArchitectureTests
             Assert.That(
                 broadTestsIndex,
                 Is.GreaterThan(performanceIndex));
+            Assert.That(
+                devTests,
+                Does.Not.Contain("SharpProof.Package.Test"));
+            Assert.That(
+                containerCommands,
+                Does.Contain("Invoke-SharpProofPackageTests.ps1"));
         }
 
         Assert.That(
@@ -2128,7 +2137,7 @@ public sealed class ArchitectureTests
                 Does.Not.Contain("XPlat Code Coverage"));
             Assert.That(
                 collector,
-                Does.Contain("SharpProof.Dev.Tests.slnf"));
+                Does.Contain("test (Join-Path $repositoryRoot 'SharpProof.sln')"));
             Assert.That(
                 collector,
                 Does.Contain("Invoke-SharpProofSemanticTests.ps1"));

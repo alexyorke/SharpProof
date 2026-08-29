@@ -89,3 +89,18 @@ dotnet_diagnostic.CA1308.severity = none
 
 [SharpProof.Worker/WorkerInputSnapshot.cs]
 dotnet_diagnostic.CA1308.severity = none
+
+# CA1508's interprocedural value-content analysis takes about 30 seconds across
+# these cooperating differential fuzz drivers despite producing no diagnostic.
+# The rule remains enabled for product code and every other test/tool source.
+[Tools/SharpProof.Fuzz/FrontendFuzzing.cs]
+dotnet_diagnostic.CA1508.severity = none
+
+[Tools/SharpProof.Fuzz/FuzzRunner.cs]
+dotnet_diagnostic.CA1508.severity = none
+
+[Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs]
+dotnet_diagnostic.CA1508.severity = none
+
+[Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs]
+dotnet_diagnostic.CA1508.severity = none

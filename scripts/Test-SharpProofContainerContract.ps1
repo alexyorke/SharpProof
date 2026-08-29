@@ -31,6 +31,8 @@ $devContainer = Get-Content -LiteralPath (
     ConvertFrom-Json
 $devInitializer = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'eng/container/dev-init.sh') -Raw
+$taskEntrypoint = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'eng/container/entrypoint.sh') -Raw
 $directoryBuildTargets = Get-Content -LiteralPath (
     Join-Path $repositoryRoot 'Directory.Build.targets') -Raw
 $packages = [xml](Get-Content -LiteralPath (
@@ -421,6 +423,33 @@ if ($devInitializer -cnotmatch 'SHARPPROOF_ORIGIN_URL' -or
 }
 if ($devInitializer -cmatch 'git bundle|repository\.bundle|SHARPPROOF_SEED_ROOT') {
     throw 'The Dev Container initializer retains a host Git bootstrap.'
+}
+foreach ($requiredTaskOverlayFragment in @(
+        'candidate="${parent_root}/${repository_name}${worktree_suffix}"',
+        'mktemp /tmp/sharpproof-gitconfig.XXXXXXXX',
+        'export GIT_CONFIG_GLOBAL="${git_config_global}"',
+        'git_source status',
+        '--porcelain=v1 -z --untracked-files=all --no-renames --',
+        'status_path="${status_record:3}"',
+        '--files-from="${overlay_file}"')) {
+    if (-not $taskEntrypoint.Contains(
+            $requiredTaskOverlayFragment,
+            [StringComparison]::Ordinal)) {
+        throw (
+            'The disposable task workspace must overlay only Git-reported ' +
+            "worktree changes; missing '$requiredTaskOverlayFragment'.")
+    }
+}
+if ($taskEntrypoint -cmatch 'GIT_CONFIG_GLOBAL=/home/sharpproof/\.gitconfig') {
+    throw (
+        'Parallel disposable tasks must not contend on the global Git ' +
+        'configuration file.')
+}
+if ($taskEntrypoint -cmatch
+    'git_source diff\s+\\\s*\r?\n\s*--no-renames --name-only --diff-filter=D') {
+    throw (
+        'The disposable task workspace must not rescan Git solely for ' +
+        'deleted paths.')
 }
 if ($directoryBuildTargets -cnotmatch '_RequireSharpProofCanonicalContainer' -or
     $directoryBuildTargets -cnotmatch 'SHARPPROOF_CONTAINER' -or
