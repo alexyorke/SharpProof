@@ -566,6 +566,26 @@ public sealed class IrKernelTests
         Assert.That(secondText, Is.EqualTo(firstText));
     }
 
+    [Test]
+    public void PrinterRejectsTermsBeyondItsFormattingDepthLimit()
+    {
+        var factory = new IrFactory();
+        var variable = factory.Variable(
+            factory.CreateVariable("value", factory.IntegerType));
+        IrTerm term = variable;
+        for (var index = 0; index < 2048; index++)
+        {
+            term = factory.Binary(IrBinaryOperator.Add, term, variable);
+        }
+
+        var printer = new IrPrinter(factory);
+        var exception = Assert.Throws<InvalidOperationException>(
+            (Action)(() => printer.Print(term)));
+
+        Assert.That(exception!.Message, Does.Contain("formatting depth"));
+        Assert.That(printer.Print(factory.Integer(1)), Is.EqualTo("1"));
+    }
+
     [TestCase(IrUnaryOperator.Not, IrTypeKind.Boolean, "(!v0)")]
     [TestCase(IrUnaryOperator.Negate, IrTypeKind.Integer, "(-v0)")]
     public void UnaryOperatorMetadataPreservesTypesKeysAndTokens(

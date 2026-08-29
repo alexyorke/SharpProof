@@ -2,13 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 8. MEDIUM - IrPrinter can terminate the process on deeply nested valid terms
-
-- Files and members: `SharpProof.Ir/IrPrinter.cs`, `Print`, lines 8-28; `SharpProof.Ir/IrPrinterProjections.generated.cs`, `Format` and `FormatOpaque`, lines 12-30.
-- Mechanism: Recursive formatting has no depth bound although the IR factory permits unbounded depth; `StackOverflowException` is not recoverable.
-- Impact: Worker or process crash.
-- Safe reproduction/evidence: Construct a long chain of nonfoldable binary `Add(previous, variable)` nodes and call `Print`.
-
 ## 9. HIGH - Await protocol calls omitted from effect summaries
 
 - Files and members: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, `ScanAwait`, lines 90-102; `SharpProof.Effects/OperationEffectScanner.cs`, `ScanCoreOperation` dispatch, lines 256-257.

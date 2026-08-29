@@ -2,15 +2,37 @@ namespace SharpProof.Ir;
 
 public sealed partial class IrPrinter(IrFactory factory)
 {
+    private const int MaxFormatDepth = 1024;
+
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
+    private int _formatDepth;
 
     public string Print(IrTerm term)
     {
         ArgumentNullGuard.NotNull(term, nameof(term));
 
         _factory.EnsureTerm(term, nameof(term));
-        return Format(term);
+        return FormatChild(term);
+    }
+
+    private string FormatChild(IrTerm term)
+    {
+        if (_formatDepth >= MaxFormatDepth)
+        {
+            throw new InvalidOperationException(
+                "IR term exceeds the printer formatting depth limit.");
+        }
+
+        _formatDepth++;
+        try
+        {
+            return Format(term);
+        }
+        finally
+        {
+            _formatDepth--;
+        }
     }
 
     private string FormatOpaque(IrOpaqueTerm opaque)
@@ -20,10 +42,10 @@ public sealed partial class IrPrinter(IrFactory factory)
             : "impure:" + opaque.Operation + ":";
         var arguments = string.Join(
             ", ",
-            opaque.Arguments.Select(Format));
+            opaque.Arguments.Select(FormatChild));
         var receiver = opaque.Receiver == null
             ? ""
-            : Format(opaque.Receiver) +
+            : FormatChild(opaque.Receiver) +
                 (opaque.Arguments.IsDefaultOrEmpty ? "" : "; ");
         return prefix + opaque.Member + "(" + receiver + arguments + ")";
     }
