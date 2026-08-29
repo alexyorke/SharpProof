@@ -6,7 +6,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 The latest audit wave ran against exact baseline
 `ffe74fff1c852d073610cfbebc54c141521a25fb`. Its ten subsystem reports contain
-43 candidate findings below. Each candidate remains open until the main agent
+42 candidate findings below. Each candidate remains open until the main agent
 independently reproduces it, adds a regression test, implements the fix, and
 removes the detailed entry in the corresponding fix commit.
 
@@ -51,6 +51,10 @@ The following findings concern cybersecurity, raceable trust decisions, or files
   generic local function is analyzed successfully and reports its nested
   precondition violation. Together with the existing generic-local and method-
   group coverage, this disproves the claimed template/constructed-symbol miss.
+- **Latest Scout 1, Finding 6:** Roslyn models conversion-operator and ordinary
+  operator declarations as distinct syntax-node types. The existing exact-span
+  regression confirms conversion locations use the `implicit`/`explicit`
+  keyword, so the claimed unreachable switch arm does not exist.
 
 ## Resolved in this branch
 
@@ -101,18 +105,11 @@ The deferred security/containment findings addressed in this branch have dedicat
 
 ## Active, deferred, and rejected findings
 
-The 43 detailed findings below are pending independent reproduction and TDD
+The 42 detailed findings below are pending independent reproduction and TDD
 resolution. Historical findings remain represented by the compact resolution
 and reclassification ledgers above.
 
 ## [Bug hunt 2026-08-29T18:40:38Z] Scout 1 — Core analyzer logic (SharpProof.Analyzer.Core, SharpProof.Analyzer)
-
-## Finding 6 — Unreachable switch arm: `ConversionOperatorDeclarationSyntax` case can never execute
-- **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\AnalyzerSyntaxHelpers.cs`
-- **Function/method + containing type:** `GetCallableDeclarationLocation(SyntaxNode)` in static class `AnalyzerSyntaxHelpers`
-- **Line number(s):** 19–21 (dead arm within the switch at 7–23)
-- **Bug description:** `ConversionOperatorDeclarationSyntax` derives from `OperatorDeclarationSyntax` in the Roslyn syntax API, and the switch tests `OperatorDeclarationSyntax` first. The later `ConversionOperatorDeclarationSyntax conversion => conversion.ImplicitOrExplicitKeyword.GetLocation()` arm is unreachable, so all conversion operators report the operator keyword position instead of the intended `implicit`/`explicit` keyword position. Dead code + wrong diagnostic location vs intent.
-- **Category:** logic — **Severity:** low — **Confidence:** 0.85
 
 Scout 1 clean areas (verified, no bugs): SharpProofAnalyzer.cs registration; AnalyzerSession.cs; AnalyzerGeneratedCodePolicy.cs; ManagedContractFacts.cs; CallArgumentAliasPolicy.cs; ClosedContractDiagnostics.cs; InvalidContractArgumentDiagnostics.cs; ContractRuntimePolicy.cs; EffectEvaluationTypes.cs; generated catalogs (EffectEvaluationProjections, EffectEvaluationProducerTupleCatalog, AnalyzerDiagnosticCatalog, DeclarativeModels); both descriptor tables (SP0002…SP0050, SPCF0001…SPCF0008); CompilerExceptionTypeIdentity.cs; Configuration/AnalyzerConfiguration*.cs; ContractForValidation/*; SynthesizedRecordCallAnalysis.cs; PrimaryConstructorCallableInventory.cs; EffectContractDiagnostics.cs; LanguageSubsetGate.cs; AnalyzerFeaturePipeline.cs; SharpProofControlAttributePolicy.cs; remainder of RequiresCallSiteDiscovery.cs / RequiresCallSiteTreeAnalyzer.cs.
 ## [Bug hunt 2026-08-29T18:41:58Z] Scout 2 — Dataflow & IR (SharpProof.Dataflow, SharpProof.Ir)
