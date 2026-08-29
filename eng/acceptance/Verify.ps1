@@ -14,7 +14,6 @@ $ErrorActionPreference = 'Stop'
 $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
-. (Join-Path $repositoryRoot 'scripts\Assert-SharpProofUniqueJsonProperties.ps1')
 $wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = $null
 
@@ -266,6 +265,7 @@ Invoke-SharpProofDotnet -Arguments @(
 Complete-AcceptanceTimingPhase
 
 Start-AcceptanceTimingPhase -Name 'static-validation'
+. (Join-Path $repositoryRoot 'scripts\Assert-SharpProofUniqueJsonProperties.ps1')
 . (Join-Path $repositoryRoot 'scripts\Get-SharpProofTcbPaths.ps1')
 . (Join-Path $repositoryRoot 'scripts\Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $repositoryRoot 'scripts\CSharpSourceMetrics.ps1')
