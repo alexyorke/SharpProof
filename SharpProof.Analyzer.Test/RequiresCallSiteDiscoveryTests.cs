@@ -376,6 +376,41 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public async Task ReducedExtensionArgumentsRetainTheirOriginalActuals()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public static class Extensions
+            {
+                public static void Positive(this int receiver, int value)
+                {
+                    Contract.Requires(receiver > 0);
+                    Contract.Requires(value > 0);
+                }
+            }
+
+            public static class Subject
+            {
+                public static void Satisfied() => 5.Positive(7);
+                public static void ReceiverViolated() => 0.Positive(7);
+                public static void ArgumentViolated() => 5.Positive(-1);
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027", "SP0027"]));
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1),
+            Is.EqualTo([15, 16]));
+    }
+
+    [Test]
     public void NestedUsingStatementsRetainBothDisposalTargets()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(

@@ -6,7 +6,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 The latest audit wave ran against exact baseline
 `ffe74fff1c852d073610cfbebc54c141521a25fb`. Its ten subsystem reports contain
-48 candidate findings below. Each candidate remains open until the main agent
+47 candidate findings below. Each candidate remains open until the main agent
 independently reproduces it, adds a regression test, implements the fix, and
 removes the detailed entry in the corresponding fix commit.
 
@@ -28,6 +28,12 @@ The following findings concern cybersecurity, raceable trust decisions, or files
 - **371:** `[SharpProofSuppress]` is documented and tested as analyzer-reporting policy only; collector verification remaining active is intentional fail-closed behavior.
 - **412:** The claimed Gates RS0030 build failure was not reproduced; the current Release Gates build is clean and the remaining mutation calls are intentional harness code.
 - **417-419:** The reported Linux backslash failures were disproved by canonical PowerShell `Join-Path` normalization and passing path-authority probes.
+- **Latest Scout 1, Finding 1:** Reduced extension invocations retain the
+  receiver in `IInvocationOperation.Instance` and expose only the remaining
+  parameters through the reduced target's argument ordinals. The focused
+  analyzer regression reports exactly the receiver and declared-argument
+  violations while accepting the satisfied call; the reported shift was not
+  reproduced.
 
 ## Resolved in this branch
 
@@ -78,39 +84,11 @@ The deferred security/containment findings addressed in this branch have dedicat
 
 ## Active, deferred, and rejected findings
 
-The 48 detailed findings below are pending independent reproduction and TDD
+The 47 detailed findings below are pending independent reproduction and TDD
 resolution. Historical findings remain represented by the compact resolution
 and reclassification ledgers above.
 
 ## [Bug hunt 2026-08-29T18:40:38Z] Scout 1 — Core analyzer logic (SharpProof.Analyzer.Core, SharpProof.Analyzer)
-
-## Finding 1 — Off-by-one mapping of contract parameters to actual arguments for reduced extension-method calls
-- **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\RequiresCallSiteAnalyzer.cs`
-- **Function/method + containing type:** `GetActual`, `GetArgument`, `TryGetSyntheticArgument`, `GetAliasEvaluation` in nested class `RequiresCallSiteAnalyzer.Analysis` / static class `RequiresCallSiteAnalyzer`
-- **Line number(s):** 769–793 (`GetActual`, esp. 786–788), 795–810 (`TryGetSyntheticArgument`, esp. 806–809), 863–889 (`GetArgument`, esp. 867–871), 812–861 (`GetAliasEvaluation`, esp. 827–837)
-- **Bug description:** For a *reduced* extension-method invocation (`x.M(a, b)`), Roslyn represents the receiver as the **first implicit argument** (`IArgumentOperation` with `Parameter` = the receiver parameter, ordinal 0) and sets `IInvocationOperation.Instance` to **null** ("or null if the method is static" — a reduced extension method is static). Verified against Roslyn's own operation-tree baselines (`IOperationTests_IArgument.cs`, identical in Roslyn 3.2.0 through current main; repo pins Microsoft.CodeAnalysis.CSharp **4.14.0**). The code assumes the opposite model: the receiver lives in `Instance` and declared arguments are numbered 0-based over declared params. Consequences for a call to `Ext.Foo(this T r, A a, B b)` bound against `ReducedFrom` (contract variable ordinals: r=0, a=1, b=2):
-  - Ordinal 0 (receiver): `GetActual` returns `callSite.Instance` (lines 785–788) = **null** → `AnalyzeConcreteCall`/`AnalyzeAbstractCallSite` bail with `Unknown`/`null`. The receiver's real actual (available as `Arguments[0].Value`) is never used → preconditions on the extension receiver are silently never checked.
-  - Ordinal ≥ 1 (declared params): `GetArgument` computes `ordinal = variable.Ordinal - 1` (lines 869–871) and matches `argument.Parameter?.Ordinal == ordinal` (line 875) → declared param *a* (ordinal 1) matches the **receiver argument** (Parameter.Ordinal 0), param *b* matches param *a*'s argument, etc. The concrete replay/abstract evaluation then evaluates each declared parameter's contract against the **predecessor argument's value**. This can produce **false `SP0027` "Precondition Violated"** reports (e.g., `0.Foo(7)` with `Requires(a > 0)` is evaluated as `0 > 0` → false → reported) and **false "Proven" verdicts / missed diagnostics** (e.g., `5.Foo(-1)` evaluated as `5 > 0` → proven). Type-compatibility guards do not catch it when receiver and parameter types coincide.
-  - `TryGetSyntheticArgument` (lines 806–809) applies the same `-1` shift against `SyntheticArguments` (harmless today only because that map is empty for invocation candidates).
-  - By contrast, the static call form `Ext.M(x, y)` (TargetMethod not reduced) works correctly with the identity mapping — confirming the `-1` adjustment is wrong specifically for the reduced form.
-  No test coverage for contracts on extension methods with declared parameters (only parameterless extension receivers appear in tests).
-- **Code excerpt:**
-```csharp
-var ordinal = isReducedExtension
-    ? variable.Ordinal - 1      // wrong: reduced invocations carry the receiver as argument ordinal 0
-    : variable.Ordinal;
-IArgumentOperation? result = null;
-foreach (var argument in callSite.Arguments)
-{
-    if (argument.Parameter?.Ordinal != ordinal) { continue; }
-```
-```csharp
-BoundContractVariableRole.Receiver => callSite.Instance,              // null for reduced extension calls
-BoundContractVariableRole.Parameter
-    when isReducedExtension && variable.Ordinal == 0 =>
-    callSite.Instance,                                                // null → Unknown
-```
-- **Category:** logic / api-misuse — **Severity:** high — **Confidence:** 0.8
 
 ## Finding 2 — Same extension-argument convention error in the effect call-precondition policy (wrong actual values / shifted indices)
 - **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\EffectCallPreconditionPolicy.cs`
