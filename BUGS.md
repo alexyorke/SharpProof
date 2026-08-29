@@ -50,6 +50,8 @@ Reset/invalidation removes publication members without the full filesystem durab
 - **6:** `RegisterCompilationEndAction` is a valid Roslyn registration API; the naming claim was based on a mistaken signature assumption.
 - **275:** Exact `Contract.Result<T>` nullability matching is intentional contract identity behavior and is covered by binder tests.
 - **279:** The original silent profile/configuration disagreement report is superseded. Current configuration parsing detects conflicting aliases and reports the authoritative invalid-configuration diagnostic; no silent shadowing remains.
+- **317:** The GUID-bearing compiler-manifest path was replaced with a stable compiler-visible source path and the unchanged-build editorconfig regression is covered by `8127933fc`. Target-level verifier reuse remains intentionally deferred because an inputs/outputs-only skip could bypass repeated refutation and infrastructure checks; a persisted canonical status fingerprint is required before changing that behavior.
+- **369:** Explicit-interface implementation admission is fixed by `fa58c7533`; static constructors remain intentionally fail-closed because type-initialization ordering and replay evidence are not modeled.
 - **366:** Leading-double-slash path identity divergence was not reproduced by the canonical Linux/.NET path implementation; no publication split was observed.
 - **371:** `[SharpProofSuppress]` is documented and tested as analyzer-reporting policy only; collector verification remaining active is intentional fail-closed behavior.
 - **412:** The claimed Gates RS0030 build failure was not reproduced; the current Release Gates build is clean and the remaining mutation calls are intentional harness code.
@@ -67,6 +69,8 @@ Resolved reports are removed after reproduction, implementation, regression test
 | 285 | `8d166cad1` (semantic Roslyn outcome-construction architecture scan) |
 | 324 | `e5850507a` (audited Roslyn construction and whole-compilation diagnostics boundary) |
 | 409 | `6462246f7` (protocol answer catalog and guarded semantic-cache writes) |
+| 317 | `8127933fc` (stable compiler-visible manifest source path and incremental regression) |
+| 369 | `fa58c7533` (explicit-interface implementation boundary; static constructors remain fail-closed) |
 | 202 | `0a2c179f9` (runtime companion path validation and generated launcher coverage) |
 | 257-262 | `68afb8ca1`, `c3ab72290`, `8bd08c6e0` |
 | 263-270 | `0c9e0ec0d`, `0c95dad38`, `0a2c179f9`, `a7b99ca24` |
@@ -95,31 +99,6 @@ The audit does not claim that the deferred security findings are fixed. Any futu
 ## Active, deferred, and rejected findings
 
 Historical resolved reports are intentionally removed from this file; the compact resolution table above retains their evidence anchors. The entries below are the remaining deferred, partial, policy, rejected, disproved, or not-reproduced records.
-
-### 317. [PARTIALLY RESOLVED 8127933fc] Per-Invocation GUID Leaks Through CompilerVisibleProperty Into GeneratedMSBuildEditorConfig.editorconfig, Defeating Incremental Compilation for Every Verification-Enabled Project
-
-**Location**: `SharpProof.Verifier\buildTransitive\SharpProof.Verifier.targets` (GUID mint at Line ~126: `_SharpProofInvocationId Condition="'$(_SharpProofInvocationId)' == ''"` -> NewGuid; `_SharpProofExpectedInvocationDirectory`/`_SharpProofInvocationDirectory` = runs/<guid> at Lines ~128/131; `_SharpProofCompilerManifestPath` = Combine(invocation dir, 'compiler-manifest.json') at Line 146; hook at Line 92); `SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props` (Line 33: `<CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />`); consumer proof `SharpProof.CompilerCollector\FinalCompilationCollector.cs` (Line 7 reads analyzer-config key `build_property._SharpProofCompilerManifestPath`); SDK chain: Microsoft.Managed.Core.targets writes CompilerVisibleProperty values into `$(IntermediateOutputPath)$(MSBuildProjectName).GeneratedMSBuildEditorConfig.editorconfig` and adds it to @(EditorConfigFiles); Microsoft.CSharp.Core.targets lists @(EditorConfigFiles) among CoreCompile Inputs and passes them to Csc.
-**Description**: Every build that runs _SharpProofInitializeVerify mints a fresh _SharpProofInvocationId GUID (condition `'== ''` means new per project evaluation per msbuild invocation) and derives _SharpProofCompilerManifestPath under runs/<guid>/ - that property is registered as compiler-visible and read back by the collector through the generated editorconfig, proving the value travels there. Because the manifest path embeds a fresh GUID on every invocation, the generated editorconfig content differs on every build, the write-always target rewrites it, its timestamp bumps, and CoreCompile's Inputs check always fails: csc, all analyzers/generators, and then the entire verifier pipeline (launcher + worker + Z3) rerun on every no-op `dotnet build` of any project with SharpProofVerify=true (strict profile makes that opt-out-free via AnalyzerConsumer.props/portable targets). Secondary effect: during design-time builds the setting PropertyGroup condition excludes DesignTimeBuild, so the property flips empty and back around every F5, churning the same file. A stable path already exists ($(_SharpProofVerifyDirectory), computed identically without the invocation id). Verified mechanically against both repo files and installed SDK 9.0.317 targets.
-**Reproduction Steps**:
-1. In the canonical container create a consumer project with strict profile plus both SharpProof packages; build twice with zero source changes.
-2. After build 2, observe obj/Debug/net8.0/<Project>.GeneratedMSBuildEditorConfig.editorconfig contains a DIFFERENT build_property._sharpproofcompilermanifestpath (.../runs/<new-guid>/compiler-manifest.json) than after build 1.
-3. Observe CoreCompile/Csc re-executed on build 2 (-v:n shows no "Skipping target CoreCompile") followed by a fresh launcher spawn although no input changed. Delete only the GUID from that one line and rebuild: the file stops changing and CoreCompile skips again, isolating the GUID as the cause.
-**Confidence**: High (each link verified statically; blast radius is all verification-enabled projects).
-
-**Status**: The compiler-visible value now uses the stable, package-owned
-`_SharpProofCompilerManifestSourcePath` (`compiler-manifest.input.json`) while
-the GUID-bearing `_SharpProofCompilerManifestPath` remains a private
-per-invocation copy. The compiler collector writes the stable source, the
-verification target copies it into the isolated run directory, and the
-invalidation task protects both paths. The incremental regression confirms the
-generated editorconfig is byte-identical on an unchanged second build and no
-longer contains a `/runs/` path. The `SharpProofVerify` target still has no
-incremental `Inputs`/`Outputs`, so whether the verifier itself is skipped on a
-no-op remains a separate follow-up. This is intentionally deferred: the
-pre-dependency invalidation target removes owned outputs before verification,
-and a safe skip requires a persisted input/status fingerprint that still
-rechecks unchanged refuted, missing, corrupt, and infrastructure results. An
-`Inputs`/`Outputs`-only change would weaken the repeated-refutation guarantee.
 
 ### 318. [DEFERRED CONTAINMENT] Retained Cleanup Anchors Invoke Environment.FailFast Asynchronously After RunVerifier Has Returned - Killing Reused MSBuild Nodes (and Unrelated Concurrent Builds) After the Task Reported Its Result
 
@@ -151,16 +130,6 @@ rechecks unchanged refuted, missing, corrupt, and infrastructure results. An
 3. `stat -c '%F %s' /dev/null` -> `regular file` with size > 0 (was `character special file`, size 0); `echo x >/dev/null` now appends to disk.
 4. Unprivileged cross-check: `mkfifo /tmp/f` and pass it via the same property - exit 0 and `/tmp/f` is now a regular file.
 **Confidence**: High on mechanism (no type gate exists anywhere on the pipeline; POSIX unlink/rename semantics standard); impact-weighted Medium overall because triggering requires an operator-supplied pathological path.
-
-### 369. [PARTIALLY RESOLVED fa58c7533] Explicit Interface Implementations and Static Constructors Are Analyzed In-Process but Marked Unsupported in the Manifest - Strict Builds Kill Analyzer-Blessed Members While Advisory Builds Silently Lose All Coverage for Them
-
-**Location**: `SharpProof.CompilerCollector\CompilerArtifact\ClaimManifestBuilder.cs` (the callable-kind whitelist now admits `ExplicitInterfaceImplementation` but intentionally excludes `StaticConstructor`); admitting counterparts `SharpProof.Analyzer.Core\LanguageSubsetGate.cs` and `SharpProof.Contracts\ContractBinder.cs`; enforcement `SharpProof.CompilerCollector\CompilerArtifact\CompilerCallableLowerer.cs` (unsupported targets fail closed with `WorkerClaimReason.UnsupportedCallable`); strict consequence `SharpProof.Worker.Launcher\Program.cs` (incomplete callables fail under `require-proven`).
-**Description**: The explicit-interface half of the original report was resolved by `fa58c7533` and is covered by manifest and binder tests; EII bodies now remain in the verifier-supported callable set. Static constructors remain analyzer/binder-admitted but collector-unsupported. The collector and worker do not replay type initialization or static-constructor ordering, so broadening that whitelist would make replay evidence unsound. This is a deliberate fail-closed boundary, not a claim that static constructors are currently proven. Distinct from #341 (documentation enumerating fewer kinds than the gate) and #370 (the separate static-state mutation gate).
-**Reproduction Steps**:
-1. Strict-profile project (`SharpProofProfile=strict` => verify policy require-proven) referencing SharpProof.Attributes; add an explicitly initialized static constructor and a selected static constructor or static member.
-2. Build in-container: static-constructor replay remains unsupported, so the worker returns Unknown/Incomplete and require-proven fails closed with SP0047. This is expected until type-initialization ordering and replay evidence are modeled.
-3. Use an explicit interface implementation as a control: the same selected EII body remains in the verifier-supported callable set and is covered by `ClaimManifestBuilderTests.ExplicitInterfaceImplementationUsesTheSupportedCallableSet`.
-**Confidence**: High for the original explicit-interface divergence, which is resolved by `fa58c7533`; static-constructor admission remains intentionally fail-closed because constructor initialization and replay semantics need a separate design.
 
 ### 406. [DEFERRED SECURITY] The Worker's `--request`/`--result` Distinctness Guard Is Ordinal-String-Only - Symlink/Hardlink Aliases Bypass It While the Launcher's Own Path-Conflict Machinery Classifies the Identical Layout as a Conflict
 
