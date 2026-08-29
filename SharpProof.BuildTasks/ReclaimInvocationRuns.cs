@@ -3,6 +3,10 @@ using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Design",
+    "CA1515:Consider making public types internal",
+    Justification = "MSBuild loads task types by their public names.")]
 public sealed class ReclaimInvocationRuns : Microsoft.Build.Utilities.Task
 {
     [Required]

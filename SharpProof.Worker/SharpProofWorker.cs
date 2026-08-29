@@ -684,7 +684,7 @@ public sealed class SharpProofWorker : IDisposable
                     return LaneRenewalResult.Success;
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException and
-                    not StackOverflowException)
+                    not StackOverflowException and not OperationCanceledException)
                 {
                     try
                     {
@@ -692,7 +692,8 @@ public sealed class SharpProofWorker : IDisposable
                     }
                     catch (Exception cleanupException) when (
                         cleanupException is not OutOfMemoryException and
-                        not StackOverflowException)
+                        not StackOverflowException and
+                        not OperationCanceledException)
                     {
                         // Renewal is already failing; cleanup must not replace
                         // the typed lifecycle failure with another exception.

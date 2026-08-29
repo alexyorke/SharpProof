@@ -247,7 +247,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
         if (effect != null)
         {
-            ValidateEffectClaim(target, effect, result, indexes, errors);
+            ValidateEffectClaim(effect, result, indexes, errors);
         }
         else
         {
@@ -425,7 +425,6 @@ internal sealed class CompilerResponseEvidenceAuthority :
     }
 
     private static void ValidateEffectClaim(
-        CompilerCallablePreparation target,
         CompilerEffectClaimArtifact evidence,
         WorkerClaimResult result,
         TargetClaimIndexes indexes,
@@ -640,7 +639,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static IEnumerable<string> AssumptionIdsForCore(
         IEnumerable<string>? proofCore,
         bool requiresOnly,
-        IReadOnlyDictionary<string, string> assumptionIdsByLabel)
+        Dictionary<string, string> assumptionIdsByLabel)
     {
         return (proofCore ?? [])
             .Where(assumptionIdsByLabel.ContainsKey)
