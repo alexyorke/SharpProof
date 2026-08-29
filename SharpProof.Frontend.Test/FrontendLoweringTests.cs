@@ -563,6 +563,33 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void PureOpaqueIdentitySeparatesDistinctConstantFields()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            private const long First = 1L;
+            private const long Second = 2L;
+            public static long Target() => First + Second;
+            """);
+        var fields = compiled.TargetExpression
+            .DescendantsAndSelf()
+            .OfType<IFieldReferenceOperation>()
+            .ToArray();
+        Assert.That(fields, Has.Length.EqualTo(2));
+
+        var lowerer = new RoslynOperationLowerer(compiled.Factory);
+        var first = lowerer.Lower(fields[0]);
+        var second = lowerer.Lower(fields[1]);
+
+        Assert.That(first.Term, Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(second.Term, Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(((IrOpaqueTerm)first.Term).Purity, Is.EqualTo(IrOpaquePurity.Pure));
+        Assert.That(((IrOpaqueTerm)second.Term).Purity, Is.EqualTo(IrOpaquePurity.Pure));
+        Assert.That(second.Term, Is.Not.SameAs(first.Term));
+        Assert.That(second.Term.Id, Is.Not.EqualTo(first.Term.Id));
+    }
+
+    [Test]
     public void CompilerIdentitySeparatesSameNamedTypesFromDifferentAssemblies()
     {
         var leftReference = CreateAliasedTypeReference(

@@ -479,7 +479,10 @@ public sealed class RoslynOperationLowerer
         {
             return CompilerConstantAdmission.IsCatalogIntegerBoundary(operation)
                 ? _owner.LowerConstant(operation)
-                : DefaultVisit(operation, argument);
+                : _owner.Opaque(
+                    operation,
+                    FrontendAbstention.UnsupportedOperationKind,
+                    operation.Field);
         }
 
         public override LoweredExpression VisitLocalReference(
