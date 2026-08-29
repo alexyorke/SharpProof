@@ -1890,9 +1890,9 @@ public sealed class ArchitectureTests
             "ContainerNativeLibrary.cs"));
 
         var exactLoad =
-            "NativeLibrary.Load(" + Environment.NewLine +
-            "                " +
-            "ContainerContract.ResolveZ3LibraryRequired());";
+            "using var verified = ContainerContract.OpenZ3LibraryRequired();" +
+            Environment.NewLine +
+            "            var handle = NativeLibrary.Load(verified.LoadPath);";
         Assert.That(
             host.Contains(exactLoad, StringComparison.Ordinal) &&
             !host.Contains(

@@ -856,7 +856,7 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'container-z3-refuses-ambient-load'
         File = 'SharpProof.Host\ContainerNativeLibrary.cs'
-        Original = "            var handle = NativeLibrary.Load(`n                ContainerContract.ResolveZ3LibraryRequired());"
+        Original = "            var handle = NativeLibrary.Load(verified.LoadPath);"
         Mutated = '            var handle = NativeLibrary.Load(Z3ImportName);'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath'

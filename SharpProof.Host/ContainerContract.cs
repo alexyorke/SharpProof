@@ -34,6 +34,29 @@ public sealed class ContainerContractInfo
     public string VerifierPackageId { get; }
 }
 
+internal sealed class VerifiedNativeLibrary : IDisposable
+{
+    private readonly FileStream _stream;
+
+    internal VerifiedNativeLibrary(string path, FileStream stream)
+    {
+        Path = path;
+        _stream = stream;
+    }
+
+    internal string Path { get; }
+
+    // Keep the descriptor open while the native loader resolves this path.
+    // /proc/self/fd binds dlopen to the validated inode even if the named
+    // path is replaced after validation.
+    internal string LoadPath => $"/proc/self/fd/{_stream.SafeFileHandle.DangerousGetHandle().ToInt32()}";
+
+    public void Dispose()
+    {
+        _stream.Dispose();
+    }
+}
+
 public static class ContainerContract
 {
     private const string DefaultContractPath =
@@ -153,6 +176,12 @@ public static class ContainerContract
 
     public static string ResolveZ3LibraryRequired()
     {
+        using var verified = OpenZ3LibraryRequired();
+        return verified.Path;
+    }
+
+    internal static VerifiedNativeLibrary OpenZ3LibraryRequired()
+    {
         var contract = ValidateRequired();
         var nativeRoot = Environment.GetEnvironmentVariable(
             "SHARPPROOF_NATIVE_ROOT");
@@ -160,33 +189,62 @@ public static class ContainerContract
         {
             nativeRoot = "/opt/sharpproof/native";
         }
-        var library = LinuxPathIdentity.RequireLocalPath(Path.Combine(
+        var library = Path.Combine(
             nativeRoot,
             "z3",
             contract.Z3Version,
             "linux-x64",
-            "libz3.so"));
-        var information = new FileInfo(library);
-        if (!information.Exists || information.Length != contract.Z3LibraryBytes)
-        {
-            throw new InvalidDataException(
-                "The SharpProof Z3 native payload is missing or has the wrong size.");
-        }
-        using var stream = new FileStream(
+            "libz3.so");
+        return OpenZ3LibraryRequired(library, contract);
+    }
+
+    internal static VerifiedNativeLibrary OpenZ3LibraryRequired(
+        string library)
+    {
+        return OpenZ3LibraryRequired(library, ValidateRequired());
+    }
+
+    private static VerifiedNativeLibrary OpenZ3LibraryRequired(
+        string library,
+        ContainerContractInfo contract)
+    {
+        library = LinuxPathIdentity.RequireLocalPath(library);
+        var stream = new FileStream(
             library,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-        var hash = Convert.ToHexString(SHA256.HashData(stream));
-        if (!string.Equals(
-                hash,
-                contract.Z3LibrarySha256,
-                StringComparison.OrdinalIgnoreCase))
+        try
         {
-            throw new InvalidDataException(
-                "The SharpProof Z3 native payload hash does not match the container contract.");
+            if (stream.Length != contract.Z3LibraryBytes)
+            {
+                throw new InvalidDataException(
+                    "The SharpProof Z3 native payload is missing or has the wrong size.");
+            }
+
+            var hash = Convert.ToHexString(SHA256.HashData(stream));
+            if (!string.Equals(
+                    hash,
+                    contract.Z3LibrarySha256,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    "The SharpProof Z3 native payload hash does not match the container contract.");
+            }
+
+            stream.Position = 0;
+            return new VerifiedNativeLibrary(library, stream);
         }
-        return library;
+        catch (OperationCanceledException)
+        {
+            stream.Dispose();
+            throw;
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
     }
 
     private static JsonDocument ReadEmbeddedToolchain()

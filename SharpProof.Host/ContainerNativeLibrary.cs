@@ -25,8 +25,8 @@ public static class ContainerNativeLibrary
                 return;
             }
 
-            var handle = NativeLibrary.Load(
-                ContainerContract.ResolveZ3LibraryRequired());
+            using var verified = ContainerContract.OpenZ3LibraryRequired();
+            var handle = NativeLibrary.Load(verified.LoadPath);
             try
             {
                 NativeLibrary.SetDllImportResolver(

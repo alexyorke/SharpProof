@@ -18,12 +18,6 @@ are included in this audit-only wave.
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
 
-### 271. Z3 pin/hash versus loaded-library identity
-
-**Status:** Deferred security review.
-
-The container contract validates bytes separately from the library later loaded by the native resolver.
-
 ### 272. Publication-path validation versus use
 
 **Status:** Deferred security review.
