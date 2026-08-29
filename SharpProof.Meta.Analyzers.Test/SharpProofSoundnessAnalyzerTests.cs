@@ -452,6 +452,47 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ProtocolAnswersAreDetectedAndCacheabilityGuardsAreHonored()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Worker.Protocol {
+                public sealed class WorkerVerifyResponse { }
+                public enum WorkerRunFailureReason { None, InfrastructureFailure }
+            }
+            namespace SharpProof.Worker {
+                public static class VerificationCache {
+                    public static bool IsCacheable(
+                        Protocol.WorkerVerifyResponse response) => true;
+                }
+            }
+            namespace SharpProof.Verify {
+                internal interface ISemanticCache { }
+                sealed class ProofCache : ISemanticCache {
+                    internal void Write(object answer) { }
+                }
+                sealed class C {
+                    void Unguarded(ProofCache cache) =>
+                        cache.Write(new SharpProof.Worker.Protocol.WorkerVerifyResponse());
+                    void Guarded(
+                        ProofCache cache,
+                        SharpProof.Worker.Protocol.WorkerVerifyResponse response) {
+                        if (SharpProof.Worker.VerificationCache.IsCacheable(response))
+                            cache.Write(response);
+                    }
+                    void Failure(ProofCache cache) =>
+                        cache.Write(
+                            SharpProof.Worker.Protocol.WorkerRunFailureReason.InfrastructureFailure);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task SemanticCacheFactoryDelegatesAreInspectedForNonCacheableAnswers()
     {
         var diagnostics = await Analyze(

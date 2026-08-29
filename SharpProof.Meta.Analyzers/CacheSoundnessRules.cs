@@ -25,7 +25,8 @@ internal static class CacheSoundnessRules
             IsCacheType(ownerType, symbols) &&
             StoredValueArguments(invocation).Any(argument => IsNonCacheableSemanticAnswer(
                 argument.Value, root,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default))))
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)) &&
+                !IsInsideCacheabilityGuard(invocation, argument.Value)))
         {
             Report(context, invocation.Syntax.GetLocation());
         }
@@ -488,7 +489,9 @@ internal static class CacheSoundnessRules
                 when field.Field.ContainingType.TypeKind == TypeKind.Enum &&
                      IsSemanticAnswerType(field.Type) => IsNonCacheableName(field.Field.Name),
             IObjectCreationOperation creation =>
-                IsSemanticAnswerType(creation.Type) && IsNonCacheableName(creation.Type?.Name),
+                IsSemanticAnswerType(creation.Type) &&
+                (IsNonCacheableName(creation.Type?.Name) ||
+                 IsKnownProtocolAnswerType(creation.Type)),
             ILocalReferenceOperation local => ResolveLocal(local, root, resolving),
             IConditionalOperation conditional =>
                 IsNonCacheableSemanticAnswer(conditional.WhenTrue, root, resolving) ||
@@ -508,7 +511,9 @@ internal static class CacheSoundnessRules
                 when localFunction.Body is { } localBody =>
                 ContainsNonCacheableSemanticAnswer(localBody, root, resolving),
             IPropertyReferenceOperation property => ResolveProperty(property),
-            IInvocationOperation invocation => ResolveInvocation(invocation),
+            IInvocationOperation invocation =>
+                IsKnownProtocolAnswerType(invocation.Type) ||
+                ResolveInvocation(invocation),
             _ => IsSemanticAnswerType(operation.Type) &&
                 operation.ConstantValue is not { HasValue: true }
         };
@@ -748,9 +753,96 @@ internal static class CacheSoundnessRules
         {
             return false;
         }
-        return type.Name.IndexOf("Answer", StringComparison.Ordinal) >= 0 ||
+        return IsKnownProtocolAnswerType(type) ||
+               type.Name.IndexOf("Answer", StringComparison.Ordinal) >= 0 ||
                type.Name.IndexOf("Result", StringComparison.Ordinal) >= 0 ||
                type.Name.IndexOf("Outcome", StringComparison.Ordinal) >= 0;
+    }
+
+    private static bool IsKnownProtocolAnswerType(ITypeSymbol? type)
+    {
+        if (type is not INamedTypeSymbol named)
+        {
+            return false;
+        }
+
+        var protocol = named.ContainingNamespace;
+        return string.Equals(protocol.Name, "Protocol", StringComparison.Ordinal) &&
+               string.Equals(protocol.ContainingNamespace?.Name, "Worker", StringComparison.Ordinal) &&
+               string.Equals(protocol.ContainingNamespace?.ContainingNamespace?.Name, "SharpProof", StringComparison.Ordinal) &&
+               protocol.ContainingNamespace?.ContainingNamespace?.ContainingNamespace?.IsGlobalNamespace == true &&
+               named.Name is
+                   "WorkerVerifyResponse" or
+                   "WorkerRunStatus" or
+                   "WorkerRunFailureReason" or
+                   "WorkerCallableCoverage" or
+                   "WorkerCallableCoverageReason" or
+                   "WorkerClaimOutcome" or
+                   "WorkerClaimReason" or
+                   "WorkerCacheStatus";
+    }
+
+    private static bool IsInsideCacheabilityGuard(
+        IInvocationOperation write,
+        IOperation value)
+    {
+        for (var current = write.Parent;
+             current != null;
+             current = current.Parent)
+        {
+            if (current is not IConditionalOperation conditional)
+            {
+                continue;
+            }
+
+            foreach (var guard in conditional.Condition
+                         .DescendantsAndSelf()
+                         .OfType<IInvocationOperation>())
+            {
+                if (!string.Equals(
+                        guard.TargetMethod.Name,
+                        "IsCacheable",
+                        StringComparison.Ordinal) ||
+                    !string.Equals(
+                        guard.TargetMethod.ContainingType?.Name,
+                        "VerificationCache",
+                        StringComparison.Ordinal) ||
+                    !IsSharpProofWorkerNamespace(
+                        guard.TargetMethod.ContainingType?.ContainingNamespace) ||
+                    !guard.Arguments.Any(argument =>
+                        IsSameStorage(argument.Value, value)))
+                {
+                    continue;
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSameStorage(IOperation left, IOperation right)
+    {
+        left = UnwrapAssignmentOperation(left);
+        right = UnwrapAssignmentOperation(right);
+        return (left, right) switch
+        {
+            (ILocalReferenceOperation first, ILocalReferenceOperation second) =>
+                SymbolEqualityComparer.Default.Equals(first.Local, second.Local),
+            (IParameterReferenceOperation first, IParameterReferenceOperation second) =>
+                SymbolEqualityComparer.Default.Equals(first.Parameter, second.Parameter),
+            (IFieldReferenceOperation first, IFieldReferenceOperation second) =>
+                SymbolEqualityComparer.Default.Equals(first.Field, second.Field),
+            _ => false
+        };
+    }
+
+    private static bool IsSharpProofWorkerNamespace(INamespaceSymbol? symbol)
+    {
+        return string.Equals(symbol?.Name, "Worker", StringComparison.Ordinal) &&
+               string.Equals(symbol?.ContainingNamespace?.Name, "SharpProof", StringComparison.Ordinal) &&
+               symbol?.ContainingNamespace?.ContainingNamespace?.IsGlobalNamespace == true;
     }
 
     private static bool IsSharpProofNamespace(INamespaceSymbol? symbol)
