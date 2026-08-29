@@ -49,10 +49,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operation,
                 operationFacts,
                 semanticModel.Compilation,
-                cancellationToken,
                 semanticModel,
                 caller,
-                includeForEachProtocol: true);
+                includeForEachProtocol: true,
+                cancellationToken: cancellationToken);
             if (calls.IsDefaultOrEmpty)
             {
                 continue;
@@ -160,9 +160,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     operation,
                     operationFacts,
                     semanticModel.Compilation,
-                    cancellationToken,
                     semanticModel,
-                    caller);
+                    caller,
+                    cancellationToken: cancellationToken);
                 var isSynthesizedDispose =
                     operation is IInvocationOperation invocation &&
                     UsingDisposalEffectResolver
@@ -466,9 +466,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
         baseConstructor = null!;
         syntheticArguments = ImmutableDictionary<int, long>.Empty;
         var hasImplicitBaseInitializer = declaration is ConstructorDeclarationSyntax
-            {
-                Initializer: null
-            } ||
+        {
+            Initializer: null
+        } ||
             declaration is TypeDeclarationSyntax primaryDeclaration &&
             primaryDeclaration.BaseList?.Types.Any(static baseType =>
                 baseType is not PrimaryConstructorBaseTypeSyntax) == true &&
@@ -1181,15 +1181,17 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var statementOperation = semanticModel.GetOperation(
             statement,
             cancellationToken);
-        var expression = statementOperation switch
+        IOperation expression;
+        switch (statementOperation)
         {
-            IReturnOperation { ReturnedValue: { } value } => value,
-            IExpressionStatementOperation { Operation: { } value } => value,
-            _ => null
-        };
-        if (expression == null)
-        {
-            return false;
+            case IReturnOperation { ReturnedValue: { } value }:
+                expression = value;
+                break;
+            case IExpressionStatementOperation { Operation: { } value }:
+                expression = value;
+                break;
+            default:
+                return false;
         }
 
         var property = expression.DescendantsAndSelf()
@@ -1318,13 +1320,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IOperation? callSite,
         DefiniteOperationFacts operationFacts)
     {
+        var initializer = callSite?.Syntax.AncestorsAndSelf()
+            .OfType<InitializerExpressionSyntax>()
+            .FirstOrDefault(initializer => initializer.IsKind(
+                SyntaxKind.CollectionInitializerExpression));
         if (statementExpression == null ||
             callSite is not IInvocationOperation { IsImplicit: true } ||
-            callSite.Syntax.AncestorsAndSelf()
-                .OfType<InitializerExpressionSyntax>()
-                .FirstOrDefault(initializer => initializer.IsKind(
-                    SyntaxKind.CollectionInitializerExpression)) is not
-                { } initializer ||
+            initializer == null ||
             !statementExpression.Span.Contains(initializer.Span))
         {
             return false;
@@ -1376,10 +1378,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IOperation operation,
         DefiniteOperationFacts? operationFacts = null,
         Compilation? compilation = null,
-        CancellationToken cancellationToken = default,
         SemanticModel? semanticModel = null,
         IMethodSymbol? caller = null,
-        bool includeForEachProtocol = false)
+        bool includeForEachProtocol = false,
+        CancellationToken cancellationToken = default)
     {
         return operation switch
         {
@@ -1388,14 +1390,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 semanticModel != null =>
                 GetForEachCalls(
                     forEach,
-                    semanticModel,
-                    cancellationToken),
+                    semanticModel),
             IAwaitOperation awaitOperation when
                 semanticModel != null =>
                 GetAwaitCalls(
                     awaitOperation,
-                    semanticModel,
-                    cancellationToken),
+                    semanticModel),
             IUsingOperation @using when
                 compilation != null && caller != null &&
                 !@using.IsAsynchronous =>
@@ -1448,8 +1448,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private static ImmutableArray<RequiresCallTarget> GetForEachCalls(
         IForEachLoopOperation forEach,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
+        SemanticModel semanticModel)
     {
         if (forEach.IsAsynchronous ||
             forEach.Syntax is not CommonForEachStatementSyntax syntax)
@@ -1480,8 +1479,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private static ImmutableArray<RequiresCallTarget> GetAwaitCalls(
         IAwaitOperation awaitOperation,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
+        SemanticModel semanticModel)
     {
         if (awaitOperation.Syntax is not AwaitExpressionSyntax syntax)
         {
@@ -2953,46 +2951,14 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var declaration = property.Property.GetMethod.DeclaringSyntaxReferences
             .Select(reference => reference.GetSyntax(cancellationToken))
             .FirstOrDefault();
-        var expression = declaration switch
-        {
-            PropertyDeclarationSyntax
-            { ExpressionBody.Expression: { } body } => body,
-            IndexerDeclarationSyntax
-            { ExpressionBody.Expression: { } body } => body,
-            AccessorDeclarationSyntax
-            { ExpressionBody.Expression: { } body } => body,
-            AccessorDeclarationSyntax accessor
-                when accessor.Body?.Statements.Count == 1 &&
-                     accessor.Body.Statements[0] is
-                         ReturnStatementSyntax returned &&
-                     returned.Expression is { } body => body,
-            _ => null
-        };
-        if (expression == null)
-        {
-            var accessor = declaration?.DescendantNodes()
-                .OfType<AccessorDeclarationSyntax>()
-                .FirstOrDefault(static candidate =>
-                    candidate.IsKind(SyntaxKind.GetAccessorDeclaration));
-            if (accessor?.ExpressionBody?.Expression is { } body)
-            {
-                expression = body;
-            }
-            else if (accessor?.Body?.Statements.Count == 1 &&
-                     accessor.Body.Statements[0] is
-                         ReturnStatementSyntax returned &&
-                     returned.Expression is { } returnedExpression)
-            {
-                expression = returnedExpression;
-            }
-        }
-        if (expression == null)
+        var expression = GetCoalesceGetterExpression(declaration);
+        if (expression is not { } resolvedExpression)
         {
             return CoalesceGetterResult.Unknown;
         }
 
         var operation = semanticModel.GetOperation(
-            expression,
+            resolvedExpression,
             cancellationToken);
         if (operation == null)
         {
@@ -3009,6 +2975,59 @@ internal sealed partial class RequiresCallSiteDiscovery(
         return DefiniteOperationFacts.IsDefinitelyNonNull(operation)
             ? CoalesceGetterResult.NonNull
             : CoalesceGetterResult.Unknown;
+    }
+
+    private static ExpressionSyntax? GetCoalesceGetterExpression(
+        SyntaxNode? declaration)
+    {
+        switch (declaration)
+        {
+            case PropertyDeclarationSyntax
+            {
+                ExpressionBody.Expression: { } propertyBody
+            }:
+                return propertyBody;
+            case IndexerDeclarationSyntax
+            {
+                ExpressionBody.Expression: { } indexerBody
+            }:
+                return indexerBody;
+            case AccessorDeclarationSyntax
+            {
+                ExpressionBody.Expression: { } accessorBody
+            }:
+                return accessorBody;
+            case AccessorDeclarationSyntax accessorWithBody
+                when accessorWithBody.Body?.Statements.Count == 1 &&
+                     accessorWithBody.Body.Statements[0] is
+                         ReturnStatementSyntax returnedStatement &&
+                     returnedStatement.Expression is { } returnedBody:
+                return returnedBody;
+        }
+
+        if (declaration is null)
+        {
+            return null;
+        }
+
+        var accessorDeclaration = declaration.DescendantNodes()
+            .OfType<AccessorDeclarationSyntax>()
+            .FirstOrDefault(static candidate =>
+                candidate.IsKind(SyntaxKind.GetAccessorDeclaration));
+        if (accessorDeclaration?.ExpressionBody?.Expression is { } expression)
+        {
+            return expression;
+        }
+
+        if (accessorDeclaration?.Body?.Statements.Count == 1 &&
+            accessorDeclaration.Body.Statements[0] is
+                ReturnStatementSyntax fallbackReturn &&
+            fallbackReturn.Expression is { } returnedExpression)
+        {
+            return returnedExpression;
+        }
+
+        return null;
     }
 
     private static RequiresCallTarget CreateGetterCall(

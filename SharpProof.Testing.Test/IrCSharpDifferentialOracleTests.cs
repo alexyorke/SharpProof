@@ -287,19 +287,19 @@ public sealed class IrCSharpDifferentialOracleTests
             }
 
             foreach (var child in term switch
-                     {
-                         IrUnaryTerm unary => [unary.Operand],
-                         IrBinaryTerm binary => [binary.Left, binary.Right],
-                         IrConditionalTerm conditional =>
-                             [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse],
-                         IrCastTerm cast => [cast.Operand],
-                         IrLengthTerm length => [length.Value],
-                         IrSequenceAccessTerm access => [access.Sequence, access.Index],
-                         IrOpaqueTerm opaque => opaque.Receiver == null
-                             ? opaque.Arguments
-                             : opaque.Arguments.Insert(0, opaque.Receiver),
-                         _ => []
-                     })
+            {
+                IrUnaryTerm unary => [unary.Operand],
+                IrBinaryTerm binary => [binary.Left, binary.Right],
+                IrConditionalTerm conditional =>
+                    [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse],
+                IrCastTerm cast => [cast.Operand],
+                IrLengthTerm length => [length.Value],
+                IrSequenceAccessTerm access => [access.Sequence, access.Index],
+                IrOpaqueTerm opaque => opaque.Receiver == null
+                    ? opaque.Arguments
+                    : opaque.Arguments.Insert(0, opaque.Receiver),
+                _ => []
+            })
             {
                 pending.Push(child);
             }

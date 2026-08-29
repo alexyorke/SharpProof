@@ -35,7 +35,7 @@ public sealed class FuzzRunnerEvidenceTests
             Is.Zero,
             result.StandardOutput + Environment.NewLine + result.StandardError);
 
-        var campaign = File.ReadAllText(Path.Combine(
+        var campaign = await File.ReadAllTextAsync(Path.Combine(
             root,
             "scripts",
             "Invoke-SharpProofFuzzCampaign.ps1"));
@@ -75,7 +75,7 @@ public sealed class FuzzRunnerEvidenceTests
             Is.Zero,
             result.StandardOutput + Environment.NewLine + result.StandardError);
 
-        var campaign = File.ReadAllText(Path.Combine(
+        var campaign = await File.ReadAllTextAsync(Path.Combine(
             root,
             "scripts",
             "Invoke-SharpProofFuzzCampaign.ps1"));

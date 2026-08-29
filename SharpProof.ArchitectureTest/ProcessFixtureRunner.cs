@@ -15,10 +15,10 @@ internal static class ProcessFixtureRunner
         TimeSpan timeout)
     {
         ArgumentNullException.ThrowIfNull(startInfo);
-        if (timeout <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(timeout));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
+            timeout,
+            TimeSpan.Zero,
+            nameof(timeout));
 
         using var process = Process.Start(startInfo) ??
             throw new InvalidOperationException(

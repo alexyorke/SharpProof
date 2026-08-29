@@ -737,7 +737,8 @@ public sealed class ApiSpecTests
                 new IrInterpreter(factory)
                     .Evaluate(instantiated.Postconditions[0]).Value?.Boolean,
                 Is.EqualTo(expected),
-                "accepted lazy condition " + index.ToString());
+                "accepted lazy condition " + index.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture));
         }
     }
 
@@ -884,9 +885,9 @@ public sealed class ApiSpecTests
             .Where(static constructor =>
                 constructor.Parameters.Length == 0 ||
                 constructor.Parameters is [
-                {
-                    Type.SpecialType: SpecialType.System_String
-                }])
+                    {
+                        Type.SpecialType: SpecialType.System_String
+                    }])
             .ToArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
@@ -1065,7 +1066,7 @@ public sealed class ApiSpecTests
             []);
     }
 
-    private static SpecTermDeclaration PartialDivisionPredicate()
+    private static SpecBinaryDeclaration PartialDivisionPredicate()
     {
         var quotient = new SpecBinaryDeclaration(
             IrBinaryOperator.Divide,

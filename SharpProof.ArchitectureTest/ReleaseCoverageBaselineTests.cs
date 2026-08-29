@@ -69,7 +69,7 @@ public sealed class ReleaseCoverageBaselineTests
                 continue;
             }
 
-            if (indent == 2 && trimmed.EndsWith(":", StringComparison.Ordinal))
+            if (indent == 2 && trimmed.EndsWith(':'))
             {
                 break;
             }
@@ -331,7 +331,7 @@ public sealed class ReleaseCoverageBaselineTests
                 .Output.Trim();
             var evidencePath = Path.Combine(workspace, "acceptance.json");
             var receiptDirectory = Path.Combine(workspace, "receipts");
-            using var contract = JsonDocument.Parse(File.ReadAllText(
+            using var contract = JsonDocument.Parse(await File.ReadAllTextAsync(
                 Path.Combine(root, "eng", "acceptance", "contract.json")));
             var phaseNames = contract.RootElement
                 .GetProperty("automation")
@@ -988,17 +988,20 @@ public sealed class ReleaseCoverageBaselineTests
                 componentCommit,
                 "en-US");
 
-            File.SetUnixFileMode(
-                Path.Combine(
-                    repository,
-                    paths[0].Replace('/', Path.DirectorySeparatorChar)),
-                UnixFileMode.UserRead |
-                UnixFileMode.UserWrite |
-                UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead |
-                UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead |
-                UnixFileMode.OtherExecute);
+            if (OperatingSystem.IsLinux())
+            {
+                File.SetUnixFileMode(
+                    Path.Combine(
+                        repository,
+                        paths[0].Replace('/', Path.DirectorySeparatorChar)),
+                    UnixFileMode.UserRead |
+                    UnixFileMode.UserWrite |
+                    UnixFileMode.UserExecute |
+                    UnixFileMode.GroupRead |
+                    UnixFileMode.GroupExecute |
+                    UnixFileMode.OtherRead |
+                    UnixFileMode.OtherExecute);
+            }
             await AssertSuccessAsync(RunAsync(
                 repository,
                 "git",

@@ -132,7 +132,15 @@ public sealed partial class ReleaseQualificationMatrixTests
                     status = "passed",
                     commit,
                     osFamily,
-                    architecture = RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(),
+                    architecture = RuntimeInformation.OSArchitecture switch
+                    {
+                        Architecture.X64 => "x64",
+                        Architecture.X86 => "x86",
+                        Architecture.Arm => "arm",
+                        Architecture.Arm64 => "arm64",
+                        _ => throw new PlatformNotSupportedException(
+                            "The runtime architecture is not supported by the fixture.")
+                    },
                     attemptId = new string('a', 32),
                     packageArtifacts = packages.Take(count)
                 }));

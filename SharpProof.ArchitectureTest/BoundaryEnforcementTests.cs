@@ -190,7 +190,7 @@ public sealed class BoundaryEnforcementTests
             .Where(static line => line.Length != 0 && !line.StartsWith('#'))
             .Select(static line =>
             {
-                var separator = line.IndexOf(';');
+                var separator = line.IndexOf(';', StringComparison.Ordinal);
                 Assert.That(separator, Is.GreaterThan(2), line);
                 var id = line[..separator];
                 Assert.That(id, Does.StartWith("M:"), line);
