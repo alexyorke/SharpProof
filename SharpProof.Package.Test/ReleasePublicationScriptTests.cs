@@ -447,7 +447,7 @@ public sealed class ReleasePublicationScriptTests
             "missing" => "invalid symbol package layout",
             "foreign" => "debug identifier",
             "wrong-commit" => "canonical repository commit",
-            "duplicate" => "duplicate entry",
+            "duplicate" => "duplicate canonical entry",
             "malformed" => "portable PDB",
             _ => throw new ArgumentOutOfRangeException(nameof(mutation))
         };

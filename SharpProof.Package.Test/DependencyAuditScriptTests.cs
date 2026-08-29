@@ -22,7 +22,7 @@ public sealed class DependencyAuditScriptTests
     ];
 
     [Test]
-    public async Task CleanReportProducesDeterministicEvidence()
+    public async Task CleanReportProducesDeterministicEvidenceWithFreshMetadata()
     {
         using var workspace = DependencyAuditWorkspace.Create();
         var first = await workspace.RunAsync(workspace.CreateCleanReport());
@@ -35,11 +35,21 @@ public sealed class DependencyAuditScriptTests
         var secondEvidence = await File.ReadAllBytesAsync(
             workspace.OutputPath);
 
-        Assert.That(secondEvidence, Is.EqualTo(firstEvidence));
+        Assert.That(
+            DeterministicProjection(secondEvidence),
+            Is.EqualTo(DeterministicProjection(firstEvidence)));
         using var document = JsonDocument.Parse(secondEvidence);
         var root = document.RootElement;
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(
+                DateTimeOffset.TryParse(
+                    root.GetProperty("checkedAtUtc").GetString(),
+                    out _),
+                Is.True);
+            Assert.That(
+                root.GetProperty("attemptId").GetString(),
+                Does.Match("^(?:[0-9]+/[0-9]+|local-[0-9a-f]{32})$"));
             Assert.That(
                 root.GetProperty("schemaVersion").GetInt32(),
                 Is.EqualTo(1));
@@ -68,6 +78,15 @@ public sealed class DependencyAuditScriptTests
                 Encoding.UTF8.GetString(secondEvidence),
                 Does.EndWith("\n"));
         }
+    }
+
+    private static string DeterministicProjection(byte[] evidence)
+    {
+        var projection = JsonNode.Parse(evidence)?.AsObject() ??
+            throw new InvalidDataException("Dependency evidence is not an object.");
+        projection.Remove("checkedAtUtc");
+        projection.Remove("attemptId");
+        return projection.ToJsonString();
     }
 
     [TestCase("warning")]

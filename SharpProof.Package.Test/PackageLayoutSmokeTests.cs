@@ -477,7 +477,7 @@ public sealed class PackageLayoutSmokeTests
             var kind = artifact.GetProperty("kind").GetString();
             var path = kind == "sbom"
                 ? workspace.SbomPath
-                : Path.Combine(feed.Source, fileName);
+                : Path.Combine(workspace.OutputDirectory, fileName);
             var hash = Convert.ToHexString(
                 SHA256.HashData(
                     await File.ReadAllBytesAsync(path)));
