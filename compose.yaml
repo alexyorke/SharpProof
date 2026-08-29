@@ -23,7 +23,7 @@ x-sharpproof-common: &sharpproof-common
     - sharpproof-dotnet-home:/home/sharpproof/.dotnet
     - ./artifacts:/workspace/SharpProof/artifacts
   mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-40g}
-  cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-16}
+  cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-0}
 
 services:
   dev:

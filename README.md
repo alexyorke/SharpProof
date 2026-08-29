@@ -193,8 +193,8 @@ The [container development guide](docs/container-development.md) explains
 workspace isolation, test targets, resource overrides, and when a disposable
 docker compose run --rm tooling qualification command is preferable.
 
-The default container budget is 16 CPUs and 40960 MiB.
-Test-project concurrency uses 8 lanes (one lane per 2 CPUs).
+Containers use all CPUs available to Docker and up to 40960 MiB by default.
+Test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
 Trusted mutations use 4 deterministic weighted lanes.
 The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
 The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
@@ -223,6 +223,10 @@ embedded payload hashes, assembly identity, pinned container inputs, and tested
 byte-promotion evidence. The preview is not production-ready; protected
 release environments, package publication, pilot evidence, and the exact
 candidate release run remain owner-controlled work.
+
+Before publication, every main package must be absent from the destination.
+Main and symbol packages are pushed without duplicate skipping; any collision
+or partial publication fails closed and requires a new version.
 
 ## Policies
 

@@ -78,8 +78,8 @@ obtain that workspace using container Git; Git remains unnecessary on the host.
 `portable-tests`, broad coverage, and acceptance run independent test projects
 through MSBuild's project scheduler.
 
-The default container budget is 16 CPUs and 40960 MiB.
-Test-project concurrency uses 8 lanes (one lane per 2 CPUs).
+Containers use all CPUs available to Docker and up to 40960 MiB by default.
+Test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
 Trusted mutations use 4 deterministic weighted lanes. Worker fixtures and
 package integration methods run in isolated duration-weighted processes.
 Override the

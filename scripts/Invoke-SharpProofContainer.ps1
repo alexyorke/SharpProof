@@ -179,13 +179,27 @@ switch ($Command) {
             '--no-build', '--no-restore',
             '--filter',
             'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
-        Invoke-DotNet @(
-            'test', 'SharpProof.Dev.Tests.slnf',
-            '--configuration', $Configuration,
-            '--no-build', '--no-restore',
-            "/m:$testProjectParallelism",
-            '--filter',
-            'TestCategory!=Performance&TestCategory!=Coverage')
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofSemanticTests.ps1') `
+            -Configuration $Configuration `
+            -NoBuild `
+            -TestFilter (
+                'TestCategory!=Performance&TestCategory!=Coverage&' +
+                'TestCategory!=Corpus')
+        if ($LASTEXITCODE -ne 0) {
+            throw 'PR semantic validation failed.'
+        }
+
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofPackageTests.ps1') `
+            -Configuration $Configuration `
+            -NoBuild `
+            -TestFilter (
+                'TestCategory!=Performance&TestCategory!=Coverage&' +
+                'TestCategory!=Corpus')
+        if ($LASTEXITCODE -ne 0) {
+            throw 'PR package validation failed.'
+        }
     }
     'test' {
         Invoke-DotNet @('restore', $Target, '--locked-mode')

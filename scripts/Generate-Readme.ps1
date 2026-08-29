@@ -830,25 +830,23 @@ if ([regex]::Matches(
         [regex]::Escape($typedResultReadmeClaim)).Count -ne 1) {
     throw 'README.md must contain the exact typed-result documentation claim.'
 }
-$containerCpuCount = [int]$acceptanceContract.container.defaultCpuCount
+$containerCpuLimit = [int]$acceptanceContract.container.defaultCpuLimit
 $containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
 $testProjectCpuDivisor =
     [int]$acceptanceContract.automation.testProjectCpuDivisor
 $mutationParallelism =
     [int]$acceptanceContract.automation.mutationParallelism
-if ($containerCpuCount -le 0 -or
+if ($containerCpuLimit -ne 0 -or
     $containerMemoryMiB -le 0 -or
     $testProjectCpuDivisor -le 0 -or
-    $containerCpuCount % $testProjectCpuDivisor -ne 0 -or
     $mutationParallelism -le 0) {
     throw 'Acceptance resource and concurrency authority is invalid.'
 }
-$testProjectLanes = $containerCpuCount / $testProjectCpuDivisor
 $resourceClaims = @(
-    ("The default container budget is $containerCpuCount CPUs and " +
-        "$containerMemoryMiB MiB.")
-    ("Test-project concurrency uses $testProjectLanes lanes " +
-        "(one lane per $testProjectCpuDivisor CPUs).")
+    ("Containers use all CPUs available to Docker and up to " +
+        "$containerMemoryMiB MiB by default.")
+    ("Test-project concurrency auto-detects the available CPUs " +
+        "and uses one lane per $testProjectCpuDivisor CPUs.")
     ("Trusted mutations use $mutationParallelism deterministic weighted lanes.")
 )
 foreach ($resourceDocument in @(

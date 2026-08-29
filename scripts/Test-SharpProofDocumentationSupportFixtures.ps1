@@ -90,35 +90,35 @@ try {
         }
         'wrong-container-cpu' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 12 CPUs and 40960 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                'Containers use 12 CPUs and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'wrong-container-memory' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 CPUs and 32768 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                'Containers use all CPUs available to Docker and up to 32768 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'missing-resource-claim' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
                 '',
                 [StringComparison]::Ordinal)
         }
         'duplicate-resource-claim' {
-            $text += "`nThe default container budget is 16 CPUs and 40960 MiB.`n"
+            $text += "`nContainers use all CPUs available to Docker and up to 40960 MiB by default.`n"
         }
         'resource-claim-case' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 cpus and 40960 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                'Containers use all cpus available to Docker and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'resource-claim-spacing' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 CPUs  and 40960 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                'Containers use all CPUs  available to Docker and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'catalog-resource-drift' {
