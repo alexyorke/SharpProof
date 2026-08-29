@@ -2,15 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 6. MEDIUM - Named arguments passed to expression-level opaque invocations in source order
-
-- File: `SharpProof.Frontend/RoslynOperationLowerer.cs`
-- Members: `VisitInvocation`, `GetMember`
-- Lines: 167-177, 906-911
-- Mechanism: `operation.Arguments` values are not sorted by `Parameter.Ordinal`; the parameter-type vector uses the same order. The program-level path sorts at lines 320-330.
-- Impact: Known-pure opaque calls place values in the wrong formal slots.
-- Safe reproduction/evidence: `F(y:b,x:a)` for `F(long x,long y)` becomes opaque `F(b,a)`.
-
 ## 7. MEDIUM - Distinct pure unsupported operations can hash-cons to an identical opaque term
 
 - Files and members: `SharpProof.Frontend/CompilerIdentityBridge.cs`, `CreateSemanticOperationIdentity`, lines 124-137; `SharpProof.Frontend/RoslynOperationLowerer.cs`, `IsDemonstrablyPure`, `DefaultVisit`, and `VisitFieldReference`, lines 319-357 and 433-466.

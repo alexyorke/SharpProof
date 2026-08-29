@@ -461,6 +461,30 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void NamedArgumentsForExpressionOpaqueInvocationsUseParameterOrdinal()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            private static long Add(long first, long second) => first;
+            public static long Target(long value) =>
+                Add(second: value, first: 3L);
+            """);
+        var result = new RoslynOperationLowerer(
+            compiled.Factory,
+            static method => method.Name == "Add")
+            .Lower(compiled.TargetExpression);
+
+        AssertOpaque(
+            result,
+            IrOpaquePurity.Pure,
+            FrontendAbstention.UnsupportedInvocationShape);
+        var opaque = (IrOpaqueTerm)result.Term;
+        Assert.That(opaque.Arguments, Has.Length.EqualTo(2));
+        Assert.That(((IrIntegerTerm)opaque.Arguments[0]).Value, Is.EqualTo(3L));
+        Assert.That(opaque.Arguments[1], Is.TypeOf<IrVariableTerm>());
+    }
+
+    [Test]
     public void PureOpaqueIdentityIsStructuralAndImpureIdentityIsPerOccurrence()
     {
         using var pure = CompiledMethod.Create(

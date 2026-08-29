@@ -290,10 +290,20 @@ public sealed class RoslynOperationLowerer
         var loweredReceiver = receiver == null ? null : LowerCore(receiver);
         var loweredArguments = (arguments ?? operation.ChildOperations)
             .Where(child => !ReferenceEquals(child, receiver))
-            .Select(LowerCore)
+            .Select((child, index) =>
+            {
+                var argument = child as IArgumentOperation;
+                return (
+                    Ordinal: argument?.Parameter?.Ordinal ?? int.MaxValue,
+                    Index: index,
+                    Term: LowerCore(argument?.Value ?? child).Term);
+            })
+            .OrderBy(static value => value.Ordinal)
+            .ThenBy(static value => value.Index)
+            .Select(static value => value.Term)
             .ToArray();
         var receiverTerm = loweredReceiver?.Term;
-        var argumentTerms = loweredArguments.Select(static value => value.Term).ToArray();
+        var argumentTerms = loweredArguments;
         var resultType = GetTypeId(operation.Type);
         var declaringType = receiverTerm?.Type ??
             (symbol?.ContainingType == null
@@ -914,7 +924,7 @@ public sealed class RoslynOperationLowerer
         {
             return _owner.Opaque(operation, FrontendAbstention.UnsupportedInvocationShape,
                 operation.TargetMethod, operation.Instance,
-                operation.Arguments.Select(static value => value.Value));
+                operation.Arguments);
         }
 
         private static FrontendAbstention FirstAbstention(
