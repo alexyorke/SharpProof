@@ -6941,7 +6941,10 @@ public sealed class WorkerTests
                 BackendFailureReason.InfrastructureFailure);
         }
 
-        public void Dispose() => DisposeCount++;
+        public void Dispose()
+        {
+            DisposeCount++;
+        }
     }
 
     private sealed class SpuriousModelBackend : ISmtBackend

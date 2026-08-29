@@ -683,8 +683,9 @@ public sealed class SharpProofWorker : IDisposable
                     _ownedBackend = replacementOwner;
                     return LaneRenewalResult.Success;
                 }
+#pragma warning disable SPMETA003 // Renewal translates backend-disposal cancellation into typed lifecycle evidence.
                 catch (Exception exception) when (exception is not OutOfMemoryException and
-                    not StackOverflowException and not OperationCanceledException)
+                    not StackOverflowException)
                 {
                     try
                     {
@@ -692,8 +693,7 @@ public sealed class SharpProofWorker : IDisposable
                     }
                     catch (Exception cleanupException) when (
                         cleanupException is not OutOfMemoryException and
-                        not StackOverflowException and
-                        not OperationCanceledException)
+                        not StackOverflowException)
                     {
                         // Renewal is already failing; cleanup must not replace
                         // the typed lifecycle failure with another exception.
@@ -702,6 +702,7 @@ public sealed class SharpProofWorker : IDisposable
                         ? LaneRenewalResult.BackendUnavailable
                         : LaneRenewalResult.InfrastructureFailure;
                 }
+#pragma warning restore SPMETA003
             }
         }
         internal void DisposeOwnedBackend()

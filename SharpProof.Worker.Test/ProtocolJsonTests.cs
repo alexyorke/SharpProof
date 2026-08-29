@@ -83,6 +83,10 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA1849:Call async methods when available",
+        Justification = "This test intentionally measures the synchronous reader beside its asynchronous counterpart.")]
     public async Task BoundedReadersAllocateInProportionToSmallFiles()
     {
         var path = Path.Combine(
@@ -90,7 +94,7 @@ public sealed class ProtocolJsonTests
             "protocol-small-" + Guid.NewGuid().ToString("N") + ".json");
         try
         {
-            File.WriteAllText(path, "{\"value\":1}", Encoding.UTF8);
+            await File.WriteAllTextAsync(path, "{\"value\":1}", Encoding.UTF8);
 
             _ = WorkerProtocolJson.ReadBytesFile(path);
             _ = WorkerProtocolJson.ReadUtf8File(path);

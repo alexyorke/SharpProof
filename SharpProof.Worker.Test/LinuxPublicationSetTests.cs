@@ -68,7 +68,8 @@ public sealed class LinuxPublicationSetTests
         var paths = Enumerable.Range(0, 4)
             .Select(index => Path.Combine(
                 directory.Path,
-                "publication-" + index.ToString() + ".json"))
+                "publication-" + index.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture) + ".json"))
             .ToArray();
         var caseFoldProbes = 0;
         var statFsProbes = 0;

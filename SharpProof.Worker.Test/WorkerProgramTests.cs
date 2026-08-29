@@ -89,7 +89,7 @@ public sealed class WorkerProgramTests
         using (var link = Process.Start(linkStartInfo))
         {
             Assert.That(link, Is.Not.Null);
-            link!.WaitForExit();
+            await link!.WaitForExitAsync();
             Assert.That(link.ExitCode, Is.Zero);
         }
         try

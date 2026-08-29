@@ -269,12 +269,19 @@ internal sealed class ContractApiIdentityResolver
         unreadableReason = null;
         try
         {
-            var referenceMetadataId = reference.GetMetadataId();
             var bytes = File.ReadAllBytes(path);
-            var fileMetadataId = MetadataReference
-                .CreateFromImage(bytes)
-                .GetMetadataId();
-            if (!referenceMetadataId.Equals(fileMetadataId))
+            if (reference.GetMetadata() is not AssemblyMetadata referenceMetadata)
+            {
+                return false;
+            }
+
+            using var imageMetadata = AssemblyMetadata.CreateFromImage(bytes);
+            var referenceModules = referenceMetadata.GetModules();
+            var imageModules = imageMetadata.GetModules();
+            if (referenceModules.Length != imageModules.Length ||
+                !referenceModules.Select(static module => module.GetModuleVersionId())
+                    .SequenceEqual(imageModules.Select(
+                        static module => module.GetModuleVersionId())))
             {
                 return false;
             }
