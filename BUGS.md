@@ -78,7 +78,7 @@ Resolved reports are removed after reproduction, implementation, regression test
 | 406 | `b83fc87b8` (worker request/result inode aliases are rejected) |
 | 407 | `ebfaa3e50` (resolver publication gate blocks callbacks until the verified handle is published) |
 
-The deferred security/containment findings addressed in this branch have dedicated threat-model review and focused regression evidence below. Future changes to those areas should preserve that validation boundary.
+The deferred security/containment findings addressed in this branch have dedicated threat-model review and focused regression evidence in their resolution commits. Future changes to those areas should preserve that validation boundary.
 
 ## Active, deferred, and rejected findings
 
