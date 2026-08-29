@@ -61,9 +61,6 @@ $earlyOutput = Resolve-OutputPath -Path $OutputPath
 if (Test-Path -LiteralPath $earlyOutput -PathType Container) {
     throw "OutputPath is a directory: '$OutputPath'."
 }
-if ([IO.File]::Exists($earlyOutput)) {
-    [IO.File]::Delete($earlyOutput)
-}
 
 function Get-ExactProperty {
     param(
@@ -347,6 +344,9 @@ if ([StringComparer]::OrdinalIgnoreCase.Equals(
             $resolvedOutput,
             $resolvedReport))) {
     throw 'OutputPath cannot overwrite an audit input.'
+}
+if ([IO.File]::Exists($earlyOutput)) {
+    [IO.File]::Delete($earlyOutput)
 }
 [IO.Directory]::CreateDirectory($outputDirectory) |
     Out-Null
