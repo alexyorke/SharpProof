@@ -388,8 +388,9 @@ public sealed class BuildTaskTests
             "SharpProof.Cleanup/1 " + nonce + "\n" +
             "unterminated";
 
+        using var reader = new ChunkedTextReader(input, 3);
         var result = await RunVerifier.ReadBoundedOutputAsync(
-            new ChunkedTextReader(input, 3),
+            reader,
             nonce,
             static () => { });
 

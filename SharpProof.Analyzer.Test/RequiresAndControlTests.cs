@@ -49,7 +49,8 @@ public sealed class RequiresAndControlTests
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0027"]));
         Assert.That(
-            diagnostics[0].GetMessage(),
+            diagnostics[0].GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
             Does.Contain("Positive"));
     }
 
