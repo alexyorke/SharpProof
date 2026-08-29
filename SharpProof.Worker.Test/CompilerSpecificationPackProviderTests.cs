@@ -5,6 +5,7 @@ using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Summaries;
 
 namespace SharpProof.Worker.Test;
 
@@ -361,6 +362,85 @@ public sealed class CompilerSpecificationPackProviderTests
         Assert.Throws<InvalidOperationException>((Action)(() =>
             CompilerSpecificationPackProvider.ResolveAuthority(
                 ["dotnet.scalar", "missing.pack"])));
+    }
+
+    [Test]
+    public void DotNetScalarPackBuildsCanonicalFrameworkMathSummary()
+    {
+        var source =
+            "public static class Subject { " +
+            "public static int Maximum(int left, int right) => " +
+            "System.Math.Max(left, right); }";
+        var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            source);
+        var runtimeDirectory = Path.GetDirectoryName(
+            typeof(object).Assembly.Location)!;
+        var packRoot = Path.Combine(
+            Path.GetFullPath(Path.Combine(runtimeDirectory, "..", "..", "..")),
+            "packs",
+            "Microsoft.NETCore.App.Ref");
+        var packVersion = Directory.GetDirectories(packRoot)
+            .Select(Path.GetFileName)
+            .Where(static value => value != null)
+            .Select(static value => Version.Parse(value!))
+            .Where(static value => value.Major == 8)
+            .OrderByDescending(static value => value)
+            .First();
+        var references = Directory.GetFiles(
+                Path.Combine(
+                    packRoot,
+                    packVersion.ToString(),
+                    "ref",
+                    "net8.0"),
+                "*.dll",
+                SearchOption.TopDirectoryOnly)
+            .Select(static path =>
+                Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path));
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+            "SpecificationPackResolution",
+            [tree],
+            references,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+        var invocation = tree.GetRoot().DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
+            .Single();
+        var method = (Microsoft.CodeAnalysis.IMethodSymbol)Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+            .GetSymbolInfo(compilation.GetSemanticModel(tree), invocation)
+            .Symbol!;
+        var factory = new IrFactory();
+        var provider = new CompilerSpecificationPackProvider(
+            factory,
+            ["dotnet.scalar"]);
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Max",
+            factory.IntegerType,
+            isStatic: true,
+            factory.IntegerType,
+            factory.IntegerType);
+
+        Assert.That(provider.CanResolve(method), Is.True);
+        Assert.That(
+            provider.TryBuild(
+                method,
+                member,
+                CancellationToken.None,
+                out var summary),
+            Is.True,
+            method.GetDocumentationCommentId() + " from " +
+            method.ContainingAssembly.Identity);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(summary, Is.Not.Null);
+            Assert.That(
+                summary!.Signature.Provenance.Origin,
+                Is.EqualTo(IrSummaryOrigin.SpecificationPack));
+            Assert.That(
+                summary.Signature.Provenance.EvidenceCallIdentity,
+                Is.EqualTo(SemanticClaimIdentity.CreateCallableId(method)));
+        }
     }
 
     private static string Binary(

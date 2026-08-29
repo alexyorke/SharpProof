@@ -199,7 +199,7 @@ internal sealed class CompilerSpecificationPackProvider
                 IrSummaryOrigin.SpecificationPack,
                 definition.EvidenceSha256,
                 definition.EvidenceIdentity,
-                method.GetDocumentationCommentId() ?? string.Empty));
+                SemanticClaimIdentity.CreateCallableId(method)));
         var environment = parameters.ToImmutableDictionary(
             static parameter => parameter,
             parameter => (IrTerm)_factory.Variable(parameter));
