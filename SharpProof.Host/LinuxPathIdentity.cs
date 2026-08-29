@@ -591,28 +591,28 @@ public static partial class LinuxPathIdentity
         InvalidatePublicationSetCore(
             publicationPaths,
             timeout,
-            cancellationToken,
-            qualificationCache: null);
+            qualificationCache: null,
+            cancellationToken: cancellationToken);
     }
 
     internal static void InvalidatePublicationSet(
         IEnumerable<string> publicationPaths,
         TimeSpan timeout,
-        CancellationToken cancellationToken,
-        PathQualificationCache qualificationCache)
+        PathQualificationCache qualificationCache,
+        CancellationToken cancellationToken)
     {
         InvalidatePublicationSetCore(
             publicationPaths,
             timeout,
-            cancellationToken,
-            qualificationCache);
+            qualificationCache,
+            cancellationToken);
     }
 
     private static void InvalidatePublicationSetCore(
         IEnumerable<string> publicationPaths,
         TimeSpan timeout,
-        CancellationToken cancellationToken,
-        PathQualificationCache? qualificationCache)
+        PathQualificationCache? qualificationCache,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(publicationPaths);
         var requestedPaths = publicationPaths
@@ -795,8 +795,8 @@ public static partial class LinuxPathIdentity
     internal static IDisposable AcquirePublicationSet(
         IEnumerable<string> publicationPaths,
         TimeSpan timeout,
-        CancellationToken cancellationToken,
-        PathQualificationCache qualificationCache)
+        PathQualificationCache qualificationCache,
+        CancellationToken cancellationToken)
     {
         return AcquirePublicationLocks(
             publicationPaths,
@@ -1642,7 +1642,7 @@ public static partial class LinuxPathIdentity
         return result;
     }
 
-    private static IEnumerable<(string Mount, string Type)> ReadMountInfo(
+    private static List<(string Mount, string Type)> ReadMountInfo(
         PathQualificationCache? qualificationCache,
         string mountInfoPath)
     {

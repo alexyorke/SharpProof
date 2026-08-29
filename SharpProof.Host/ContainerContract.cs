@@ -209,13 +209,14 @@ public static class ContainerContract
         ContainerContractInfo contract)
     {
         library = LinuxPathIdentity.RequireLocalPath(library);
-        var stream = new FileStream(
-            library,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read);
+        FileStream? stream = null;
         try
         {
+            stream = new FileStream(
+                library,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
             if (stream.Length != contract.Z3LibraryBytes)
             {
                 throw new InvalidDataException(
@@ -233,17 +234,13 @@ public static class ContainerContract
             }
 
             stream.Position = 0;
-            return new VerifiedNativeLibrary(library, stream);
+            var verified = new VerifiedNativeLibrary(library, stream);
+            stream = null;
+            return verified;
         }
-        catch (OperationCanceledException)
+        finally
         {
-            stream.Dispose();
-            throw;
-        }
-        catch
-        {
-            stream.Dispose();
-            throw;
+            stream?.Dispose();
         }
     }
 

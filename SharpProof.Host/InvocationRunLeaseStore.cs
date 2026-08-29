@@ -132,7 +132,7 @@ internal static class InvocationRunLeaseStore
     {
         if (processId <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(processId));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(processId);
         }
 
         var directory = NormalizeDirectory(invocationDirectory);

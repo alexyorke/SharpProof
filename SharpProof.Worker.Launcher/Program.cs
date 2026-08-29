@@ -628,8 +628,8 @@ internal static class Program
                 arguments.PublishSarifPath
             }.OfType<string>(),
             TimeSpan.FromSeconds(30),
-            CancellationToken.None,
-            qualificationCache);
+            qualificationCache,
+            CancellationToken.None);
 
         request.CompilerManifest.Path = arguments.PublishCompilerManifestPath!;
         response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
@@ -878,8 +878,8 @@ internal static class Program
                 arguments.PublishSarifPath
             }.OfType<string>(),
             TimeSpan.FromSeconds(30),
-            CancellationToken.None,
-            qualificationCache);
+            qualificationCache,
+            CancellationToken.None);
     }
 
     private sealed class PublicationMember
