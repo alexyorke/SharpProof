@@ -253,14 +253,11 @@ public static partial class ApiSpecInstantiator
             }
 
             var peerType = factory.GetTypeInfo(peer.Term!.Type);
-            if (value.Type == IrTypeKind.Sequence)
-            {
-                return Failure(SpecInstantiationFailureKind.UnsupportedValueType, null,
-                    "A factory-independent sequence null needs a concrete sequence type substitution.");
-            }
-
             return peerType.Kind == value.Type &&
-                   value.Type is IrTypeKind.String or IrTypeKind.Reference
+                   value.Type is
+                       IrTypeKind.String or
+                       IrTypeKind.Reference or
+                       IrTypeKind.Sequence
                 ? new(factory.Null(peer.Term.Type), null)
                 : Failure(SpecInstantiationFailureKind.TypeMismatch, null,
                     "The exact instantiated null operand type does not match its peer.");

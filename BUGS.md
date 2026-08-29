@@ -2,15 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 12. MEDIUM - Concrete sequence-null comparisons rejected despite exact peer type
-
-- File: `SharpProof.Specs/ApiSpecInstantiation.cs`
-- Member: `ApiSpecInstantiator.Instantiation.Null(SpecNullDeclaration, TermResult)`
-- Lines: 248-266, especially 255-260
-- Mechanism: Sequence kind is rejected unconditionally although `peer.Term.Type` supplies the concrete sequence type; String and Reference use `factory.Null(peer.Term.Type)`.
-- Impact: A valid catalogued `sequenceResult != null` specification always instantiates as `UnsupportedValueType`.
-- Safe reproduction/evidence: Compare a sequence-typed result or parameter with `SpecNullDeclaration(IrTypeKind.Sequence)` and a concrete sequence substitution.
-
 ## 13. HIGH - Production package test hook bypasses verifier runtime-closure expectation
 
 - Files: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props`, lines 11-17; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`, lines 12-13, 15-22, 33-39.
