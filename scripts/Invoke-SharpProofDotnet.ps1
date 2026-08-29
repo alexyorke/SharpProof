@@ -18,12 +18,18 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'SharpProof .NET commands must run in the canonical Linux container. Use docker compose run --rm tooling <command>.'
 }
 
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+$effectiveArguments = @(
+    Add-SharpProofStaticGraphArgument -Arguments $DotnetArgs
+)
+
 $startInfo = [Diagnostics.ProcessStartInfo]::new()
 $startInfo.FileName = 'dotnet'
 $startInfo.WorkingDirectory = (Get-Location).Path
 $startInfo.UseShellExecute = $false
 $startInfo.CreateNoWindow = $true
-foreach ($argument in $DotnetArgs) {
+foreach ($argument in $effectiveArguments) {
     [void]$startInfo.ArgumentList.Add($argument)
 }
 $capture = -not [string]::IsNullOrWhiteSpace($OutputPath)

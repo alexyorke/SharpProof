@@ -32,9 +32,14 @@ if ($env:SHARPPROOF_CONTAINER -cne '1' -or
 }
 
 function Invoke-DotNet([string[]]$Arguments) {
-    & dotnet @Arguments
+    $effectiveArguments = @(
+        Add-SharpProofStaticGraphArgument -Arguments $Arguments
+    )
+    & dotnet @effectiveArguments
     if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+        throw (
+            "dotnet $($effectiveArguments -join ' ') failed with exit " +
+            "code $LASTEXITCODE.")
     }
 }
 

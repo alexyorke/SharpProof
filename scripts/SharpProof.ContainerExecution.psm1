@@ -1,6 +1,24 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Add-SharpProofStaticGraphArgument {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    if ($Arguments.Count -lt 2 -or
+        $Arguments[0] -notin @('build', 'test') -or
+        [IO.Path]::GetExtension($Arguments[1]) -notin @('.sln', '.slnf') -or
+        $Arguments -contains '-graphBuild' -or
+        $Arguments -contains '/graphBuild') {
+        return $Arguments
+    }
+
+    return @($Arguments) + '-graphBuild'
+}
+
 function Get-SharpProofTestProjectParallelism {
     [CmdletBinding()]
     param(
@@ -101,5 +119,6 @@ function New-SharpProofIsolatedTestOutput {
 }
 
 Export-ModuleMember -Function @(
+    'Add-SharpProofStaticGraphArgument',
     'Get-SharpProofTestProjectParallelism',
     'New-SharpProofIsolatedTestOutput')
