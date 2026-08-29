@@ -36,12 +36,6 @@ The container contract validates bytes separately from the library later loaded 
 
 Path identity is checked by a userspace walk and is not kernel-enforced against a concurrent symlink replacement.
 
-### 273. Publication deletion durability
-
-**Status:** Deferred integrity/durability review.
-
-Reset/invalidation removes publication members without the full filesystem durability protocol required to survive a power loss.
-
 ## Rejected or reclassified leads
 
 - **1-3:** `ArgumentNullGuard` assignments are intentional null-state narrowing/field initialization patterns, not correctness bugs.
@@ -73,6 +67,7 @@ Resolved reports are removed after reproduction, implementation, regression test
 | 369 | `fa58c7533` (explicit-interface implementation boundary; static constructors remain fail-closed) |
 | 364 | `02a645e69` (regular-file validation for private verifier paths) |
 | 337 | `cc0f2bc6b` (validated recovery for interrupted release-bundle swaps) |
+| 273 | `91636b24f` (directory synchronization after publication deletion) |
 | 202 | `0a2c179f9` (runtime companion path validation and generated launcher coverage) |
 | 257-262 | `68afb8ca1`, `c3ab72290`, `8bd08c6e0` |
 | 263-270 | `0c9e0ec0d`, `0c95dad38`, `0a2c179f9`, `a7b99ca24` |
