@@ -2,14 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 14. MEDIUM - Host support detection omits Linux check
-
-- Files: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props`, lines 4-8; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`, lines 33-39 and 138-152; `SharpProof.Verifier/SharpProof.Verifier.nuspec`, lines 28 and 57.
-- Member/property: `_SharpProofVerifierHostSupported`
-- Mechanism: Core MSBuild plus container marker plus x64 process/OS declares support without an OS test, although the payload is Linux `libz3.so`.
-- Impact: Windows x64 bypasses unsupported-host rejection and fails later in a Linux-only path, while closure validation misleadingly treats the on-disk `.so` as usable.
-- Safe reproduction/evidence: Run a package integration test on Windows x64 with the container marker set and `SharpProofVerify` enabled. `SharpProof.Host/ContainerContract.cs` lines 44-50 independently shows Linux is required.
-
 ## 15. HIGH - Z3 validation and native load are vulnerable to a file-replacement race
 
 - Files and members: `SharpProof.Host/ContainerContract.cs`, `ResolveZ3LibraryRequired`, lines 120-155; `SharpProof.Host/ContainerNativeLibrary.cs`, `InstallZ3ResolverRequired`, lines 28-36.
