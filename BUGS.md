@@ -76,7 +76,7 @@ Resolved reports are removed after reproduction, implementation, regression test
 | 272 | `2430007b0` (publication reads use no-follow directory handles) |
 | 318 | `3be94f0b0` (retained cleanup failures stay inside the task boundary) |
 | 406 | `b83fc87b8` (worker request/result inode aliases are rejected) |
-| 407 | pending (resolver publication gate is implemented and focused tests pass) |
+| 407 | `ebfaa3e50` (resolver publication gate blocks callbacks until the verified handle is published) |
 
 The deferred security/containment findings addressed in this branch have dedicated threat-model review and focused regression evidence below. Future changes to those areas should preserve that validation boundary.
 
