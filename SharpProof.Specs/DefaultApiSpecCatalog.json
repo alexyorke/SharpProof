@@ -131,7 +131,7 @@
         "genericArity": 1,
         "receiverType": null,
         "parameterTypes": [],
-        "resultType": "Sequence",
+        "resultType": "Reference",
         "approvedAssemblySet": "framework"
       },
       "facets": {

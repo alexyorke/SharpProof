@@ -58,14 +58,6 @@ function Resolve-OutputPath {
 }
 
 $earlyOutput = Resolve-OutputPath -Path $OutputPath
-$repositoryPrefix = $repositoryRoot.TrimEnd(
-    [IO.Path]::DirectorySeparatorChar,
-    [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-if (-not $earlyOutput.StartsWith(
-        $repositoryPrefix,
-        [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'OutputPath must remain inside the repository.'
-}
 if (Test-Path -LiteralPath $earlyOutput -PathType Container) {
     throw "OutputPath is a directory: '$OutputPath'."
 }

@@ -250,7 +250,7 @@ public sealed partial class ApiSpecTable
                     "M:System.Linq.Enumerable.Empty``1",
                     "System.Linq.Enumerable",
                     SpecTargetMemberKind.Method, "Empty",
-                    true, 1, null, [], IrTypeKind.Sequence,
+                    true, 1, null, [], IrTypeKind.Reference,
                     assemblySetFramework),
                 new ApiSpecFacets(
                     new SpecEffectFacet(SpecEffect.Unknown, evidenceTypeInitialization),
