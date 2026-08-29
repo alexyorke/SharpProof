@@ -360,6 +360,8 @@ public sealed class ReleaseCoverageBaselineTests
                 (Value: JsonSerializer.Serialize(new
                 {
                     schemaVersion = 1,
+                    command = "acceptance",
+                    configuration = "Release",
                     status = "passed",
                     commit = head,
                     phases = passingPhases
