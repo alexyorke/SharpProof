@@ -41,7 +41,7 @@ function Remove-PortableQualificationOutputs {
 }
 trap {
     if ($portableGate) { Remove-PortableQualificationOutputs }
-    throw
+    throw $_
 }
 $expectedAcceptancePhases = @()
 if ($Gate -in @('acceptance-debug', 'acceptance-release')) {
