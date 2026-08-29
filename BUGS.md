@@ -27,15 +27,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 19. MEDIUM - Attribute ordering and generated claim identity depend on current culture
-
-- File: `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs`
-- Members: `CreatePostconditions`, `CreateEffectClaims`, `AttributeOrder`
-- Lines: 194-201, 311-319, 613-617
-- Mechanism: `OrderBy` on `(string Path,int Start)` uses default `ValueTuple` and culture-sensitive string comparison.
-- Impact: The same compilation can change attribute order, ordinals, duplicate ranks, IDs, fingerprints, and location mapping across cultures.
-- Safe reproduction/evidence: Place partial or merged attributes in filenames that collate differently under `en-US` and `sv-SE`.
-
 ## 20. LOW - Generated files are overwritten non-atomically
 
 - File: `scripts/GeneratedFileHelpers.ps1`

@@ -193,7 +193,12 @@ internal sealed partial class ClaimManifestBuilder(
                 clause.Invocation, null, clause.Placement))
             .Concat(target.GetReturnTypeAttributes()
                 .Where(_attributes.IsClosedContract)
-                .OrderBy(AttributeOrder)
+                .OrderBy(
+                    static attribute =>
+                        attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
+                    StringComparer.Ordinal)
+                .ThenBy(static attribute =>
+                    attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue)
                 .Select(attribute => new ClaimCandidate(
                     SemanticClaimIdentity.CreateAttributeFingerprint(attribute, target),
                     AttributeLocation(attribute, target),
@@ -310,7 +315,13 @@ internal sealed partial class ClaimManifestBuilder(
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation.Kind))
         {
-            foreach (var attribute in evaluation.Attributes.OrderBy(AttributeOrder))
+            foreach (var attribute in evaluation.Attributes
+                .OrderBy(
+                    static attribute =>
+                        attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
+                    StringComparer.Ordinal)
+                .ThenBy(static attribute =>
+                    attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var fingerprint = "effect:" + evaluation.Kind + ":" +
@@ -608,12 +619,6 @@ internal sealed partial class ClaimManifestBuilder(
     {
         return attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ??
         target.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
-    }
-
-    private static (string Path, int Start) AttributeOrder(AttributeData attribute)
-    {
-        return (attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
-                attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue);
     }
 
     private static Location CallableLocation(IMethodSymbol method, SyntaxNode? declaration)

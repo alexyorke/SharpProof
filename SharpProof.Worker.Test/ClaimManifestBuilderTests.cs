@@ -168,6 +168,41 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void AttributeClaimOrderingIsCultureInvariant()
+    {
+        const string definition =
+            "using SharpProof.Attributes;\n" +
+            "public static partial class Subject {\n" +
+            "    [return: Positive]\n" +
+            "    public static partial int Value();\n" +
+            "}";
+        const string implementation =
+            "using SharpProof.Attributes;\n" +
+            "public static partial class Subject {\n" +
+            "    [return: InRange(-1, 1)]\n" +
+            "    public static partial int Value() => 0;\n" +
+            "}";
+        var original = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture =
+                System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            var enUs = Build(("ä.cs", definition), ("z.cs", implementation));
+            System.Globalization.CultureInfo.CurrentCulture =
+                System.Globalization.CultureInfo.GetCultureInfo("sv-SE");
+            var svSe = Build(("ä.cs", definition), ("z.cs", implementation));
+
+            Assert.That(
+                svSe.Manifest.Claims.Select(static claim => claim.ClaimId),
+                Is.EqualTo(enUs.Manifest.Claims.Select(static claim => claim.ClaimId)));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    [Test]
     public void AssumptionIdentityIncludesCallableScopeAndUsesGeneratedGrammar()
     {
         var result = Build((
