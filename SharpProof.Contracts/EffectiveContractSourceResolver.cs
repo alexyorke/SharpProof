@@ -81,6 +81,16 @@ internal sealed class EffectiveContractSourceResolver
                     : ContractBindingFailure.None);
         }
 
+        if (direct.HasPlacementErrors)
+        {
+            return Create(
+                target,
+                direct,
+                direct,
+                usesCompanion: false,
+                ContractBindingFailure.InvalidClausePlacement);
+        }
+
         if (target.MethodKind == MethodKind.Ordinary)
         {
             var companion = ContractForSymbolMatcher.ResolveCompanion(

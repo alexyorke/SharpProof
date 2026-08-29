@@ -2,15 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 11. HIGH - Invalid direct clauses silently ignored when a companion exists
-
-- File: `SharpProof.Contracts/EffectiveContractSourceResolver.cs`
-- Member: `ResolveCore`
-- Lines: 71-82, 84-113
-- Mechanism: Direct placement errors propagate in direct-only or no-companion branches, but the companion branch computes failure only from companion inventory and omits `direct.HasPlacementErrors`.
-- Impact: A malformed direct contract is discarded and the method verifies against different companion clauses.
-- Safe reproduction/evidence: Use a late, conditional, or unreachable direct `Requires`, `Ensures`, or `Assume` plus a valid matching `[ContractFor]` companion.
-
 ## 12. MEDIUM - Concrete sequence-null comparisons rejected despite exact peer type
 
 - File: `SharpProof.Specs/ApiSpecInstantiation.cs`
