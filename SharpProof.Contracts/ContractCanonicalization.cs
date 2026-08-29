@@ -11,11 +11,8 @@ internal sealed class ContractCanonicalization(
     internal Func<ITypeSymbol?, ITypeSymbol?>? CreateTypeSpecializer(
         IMethodSymbol source)
     {
-        var substitutions = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(
-            SymbolEqualityComparer.Default);
-        var signatureTypes = new Dictionary<ITypeSymbol, ITypeSymbol>(
-            SymbolEqualityComparer.IncludeNullability);
-        if (!AddParameters(
+        var specializer = new TypeSpecializer(_compilation);
+        if (!specializer.AddParameters(
             source.OriginalDefinition.TypeParameters,
             source.TypeArguments))
         {
@@ -25,14 +22,14 @@ internal sealed class ContractCanonicalization(
              type != null;
              type = type.ContainingType)
         {
-            if (!AddParameters(
+            if (!specializer.AddParameters(
                 type.OriginalDefinition.TypeParameters,
                 type.TypeArguments))
             {
                 return null;
             }
         }
-        if (!AddSignatureType(
+        if (!specializer.AddSignatureType(
             source.OriginalDefinition.ReturnType,
             source.ReturnType))
         {
@@ -45,7 +42,7 @@ internal sealed class ContractCanonicalization(
         }
         for (var index = 0; index < source.Parameters.Length; index++)
         {
-            if (!AddSignatureType(
+            if (!specializer.AddSignatureType(
                 source.OriginalDefinition.Parameters[index].Type,
                 source.Parameters[index].Type))
             {
@@ -57,7 +54,7 @@ internal sealed class ContractCanonicalization(
             source.OriginalDefinition.PartialDefinitionPart;
         if (partialCounterpart != null)
         {
-            if (!AddParameters(
+            if (!specializer.AddParameters(
                 partialCounterpart.TypeParameters,
                 source.TypeArguments) ||
                 partialCounterpart.Parameters.Length !=
@@ -65,7 +62,7 @@ internal sealed class ContractCanonicalization(
             {
                 return null;
             }
-            if (!AddSignatureType(
+            if (!specializer.AddSignatureType(
                 partialCounterpart.ReturnType,
                 source.ReturnType))
             {
@@ -73,7 +70,7 @@ internal sealed class ContractCanonicalization(
             }
             for (var index = 0; index < source.Parameters.Length; index++)
             {
-                if (!AddSignatureType(
+                if (!specializer.AddSignatureType(
                     partialCounterpart.Parameters[index].Type,
                     source.Parameters[index].Type))
                 {
@@ -82,22 +79,35 @@ internal sealed class ContractCanonicalization(
             }
         }
 
-        return Specialize;
+        return specializer.Specialize;
+    }
 
-        ITypeSymbol? Specialize(ITypeSymbol? type)
+    // Keep recursive specialization in ordinary methods. Roslyn's CA1508
+    // points-to analysis expands recursive local functions as one operation
+    // block, which previously made this small project take minutes to compile.
+    private sealed class TypeSpecializer(Compilation compilation)
+    {
+        private readonly Compilation _compilation = compilation;
+        private readonly Dictionary<ITypeParameterSymbol, ITypeSymbol>
+            _substitutions = new(SymbolEqualityComparer.Default);
+        private readonly Dictionary<ITypeSymbol, ITypeSymbol>
+            _signatureTypes = new(
+                SymbolEqualityComparer.IncludeNullability);
+
+        internal ITypeSymbol? Specialize(ITypeSymbol? type)
         {
             if (type == null)
             {
                 return null;
             }
 
-            if (signatureTypes.TryGetValue(type, out var signatureType))
+            if (_signatureTypes.TryGetValue(type, out var signatureType))
             {
                 return signatureType;
             }
 
             if (type is ITypeParameterSymbol parameter &&
-                substitutions.TryGetValue(parameter, out var replacement))
+                _substitutions.TryGetValue(parameter, out var replacement))
             {
                 return type.NullableAnnotation == NullableAnnotation.Annotated
                     ? replacement.WithNullableAnnotation(
@@ -217,7 +227,7 @@ internal sealed class ContractCanonicalization(
             }
         }
 
-        bool AddParameters(
+        internal bool AddParameters(
             ImmutableArray<ITypeParameterSymbol> parameters,
             ImmutableArray<ITypeSymbol> arguments)
         {
@@ -228,21 +238,21 @@ internal sealed class ContractCanonicalization(
 
             for (var index = 0; index < parameters.Length; index++)
             {
-                substitutions[parameters[index]] = arguments[index];
+                _substitutions[parameters[index]] = arguments[index];
             }
 
             return true;
         }
 
-        bool AddSignatureType(
+        internal bool AddSignatureType(
             ITypeSymbol original,
             ITypeSymbol constructed)
         {
-            if (signatureTypes.ContainsKey(original))
+            if (_signatureTypes.ContainsKey(original))
             {
                 return true;
             }
-            signatureTypes.Add(original, constructed);
+            _signatureTypes.Add(original, constructed);
 
             switch (original, constructed)
             {
