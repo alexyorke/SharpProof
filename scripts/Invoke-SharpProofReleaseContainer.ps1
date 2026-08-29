@@ -22,9 +22,6 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
-Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
-Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
 
 function Require-Environment([string]$Name) {
     $value = [Environment]::GetEnvironmentVariable($Name)
@@ -105,6 +102,9 @@ switch ($Mode) {
         Write-Host "Coverage baseline evidence: $output"
     }
     'WriteQualificationEvidence' {
+        Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationEvidence.psm1') -Force
+        Import-Module (Join-Path `
+            $PSScriptRoot 'SharpProof.ReleaseConfigurationEvidence.psm1') -Force
         # Claim ownership before any preflight so a failed retry cannot leave
         # a previous passing qualification record in persistent artifacts.
         Remove-QualificationEvidence
