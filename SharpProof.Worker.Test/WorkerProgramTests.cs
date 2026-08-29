@@ -68,6 +68,55 @@ public sealed class WorkerProgramTests
 
     [Test]
     [Platform("Linux")]
+    public async Task DirectInvocationRejectsHardlinkedRequestResultBeforeStartBarrier()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Worker.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var requestPath = Path.Combine(directory, "request.json");
+        var resultPath = Path.Combine(directory, "result.json");
+        const string sentinel = "request-sentinel";
+        await File.WriteAllTextAsync(requestPath, sentinel);
+        var linkStartInfo = new ProcessStartInfo
+        {
+            FileName = "/bin/ln",
+            UseShellExecute = false
+        };
+        linkStartInfo.ArgumentList.Add(requestPath);
+        linkStartInfo.ArgumentList.Add(resultPath);
+        using (var link = Process.Start(linkStartInfo))
+        {
+            Assert.That(link, Is.Not.Null);
+            link!.WaitForExit();
+            Assert.That(link.ExitCode, Is.Zero);
+        }
+        try
+        {
+            var exitCode = await Program.Main([
+                "verify",
+                "--request",
+                requestPath,
+                "--result",
+                resultPath,
+                "--start-stdin",
+                "--parent-pid",
+                "1"
+            ]);
+
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(await File.ReadAllTextAsync(requestPath), Is.EqualTo(sentinel));
+            Assert.That(await File.ReadAllTextAsync(resultPath), Is.EqualTo(sentinel));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public async Task DirectInvocationRejectsNonRegularResultBeforeStartBarrier()
     {
         var directory = Path.Combine(

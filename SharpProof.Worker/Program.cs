@@ -248,7 +248,8 @@ internal static class Program
             parentProcessId = 0;
             return false;
         }
-        return !string.Equals(request, result, StringComparison.Ordinal);
+        return !string.Equals(request, result, StringComparison.Ordinal) &&
+            !LinuxPathIdentity.PathsConflict(request, result);
     }
 
     internal static async Task<bool> WaitForStartAsync(
