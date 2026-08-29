@@ -42,6 +42,9 @@ public sealed class WorkerBinaryIdentityTests
                 Path.Combine(live, WorkerBinaryIdentity.OwnerLeaseFileName),
                 "{\"pid\":" + currentProcess.Id +
                 ",\"startTimeUtcTicks\":" + liveTicks + "}");
+            Directory.SetLastWriteTimeUtc(
+                dead,
+                DateTime.UtcNow.AddMinutes(-2));
 
             WorkerBinaryIdentity.ReclaimOrphanedStagingDirectories(
                 temporaryDirectory);
@@ -52,6 +55,38 @@ public sealed class WorkerBinaryIdentityTests
                 Assert.That(Directory.Exists(live), Is.True);
                 Assert.That(Directory.Exists(unowned), Is.True);
             }
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryDirectory))
+            {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void StartupDoesNotReclaimARecentDeadOwnerDirectory()
+    {
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.RuntimeReclaimRecent." +
+                Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+        try
+        {
+            var recent = Path.Combine(
+                temporaryDirectory,
+                "SharpProof.Worker.Runtime.recent");
+            Directory.CreateDirectory(recent);
+            File.WriteAllText(
+                Path.Combine(recent, WorkerBinaryIdentity.OwnerLeaseFileName),
+                "{\"pid\":1,\"startTimeUtcTicks\":1}");
+
+            WorkerBinaryIdentity.ReclaimOrphanedStagingDirectories(
+                temporaryDirectory);
+
+            Assert.That(Directory.Exists(recent), Is.True);
         }
         finally
         {

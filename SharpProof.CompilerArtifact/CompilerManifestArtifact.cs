@@ -48,6 +48,8 @@ internal static class WorkerBinaryIdentity
     internal const long MaximumDependenciesBytes = 1024L * 1024;
     internal const long MaximumRuntimeConfigBytes = 64L * 1024;
     internal const int MaximumReclaimDirectories = 64;
+    private static readonly TimeSpan ReclaimGracePeriod =
+        TimeSpan.FromMinutes(1);
 
     internal static WorkerRuntimeClosureSnapshot CreateSnapshot(
         string workerPath)
@@ -319,6 +321,24 @@ internal static class WorkerBinaryIdentity
                         AltDirectorySeparatorChar),
                     protectedPath,
                     StringComparison.Ordinal))
+            {
+                continue;
+            }
+            // A launcher can still be handing a freshly-created staging
+            // directory to a child worker while another process performs its
+            // startup sweep. A just-created directory is not evidence of a
+            // dead owner yet; defer reclamation until the next sweep.
+            DateTime lastWriteTime;
+            try
+            {
+                lastWriteTime = Directory.GetLastWriteTimeUtc(directory);
+            }
+            catch (Exception exception) when (
+                exception is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+            if (DateTime.UtcNow - lastWriteTime < ReclaimGracePeriod)
             {
                 continue;
             }
