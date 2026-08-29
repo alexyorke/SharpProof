@@ -6,7 +6,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 The latest audit wave ran against exact baseline
 `ffe74fff1c852d073610cfbebc54c141521a25fb`. Its ten subsystem reports contain
-46 candidate findings below. Each candidate remains open until the main agent
+45 candidate findings below. Each candidate remains open until the main agent
 independently reproduces it, adds a regression test, implements the fix, and
 removes the detailed entry in the corresponding fix commit.
 
@@ -38,6 +38,11 @@ The following findings concern cybersecurity, raceable trust decisions, or files
   invocation convention. A focused `[DoesNotThrow]` regression proves the
   satisfied receiver/argument pair and rejects each invalid actual separately;
   the alleged argument shift was not reproduced.
+- **Latest Scout 1, Finding 3:** Roslyn's foreach semantic information returns
+  an extension `GetEnumerator` as the original static method with the collection
+  in argument slot zero, not as a reduced method requiring `Instance`. Direct
+  candidate assertions and satisfied/violated analyzer cases disprove the
+  reported receiver loss.
 
 ## Resolved in this branch
 
@@ -88,24 +93,11 @@ The deferred security/containment findings addressed in this branch have dedicat
 
 ## Active, deferred, and rejected findings
 
-The 46 detailed findings below are pending independent reproduction and TDD
+The 45 detailed findings below are pending independent reproduction and TDD
 resolution. Historical findings remain represented by the compact resolution
 and reclassification ledgers above.
 
 ## [Bug hunt 2026-08-29T18:40:38Z] Scout 1 — Core analyzer logic (SharpProof.Analyzer.Core, SharpProof.Analyzer)
-
-## Finding 3 — Inverted receiver condition for pattern-based `foreach` over an extension `GetEnumerator`
-- **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\RequiresCallSiteDiscovery.cs`
-- **Function/method + containing type:** `GetForEachCalls` (vs. `GetAwaitCalls`) in sealed partial class `RequiresCallSiteDiscovery`
-- **Line number(s):** 1467–1470 (`GetForEachCalls`), contrast 1497–1499 (`GetAwaitCalls`)
-- **Bug description:** `GetForEachCalls` sets the synthesized call's receiver to the collection only when the enumerator method is a **non-reduced instance** method:
-```csharp
-var instance = !getEnumerator.IsStatic && getEnumerator.ReducedFrom == null
-    ? forEach.Collection
-    : null;
-```
-For the pattern-based C# 9 `GetEnumerator` **extension method** (IsStatic, `ReducedFrom != null`) the instance is dropped. Under the file's own modeling convention (the receiver is carried via `Instance`), a `Requires` on the extension enumerator's receiver parameter then resolves to a null actual → `Unknown` → the foreach's precondition is silently never verified. The sibling `GetAwaitCalls` three methods down uses the correct opposite condition (supplies the awaited operation for the reduced-extension case). The two adjacent methods implement the same concept with mutually inverted conditions; the foreach variant is the lossy one (conservative miss, no false positives).
-- **Category:** logic — **Severity:** medium — **Confidence:** 0.7
 
 ## Finding 4 — `ContractFor` companion validation is skipped under `sharpproof_profile=off`, contradicting the adjacent comment
 - **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs`

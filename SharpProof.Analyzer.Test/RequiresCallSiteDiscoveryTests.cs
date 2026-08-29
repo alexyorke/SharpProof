@@ -285,6 +285,82 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public async Task ExtensionForeachGetEnumeratorRetainsItsReceiver()
+    {
+        const string source = """
+            using SharpProof.Attributes;
+
+            public struct Enumerator
+            {
+                public int Current => 0;
+                public bool MoveNext() => false;
+            }
+
+            public static class Extensions
+            {
+                public static Enumerator GetEnumerator(this int value)
+                {
+                    Contract.Requires(value > 0);
+                    return default;
+                }
+            }
+
+            public static class Subject
+            {
+                public static void Satisfied()
+                {
+                    foreach (var item in 1) { }
+                }
+
+                public static void Violated()
+                {
+                    foreach (var item in 0) { }
+                }
+            }
+            """;
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            source,
+            ["SP0027"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            "contracts");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+        Assert.That(
+            diagnostics[0].Location.GetLineSpan().StartLinePosition.Line + 1,
+            Is.EqualTo(27));
+
+        var tree = compilation.SyntaxTrees.Single();
+        var declaration = (await tree.GetRootAsync()).DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single(static method =>
+                method.Identifier.ValueText == "Violated");
+        var semanticModel = compilation.GetSemanticModel(tree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+        var candidates = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None)
+            .Get(callerContracts: null);
+        var getEnumerator = candidates!.Value.Single(static candidate =>
+            candidate.TargetMethod.Name == "GetEnumerator");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(getEnumerator.TargetMethod.IsStatic, Is.True);
+            Assert.That(getEnumerator.TargetMethod.ReducedFrom, Is.Null);
+            Assert.That(getEnumerator.Instance, Is.Null);
+            Assert.That(getEnumerator.Arguments, Has.Length.EqualTo(1));
+            Assert.That(
+                getEnumerator.Arguments[0].Value.Syntax.ToString(),
+                Is.EqualTo("0"));
+        }
+    }
+
+    [Test]
     public void PatternForeachGetEnumeratorRequiresIsReported()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
