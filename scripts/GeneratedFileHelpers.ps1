@@ -140,8 +140,40 @@ function Update-SharpProofGeneratedFile
         return
     }
 
-    [System.IO.File]::WriteAllText(
-        $Path,
-        $normalizedContent,
-        [System.Text.UTF8Encoding]::new($false))
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $directory = [System.IO.Path]::GetDirectoryName($fullPath)
+    $temporaryPath = [System.IO.Path]::Combine(
+        $directory,
+        '.' + [System.IO.Path]::GetFileName($fullPath) + '.' +
+            [Guid]::NewGuid().ToString('N') + '.tmp')
+    $encoding = [System.Text.UTF8Encoding]::new($false)
+    $bytes = $encoding.GetBytes($normalizedContent)
+    try
+    {
+        $stream = [System.IO.File]::Open(
+            $temporaryPath,
+            [System.IO.FileMode]::CreateNew,
+            [System.IO.FileAccess]::Write,
+            [System.IO.FileShare]::None)
+        try
+        {
+            $stream.Write($bytes, 0, $bytes.Length)
+            $stream.Flush($true)
+        }
+        finally
+        {
+            $stream.Dispose()
+        }
+
+        [System.IO.File]::Move($temporaryPath, $fullPath, $true)
+        $temporaryPath = $null
+    }
+    finally
+    {
+        if ($null -ne $temporaryPath -and
+            [System.IO.File]::Exists($temporaryPath))
+        {
+            [System.IO.File]::Delete($temporaryPath)
+        }
+    }
 }

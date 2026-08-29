@@ -27,15 +27,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 20. LOW - Generated files are overwritten non-atomically
-
-- File: `scripts/GeneratedFileHelpers.ps1`
-- Member: `Update-SharpProofGeneratedFile`
-- Lines: 143-146
-- Mechanism: `File.WriteAllText` truncates the destination before completing its replacement.
-- Impact: An interruption, disk-full condition, or concurrent reader can leave or observe empty or partial source; multi-output generators can leave mixed versions.
-- Safe reproduction/evidence: Use an isolated temporary output with an injected write failure or interruption.
-
 ## 21. HIGH - SPMETA002 permits mutable process-global contents behind a readonly or get-only reference
 
 - File: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`

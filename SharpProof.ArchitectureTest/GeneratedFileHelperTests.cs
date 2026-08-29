@@ -97,6 +97,26 @@ public sealed class GeneratedFileHelperTests
         }
     }
 
+    [Test]
+    public async Task GeneratedUpdatesUseAtomicSameDirectoryReplacement()
+    {
+        var source = await File.ReadAllTextAsync(Path.Combine(
+            RepositoryRoot(),
+            "scripts",
+            "GeneratedFileHelpers.ps1"));
+        var start = source.IndexOf(
+            "function Update-SharpProofGeneratedFile",
+            StringComparison.Ordinal);
+        Assert.That(start, Is.GreaterThanOrEqualTo(0));
+        var body = source[start..];
+
+        Assert.That(body, Does.Contain("[System.IO.FileMode]::CreateNew"));
+        Assert.That(body, Does.Contain("Flush($true)"));
+        Assert.That(body, Does.Contain("[System.IO.File]::Move("));
+        Assert.That(body, Does.Contain("finally"));
+        Assert.That(body, Does.Not.Contain("[System.IO.File]::WriteAllText("));
+    }
+
     private static string RepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
