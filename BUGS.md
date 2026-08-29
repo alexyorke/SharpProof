@@ -2,15 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 1. HIGH - Primary-constructor analysis crashes on multiple argument-bearing base-list entries
-
-- File: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`
-- Member: `AnalyzePrimaryConstructorInitializer`
-- Lines: 53-55
-- Mechanism: `OfType<PrimaryConstructorBaseTypeSyntax>().SingleOrDefault()` throws `InvalidOperationException` when Roslyn exposes more than one entry in semantically erroneous source.
-- Impact: AD0001 aborts analysis during malformed or incomplete code and suppresses expected diagnostics.
-- Safe reproduction/evidence: Analyze `class Derived() : Base(), IFoo()` with `Base` class and `IFoo` interface.
-
 ## 2. HIGH - Implicit parameterless base calls skipped for primary constructors
 
 - Files and members: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, `AnalyzePrimaryConstructorInitializer`, lines 53-59; `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, `TryGetImplicitParameterlessBaseConstructor`, lines 379-395.
