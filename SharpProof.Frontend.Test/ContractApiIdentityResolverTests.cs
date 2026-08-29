@@ -29,6 +29,35 @@ public sealed class ContractApiIdentityResolverTests
         }
     }
 
+    [Test]
+    public void PayloadHashMustBindToTheMetadataReferenceImage()
+    {
+        var temporaryDirectory = CreateTemporaryDirectory();
+        var trustedPath = typeof(SharpProof.Attributes.Contract).Assembly.Location;
+        var path = Path.Combine(
+            temporaryDirectory,
+            "SharpProof.Attributes.dll");
+        try
+        {
+            File.WriteAllBytes(path, EmitContractImage(validContractShape: true));
+            var reference = MetadataReference.CreateFromFile(path);
+            var compilation = CreateConsumer(reference);
+            Assert.That(
+                compilation.GetTypeByMetadataName(
+                    ContractApiMetadata.Contract),
+                Is.Not.Null);
+            File.Copy(trustedPath, path, overwrite: true);
+
+            var resolver = ContractApiIdentityResolver.ForCompilation(compilation);
+
+            Assert.That(resolver.Contract, Is.Null);
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void UnapprovedContractPayloadRejectsSamePackageAttributes(

@@ -232,15 +232,16 @@ internal sealed class ContractApiIdentityResolver
 
         foreach (var match in matches)
         {
-            if (match is not PortableExecutableReference
-                {
-                    FilePath: { Length: > 0 } path
-                })
+            if (match is not PortableExecutableReference portable ||
+                portable.FilePath is not { Length: > 0 } path)
             {
                 return false;
             }
 
-            var trusted = HasExpectedPayloadHash(path, out var unreadableReason);
+            var trusted = HasExpectedPayloadHash(
+                path,
+                portable,
+                out var unreadableReason);
             if (unreadableReason != null)
             {
                 UnreadableContractApiReason = unreadableReason;
@@ -260,22 +261,31 @@ internal sealed class ContractApiIdentityResolver
     /// environment fault the user can act on, and reporting it is the difference
     /// between an explained failure and the analyzer silently doing nothing.
     /// </summary>
-    private static bool HasExpectedPayloadHash(string path, out string? unreadableReason)
+    private static bool HasExpectedPayloadHash(
+        string path,
+        PortableExecutableReference reference,
+        out string? unreadableReason)
     {
         unreadableReason = null;
         try
         {
-            using var stream = File.Open(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read);
+            var referenceMetadataId = reference.GetMetadataId();
+            var bytes = File.ReadAllBytes(path);
+            var fileMetadataId = MetadataReference
+                .CreateFromImage(bytes)
+                .GetMetadataId();
+            if (!referenceMetadataId.Equals(fileMetadataId))
+            {
+                return false;
+            }
+
             using var algorithm = SHA256.Create();
-            return algorithm.ComputeHash(stream).SequenceEqual(
+            return algorithm.ComputeHash(bytes).SequenceEqual(
                 AttributesAssemblyPayloadSha256);
         }
         catch (Exception exception) when (
             exception is ArgumentException or
+                BadImageFormatException or
                 IOException or
                 NotSupportedException or
                 UnauthorizedAccessException or

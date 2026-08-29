@@ -18,12 +18,6 @@ are included in this audit-only wave.
 
 The following findings concern cybersecurity, raceable trust decisions, or filesystem durability/integrity. They are recorded for a separate security review and were not implemented in this audit, per the user's explicit no-cybersecurity instruction.
 
-### 215. Trusted-attributes payload/hash binding race
-
-**Status:** Deferred security review.
-
-The analyzer hashes the file at a path after Roslyn has loaded the reference, without proving that both reads describe the same bytes.
-
 ### 271. Z3 pin/hash versus loaded-library identity
 
 **Status:** Deferred security review.
