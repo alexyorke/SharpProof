@@ -78,6 +78,12 @@ public static partial class LinuxPathIdentity
         set;
     }
 
+    internal static Action<string>? DirectorySyncOverrideForTest
+    {
+        get;
+        set;
+    }
+
     // A launcher invocation qualifies the same publication paths through
     // several validation and publication phases.  Keep the expensive,
     // read-only filesystem classification in this short-lived cache while
@@ -397,6 +403,11 @@ public static partial class LinuxPathIdentity
     {
         EnsureLinux();
         var canonical = Canonicalize(directory);
+        if (DirectorySyncOverrideForTest is { } sync)
+        {
+            sync(canonical);
+            return;
+        }
         var descriptor = NativeMethods.Open(
             canonical,
             OpenReadOnly | OpenDirectory | OpenCloseOnExec,
@@ -418,6 +429,17 @@ public static partial class LinuxPathIdentity
             }
             throw new IOException(
                 $"SharpProof could not synchronize a publication directory (errno {error}).");
+        }
+    }
+
+    private static void SyncParentDirectories(IEnumerable<string> paths)
+    {
+        foreach (var directory in paths
+                     .Select(static path => Path.GetDirectoryName(path))
+                     .Where(static path => !string.IsNullOrEmpty(path))
+                     .Distinct(StringComparer.Ordinal))
+        {
+            SyncDirectory(directory!);
         }
     }
 
@@ -493,16 +515,26 @@ public static partial class LinuxPathIdentity
                 }
             }
 
-            for (var index = 0; index < canonicalPaths.Length; index++)
+            var changedPaths = new List<string>();
+            try
             {
-                if (markerState[index].HasValue)
+                for (var index = 0; index < canonicalPaths.Length; index++)
                 {
-                    if (pathState[index].HasValue)
+                    if (markerState[index].HasValue)
                     {
-                        File.Delete(canonicalPaths[index]);
+                        if (pathState[index].HasValue)
+                        {
+                            File.Delete(canonicalPaths[index]);
+                            changedPaths.Add(canonicalPaths[index]);
+                        }
+                        File.Delete(markerPaths[index]);
+                        changedPaths.Add(markerPaths[index]);
                     }
-                    File.Delete(markerPaths[index]);
                 }
+            }
+            finally
+            {
+                SyncParentDirectories(changedPaths);
             }
             return;
         }
@@ -519,16 +551,26 @@ public static partial class LinuxPathIdentity
                     "SharpProof publication members must be regular files.");
             }
         }
-        for (var index = 0; index < canonicalPaths.Length; index++)
+        var fullChangedPaths = new List<string>();
+        try
         {
-            if (pathState[index].HasValue)
+            for (var index = 0; index < canonicalPaths.Length; index++)
             {
-                File.Delete(canonicalPaths[index]);
+                if (pathState[index].HasValue)
+                {
+                    File.Delete(canonicalPaths[index]);
+                    fullChangedPaths.Add(canonicalPaths[index]);
+                }
+            }
+            foreach (var markerPath in markerPaths)
+            {
+                File.Delete(markerPath);
+                fullChangedPaths.Add(markerPath);
             }
         }
-        foreach (var markerPath in markerPaths)
+        finally
         {
-            File.Delete(markerPath);
+            SyncParentDirectories(fullChangedPaths);
         }
     }
 
@@ -596,23 +638,33 @@ public static partial class LinuxPathIdentity
             }
         }
 
-        foreach (var (path, _) in owned)
+        var changedPaths = new List<string>();
+        try
         {
-            var information = TryInformation(path);
-            if (information is { } value &&
-                (value.Mode & FileTypeMask) != FileTypeRegular)
+            foreach (var (path, _) in owned)
             {
-                throw new IOException(
-                    "SharpProof publication members must be regular files.");
+                var information = TryInformation(path);
+                if (information is { } value &&
+                    (value.Mode & FileTypeMask) != FileTypeRegular)
+                {
+                    throw new IOException(
+                        "SharpProof publication members must be regular files.");
+                }
+                if (information.HasValue)
+                {
+                    File.Delete(path);
+                    changedPaths.Add(path);
+                }
             }
-            if (information.HasValue)
+            foreach (var (_, markerPath) in owned)
             {
-                File.Delete(path);
+                File.Delete(markerPath);
+                changedPaths.Add(markerPath);
             }
         }
-        foreach (var (_, markerPath) in owned)
+        finally
         {
-            File.Delete(markerPath);
+            SyncParentDirectories(changedPaths);
         }
     }
 
@@ -671,39 +723,51 @@ public static partial class LinuxPathIdentity
             ValidatePublicationMarkerFormat(markerPath);
             hasOwnedPublicationMarker = true;
         }
-        foreach (var path in canonicalOutputPaths)
+        var changedPaths = new List<string>();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var markerPath = PublicationMarkerPath(path);
-            if (TryInformation(markerPath) is not { } markerInformation)
+            foreach (var path in canonicalOutputPaths)
             {
-                if (hasOwnedPublicationMarker && TryInformation(path) is { } memberInformation)
+                cancellationToken.ThrowIfCancellationRequested();
+                var markerPath = PublicationMarkerPath(path);
+                if (TryInformation(markerPath) is not { } markerInformation)
                 {
-                    if ((memberInformation.Mode & FileTypeMask) != FileTypeRegular)
+                    if (hasOwnedPublicationMarker && TryInformation(path) is { } memberInformation)
+                    {
+                        if ((memberInformation.Mode & FileTypeMask) != FileTypeRegular)
+                        {
+                            throw new IOException(
+                                "SharpProof publication members must be regular files.");
+                        }
+                        File.Delete(path);
+                        changedPaths.Add(path);
+                    }
+                    continue;
+                }
+
+                if ((markerInformation.Mode & FileTypeMask) != FileTypeRegular)
+                {
+                    throw new IOException(
+                        "SharpProof publication ownership markers must be regular files.");
+                }
+                ValidatePublicationMarkerFormat(markerPath);
+                if (TryInformation(path) is { } information)
+                {
+                    if ((information.Mode & FileTypeMask) != FileTypeRegular)
                     {
                         throw new IOException(
                             "SharpProof publication members must be regular files.");
                     }
                     File.Delete(path);
+                    changedPaths.Add(path);
                 }
-                continue;
+                File.Delete(markerPath);
+                changedPaths.Add(markerPath);
             }
-            if ((markerInformation.Mode & FileTypeMask) != FileTypeRegular)
-            {
-                throw new IOException(
-                    "SharpProof publication ownership markers must be regular files.");
-            }
-            ValidatePublicationMarkerFormat(markerPath);
-            if (TryInformation(path) is { } information)
-            {
-                if ((information.Mode & FileTypeMask) != FileTypeRegular)
-                {
-                    throw new IOException(
-                        "SharpProof publication members must be regular files.");
-                }
-                File.Delete(path);
-            }
-            File.Delete(markerPath);
+        }
+        finally
+        {
+            SyncParentDirectories(changedPaths);
         }
     }
 

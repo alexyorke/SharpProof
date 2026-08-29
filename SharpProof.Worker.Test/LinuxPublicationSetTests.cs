@@ -666,6 +666,72 @@ public sealed class LinuxPublicationSetTests
         }
     }
 
+    [TestCase("reset")]
+    [TestCase("invalidate")]
+    [TestCase("invalidate-members")]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void PublicationDeletionSynchronizesParentDirectories(
+        string operation)
+    {
+        using var directory = TemporaryDirectory.Create();
+        var result = Path.Combine(directory.Path, "durable-result.json");
+        var sibling = Path.Combine(directory.Path, "durable-sibling.json");
+        var paths = new[] { result, sibling };
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   paths,
+                   TimeSpan.FromSeconds(1)))
+        {
+            File.WriteAllText(result, "published");
+            File.WriteAllText(sibling, "sibling");
+        }
+
+        var synchronized = new List<string>();
+        try
+        {
+            LinuxPathIdentity.DirectorySyncOverrideForTest =
+                path => synchronized.Add(path);
+            switch (operation)
+            {
+                case "reset":
+                    LinuxPathIdentity.ResetPublicationSet(
+                        paths,
+                        TimeSpan.FromSeconds(1));
+                    break;
+                case "invalidate":
+                    LinuxPathIdentity.InvalidatePublicationSet(
+                        paths,
+                        TimeSpan.FromSeconds(1));
+                    break;
+                case "invalidate-members":
+                    LinuxPathIdentity.InvalidatePublicationMembers(
+                        paths,
+                        [result],
+                        TimeSpan.FromSeconds(1));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(operation));
+            }
+        }
+        finally
+        {
+            LinuxPathIdentity.DirectorySyncOverrideForTest = null;
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(File.Exists(result), Is.False);
+            Assert.That(
+                operation == "invalidate-members"
+                    ? File.Exists(sibling)
+                    : !File.Exists(sibling),
+                Is.True);
+            Assert.That(
+                synchronized,
+                Does.Contain(directory.Path));
+        }
+    }
+
     [Test]
     public void AcquisitionSweepsOrphanedTemporaryMarkers()
     {
