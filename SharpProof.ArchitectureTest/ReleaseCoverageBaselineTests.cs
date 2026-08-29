@@ -510,7 +510,6 @@ public sealed class ReleaseCoverageBaselineTests
                 (Value: $"{{\"schemaVersion\":1,\"passed\":null,\"commit\":\"{head}\"}}", Valid: false),
                 (Value: $"{{\"schemaVersion\":1,\"commit\":\"{head}\"}}", Valid: false)
             };
-            string? receiptBytes = null;
             foreach (var fixture in fixtures)
             {
                 await File.WriteAllTextAsync(evidencePath, fixture.Value);
@@ -539,18 +538,11 @@ public sealed class ReleaseCoverageBaselineTests
                 var receiptPath = Path.Combine(receiptDirectory, "coverage.json");
                 if (fixture.Valid)
                 {
-                    receiptBytes = await File.ReadAllTextAsync(receiptPath);
+                    Assert.That(File.Exists(receiptPath), Is.True);
                 }
                 else
                 {
-                    Assert.That(
-                        File.Exists(receiptPath),
-                        Is.EqualTo(receiptBytes is not null));
-                    if (receiptBytes is not null)
-                    {
-                        Assert.That(await File.ReadAllTextAsync(receiptPath),
-                            Is.EqualTo(receiptBytes));
-                    }
+                    Assert.That(File.Exists(receiptPath), Is.False);
                 }
             }
         }

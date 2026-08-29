@@ -791,12 +791,6 @@ public sealed class CoverageScriptTests
             await AssertSuccessAsync(RunAsync(
                 repository,
                 "git",
-                "branch",
-                "feature"));
-
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
                 "switch",
                 "-c",
                 "comparison"));
@@ -807,10 +801,11 @@ public sealed class CoverageScriptTests
                 repository,
                 "git",
                 "switch",
+                "-c",
                 "feature"));
             if (featureChangesTcb)
             {
-                await WriteTrustedSourceAsync(repository, value: 1);
+                await WriteTrustedSourceAsync(repository, value: 2);
             }
             else
             {
