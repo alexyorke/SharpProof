@@ -1375,8 +1375,8 @@ internal static class PerformanceGate
         const string expectedVerifierCondition =
             "'$(_SharpProofProjectLanguageSupported)'=='true'AND" +
             "'$(SharpProofVerify)'=='true'AND'$(_SharpProofProfileNormalized)'!='off'AND" +
-            "'$(_SharpProofVerifierHostSupported)'=='true'AND" +
-            "'$(DesignTimeBuild)'!='true'AND'$(BuildingProject)'!='false'";
+            "'$(DesignTimeBuild)'!='true'AND'$(BuildingProject)'!='false'AND" +
+            "'$(SkipCompilerExecution)'!='true'";
         var unexpectedCoreDependency = verifierTargets.Descendants("Target")
             .Where(target => !ReferenceEquals(target, verifierTarget))
             .Any(target => SplitTargetList(
@@ -1450,7 +1450,7 @@ internal static class PerformanceGate
                 StringComparison.Ordinal) ||
             !string.Equals(
                 (string?)verifierTarget?.Attribute("DependsOnTargets"),
-                "_SharpProofInitializeVerify;_SharpProofVerifyCore",
+                "CoreCompile;_SharpProofInitializeVerify;_SharpProofVerifyCore",
                 StringComparison.Ordinal) ||
             verifierCore == null ||
             verifierCore.Attribute("BeforeTargets") != null ||
