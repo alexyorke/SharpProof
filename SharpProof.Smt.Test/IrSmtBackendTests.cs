@@ -1154,6 +1154,10 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA1849:Call async methods when available",
+        Justification = "Cancellation must complete synchronously while the backend monitor is held to assert queued waiters do not enter the query.")]
     public async Task CanceledChecksQueuedBehindAnActiveQueryDoNotOccupyWorkers()
     {
         var factory = new IrFactory();

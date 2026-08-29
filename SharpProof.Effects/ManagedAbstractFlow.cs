@@ -2922,7 +2922,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         !(conversion.Operand.Type?.IsValueType is true && conversion.Type?.IsReferenceType is true);
     }
 
-    private bool IsProvenFailingConversion(IConversionOperation conversion)
+    private static bool IsProvenFailingConversion(IConversionOperation conversion)
     {
         if (conversion.Conversion.IsImplicit ||
             conversion.IsTryCast ||

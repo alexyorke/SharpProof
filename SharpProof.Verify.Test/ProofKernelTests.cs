@@ -346,7 +346,7 @@ public sealed class ProofKernelTests
     {
         var fixture = CreateFixture();
         using var foreignCancellation = new CancellationTokenSource();
-        foreignCancellation.Cancel();
+        await foreignCancellation.CancelAsync();
 
         var outcome = await new ProofKernel(
                 new ForeignCanceledBackend(foreignCancellation.Token))
@@ -616,7 +616,7 @@ public sealed class ProofKernelTests
             {
                 await Task.Delay(100).ConfigureAwait(false);
                 await cancellation.CancelAsync().ConfigureAwait(false);
-            });
+            }, CancellationToken.None);
             return Task.FromResult(result);
         }
     }
@@ -635,7 +635,7 @@ public sealed class ProofKernelTests
             {
                 await Task.Delay(1).ConfigureAwait(false);
                 await cancellation.CancelAsync().ConfigureAwait(false);
-            });
+            }, CancellationToken.None);
             return Task.FromResult(BackendCheckResult.Satisfiable(model));
         }
     }

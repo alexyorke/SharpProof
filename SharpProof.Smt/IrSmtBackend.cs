@@ -16,6 +16,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     private long _lastResourceSnapshot;
     private bool _resourceAccountingExhausted;
     private int _activeCheckCount;
+    private int _pendingCheckCount;
     private bool _interrupted;
     private bool _disposed;
 
@@ -73,6 +74,17 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         ArgumentNullGuard.NotNull(query, nameof(query));
 
         cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return Task.FromResult(
+                    BackendCheckResult.Unknown(BackendFailureReason.Unavailable));
+            }
+
+            _pendingCheckCount++;
+        }
+
         return CheckAsyncCore(query, cancellationToken);
     }
 
@@ -80,66 +92,80 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         VerificationQuery query,
         CancellationToken cancellationToken)
     {
-        await _checkGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            // Keep the native Z3 call on a worker thread, but perform queue
-            // admission asynchronously so canceled waiters never occupy one.
-            return await Task.Run(() =>
+            await _checkGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                Interlocked.Increment(ref _activeCheckCount);
-                try
+                // Keep the native Z3 call on a worker thread, but perform queue
+                // admission asynchronously so canceled waiters never occupy one.
+                return await Task.Run(() =>
                 {
-                    lock (_gate)
+                    Interlocked.Increment(ref _activeCheckCount);
+                    try
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        Volatile.Write(ref _interrupted, false);
-                        if (_disposed || Volatile.Read(ref _interrupted))
+                        lock (_gate)
                         {
-                            return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
-                        }
+                            cancellationToken.ThrowIfCancellationRequested();
+                            Volatile.Write(ref _interrupted, false);
+                            if (_disposed || Volatile.Read(ref _interrupted))
+                            {
+                                return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
+                            }
 
-                        if (_resourceAccountingExhausted)
-                        {
-                            return BackendCheckResult.Unknown(BackendFailureReason.ResourceLimit);
-                        }
+                            if (_resourceAccountingExhausted)
+                            {
+                                return BackendCheckResult.Unknown(BackendFailureReason.ResourceLimit);
+                            }
 
-                        using var registration = cancellationToken.Register(
-                            static state => ((IrSmtBackend)state!).Interrupt(),
-                            this);
-                        cancellationToken.ThrowIfCancellationRequested();
-                        try
-                        {
-                            var result = CheckCore(query, cancellationToken);
+                            using var registration = cancellationToken.Register(
+                                static state => ((IrSmtBackend)state!).Interrupt(),
+                                this);
                             cancellationToken.ThrowIfCancellationRequested();
-                            return result;
-                        }
-                        catch (UnsupportedIrEncodingException)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            return BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding);
-                        }
-                        catch (Exception exception) when (exception is
-                            Z3Exception or
-                            InvalidOperationException or
-                            ArgumentException or
-                            ArithmeticException)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            return BackendCheckResult.Unknown(
-                                BackendFailureReason.InfrastructureFailure);
+                            try
+                            {
+                                var result = CheckCore(query, cancellationToken);
+                                cancellationToken.ThrowIfCancellationRequested();
+                                return result;
+                            }
+                            catch (UnsupportedIrEncodingException)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                return BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding);
+                            }
+                            catch (Exception exception) when (exception is
+                                Z3Exception or
+                                InvalidOperationException or
+                                ArgumentException or
+                                ArithmeticException)
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                return BackendCheckResult.Unknown(
+                                    BackendFailureReason.InfrastructureFailure);
+                            }
                         }
                     }
-                }
-                finally
-                {
-                    Interlocked.Decrement(ref _activeCheckCount);
-                }
-            }, CancellationToken.None).ConfigureAwait(false);
+                    finally
+                    {
+                        Interlocked.Decrement(ref _activeCheckCount);
+                    }
+                }, CancellationToken.None).ConfigureAwait(false);
+            }
+            finally
+            {
+                _checkGate.Release();
+            }
         }
         finally
         {
-            _checkGate.Release();
+            lock (_gate)
+            {
+                _pendingCheckCount--;
+                if (_disposed && _pendingCheckCount == 0)
+                {
+                    _checkGate.Dispose();
+                }
+            }
         }
     }
 
@@ -160,6 +186,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
             _disposed = true;
             _context.Dispose();
+            if (_pendingCheckCount == 0)
+            {
+                _checkGate.Dispose();
+            }
         }
     }
 
@@ -172,9 +202,9 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             _context,
             query,
             owner,
-            cancellationToken,
             _maximumDecodedStringLength,
-            _stringLiteralProgress);
+            _stringLiteralProgress,
+            cancellationToken);
         using var solver = _context.MkSolver();
         using var parameters = _context.MkParams();
         using var rlimit = _context.MkSymbol("rlimit");
@@ -320,9 +350,14 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         long observed,
         out long total)
     {
-        if (consumed < 0 || observed < 0)
+        if (consumed < 0)
         {
-            throw new ArgumentOutOfRangeException();
+            throw new ArgumentOutOfRangeException(nameof(consumed));
+        }
+
+        if (observed < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(observed));
         }
 
         if (observed > long.MaxValue - consumed)
@@ -447,9 +482,9 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             Context context,
             VerificationQuery query,
             Z3ExpressionOwner owner,
-            CancellationToken cancellationToken,
             int maximumDecodedStringLength,
-            Action<int>? stringLiteralProgress)
+            Action<int>? stringLiteralProgress,
+            CancellationToken cancellationToken)
         {
             _context = context;
             _owner = owner;
@@ -464,13 +499,13 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             {
                 ValidateDepth(
                     assumption.Predicate,
-                    cancellationToken,
-                    maximumDepths);
+                    maximumDepths,
+                    cancellationToken);
             }
             ValidateDepth(
                 query.Goal.Predicate,
-                cancellationToken,
-                maximumDepths);
+                maximumDepths,
+                cancellationToken);
             Variables = query.ModelVariables;
             IntegerVariables = [.. Variables.Where(variable =>
                 _factory.GetVariableInfo(variable).Type == _factory.IntegerType)];
@@ -517,8 +552,8 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
         private static void ValidateDepth(
             IrTerm root,
-            CancellationToken cancellationToken,
-            Dictionary<IrId, int> maximumDepths)
+            Dictionary<IrId, int> maximumDepths,
+            CancellationToken cancellationToken)
         {
             var pending = new Stack<(IrTerm Term, int Depth)>();
             pending.Push((root, 1));
