@@ -11,7 +11,8 @@ param(
         'bundle-missing-package','bundle-case-collision',
         'bundle-empty-directory','bundle-hardlink-alias',
         'bundle-fifo',
-        'bundle-atomic-replacement','bundle-atomic-failure-cleanup')]
+        'bundle-atomic-replacement','bundle-atomic-failure-cleanup',
+        'bundle-atomic-recovery')]
     [string]$Mutation
 )
 
@@ -21,6 +22,7 @@ $ErrorActionPreference = 'Stop'
 
 $root = Join-Path ([IO.Path]::GetTempPath()) (
     'sharpproof-checksums-' + [Guid]::NewGuid().ToString('N'))
+$recoveryBackup = $null
 try {
     [IO.Directory]::CreateDirectory($root) | Out-Null
     $artifacts = @(
@@ -95,7 +97,8 @@ try {
         }
         if ($Mutation -in @(
                 'bundle-atomic-replacement',
-                'bundle-atomic-failure-cleanup')) {
+                'bundle-atomic-failure-cleanup',
+                'bundle-atomic-recovery')) {
             $staging = $root + '.staging'
             [IO.Directory]::CreateDirectory($staging) | Out-Null
             Get-ChildItem -LiteralPath $root -File | ForEach-Object {
@@ -117,6 +120,16 @@ try {
                 if (-not $failed -or [IO.Directory]::Exists($staging)) {
                     throw 'Invalid staging did not fail and clean up.'
                 }
+            }
+            elseif ($Mutation -eq 'bundle-atomic-recovery') {
+                $recoveryBackup = Join-Path ([IO.Path]::GetDirectoryName($root)) (
+                    '.' + [IO.Path]::GetFileName($root) + '.recovery.backup')
+                [IO.Directory]::Move($root, $recoveryBackup)
+                Publish-SharpProofReleaseBundleAtomically `
+                    -StagingDirectory $staging `
+                    -DestinationDirectory $root `
+                    -Artifacts $artifacts `
+                    -Owner 'Fixture atomic bundle recovery'
             }
             else {
                 Publish-SharpProofReleaseBundleAtomically `
@@ -184,5 +197,9 @@ try {
 finally {
     if ([IO.Directory]::Exists($root)) {
         Remove-Item -LiteralPath $root -Recurse -Force
+    }
+    if ($null -ne $recoveryBackup -and
+            [IO.Directory]::Exists($recoveryBackup)) {
+        Remove-Item -LiteralPath $recoveryBackup -Recurse -Force
     }
 }

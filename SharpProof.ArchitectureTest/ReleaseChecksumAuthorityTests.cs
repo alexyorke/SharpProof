@@ -131,6 +131,7 @@ public sealed class ReleaseChecksumAuthorityTests
     [TestCase("bundle-hardlink-alias", false)]
     [TestCase("bundle-atomic-replacement", true)]
     [TestCase("bundle-atomic-failure-cleanup", true)]
+    [TestCase("bundle-atomic-recovery", true)]
     public async Task ChecksumBytesAreExact(string mutation, bool expectedSuccess)
     {
         var result = await RunFixtureAsync(mutation);

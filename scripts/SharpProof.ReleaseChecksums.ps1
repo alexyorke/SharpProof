@@ -375,6 +375,73 @@ function Test-SharpProofReleaseBundleTopology {
         -Owner $Owner
 }
 
+function Get-SharpProofReleaseBundleBackupCandidates {
+    param(
+        [Parameter(Mandatory = $true)][string]$DestinationDirectory
+    )
+
+    $destination = [IO.Path]::GetFullPath($DestinationDirectory)
+    $parent = [IO.Path]::GetDirectoryName($destination)
+    if (-not [IO.Directory]::Exists($parent)) {
+        return @()
+    }
+    $leaf = [IO.Path]::GetFileName($destination)
+    $prefix = '.' + $leaf + '.'
+    $suffix = '.backup'
+    return @(
+        Get-ChildItem -LiteralPath $parent -Force -Directory |
+            Where-Object {
+                $_.Name.StartsWith($prefix, [StringComparison]::Ordinal) -and
+                $_.Name.EndsWith($suffix, [StringComparison]::Ordinal) -and
+                (($null -eq $_.Attributes) -or
+                    (($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0))
+            } |
+            Sort-Object Name
+    )
+}
+
+function Restore-SharpProofReleaseBundleBackup {
+    param(
+        [Parameter(Mandatory = $true)][string]$DestinationDirectory,
+        [Parameter()][AllowNull()][object[]]$Artifacts,
+        [Parameter(Mandatory = $true)][string]$Owner
+    )
+
+    $destination = [IO.Path]::GetFullPath($DestinationDirectory)
+    if ([IO.Directory]::Exists($destination)) {
+        return $false
+    }
+    $candidates = @(Get-SharpProofReleaseBundleBackupCandidates `
+        -DestinationDirectory $destination)
+    if ($candidates.Count -eq 0) {
+        return $false
+    }
+    if ($candidates.Count -ne 1) {
+        throw "$Owner found multiple recoverable release bundle backups."
+    }
+    $backup = [string]$candidates[0].FullName
+    $effectiveArtifacts = @($Artifacts)
+    if ($effectiveArtifacts.Count -eq 0) {
+        $manifestReader = Get-Command `
+            -Name Read-SharpProofCanonicalReleaseJson `
+            -CommandType Function `
+            -ErrorAction SilentlyContinue
+        if ($null -eq $manifestReader) {
+            throw "$Owner cannot validate a backup without release manifest support."
+        }
+        $manifest = Read-SharpProofCanonicalReleaseJson `
+            -Path (Join-Path $backup 'SharpProof.release.json') `
+            -DocumentType ReleaseManifest
+        $effectiveArtifacts = @($manifest.artifacts)
+    }
+    Test-SharpProofReleaseBundleTopology `
+        -Directory $backup `
+        -Artifacts $effectiveArtifacts `
+        -Owner "$Owner backup"
+    [IO.Directory]::Move($backup, $destination)
+    return $true
+}
+
 function Publish-SharpProofReleaseBundleAtomically {
     param(
         [Parameter(Mandatory = $true)][string]$StagingDirectory,
@@ -387,8 +454,14 @@ function Publish-SharpProofReleaseBundleAtomically {
     $destination = [IO.Path]::GetFullPath($DestinationDirectory)
     if ([IO.Path]::GetDirectoryName($staging) -cne
             [IO.Path]::GetDirectoryName($destination) -or
-        $staging -ceq $destination -or
-        -not [IO.Directory]::Exists($destination)) {
+        $staging -ceq $destination) {
+        throw "$Owner staging and destination topology is invalid."
+    }
+    $null = Restore-SharpProofReleaseBundleBackup `
+        -DestinationDirectory $destination `
+        -Artifacts $Artifacts `
+        -Owner $Owner
+    if (-not [IO.Directory]::Exists($destination)) {
         throw "$Owner staging and destination topology is invalid."
     }
     try {

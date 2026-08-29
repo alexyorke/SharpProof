@@ -509,6 +509,9 @@ function Test-PackageThirdPartyInventory {
     }
 }
 
+$null = Restore-SharpProofReleaseBundleBackup `
+    -DestinationDirectory ([IO.Path]::GetFullPath($PackageSource)) `
+    -Owner 'Release package source recovery'
 $resolvedSource = (Resolve-Path `
     -LiteralPath $PackageSource `
     -ErrorAction Stop).Path
