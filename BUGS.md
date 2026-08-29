@@ -71,6 +71,7 @@ Resolved reports are removed after reproduction, implementation, regression test
 | 409 | `6462246f7` (protocol answer catalog and guarded semantic-cache writes) |
 | 317 | `8127933fc` (stable compiler-visible manifest source path and incremental regression) |
 | 369 | `fa58c7533` (explicit-interface implementation boundary; static constructors remain fail-closed) |
+| 364 | `02a645e69` (regular-file validation for private verifier paths) |
 | 202 | `0a2c179f9` (runtime companion path validation and generated launcher coverage) |
 | 257-262 | `68afb8ca1`, `c3ab72290`, `8bd08c6e0` |
 | 263-270 | `0c9e0ec0d`, `0c95dad38`, `0a2c179f9`, `a7b99ca24` |
@@ -119,17 +120,6 @@ Historical resolved reports are intentionally removed from this file; the compac
 2. Observe artifacts/container-packages gone and artifacts/.container-packages.<guid>.backup present.
 3. Rerun any dependent command (pack/pilots/package-consumers): fails at Resolve-Path with "PackageSource is not a directory"; grep confirms no script ever references *.backup to self-heal.
 **Confidence**: High mechanics (both move sites, catch-only restoration, absence of recovery consumer, destination==source default all verified line-by-line); Low-Medium likelihood/severity (kill window is narrow, but the result bricks the release pipeline's input directory until manual recovery).
-
-### 364. [DEFERRED I/O SAFETY] Private I/O Paths Accept Pre-Existing Non-Regular Files - --result /dev/null Unlinks the Device Node and Renames a Regular File Over It While the Run Reports Success
-
-**Location**: `SharpProof.Worker.Launcher\Program.cs` (Staging + `DeleteIfExists` Lines 92-96; generic delete helper Lines 926-932 using `File.Exists`/`File.Delete` with no file-type check; `ValidateDistinctPaths` Lines 1045-1108 applying `RequireLocalPath` ONLY to publication paths at Lines 1059-1062); canonicalization type-checks ANCESTORS only `SharpProof.Host\LinuxPathIdentity.cs` (Lines 96-118 `Canonicalize`: final component unchecked); blind rename-over-inode `SharpProof.Ir\AtomicFile.cs` (Lines 144-187 `Prepare`/`Publish` via `File.Replace`/`File.Move`); worker writes through the same rename `SharpProof.Worker\Program.cs` (Lines 283-286); deliberate contrast on the publication side `LinuxPathIdentity.cs` (Lines 1215-1233 `EnsureRegularPublicationPath`, Lines 684-714 `DeleteIfUnprotected` demanding regular files).
-**Description**: `--request/--result/--compiler-manifest/--cache-directory` receive no regular-file/type validation anywhere: `Canonicalize` validates only that ancestors are directories, distinctness checks compare path strings/stat identity, and nothing refuses character devices/FIFOs. Execution then deletes the existing node (`File.Exists` is true for `/dev/null`) and the worker's staged-write rename recreates the path as a REGULAR FILE containing the result JSON - the container's `/dev/null` is silently destroyed while the launcher exits 0 with a genuine green verdict; every subsequent process writing to /dev/null fills a growing regular file (disk exhaustion, bizarre downstream failures). Unprivileged variant: any user-owned FIFO/block device passed as `--result` is clobbered identically. The codebase's own publication layer explicitly demands regular outputs ("publication members must be regular files"), so private-path acceptance is a gap, not a choice. Distinct from #308 (relative cache-directory anchors), #316/#290 (temp sweeping/test globs): none covers inode-type validation of the private path pipeline.
-**Reproduction Steps**:
-1. In the canonical container, run a verification with the result redirected at the device: `dotnet build -p:SharpProofVerify=true -p:SharpProofVerifyResultFile=/dev/null`.
-2. Build completes with exit 0 (the launcher reads back its own JSON from the path).
-3. `stat -c '%F %s' /dev/null` -> `regular file` with size > 0 (was `character special file`, size 0); `echo x >/dev/null` now appends to disk.
-4. Unprivileged cross-check: `mkfifo /tmp/f` and pass it via the same property - exit 0 and `/tmp/f` is now a regular file.
-**Confidence**: High on mechanism (no type gate exists anywhere on the pipeline; POSIX unlink/rename semantics standard); impact-weighted Medium overall because triggering requires an operator-supplied pathological path.
 
 ### 406. [DEFERRED SECURITY] The Worker's `--request`/`--result` Distinctness Guard Is Ordinal-String-Only - Symlink/Hardlink Aliases Bypass It While the Launcher's Own Path-Conflict Machinery Classifies the Identical Layout as a Conflict
 
