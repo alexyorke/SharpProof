@@ -208,6 +208,52 @@ public static partial class LinuxPathIdentity
         return RequireLocalPath(path, qualificationCache: null);
     }
 
+    internal static string RequireRegularFilePath(string path)
+    {
+        var canonical = Canonicalize(path);
+        if (NativeMethods.LStat(canonical, out var information) == 0)
+        {
+            if ((information.Mode & FileTypeMask) != FileTypeRegular)
+            {
+                throw new ArgumentException(
+                    "SharpProof writable file paths must be regular files.",
+                    nameof(path));
+            }
+            return canonical;
+        }
+
+        var error = Marshal.GetLastPInvokeError();
+        if (error != ErrorNoEntry)
+        {
+            throw new IOException(
+                $"SharpProof could not inspect the writable file path (errno {error}).");
+        }
+        return canonical;
+    }
+
+    internal static string RequireDirectoryPath(string path)
+    {
+        var canonical = Canonicalize(path);
+        if (NativeMethods.LStat(canonical, out var information) == 0)
+        {
+            if ((information.Mode & FileTypeMask) != FileTypeDirectory)
+            {
+                throw new ArgumentException(
+                    "SharpProof cache paths must be directories.",
+                    nameof(path));
+            }
+            return canonical;
+        }
+
+        var error = Marshal.GetLastPInvokeError();
+        if (error != ErrorNoEntry)
+        {
+            throw new IOException(
+                $"SharpProof could not inspect the directory path (errno {error}).");
+        }
+        return canonical;
+    }
+
     internal static string RequireLocalPath(
         string path,
         PathQualificationCache? qualificationCache)

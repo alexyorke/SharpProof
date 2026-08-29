@@ -1126,6 +1126,28 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void PrivateDeviceResultIsRejectedBeforeStaging()
+    {
+        string[] arguments = [
+            "verify",
+            "--worker", "worker.dll",
+            "--request", "/tmp/sharpproof-private-request.json",
+            "--result", "/dev/null",
+            "--compiler-manifest", "/tmp/sharpproof-private-manifest.json",
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(() => parsed.ValidateDistinctPaths(null)));
+        Assert.That(exception, Is.Not.Null);
+        Assert.That(exception!.Message, Does.Contain("regular"));
+    }
+
+    [Test]
     public void WorkerResultByteLimitIsEnforcedBeforeDeserialization()
     {
         var path = Path.Combine(

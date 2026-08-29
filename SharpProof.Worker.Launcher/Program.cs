@@ -1087,9 +1087,13 @@ internal static class Program
 
     private static void DeleteIfExists(string? path)
     {
-        if (path != null && File.Exists(path))
+        if (path != null)
         {
-            File.Delete(path);
+            LinuxPathIdentity.RequireRegularFilePath(path);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 
@@ -1270,11 +1274,27 @@ internal sealed partial class LauncherArguments
             PublishRequestPath, PublishResultPath, PublishCompilerManifestPath,
             PublishSarifPath
         }.OfType<string>().ToArray();
+        string?[] writableFileCandidates = [
+            RequestPath,
+            ResultPath,
+            CompilerManifestPath,
+            ..publicationPaths
+        ];
         foreach (var publicationPath in publicationPaths)
         {
             LinuxPathIdentity.RequireLocalPath(
                 publicationPath,
                 qualificationCache);
+        }
+        foreach (var writableFilePath in writableFileCandidates
+                     .OfType<string>()
+                     .Where(static path => !string.IsNullOrWhiteSpace(path)))
+        {
+            LinuxPathIdentity.RequireRegularFilePath(writableFilePath);
+        }
+        if (!string.IsNullOrWhiteSpace(cacheDirectory))
+        {
+            LinuxPathIdentity.RequireDirectoryPath(cacheDirectory);
         }
         var runtimeDirectories = runtimeRoots
             .Concat(LauncherArguments.LauncherRuntimePaths)

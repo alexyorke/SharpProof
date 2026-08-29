@@ -236,8 +236,10 @@ internal static class Program
         }
         try
         {
-            request = Path.GetFullPath(requestValue);
-            result = Path.GetFullPath(resultValue);
+            request = LinuxPathIdentity.RequireRegularFilePath(
+                Path.GetFullPath(requestValue));
+            result = LinuxPathIdentity.RequireRegularFilePath(
+                Path.GetFullPath(resultValue));
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or NotSupportedException)

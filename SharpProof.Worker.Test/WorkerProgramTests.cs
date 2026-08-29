@@ -67,6 +67,36 @@ public sealed class WorkerProgramTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public async Task DirectInvocationRejectsNonRegularResultBeforeStartBarrier()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Worker.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var exitCode = await Program.Main([
+                "verify",
+                "--request",
+                Path.Combine(directory, "request.json"),
+                "--result",
+                "/dev/null",
+                "--start-stdin",
+                "--parent-pid",
+                "1"
+            ]);
+
+            Assert.That(exitCode, Is.EqualTo(2));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task DirectInvocationRejectsMalformedPathsWithoutThrowing()
     {
         var exitCode = await Program.Main([
