@@ -9,6 +9,13 @@ namespace SharpProof.Fuzz.Test;
 [TestFixture]
 public sealed class FuzzRunnerTests
 {
+    private static readonly string[] ExpectedAbstentionOracleOrder =
+    [
+        "frontend",
+        "finite-domain-smt",
+        "partial-term-smt"
+    ];
+
     [Test]
     public void AbstentionEvidenceRetainsEachOracleBeforeApplyingTheCap()
     {
@@ -56,12 +63,7 @@ public sealed class FuzzRunnerTests
                 Is.EqualTo(FuzzRunner.MaximumRetainedAbstentions));
             Assert.That(
                 evidence.Take(3).Select(static item => item.Oracle),
-                Is.EqualTo(new[]
-                {
-                    "frontend",
-                    "finite-domain-smt",
-                    "partial-term-smt"
-                }));
+                Is.EqualTo(ExpectedAbstentionOracleOrder));
             Assert.That(evidence[0].Detail, Is.EqualTo("frontend-detail-0"));
             Assert.That(evidence[0].Input, Does.Contain("Target"));
             Assert.That(

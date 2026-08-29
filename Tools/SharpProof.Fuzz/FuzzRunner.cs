@@ -646,7 +646,8 @@ public static class FuzzRunner
         var scenarios = string.Join(
             "; ",
             generated.Scenarios.Select((scenario, index) =>
-                "scenario " + index.ToString() + ": " +
+                "scenario " + index.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture) + ": " +
                 string.Join(
                     ", ",
                     scenario
@@ -754,17 +755,10 @@ public static class FuzzRunner
         IReadOnlyList<GeneratedCSharpCase> cases,
         IReadOnlyList<FrontendDifferentialResult> results)
     {
-        var textParameters = 0;
-        var stringLiterals = 0;
-        var nullStrings = 0;
-        var stringConcatenations = 0;
-        var stringLengths = 0;
-        var stringCasts = 0;
-        var arrayLengths = 0;
-        var arrayIndexes = 0;
+        var evaluator = new FrontendCoverageEvaluator();
         foreach (var generated in cases)
         {
-            Evaluate(generated.Expression, generated);
+            evaluator.Evaluate(generated.Expression, generated);
         }
 
         var divideByZero = 0;
@@ -793,269 +787,334 @@ public static class FuzzRunner
                     break;
             }
         }
+
         return new FrontendFuzzCoverage(
-            textParameters,
-            stringLiterals,
-            nullStrings,
-            stringConcatenations,
-            stringLengths,
-            stringCasts,
-            arrayLengths,
-            arrayIndexes,
+            evaluator.TextParameters,
+            evaluator.StringLiterals,
+            evaluator.NullStrings,
+            evaluator.StringConcatenations,
+            evaluator.StringLengths,
+            evaluator.StringCasts,
+            evaluator.ArrayLengths,
+            evaluator.ArrayIndexes,
             divideByZero,
             overflow,
             nullReference,
             indexOutOfRange,
             invalidCast);
+    }
 
-        GeneratedEvaluation Evaluate(
+    private sealed class FrontendCoverageEvaluator
+    {
+        private int _textParameters;
+        private int _stringLiterals;
+        private int _nullStrings;
+        private int _stringConcatenations;
+        private int _stringLengths;
+        private int _stringCasts;
+        private int _arrayLengths;
+        private int _arrayIndexes;
+
+        internal int TextParameters => _textParameters;
+        internal int StringLiterals => _stringLiterals;
+        internal int NullStrings => _nullStrings;
+        internal int StringConcatenations => _stringConcatenations;
+        internal int StringLengths => _stringLengths;
+        internal int StringCasts => _stringCasts;
+        internal int ArrayLengths => _arrayLengths;
+        internal int ArrayIndexes => _arrayIndexes;
+
+        internal GeneratedEvaluation Evaluate(
             GeneratedCSharpExpression expression,
             GeneratedCSharpCase generated)
         {
             Count(expression);
-            switch (expression.Kind)
+            return expression.Kind switch
             {
-                case GeneratedExpressionKind.BooleanLiteral:
-                    return new(false, expression.BooleanValue);
-                case GeneratedExpressionKind.IntegerLiteral:
-                    return new(false, expression.IntegerValue);
-                case GeneratedExpressionKind.LeftParameter:
-                    return new(false, generated.Left);
-                case GeneratedExpressionKind.RightParameter:
-                    return new(false, generated.Right);
-                case GeneratedExpressionKind.ConditionParameter:
-                    return new(false, generated.Condition);
-                case GeneratedExpressionKind.TextParameter:
-                    return new(false, generated.Text);
-                case GeneratedExpressionKind.ValuesParameter:
-                    return new(false, generated.Values);
-                case GeneratedExpressionKind.ReferenceParameter:
-                    return new(false, generated.Reference);
-                case GeneratedExpressionKind.NullReference:
-                case GeneratedExpressionKind.NullString:
-                    return new(false, null);
-                case GeneratedExpressionKind.StringLiteral:
-                    return new(false, expression.StringValue);
-                case GeneratedExpressionKind.Not:
-                {
-                    var operand = Evaluate(expression.Children[0], generated);
-                    return operand.Failed || operand.Value is not bool value
-                        ? GeneratedEvaluation.Failure
-                        : new(false, !value);
-                }
-                case GeneratedExpressionKind.Negate:
-                {
-                    var operand = Evaluate(expression.Children[0], generated);
-                    if (operand.Failed || operand.Value is not long value)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
+                GeneratedExpressionKind.BooleanLiteral =>
+                    new(false, expression.BooleanValue),
+                GeneratedExpressionKind.IntegerLiteral =>
+                    new(false, expression.IntegerValue),
+                GeneratedExpressionKind.LeftParameter =>
+                    new(false, generated.Left),
+                GeneratedExpressionKind.RightParameter =>
+                    new(false, generated.Right),
+                GeneratedExpressionKind.ConditionParameter =>
+                    new(false, generated.Condition),
+                GeneratedExpressionKind.TextParameter =>
+                    new(false, generated.Text),
+                GeneratedExpressionKind.ValuesParameter =>
+                    new(false, generated.Values),
+                GeneratedExpressionKind.ReferenceParameter =>
+                    new(false, generated.Reference),
+                GeneratedExpressionKind.NullReference or
+                    GeneratedExpressionKind.NullString =>
+                    new(false, null),
+                GeneratedExpressionKind.StringLiteral =>
+                    new(false, expression.StringValue),
+                GeneratedExpressionKind.Not =>
+                    EvaluateNot(expression, generated),
+                GeneratedExpressionKind.Negate =>
+                    EvaluateNegate(expression, generated),
+                GeneratedExpressionKind.Conditional =>
+                    EvaluateConditional(expression, generated),
+                GeneratedExpressionKind.AndAlso or
+                    GeneratedExpressionKind.OrElse =>
+                    EvaluateLogical(expression, generated),
+                GeneratedExpressionKind.StringConcat =>
+                    EvaluateStringConcat(expression, generated),
+                GeneratedExpressionKind.Length =>
+                    EvaluateLength(expression, generated),
+                GeneratedExpressionKind.ArrayIndex =>
+                    EvaluateArrayIndex(expression, generated),
+                GeneratedExpressionKind.CastToString =>
+                    EvaluateCastToString(expression, generated),
+                GeneratedExpressionKind.Add or
+                    GeneratedExpressionKind.Subtract or
+                    GeneratedExpressionKind.Multiply or
+                    GeneratedExpressionKind.Divide or
+                    GeneratedExpressionKind.Remainder or
+                    GeneratedExpressionKind.Equal or
+                    GeneratedExpressionKind.NotEqual or
+                    GeneratedExpressionKind.LessThan or
+                    GeneratedExpressionKind.LessThanOrEqual or
+                    GeneratedExpressionKind.GreaterThan or
+                    GeneratedExpressionKind.GreaterThanOrEqual =>
+                    EvaluateArithmetic(expression, generated),
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(expression), expression.Kind, "Unknown expression kind.")
+            };
+        }
 
-                    try
-                    {
-                        return new(false, checked(-value));
-                    }
-                    catch (OverflowException)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-                }
-                case GeneratedExpressionKind.Conditional:
-                {
-                    var condition = Evaluate(expression.Children[0], generated);
-                    if (condition.Failed || condition.Value is not bool value)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
+        private GeneratedEvaluation EvaluateNot(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var operand = Evaluate(expression.Children[0], generated);
+            return operand.Failed || operand.Value is not bool value
+                ? GeneratedEvaluation.Failure
+                : new(false, !value);
+        }
 
-                    return Evaluate(
-                        expression.Children[value ? 1 : 2],
-                        generated);
-                }
-                case GeneratedExpressionKind.AndAlso:
-                case GeneratedExpressionKind.OrElse:
-                {
-                    var left = Evaluate(expression.Children[0], generated);
-                    if (left.Failed || left.Value is not bool leftValue)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-
-                    var shortCircuits = expression.Kind ==
-                        GeneratedExpressionKind.AndAlso
-                            ? !leftValue
-                            : leftValue;
-                    if (shortCircuits)
-                    {
-                        return new(false, leftValue);
-                    }
-
-                    var right = Evaluate(expression.Children[1], generated);
-                    return right.Failed || right.Value is not bool rightValue
-                        ? GeneratedEvaluation.Failure
-                        : new(false, rightValue);
-                }
-                case GeneratedExpressionKind.StringConcat:
-                {
-                    var left = Evaluate(expression.Children[0], generated);
-                    if (left.Failed)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-
-                    var right = Evaluate(expression.Children[1], generated);
-                    return right.Failed
-                        ? GeneratedEvaluation.Failure
-                        : new(false,
-                            (left.Value as string ?? string.Empty) +
-                            (right.Value as string ?? string.Empty));
-                }
-                case GeneratedExpressionKind.Length:
-                {
-                    var operand = Evaluate(expression.Children[0], generated);
-                    if (operand.Failed || operand.Value == null)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-
-                    return operand.Value switch
-                    {
-                        string text => new(false, (long)text.Length),
-                        long[] values => new(false, (long)values.Length),
-                        _ => GeneratedEvaluation.Failure
-                    };
-                }
-                case GeneratedExpressionKind.ArrayIndex:
-                {
-                    var values = Evaluate(expression.Children[0], generated);
-                    if (values.Failed || values.Value is not long[] array)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-
-                    var index = Evaluate(expression.Children[1], generated);
-                    if (index.Failed || index.Value is not long offset ||
-                        offset < 0 || offset >= array.Length)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-
-                    return new(false, array[(int)offset]);
-                }
-                case GeneratedExpressionKind.CastToString:
-                {
-                    var operand = Evaluate(expression.Children[0], generated);
-                    return operand.Failed ||
-                        operand.Value != null && operand.Value is not string
-                        ? GeneratedEvaluation.Failure
-                        : operand;
-                }
-                case GeneratedExpressionKind.Add:
-                case GeneratedExpressionKind.Subtract:
-                case GeneratedExpressionKind.Multiply:
-                case GeneratedExpressionKind.Divide:
-                case GeneratedExpressionKind.Remainder:
-                case GeneratedExpressionKind.Equal:
-                case GeneratedExpressionKind.NotEqual:
-                case GeneratedExpressionKind.LessThan:
-                case GeneratedExpressionKind.LessThanOrEqual:
-                case GeneratedExpressionKind.GreaterThan:
-                case GeneratedExpressionKind.GreaterThanOrEqual:
-                {
-                    var left = Evaluate(expression.Children[0], generated);
-                    if (left.Failed)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-
-                    var right = Evaluate(expression.Children[1], generated);
-                    if (right.Failed)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-
-                    if (expression.Kind is GeneratedExpressionKind.Equal or
-                        GeneratedExpressionKind.NotEqual)
-                    {
-                        var equal = Equals(left.Value, right.Value);
-                        return new(false,
-                            expression.Kind == GeneratedExpressionKind.Equal
-                                ? equal
-                                : !equal);
-                    }
-
-                    if (left.Value is not long leftInteger ||
-                        right.Value is not long rightInteger)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-
-                    try
-                    {
-                        return expression.Kind switch
-                        {
-                            GeneratedExpressionKind.Add =>
-                                new(false, checked(leftInteger + rightInteger)),
-                            GeneratedExpressionKind.Subtract =>
-                                new(false, checked(leftInteger - rightInteger)),
-                            GeneratedExpressionKind.Multiply =>
-                                new(false, checked(leftInteger * rightInteger)),
-                            GeneratedExpressionKind.Divide =>
-                                new(false, checked(leftInteger / rightInteger)),
-                            GeneratedExpressionKind.Remainder =>
-                                new(false, checked(leftInteger % rightInteger)),
-                            GeneratedExpressionKind.LessThan =>
-                                new(false, leftInteger < rightInteger),
-                            GeneratedExpressionKind.LessThanOrEqual =>
-                                new(false, leftInteger <= rightInteger),
-                            GeneratedExpressionKind.GreaterThan =>
-                                new(false, leftInteger > rightInteger),
-                            GeneratedExpressionKind.GreaterThanOrEqual =>
-                                new(false, leftInteger >= rightInteger),
-                            _ => GeneratedEvaluation.Failure
-                        };
-                    }
-                    catch (ArithmeticException)
-                    {
-                        return GeneratedEvaluation.Failure;
-                    }
-                }
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(expression), expression.Kind, "Unknown expression kind.");
+        private GeneratedEvaluation EvaluateNegate(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var operand = Evaluate(expression.Children[0], generated);
+            if (operand.Failed || operand.Value is not long value)
+            {
+                return GeneratedEvaluation.Failure;
             }
 
-            void Count(GeneratedCSharpExpression current)
+            try
             {
-                switch (current.Kind)
+                return new(false, checked(-value));
+            }
+            catch (OverflowException)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+        }
+
+        private GeneratedEvaluation EvaluateConditional(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var condition = Evaluate(expression.Children[0], generated);
+            if (condition.Failed || condition.Value is not bool value)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            return Evaluate(
+                expression.Children[value ? 1 : 2],
+                generated);
+        }
+
+        private GeneratedEvaluation EvaluateLogical(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var left = Evaluate(expression.Children[0], generated);
+            if (left.Failed || left.Value is not bool leftValue)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            var shortCircuits = expression.Kind == GeneratedExpressionKind.AndAlso
+                ? !leftValue
+                : leftValue;
+            if (shortCircuits)
+            {
+                return new(false, leftValue);
+            }
+
+            var right = Evaluate(expression.Children[1], generated);
+            return right.Failed || right.Value is not bool rightValue
+                ? GeneratedEvaluation.Failure
+                : new(false, rightValue);
+        }
+
+        private GeneratedEvaluation EvaluateStringConcat(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var left = Evaluate(expression.Children[0], generated);
+            if (left.Failed)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            var right = Evaluate(expression.Children[1], generated);
+            return right.Failed
+                ? GeneratedEvaluation.Failure
+                : new(false,
+                    (left.Value as string ?? string.Empty) +
+                    (right.Value as string ?? string.Empty));
+        }
+
+        private GeneratedEvaluation EvaluateLength(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var operand = Evaluate(expression.Children[0], generated);
+            if (operand.Failed || operand.Value == null)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            return operand.Value switch
+            {
+                string text => new(false, (long)text.Length),
+                long[] values => new(false, (long)values.Length),
+                _ => GeneratedEvaluation.Failure
+            };
+        }
+
+        private GeneratedEvaluation EvaluateArrayIndex(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var values = Evaluate(expression.Children[0], generated);
+            if (values.Failed || values.Value is not long[] array)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            var index = Evaluate(expression.Children[1], generated);
+            if (index.Failed || index.Value is not long offset ||
+                offset < 0 || offset >= array.Length)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            return new(false, array[(int)offset]);
+        }
+
+        private GeneratedEvaluation EvaluateCastToString(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var operand = Evaluate(expression.Children[0], generated);
+            return operand.Failed ||
+                operand.Value != null && operand.Value is not string
+                ? GeneratedEvaluation.Failure
+                : operand;
+        }
+
+        private GeneratedEvaluation EvaluateArithmetic(
+            GeneratedCSharpExpression expression,
+            GeneratedCSharpCase generated)
+        {
+            var left = Evaluate(expression.Children[0], generated);
+            if (left.Failed)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            var right = Evaluate(expression.Children[1], generated);
+            if (right.Failed)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            if (expression.Kind is GeneratedExpressionKind.Equal or
+                GeneratedExpressionKind.NotEqual)
+            {
+                var equal = Equals(left.Value, right.Value);
+                return new(false,
+                    expression.Kind == GeneratedExpressionKind.Equal
+                        ? equal
+                        : !equal);
+            }
+
+            if (left.Value is not long leftInteger ||
+                right.Value is not long rightInteger)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+
+            try
+            {
+                return expression.Kind switch
                 {
-                    case GeneratedExpressionKind.TextParameter:
-                        textParameters++;
-                        break;
-                    case GeneratedExpressionKind.StringLiteral:
-                        stringLiterals++;
-                        break;
-                    case GeneratedExpressionKind.NullString:
-                        nullStrings++;
-                        break;
-                    case GeneratedExpressionKind.StringConcat:
-                        stringConcatenations++;
-                        break;
-                    case GeneratedExpressionKind.Length
-                        when current.Children[0].Type ==
-                             GeneratedExpressionType.String:
-                        stringLengths++;
-                        break;
-                    case GeneratedExpressionKind.Length:
-                        arrayLengths++;
-                        break;
-                    case GeneratedExpressionKind.CastToString:
-                        stringCasts++;
-                        break;
-                    case GeneratedExpressionKind.ArrayIndex:
-                        arrayIndexes++;
-                        break;
-                }
+                    GeneratedExpressionKind.Add =>
+                        new(false, checked(leftInteger + rightInteger)),
+                    GeneratedExpressionKind.Subtract =>
+                        new(false, checked(leftInteger - rightInteger)),
+                    GeneratedExpressionKind.Multiply =>
+                        new(false, checked(leftInteger * rightInteger)),
+                    GeneratedExpressionKind.Divide =>
+                        new(false, checked(leftInteger / rightInteger)),
+                    GeneratedExpressionKind.Remainder =>
+                        new(false, checked(leftInteger % rightInteger)),
+                    GeneratedExpressionKind.LessThan =>
+                        new(false, leftInteger < rightInteger),
+                    GeneratedExpressionKind.LessThanOrEqual =>
+                        new(false, leftInteger <= rightInteger),
+                    GeneratedExpressionKind.GreaterThan =>
+                        new(false, leftInteger > rightInteger),
+                    GeneratedExpressionKind.GreaterThanOrEqual =>
+                        new(false, leftInteger >= rightInteger),
+                    _ => GeneratedEvaluation.Failure
+                };
+            }
+            catch (ArithmeticException)
+            {
+                return GeneratedEvaluation.Failure;
+            }
+        }
+
+        private void Count(GeneratedCSharpExpression current)
+        {
+            switch (current.Kind)
+            {
+                case GeneratedExpressionKind.TextParameter:
+                    _textParameters++;
+                    break;
+                case GeneratedExpressionKind.StringLiteral:
+                    _stringLiterals++;
+                    break;
+                case GeneratedExpressionKind.NullString:
+                    _nullStrings++;
+                    break;
+                case GeneratedExpressionKind.StringConcat:
+                    _stringConcatenations++;
+                    break;
+                case GeneratedExpressionKind.Length
+                    when current.Children[0].Type ==
+                         GeneratedExpressionType.String:
+                    _stringLengths++;
+                    break;
+                case GeneratedExpressionKind.Length:
+                    _arrayLengths++;
+                    break;
+                case GeneratedExpressionKind.CastToString:
+                    _stringCasts++;
+                    break;
+                case GeneratedExpressionKind.ArrayIndex:
+                    _arrayIndexes++;
+                    break;
             }
         }
     }
