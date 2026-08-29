@@ -2,15 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 5. HIGH - Inherited instance members receive receiver-dependent identities, breaking aliasing
-
-- File: `SharpProof.Frontend/RoslynOperationLowerer.cs`
-- Member: `GetMember`
-- Lines: 167-177, especially 173
-- Mechanism: The code uses `receiver.Type` as `DeclaringType` instead of the symbol's declaring type. `GetOrCreateMember` keys on `DeclaringType`, so one inherited field or method gets distinct IDs through Base-typed and Derived-typed receivers.
-- Impact: The same physical field can be modeled as separate locations, and summary matching can fail.
-- Safe reproduction/evidence: Alias `Base b` and `Derived d` to the same object, set `b.Value=1`, then `d.Value=2`, and read `b.Value`. C# returns 2, but member-keyed IR can retain 1. `ProgramLoweringTests.cs` lines 472-509 currently classify receiver-typed behavior as exact.
-
 ## 6. MEDIUM - Named arguments passed to expression-level opaque invocations in source order
 
 - File: `SharpProof.Frontend/RoslynOperationLowerer.cs`

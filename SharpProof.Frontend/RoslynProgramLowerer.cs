@@ -271,7 +271,7 @@ public sealed class RoslynProgramLowerer(
             var resultType = _expressions.GetTypeId(invocation.Type);
             var hasSupportedResult = invocation.TargetMethod.ReturnsVoid ||
                 CompilerIdentityBridge.IsSupportedValueDomain(invocation.Type);
-            var member = _expressions.GetMember(invocation.TargetMethod, receiver, "call:", invocation.Type, arguments);
+            var member = _expressions.GetMember(invocation.TargetMethod, ref receiver, "call:", invocation.Type, arguments);
             var isDirect = IsDirectInvocation(invocation);
             if (!isDirect)
             {
@@ -339,7 +339,7 @@ public sealed class RoslynProgramLowerer(
                 {
                     case IFieldReferenceOperation field:
                         var fieldReceiver = LowerOptionalValue(block, operation, field.Instance);
-                        var fieldMember = _expressions.GetMember(field.Field, fieldReceiver, "field:", field.Type);
+                        var fieldMember = _expressions.GetMember(field.Field, ref fieldReceiver, "field:", field.Type);
                         return LocationLowering.FromLocation(_builder.MemberLocation(fieldMember, fieldReceiver));
                     case IPropertyReferenceOperation property:
                         _ = LowerOptionalValue(block, operation, property.Instance);

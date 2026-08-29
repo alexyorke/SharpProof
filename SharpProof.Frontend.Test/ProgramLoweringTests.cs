@@ -510,6 +510,39 @@ public sealed class ProgramLoweringTests
         }
     }
 
+    [Test]
+    public void InheritedInstanceMembersShareIdentityAcrossReceiverTypes()
+    {
+        var lowered = Lower(
+            """
+            private class Base {
+                public long Value;
+            }
+            private sealed class Derived : Base {
+            }
+            private static long Target(Base baseValue, Derived derivedValue) {
+                baseValue.Value = 1L;
+                derivedValue.Value = 2L;
+                return baseValue.Value;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var members = instructions
+            .OfType<IrStoreInstruction>()
+            .Select(static instruction => (IrMemberLocation)instruction.Location)
+            .Select(static location => location.Member)
+            .Concat(instructions
+                .OfType<IrLoadInstruction>()
+                .Select(static instruction => (IrMemberLocation)instruction.Location)
+                .Select(static location => location.Member))
+            .ToArray();
+
+        Assert.That(members, Has.Length.EqualTo(3));
+        Assert.That(members.Distinct().ToArray(), Has.Length.EqualTo(1));
+    }
+
     private static string Shape(IrProgram program)
     {
         return string.Join(
