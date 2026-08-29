@@ -977,9 +977,10 @@ internal static class CompilerImplementationIlSummaryLowerer
 
             var terms = arguments.Select(static value => value.Term)
                 .ToArray();
+            IrTerm? receiver = null;
             var member = _mapper.GetMember(
                 target,
-                receiver: null,
+                ref receiver,
                 "call:",
                 target.ReturnType,
                 terms);

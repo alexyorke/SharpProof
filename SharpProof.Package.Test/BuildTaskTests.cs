@@ -573,6 +573,60 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void PublishedResultValidatorRejectsACompleteResponseWithoutPayload()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-result-structure-");
+        try
+        {
+            var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
+            var request = Path.Combine(directory.FullName, "request.json");
+            var result = Path.Combine(directory.FullName, "result.json");
+            File.WriteAllText(manifest, "{}");
+            var manifestHash = Convert.ToHexString(
+                SHA256.HashData(File.ReadAllBytes(manifest)));
+            var requestJson = JsonSerializer.Serialize(new
+            {
+                protocolVersion = "11",
+                compilerManifest = new { path = manifest, sha256 = manifestHash },
+                budgets = new { },
+                cache = new { },
+                verifyPolicy = "Advisory",
+                assumptionPolicy = "Allow"
+            });
+            File.WriteAllText(request, requestJson);
+            var requestHash = Convert.ToHexString(
+                SHA256.HashData(File.ReadAllBytes(request)));
+            File.WriteAllText(
+                result,
+                JsonSerializer.Serialize(new
+                {
+                    protocolVersion = "11",
+                    requestHash,
+                    inputHash = new string('z', 64),
+                    runStatus = "Complete"
+                }));
+
+            var engine = new RecordingBuildEngine();
+            var task = new ValidatePublishedVerificationResult
+            {
+                BuildEngine = engine,
+                RequestPath = request,
+                ResultPath = result,
+                ManifestPath = manifest
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            Assert.That(engine.Errors, Is.Not.Empty);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void CanceledVerifierTaskDoesNotLaunchAProcess()
     {
         var engine = new RecordingBuildEngine();

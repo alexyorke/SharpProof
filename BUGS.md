@@ -18,15 +18,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: The output set cannot recover through the public reset API; acquire and publish remain unusable until manual metadata cleanup.
 - Safe reproduction/evidence: Use a fixture with at least two markers, inject cancellation or a filesystem failure after the first marker deletion, then retry with `CancellationToken.None`.
 
-## 17. HIGH - Published-result validator accepts a structurally invalid or fabricated Complete result
-
-- File: `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs`
-- Member: `Execute`
-- Lines: 27-67, especially 37-45 and 57-64
-- Mechanism: The validator parses a generic `JsonDocument` and checks only `protocolVersion`, `requestHash`, `inputHash` length, and `runStatus`. It never deserializes or validates the full `WorkerVerifyResponse`, and a 64-character `inputHash` need not be hexadecimal.
-- Impact: A result lacking manifest, callable or claim results, summary, errors, or failure reason can pass final publication validation.
-- Safe reproduction/evidence: Use a test fixture with the correct request hash, protocol 11, `runStatus` of `Complete`, an arbitrary 64-character `inputHash`, and no other response fields.
-
 ## 18. HIGH - Worker and cache identity exclude the native Z3 solver
 
 - File: `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs`

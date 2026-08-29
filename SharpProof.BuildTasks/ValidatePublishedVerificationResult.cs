@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Build.Framework;
 using SharpProof.Host;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.BuildTasks;
 
@@ -16,56 +18,104 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
     [Required]
     public string ManifestPath { get; set; } = string.Empty;
 
+    public string? SarifPath { get; set; }
+
+    public string? ProjectDirectory { get; set; }
+
+    public string? InvocationResultPath { get; set; }
+
     public override bool Execute()
     {
         try
         {
-            var requestPath = LinuxPathIdentity.RequireLocalPath(RequestPath);
-            var resultPath = LinuxPathIdentity.RequireLocalPath(ResultPath);
-            var manifestPath = LinuxPathIdentity.RequireLocalPath(ManifestPath);
+            var projectDirectory = Path.GetFullPath(
+                string.IsNullOrWhiteSpace(ProjectDirectory)
+                    ? Environment.CurrentDirectory
+                    : ProjectDirectory);
+            string ResolvePath(string path)
+            {
+                return LinuxPathIdentity.RequireLocalPath(
+                    Path.IsPathRooted(path)
+                        ? path
+                        : Path.Combine(projectDirectory, path));
+            }
+
+            var requestPath = ResolvePath(RequestPath);
+            var resultPath = ResolvePath(ResultPath);
+            var manifestPath = ResolvePath(ManifestPath);
+            WorkerVerifyResponse? invocationResponse = null;
+            if (!string.IsNullOrWhiteSpace(InvocationResultPath))
+            {
+                var invocationPath = ResolvePath(InvocationResultPath!);
+                invocationResponse = WorkerProtocolJson.DeserializeResponse(
+                    DecodeUtf8(File.ReadAllBytes(invocationPath)));
+                if (invocationResponse == null ||
+                    !WorkerProtocolJson.Validate(invocationResponse).IsValid ||
+                    invocationResponse.RunStatus != WorkerRunStatus.Complete)
+                {
+                    throw new InvalidDataException(
+                        "the private invocation result does not satisfy the worker protocol");
+                }
+            }
             var requestBytes = File.ReadAllBytes(requestPath);
-            using var request = JsonDocument.Parse(requestBytes);
-            using var response = JsonDocument.Parse(File.ReadAllBytes(resultPath));
-            var requestRoot = request.RootElement;
-            var responseRoot = response.RootElement;
-            if (requestRoot.ValueKind != JsonValueKind.Object ||
-                responseRoot.ValueKind != JsonValueKind.Object ||
-                !requestRoot.TryGetProperty("compilerManifest", out var compilerManifest) ||
-                compilerManifest.ValueKind != JsonValueKind.Object ||
-                !compilerManifest.TryGetProperty("path", out var manifestPathProperty) ||
-                !compilerManifest.TryGetProperty("sha256", out var manifestHashProperty) ||
-                !responseRoot.TryGetProperty("requestHash", out var requestHashProperty) ||
-                !responseRoot.TryGetProperty("inputHash", out var inputHashProperty) ||
-                !responseRoot.TryGetProperty("runStatus", out var runStatusProperty) ||
-                !requestRoot.TryGetProperty("protocolVersion", out var requestProtocol) ||
-                !responseRoot.TryGetProperty("protocolVersion", out var responseProtocol) ||
-                requestProtocol.GetString() != "11" ||
-                responseProtocol.GetString() != "11" ||
-                inputHashProperty.GetString()?.Length != 64 ||
-                runStatusProperty.GetString() != "Complete")
+            var request = WorkerProtocolJson.DeserializeRequest(
+                DecodeUtf8(requestBytes));
+            if (request == null || !WorkerProtocolJson.Validate(request).IsValid)
             {
                 throw new InvalidDataException(
-                    "the request or result does not satisfy the worker protocol");
+                    "the published request does not satisfy the worker protocol");
+            }
+            var response = WorkerProtocolJson.DeserializeResponse(
+                DecodeUtf8(File.ReadAllBytes(resultPath)));
+            var expectedInputHash = invocationResponse?.InputHash;
+            var expectedManifest = invocationResponse?.Manifest;
+            if (response == null ||
+                !(invocationResponse == null
+                    ? WorkerProtocolJson.Validate(response)
+                    : WorkerProtocolJson.Validate(
+                        response,
+                        expectedInputHash!,
+                        expectedManifest)).IsValid ||
+                response.RunStatus != WorkerRunStatus.Complete)
+            {
+                throw new InvalidDataException(
+                    "the published result does not satisfy the worker protocol");
             }
 
             var manifestBytes = File.ReadAllBytes(manifestPath);
             var manifestHash = Convert.ToHexString(
                 SHA256.HashData(manifestBytes));
             if (!string.Equals(
-                    Path.GetFullPath(manifestPathProperty.GetString() ?? string.Empty),
+                    ResolvePath(request.CompilerManifest.Path),
                     manifestPath,
                     StringComparison.Ordinal) ||
                 !string.Equals(
-                    manifestHashProperty.GetString(),
+                    request.CompilerManifest.Sha256,
                     manifestHash,
                     StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(
-                    requestHashProperty.GetString(),
-                    Convert.ToHexString(SHA256.HashData(requestBytes)),
+                    response.RequestHash,
+                    WorkerProtocolJson.ComputeRequestHash(request),
                     StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException(
                     "the result is not bound to the exact published request and compiler manifest");
+            }
+            if (invocationResponse != null)
+            {
+                var invocationRequestHash = invocationResponse.RequestHash;
+                invocationResponse.RequestHash = response.RequestHash;
+                var invocationJson = WorkerProtocolJson.SerializeResponse(
+                    invocationResponse);
+                invocationResponse.RequestHash = invocationRequestHash;
+                if (!string.Equals(
+                        invocationJson,
+                        WorkerProtocolJson.SerializeResponse(response),
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "the published result does not belong to this invocation");
+                }
             }
         }
         catch (Exception exception) when (exception is
@@ -79,4 +129,19 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
 
         return !Log.HasLoggedErrors;
     }
+
+    private static string DecodeUtf8(byte[] bytes)
+    {
+        var offset = bytes.Length >= 3 &&
+            bytes[0] == 0xEF &&
+            bytes[1] == 0xBB &&
+            bytes[2] == 0xBF
+            ? 3
+            : 0;
+        return new UTF8Encoding(false, true).GetString(
+            bytes,
+            offset,
+            bytes.Length - offset);
+    }
+
 }
