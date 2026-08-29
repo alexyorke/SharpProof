@@ -53,28 +53,39 @@ internal static partial class RequiresCallSiteAnalyzer
         var initializer = declaration.BaseList?.Types
             .OfType<PrimaryConstructorBaseTypeSyntax>()
             .SingleOrDefault();
+        IMethodSymbol? target;
+        ImmutableArray<IArgumentOperation?> arguments;
+        IOperation? origin;
+        SyntaxNode callSiteSyntax;
         if (initializer == null)
         {
-            return AnalyzerSemanticOutcome.NotApplicable;
+            target = TryGetImplicitParameterlessBaseConstructor(constructor);
+            arguments = [];
+            origin = null;
+            callSiteSyntax = declaration;
         }
-
-        var initializerOperation = semanticModel.GetOperation(
-            initializer,
-            cancellationToken);
-        var target = initializerOperation is IInvocationOperation invocation
-            ? invocation.TargetMethod
-            : semanticModel.GetSymbolInfo(initializer, cancellationToken)
-                .Symbol as IMethodSymbol;
-        var arguments = initializerOperation is IInvocationOperation baseCallOperation
-            ? baseCallOperation.Arguments.Cast<IArgumentOperation?>().ToImmutableArray()
-            : initializer.ArgumentList.Arguments
-                .Select(argument => semanticModel.GetOperation(
-                    argument,
-                    cancellationToken) as IArgumentOperation)
-                .ToImmutableArray();
-        var origin = initializerOperation ??
-            (arguments.IsDefaultOrEmpty ? null : arguments[0]);
-        if (target == null || origin == null ||
+        else
+        {
+            var initializerOperation = semanticModel.GetOperation(
+                initializer,
+                cancellationToken);
+            target = initializerOperation is IInvocationOperation invocation
+                ? invocation.TargetMethod
+                : semanticModel.GetSymbolInfo(initializer, cancellationToken)
+                    .Symbol as IMethodSymbol;
+            arguments = initializerOperation is IInvocationOperation baseCallOperation
+                ? baseCallOperation.Arguments.Cast<IArgumentOperation?>()
+                    .ToImmutableArray()
+                : initializer.ArgumentList.Arguments
+                    .Select(argument => semanticModel.GetOperation(
+                        argument,
+                        cancellationToken) as IArgumentOperation)
+                    .ToImmutableArray();
+            origin = initializerOperation ??
+                (arguments.IsDefaultOrEmpty ? null : arguments[0]);
+            callSiteSyntax = initializer;
+        }
+        if (target == null || initializer != null && origin == null ||
             arguments.Any(static argument => argument == null))
         {
             return AnalyzerSemanticOutcome.Unknown;
@@ -82,6 +93,7 @@ internal static partial class RequiresCallSiteAnalyzer
 
         var baseCall = new RequiresCallSiteCandidate(
             origin,
+            callSiteSyntax,
             target,
             Instance: null,
             arguments.OfType<IArgumentOperation>().ToImmutableArray(),
@@ -116,10 +128,10 @@ internal static partial class RequiresCallSiteAnalyzer
                              .CreateUnflowedCandidates(operation))
                 {
                     if (!nestedCalls.Any(existing =>
-                            existing.Operation.Syntax.SyntaxTree ==
-                                call.Operation.Syntax.SyntaxTree &&
-                            existing.Operation.Syntax.Span ==
-                                call.Operation.Syntax.Span &&
+                            existing.Syntax.SyntaxTree ==
+                                call.Syntax.SyntaxTree &&
+                            existing.Syntax.Span ==
+                                call.Syntax.Span &&
                             SymbolEqualityComparer.Default.Equals(
                                 existing.TargetMethod,
                                 call.TargetMethod)))
@@ -149,6 +161,26 @@ internal static partial class RequiresCallSiteAnalyzer
                     baseCall,
                     requireCallerOwnership: false))
             : outcome;
+    }
+
+    private static IMethodSymbol? TryGetImplicitParameterlessBaseConstructor(
+        IMethodSymbol constructor)
+    {
+        if (constructor is not
+            {
+                MethodKind: MethodKind.Constructor,
+                IsStatic: false,
+                ContainingType.TypeKind: TypeKind.Class
+            })
+        {
+            return null;
+        }
+
+        var candidates = constructor.ContainingType.BaseType?
+            .InstanceConstructors
+            .Where(static candidate => candidate.Parameters.IsEmpty)
+            .ToImmutableArray() ?? [];
+        return candidates.Length == 1 ? candidates[0] : null;
     }
 
     internal static AnalyzerSemanticOutcome AnalyzeInitializerCall(
@@ -235,7 +267,7 @@ internal static partial class RequiresCallSiteAnalyzer
         {
             if (requireCallerOwnership && !SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetEnclosingSymbol(
-                        candidate.Operation.Syntax.SpanStart, cancellationToken),
+                        candidate.Syntax.SpanStart, cancellationToken),
                     caller))
             {
                 return AnalyzerSemanticOutcome.NotApplicable;
@@ -257,7 +289,7 @@ internal static partial class RequiresCallSiteAnalyzer
             {
                 SharpProofControlAttributePolicy.ReportRejectedContractApi(
                     contractTarget.Name,
-                    candidate.Operation.Syntax.GetLocation(),
+                    candidate.Syntax.GetLocation(),
                     reportDiagnostic);
                 return AnalyzerSemanticOutcome.Unknown;
             }
@@ -299,7 +331,7 @@ internal static partial class RequiresCallSiteAnalyzer
             BoundMethodContracts contracts,
             ImmutableArray<BoundContractClause> requires)
         {
-            if (candidate.Flow == null)
+            if (candidate.Flow == null || candidate.Operation == null)
             {
                 return AnalyzerSemanticOutcome.Unknown;
             }
@@ -479,7 +511,7 @@ internal static partial class RequiresCallSiteAnalyzer
                     printer ??= new IrPrinter(_factory);
                     reportDiagnostic(Diagnostic.Create(
                         GeneratedDiagnosticDescriptors.RequiresNotProvenRule,
-                        callSite.Operation.Syntax.GetLocation(),
+                        callSite.Syntax.GetLocation(),
                         callSite.TargetMethod.Name,
                         printer.Print(evaluation.Condition)));
                 }

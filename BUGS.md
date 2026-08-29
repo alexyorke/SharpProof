@@ -2,13 +2,6 @@
 
 This section records the coordinator's unverified compilation of findings from exactly 10 read-only auditors. The central writer did not inspect or reverify the code. Auditor coverage: Analyzer/Core (4), Frontend/IR (4), Dataflow/Effects (2), Contracts/Specs/Summaries (2), SMT/Verifier (2), Worker/Host/Verify (2), Compiler/Build/Generators (4), Gates/Package/Meta (3), Tests/Fuzz/Misc (4), and Scripts/CI (1).
 
-## 2. HIGH - Implicit parameterless base calls skipped for primary constructors
-
-- Files and members: `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, `AnalyzePrimaryConstructorInitializer`, lines 53-59; `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`, `TryGetImplicitParameterlessBaseConstructor`, lines 379-395.
-- Mechanism: The primary-constructor path returns `NotApplicable` unless explicit `Base(...)` syntax exists; the ordinary implicit path accepts only `ConstructorDeclarationSyntax`, not `TypeDeclarationSyntax`.
-- Impact: A false `Contract.Requires` in the implicit `Base()` call is not checked.
-- Safe reproduction/evidence: Use a `Base` parameterless constructor containing `Requires(false)` with `sealed class Derived() : Base {}`.
-
 ## 3. HIGH - Implemented partial target methods falsely treated as ambiguous ContractFor members
 
 - File: `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs`

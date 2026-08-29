@@ -34,7 +34,8 @@ internal readonly partial record struct LanguageSubsetDecision(
 );
 
 internal readonly partial record struct RequiresCallSiteCandidate(
-    IOperation Operation,
+    IOperation? Operation,
+    SyntaxNode Syntax,
     IMethodSymbol TargetMethod,
     IOperation? Instance,
     ImmutableArray<IArgumentOperation> Arguments,

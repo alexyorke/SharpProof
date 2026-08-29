@@ -53,7 +53,8 @@
           "modifiers": ["readonly"],
           "name": "RequiresCallSiteCandidate",
           "parameters": [
-            {"type": "IOperation", "name": "Operation"},
+            {"type": "IOperation?", "name": "Operation"},
+            {"type": "SyntaxNode", "name": "Syntax"},
             {"type": "IMethodSymbol", "name": "TargetMethod"},
             {"type": "IOperation?", "name": "Instance"},
             {"type": "ImmutableArray<IArgumentOperation>", "name": "Arguments"},

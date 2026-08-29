@@ -117,6 +117,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationRoot!;
             callSites.Add(new RequiresCallSiteCandidate(
                 origin,
+                origin.Syntax,
                 baseConstructor,
                 Instance: null,
                 Arguments: [],
@@ -187,6 +188,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     }
                     var candidate = new RequiresCallSiteCandidate(
                         operation,
+                        operation.Syntax,
                         call.TargetMethod,
                         call.Instance,
                         call.Arguments,
@@ -204,9 +206,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status);
                     var existingIndex = callSites.FindIndex(existing =>
-                        existing.Operation.Syntax.SyntaxTree ==
+                        existing.Syntax.SyntaxTree ==
                             operation.Syntax.SyntaxTree &&
-                        existing.Operation.Syntax.Span ==
+                        existing.Syntax.Span ==
                             operation.Syntax.Span &&
                         SymbolEqualityComparer.Default.Equals(
                             existing.TargetMethod,
@@ -246,9 +248,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                          call.TargetMethod.MethodKind == MethodKind.PropertySet))
             {
                 if (callSites.Any(existing =>
-                        existing.Operation.Syntax.SyntaxTree ==
+                        existing.Syntax.SyntaxTree ==
                             property.Syntax.SyntaxTree &&
-                        existing.Operation.Syntax.Span == property.Syntax.Span &&
+                        existing.Syntax.Span == property.Syntax.Span &&
                         SymbolEqualityComparer.Default.Equals(
                             existing.TargetMethod,
                             call.TargetMethod)))
@@ -258,6 +260,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
                 callSites.Add(new RequiresCallSiteCandidate(
                     property,
+                    property.Syntax,
                     call.TargetMethod,
                     call.Instance,
                     call.Arguments,
@@ -270,7 +273,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
         return [
             .. callSites.OrderBy(
-                static candidate => candidate.Operation.Syntax.SpanStart)
+                static candidate => candidate.Syntax.SpanStart)
         ];
     }
 
@@ -753,6 +756,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         return [.. GetCalls(operation).Select(call =>
             new RequiresCallSiteCandidate(
                 operation,
+                operation.Syntax,
                 call.TargetMethod,
                 call.Instance,
                 call.Arguments,
