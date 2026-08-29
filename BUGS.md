@@ -6,7 +6,7 @@ This file is the current, evidence-backed status ledger for the repository audit
 
 The latest audit wave ran against exact baseline
 `ffe74fff1c852d073610cfbebc54c141521a25fb`. Its ten subsystem reports contain
-45 candidate findings below. Each candidate remains open until the main agent
+44 candidate findings below. Each candidate remains open until the main agent
 independently reproduces it, adds a regression test, implements the fix, and
 removes the detailed entry in the corresponding fix commit.
 
@@ -43,6 +43,10 @@ The following findings concern cybersecurity, raceable trust decisions, or files
   in argument slot zero, not as a reduced method requiring `Instance`. Direct
   candidate assertions and satisfied/violated analyzer cases disprove the
   reported receiver loss.
+- **Latest Scout 1, Finding 4:** Profile Off intentionally means no SharpProof
+  analysis: package targets omit analyzer/generator items, no session is
+  constructed, and existing generated-companion coverage requires silence. The
+  adjacent comment now explicitly limits its invariant to later non-Off exits.
 
 ## Resolved in this branch
 
@@ -93,29 +97,11 @@ The deferred security/containment findings addressed in this branch have dedicat
 
 ## Active, deferred, and rejected findings
 
-The 45 detailed findings below are pending independent reproduction and TDD
+The 44 detailed findings below are pending independent reproduction and TDD
 resolution. Historical findings remain represented by the compact resolution
 and reclassification ledgers above.
 
 ## [Bug hunt 2026-08-29T18:40:38Z] Scout 1 — Core analyzer logic (SharpProof.Analyzer.Core, SharpProof.Analyzer)
-
-## Finding 4 — `ContractFor` companion validation is skipped under `sharpproof_profile=off`, contradicting the adjacent comment
-- **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\SharpProofAnalyzerEngine.cs`
-- **Function/method + containing type:** `InitializeCompilation` in sealed partial class `SharpProofAnalyzerEngine`
-- **Line number(s):** 41–51 (Off-profile early return) vs. 53–59 (registration it claims precedes all early returns)
-- **Bug description:** The comment states the companion validator is registered "before configuration/activation early returns so invalid companions are never hidden by an unrelated configuration diagnostic" — but the `SharpProofProfile.Off` early return at lines 41–51 executes **before** `context.RegisterCompilationEndAction(ValidateContractForCompanions)` at line 58. With `sharpproof_profile=off`, every `[ContractFor]` companion is completely unvalidated (no SPCF0001–SPCF0008 diagnostics), which is exactly the "hidden by configuration" scenario the comment says must not happen. Either the early return is wrong (Off should still validate companions) or the comment is stale; as written the behavior contradicts the stated invariant.
-- **Code excerpt:**
-```csharp
-if (configuration.Profile == SharpProofProfile.Off)
-{
-    if (!configurationDiagnostics.IsEmpty) { ... }
-    return;                       // skips the registration below
-}
-// ContractFor validation is a final-compilation reconciliation. ... Register it
-// before configuration/activation early returns ...
-context.RegisterCompilationEndAction(ValidateContractForCompanions);
-```
-- **Category:** config / logic — **Severity:** medium — **Confidence:** 0.7
 
 ## Finding 5 — `OriginalDefinition` vs. constructed-symbol mismatch breaks nested generic local-function analysis
 - **File:** `C:\w\PurelySharp-bug-hunt\SharpProof.Analyzer.Core\RequiresCallSiteTreeAnalyzer.cs`

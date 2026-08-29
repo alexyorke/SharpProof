@@ -53,8 +53,9 @@ internal sealed partial class SharpProofAnalyzerEngine
         // ContractFor validation is a final-compilation reconciliation. The
         // analyzer is the sole owner so every source tree, including output
         // added by peer generators, is observed exactly once. Register it
-        // before configuration/activation early returns so invalid companions
-        // are never hidden by an unrelated configuration diagnostic.
+        // before the remaining non-Off configuration/activation early returns
+        // so invalid companions are never hidden by an unrelated configuration
+        // diagnostic.
         context.RegisterCompilationEndAction(
             ValidateContractForCompanions);
 
