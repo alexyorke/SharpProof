@@ -1,0 +1,176 @@
+using Microsoft.CodeAnalysis;
+using NUnit.Framework;
+
+namespace SharpProof.Analyzer.Test;
+
+[TestFixture]
+public sealed class ContractForCycleAnalyzerTests
+{
+    private static readonly string[] DiagnosticIds =
+        ["SP0047", "SPCF0009", "SPCF0010"];
+
+    [Test]
+    public async Task SelfTargetIsRejectedAndItsBodyIsAnalyzedAsImplementation()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System;
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(SelfContracts))]
+            public static class SelfContracts
+            {
+                public static int Map(int value)
+                {
+                    Contract.Ensures(true);
+                    Func<int> unsupported = () => value;
+                    return unsupported();
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPCF0009", "SP0047"]));
+        Assert.That(
+            diagnostics[0].GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Is.EqualTo(
+                "Contract companion 'SelfContracts' cannot target itself"));
+    }
+
+    [Test]
+    public async Task MutualCycleRejectsEachEdgeAndAnalyzesBothImplementations()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System;
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(RightContracts))]
+            public static class LeftContracts
+            {
+                public static int Map(int value)
+                {
+                    Contract.Ensures(true);
+                    Func<int> unsupported = () => value;
+                    return unsupported();
+                }
+            }
+
+            [ContractFor(typeof(LeftContracts))]
+            public static class RightContracts
+            {
+                public static int Map(int value)
+                {
+                    Contract.Ensures(true);
+                    Func<int> unsupported = () => value;
+                    return unsupported();
+                }
+            }
+            """);
+
+        var cycleDiagnostics = diagnostics
+            .Where(static diagnostic => diagnostic.Id == "SPCF0010")
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(
+                    ["SPCF0010", "SP0047", "SPCF0010", "SP0047"]));
+            Assert.That(
+                cycleDiagnostics.Select(static diagnostic =>
+                    diagnostic.GetMessage(
+                        System.Globalization.CultureInfo.InvariantCulture)),
+                Is.EqualTo(
+                    [
+                        "Contract companion 'LeftContracts' targets " +
+                        "'RightContracts' in a ContractFor cycle",
+                        "Contract companion 'RightContracts' targets " +
+                        "'LeftContracts' in a ContractFor cycle"
+                    ]));
+        }
+    }
+
+    [Test]
+    public async Task AcyclicCompanionChainRemainsValid()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(MiddleContracts))]
+            public static class OuterContracts
+            {
+                public static int Map(int value) => value;
+            }
+
+            [ContractFor(typeof(Target))]
+            public static class MiddleContracts
+            {
+                public static int Map(int value) => value;
+            }
+
+            public static class Target
+            {
+                public static int Map(int value) => value;
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void MutualCycleCannotSupplyContractsThroughTheBinder()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(RightContracts))]
+            public static class LeftContracts
+            {
+                public static int Map(int value)
+                {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+
+            [ContractFor(typeof(LeftContracts))]
+            public static class RightContracts
+            {
+                public static int Map(int value) => value;
+            }
+            """,
+            []);
+        var target = compilation.GetTypeByMetadataName("RightContracts")!
+            .GetMembers("Map")
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        var binding = new SharpProof.Contracts.ContractBinder(
+            compilation,
+            new SharpProof.Ir.IrFactory()).Bind(target);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(binding.IsSuccess, Is.True);
+            Assert.That(binding.Contracts, Is.Not.Null);
+            Assert.That(binding.Contracts!.UsesCompanion, Is.False);
+            Assert.That(binding.Contracts.Clauses, Is.Empty);
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    binding.Contracts.Source,
+                    target),
+                Is.True);
+        }
+    }
+
+    private static Task<System.Collections.Immutable.ImmutableArray<Diagnostic>>
+        AnalyzeAsync(string source)
+    {
+        return AnalyzerTestHost.AnalyzeAsync(
+            source,
+            mode: "CONTRACTS",
+            enabledIds: DiagnosticIds);
+    }
+}

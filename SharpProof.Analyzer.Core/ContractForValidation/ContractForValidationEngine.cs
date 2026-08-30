@@ -43,11 +43,30 @@ internal static class ContractForValidationEngine
             candidates,
             diagnostics,
             cancellationToken);
+        var relationships = ContractForSymbolMatcher
+            .ClassifyCompanionRelationships(
+                ContractForSymbolMatcher.DiscoverCompanionRelationships(
+                    compilation,
+                    cancellationToken),
+                cancellationToken);
+        var accepted = ImmutableArray.CreateBuilder<ResolvedCompanion>();
+        foreach (var companion in companions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (ContractForCompanionValidator.ValidateRelationship(
+                    companion,
+                    relationships,
+                    diagnostics))
+            {
+                accepted.Add(companion);
+            }
+        }
+
+        companions = accepted.ToImmutable();
         var clauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
         var overlapping = FindOverlappingCompanions(
             companions,
-            ContractForSymbolMatcher.DiscoverCompanions(
-                compilation, cancellationToken),
+            relationships.Accepted,
             cancellationToken);
         foreach (var companion in companions)
         {

@@ -98,6 +98,28 @@ internal static class ContractForDiagnosticDescriptors
         helpLinkUri: "",
         customTags: []);
 
+    internal static readonly DiagnosticDescriptor SelfTarget = new(
+        id: "SPCF0009",
+        title: "ContractFor companion targets itself",
+        messageFormat: "Contract companion '{0}' cannot target itself",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Rejects ContractFor relationships whose companion and target are the same type.",
+        helpLinkUri: "",
+        customTags: []);
+
+    internal static readonly DiagnosticDescriptor CyclicRelationship = new(
+        id: "SPCF0010",
+        title: "Cyclic ContractFor relationship",
+        messageFormat: "Contract companion '{0}' targets '{1}' in a ContractFor cycle",
+        category: "SharpProof.ContractFor.Usage",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Rejects ContractFor relationships that participate in a cycle of companion and target types.",
+        helpLinkUri: "",
+        customTags: []);
+
     internal static readonly ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics = [
         InvalidTarget,
         DuplicateCompanion,
@@ -106,6 +128,8 @@ internal static class ContractForDiagnosticDescriptors
         SignatureMismatch,
         AmbiguousMember,
         BodyRequired,
-        InvalidClausePlacement
+        InvalidClausePlacement,
+        SelfTarget,
+        CyclicRelationship
     ];
 }

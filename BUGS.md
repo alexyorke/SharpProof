@@ -216,13 +216,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Callers can receive a `SemanticModel` with wrong bindings or options, leading to incorrect collection or analysis for source compilation references.
 - Safe evidence: Two leaf compilations built from one shared tree with different references defining the same name differently, both referenced from a root, produce one arbitrary owner in `GetSemanticModel(root, sharedTree)`.
 
-## Wave 5.18. HIGH - ContractFor companion and target cycles are accepted
-
-- Files and members: `SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs`, `ResolveCompanions`, lines 176-189; `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs`, `Validate`, lines 16-29. Downstream: `AnalyzerSession.IsContractCompanion`, lines 137-142; `AnalyzerFeaturePipeline`, lines 185-187.
-- Mechanism: `ResolveCompanions` records every successfully parsed edge, including companion equals target and cycles. The validator checks companion shape and target/candidate surfaces but not distinctness or acyclicity. `[ContractFor(typeof(Self))] public static class Self { public static int M(int x) => x; }` is legal; target and candidate methods are the same symbols, so maps succeed. Two static classes can likewise target each other. `AnalyzerSession.IsContractCompanion` classifies a method solely because its containing type appears as a companion, and `AnalyzerFeaturePipeline` skips operation-block analysis.
-- Impact: Actual executable static methods in self-cycles or mutual cycles evade implementation verification while their bodies are accepted as specifications; calls can resolve contracts through the cycle or self edge.
-- Safe evidence: Deterministic trace: `ResolveCompanions` accepts the self descriptor; `FindOverlappingCompanions` excludes identical type at lines 135-140; `Validate` compares each method to itself; `IsContractCompanion` skips its operation block.
-
 ## Wave 5.20. HIGH - SMT encoding truncates string literals at embedded NUL
 
 - File: `SharpProof.Smt/IrSmtBackend.cs`

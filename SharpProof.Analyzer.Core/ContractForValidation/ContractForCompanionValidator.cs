@@ -6,6 +6,37 @@ namespace SharpProof.ContractForValidation;
 /// </summary>
 internal static class ContractForCompanionValidator
 {
+    internal static bool ValidateRelationship(
+        ResolvedCompanion companion,
+        ContractForSymbolMatcher.CompanionRelationshipInventory relationships,
+        List<Diagnostic> diagnostics)
+    {
+        var issue = relationships.GetIssue(companion.Companion);
+        switch (issue)
+        {
+            case ContractForSymbolMatcher.CompanionRelationshipIssue.None:
+                return true;
+            case ContractForSymbolMatcher.CompanionRelationshipIssue.SelfTarget:
+                diagnostics.Add(At(
+                    ContractForDiagnosticDescriptors.SelfTarget,
+                    companion.AttributeLocation,
+                    companion.Companion.Name));
+                return false;
+            case ContractForSymbolMatcher.CompanionRelationshipIssue.Cycle:
+                diagnostics.Add(At(
+                    ContractForDiagnosticDescriptors.CyclicRelationship,
+                    companion.AttributeLocation,
+                    companion.Companion.Name,
+                    companion.Target.Name));
+                return false;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(relationships),
+                    issue,
+                    "Unknown ContractFor relationship issue.");
+        }
+    }
+
     internal static void Validate(
         ResolvedCompanion companion,
         Compilation compilation,

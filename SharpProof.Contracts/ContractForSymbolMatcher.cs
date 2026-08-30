@@ -2,6 +2,13 @@ namespace SharpProof.Contracts;
 
 internal static class ContractForSymbolMatcher
 {
+    internal enum CompanionRelationshipIssue
+    {
+        None,
+        SelfTarget,
+        Cycle
+    }
+
     internal sealed class CompanionDescriptor(
         INamedTypeSymbol type,
         (INamedTypeSymbol Target, bool IsOpen) contractTarget)
@@ -9,6 +16,31 @@ internal static class ContractForSymbolMatcher
         internal INamedTypeSymbol Type { get; } = type;
         internal (INamedTypeSymbol Target, bool IsOpen) ContractTarget { get; } = contractTarget;
         internal INamedTypeSymbol Target => ContractTarget.Target;
+    }
+
+    internal sealed class CompanionRelationshipInventory(
+        ImmutableArray<CompanionDescriptor> accepted,
+        HashSet<INamedTypeSymbol> selfTargeting,
+        HashSet<INamedTypeSymbol> cyclic)
+    {
+        private readonly HashSet<INamedTypeSymbol> _selfTargeting =
+            selfTargeting;
+        private readonly HashSet<INamedTypeSymbol> _cyclic = cyclic;
+
+        internal ImmutableArray<CompanionDescriptor> Accepted { get; } =
+            accepted;
+
+        internal CompanionRelationshipIssue GetIssue(
+            INamedTypeSymbol companion)
+        {
+            if (_selfTargeting.Contains(companion))
+            {
+                return CompanionRelationshipIssue.SelfTarget;
+            }
+            return _cyclic.Contains(companion)
+                ? CompanionRelationshipIssue.Cycle
+                : CompanionRelationshipIssue.None;
+        }
     }
 
     internal sealed class CompanionResolution(
@@ -110,6 +142,17 @@ internal static class ContractForSymbolMatcher
         Compilation compilation,
         CancellationToken cancellationToken = default)
     {
+        return ClassifyCompanionRelationships(
+                DiscoverCompanionRelationships(compilation, cancellationToken),
+                cancellationToken)
+            .Accepted;
+    }
+
+    internal static ImmutableArray<CompanionDescriptor>
+        DiscoverCompanionRelationships(
+            Compilation compilation,
+            CancellationToken cancellationToken = default)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         var contractFor = ContractSelectionInventory.ForCompilation(compilation).ContractFor;
         if (contractFor == null)
@@ -129,6 +172,92 @@ internal static class ContractForSymbolMatcher
             }
         }
         return result.ToImmutable();
+    }
+
+    internal static CompanionRelationshipInventory
+        ClassifyCompanionRelationships(
+            ImmutableArray<CompanionDescriptor> relationships,
+            CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var comparer = (IEqualityComparer<INamedTypeSymbol>)
+            SymbolEqualityComparer.Default;
+        var byType = new Dictionary<INamedTypeSymbol, CompanionDescriptor>(
+            comparer);
+        foreach (var relationship in relationships)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!byType.ContainsKey(relationship.Type))
+            {
+                byType.Add(relationship.Type, relationship);
+            }
+        }
+
+        var edges = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(
+            comparer);
+        var incoming = byType.Keys.ToDictionary(
+            static type => type,
+            static _ => 0,
+            comparer);
+        foreach (var pair in byType)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var source = pair.Key;
+            var relationship = pair.Value;
+            if (!byType.ContainsKey(relationship.Target))
+            {
+                continue;
+            }
+            edges.Add(source, relationship.Target);
+            incoming[relationship.Target]++;
+        }
+
+        var pending = new Queue<INamedTypeSymbol>(
+            incoming.Where(static pair => pair.Value == 0)
+                .Select(static pair => pair.Key));
+        while (pending.Count != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var source = pending.Dequeue();
+            if (!edges.TryGetValue(source, out var target))
+            {
+                continue;
+            }
+            incoming[target]--;
+            if (incoming[target] == 0)
+            {
+                pending.Enqueue(target);
+            }
+        }
+
+        var accepted = ImmutableArray.CreateBuilder<CompanionDescriptor>();
+        var selfTargeting = new HashSet<INamedTypeSymbol>(comparer);
+        var cyclic = new HashSet<INamedTypeSymbol>(comparer);
+        foreach (var relationship in relationships)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (SymbolEqualityComparer.Default.Equals(
+                    relationship.Type,
+                    relationship.Target))
+            {
+                selfTargeting.Add(relationship.Type);
+            }
+            else if (incoming.TryGetValue(
+                         relationship.Type,
+                         out var remaining) &&
+                     remaining > 0)
+            {
+                cyclic.Add(relationship.Type);
+            }
+            else
+            {
+                accepted.Add(relationship);
+            }
+        }
+        return new CompanionRelationshipInventory(
+            accepted.ToImmutable(),
+            selfTargeting,
+            cyclic);
     }
 
     internal static CompanionResolution ResolveCompanion(
