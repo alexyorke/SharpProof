@@ -27,6 +27,36 @@ try {
     }
     [IO.File]::WriteAllText($unrelated, 'keep')
 
+    $gitRoot = Join-Path $root 'source'
+    [IO.Directory]::CreateDirectory($gitRoot) | Out-Null
+    & git -C $gitRoot init --quiet
+    & git -C $gitRoot config user.name 'SharpProof Fixture'
+    & git -C $gitRoot config user.email 'fixture@sharpproof.invalid'
+    [IO.File]::WriteAllText((Join-Path $gitRoot 'tracked.txt'), 'clean')
+    & git -C $gitRoot add -- tracked.txt
+    & git -C $gitRoot commit --quiet -m baseline
+    if ($LASTEXITCODE -ne 0) {
+        throw 'The fuzz source-state fixture could not create its baseline.'
+    }
+    $expectedCommit = (& git -C $gitRoot rev-parse HEAD).Trim()
+    $actualCommit = Get-SharpProofCleanFuzzSourceCommit `
+        -RepositoryRoot $gitRoot
+    if ($actualCommit -cne $expectedCommit) {
+        throw 'Clean fuzz source state did not retain the exact commit.'
+    }
+    [IO.File]::AppendAllText((Join-Path $gitRoot 'tracked.txt'), 'dirty')
+    $dirtyRejected = $false
+    try {
+        [void](Get-SharpProofCleanFuzzSourceCommit -RepositoryRoot $gitRoot)
+    }
+    catch {
+        $dirtyRejected = $_.Exception.Message -ceq
+            'Fuzz evidence requires a clean tracked repository tree.'
+    }
+    if (-not $dirtyRejected) {
+        throw 'Dirty tracked fuzz source state was accepted.'
+    }
+
     Initialize-SharpProofFuzzEvidence -OutputDirectory $root
     if ([IO.File]::Exists($campaign) -or
         [IO.File]::Exists((Join-Path $root 'rotating-1.stdout.json')) -or
@@ -149,7 +179,7 @@ try {
     }
 
     $failedSummary = [pscustomobject][ordered]@{
-        schemaVersion = 3
+        schemaVersion = 4
         status = 'failed'
         commit = ('0' * 40)
         runs = @([pscustomobject][ordered]@{
@@ -199,7 +229,7 @@ try {
         throw 'Retry did not replace only the owned stable evidence.'
     }
 
-    Write-Host 'Fuzz evidence lifecycle fixtures: 23'
+    Write-Host 'Fuzz evidence lifecycle fixtures: 25'
 }
 finally {
     if ([IO.Directory]::Exists($root)) {

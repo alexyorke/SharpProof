@@ -1,5 +1,31 @@
 Set-StrictMode -Version Latest
 
+function Get-SharpProofCleanFuzzSourceCommit {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $headOutput = @(& git -C $RepositoryRoot rev-parse HEAD)
+    $headExitCode = $LASTEXITCODE
+    $head = if ($headOutput.Count -eq 1) {
+        ([string]$headOutput[0]).Trim()
+    }
+    else {
+        ''
+    }
+    if ($headExitCode -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
+        throw 'Unable to bind fuzz evidence to the exact source commit.'
+    }
+    $dirty = @(& git -C $RepositoryRoot status `
+        --porcelain=v1 --untracked-files=no)
+    if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) {
+        throw 'Fuzz evidence requires a clean tracked repository tree.'
+    }
+    return $head
+}
+
 function Assert-SharpProofFuzzCaseBudget {
     [CmdletBinding()]
     param(

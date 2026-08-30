@@ -22,14 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.25. MEDIUM - Fuzz evidence labels dirty or stale execution as the HEAD commit
-
-- File: `scripts/Invoke-SharpProofFuzzCampaign.ps1`
-- Locations: Top-level current lines 21-43; run construction at 88-103; summary at 193-203
-- Mechanism: The script records `git rev-parse HEAD` but does not reject dirty tracked state or authenticate binaries. It runs existing output with `--no-build` and writes the HEAD SHA regardless of working-tree or binary changes.
-- Impact: A campaign from modified source or stale binaries is attributed to an unchanged commit, weakening reproducibility and freshness.
-- Safe reproduction/evidence: In a disposable checkout, change tracked fuzz/product source or Release output without changing HEAD. The campaign commit remains HEAD. By contrast, `Test-SharpProofMutationCatalog.ps1` lines 21-27 rejects dirty tracked trees.
-
 ## Wave 2.26. MEDIUM - Parallel mutation shard cache does not authenticate receipt contents before merge
 
 - File: `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1`
