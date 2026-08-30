@@ -191,7 +191,7 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 15 currently admits one
+  For an effect candidate, compiler artifact schema 16 currently admits one
   unconditional definite managed object/array allocation event. The worker
   recomputes its constraint and operation identities, checks its source-tree
   identity/span and sealed witness, and independently derives `Allocates`.
@@ -243,7 +243,7 @@ ghost specification evidence.
 ## Closed compiler artifact and remaining limits
 
 During container verification, the production analyzer captures compiler
-artifact schema version 15 from the post-generator compilation. The artifact
+artifact schema version 16 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;

@@ -68,7 +68,7 @@ never used. A main or symbol collision fails closed; any partial publication
 requires a new version rather than reusing remote bytes.
 
 The worker protocol is 11, the cache schema is 13, and compiler artifacts use
-schema 15. The worker consumes sealed compiler artifacts rather than parsing
+schema 16. The worker consumes sealed compiler artifacts rather than parsing
 source or rereading references. The admitted semantic subset and typed
 `Unknown` behavior are documented separately in `SEMANTICS.md` and
 `docs/analysis-limits.md`.

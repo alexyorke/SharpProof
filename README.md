@@ -121,7 +121,7 @@ Current preview wire contracts are:
 - protocol version 11
 - cache schema version 13
 - manifest schema version 4
-- compiler artifact schema version 15
+- compiler artifact schema version 16
 - relational-summary schema version 2
 - specification-pack schema version 1
 
