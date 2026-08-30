@@ -22,13 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.3. MEDIUM - Signed minimum remainder by -1 is treated as overflowing in both SMT and effect analysis
-
-- Files and members: `SharpProof.Smt/IrSmtBackend.cs`, `QueryEncoder.EncodeDivision` and `DivisionDefined`, current lines 514-527 and 618-630; `SharpProof.Effects/OperationEffectScanner.cs`, `IntegralDivisionExceptions`, current lines 516-540.
-- Mechanism: Both implementations share the signed-division min/-1 overflow rule with Remainder. C# division overflows for this pair, but remainder is defined as zero.
-- Impact: SMT postcondition checks abstain as `PostconditionMayBeUndefined`, while effect analysis fabricates `OverflowException` and can falsely reject `DoesNotThrow` or allowed-exception summaries.
-- Safe reproduction/evidence: Prove `long.MinValue % -1 == 0`, or analyze `static long M() => long.MinValue % -1;`. The former returns `Unknown` instead of `Proven`; the latter records an impossible overflow effect although runtime returns zero.
-
 ## Wave 2.4. MEDIUM - Cancellation permanently poisons a reusable SMT backend
 
 - File: `SharpProof.Smt/IrSmtBackend.cs`
