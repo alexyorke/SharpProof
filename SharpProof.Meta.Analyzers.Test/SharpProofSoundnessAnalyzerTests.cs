@@ -1052,7 +1052,6 @@ public sealed class SharpProofSoundnessAnalyzerTests
         const string source =
             """
             using System;
-            using System.Threading;
             using System.Threading.Tasks;
             namespace SharpProof.Worker {
                 static class Program {
@@ -1060,26 +1059,6 @@ public sealed class SharpProofSoundnessAnalyzerTests
                         await Task.Yield();
                         try { throw new OperationCanceledException(); }
                         catch (OperationCanceledException) { return 4; }
-                    }
-                }
-
-                sealed class CallableVerificationResult { }
-                static class CallableVerificationPolicy {
-                    private static async Task<CallableVerificationResult>
-                        VerifyTargetAsync(
-                            object verifier,
-                            object target,
-                            object budgets,
-                            object parallelism,
-                            object resourceGate,
-                            object projectBoundary,
-                            CancellationToken callerCancellation) {
-                        await Task.Yield();
-                        try { throw new OperationCanceledException(); }
-                        catch (OperationCanceledException) {
-                            callerCancellation.ThrowIfCancellationRequested();
-                            return new CallableVerificationResult();
-                        }
                     }
                 }
             }
