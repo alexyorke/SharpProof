@@ -521,6 +521,49 @@ public sealed class ProtocolJsonTests
         }
     }
 
+    [TestCase(
+        WorkerClaimReason.EffectSummaryIncomplete,
+        WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)]
+    [TestCase(
+        WorkerClaimReason.EffectContractNotEstablished,
+        WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)]
+    [TestCase(
+        WorkerClaimReason.ResourceLimit,
+        WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)]
+    [TestCase(
+        WorkerClaimReason.ResourceLimit,
+        WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)]
+    [TestCase(
+        WorkerClaimReason.UnsupportedBody,
+        WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)]
+    [TestCase(
+        WorkerClaimReason.UnsupportedBody,
+        WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)]
+    public void AcceptedUnknownEffectTuplePassesFullResponseValidation(
+        WorkerClaimReason reason,
+        WorkerEffectEvidenceCertainty certainty)
+    {
+        var response = CreateResponse(CreateEffectManifest());
+        SetUnknown(response, reason);
+        response.ClaimResults[0].EffectCertainty = certainty;
+        response.CallableResults[0].Coverage =
+            WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        if (certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+        {
+            response.ClaimResults[0].Assumptions.Single(static assumption =>
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary).Used = true;
+        }
+        response.Summary = CreateSummary(response);
+
+        var validation = WorkerProtocolJson.Validate(response);
+
+        Assert.That(
+            validation.Errors.Select(static error => error.Code),
+            Is.Empty);
+    }
+
     [Test]
     public void VacuityEvidenceIsClosedAndRequiresProofCore()
     {

@@ -238,14 +238,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: A goal comparing those strings for equality becomes UNSAT after goal negation and is returned as proven, while `IrInterpreter` ordinal equality is false. SAT replay cannot catch an UNSAT false proof.
 - Safe evidence: Z3 4.12.2 `Context.cs` lines 2254-2260 and `api_seq.cpp` lines 43-60 distinguish truncating `Z3_mk_string` from length-aware `Z3_mk_lstring`.
 
-## Wave 5.21. HIGH - Response effect-evidence tuple validation rejects six accepted and produced effect states
-
-- File: `SharpProof.Worker.Protocol/ProtocolModel.generated.cs`
-- Members: `WorkerProtocolMetadata.MatchesEffectCertainty`, lines 756-772; `MatchesEffectEvidenceTuple`, lines 773-781
-- Mechanism: `MatchesEffectCertainty` accepts `Unknown+TrustedCompleteBoundary` for `EffectSummaryIncomplete` and `EffectContractNotEstablished`, and `Unknown+{IncompleteMayEffectSummary, TrustedCompleteBoundary}` for `ResourceLimit` and `UnsupportedBody`. `MatchesEffectEvidenceTuple` has rows only for `EffectSummaryIncomplete+Incomplete`, `EffectContractNotEstablished+Complete`, and `Unknown+Unavailable`, omitting all six accepted tuples. `ProtocolJson.ValidateClaimResult` invokes both, so the latter emits `response.effect_evidence` for otherwise supported results.
-- Impact: Legitimate partial or trusted effect-analysis `Unknown` results become `worker.malformed_result` failed runs instead of semantic `Unknown`, breaking effect verification under resource limits, unsupported bodies, and trusted-summary uncertainty.
-- Safe evidence: `EffectClaimResultAssembler.Assemble` passes valid effect-certainty tuples through; `CompilerEffectEvidenceCatalog.SupportedEffectTuples` explicitly includes the six states; `CompilerWireMappings` maps real `ResourceLimit` and `UnsupportedBody` analyzer outcomes. `ProtocolJsonTests.ResourceLimitIncompleteEffectTupleIsAProtocolState` tests only `HasValidEffectCertainty`, not whole-response validation.
-
 ## Wave 5.23. HIGH - Structural package-policy validation does not model evaluated MSBuild behavior
 
 - File and member: `SharpProof.Gates/Performance/PerformanceGate.cs`, `ValidateAdvisoryPackagePolicy(XDocument portableProps, XDocument portableTargets, XDocument verifierProps, XDocument verifierTargets)`, current lines 1209-1451, and `HasAnalyzerItem`, lines 1460-1477.
