@@ -74,6 +74,29 @@ internal sealed class ConversionOwnershipClassifier
         };
     }
 
+    /// <summary>
+    /// Classifies state reachable through a call argument, including reference
+    /// fields copied as part of a managed value type.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ClassifyRegion"/> describes ownership of the value itself.
+    /// That distinction keeps writes to an ordinary by-value struct copy local.
+    /// A call boundary can also write objects referenced by fields of that copy,
+    /// so managed value arguments need a separate reachability classification.
+    /// </remarks>
+    internal EffectRegionSet ClassifyCallArgumentRegion(
+        IOperation? operation)
+    {
+        return operation?.Type is
+        {
+            IsValueType: true,
+            IsUnmanagedType: false,
+            IsRefLikeType: false
+        }
+            ? ClassifyManagedValueReachability(operation)
+            : ClassifyRegion(operation);
+    }
+
     internal EffectRegionSet ClassifyParameter(IParameterSymbol parameter)
     {
         EffectRegionSet declaredRegion;
@@ -109,6 +132,58 @@ internal sealed class ConversionOwnershipClassifier
             _localRegions.TryGetValue(parameter, out var learnedRegions)
                 ? declaredRegion.Union(learnedRegions)
                 : declaredRegion;
+    }
+
+    private EffectRegionSet ClassifyManagedValueReachability(
+        IOperation operation)
+    {
+        return operation switch
+        {
+            IConversionOperation { OperatorMethod: null } conversion =>
+                ClassifyCallArgumentRegion(conversion.Operand),
+            IParenthesizedOperation parenthesized =>
+                ClassifyCallArgumentRegion(parenthesized.Operand),
+            IParameterReferenceOperation parameter =>
+                ReachableParameterRegion(parameter.Parameter),
+            IInstanceReferenceOperation =>
+                EffectRegionSet.Create(EffectRegionId.Receiver),
+            IFieldReferenceOperation { Field.IsStatic: true } =>
+                EffectRegionSet.Create(EffectRegionId.Static()),
+            IFieldReferenceOperation { Instance: { } instance } =>
+                ClassifyCallArgumentRegion(instance),
+            IConditionalOperation conditional =>
+                ClassifyCallArgumentRegion(conditional.WhenTrue).Union(
+                    ClassifyCallArgumentRegion(conditional.WhenFalse)),
+            ICoalesceOperation coalesce =>
+                ClassifyCallArgumentRegion(coalesce.Value).Union(
+                    ClassifyCallArgumentRegion(coalesce.WhenNull)),
+            ITupleOperation tuple =>
+                tuple.Elements.Aggregate(
+                    EffectRegionSet.Empty,
+                    (regions, element) => regions.Union(
+                        ClassifyCallArgumentRegion(element))),
+            IFlowCaptureReferenceOperation capture
+                when _coalesceCaptures.TryResolve(
+                    capture,
+                    out var captured) =>
+                ClassifyCallArgumentRegion(captured),
+            ILiteralOperation or IDefaultValueOperation =>
+                EffectRegionSet.Empty,
+            _ => EffectRegionSet.Unknown
+        };
+    }
+
+    private EffectRegionSet ReachableParameterRegion(
+        IParameterSymbol parameter)
+    {
+        var declaredRegion = ClassifyParameter(parameter);
+        return !declaredRegion.IsEmpty ||
+            !SymbolEqualityComparer.Default.Equals(
+                parameter.ContainingSymbol?.OriginalDefinition,
+                _method.OriginalDefinition)
+                ? declaredRegion
+                : EffectRegionSet.Create(
+                    EffectRegionId.Parameter(parameter.Ordinal));
     }
 
     internal void BuildLocalRegions(

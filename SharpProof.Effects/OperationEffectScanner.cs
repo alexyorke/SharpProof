@@ -355,7 +355,8 @@ internal sealed partial class OperationEffectScanner
         {
             arguments = arguments.SetItem(
                 accessor.Parameters.Length - 1,
-                _conversionOwnership.ClassifyRegion(assignedValue));
+                _conversionOwnership.ClassifyCallArgumentRegion(
+                    assignedValue));
             actualArguments = actualArguments.SetItem(
                 accessor.Parameters.Length - 1,
                 assignedValue);
@@ -650,7 +651,10 @@ internal sealed partial class OperationEffectScanner
         }
 
         var receiverRegion = receiver ??
-            _conversionOwnership.ClassifyRegion(instance);
+            (method.ReducedFrom == null
+                ? _conversionOwnership.ClassifyRegion(instance)
+                : _conversionOwnership.ClassifyCallArgumentRegion(
+                    instance));
         var writeReceiver = UsesDefensiveReceiverCopy(method, instance)
             ? EffectRegionSet.Empty
             : receiverRegion;
@@ -1410,7 +1414,8 @@ internal sealed partial class OperationEffectScanner
             }
 
             result[ordinal] = result[ordinal].Union(
-                _conversionOwnership.ClassifyRegion(argument.Value));
+                _conversionOwnership.ClassifyCallArgumentRegion(
+                    argument.Value));
         }
         return [.. result];
     }
