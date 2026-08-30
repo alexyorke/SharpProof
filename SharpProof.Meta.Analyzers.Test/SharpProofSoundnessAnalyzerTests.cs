@@ -408,6 +408,141 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.EqualTo(3));
     }
 
+    [Test]
+    public async Task SemanticCacheWritesFollowInterfaceAndBaseTypedAliases()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            interface IAnswerStore {
+                Answer this[string key] { set; }
+                Answer Latest { set; }
+                void Write(Answer answer);
+            }
+            abstract class AnswerStoreBase {
+                internal abstract Answer this[string key] { set; }
+                internal abstract Answer Latest { set; }
+                internal abstract void Write(Answer answer);
+            }
+            sealed class ProofCache : AnswerStoreBase, IAnswerStore {
+                Answer IAnswerStore.this[string key] { set { } }
+                Answer IAnswerStore.Latest { set { } }
+                void IAnswerStore.Write(Answer answer) { }
+                internal override Answer this[string key] { set { } }
+                internal override Answer Latest { set { } }
+                internal override void Write(Answer answer) { }
+            }
+            sealed class C {
+                void ThroughInterface(ProofCache cache) {
+                    IAnswerStore store = cache;
+                    store.Write(Answer.Unknown);
+                    store["key"] = Answer.Unknown;
+                    store.Latest = Answer.Unknown;
+                }
+                void ThroughBase(ProofCache cache) {
+                    AnswerStoreBase store = cache;
+                    store.Write(Answer.Unknown);
+                    store["key"] = Answer.Unknown;
+                    store.Latest = Answer.Unknown;
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(6));
+    }
+
+    [Test]
+    public async Task SemanticCacheWritesAnalyzeHelperReturnExpressions()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            static class AnswerSource {
+                internal static Answer Alias() {
+                    var answer = Answer.Unknown;
+                    return answer;
+                }
+                internal static Answer Conditional(bool condition) =>
+                    condition ? Answer.Unknown : Answer.Proven;
+                internal static Answer Switch(int value) => value switch {
+                    0 => Answer.Unknown,
+                    _ => Answer.Proven
+                };
+                internal static Answer Coalesce(Answer? answer) =>
+                    answer ?? Answer.Unknown;
+                internal static Answer Nested() => Alias();
+                internal static Answer AliasProperty {
+                    get {
+                        var answer = Answer.Unknown;
+                        return answer;
+                    }
+                }
+                internal static Answer ConditionalProperty =>
+                    true ? Answer.Unknown : Answer.Proven;
+            }
+            sealed class C {
+                void M(ProofCache cache, bool condition, int value,
+                    Answer? answer) {
+                    cache.Write(AnswerSource.Alias());
+                    cache.Write(AnswerSource.Conditional(condition));
+                    cache.Write(AnswerSource.Switch(value));
+                    cache.Write(AnswerSource.Coalesce(answer));
+                    cache.Write(AnswerSource.Nested());
+                    cache.Write(AnswerSource.AliasProperty);
+                    cache.Write(AnswerSource.ConditionalProperty);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(7));
+    }
+
+    [Test]
+    public async Task WorkerVerifyResponseIsAConservativeSemanticCacheValue()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyResponse { }
+            }
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+                sealed class VerificationCache {
+                    internal static bool IsCacheable(
+                        WorkerVerifyResponse response) => true;
+                    internal void TryWrite(WorkerVerifyResponse response) { }
+                }
+                sealed class C {
+                    void M(VerificationCache cache,
+                        WorkerVerifyResponse response) =>
+                        cache.TryWrite(response);
+                    void Guarded(VerificationCache cache,
+                        WorkerVerifyResponse response) {
+                        if (VerificationCache.IsCacheable(response)) {
+                            cache.TryWrite(response);
+                        }
+                    }
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(1));
+    }
+
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
     public async Task ReportsCSharpExpressionTextConstruction(string source)
     {
@@ -990,6 +1125,49 @@ public sealed class SharpProofSoundnessAnalyzerTests
             diagnostics.Count(static diagnostic =>
                 diagnostic.Id == "SPMETA003"),
             Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task WorkerVerifyAsyncRefKindOverloadDoesNotCrashAnalysis()
+    {
+        const string source =
+            """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyRequest { }
+                sealed class WorkerVerifyResponse { }
+            }
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+                sealed class SharpProofWorker {
+                    internal async Task<WorkerVerifyResponse> VerifyAsync(
+                        WorkerVerifyRequest request,
+                        CancellationToken cancellationToken) {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return new WorkerVerifyResponse();
+                        }
+                    }
+
+                    internal Task<WorkerVerifyResponse> VerifyAsync(
+                        WorkerVerifyRequest request,
+                        ref CancellationToken cancellationToken) =>
+                        Task.FromResult(new WorkerVerifyResponse());
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("AD0001"));
     }
 
     [Test]

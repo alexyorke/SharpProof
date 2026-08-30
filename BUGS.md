@@ -143,15 +143,6 @@ This section records 7 findings from exactly 10 fresh read-only auditors. The re
 
 This section records 34 findings from exactly 30 fresh read-only auditors. The relay compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 5.1. MEDIUM - KnownSymbols construction can crash the meta-analyzer on a legal ref-kind overload
-
-- File: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`
-- Member: `KnownSymbols` constructor
-- Current lines: 515-522, especially `SingleOrDefault` at line 516
-- Mechanism: The predicate identifies `WorkerVerifyAsync` by instance/static status, arity, return type, parameter count, names, and types, but never checks `IParameterSymbol.RefKind`. C# legally permits `VerifyAsync(WorkerVerifyRequest, CancellationToken)` alongside `VerifyAsync(WorkerVerifyRequest, ref CancellationToken)`; both have the same Roslyn parameter `Type` and satisfy the predicate. `SingleOrDefault` then throws `InvalidOperationException` during the compilation-start action, where line 64 creates `KnownSymbols`.
-- Impact: Analyzer failure or AD0001 prevents SPMETA cancellation and soundness enforcement instead of merely declining the audited-boundary exemption.
-- Safe evidence: `RefKind` is absent from lines 516-522, and `SingleOrDefault` throws when more than one element matches.
-
 ## Wave 5.3. HIGH - Compiler response evidence authority does not bind effect outcome, reason, or certainty
 
 - File: `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs`
@@ -588,31 +579,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Mechanism: `MethodOutcomeKey` contains only `MetadataName`, `DeclaredAccessibility`, and the first in-source `SourceSpan.Start`; it omits syntax-tree or file identity, containing symbol, and signature. Same-name and accessibility methods at the same offset in different trees collide and their outcomes are combined.
 - Impact: A multi-tree `Compilation` can produce a false combined outcome, omit a method, or report an incorrect target count. Current direct `CorpusGate` replay is single-tree, limiting present exposure; the `Compilation` overload is unconstrained.
 - Safe evidence: `OpenSourceCorpusRunner`'s multi-tree recorder keys by `SyntaxTree` plus `SourceStart`, demonstrating that tree identity is needed.
-
-## Wave 6.28. HIGH - Interface or base-typed cache receivers bypass cache-soundness analysis
-
-- File: `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs`
-- Members: `AnalyzeWrite`, current lines 16-28, especially 18-22; `AnalyzeAssignment`, lines 30-43, especially 33-37; `IsCacheType`, lines 51-54
-- Mechanism: Analysis is gated by whether the static receiver or containing type's simple `Name` contains `Cache`. A real cache referenced through an interface or base type without that substring is skipped before the unsafe value is examined; property and indexer writes have the same gap.
-- Impact: Routine abstraction or refactoring removes the error-level invariant and permits Unknown or failure answers into an actual cache.
-- Safe evidence: `IAnswerStore store = proofCache; store.Write(Answer.Unknown);` has receiver and containing type `IAnswerStore` and returns before value analysis.
-
-## Wave 6.29. HIGH - Helper return analysis loses unsafe answers behind aliases and compound expressions
-
-- File: `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs`
-- Members: `ResolveProperty`/`ResolveInvocation`, current lines 281-295; `GetReturnedValueNames`, lines 297-327; `IsNonCacheableName`, lines 350-358
-- Mechanism: Returned-value extraction recognizes only a top-level member access, identifier, or object creation, returning raw names without resolving identifier definitions or recursively analyzing conditional, switch, coalesce, or invocation expressions.
-- Impact: Trivial helper extraction or aliasing bypasses SPMETA010 and allows transient or abstaining facts to be cached.
-- Safe evidence: `Answer Resolve(){ var x=Answer.Unknown; return x; } cache.Write(Resolve());` yields name `x`, treated safe. `Answer Resolve(bool b) => b ? Answer.Unknown : Answer.Proven;` yields no names, and method name `Resolve` is treated safe.
-
-## Wave 6.30. HIGH - WorkerVerifyResponse lies outside the semantic-answer cache predicate
-
-- File: `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs`
-- Member: `IsSemanticAnswerType`
-- Current lines: 329-338; context `VerificationCache.TryWriteAsync`, lines 123-139, and `SharpProofWorker` guard, lines 324-332
-- Mechanism: The predicate recognizes SharpProof type names containing `Answer`, `Result`, or `Outcome`; `WorkerVerifyResponse` is excluded. Writes of `WorkerVerifyResponse` therefore cannot produce SPMETA010 even when they contain `TimedOut`, `Failed`, or `Unknown` results.
-- Impact: The non-cacheable-answer invariant is not enforced at the principal persistent cache boundary. The current `SharpProofWorker` guard limits immediate exposure, but deleting, weakening, or bypassing it would evade the analyzer.
-- Safe evidence: `VerificationCache.TryWriteAsync` accepts and serializes `WorkerVerifyResponse`, whose name fails the predicate.
 
 # Read-Only Multi-Agent Bug Audit - Wave 7 - 2026-08-29
 

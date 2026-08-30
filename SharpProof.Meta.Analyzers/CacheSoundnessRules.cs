@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -15,11 +16,19 @@ internal static class CacheSoundnessRules
 
     internal static void AnalyzeWrite(OperationAnalysisContext context, IInvocationOperation invocation)
     {
+        var root = Root(invocation);
         if (!WriteMethods.Contains(invocation.TargetMethod.Name) ||
-            !IsCacheType(invocation.Instance?.Type ?? invocation.TargetMethod.ContainingType) ||
-            !invocation.Arguments.Any(argument => IsNonCacheableSemanticAnswer(
-                argument.Value, Root(argument.Value),
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default))))
+            !IsCacheReceiver(
+                invocation.Instance,
+                invocation.TargetMethod.ContainingType,
+                root,
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)) ||
+            !invocation.Arguments.Any(argument =>
+                !IsGuardedCacheableResponse(invocation, argument.Value) &&
+                IsNonCacheableSemanticAnswer(
+                    argument.Value,
+                    root,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default))))
         {
             return;
         }
@@ -30,10 +39,16 @@ internal static class CacheSoundnessRules
     internal static void AnalyzeAssignment(OperationAnalysisContext context)
     {
         var assignment = (ISimpleAssignmentOperation)context.Operation;
+        var root = Root(assignment);
         if (assignment.Target is not IPropertyReferenceOperation property ||
-            !IsCacheType(property.Instance?.Type ?? property.Property.ContainingType) ||
+            !IsCacheReceiver(
+                property.Instance,
+                property.Property.ContainingType,
+                root,
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)) ||
             !IsNonCacheableSemanticAnswer(
-                assignment.Value, Root(assignment),
+                assignment.Value,
+                root,
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
         {
             return;
@@ -53,6 +68,186 @@ internal static class CacheSoundnessRules
         return type?.Name.IndexOf("Cache", StringComparison.Ordinal) >= 0;
     }
 
+    private static bool IsGuardedCacheableResponse(
+        IInvocationOperation write,
+        IOperation value)
+    {
+        if (!IsWorkerVerifyResponse(value.Type))
+        {
+            return false;
+        }
+
+        for (var current = write.Parent; current != null; current = current.Parent)
+        {
+            if (current is IConditionalOperation conditional &&
+                IsDescendantOf(write, conditional.WhenTrue) &&
+                HasCacheableGuard(conditional.Condition, value))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasCacheableGuard(
+        IOperation condition,
+        IOperation value)
+    {
+        condition = condition switch
+        {
+            IConversionOperation conversion when conversion.OperatorMethod == null =>
+                conversion.Operand,
+            IParenthesizedOperation parenthesized => parenthesized.Operand,
+            _ => condition
+        };
+
+        if (condition is IInvocationOperation
+            {
+                TargetMethod:
+                {
+                    IsStatic: true,
+                    Name: "IsCacheable",
+                    ContainingType: { } containingType
+                }
+            } invocation &&
+            IsCacheType(containingType) &&
+            invocation.Arguments.FirstOrDefault(argument =>
+                argument.Parameter?.Ordinal == 0) is { } response &&
+            IsSameValue(response.Value, value))
+        {
+            return true;
+        }
+
+        return condition is IBinaryOperation
+        {
+            OperatorKind: BinaryOperatorKind.ConditionalAnd
+        } binary &&
+            (HasCacheableGuard(binary.LeftOperand, value) ||
+             HasCacheableGuard(binary.RightOperand, value));
+    }
+
+    private static bool IsSameValue(IOperation left, IOperation right)
+    {
+        left = UnwrapValue(left);
+        right = UnwrapValue(right);
+        return left switch
+        {
+            ILocalReferenceOperation local
+                when right is ILocalReferenceOperation other =>
+                SymbolEqualityComparer.Default.Equals(
+                    local.Local,
+                    other.Local),
+            IParameterReferenceOperation parameter
+                when right is IParameterReferenceOperation other =>
+                SymbolEqualityComparer.Default.Equals(
+                    parameter.Parameter,
+                    other.Parameter),
+            _ => false
+        };
+    }
+
+    private static IOperation UnwrapValue(IOperation operation)
+    {
+        while (true)
+        {
+            switch (operation)
+            {
+                case IConversionOperation
+                { OperatorMethod: null } conversion:
+                    operation = conversion.Operand;
+                    continue;
+                case IParenthesizedOperation parenthesized:
+                    operation = parenthesized.Operand;
+                    continue;
+                default:
+                    return operation;
+            }
+        }
+    }
+
+    private static bool IsDescendantOf(
+        IOperation operation,
+        IOperation ancestor)
+    {
+        for (var current = operation; current != null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsCacheReceiver(
+        IOperation? operation,
+        ITypeSymbol? fallbackType,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
+    {
+        if (IsCacheType(fallbackType) || IsCacheType(operation?.Type))
+        {
+            return true;
+        }
+
+        operation = operation switch
+        {
+            IConversionOperation conversion when conversion.OperatorMethod == null =>
+                conversion.Operand,
+            IParenthesizedOperation parenthesized => parenthesized.Operand,
+            _ => operation
+        };
+        if (IsCacheType(operation?.Type))
+        {
+            return true;
+        }
+
+        return operation switch
+        {
+            ILocalReferenceOperation local =>
+                ResolveCacheLocal(local, root, resolving),
+            IConditionalOperation conditional =>
+                IsCacheReceiver(
+                    conditional.WhenTrue,
+                    null,
+                    root,
+                    resolving) ||
+                conditional.WhenFalse != null &&
+                IsCacheReceiver(
+                    conditional.WhenFalse,
+                    null,
+                    root,
+                    resolving),
+            ICoalesceOperation coalesce =>
+                IsCacheReceiver(coalesce.Value, null, root, resolving) ||
+                IsCacheReceiver(coalesce.WhenNull, null, root, resolving),
+            _ => false
+        };
+    }
+
+    private static bool ResolveCacheLocal(
+        ILocalReferenceOperation reference,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
+    {
+        if (!resolving.Add(reference.Local))
+        {
+            return false;
+        }
+
+        try
+        {
+            return GetReachingLocalValues(reference, root).Any(value =>
+                IsCacheReceiver(value, null, root, resolving));
+        }
+        finally
+        {
+            resolving.Remove(reference.Local);
+        }
+    }
+
     private static IOperation Root(IOperation operation)
     {
         while (operation.Parent != null)
@@ -63,7 +258,9 @@ internal static class CacheSoundnessRules
     }
 
     private static bool IsNonCacheableSemanticAnswer(
-        IOperation operation, IOperation root, HashSet<ILocalSymbol> resolving)
+        IOperation operation,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
     {
         operation = operation switch
         {
@@ -78,11 +275,35 @@ internal static class CacheSoundnessRules
                      IsSemanticAnswerType(field.Type) => IsNonCacheableName(field.Field.Name),
             IObjectCreationOperation creation =>
                 IsSemanticAnswerType(creation.Type) && IsNonCacheableName(creation.Type?.Name),
-            ILocalReferenceOperation local => ResolveLocal(local, root, resolving),
+            ILocalReferenceOperation local => ResolveLocal(
+                local,
+                root,
+                resolving),
             IConditionalOperation conditional =>
-                IsNonCacheableSemanticAnswer(conditional.WhenTrue, root, resolving) ||
+                IsNonCacheableSemanticAnswer(
+                    conditional.WhenTrue,
+                    root,
+                    resolving) ||
                 conditional.WhenFalse != null &&
-                IsNonCacheableSemanticAnswer(conditional.WhenFalse, root, resolving),
+                IsNonCacheableSemanticAnswer(
+                    conditional.WhenFalse,
+                    root,
+                    resolving),
+            ISwitchExpressionOperation switchExpression =>
+                switchExpression.Arms.Any(arm =>
+                    IsNonCacheableSemanticAnswer(
+                        arm.Value,
+                        root,
+                        resolving)),
+            ICoalesceOperation coalesce =>
+                IsNonCacheableSemanticAnswer(
+                    coalesce.Value,
+                    root,
+                    resolving) ||
+                IsNonCacheableSemanticAnswer(
+                    coalesce.WhenNull,
+                    root,
+                    resolving),
             IPropertyReferenceOperation property => ResolveProperty(property),
             IInvocationOperation invocation => ResolveInvocation(invocation),
             _ => IsSemanticAnswerType(operation.Type) &&
@@ -91,7 +312,8 @@ internal static class CacheSoundnessRules
     }
 
     private static bool ResolveLocal(
-        ILocalReferenceOperation reference, IOperation root,
+        ILocalReferenceOperation reference,
+        IOperation root,
         HashSet<ILocalSymbol> resolving)
     {
         if (!resolving.Add(reference.Local))
@@ -106,7 +328,10 @@ internal static class CacheSoundnessRules
                 return IsSemanticAnswerType(reference.Type);
             }
             return writes.Any(value =>
-                IsNonCacheableSemanticAnswer(value, root, resolving));
+                IsNonCacheableSemanticAnswer(
+                    value,
+                    root,
+                    resolving));
         }
         finally
         {
@@ -280,50 +505,281 @@ internal static class CacheSoundnessRules
 
     private static bool ResolveProperty(IPropertyReferenceOperation property)
     {
-        var values = GetReturnedValueNames(property.Property).ToArray();
-        return values.Length == 0
-            ? IsSemanticAnswerType(property.Type) && IsNonCacheableName(property.Property.Name)
-            : values.Any(IsNonCacheableName);
+        return IsNonCacheableReturnedValue(
+            property.Property,
+            property.Type,
+            property.Property.Name);
     }
 
     private static bool ResolveInvocation(IInvocationOperation invocation)
     {
-        var values = GetReturnedValueNames(invocation.TargetMethod).ToArray();
-        return values.Length == 0
-            ? IsSemanticAnswerType(invocation.Type) && IsNonCacheableName(invocation.TargetMethod.Name)
-            : values.Any(IsNonCacheableName);
+        return IsNonCacheableReturnedValue(
+            invocation.TargetMethod,
+            invocation.Type,
+            invocation.TargetMethod.Name);
     }
 
-    private static IEnumerable<string> GetReturnedValueNames(ISymbol symbol)
+    private static bool IsNonCacheableReturnedValue(
+        ISymbol symbol,
+        ITypeSymbol? returnType,
+        string fallbackName)
     {
-        foreach (var reference in symbol.DeclaringSyntaxReferences)
+        var names = GetReturnedValueNames(
+            symbol,
+            new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+        return names.Length == 0
+            ? IsSemanticAnswerType(returnType) &&
+              IsNonCacheableName(fallbackName)
+            : names.Any(IsNonCacheableName);
+    }
+
+    private static ImmutableArray<string> GetReturnedValueNames(
+        ISymbol symbol,
+        HashSet<ISymbol> resolving)
+    {
+        if (!resolving.Add(symbol))
         {
-            var syntax = reference.GetSyntax();
-            foreach (var expression in syntax.DescendantNodesAndSelf()
-                         .OfType<ArrowExpressionClauseSyntax>()
-                         .Select(static arrow => arrow.Expression)
-                         .Concat(syntax.DescendantNodesAndSelf()
-                             .OfType<ReturnStatementSyntax>()
-                             .Where(static statement => statement.Expression != null)
-                             .Select(static statement => statement.Expression!))
-                         .Where(expression => !expression.Ancestors()
-                             .TakeWhile(ancestor => !ReferenceEquals(ancestor, syntax))
-                             .Any(static ancestor => ancestor is
-                                 AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)))
+            return ["Unknown"];
+        }
+
+        try
+        {
+            var names = ImmutableArray.CreateBuilder<string>();
+            foreach (var reference in symbol.DeclaringSyntaxReferences)
             {
-                var name = expression switch
+                var syntax = reference.GetSyntax();
+                foreach (var expression in GetReturnExpressions(syntax))
                 {
-                    MemberAccessExpressionSyntax member => member.Name.Identifier.ValueText,
-                    IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
-                    ObjectCreationExpressionSyntax creation => creation.Type.ToString(),
-                    _ => null
-                };
-                if (name != null)
-                {
-                    yield return name;
+                    names.AddRange(GetExpressionValueNames(
+                        expression,
+                        symbol,
+                        syntax,
+                        resolving,
+                        new HashSet<string>(StringComparer.Ordinal)));
                 }
             }
+            return names.ToImmutable();
         }
+        finally
+        {
+            resolving.Remove(symbol);
+        }
+    }
+
+    private static IEnumerable<ExpressionSyntax> GetReturnExpressions(
+        SyntaxNode syntax)
+    {
+        return syntax.DescendantNodesAndSelf()
+            .OfType<ArrowExpressionClauseSyntax>()
+            .Select(static arrow => arrow.Expression)
+            .Concat(syntax.DescendantNodesAndSelf()
+                .OfType<ReturnStatementSyntax>()
+                .Where(static statement => statement.Expression != null)
+                .Select(static statement => statement.Expression!))
+            .Where(expression => !IsInsideNestedCallable(expression, syntax));
+    }
+
+    private static ImmutableArray<string> GetExpressionValueNames(
+        ExpressionSyntax expression,
+        ISymbol owner,
+        SyntaxNode syntax,
+        HashSet<ISymbol> resolving,
+        HashSet<string> resolvingNames)
+    {
+        var names = ImmutableArray.CreateBuilder<string>();
+        switch (expression)
+        {
+            case ParenthesizedExpressionSyntax parenthesized:
+                names.AddRange(GetExpressionValueNames(
+                    parenthesized.Expression,
+                    owner,
+                    syntax,
+                    resolving,
+                    resolvingNames));
+                break;
+            case CastExpressionSyntax cast:
+                names.AddRange(GetExpressionValueNames(
+                    cast.Expression,
+                    owner,
+                    syntax,
+                    resolving,
+                    resolvingNames));
+                break;
+            case ConditionalExpressionSyntax conditional:
+                names.AddRange(GetExpressionValueNames(
+                    conditional.WhenTrue,
+                    owner,
+                    syntax,
+                    resolving,
+                    resolvingNames));
+                names.AddRange(GetExpressionValueNames(
+                    conditional.WhenFalse,
+                    owner,
+                    syntax,
+                    resolving,
+                    resolvingNames));
+                break;
+            case SwitchExpressionSyntax switchExpression:
+                foreach (var arm in switchExpression.Arms)
+                {
+                    names.AddRange(GetExpressionValueNames(
+                        arm.Expression,
+                        owner,
+                        syntax,
+                        resolving,
+                        resolvingNames));
+                }
+                break;
+            case BinaryExpressionSyntax binary
+                when binary.IsKind(SyntaxKind.CoalesceExpression):
+                names.AddRange(GetExpressionValueNames(
+                    binary.Left,
+                    owner,
+                    syntax,
+                    resolving,
+                    resolvingNames));
+                names.AddRange(GetExpressionValueNames(
+                    binary.Right,
+                    owner,
+                    syntax,
+                    resolving,
+                    resolvingNames));
+                break;
+            case IdentifierNameSyntax identifier:
+                names.AddRange(GetIdentifierValueNames(
+                    identifier,
+                    owner,
+                    syntax,
+                    resolving,
+                    resolvingNames));
+                break;
+            case MemberAccessExpressionSyntax member:
+                names.Add(member.Name.Identifier.ValueText);
+                names.AddRange(GetMemberValueNames(
+                    member.Name.Identifier.ValueText,
+                    owner,
+                    resolving));
+                break;
+            case InvocationExpressionSyntax invocation:
+                var name = GetInvokedName(invocation.Expression);
+                if (name != null)
+                {
+                    names.Add(name);
+                    names.AddRange(GetMemberValueNames(name, owner, resolving));
+                }
+                break;
+            case ObjectCreationExpressionSyntax creation:
+                names.Add(creation.Type.ToString());
+                break;
+        }
+        return names.ToImmutable();
+    }
+
+    private static ImmutableArray<string> GetIdentifierValueNames(
+        IdentifierNameSyntax identifier,
+        ISymbol owner,
+        SyntaxNode syntax,
+        HashSet<ISymbol> resolving,
+        HashSet<string> resolvingNames)
+    {
+        var name = identifier.Identifier.ValueText;
+        if (!resolvingNames.Add(name))
+        {
+            return ["Unknown"];
+        }
+
+        try
+        {
+            var values = syntax.DescendantNodes()
+                .Where(candidate =>
+                    candidate.SpanStart < identifier.SpanStart &&
+                    !IsInsideNestedCallable(candidate, syntax))
+                .Select(candidate => GetSyntacticLocalWrite(candidate, name))
+                .Where(static value => value != null)
+                .Cast<ExpressionSyntax>()
+                .ToArray();
+            if (values.Length == 0)
+            {
+                return [name];
+            }
+
+            var names = ImmutableArray.CreateBuilder<string>();
+            foreach (var value in values)
+            {
+                names.AddRange(GetExpressionValueNames(
+                    value,
+                    owner,
+                    syntax,
+                    resolving,
+                    resolvingNames));
+            }
+            return names.ToImmutable();
+        }
+        finally
+        {
+            resolvingNames.Remove(name);
+        }
+    }
+
+    private static ImmutableArray<string> GetMemberValueNames(
+        string name,
+        ISymbol owner,
+        HashSet<ISymbol> resolving)
+    {
+        if (owner.ContainingType == null)
+        {
+            return [];
+        }
+
+        var names = ImmutableArray.CreateBuilder<string>();
+        foreach (var member in owner.ContainingType.GetMembers(name))
+        {
+            if (member is IMethodSymbol or IPropertySymbol)
+            {
+                names.AddRange(GetReturnedValueNames(member, resolving));
+            }
+        }
+        return names.ToImmutable();
+    }
+
+    private static string? GetInvokedName(ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            MemberAccessExpressionSyntax member =>
+                member.Name.Identifier.ValueText,
+            MemberBindingExpressionSyntax binding =>
+                binding.Name.Identifier.ValueText,
+            _ => null
+        };
+    }
+
+    private static ExpressionSyntax? GetSyntacticLocalWrite(
+        SyntaxNode syntax,
+        string name)
+    {
+        return syntax switch
+        {
+            VariableDeclaratorSyntax declarator
+                when declarator.Identifier.ValueText == name =>
+                declarator.Initializer?.Value,
+            AssignmentExpressionSyntax assignment
+                when assignment.Left is IdentifierNameSyntax identifier &&
+                     identifier.Identifier.ValueText == name =>
+                assignment.Right,
+            _ => null
+        };
+    }
+
+    private static bool IsInsideNestedCallable(
+        SyntaxNode node,
+        SyntaxNode root)
+    {
+        return node.Ancestors()
+            .TakeWhile(ancestor => !ReferenceEquals(ancestor, root))
+            .Any(static ancestor => ancestor is
+                AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax);
     }
 
     private static bool IsSemanticAnswerType(ITypeSymbol? type)
@@ -334,7 +790,45 @@ internal static class CacheSoundnessRules
         }
         return type.Name.IndexOf("Answer", StringComparison.Ordinal) >= 0 ||
                type.Name.IndexOf("Result", StringComparison.Ordinal) >= 0 ||
-               type.Name.IndexOf("Outcome", StringComparison.Ordinal) >= 0;
+               type.Name.IndexOf("Outcome", StringComparison.Ordinal) >= 0 ||
+               IsWorkerVerifyResponse(type);
+    }
+
+    private static bool IsWorkerVerifyResponse(ITypeSymbol? type)
+    {
+        return type != null &&
+               string.Equals(
+                   type.Name,
+                   "WorkerVerifyResponse",
+                   StringComparison.Ordinal) &&
+               IsExactNamespace(
+                   type.ContainingNamespace,
+                   "SharpProof",
+                   "Worker",
+                   "Protocol");
+    }
+
+    private static bool IsExactNamespace(
+        INamespaceSymbol? value,
+        params string[] expected)
+    {
+        var current = value;
+        for (var index = expected.Length - 1; index >= 0; index--)
+        {
+            if (current == null ||
+                current.IsGlobalNamespace ||
+                !string.Equals(
+                    current.Name,
+                    expected[index],
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            current = current.ContainingNamespace;
+        }
+
+        return current?.IsGlobalNamespace == true;
     }
 
     private static bool IsSharpProofNamespace(INamespaceSymbol? symbol)

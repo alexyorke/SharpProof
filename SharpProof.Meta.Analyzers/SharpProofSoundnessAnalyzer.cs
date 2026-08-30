@@ -550,10 +550,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             WorkerVerifyAsync = worker?.GetMembers("VerifyAsync").OfType<IMethodSymbol>().SingleOrDefault(candidate =>
                 candidate is { IsStatic: false, Arity: 0, Parameters.Length: 2 } &&
                 SymbolEqualityComparer.Default.Equals(candidate.ReturnType, workerTask) &&
-                candidate.Parameters[0] is { Name: "request", Type: var requestType } &&
-                IsSameType(requestType, this[KnownType.WorkerVerifyRequest]) &&
-                candidate.Parameters[1] is { Name: "cancellationToken", Type: var cancellationType } &&
-                IsSameType(cancellationType, this[KnownType.CancellationToken]));
+                candidate.Parameters[0].Name == "request" &&
+                candidate.Parameters[0].RefKind == RefKind.None &&
+                IsSameType(candidate.Parameters[0].Type, this[KnownType.WorkerVerifyRequest]) &&
+                candidate.Parameters[1].Name == "cancellationToken" &&
+                candidate.Parameters[1].RefKind == RefKind.None &&
+                IsSameType(candidate.Parameters[1].Type, this[KnownType.CancellationToken]));
         }
 
         internal INamedTypeSymbol? this[KnownType type] => _types[(int)type];
