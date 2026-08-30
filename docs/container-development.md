@@ -159,6 +159,7 @@ through MSBuild's project scheduler.
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
 Semantic-test scheduling uses every container-visible CPU.
 The persistent workspace serializes commands.
+Package integration tests use 75% of container-visible CPU lanes by default.
 Other test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
 Parallel prerequisite builds use 75% of container-visible CPU lanes by default.
 Finite task workspaces use an 8 GiB `/tmp` tmpfs by default, keeping source

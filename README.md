@@ -199,6 +199,7 @@ docker compose run --rm tooling qualification command is preferable.
 
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
 Semantic-test scheduling uses every container-visible CPU.
+Package integration tests use 75% of container-visible CPU lanes by default.
 Other test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
 Parallel prerequisite builds use 75% of container-visible CPU lanes by default.
 Trusted mutations use 4 deterministic weighted lanes.

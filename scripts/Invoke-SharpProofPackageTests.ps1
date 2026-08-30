@@ -32,7 +32,7 @@ if ($Fast -and $NoBuild) {
 
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-$parallelism = Get-SharpProofTestProjectParallelism `
+$parallelism = Get-SharpProofPackageTestParallelism `
     -RepositoryRoot $repositoryRoot
 $buildParallelism = Get-SharpProofBuildParallelism `
     -RepositoryRoot $repositoryRoot

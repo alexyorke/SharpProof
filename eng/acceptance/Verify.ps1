@@ -458,6 +458,7 @@ Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $true 'analyzer.diag
 Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 'analyzer.unsupportedUnannotatedCallableBehavior'
 Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
 Assert-Equal $contract.automation.solutionBuildWallSeconds 600 'automation.solutionBuildWallSeconds'
+Assert-Equal $contract.automation.packageTestCpuPercent 75 'automation.packageTestCpuPercent'
 Assert-Equal $contract.mutationEvidence.schemaVersion 1 'mutationEvidence.schemaVersion'
 if ([int]$contract.mutationEvidence.expectedCatalogCount -le 0) {
     throw 'mutationEvidence.expectedCatalogCount must be positive.'

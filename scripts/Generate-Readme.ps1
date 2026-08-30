@@ -863,6 +863,8 @@ $containerCpuLimit = [int]$acceptanceContract.container.defaultCpuLimit
 $containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
 $testProjectCpuDivisor =
     [int]$acceptanceContract.automation.testProjectCpuDivisor
+$packageTestCpuPercent =
+    [int]$acceptanceContract.automation.packageTestCpuPercent
 $buildCpuPercent =
     [int]$acceptanceContract.automation.buildCpuPercent
 $mutationParallelism =
@@ -870,6 +872,8 @@ $mutationParallelism =
 if ($containerCpuLimit -ne 0 -or
     $containerMemoryMiB -le 0 -or
     $testProjectCpuDivisor -le 0 -or
+    $packageTestCpuPercent -le 0 -or
+    $packageTestCpuPercent -gt 100 -or
     $buildCpuPercent -le 0 -or
     $buildCpuPercent -gt 100 -or
     $mutationParallelism -le 0) {
@@ -879,6 +883,8 @@ $resourceClaims = @(
     ("Containers use all CPUs available to Docker and up to " +
         "$containerMemoryMiB MiB by default.")
     "Semantic-test scheduling uses every container-visible CPU."
+    ("Package integration tests use $packageTestCpuPercent% of " +
+        "container-visible CPU lanes by default.")
     ("Other test-project concurrency auto-detects the available CPUs " +
         "and uses one lane per $testProjectCpuDivisor CPUs.")
     ("Parallel prerequisite builds use $buildCpuPercent% of " +
