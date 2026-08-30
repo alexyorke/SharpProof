@@ -155,7 +155,8 @@ internal static class Program
             artifact.Manifest, expectedVersions,
             out var validResponse, out var validatedResponse,
             arguments.TerminationGraceMilliseconds,
-            responseAuthority);
+            responseAuthority,
+            exitCode);
         if (!validResponse)
         {
             await WriteLauncherFailureAsync(arguments.ResultPath, request, artifact, expectedInputHash,
@@ -166,7 +167,8 @@ internal static class Program
                 artifact.Manifest, expectedVersions,
                 out validResponse, out validatedResponse,
                 arguments.TerminationGraceMilliseconds,
-                responseAuthority);
+                responseAuthority,
+                exitCode);
         }
         if (validResponse)
         {
@@ -353,7 +355,8 @@ internal static class Program
         WorkerVersionSummary? expectedVersions,
         out bool validResponse, out WorkerVerifyResponse? validatedResponse,
         int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds,
-        IWorkerResponseEvidenceAuthority? responseAuthority = null)
+        IWorkerResponseEvidenceAuthority? responseAuthority = null,
+        int? workerExitCode = null)
     {
         validResponse = false;
         validatedResponse = null;
@@ -399,6 +402,13 @@ internal static class Program
         {
             WriteErrors(validation.Errors, "SharpProof ");
             WriteErrors(response?.Errors ?? [], "SharpProof worker ");
+            return 3;
+        }
+        if (workerExitCode is not (null or 0) &&
+            response?.RunStatus == WorkerRunStatus.Complete)
+        {
+            Console.Error.WriteLine(
+                "SharpProof worker result is inconsistent with its process exit code.");
             return 3;
         }
         validResponse = true;
