@@ -1,6 +1,6 @@
 # Bug backlog
 
-442 open bugs, reprioritized by impact, reachability, and affected scope.
+441 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,11 +9,10 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (154)
+## P0 - Critical (153)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-013 [P0] - By-value structs erase writes to referenced heap state:** Effects ownership mapping treats nonref value-type parameters as empty even when a copied struct contains references. Callee writes through those references disappear during remapping, so a trusted boundary can mutate caller heap while the caller appears pure.
-- **BUG-016 [P0] - Catch reachability omits implicit formatting calls:** ExceptionHandlerReachability traverses interpolation and concatenation operands but never models implicit ToString or formatting calls, unlike the effect scanner. A real formatting exception can leave its catch unreachable, omitting catch effects while treating the exception as handled.
 - **BUG-017 [P0] - Closure calls do not havoc captured locals:** RoslynProgramLowerer derives call-mutated variables only from explicit ref and out arguments. An impure closure can mutate a captured local while lowering preserves its old IR value as Exact, making downstream reasoning unsound.
 - **BUG-018 [P0] - Coalesce and compound cache writes bypass soundness analysis:** SharpProofSoundnessAnalyzer registers only simple assignments, so coalesce and compound assignments to cache properties or indexers are never inspected. These direct setters can persist explicitly unsafe semantic answers without the required SPMETA010 error.
 - **BUG-019 [P0] - Coalesce assignment leaves stale flow facts:** ManagedAbstractFlow writes a coalesce-assignment result only to Roslyn's synthetic flow capture instead of the captured local, field, or property. Stale null facts can suppress a real later static write while analysis remains Complete, allowing a false purity result.
