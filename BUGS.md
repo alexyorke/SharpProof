@@ -26,13 +26,6 @@ This section records the coordinator's unverified compilation of 26 new findings
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 3.3. HIGH - Calls nested inside larger expressions lose side effects and ref/out havoc
-
-- Files and members: `SharpProof.Frontend/RoslynProgramLowerer.cs`, `LowerValue`, lines 241-262, and `LowerInvocation`, lines 291-303; `SharpProof.Frontend/RoslynOperationLowerer.cs`, `VisitInvocation`, lines 906-912, and `Opaque`, lines 279-316.
-- Mechanism: Only a root invocation uses program-call lowering. An invocation nested beneath a binary operation, conversion, or other expression becomes an opaque term; the expression route cannot emit `IrCallInstruction` or havoc ref/out/memory. Observation records abstention without updating state.
-- Impact: Later reads retain pre-call state, underapproximating behavior on the abstaining path.
-- Safe evidence: Use `Mutate(ref x) + 1L` in a local initializer and then return `x`. The root is binary, so the call/havoc route is missed.
-
 ## Wave 3.4. HIGH - Field loads and struct `this` bypass supported-value-domain admission
 
 - Files and members: `SharpProof.Frontend/RoslynProgramLowerer.cs`, `LowerValue`, `LowerLocation`, `LowerReturn`, and `LowerOptionalValue`; `SharpProof.Frontend/RoslynOperationLowerer.cs`, `VisitInstanceReference`, `GetInstance`, and `GetTypeId`; intended check in `SharpProof.Frontend/CompilerIdentityBridge.cs`, `IsSupportedValueDomain`.
@@ -54,21 +47,6 @@ This section records 37 findings from exactly 10 fresh read-only auditors after 
 - Mechanism: A null literal conversion to pointer routes to `LowerConstant`; `GetTypeId` creates an IR reference type, and the constant guard does not reject pointer kinds, returning exact null.
 - Impact: Pointer or function-pointer domain enters exact reference IR despite explicit exclusion elsewhere.
 - Safe evidence: `public static unsafe int* Target()=>null;` yields `factory.Null(pointerReferenceType)` with `Exact`.
-
-## Wave 3.8. MEDIUM - IrSemanticTerms fast paths bypass predicate type and factory validation
-
-- File: `SharpProof.Ir/IrSemanticTerms.cs`
-- Members: `ConstrainSuccessfulEvaluation`, lines 21-41, especially 29-32; `Combine`, lines 82-100, especially 91-94
-- Mechanism: The no-witness `ConstrainSuccessfulEvaluation` path and singleton `Conjoin`/`Disjoin` path return their predicate/term directly after minimal checks. Unlike their nontrivial paths through `factory.Binary`, they do not enforce Boolean type or factory ownership.
-- Impact: Canonical Boolean helpers can return non-Boolean or foreign-factory terms, allowing malformed predicates into interning, substitution, summaries, or verification.
-- Safe evidence: `Conjoin(factory,new[]{factory.Integer(1)})` returns an integer, a foreign-factory singleton passes `Conjoin`/`Disjoin`, and `ConstrainSuccessfulEvaluation(factory, foreignFactory.Integer(1), null)` returns the foreign integer.
-
-## Wave 3.10. MEDIUM - Boolean-typed IrValue with the wrong runtime kind causes a raw interpreter exception
-
-- Files and members: `SharpProof.Ir/IrProgramInterpreter.cs`, `Execute`, lines 35-44 and 70-95, with `.Boolean` at 80 and 95; `SharpProof.Ir/IrInterpreter.cs`, `EvaluateVariable`, lines 174-189; `IrValue.Boolean`/`Get<T>`, lines 61-73.
-- Mechanism: Initial values are validated only by `Type`. `Assume`, `Assert`, or `Branch` reads Boolean without a `Kind` check and reaches `Get<T>`'s `InvalidOperationException`.
-- Impact: Execution escapes the structured `Unsupported`/`Exception` result model for malformed decoded or friend-produced values.
-- Safe evidence: In a friend or test assembly, bind a Boolean condition variable to `new IrValue(factory.BooleanType, IrValueKind.Integer,1L)` and execute `Assume`, `Assert`, or `Branch`.
 
 ## Wave 3.11. MEDIUM - Public string-value construction accepts malformed UTF-16
 

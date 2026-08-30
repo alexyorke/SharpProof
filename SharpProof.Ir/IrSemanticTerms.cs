@@ -28,7 +28,7 @@ public static class IrSemanticTerms
 
         if (!RequiresDefinednessWitness(evaluated))
         {
-            return predicate;
+            return ValidateBooleanTerm(factory, predicate, nameof(predicate));
         }
 
         var successfulEvaluation = factory.Binary(
@@ -90,7 +90,7 @@ public static class IrSemanticTerms
         {
             if (count == 1)
             {
-                return ArgumentNullGuard.NotNull(terms[start], nameof(terms));
+                return ValidateBooleanTerm(factory, terms[start], nameof(terms));
             }
 
             var leftCount = count / 2;
@@ -99,6 +99,23 @@ public static class IrSemanticTerms
                 Visit(start, leftCount),
                 Visit(start + leftCount, count - leftCount));
         }
+    }
+
+    private static IrTerm ValidateBooleanTerm(
+        IrFactory factory,
+        IrTerm? term,
+        string parameterName)
+    {
+        term = ArgumentNullGuard.NotNull(term, parameterName);
+        factory.EnsureTerm(term, parameterName);
+        if (term.Type != factory.BooleanType)
+        {
+            throw new ArgumentException(
+                "The term must be boolean.",
+                parameterName);
+        }
+
+        return term;
     }
 }
 

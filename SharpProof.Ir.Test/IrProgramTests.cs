@@ -95,6 +95,68 @@ public sealed class IrProgramTests
         Assert.That(execution.ReturnValue!.Integer, Is.EqualTo(expected));
     }
 
+    [TestCase(IrInstructionKind.Assume)]
+    [TestCase(IrInstructionKind.Assert)]
+    [TestCase(IrInstructionKind.Branch)]
+    public void InterpreterRejectsBooleanValuesWithWrongRuntimeKinds(
+        IrInstructionKind instructionKind)
+    {
+        var factory = new IrFactory();
+        var flag = factory.CreateVariable("flag", factory.BooleanType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var whenTrue = builder.CreateBlock("true");
+        var whenFalse = builder.CreateBlock("false");
+        var condition = factory.Variable(flag);
+        IrInstruction instruction = instructionKind switch
+        {
+            IrInstructionKind.Assume => builder.Assume(
+                entry,
+                factory.CreateOperation("assume"),
+                condition),
+            IrInstructionKind.Assert => builder.Assert(
+                entry,
+                factory.CreateOperation("assert"),
+                condition),
+            IrInstructionKind.Branch => builder.Branch(
+                entry,
+                factory.CreateOperation("branch"),
+                condition,
+                whenTrue,
+                whenFalse),
+            _ => throw new ArgumentOutOfRangeException(nameof(instructionKind))
+        };
+        if (instructionKind != IrInstructionKind.Branch)
+        {
+            builder.Return(entry, factory.CreateOperation("entry-return"));
+        }
+        builder.Return(whenTrue, factory.CreateOperation("true-return"));
+        builder.Return(whenFalse, factory.CreateOperation("false-return"));
+        var malformed = new IrValue(
+            factory.BooleanType,
+            IrValueKind.Integer,
+            1L);
+
+        var result = new IrProgramInterpreter(factory).Execute(
+            builder.Build(),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [flag] = malformed
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Status,
+                Is.EqualTo(IrProgramExecutionStatus.Unsupported));
+            Assert.That(result.Instruction, Is.SameAs(instruction));
+            Assert.That(
+                result.Unsupported!.Reason,
+                Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
+            Assert.That(result.Exception, Is.Null);
+        }
+    }
+
     [Test]
     public void BuilderCreatesClosedTypedMemoryAndCallInstructions()
     {

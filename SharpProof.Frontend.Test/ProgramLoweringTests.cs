@@ -115,6 +115,38 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void NestedRefInvocationCarriesCallAndMutationHavoc()
+    {
+        var lowered = Lower(
+            """
+            private static long Mutate(ref long value) => ++value;
+            public static long Target(long value) {
+                long result = Mutate(ref value) + 1L;
+                return value;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var parameter = lowered.Result.Variables.Single(
+            static binding =>
+                binding.Symbol is IParameterSymbol
+                {
+                    Name: "value"
+                });
+
+        Assert.That(
+            instructions.OfType<IrCallInstruction>(),
+            Has.Exactly(1).Items);
+        var havoc = instructions
+            .OfType<IrHavocInstruction>()
+            .Single(static instruction =>
+                instruction.HavocKind ==
+                IrHavocKind.VariablesAndMemory);
+        Assert.That(havoc.Variables, Is.EqualTo(new[] { parameter.Variable }));
+    }
+
+    [Test]
     public void OnlySpecBackedPureCallsAvoidMemoryHavoc()
     {
         const string source =

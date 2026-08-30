@@ -255,11 +255,34 @@ public sealed class RoslynProgramLowerer(
                     }
                     Abstain(operation, location.Abstention);
                     break;
+                default:
+                    LowerNestedInvocations(block, operation, value);
+                    break;
             }
 
             var lowered = _expressions.Lower(value);
             Observe(operation, lowered.Classification);
             return lowered.Term;
+        }
+
+        private void LowerNestedInvocations(
+            IrBlockId block, OperationId operation, IOperation value)
+        {
+            switch (value)
+            {
+                case IInvocationOperation invocation:
+                    LowerInvocation(block, operation, invocation, wantsResult: false);
+                    return;
+                case IAnonymousFunctionOperation:
+                case ILocalFunctionOperation:
+                case INameOfOperation:
+                    return;
+            }
+
+            foreach (var child in value.ChildOperations)
+            {
+                LowerNestedInvocations(block, operation, child);
+            }
         }
 
         private IrVariableTerm? LowerInvocation(
