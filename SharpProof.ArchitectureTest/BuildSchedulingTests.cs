@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
@@ -8,6 +9,35 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class BuildSchedulingTests
 {
+    [Test]
+    public void ProductionInventoryUsesBoundedCatalogOwnedParallelism()
+    {
+        var root = FindRepositoryRoot();
+        using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "acceptance",
+            "contract.json")));
+        var inventory = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Get-SharpProofProductionInventory.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                contract.RootElement.GetProperty("automation")
+                    .GetProperty("productionInventoryMaxParallelism")
+                    .GetInt32(),
+                Is.EqualTo(8));
+            Assert.That(
+                inventory,
+                Does.Contain("Get-SharpProofTestProjectParallelism"));
+            Assert.That(inventory, Does.Contain("ForEach-Object -Parallel"));
+            Assert.That(inventory, Does.Contain("-ThrottleLimit $parallelism"));
+        }
+    }
+
     private static readonly string[] BuildSolution =
         ["build", "SharpProof.sln", "--no-restore", "-graphBuild"];
     private static readonly string[] TestFilter =
@@ -131,15 +161,15 @@ public sealed class BuildSchedulingTests
         {
             Assert.That(container, Does.Contain("$arguments += '--no-build'"));
             Assert.That(container, Does.Contain(
-                "$semanticArguments += '-NoBuild'"));
+                "$semanticArguments.NoBuild = $true"));
             Assert.That(container, Does.Contain(
-                "$semanticArguments += @('-TestFilter', $TestFilter)"));
+                "$semanticArguments.TestFilter = $TestFilter"));
             Assert.That(container, Does.Contain(
-                "$packageArguments += '-NoBuild'"));
+                "$packageArguments.NoBuild = $true"));
             Assert.That(container, Does.Contain(
                 "'-NoBuild is supported only for test commands"));
             Assert.That(container, Does.Contain(
-                "$changedArguments += '-NoBuild'"));
+                "$changedArguments.NoBuild = $true"));
         }
     }
 
@@ -210,6 +240,103 @@ public sealed class BuildSchedulingTests
             Assert.That(semantic, Does.Contain("'vstest', $assembly"));
             Assert.That(semantic,
                 Does.Contain("-not $coverageEnabled"));
+        }
+    }
+
+    [Test]
+    public void SemanticArchitectureShardsCoverEveryFixture()
+    {
+        var root = FindRepositoryRoot();
+        var semantic = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
+        var roster = Regex.Match(
+            semantic,
+            @"(?s)\$architectureFixtures\s*=\s*@\((?<body>.*?)\)");
+
+        Assert.That(roster.Success, Is.True,
+            "The semantic scheduler must declare its Architecture fixtures.");
+        var configured = Regex.Matches(
+                roster.Groups["body"].Value,
+                @"'(?<name>[A-Za-z0-9_]+)'")
+            .Select(static match => match.Groups["name"].Value)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var expected = typeof(BuildSchedulingTests).Assembly.GetTypes()
+            .Where(static type =>
+                type.Namespace == "SharpProof.ArchitectureTest" &&
+                type.GetCustomAttributesData().Any(static attribute =>
+                    attribute.AttributeType == typeof(TestFixtureAttribute)))
+            .Select(static type => type.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(configured, Is.Unique);
+            Assert.That(configured, Is.EqualTo(expected));
+            Assert.That(semantic,
+                Does.Contain("$architectureShardingEnabled"));
+            Assert.That(semantic,
+                Does.Contain("$semanticProjectShardingEnabled"));
+            Assert.That(semantic, Does.Contain("$semanticProjects"));
+            Assert.That(semantic,
+                Does.Contain("FullyQualifiedName!~"));
+            Assert.That(semantic,
+                Does.Contain("Slots = $mainParallelism"));
+            Assert.That(semantic,
+                Does.Contain("$availableSlots = $parallelism - $activeSlots"));
+            Assert.That(semantic, Does.Contain("$pending.Remove($task)"));
+            Assert.That(semantic,
+                Does.Contain("$architectureFixtureSlots"));
+            Assert.That(semantic,
+                Does.Contain("ProductionInventoryAuthorityTests = 8"));
+            Assert.That(
+                semantic,
+                Does.Contain(
+                    "$startInfo.Environment['SHARPPROOF_TEST_PROJECT_PARALLELISM']"));
+        }
+    }
+
+    [Test]
+    public void ExpensiveScriptFixturesUseBoundedCaseParallelism()
+    {
+        var fixtures = new[]
+        {
+            typeof(BoundaryEnforcementTests),
+            typeof(CoverageScriptTests),
+            typeof(DocumentationSupportContractTests),
+            typeof(PackageDependencyAuthorityTests),
+            typeof(PublicationDestinationAuthorityTests),
+            typeof(PublicationPlanIdentityTests),
+            typeof(ReleaseChecksumAuthorityTests)
+        };
+        var workerAttribute = typeof(BuildSchedulingTests).Assembly
+            .GetCustomAttributesData()
+            .Single(static attribute =>
+                attribute.AttributeType == typeof(LevelOfParallelismAttribute));
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var fixture in fixtures)
+            {
+                var attribute = fixture.GetCustomAttributesData()
+                    .Single(static candidate =>
+                        candidate.AttributeType ==
+                            typeof(ParallelizableAttribute));
+                Assert.That(
+                    Convert.ToInt32(
+                        attribute.ConstructorArguments.Single().Value,
+                        CultureInfo.InvariantCulture),
+                    Is.EqualTo((int)ParallelScope.Children),
+                    fixture.Name);
+            }
+            Assert.That(
+                Convert.ToInt32(
+                    workerAttribute.ConstructorArguments.Single().Value,
+                    CultureInfo.InvariantCulture),
+                Is.EqualTo(4));
         }
     }
 

@@ -22,6 +22,7 @@
     "solutionTestWallSeconds": 1800,
     "mutationShardWallSeconds": 3600,
     "testProjectCpuDivisor": 2,
+    "productionInventoryMaxParallelism": 8,
     "mutationParallelism": 4,
     "mutationDefaultWeight": 1,
     "acceptanceTimingPhases": [

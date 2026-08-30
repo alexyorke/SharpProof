@@ -57,10 +57,12 @@ $relativePath = switch ($Mutation) {
     }
     default { 'README.md' }
 }
-$readmePath = Join-Path $repositoryRoot $relativePath
-$originalBytes = [IO.File]::ReadAllBytes($readmePath)
+$sourcePath = Join-Path $repositoryRoot $relativePath
+$sourceBytes = [IO.File]::ReadAllBytes($sourcePath)
+$overridePath = Join-Path ([IO.Path]::GetTempPath()) (
+    'sharpproof-documentation-' + [Guid]::NewGuid().ToString('N') + '.txt')
 try {
-    $text = [Text.Encoding]::UTF8.GetString($originalBytes)
+    $text = [Text.Encoding]::UTF8.GetString($sourceBytes)
     switch ($Mutation) {
         'stale-win-x64' {
             $text += "`nSharpProof.Verifier.Win-x64 is supported.`n"
@@ -181,11 +183,16 @@ try {
         }
     }
     [IO.File]::WriteAllText(
-        $readmePath,
+        $overridePath,
         $text,
         [Text.UTF8Encoding]::new($false))
-    & (Join-Path $PSScriptRoot 'Generate-Readme.ps1') -Verify
+    & (Join-Path $PSScriptRoot 'Generate-Readme.ps1') `
+        -Verify `
+        -TextOverrideRelativePath $relativePath `
+        -TextOverridePath $overridePath
 }
 finally {
-    [IO.File]::WriteAllBytes($readmePath, $originalBytes)
+    if ([IO.File]::Exists($overridePath)) {
+        [IO.File]::Delete($overridePath)
+    }
 }

@@ -1,12 +1,36 @@
 [CmdletBinding()]
 param(
-    [switch]$Verify
+    [switch]$Verify,
+
+    [string]$TextOverrideRelativePath = '',
+
+    [string]$TextOverridePath = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$hasTextOverrideRelativePath =
+    -not [string]::IsNullOrWhiteSpace($TextOverrideRelativePath)
+$hasTextOverridePath = -not [string]::IsNullOrWhiteSpace($TextOverridePath)
+if ($hasTextOverrideRelativePath -ne $hasTextOverridePath) {
+    throw (
+        'TextOverrideRelativePath and TextOverridePath must be supplied ' +
+        'together.')
+}
+$normalizedTextOverrideRelativePath = if ($hasTextOverrideRelativePath) {
+    $TextOverrideRelativePath.Replace('\', '/')
+}
+else {
+    ''
+}
+$resolvedTextOverridePath = if ($hasTextOverridePath) {
+    (Resolve-Path -LiteralPath $TextOverridePath -ErrorAction Stop).Path
+}
+else {
+    ''
+}
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $repositoryDefaultBranch = 'master'
 $currentMaintainedDocuments = @(
@@ -56,6 +80,11 @@ function Get-RequiredText {
     $path = Get-RepositoryPath $RelativePath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Required documentation source is missing: $RelativePath"
+    }
+    if ($hasTextOverrideRelativePath -and
+        $RelativePath.Replace('\', '/') -ceq
+            $normalizedTextOverrideRelativePath) {
+        return Get-Content -LiteralPath $resolvedTextOverridePath -Raw
     }
     return Get-Content -LiteralPath $path -Raw
 }

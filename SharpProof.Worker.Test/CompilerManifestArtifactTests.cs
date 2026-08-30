@@ -1,5 +1,6 @@
 using System.Text;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,10 +14,38 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Worker.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class CompilerManifestArtifactTests
 {
     private const string SourceMarker =
         "sharp-proof-source-must-not-be-embedded";
+
+    [Test]
+    public void CompilerManifestCasesUseBoundedParallelism()
+    {
+        var fixtureAttribute = typeof(CompilerManifestArtifactTests)
+            .GetCustomAttributesData()
+            .Single(static attribute =>
+                attribute.AttributeType == typeof(ParallelizableAttribute));
+        var workerAttribute = typeof(CompilerManifestArtifactTests).Assembly
+            .GetCustomAttributesData()
+            .Single(static attribute =>
+                attribute.AttributeType == typeof(LevelOfParallelismAttribute));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                Convert.ToInt32(
+                    fixtureAttribute.ConstructorArguments.Single().Value,
+                    CultureInfo.InvariantCulture),
+                Is.EqualTo((int)ParallelScope.Children));
+            Assert.That(
+                Convert.ToInt32(
+                    workerAttribute.ConstructorArguments.Single().Value,
+                    CultureInfo.InvariantCulture),
+                Is.EqualTo(4));
+        }
+    }
 
     [Test]
     public void ArtifactRecordsCompilerAndSyntaxEvidenceWithoutSourceText()

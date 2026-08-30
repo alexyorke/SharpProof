@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
-[NonParallelizable]
+[Parallelizable(ParallelScope.Children)]
 public sealed class DocumentationSupportContractTests
 {
     [TestCase("clean", true)]

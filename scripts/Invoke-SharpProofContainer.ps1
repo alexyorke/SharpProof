@@ -242,21 +242,25 @@ switch ($Command) {
         Invoke-DotNet $arguments
     }
     'test-changed' {
-        $changedArguments = @('-Configuration', $Configuration)
+        $changedArguments = @{
+            Configuration = $Configuration
+        }
         if ($NoBuild) {
-            $changedArguments += '-NoBuild'
+            $changedArguments.NoBuild = $true
         }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofChangedTests.ps1') `
             @changedArguments
     }
     'semantic-tests' {
-        $semanticArguments = @('-Configuration', $Configuration)
+        $semanticArguments = @{
+            Configuration = $Configuration
+        }
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $semanticArguments += @('-TestFilter', $TestFilter)
+            $semanticArguments.TestFilter = $TestFilter
         }
         if ($NoBuild) {
-            $semanticArguments += '-NoBuild'
+            $semanticArguments.NoBuild = $true
         }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofSemanticTests.ps1') `
@@ -309,12 +313,13 @@ switch ($Command) {
         Invoke-DotNet $arguments
     }
     'package-tests' {
-        $packageArguments = @(
-            '-Configuration', $Configuration,
-            '-TestFilter', $TestFilter,
-            '-PackageSource', $PackageSource)
+        $packageArguments = @{
+            Configuration = $Configuration
+            TestFilter = $TestFilter
+            PackageSource = $PackageSource
+        }
         if ($NoBuild) {
-            $packageArguments += '-NoBuild'
+            $packageArguments.NoBuild = $true
         }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
