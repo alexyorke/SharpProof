@@ -82,7 +82,9 @@ smoke. The exact release performance protocol remains part of `sp acceptance`;
 trusted mutations remain a separate exact-commit gate.
 
 The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
-Roslyn's compiler server. A no-change rebuild is therefore incremental.
+Roslyn's compiler server. It also enables the opt-in MSBuild server, whose
+evaluation cache remains warm between closely spaced commands. A no-change
+rebuild is therefore incremental and avoids repeatedly starting MSBuild.
 Finite `docker compose run --rm tooling ...` commands materialize the current
 source snapshot in a private temporary workspace and pay a cold build; use them
 for qualification, not for every edit. `contract`, `build`, and ordinary test
@@ -99,7 +101,8 @@ docker compose exec loop sharpproof-loop test -Target SharpProof.Analyzer.Test/S
 
 Each `sharpproof-loop` command mirrors the current tracked and non-ignored
 untracked source into a private Compose volume, then runs `sp` there. The mirror
-keeps `bin`, `obj`, compiler servers, and package caches between commands. A
+keeps `bin`, `obj`, MSBuild and Roslyn compiler servers, and package caches
+between commands. A
 non-blocking workspace lock rejects overlapping commands, so multiple agents
 cannot corrupt the shared incremental outputs. Use a distinct
 `COMPOSE_PROJECT_NAME` for an independent checkout or independent build lane.

@@ -40,6 +40,7 @@ services:
     environment:
       NUGET_PACKAGES: /home/sharpproof/.nuget/packages
       DOTNET_CLI_HOME: /home/sharpproof/.dotnet
+      DOTNET_CLI_USE_MSBUILD_SERVER: "1"
       SHARPPROOF_REPO_ROOT: /workspace/SharpProof
       SHARPPROOF_TEST_PROJECT_PARALLELISM: ${SHARPPROOF_TEST_PROJECT_PARALLELISM:-}
       SHARPPROOF_ORIGIN_URL: ${SHARPPROOF_ORIGIN_URL:-https://github.com/alexyorke/SharpProof.git}
@@ -57,6 +58,7 @@ services:
     environment:
       NUGET_PACKAGES: /home/sharpproof/.nuget/packages
       DOTNET_CLI_HOME: /home/sharpproof/.dotnet
+      DOTNET_CLI_USE_MSBUILD_SERVER: "1"
       SHARPPROOF_REPO_ROOT: /workspace/SharpProof
       SHARPPROOF_TEST_PROJECT_PARALLELISM: ${SHARPPROOF_TEST_PROJECT_PARALLELISM:-}
       SHARPPROOF_LOOP_SOURCE_ROOT: /workspace/HostSource

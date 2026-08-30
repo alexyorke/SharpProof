@@ -235,6 +235,48 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void PersistentIterationsReuseBuildServersAndSafeTestWorkers()
+    {
+        var root = FindRepositoryRoot();
+        var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
+        var analyzerAssembly = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Analyzer.Test",
+            "AssemblyInfo.cs"));
+        var runtimeFixtures = new[]
+        {
+            "RuntimeFlagshipOracleTests.cs",
+            "RuntimeRequiresOracleTests.cs"
+        };
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                Regex.Matches(
+                    compose,
+                    "DOTNET_CLI_USE_MSBUILD_SERVER: \\\"1\\\"").Count,
+                Is.EqualTo(2));
+            Assert.That(
+                analyzerAssembly,
+                Does.Contain("[assembly: LevelOfParallelism(4)]"));
+            Assert.That(
+                analyzerAssembly,
+                Does.Contain(
+                    "[assembly: Parallelizable(ParallelScope.Fixtures)]"));
+            foreach (var fixture in runtimeFixtures)
+            {
+                Assert.That(
+                    File.ReadAllText(Path.Combine(
+                        root,
+                        "SharpProof.Analyzer.Test",
+                        fixture)),
+                    Does.Contain("[NonParallelizable]"),
+                    fixture);
+            }
+        }
+    }
+
+    [Test]
     public void NestedPackageConsumersUseClosureScopedCompilerServers()
     {
         var root = FindRepositoryRoot();
