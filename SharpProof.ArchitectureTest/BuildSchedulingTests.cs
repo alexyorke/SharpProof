@@ -132,6 +132,42 @@ public sealed class BuildSchedulingTests
         }
     }
 
+    [Test]
+    public void NestedPackageConsumersUseClosureScopedCompilerServers()
+    {
+        var root = FindRepositoryRoot();
+        var fixtures = new[]
+        {
+            "FinalCompilationProbeTests.cs",
+            "PackageLayoutSmokeTests.cs",
+            "PackagedProductFeed.cs",
+            "WorkerMsBuildIntegrationTests.cs"
+        };
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var fixture in fixtures)
+            {
+                var contents = File.ReadAllText(Path.Combine(
+                    root,
+                    "SharpProof.Package.Test",
+                    fixture));
+                Assert.That(
+                    contents,
+                    Does.Not.Contain("-p:UseSharedCompilation=false"),
+                    fixture);
+                Assert.That(
+                    contents,
+                    Does.Contain("SharedCompilationId"),
+                    fixture);
+                Assert.That(
+                    contents,
+                    Does.Contain("/nodeReuse:false"),
+                    fixture);
+            }
+        }
+    }
+
     private static readonly string[] BuildSolution =
         ["build", "SharpProof.sln", "--no-restore", "-graphBuild"];
     private static readonly string[] TestFilter =

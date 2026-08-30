@@ -19,6 +19,10 @@ namespace SharpProof.Package.Test;
 [NonParallelizable]
 public sealed class WorkerMsBuildIntegrationTests
 {
+    private static readonly string s_sharedCompilationServerId =
+        "sharpproof-worker-integration-" +
+        typeof(WorkerMsBuildIntegrationTests).Assembly.ManifestModule
+            .ModuleVersionId.ToString("N");
     private static readonly string[] s_publicPolicyProperties = [
         "SharpProofProfile",
         "SharpProofFeatures",
@@ -1381,6 +1385,8 @@ public sealed class WorkerMsBuildIntegrationTests
                     Path.DirectorySeparatorChar),
                 ("DefaultItemExcludesInProjectFolder",
                     "obj-*/**"),
+                ("SharedCompilationId",
+                    s_sharedCompilationServerId + "-" + name),
                 ("SharpProofFeatures", features),
                 ("SharpProofVerifyRequestFile", request),
                 ("SharpProofVerifyResultFile", result),
@@ -3634,7 +3640,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 new System.Text.UTF8Encoding(false));
             var build = await RunDotNetAsync([
                 "build", project, "-c", "Release", "--nologo",
-                "/nodeReuse:false", "-p:UseSharedCompilation=false"
+                "/nodeReuse:false"
             ]);
             if (build.ExitCode != 0)
             {
@@ -3681,7 +3687,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 new System.Text.UTF8Encoding(false));
             var build = await RunDotNetAsync([
                 "build", project, "-c", "Release", "--nologo",
-                "/nodeReuse:false", "-p:UseSharedCompilation=false"
+                "/nodeReuse:false"
             ]);
             if (build.ExitCode != 0)
             {
@@ -3734,7 +3740,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 new System.Text.UTF8Encoding(false));
             var build = await RunDotNetAsync([
                 "build", project, "-c", "Release", "--nologo",
-                "/nodeReuse:false", "-p:UseSharedCompilation=false"
+                "/nodeReuse:false"
             ]);
             if (build.ExitCode != 0)
             {
@@ -3829,7 +3835,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 "Release",
                 "--nologo",
                 "/nodeReuse:false",
-                "-p:UseSharedCompilation=false",
                 "-p:GeneratePackageOnBuild=false"
             };
             if (verify.HasValue)
@@ -4036,6 +4041,8 @@ public sealed class WorkerMsBuildIntegrationTests
             {
                 startInfo.ArgumentList.Add(argument);
             }
+            startInfo.Environment["SharedCompilationId"] =
+                s_sharedCompilationServerId;
             using var process = Process.Start(startInfo)!;
             var standardOutput = process.StandardOutput.ReadToEndAsync();
             var standardError = process.StandardError.ReadToEndAsync();

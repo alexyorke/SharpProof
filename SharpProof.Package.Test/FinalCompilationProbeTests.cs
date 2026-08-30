@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -557,10 +558,14 @@ public sealed class FinalCompilationProbeTests
             Path.GetTempPath(),
             "SharpProof.FinalProbe");
         private readonly string _root;
+        private string _sharedCompilationServerId;
 
         private ProbeWorkspace(string root)
         {
             _root = root;
+            _sharedCompilationServerId = CreateSharedCompilationServerId(
+                "direct",
+                root);
             ProjectPath = Path.Combine(root, "Consumer.csproj");
             ArtifactDirectory = Path.Combine(root, "probe");
             PackageCache = Path.Combine(root, "package-cache");
@@ -627,6 +632,9 @@ public sealed class FinalCompilationProbeTests
             string profile = "advisory",
             bool designTimeBuild = false)
         {
+            _sharedCompilationServerId = CreateSharedCompilationServerId(
+                "direct",
+                _root);
             File.WriteAllText(
                 SubjectPath,
                 """
@@ -654,6 +662,9 @@ public sealed class FinalCompilationProbeTests
 
         internal void WritePackedConsumer(string packageVersion)
         {
+            _sharedCompilationServerId = CreateSharedCompilationServerId(
+                "packed",
+                _root);
             File.WriteAllText(
                 SubjectPath,
                 """
@@ -688,8 +699,7 @@ public sealed class FinalCompilationProbeTests
                 "-c",
                 "Release",
                 "--nologo",
-                "/nodeReuse:false",
-                "-p:UseSharedCompilation=false"
+                "/nodeReuse:false"
             ]);
         }
 
@@ -704,8 +714,7 @@ public sealed class FinalCompilationProbeTests
                 "Release",
                 "--no-restore",
                 "--nologo",
-                "/nodeReuse:false",
-                "-p:UseSharedCompilation=false"
+                "/nodeReuse:false"
             };
             if (forceUnsupportedWorkerHost)
             {
@@ -785,6 +794,8 @@ public sealed class FinalCompilationProbeTests
             {
                 startInfo.ArgumentList.Add(argument);
             }
+            startInfo.Environment["SharedCompilationId"] =
+                _sharedCompilationServerId;
 
             using var process = Process.Start(startInfo) ??
                 throw new InvalidOperationException("Failed to start dotnet.");
@@ -795,6 +806,19 @@ public sealed class FinalCompilationProbeTests
                 process.ExitCode,
                 (await standardOutput) + Environment.NewLine +
                 (await standardError));
+        }
+
+        private static string CreateSharedCompilationServerId(
+            string role,
+            string root)
+        {
+            var identity =
+                typeof(FinalCompilationProbeTests).Assembly.ManifestModule
+                    .ModuleVersionId.ToString("N") + "\n" +
+                Path.GetFullPath(root);
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
+            return "sharpproof-final-probe-" + role + "-" +
+                Convert.ToHexString(hash.AsSpan(0, 16));
         }
 
         internal string[] GetArtifactPaths()

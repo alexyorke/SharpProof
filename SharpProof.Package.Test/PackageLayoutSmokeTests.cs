@@ -212,8 +212,7 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false");
+            "/nodeReuse:false");
         Assert.That(publish.ExitCode, Is.Zero, publish.Output);
         Assert.That(
             Directory.EnumerateFiles(
@@ -613,8 +612,7 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false");
+            "/nodeReuse:false");
         Assert.That(analyzerBuild.ExitCode, Is.Zero, analyzerBuild.Output);
         Assert.That(analyzerBuild.Output, Does.Contain("SP0045"));
 
@@ -627,7 +625,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true");
         Assert.That(
             explicitVerification.ExitCode,
@@ -647,7 +644,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofProfile=strict");
         Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
         Assert.That(
@@ -714,7 +710,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true",
             "-p:_SharpProofVerifierHostSupported=false");
         Assert.That(unsupported.ExitCode, Is.Not.Zero, unsupported.Output);
@@ -883,7 +878,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true");
         Assert.That(
             verification.ExitCode,
@@ -914,7 +908,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true",
             "-p:SharpProofVerifyCacheEnabled=true");
         Assert.That(
@@ -1062,7 +1055,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true",
             "-p:SharpProofVerifyCacheEnabled=false",
             "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
@@ -1157,7 +1149,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true",
             "-p:_SharpProofVerifierProcessArchitecture=X86");
 
@@ -1436,8 +1427,7 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false");
+            "/nodeReuse:false");
     }
 
     private static async Task<PackagedAnalyzerItem[]>
@@ -1514,8 +1504,7 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false"
+            "/nodeReuse:false"
         };
         arguments.AddRange(properties.Select(static property =>
             "-p:" + property.Name + "=" + property.Value));
@@ -2276,6 +2265,8 @@ public sealed class PackageLayoutSmokeTests
         {
             startInfo.ArgumentList.Add(argument);
         }
+        startInfo.Environment["SharedCompilationId"] =
+            CreateSharedCompilationServerId(workingDirectory);
 
         using var process = Process.Start(startInfo)!;
         var standardOutput = process.StandardOutput.ReadToEndAsync();
@@ -2285,6 +2276,18 @@ public sealed class PackageLayoutSmokeTests
             process.ExitCode,
             (await standardOutput) + Environment.NewLine +
             (await standardError));
+    }
+
+    private static string CreateSharedCompilationServerId(
+        string workingDirectory)
+    {
+        var identity =
+            typeof(PackageLayoutSmokeTests).Assembly.ManifestModule
+                .ModuleVersionId.ToString("N") + "\n" +
+            Path.GetFullPath(workingDirectory);
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
+        return "sharpproof-package-layout-" +
+            Convert.ToHexString(hash.AsSpan(0, 16));
     }
 
     private static PackagedAnalyzerItem[]
