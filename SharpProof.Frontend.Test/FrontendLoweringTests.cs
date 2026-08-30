@@ -884,7 +884,15 @@ public sealed class FrontendLoweringTests
         Assert.That(
             snapshotHash,
             Is.EqualTo(
-                "4C2849F3D16A580C09BBB46C9526EBC1404405C9FA54A4056D631269AE2BC736"));
+                "423FE9D03A156149D96290A64F84A1B53F7FBD0F5EA8C1BC4AC9A19B72416641"));
+    }
+
+    [Test]
+    public void FieldReferencesAreAdmittedToContractExpressionStage()
+    {
+        Assert.That(
+            OperationSubsetClassifier.Classify(OperationKind.FieldReference).IsExact,
+            Is.True);
     }
 
     [Test]

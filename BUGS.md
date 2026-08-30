@@ -1923,13 +1923,6 @@ This section records 26 unique findings from exactly 30 fresh read-only auditors
 - Impact: A generic source method can appear nonthrowing for reachability, and matching handler effects are omitted.
 - Safe evidence: `Throw<T>(T value) where T:Exception { throw value; }` called with `ApplicationException` inside a matching catch; the generic body adds `EmptyPotential`.
 
-## Wave 10.15. LOW/MEDIUM - Operation-kind classifier rejects an exactly supported FieldReference shape
-
-- Files and members: `SharpProof.Frontend/OperationSubsetClassifier.cs`, `Classify`, current lines 5-9 and 22-34; generated ContractExpression catalog, lines 12-25; `CompilerConstantAdmission.IsCatalogIntegerBoundary`, lines 5-26; `RoslynOperationLowerer.VisitFieldReference`, lines 461-466.
-- Mechanism: The support catalog omits `FieldReference`, so the public classifier returns `UnsupportedOperationKind`, while catalog boundary fields such as `long.MinValue` are deliberately lowered Exact.
-- Impact: The public classifier and snapshot cannot serve as an authoritative preflight; clients reject expressions that the frontend certifies.
-- Safe evidence: `Classify(FieldReference).IsExact` is false while lowering `long.MinValue` is Exact.
-
 ## Wave 10.16. MEDIUM - Optional and params base constructors make implicit construction unconditionally incomplete
 
 - Files and members: `SharpProof.Effects/EffectCallSiteResolver.cs`, `ResolveConstruction`, current lines 101-130, especially 120-126; `EffectMethodNodeBuilder.GetUniqueParameterlessBaseConstructor`, lines 239-246.

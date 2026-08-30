@@ -477,12 +477,20 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitFieldReference(
             IFieldReferenceOperation operation, LoweringContext argument)
         {
-            return CompilerConstantAdmission.IsCatalogIntegerBoundary(operation)
-                ? _owner.LowerConstant(operation)
-                : _owner.Opaque(
-                    operation,
-                    FrontendAbstention.UnsupportedOperationKind,
-                    operation.Field);
+            if (CompilerConstantAdmission.IsCatalogIntegerBoundary(operation))
+            {
+                return _owner.LowerConstant(operation);
+            }
+
+            var abstention = operation.ConstantValue.HasValue &&
+                operation.Type is
+                {
+                    IsValueType: true,
+                    SpecialType: SpecialType.None
+                }
+                ? FrontendAbstention.UnsupportedType
+                : FrontendAbstention.UnsupportedOperationKind;
+            return _owner.Opaque(operation, abstention, operation.Field);
         }
 
         public override LoweredExpression VisitLocalReference(
