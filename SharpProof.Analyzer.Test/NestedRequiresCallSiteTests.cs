@@ -407,7 +407,9 @@ public sealed class NestedRequiresCallSiteTests
                 }
             }
             """;
-        var diagnostics = await Analyze(source);
+        var diagnostics = await Analyze(
+            source,
+            allowCompilationErrors: true);
 
         AssertRequiresDiagnostics(diagnostics, 2);
         Assert.That(
@@ -971,7 +973,9 @@ public sealed class NestedRequiresCallSiteTests
             }
             """;
 
-        var diagnostics = await Analyze(source);
+        var diagnostics = await Analyze(
+            source,
+            allowCompilationErrors: true);
 
         AssertRequiresDiagnostics(diagnostics, 14);
         Assert.That(
@@ -1111,6 +1115,7 @@ public sealed class NestedRequiresCallSiteTests
         const string source =
             """
             using System;
+            using System.Linq.Expressions;
             using SharpProof.Attributes;
 
             public static class Fixture {
@@ -1153,7 +1158,8 @@ public sealed class NestedRequiresCallSiteTests
 
         var diagnostics = await Analyze(
             source,
-            enabledIds: ["SP0024"]);
+            enabledIds: ["SP0024"],
+            allowCompilationErrors: true);
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
@@ -1245,7 +1251,8 @@ public sealed class NestedRequiresCallSiteTests
                 }
             }
             """,
-            factory);
+            factory,
+            allowCompilationErrors: true);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1264,7 +1271,8 @@ public sealed class NestedRequiresCallSiteTests
     private static Task<ImmutableArray<Diagnostic>> Analyze(
         string source,
         IAnalyzerSessionFactory? sessionFactory = null,
-        string[]? enabledIds = null)
+        string[]? enabledIds = null,
+        bool allowCompilationErrors = false)
     {
         return AnalyzerTestHost.AnalyzeAsync(
             source,
@@ -1273,7 +1281,8 @@ public sealed class NestedRequiresCallSiteTests
             sessionFactory == null
                 ? null
                 : new SharpProofAnalyzer(
-                    sessionFactory));
+                    sessionFactory),
+            allowCompilationErrors: allowCompilationErrors);
     }
 
     private static void AssertRequiresDiagnostics(

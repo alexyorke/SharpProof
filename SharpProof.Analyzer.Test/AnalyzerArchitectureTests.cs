@@ -54,6 +54,18 @@ public sealed class AnalyzerArchitectureTests
     }
 
     [Test]
+    public async Task AnalyzerHostAllowsExplicitMalformedSourceFixtures()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            "public sealed class Fixture { MissingType Value; }",
+            mode: null,
+            enabledIds: [],
+            allowCompilationErrors: true);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task ConcurrentRunsProduceTheSameDiagnostics()
     {
         const string source = """

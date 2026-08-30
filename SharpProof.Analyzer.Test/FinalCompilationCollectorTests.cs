@@ -471,19 +471,22 @@ public sealed class FinalCompilationCollectorTests
         var generalError = await EmitArtifact(
             compilation.WithOptions(compilation.Options
                 .WithGeneralDiagnosticOption(ReportDiagnostic.Error)),
-            workspace.SealPath("diagnostic-general"));
+            workspace.SealPath("diagnostic-general"),
+            allowCompilationErrors: true);
         var specificError = await EmitArtifact(
             compilation.WithOptions(compilation.Options
                 .WithSpecificDiagnosticOptions(
                     compilation.Options.SpecificDiagnosticOptions.SetItem(
                         "CS0168", ReportDiagnostic.Error))),
-            workspace.SealPath("diagnostic-specific"));
+            workspace.SealPath("diagnostic-specific"),
+            allowCompilationErrors: true);
         var providerError = await EmitArtifact(
             compilation.WithOptions(compilation.Options
                 .WithSyntaxTreeOptionsProvider(
                     new FixedDiagnosticProvider(
                         "CS0168", ReportDiagnostic.Error))),
-            workspace.SealPath("diagnostic-provider"));
+            workspace.SealPath("diagnostic-provider"),
+            allowCompilationErrors: true);
 
         using (Assert.EnterMultipleScope())
         {
@@ -549,7 +552,8 @@ public sealed class FinalCompilationCollectorTests
 
         var artifact = await EmitArtifact(
             compilation,
-            workspace.SealPath("diagnostic-location"));
+            workspace.SealPath("diagnostic-location"),
+            allowCompilationErrors: true);
         var actual = artifact.CompilerDiagnostics.Select(static diagnostic =>
             new
             {
@@ -1027,11 +1031,13 @@ public sealed class FinalCompilationCollectorTests
 
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,
-        string path)
+        string path,
+        bool allowCompilationErrors = false)
     {
         var diagnostics = await AnalyzeCollectorAsync(
             compilation,
-            Options(path));
+            Options(path),
+            allowCompilationErrors: allowCompilationErrors);
         Assert.That(diagnostics, Is.Empty);
         return CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(path));
@@ -1040,13 +1046,15 @@ public sealed class FinalCompilationCollectorTests
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string> values,
-        ImmutableArray<AdditionalText> additionalFiles = default)
+        ImmutableArray<AdditionalText> additionalFiles = default,
+        bool allowCompilationErrors = false)
     {
         return AnalyzerTestHost.AnalyzeAsync(
             compilation,
             values,
             additionalFiles,
-            new FinalCompilationCollectorAnalyzer());
+            new FinalCompilationCollectorAnalyzer(),
+            allowCompilationErrors);
     }
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(

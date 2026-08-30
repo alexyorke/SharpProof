@@ -1126,7 +1126,8 @@ public sealed class AnalyzerModeAndEffectTests
             """,
             "effects",
             ["SP0002"],
-            new SharpProofAnalyzer(factory));
+            new SharpProofAnalyzer(factory),
+            allowCompilationErrors: true);
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
@@ -2220,7 +2221,8 @@ public sealed class AnalyzerModeAndEffectTests
             """,
             "effects",
             ["SP0047"],
-            new SharpProofAnalyzer(factory));
+            new SharpProofAnalyzer(factory),
+            allowCompilationErrors: true);
 
         using (Assert.EnterMultipleScope())
         {

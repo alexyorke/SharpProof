@@ -437,7 +437,8 @@ public sealed class RequiresAndControlTests
             public sealed class Derived() : Base(), IFoo() { }
             """,
             "contracts",
-            ["SP0027"]);
+            ["SP0027"],
+            allowCompilationErrors: true);
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),

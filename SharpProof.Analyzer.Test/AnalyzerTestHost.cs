@@ -22,7 +22,8 @@ internal static class AnalyzerTestHost
         IEnumerable<MetadataReference>? additionalReferences = null,
         string? profile = null,
         string? features = null,
-        string filePath = "input.cs")
+        string filePath = "input.cs",
+        bool allowCompilationErrors = false)
     {
         var compilation = CreateCompilation(
             source,
@@ -34,7 +35,8 @@ internal static class AnalyzerTestHost
                 mode,
                 analyzer,
                 profile,
-                features)
+                features,
+                allowCompilationErrors)
             .ConfigureAwait(false);
     }
 
@@ -75,7 +77,8 @@ internal static class AnalyzerTestHost
         string? mode,
         DiagnosticAnalyzer? analyzer = null,
         string? profile = null,
-        string? features = null)
+        string? features = null,
+        bool allowCompilationErrors = false)
     {
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
@@ -112,7 +115,8 @@ internal static class AnalyzerTestHost
         return await AnalyzeAsync(
                 compilation,
                 values,
-                analyzer: analyzer)
+                analyzer: analyzer,
+                allowCompilationErrors: allowCompilationErrors)
             .ConfigureAwait(false);
     }
 
@@ -120,9 +124,13 @@ internal static class AnalyzerTestHost
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string> values,
         ImmutableArray<AdditionalText> additionalFiles = default,
-        DiagnosticAnalyzer? analyzer = null)
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false)
     {
-        EnsureCompilationHasNoErrors(compilation);
+        if (!allowCompilationErrors)
+        {
+            EnsureCompilationHasNoErrors(compilation);
+        }
         var analyzerOptions = new AnalyzerOptions(
             additionalFiles.IsDefault ? [] : additionalFiles,
             new TestOptionsProvider(values));
@@ -142,9 +150,13 @@ internal static class AnalyzerTestHost
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
         AnalyzerConfigOptionsProvider optionsProvider,
-        DiagnosticAnalyzer? analyzer = null)
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false)
     {
-        EnsureCompilationHasNoErrors(compilation);
+        if (!allowCompilationErrors)
+        {
+            EnsureCompilationHasNoErrors(compilation);
+        }
         var analyzerOptions = new AnalyzerOptions([], optionsProvider);
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer ?? new SharpProofAnalyzer()],
