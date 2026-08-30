@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.2. HIGH - Resource accounting treats an ordinary lower solver snapshot as 32-bit wrap
-
-- File: `SharpProof.Smt/IrSmtBackend.cs`
-- Member: `AccountResources`
-- Current lines: 176-200, especially 193-197
-- Mechanism: Any lower `rlimit count` becomes `(1L<<32)-previous+observed`; a fresh or reset solver may legitimately report a lower value without wrap.
-- Impact: One cheap query can fabricate approximately 4.29 billion consumed units and prematurely exhaust the method budget.
-- Safe reproduction/evidence: Use a controlled backend/statistics fixture whose second-query rlimit snapshot is lower than its first; the consumed count jumps near 2^32.
-
 ## Wave 2.3. MEDIUM - Signed minimum remainder by -1 is treated as overflowing in both SMT and effect analysis
 
 - Files and members: `SharpProof.Smt/IrSmtBackend.cs`, `QueryEncoder.EncodeDivision` and `DivisionDefined`, current lines 514-527 and 618-630; `SharpProof.Effects/OperationEffectScanner.cs`, `IntegralDivisionExceptions`, current lines 516-540.

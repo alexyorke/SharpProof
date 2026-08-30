@@ -430,6 +430,68 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task ResourceAccountingTreatsEachSolverSnapshotAsFresh()
+    {
+        const uint queryLimit = 1_000_000;
+        var factory = new IrFactory();
+        var operation = factory.CreateOperation("tracked");
+        var assumptions = Enumerable.Range(0, 256)
+            .Select(index => new Assumption(
+                factory,
+                factory.Variable(factory.CreateVariable(
+                    "tracked-" + index,
+                    factory.BooleanType)),
+                new LoweredJustification(operation)))
+            .ToArray();
+        var expensive = new VerificationQuery(
+            factory,
+            assumptions,
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        var inexpensive = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend(
+            new IrSmtBackendOptions(queryLimit));
+
+        _ = await backend.CheckAsync(expensive, CancellationToken.None);
+        var afterExpensive = backend.ConsumedResourceCount;
+        _ = await backend.CheckAsync(inexpensive, CancellationToken.None);
+        var inexpensiveCost = backend.ConsumedResourceCount - afterExpensive;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(afterExpensive, Is.GreaterThan(0));
+            Assert.That(inexpensiveCost, Is.GreaterThanOrEqualTo(0));
+            Assert.That(inexpensiveCost, Is.LessThanOrEqualTo(queryLimit));
+        }
+    }
+
+    [Test]
+    public void ResourceAccountingAddsLowerFreshSnapshotsWithoutWrap()
+    {
+        using var backend = new IrSmtBackend();
+        var addResourceCount = typeof(IrSmtBackend).GetMethod(
+            "AddResourceCount",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic);
+
+        Assert.That(addResourceCount, Is.Not.Null);
+        _ = addResourceCount!.Invoke(backend, [500L]);
+        _ = addResourceCount.Invoke(backend, [7L]);
+
+        Assert.That(backend.ConsumedResourceCount, Is.EqualTo(507));
+    }
+
+    [Test]
     public void UnsatCoreWrappersAreDisposedOnSuccessAndMalformedResult()
     {
         var successful = new[]
