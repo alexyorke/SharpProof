@@ -226,12 +226,15 @@ try {
 
     $workerClass =
         'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
-    $workerList = & dotnet test $testProject `
-        -c $Configuration `
-        --no-build `
-        --no-restore `
-        --list-tests `
-        --filter "FullyQualifiedName~$workerClass" 2>&1 | Out-String
+    if ([string]::IsNullOrWhiteSpace($testAssembly)) {
+        $testAssembly = Get-SharpProofTestAssemblyPath `
+            -ProjectPath $testProject `
+            -Configuration $Configuration
+    }
+    $workerList = & dotnet vstest $testAssembly `
+        /ListTests `
+        "/TestCaseFilter:FullyQualifiedName~$workerClass" 2>&1 |
+        Out-String
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not discover Worker MSBuild integration tests.'
     }

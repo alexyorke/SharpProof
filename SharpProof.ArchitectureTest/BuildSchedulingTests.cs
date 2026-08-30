@@ -174,6 +174,26 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void PackageWorkerDiscoveryUsesTheBuiltAssemblyDirectly()
+    {
+        var root = FindRepositoryRoot();
+        var package = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(package,
+                Does.Contain("Get-SharpProofTestAssemblyPath"));
+            Assert.That(package, Does.Contain("dotnet vstest $testAssembly"));
+            Assert.That(package, Does.Contain("/ListTests"));
+            Assert.That(package,
+                Does.Not.Contain("$workerList = & dotnet test $testProject"));
+        }
+    }
+
+    [Test]
     public void ChangedTestsCanReuseACompletedBuild()
     {
         var root = FindRepositoryRoot();
