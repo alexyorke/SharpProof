@@ -26,15 +26,6 @@ This section records the coordinator's unverified compilation of 26 new findings
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 3.11. MEDIUM - Public string-value construction accepts malformed UTF-16
-
-- File: `SharpProof.Ir/IrFactory.cs`
-- Member: `CreateStringValue`
-- Lines: 240-245; contrast `String`, lines 317-325; supporting `SharpProof.Ir/IrInterpreter.cs`, `Text`, lines 505-507
-- Mechanism: `CreateStringValue` checks only null, while the equivalent literal rejects malformed UTF-16. Object-to-string also routes through the permissive factory.
-- Impact: Model or counterexample values with unpaired surrogates may be replaced or rejected by UTF-8/JSON, corrupting round trips or collapsing distinct values, while equivalent literal IR cannot be represented.
-- Safe evidence: `factory.CreateStringValue("\uD800")` succeeds while `factory.String("\uD800")` throws.
-
 ## Wave 3.12. HIGH - Record-class `with` expressions omit guaranteed allocation and mis-map copy-constructor regions
 
 - File: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`
