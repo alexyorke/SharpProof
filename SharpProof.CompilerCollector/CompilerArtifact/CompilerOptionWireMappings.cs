@@ -7,7 +7,28 @@ internal static partial class CompilerOptionWireMappings
         CSharpCompilationOptions options,
         string name)
     {
-        var property = typeof(CompilationOptions).GetProperty(
+        return ReadInternalBoolean(
+            options,
+            typeof(CompilationOptions),
+            name);
+    }
+
+    internal static bool ReadInternalBoolean(
+        MetadataReferenceProperties properties,
+        string name)
+    {
+        return ReadInternalBoolean(
+            properties,
+            typeof(MetadataReferenceProperties),
+            name);
+    }
+
+    private static bool ReadInternalBoolean(
+        object value,
+        Type declaringType,
+        string name)
+    {
+        var property = declaringType.GetProperty(
             name,
             System.Reflection.BindingFlags.Instance |
             System.Reflection.BindingFlags.Public |
@@ -19,7 +40,7 @@ internal static partial class CompilerOptionWireMappings
                 $"The compiler option '{name}' is unavailable or has an unexpected shape.");
         }
 
-        return (bool)(property.GetValue(options) ??
+        return (bool)(property.GetValue(value) ??
             throw new InvalidOperationException(
                 $"The compiler option '{name}' returned no value."));
     }
