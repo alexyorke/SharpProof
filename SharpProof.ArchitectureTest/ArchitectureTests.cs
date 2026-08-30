@@ -1237,6 +1237,9 @@ public sealed class ArchitectureTests
                 Is.All.Positive);
             Assert.That(compose, Does.Contain("CPU_LIMIT:-0"));
             Assert.That(compose, Does.Contain("MEMORY_LIMIT:-40g"));
+            Assert.That(
+                compose,
+                Does.Contain("SHARPPROOF_TEST_PROJECT_PARALLELISM"));
             Assert.That(execution, Does.Contain("Environment]::ProcessorCount"));
             Assert.That(
                 execution,
