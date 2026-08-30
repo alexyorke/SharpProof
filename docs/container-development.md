@@ -96,6 +96,9 @@ through MSBuild's project scheduler.
 
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
 Test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
+Finite task workspaces use an 8 GiB `/tmp` tmpfs by default, keeping source
+snapshots, compiler scratch, and test outputs off the host filesystem. Set
+`SHARPPROOF_TMPFS_SIZE` higher for unusually large package or coverage runs.
 Trusted mutations use 4 deterministic weighted lanes. Worker fixtures and
 package integration methods run in isolated duration-weighted processes.
 Override the

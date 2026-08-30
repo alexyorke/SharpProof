@@ -25,6 +25,11 @@ x-sharpproof-common: &sharpproof-common
     - sharpproof-nuget:/home/sharpproof/.nuget/packages
     - sharpproof-dotnet-home:/home/sharpproof/.dotnet
     - ./artifacts:/workspace/SharpProof/artifacts
+  # Finite task workspaces, compiler scratch, and test roots live under /tmp.
+  # Keep those high-churn files in memory by default; raise the size only for
+  # unusually large package or coverage campaigns.
+  tmpfs:
+    - /tmp:rw,exec,size=${SHARPPROOF_TMPFS_SIZE:-8g}
   mem_limit: ${SHARPPROOF_CONTAINER_MEMORY_LIMIT:-40g}
   cpus: ${SHARPPROOF_CONTAINER_CPU_LIMIT:-0}
 

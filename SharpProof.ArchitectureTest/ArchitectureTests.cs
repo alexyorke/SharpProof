@@ -1240,6 +1240,7 @@ public sealed class ArchitectureTests
             Assert.That(
                 compose,
                 Does.Contain("SHARPPROOF_TEST_PROJECT_PARALLELISM"));
+            Assert.That(compose, Does.Contain("SHARPPROOF_TMPFS_SIZE"));
             Assert.That(execution, Does.Contain("Environment]::ProcessorCount"));
             Assert.That(
                 execution,
