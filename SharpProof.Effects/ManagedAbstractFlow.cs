@@ -1913,7 +1913,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     /// Returns whether a source method has a reachable normal exit.  This is
     /// intentionally a control-flow fact rather than a may-throw fact: a
     /// method with both a throwing and a returning branch can still permit the
-    /// caller's next source-order step.
+    /// caller's next source-order step. Async and iterator bodies execute
+    /// behind a deferred call boundary, so their body termination cannot make
+    /// the invocation itself noncompleting.
     /// </summary>
     internal bool MethodCanCompleteNormally(IMethodSymbol method)
     {
@@ -1933,6 +1935,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             var declaration = normalized.DeclaringSyntaxReferences[0]
                 .GetSyntax(cancellationToken);
+            if (DefersBodyCompletion(normalized, declaration))
+            {
+                return true;
+            }
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, declaration.SyntaxTree);
             var operation = model.GetOperation(declaration, cancellationToken) ??
@@ -1949,6 +1955,23 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             _activeMethods.Remove(normalized);
         }
+    }
+
+    private static bool DefersBodyCompletion(
+        IMethodSymbol method,
+        SyntaxNode declaration)
+    {
+        if (method.IsAsync)
+        {
+            return true;
+        }
+
+        var body = GetBody(declaration);
+        return body != null && body.DescendantNodesAndSelf(
+                descendIntoChildren: static node =>
+                    node is not AnonymousFunctionExpressionSyntax and
+                    not LocalFunctionStatementSyntax)
+            .Any(static node => node is YieldStatementSyntax);
     }
 
     /// <summary>
