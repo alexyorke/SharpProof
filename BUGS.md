@@ -26,15 +26,6 @@ This section records the coordinator's unverified compilation of 26 new findings
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 3.2. MEDIUM - Member-initializer reachability does not account for a non-completing base-constructor path
-
-- File: `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs`
-- Members: `AnalyzeMemberInitializer`, `CanReachMemberInitializer`
-- Lines: 439-512, especially 491-499; 515-561
-- Mechanism: `CanReachMemberInitializer` checks only earlier initializers, not whether the selected constructor's explicit or implicit base initializer or delegated this-constructor chain can complete normally.
-- Impact: SP0027 can be reported for an instance initializer that is provably unreachable because base construction always terminates first.
-- Safe evidence: `class Base { protected Base() => throw new Exception(); } class Derived : Base { int x = Guard.Positive(-1); }`. The helper has no constructor/base completion check.
-
 ## Wave 3.3. HIGH - Calls nested inside larger expressions lose side effects and ref/out havoc
 
 - Files and members: `SharpProof.Frontend/RoslynProgramLowerer.cs`, `LowerValue`, lines 241-262, and `LowerInvocation`, lines 291-303; `SharpProof.Frontend/RoslynOperationLowerer.cs`, `VisitInvocation`, lines 906-912, and `Opaque`, lines 279-316.
