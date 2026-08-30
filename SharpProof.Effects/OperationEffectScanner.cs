@@ -82,6 +82,7 @@ internal sealed partial class OperationEffectScanner
             _completionEvaluator.CanCompleteWithClone,
             _completionEvaluator.GetReachableImplicitListPatternMembers,
             session.ApiSpecs,
+            session.KnownSymbols,
             HasNonThrowingMethodSpec);
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
         // remain useful in a try body, but absence of a fact cannot prove an
