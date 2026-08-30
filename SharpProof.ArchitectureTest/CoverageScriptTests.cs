@@ -1348,17 +1348,14 @@ public sealed class CoverageScriptTests
         await AssertSuccessAsync(RunAsync(
             repository,
             "dotnet",
-            "restore",
-            "Project/Project.csproj",
-            "--ignore-failed-sources"));
-        await AssertSuccessAsync(RunAsync(
-            repository,
-            "dotnet",
             "build",
             "Project/Project.csproj",
             "--configuration",
             "Release",
-            "--no-restore"));
+            "--nologo",
+            "--verbosity",
+            "quiet",
+            "-p:RestoreIgnoreFailedSources=true"));
         var coverage = Path.Combine(repository, "coverage");
         var authorityPath = Path.Combine(coverage, "coverage-authority.json");
         await AssertSuccessAsync(RunAsync(
