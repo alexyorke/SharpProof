@@ -694,6 +694,10 @@ public sealed class BuildSchedulingTests
             root,
             "scripts",
             "Invoke-SharpProofChangedTests.ps1"));
+        var semantic = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -713,6 +717,12 @@ public sealed class BuildSchedulingTests
                 "$testArguments += '/TestCaseFilter:' + $semanticFilter"));
             Assert.That(changed, Does.Not.Contain(
                 "$NoBuild -and $selectedRelative.Count -eq 1"));
+            Assert.That(changed, Does.Contain(
+                "$directChangedProjectIsArchitecture"));
+            Assert.That(changed, Does.Contain("-ArchitectureOnly"));
+            Assert.That(semantic, Does.Contain("[switch]$ArchitectureOnly"));
+            Assert.That(semantic, Does.Contain("if (-not $ArchitectureOnly)"));
+            Assert.That(semantic, Does.Contain("architecture-only"));
         }
     }
 

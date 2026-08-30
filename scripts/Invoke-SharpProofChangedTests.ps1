@@ -244,6 +244,9 @@ if ($selectedRelative.Count -gt 0) {
         $semanticFilter =
             'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
         if ($directChangedProject) {
+            $directChangedProjectIsArchitecture =
+                [IO.Path]::GetFileName($selectedRelative[0]) -ceq
+                    'SharpProof.ArchitectureTest.csproj'
             if (-not $NoBuild) {
                 $changedProjectBuildArguments = @(
                     'build', $selectedRelative[0],
@@ -254,11 +257,25 @@ if ($selectedRelative.Count -gt 0) {
                 }
                 Invoke-RequiredDotnet $changedProjectBuildArguments
             }
-            $assembly = Get-SharpProofTestAssemblyPath `
-                -ProjectPath $selectedRelative[0] `
-                -Configuration $Configuration
-            $testArguments = @('vstest', $assembly)
-            $testArguments += '/TestCaseFilter:' + $semanticFilter
+            if ($directChangedProjectIsArchitecture) {
+                & (Join-Path $PSScriptRoot `
+                    'Invoke-SharpProofSemanticTests.ps1') `
+                    -Configuration $Configuration `
+                    -NoBuild `
+                    -ArchitectureOnly `
+                    -TimeoutSeconds $TimeoutSeconds
+                if ($LASTEXITCODE -ne 0) {
+                    throw 'Changed architecture tests failed.'
+                }
+                $testArguments = @()
+            }
+            else {
+                $assembly = Get-SharpProofTestAssemblyPath `
+                    -ProjectPath $selectedRelative[0] `
+                    -Configuration $Configuration
+                $testArguments = @('vstest', $assembly)
+                $testArguments += '/TestCaseFilter:' + $semanticFilter
+            }
         }
         else {
             $testArguments = @(
@@ -274,7 +291,9 @@ if ($selectedRelative.Count -gt 0) {
                 $testArguments += '--no-build'
             }
         }
-        Invoke-RequiredDotnet $testArguments
+        if ($testArguments.Count -gt 0) {
+            Invoke-RequiredDotnet $testArguments
+        }
     }
     finally {
         Remove-Item -LiteralPath $filterPath -Force -ErrorAction SilentlyContinue

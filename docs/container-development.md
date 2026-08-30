@@ -121,7 +121,9 @@ and then runs the built assembly directly through VSTest, avoiding a second
 MSBuild project-graph evaluation. `-NoBuild` skips that build as well.
 `sp worker-tests` uses the same build-then-VSTest path.
 `sp test-changed` also uses it when the dependency analysis selects exactly
-one test project.
+one test project. When that project is `SharpProof.ArchitectureTest`, it reuses
+the semantic runner's duration-aware architecture-fixture sharding instead of
+running the repository-wide checks serially in one test process.
 Non-coverage semantic shards and ordinary package shards use the same
 direct-assembly path. Package process-containment postflight shards retain the
 project-aware runner and run exclusively after the parallel wave. The generic
