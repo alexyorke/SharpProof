@@ -9,6 +9,8 @@ param(
 
     [switch]$NoBuild,
 
+    [switch]$NoTestBuild,
+
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 1800,
 
@@ -42,6 +44,7 @@ if ($coverageEnabled -and
         'CoverageSettings and CoverageResultsDirectory must be supplied ' +
         'together.')
 }
+$reuseTestBuild = $NoBuild -or $NoTestBuild
 $resolvedCoverageSettings = if ($coverageEnabled) {
     (Resolve-Path -LiteralPath $CoverageSettings -ErrorAction Stop).Path
 }
@@ -54,7 +57,7 @@ $resolvedCoverageResults = if ($coverageEnabled) {
 else {
     ''
 }
-$testAssembly = if ($NoBuild -and -not $coverageEnabled) {
+$testAssembly = if ($reuseTestBuild -and -not $coverageEnabled) {
     Get-SharpProofTestAssemblyPath `
         -ProjectPath $testProject `
         -Configuration $Configuration
@@ -76,6 +79,94 @@ function Invoke-RequiredDotnet {
     & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Invoke-RequiredBuilds {
+    param([Parameter(Mandatory = $true)][object[]]$Builds)
+
+    if ($Builds.Count -eq 0) {
+        return
+    }
+
+    $lanesPerBuild = [Math]::Max(
+        1,
+        [Math]::Floor($parallelism / $Builds.Count))
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $running = [Collections.Generic.List[object]]::new()
+    try {
+        foreach ($build in $Builds) {
+            $arguments = @($build.Arguments) + @(
+                "/m:$lanesPerBuild",
+                '/nodeReuse:false',
+                '-p:UseSharedCompilation=false')
+            $effectiveArguments = @(
+                Add-SharpProofStaticGraphArgument -Arguments $arguments)
+            $startInfo = [Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = 'dotnet'
+            $startInfo.WorkingDirectory = $repositoryRoot
+            $startInfo.UseShellExecute = $false
+            $startInfo.CreateNoWindow = $true
+            $startInfo.RedirectStandardOutput = $true
+            $startInfo.RedirectStandardError = $true
+            $startInfo.Environment['UseSharedCompilation'] = 'false'
+            $startInfo.Environment['MSBUILDDISABLENODEREUSE'] = '1'
+            foreach ($argument in $effectiveArguments) {
+                [void]$startInfo.ArgumentList.Add($argument)
+            }
+            $process = [Diagnostics.Process]::new()
+            $process.StartInfo = $startInfo
+            if (-not $process.Start()) {
+                $process.Dispose()
+                throw "Could not start package build $($build.Name)."
+            }
+            $running.Add([pscustomobject]@{
+                Name = [string]$build.Name
+                Arguments = $effectiveArguments
+                Process = $process
+                StandardOutput = $process.StandardOutput.ReadToEndAsync()
+                StandardError = $process.StandardError.ReadToEndAsync()
+            })
+        }
+
+        foreach ($active in $running) {
+            $remaining = $deadline - [DateTime]::UtcNow
+            if ($remaining -le [TimeSpan]::Zero -or
+                -not $active.Process.WaitForExit(
+                    [int][Math]::Ceiling($remaining.TotalMilliseconds))) {
+                throw "Parallel package builds exceeded $TimeoutSeconds seconds."
+            }
+        }
+
+        $failures = [Collections.Generic.List[string]]::new()
+        foreach ($active in $running) {
+            $stdout = $active.StandardOutput.GetAwaiter().GetResult()
+            $stderr = $active.StandardError.GetAwaiter().GetResult()
+            Write-Host "--- Package build $($active.Name) ---"
+            if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                Write-Host $stdout.TrimEnd()
+            }
+            if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                Write-Host $stderr.TrimEnd()
+            }
+            if ($active.Process.ExitCode -ne 0) {
+                $failures.Add(
+                    "$($active.Name) exited $($active.Process.ExitCode): " +
+                    ($active.Arguments -join ' '))
+            }
+        }
+        if ($failures.Count -ne 0) {
+            throw "Package builds failed:`n$($failures -join "`n")"
+        }
+    }
+    finally {
+        foreach ($active in $running) {
+            if (-not $active.Process.HasExited) {
+                $active.Process.Kill($true)
+                $active.Process.WaitForExit()
+            }
+            $active.Process.Dispose()
+        }
     }
 }
 
@@ -188,6 +279,25 @@ if ([string]::IsNullOrWhiteSpace($PackageSource)) {
 }
 [IO.Directory]::CreateDirectory($results) | Out-Null
 $campaign = [Diagnostics.Stopwatch]::StartNew()
+$phaseTimings = [Collections.Generic.List[object]]::new()
+function Invoke-TimedPhase {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][scriptblock]$Action
+    )
+
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        & $Action
+    }
+    finally {
+        $timer.Stop()
+        $phaseTimings.Add([pscustomobject]@{
+            name = $Name
+            elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
+        })
+    }
+}
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $timingOutput = Join-Path $timingDirectory (
@@ -250,22 +360,51 @@ if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
 }
 
 try {
-    if (-not $NoBuild) {
-        Invoke-RequiredDotnet @(
-            'restore', 'SharpProof.sln', '--locked-mode')
-        Invoke-RequiredDotnet @(
-            'build', $testProject, '-c', $Configuration, '--no-restore')
+    if (-not $reuseTestBuild) {
+        Invoke-TimedPhase -Name 'restore' -Action {
+            Invoke-RequiredDotnet @(
+                'restore', 'SharpProof.sln', '--locked-mode',
+                '/nodeReuse:false')
+        }
+    }
+
+    $builds = [Collections.Generic.List[object]]::new()
+    if (-not $reuseTestBuild) {
+        $builds.Add([pscustomobject]@{
+            Name = 'test-harness-' + $Configuration.ToLowerInvariant()
+            Arguments = @(
+                'build', $testProject, '-c', $Configuration,
+                '--no-restore')
+        })
+    }
+    if ([string]::IsNullOrWhiteSpace($PackageSource) -and -not $NoBuild) {
+        $builds.Add([pscustomobject]@{
+            Name = 'package-products-release'
+            Arguments = @(
+                'build',
+                'SharpProof.Verifier/SharpProof.Verifier.csproj',
+                '-c', 'Release', '--no-restore',
+                '-p:GeneratePackageOnBuild=false')
+        })
+    }
+    if ($builds.Count -gt 0) {
+        Invoke-TimedPhase -Name 'build-prerequisites' -Action {
+            Invoke-RequiredBuilds -Builds @($builds)
+        }
     }
 
     if ([string]::IsNullOrWhiteSpace($PackageSource)) {
         $packageManifest = Get-Content -LiteralPath (Join-Path `
             $repositoryRoot 'scripts/package-projects.json') -Raw |
             ConvertFrom-Json
-        foreach ($project in @($packageManifest.projects)) {
-            Invoke-RequiredDotnet @(
-                'pack', [string]$project, '-c', 'Release', '--no-restore',
-                $(if ($NoBuild) { '--no-build' } else { '--nologo' }),
-                '--output', $feed, '/p:GeneratePackageOnBuild=false')
+        Invoke-TimedPhase -Name 'pack' -Action {
+            foreach ($project in @($packageManifest.projects)) {
+                Invoke-RequiredDotnet @(
+                    'pack', [string]$project, '-c', 'Release',
+                    '--no-restore', '--no-build', '--nologo',
+                    '/nodeReuse:false', '--output', $feed,
+                    '/p:GeneratePackageOnBuild=false')
+            }
         }
     }
 
@@ -443,6 +582,7 @@ try {
     $shardTimings = [Collections.Generic.List[object]]::new()
     $failures = [Collections.Generic.List[string]]::new()
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $testPhase = [Diagnostics.Stopwatch]::StartNew()
 
     while ($pending.Count -gt 0 -or $running.Count -gt 0) {
         while ($pending.Count -gt 0 -and $running.Count -lt $parallelism) {
@@ -464,7 +604,7 @@ try {
                         $isolatedOutputRoot (
                             $shard.Name + '/' + $Configuration + '/net9.0'))
             }
-            $directVstest = $NoBuild -and -not $coverageEnabled
+            $directVstest = $reuseTestBuild -and -not $coverageEnabled
             $arguments = if ($directVstest) {
                 @('vstest', $testAssembly)
             }
@@ -556,6 +696,11 @@ try {
             $active.Process.Dispose()
         }
     }
+    $testPhase.Stop()
+    $phaseTimings.Add([pscustomobject]@{
+        name = 'test-shards'
+        elapsedMilliseconds = [long]$testPhase.Elapsed.TotalMilliseconds
+    })
 
     $campaign.Stop()
     $workerMethodTimings = Get-TestMethodTimings `
@@ -598,6 +743,7 @@ try {
         configuration = $Configuration
         parallelism = $parallelism
         totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
+        phases = @($phaseTimings)
         shards = @($shardTimings | Sort-Object name)
         workerMethods = $workerMethodTimings
         packageLayoutMethods = $packageLayoutMethodTimings

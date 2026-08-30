@@ -196,7 +196,7 @@ docker compose run --rm tooling qualification command is preferable.
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
 Test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
 Trusted mutations use 4 deterministic weighted lanes.
-The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
+The default Debug check performs one Debug solution build, one Release package-product build, and 3 Release pack commands with `--no-build`.
 The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
 
 ## Documentation and support boundary

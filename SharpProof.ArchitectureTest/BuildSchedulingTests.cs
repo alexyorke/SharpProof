@@ -66,6 +66,33 @@ public sealed class BuildSchedulingTests
         }
     }
 
+    [Test]
+    public void PackageBuildsReuseOutputsAndAvoidTheSharedCompilerBottleneck()
+    {
+        var packageTests = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(packageTests, Does.Contain("[switch]$NoTestBuild"));
+            Assert.That(packageTests, Does.Contain("$reuseTestBuild"));
+            Assert.That(packageTests, Does.Contain("Invoke-RequiredBuilds"));
+            Assert.That(packageTests,
+                Does.Contain("'package-products-release'"));
+            Assert.That(packageTests,
+                Does.Contain("SharpProof.Verifier/SharpProof.Verifier.csproj"));
+            Assert.That(packageTests,
+                Does.Contain("'-p:UseSharedCompilation=false'"));
+            Assert.That(packageTests,
+                Does.Contain("'MSBUILDDISABLENODEREUSE'"));
+            Assert.That(packageTests,
+                Does.Contain("'--no-restore', '--no-build', '--nologo'"));
+            Assert.That(packageTests, Does.Contain("phases = @($phaseTimings)"));
+        }
+    }
+
     private static readonly string[] BuildSolution =
         ["build", "SharpProof.sln", "--no-restore", "-graphBuild"];
     private static readonly string[] TestFilter =

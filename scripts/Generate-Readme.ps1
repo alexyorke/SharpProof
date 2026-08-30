@@ -918,18 +918,18 @@ if (@($debugCommands | Where-Object {
             [string]$_.configuration -ceq 'Debug'
         }).Count -ne 1 -or
     @($debugCommands | Where-Object {
-            [string]$_.id -ceq 'package-test-build' -and
-            [string]$_.configuration -ceq 'Debug'
+            [string]$_.id -ceq 'package-product-build' -and
+            [string]$_.configuration -ceq 'Release'
         }).Count -ne 1 -or
     @($debugPacks | Where-Object {
-            [string]$_.configuration -cne 'Release' -or [bool]$_.noBuild
+            [string]$_.configuration -cne 'Release' -or -not [bool]$_.noBuild
         }).Count -ne 0 -or
     @($releaseCommands | Where-Object {
             [string]$_.id -ceq 'solution-build' -and
             [string]$_.configuration -ceq 'Release'
         }).Count -ne 1 -or
     @($releaseCommands | Where-Object {
-            [string]$_.id -ceq 'package-test-build'
+            [string]$_.id -ceq 'package-product-build'
         }).Count -ne 0 -or
     @($releasePacks | Where-Object {
             [string]$_.configuration -cne 'Release' -or -not [bool]$_.noBuild
@@ -938,8 +938,8 @@ if (@($debugCommands | Where-Object {
 }
 $checkPlanClaims = @(
     ("The default Debug check performs one Debug solution build, one " +
-        "additional Debug package-test build, and $($debugPacks.Count) " +
-        "build-capable Release pack commands.")
+        "Release package-product build, and $($debugPacks.Count) Release " +
+        "pack commands with ``--no-build``.")
     ("The Release check performs one Release solution build and " +
         "$($releasePacks.Count) Release pack commands with ``--no-build``.")
 )

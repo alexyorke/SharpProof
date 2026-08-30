@@ -28,10 +28,10 @@ if ([int]$commandPlan.schemaVersion -ne 1 -or
     [string]$commandPlan.configuration -cne $Configuration) {
     throw 'Developer-check command plan is invalid.'
 }
-$packagePlanBuild = @($commandPlan.commands | Where-Object {
-        [string]$_.id -ceq 'package-test-build'
+$packageProductBuild = @($commandPlan.commands | Where-Object {
+        [string]$_.id -ceq 'package-product-build'
     }).Count -eq 1
-$packagePlanReuse = -not $packagePlanBuild
+$packagePlanReuse = -not $packageProductBuild
 $timings = [Collections.Generic.List[object]]::new()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 
@@ -52,14 +52,15 @@ function Invoke-TimedPhase {
 
 Invoke-TimedPhase -Name 'restore' -Action {
     & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
-        restore SharpProof.sln --locked-mode
+        restore SharpProof.sln --locked-mode /nodeReuse:false
     if ($LASTEXITCODE -ne 0) {
         throw 'Developer-check restore failed.'
     }
 }
 Invoke-TimedPhase -Name 'build' -Action {
     & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
-        build SharpProof.sln -c $Configuration --no-restore
+        build SharpProof.sln -c $Configuration --no-restore `
+        /nodeReuse:false -p:UseSharedCompilation=false
     if ($LASTEXITCODE -ne 0) {
         throw 'Developer-check build failed.'
     }
@@ -76,6 +77,9 @@ Invoke-TimedPhase -Name 'package-tests' -Action {
         TimeoutSeconds = $TimeoutSeconds
     }
     $packageArguments.NoBuild = $packagePlanReuse
+    if ($packageProductBuild) {
+        $packageArguments.NoTestBuild = $true
+    }
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
 }

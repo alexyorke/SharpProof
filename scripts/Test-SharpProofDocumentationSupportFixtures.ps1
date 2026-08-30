@@ -140,7 +140,7 @@ try {
         'check-plan-drift' {
             $text = $text.Replace(
                 ('The default Debug check performs one Debug solution build, ' +
-                 'one additional Debug package-test build, and 3'),
+                 'one Release package-product build, and 3'),
                 ('The default Debug check reuses one build for every package ' +
                  'and test phase, with 3'),
                 [StringComparison]::Ordinal)

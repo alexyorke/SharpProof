@@ -2017,8 +2017,8 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'dev-check-command-plan-package-build'
         File = 'scripts\Get-SharpProofDevCheckPlan.ps1'
-        Original = "    Add-Command 'package-test-build' 'package-tests' `$Configuration `$false"
-        Mutated = '    # package-test build removed from command plan'
+        Original = "    Add-Command 'package-product-build' 'package-tests' 'Release' `$false"
+        Mutated = '    # package-product build removed from command plan'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~CommandPlanOwnsConfigurationSpecificBuildGraph'
     },
