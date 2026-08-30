@@ -898,7 +898,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task InvalidCompilerElidedClauseDoesNotPoisonCompanionProof()
+    public async Task InvalidCompilerElidedClauseCannotBeHiddenByCompanionProof()
     {
         using var project = TestProject.Create(
             """
@@ -934,12 +934,15 @@ public sealed class WorkerTests
         {
             Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
             Assert.That(response.Manifest.Claims[0].Evidence,
-                Is.EqualTo(WorkerClaimEvidence.CompanionClause));
+                Is.EqualTo(WorkerClaimEvidence.DirectClause));
             Assert.That(response.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven),
-                response.ClaimResults.Single().Reason.ToString());
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(response.ClaimResults.Single().Reason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
             Assert.That(response.CallableResults.Single().Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Complete));
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+            Assert.That(response.CallableResults.Single().Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
