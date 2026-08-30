@@ -18,6 +18,9 @@ internal static class AnalyzerDiagnosticCatalog
             (ContractBindingFailure.NestedOld, true) => (
                 "<nesting>",
                 "Contract.Old cannot be nested inside Contract.Old"),
+            (ContractBindingFailure.NestedOld, false) => (
+                "<nesting>",
+                "Contract.Result cannot be nested inside Contract.Old"),
             (ContractBindingFailure.InvalidIntrinsicSignature, true) => (
                 "<signature>",
                 "expected exactly one value argument"),

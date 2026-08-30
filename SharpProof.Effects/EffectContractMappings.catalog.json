@@ -136,11 +136,14 @@
       {"type":"ManagedFlowResult?","name":"Flow"},
       {"type":"IOperation","name":"Origin"}
     ]},
+    {"name":"EffectContractInvalidAttribute","access":"internal","parameters":[
+      {"type":"AttributeData","name":"Attribute"},
+      {"type":"string","name":"Reason"}
+    ]},
     {"name":"EffectContractResolution","access":"internal","parameters":[
       {"type":"EffectContractResolutionKind","name":"Kind"},
       {"type":"EffectSummary","name":"Summary"},
-      {"type":"AttributeData?","name":"InvalidAttribute","default":"null"},
-      {"type":"string","name":"InvalidReason","default":"\"\""}
+      {"type":"ImmutableArray<EffectContractInvalidAttribute>","name":"InvalidAttributes","default":"default"}
     ]},
     {"name":"EffectMethodNode","access":"internal","parameters":[
       {"type":"EffectSummary","name":"LocalSummary"},

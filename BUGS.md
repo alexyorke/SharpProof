@@ -621,13 +621,6 @@ This section records 38 findings from exactly 30 fresh read-only auditors: 20 re
 - Impact: False Requires diagnostics and false outcomes are attributed to a delegating constructor when the actual root execution is suppressed.
 - Safe evidence: An initializer calls a failing Guard; the suppressed parameterless root exists with unsuppressed `Subject(int):this()`. C# runs the initializer only in the suppressed root, but the loop analyzes it under the delegating constructor.
 
-## Wave 7.34. MEDIUM - Only one malformed EffectContract attribute is diagnosed per callable
-
-- Files and members: `SharpProof.Analyzer.Core/EffectContractDiagnostics.cs`, `ValidateArguments`, current lines 20-27; `ExternalEffectResolver.ResolveContract`, lines 76-89; generated resolution model, lines 176-180.
-- Mechanism: `ValidateArguments` resolves once and reports only scalar `InvalidAttribute`. The resolver returns immediately on the first decode failure or inconsistent duplicate. The attribute allows multiple instances, so later independently invalid attributes are never validated or reported.
-- Impact: Incomplete diagnostics and an iterative repair loop; tooling cannot enumerate all invalid declarations in one run.
-- Safe evidence: Two `EffectContract` attributes with distinct invalid effect bits; selection includes both, but validation emits at most one SP0024.
-
 ## Wave 7.35. LOW - Property-level rejected control attributes are reported once per accessor
 
 - Files and members: `SharpProof.Analyzer.Core/SharpProofControlAttributePolicy.cs`, `ValidateDeclaredScope`, current lines 19-44; `AnalyzerFeaturePipeline.ValidateMethodAttributes`; `ContractSelectionInventory.GetCallableAttributes`.
@@ -727,13 +720,6 @@ This section records 19 unique findings from exactly 30 fresh read-only auditors
 - Mechanism: A fake worker publishes only a numeric PID. The probe first waits for the launcher to exit, by which time the worker is reaped and its PID freed, and then calls `Process.GetProcessById`. Under process churn, the PID may belong to an unrelated process; the catch handles only an absent PID, not reuse.
 - Impact: False forced-termination gate failure and about 10 seconds of budget consumption although the probed worker exited correctly.
 - Safe evidence: The ordering is explicit in the members. A process handle or verified start identity must be retained while the worker is live.
-
-## Wave 8.14. MEDIUM - Nested Contract.Result is falsely diagnosed as a return-type signature mismatch
-
-- Files and members: `SharpProof.Contracts/ContractIntrinsicValidator.cs`, `Classify`, current lines 60-69; `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs`, `ReportInvalidIntrinsics`, lines 652-671; `AnalyzerDiagnosticCatalog.DescribeIntrinsicViolation`, lines 13-29.
-- Mechanism: `Result` inside `Old` is rejected because `context.InsideOld` but collapsed to `InvalidIntrinsicSignature`. The reporter infers intrinsic identity only from Old-specific failure kinds, so it labels the intrinsic as Result and the catalog states that the result type mismatches even when it matches. The catalog's `InvalidIntrinsicSignature/isOld` arm becomes unreachable.
-- Impact: SP0024 gives advice that cannot fix the source and loses the actual forbidden-nesting cause.
-- Safe evidence: In an int method, `Ensures(Old(Result<int>()) == value)` has a matching type, yet the diagnostic claims otherwise.
 
 ## Wave 8.15. MEDIUM - Atomic replacement discards destination filesystem metadata and access mode
 

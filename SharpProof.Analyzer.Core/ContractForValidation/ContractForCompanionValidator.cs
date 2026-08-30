@@ -58,6 +58,7 @@ internal static class ContractForCompanionValidator
 
         var targets = GetLogicalMethods(companion.Target);
         var candidates = GetLogicalMethods(companion.Companion);
+        var intrinsics = new ContractIntrinsicValidator(compilation);
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
         var byTarget = targets.ToDictionary(
             static target => target,
@@ -171,6 +172,7 @@ internal static class ContractForCompanionValidator
             ValidateBody(
                 ContractClauseInventoryBuilder.NormalizeCallable(matches[0]),
                 clauses,
+                intrinsics,
                 diagnostics,
                 compilation,
                 companion.AttributeLocation,
@@ -189,6 +191,7 @@ internal static class ContractForCompanionValidator
     private static void ValidateBody(
         IMethodSymbol method,
         ContractClauseInventoryBuilder clauses,
+        ContractIntrinsicValidator intrinsics,
         List<Diagnostic> diagnostics,
         Compilation compilation,
         Location fallback,
@@ -202,6 +205,16 @@ internal static class ContractForCompanionValidator
                 GetSourceLocation(method, compilation, fallback),
                 method.Name));
             return;
+        }
+
+        foreach (var violation in intrinsics.Validate(
+                     method,
+                     inventory.ImplementationBody))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            diagnostics.Add(
+                SharpProof.Analyzer.InvalidContractArgumentDiagnostics.Create(
+                    violation));
         }
 
         foreach (var clause in inventory.Clauses)

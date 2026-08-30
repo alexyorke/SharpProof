@@ -661,23 +661,9 @@ internal static partial class AnalyzerFeaturePipeline
                 continue;
             }
 
-            var isOld = violation.Failure is
-                ContractBindingFailure.OldOutsideEnsures or ContractBindingFailure.NestedOld;
-            var (argument, reason) = DescribeIntrinsicViolation(violation.Failure, isOld);
-            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                isOld ? "Contract.Old" : "Contract.Result",
-                argument,
-                reason,
-                violation.Invocation.Syntax.GetLocation()));
+            reportDiagnostic(
+                InvalidContractArgumentDiagnostics.Create(violation));
         }
-    }
-
-    private static (string Argument, string Reason) DescribeIntrinsicViolation(
-        ContractBindingFailure failure,
-        bool isOld)
-    {
-        return AnalyzerDiagnosticCatalog.DescribeIntrinsicViolation(
-            failure, isOld);
     }
 
     private static void ReportInvalidClauses(

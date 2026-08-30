@@ -37,46 +37,53 @@ internal sealed class ContractIntrinsicValidator
             }
 
             var context = GetContext(invocation, owner);
-            var failure = Classify(invocation, owner, context, isResult);
-            if (failure != ContractBindingFailure.None)
+            var violationKind = Classify(invocation, owner, context, isResult);
+            if (violationKind.HasValue)
             {
-                violations.Add(new(invocation, context.Clause, failure));
+                violations.Add(new(
+                    invocation,
+                    context.Clause,
+                    violationKind.Value));
             }
         }
         return violations.ToImmutable();
     }
 
-    private static ContractBindingFailure Classify(
+    private static ContractIntrinsicViolationKind? Classify(
         IInvocationOperation invocation, IMethodSymbol owner, IntrinsicContext context,
         bool isResult)
     {
         if (context.Clause != BoundContractKind.Ensures)
         {
             return isResult
-                ? ContractBindingFailure.ResultOutsideEnsures
-                : ContractBindingFailure.OldOutsideEnsures;
+                ? ContractIntrinsicViolationKind.ResultOutsideEnsures
+                : ContractIntrinsicViolationKind.OldOutsideEnsures;
         }
 
         if (isResult)
         {
-            return !context.InsideOld &&
-                   invocation.Arguments.Length == 0 && !owner.ReturnsVoid &&
+            if (context.InsideOld)
+            {
+                return ContractIntrinsicViolationKind.ResultInsideOld;
+            }
+
+            return invocation.Arguments.Length == 0 && !owner.ReturnsVoid &&
                    owner.MethodKind != MethodKind.Constructor &&
                    invocation.Type != null &&
                    SymbolEqualityComparer.IncludeNullability.Equals(
                        invocation.Type, owner.ReturnType)
-                ? ContractBindingFailure.None
-                : ContractBindingFailure.InvalidIntrinsicSignature;
+                ? null
+                : ContractIntrinsicViolationKind.InvalidResultSignature;
         }
 
         if (invocation.Arguments.Length != 1)
         {
-            return ContractBindingFailure.InvalidIntrinsicSignature;
+            return ContractIntrinsicViolationKind.InvalidOldSignature;
         }
 
         return context.InsideOld
-            ? ContractBindingFailure.NestedOld
-            : ContractBindingFailure.None;
+            ? ContractIntrinsicViolationKind.OldInsideOld
+            : null;
     }
 
     private IntrinsicContext GetContext(IOperation operation, IMethodSymbol owner)
@@ -121,10 +128,41 @@ internal sealed class ContractIntrinsicValidator
     }
 }
 
-internal readonly struct ContractIntrinsicViolation(IInvocationOperation invocation,
-    BoundContractKind? enclosingClauseKind, ContractBindingFailure failure)
+internal enum ContractIntrinsicViolationKind
+{
+    ResultOutsideEnsures,
+    OldOutsideEnsures,
+    ResultInsideOld,
+    OldInsideOld,
+    InvalidResultSignature,
+    InvalidOldSignature
+}
+
+internal readonly struct ContractIntrinsicViolation(
+    IInvocationOperation invocation,
+    BoundContractKind? enclosingClauseKind,
+    ContractIntrinsicViolationKind kind)
 {
     internal IInvocationOperation Invocation { get; } = invocation;
     internal BoundContractKind? EnclosingClauseKind { get; } = enclosingClauseKind;
-    internal ContractBindingFailure Failure { get; } = failure;
+    internal ContractIntrinsicViolationKind Kind { get; } = kind;
+    internal bool IsOld => Kind is
+        ContractIntrinsicViolationKind.OldOutsideEnsures or
+        ContractIntrinsicViolationKind.OldInsideOld or
+        ContractIntrinsicViolationKind.InvalidOldSignature;
+    internal ContractBindingFailure Failure => Kind switch
+    {
+        ContractIntrinsicViolationKind.ResultOutsideEnsures =>
+            ContractBindingFailure.ResultOutsideEnsures,
+        ContractIntrinsicViolationKind.OldOutsideEnsures =>
+            ContractBindingFailure.OldOutsideEnsures,
+        ContractIntrinsicViolationKind.ResultInsideOld or
+        ContractIntrinsicViolationKind.OldInsideOld =>
+            ContractBindingFailure.NestedOld,
+        ContractIntrinsicViolationKind.InvalidResultSignature or
+        ContractIntrinsicViolationKind.InvalidOldSignature =>
+            ContractBindingFailure.InvalidIntrinsicSignature,
+        _ => throw new InvalidOperationException(
+            "Unknown contract intrinsic violation: " + Kind)
+    };
 }
