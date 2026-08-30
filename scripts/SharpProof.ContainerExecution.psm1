@@ -62,6 +62,56 @@ function Get-SharpProofTestProjectParallelism {
     return [Math]::Max(1, [Math]::Floor($visibleProcessors / $divisor))
 }
 
+function Get-SharpProofTestAssemblyPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('Debug', 'Release')]
+        [string]$Configuration
+    )
+
+    $project = if ([IO.Path]::IsPathRooted($ProjectPath)) {
+        [IO.Path]::GetFullPath($ProjectPath)
+    }
+    else {
+        [IO.Path]::GetFullPath((Join-Path (Get-Location) $ProjectPath))
+    }
+    if (-not (Test-Path -LiteralPath $project -PathType Leaf)) {
+        throw "Test project was not found: '$ProjectPath'."
+    }
+
+    [xml]$document = Get-Content -LiteralPath $project -Raw
+    $frameworks = @(
+        $document.SelectNodes("//*[local-name()='TargetFramework']") |
+            ForEach-Object { [string]$_.InnerText } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($frameworks.Count -ne 1) {
+        throw (
+            'Direct vstest requires exactly one TargetFramework in ' +
+            "'$ProjectPath'; use dotnet test for multi-target projects.")
+    }
+    $assemblyName = @(
+        $document.SelectNodes("//*[local-name()='AssemblyName']") |
+            ForEach-Object { [string]$_.InnerText } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -First 1)
+    if ($assemblyName.Count -eq 0) {
+        $assemblyName = [IO.Path]::GetFileNameWithoutExtension($project)
+    }
+    $assembly = Join-Path (Split-Path -Parent $project) (
+        'bin/' + $Configuration + '/' + $frameworks[0] + '/' +
+        $assemblyName + '.dll')
+    if (-not (Test-Path -LiteralPath $assembly -PathType Leaf)) {
+        throw (
+            "Built test assembly was not found at '$assembly'; run a " +
+            'matching build before using -NoBuild.')
+    }
+    return [IO.Path]::GetFullPath($assembly)
+}
+
 function New-SharpProofIsolatedTestOutput {
     [CmdletBinding()]
     param(
@@ -121,4 +171,5 @@ function New-SharpProofIsolatedTestOutput {
 Export-ModuleMember -Function @(
     'Add-SharpProofStaticGraphArgument',
     'Get-SharpProofTestProjectParallelism',
+    'Get-SharpProofTestAssemblyPath',
     'New-SharpProofIsolatedTestOutput')

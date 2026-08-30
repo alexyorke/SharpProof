@@ -144,6 +144,34 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void NoBuildProjectTestsCanUseTheBuiltAssemblyDirectly()
+    {
+        var root = FindRepositoryRoot();
+        var module = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "SharpProof.ContainerExecution.psm1"));
+        var container = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(module,
+                Does.Contain("function Get-SharpProofTestAssemblyPath"));
+            Assert.That(module,
+                Does.Contain("Direct vstest requires exactly one TargetFramework"));
+            Assert.That(container,
+                Does.Contain("Get-SharpProofTestAssemblyPath"));
+            Assert.That(container,
+                Does.Contain("$arguments = @('vstest', $assembly)"));
+            Assert.That(container,
+                Does.Contain("'/TestCaseFilter:' + $TestFilter"));
+        }
+    }
+
+    [Test]
     public void ChangedTestsCanReuseACompletedBuild()
     {
         var root = FindRepositoryRoot();

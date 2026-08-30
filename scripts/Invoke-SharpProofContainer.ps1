@@ -212,6 +212,18 @@ switch ($Command) {
         }
     }
     'test' {
+        if ($NoBuild -and
+            $Target.EndsWith('.csproj', [StringComparison]::OrdinalIgnoreCase)) {
+            $assembly = Get-SharpProofTestAssemblyPath `
+                -ProjectPath $Target `
+                -Configuration $Configuration
+            $arguments = @('vstest', $assembly)
+            if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+                $arguments += '/TestCaseFilter:' + $TestFilter
+            }
+            Invoke-DotNet $arguments
+            break
+        }
         if (-not $NoBuild) {
             Invoke-DotNet @('restore', $Target, '--locked-mode')
         }

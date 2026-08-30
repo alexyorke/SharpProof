@@ -86,6 +86,10 @@ changes so the Worker dependency closure is rebuilt.
 The same `-NoBuild` fast path is available on `sp test`, `sp semantic-tests`,
 `sp portable-tests`, and `sp package-tests`; use it only when the matching
 configuration and package outputs already exist in this workspace.
+For a single test project, `sp test -NoBuild` runs the built test assembly
+directly through VSTest, avoiding another MSBuild project-graph evaluation.
+Solution and sharded semantic/package commands retain their project-aware
+runner because they coordinate multiple outputs and fixtures.
 Commands that compare revisions or certify exact-commit evidence (`test-changed`,
 acceptance, mutation, packaging, pilots, fuzz, coverage, and release commands)
 require a Git-backed source workspace. Start the persistent Dev Container to
