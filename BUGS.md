@@ -201,13 +201,6 @@ This section records 37 findings from exactly 10 fresh read-only auditors after 
 
 This section records 7 findings from exactly 10 fresh read-only auditors. The relay compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 4.4. MEDIUM - Contradictory entry conditions do not short-circuit callable postcondition verification
-
-- Files and members: `SharpProof.Worker/CallableVerifier.cs`, `VerifyPostconditionsAsync`, lines 96-101, 103-131, and 187-218; intended contradictory-vacuity handling at lines 251-292. Related: `EffectClaimResultAssembler.Assemble`, lines 62-77.
-- Mechanism: After `entryFeasibility` establishes `IsContradictory`, the method still executes the body at lines 103-114, returns `Unknown` on body failure at 115-118, builds evidence and returns `Unknown` on evidence failure at 121-131, and can return per-claim `Unknown` for missing, deep, or unsupported postconditions at 187-218. Only after a successful backend query does it attach `ContradictoryPreconditions` vacuity at 251-292.
-- Impact: Valid vacuous proofs become deterministic false-`Unknown` results whenever the body, evidence, or goal is unsupported, and the advertised contradictory-precondition vacuity and proof-core evidence are lost.
-- Safe evidence: Static control-flow trace. This is inconsistent with `EffectClaimResultAssembler.Assemble` lines 62-77, which emits `Proven`/`VacuousEntry` directly once entry contradiction is known, except for its explicit `UnsupportedContract` case.
-
 ## Wave 4.5. MEDIUM - Effect replay authenticates capability and exception constraints but validates only allocation violations
 
 - Files and members: `SharpProof.Worker/EffectCounterexampleReplayer.cs`, `Replay`, lines 34-56; `Interpret`, lines 117-155; `IsViolation`, lines 158-169; `ComputeConstraintIdentity`, lines 223-241. Downstream: `SharpProof.Worker/EffectClaimResultAssembler.cs`, `Assemble`, lines 80-103.

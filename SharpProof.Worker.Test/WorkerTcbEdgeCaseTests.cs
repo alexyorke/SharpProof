@@ -375,6 +375,42 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task SemanticPreconditionContradictionShortCircuitsUnsupportedBody()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var variable = factory.Variable(value);
+        var target = CreateTarget(
+            factory,
+            [
+                Requires(factory.Binary(
+                    IrBinaryOperator.GreaterThan,
+                    variable,
+                    factory.Integer(0))),
+                Requires(factory.Binary(
+                    IrBinaryOperator.LessThan,
+                    variable,
+                    factory.Integer(0))),
+                Ensures(factory.Boolean(false))
+            ],
+            [Parameter(value)],
+            body: null);
+
+        var result = await VerifyWithSmtAsync(target);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                result.Vacuity,
+                Is.EqualTo(
+                    WorkerVacuityKind.ContradictoryPreconditions));
+            Assert.That(result.ProofCore, Is.Not.Empty);
+        }
+    }
+
+    [Test]
     public async Task ResultSourceDomainCannotCreatePreconditionVacuity()
     {
         var factory = new IrFactory();

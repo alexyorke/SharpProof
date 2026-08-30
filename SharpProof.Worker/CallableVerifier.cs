@@ -100,6 +100,14 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 entryFeasibility.Reason);
         }
 
+        if (entryFeasibility.IsContradictory)
+        {
+            return ContradictoryPostconditions(
+                target,
+                ensures.Length,
+                entryFeasibility);
+        }
+
         SymbolicBodyExecution body = target.Body switch
         {
             { Kind: CompilerPreparedBodyKind.Trivial } => TrivialBody(factory),
@@ -297,6 +305,31 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         }
         cancellationToken.ThrowIfCancellationRequested();
         return records.ToImmutable();
+    }
+
+    private static ImmutableArray<WorkerClaimResult>
+        ContradictoryPostconditions(
+            CompilerCallablePreparation target,
+            int postconditionCount,
+            CallableEntryFeasibility entryFeasibility)
+    {
+        return [.. Enumerable.Range(0, postconditionCount).Select(index =>
+        {
+            var record = CallableClaimResultAssembler.Create(
+                target,
+                target.Entry.ClaimIds[index],
+                WorkerClaimOutcome.Proven,
+                WorkerClaimReason.None,
+                WorkerEffectEvidenceCertainty.Unspecified);
+            record.Vacuity =
+                WorkerVacuityKind.ContradictoryPreconditions;
+            record.ProofCore = [.. entryFeasibility.ProofCore];
+            record.Assumptions =
+                CallableClaimResultAssembler.MarkAssumptionsUsed(
+                    target,
+                    entryFeasibility.UsedAssumptionIds);
+            return record;
+        })];
     }
 
     private async Task<ProofOutcome?> ProbeSatisfiabilityAsync(
