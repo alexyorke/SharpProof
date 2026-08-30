@@ -254,6 +254,8 @@ public sealed class FinalCompilationCollectorTests
         ProjectDirectoryKey = "build_property._SharpProofProjectDirectory";
     private const string MaximumExpressionDepthKey =
         "build_property.SharpProofVerifyMaximumExpressionDepth";
+    private const string SpecificationPacksKey =
+        "build_property.SharpProofSpecificationPacks";
 
     [Test]
     public async Task CollectorIsInactiveWithoutAPathAndForTheOffProfile()
@@ -602,6 +604,61 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0049"]));
+    }
+
+    [TestCase(";dotnet.scalar")]
+    [TestCase("dotnet.scalar;")]
+    [TestCase(";;dotnet.scalar")]
+    [TestCase(" ;dotnet.scalar")]
+    public async Task BlankSpecificationPackSegmentFailsArtifactEmission(
+        string value)
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("blank-specification-pack");
+        var options = Options(path);
+        options[SpecificationPacksKey] = value;
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            options);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task EmptyOrUnsetSpecificationPacksRemainNoPacksDefault()
+    {
+        using var workspace = new CollectorWorkspace();
+        string?[] values = [null, string.Empty, "   "];
+
+        for (var index = 0; index < values.Length; index++)
+        {
+            var path = workspace.SealPath("no-specification-packs-" + index);
+            var options = Options(path);
+            if (values[index] != null)
+            {
+                options[SpecificationPacksKey] = values[index]!;
+            }
+
+            var diagnostics = await AnalyzeCollectorAsync(
+                CreateCompilation(),
+                options);
+
+            Assert.That(diagnostics, Is.Empty);
+            var artifact = CompilerManifestArtifactJson.Deserialize(
+                await File.ReadAllTextAsync(path));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(artifact.SpecificationPackIds, Is.Empty);
+                Assert.That(artifact.Compilation.SpecificationPackIds, Is.Empty);
+            }
+        }
     }
 
     [Test]

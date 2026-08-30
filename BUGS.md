@@ -467,15 +467,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Impact: Exactly lowerable calls using two closed outer instantiations can abstain or fail depending on call order.
 - Safe evidence: Use generic `Outer<T>` with nongeneric `Inner` and static scalar `F`; invoke `Outer<int>.Inner.F` and `Outer<long>.Inner.F` and require both summaries to prepare.
 
-## Wave 6.8. MEDIUM - Blank specification-pack entries are silently discarded instead of failing closed
-
-- File: `SharpProof.CompilerCollector/FinalCompilationCollector.cs`
-- Member: `ParseSpecificationPacks`
-- Current lines: 95-103, especially `Split` with `RemoveEmptyEntries` at 95-98
-- Mechanism: Values such as `dotnet.scalar;`, `;dotnet.scalar`, doubled separators, or whitespace-only segments are accepted and serialized as though the blank ID were absent, making later blank validation ineffective.
-- Impact: Malformed compiler-visible authority configuration emits a valid manifest rather than SP0049 and no artifact, concealing truncation or interpolation mistakes and violating documented fail-closed semantics.
-- Safe evidence: Leading, trailing, doubled, and whitespace-only internal segments should produce SP0049; an entirely empty or unset property remains the no-packs default. `docs/analysis-limits.md` line 31 states that blank IDs fail closed.
-
 ## Wave 6.9. MEDIUM - Result-domain assumptions do not rewrite returns through available spec projections
 
 - Files and members: `SharpProof.Worker/PostconditionObligationBuilder.cs`, `TryAddSourceDomainAssumptions`, current lines 32-46, especially 39-46; `CallableEvidenceBuilder.Build`, lines 153-160 and domain check at 195-198; `PostconditionObligationBuilder.IsSupportedProofDomain`, lines 114-117.
