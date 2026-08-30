@@ -827,6 +827,101 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public async Task ExecutedImplicitCallShapesHonorRequiresPreconditions()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Number {
+                public static Number operator +(Number left, Number right) {
+                    Contract.Requires(false);
+                    return left;
+                }
+                public static implicit operator int(Number value) {
+                    Contract.Requires(false);
+                    return 0;
+                }
+            }
+
+            public sealed class Sequence {
+                public Enumerator GetEnumerator() {
+                    Contract.Requires(false);
+                    return new Enumerator();
+                }
+            }
+            public struct Enumerator {
+                public int Current => 0;
+                public bool MoveNext() => false;
+            }
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() {
+                    Contract.Requires(false);
+                }
+            }
+
+            public sealed class Point {
+                public void Deconstruct(out int value) {
+                    Contract.Requires(false);
+                    value = 0;
+                }
+            }
+
+            public static class Subject {
+                private static void Target() {
+                    Contract.Requires(false);
+                }
+
+                public static void Calls() {
+                    var number = new Number();
+                    _ = number + number;
+                    int converted = number;
+                    foreach (var item in new Sequence()) { _ = item; }
+                    using (var resource = new Resource()) { }
+                    var point = new Point();
+                    if (point is Point(var coordinate)) {
+                        _ = coordinate;
+                    }
+                    Action callback = Target;
+                    callback();
+                    _ = converted;
+                }
+            }
+            """,
+            ["SP0027"]);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", 6)));
+        var messages = diagnostics
+            .Select(static diagnostic => diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture))
+            .ToHashSet(StringComparer.Ordinal);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(messages, Has.Count.EqualTo(6));
+            Assert.That(messages, Does.Contain(
+                "Requires clause for 'op_Addition' is not proven: false."));
+            Assert.That(messages, Does.Contain(
+                "Requires clause for 'op_Implicit' is not proven: false."));
+            Assert.That(messages, Does.Contain(
+                "Requires clause for 'GetEnumerator' is not proven: false."));
+            Assert.That(messages, Does.Contain(
+                "Requires clause for 'Dispose' is not proven: false."));
+            Assert.That(messages, Does.Contain(
+                "Requires clause for 'Deconstruct' is not proven: false."));
+            Assert.That(messages, Does.Contain(
+                "Requires clause for 'Target' is not proven: false."));
+        }
+    }
+
+    [Test]
     public void PotentialPreconditionScreenFailsClosedWithoutTrustedApiIdentity()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
