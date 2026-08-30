@@ -296,21 +296,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                          flowResult,
                          cancellationToken))
             {
-                if (callSites.Any(existing =>
-                        existing.Syntax.SyntaxTree ==
-                            operation.Syntax.SyntaxTree &&
-                        (existing.Syntax.Span == operation.Syntax.Span ||
-                         existing.Operation?.IsImplicit == true &&
-                         operation.Syntax.Span.Contains(
-                             existing.Syntax.Span)) &&
-                        SymbolEqualityComparer.Default.Equals(
-                            existing.TargetMethod,
-                            call.TargetMethod)))
-                {
-                    continue;
-                }
-
-                callSites.Add(new RequiresCallSiteCandidate(
+                var candidate = new RequiresCallSiteCandidate(
                     operation,
                     operation.Syntax,
                     call.TargetMethod,
@@ -325,7 +311,26 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         flowAnalysisIsComplete:
                             flowAnalysis.IsComplete),
                     Flow: null,
-                    flowAnalysis.Status));
+                    flowAnalysis.Status);
+                var existingIndex = callSites.FindIndex(existing =>
+                        existing.Syntax.SyntaxTree ==
+                            operation.Syntax.SyntaxTree &&
+                        (existing.Syntax.Span == operation.Syntax.Span ||
+                         existing.Operation?.IsImplicit == true &&
+                         operation.Syntax.Span.Contains(
+                             existing.Syntax.Span)) &&
+                        SymbolEqualityComparer.Default.Equals(
+                            existing.TargetMethod,
+                            call.TargetMethod));
+                if (existingIndex < 0)
+                {
+                    callSites.Add(candidate);
+                }
+                else if (!callSites[existingIndex].CanReplay &&
+                         candidate.CanReplay)
+                {
+                    callSites[existingIndex] = candidate;
+                }
             }
         }
 
@@ -666,7 +671,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         DefiniteOperationFacts? operationFacts = null,
         SemanticModel? semanticModel = null,
         IReadOnlyDictionary<ILocalSymbol,
-            (IMethodSymbol Method, IOperation? Instance)>?
+            DirectDelegateTarget>?
             delegateTargets = null,
         ManagedFlowResult? flowResult = null,
         CancellationToken cancellationToken = default)
@@ -692,35 +697,50 @@ internal sealed partial class RequiresCallSiteDiscovery(
             ICompoundAssignmentOperation
             {
                 OperatorMethod: { } method
-            } compound => [CreateImplicitOperatorCall(
+            } compound => CreateImplicitOperatorCalls(
                 method,
+                compound,
+                compound.IsLifted,
+                flowResult,
                 compound.Target,
-                compound.Value)],
+                compound.Value),
             IIncrementOrDecrementOperation
             {
                 OperatorMethod: { } method
-            } increment => [CreateImplicitOperatorCall(
+            } increment => CreateImplicitOperatorCalls(
                 method,
-                increment.Target)],
+                increment,
+                increment.IsLifted,
+                flowResult,
+                increment.Target),
             IBinaryOperation
             {
                 OperatorMethod: { } method
-            } binary => [CreateImplicitOperatorCall(
+            } binary => CreateImplicitOperatorCalls(
                 method,
+                binary,
+                binary.IsLifted,
+                flowResult,
                 binary.LeftOperand,
-                binary.RightOperand)],
+                binary.RightOperand),
             IUnaryOperation
             {
                 OperatorMethod: { } method
-            } unary => [CreateImplicitOperatorCall(
+            } unary => CreateImplicitOperatorCalls(
                 method,
-                unary.Operand)],
+                unary,
+                unary.IsLifted,
+                flowResult,
+                unary.Operand),
             IConversionOperation
             {
                 OperatorMethod: { } method
-            } conversion => [CreateImplicitOperatorCall(
+            } conversion => CreateImplicitOperatorCalls(
                 method,
-                conversion.Operand)],
+                conversion,
+                IsLiftedUserDefinedConversion(conversion, method),
+                flowResult,
+                conversion.Operand),
             IForEachLoopOperation forEach => GetForEachCalls(
                 forEach,
                 operationFacts,
@@ -757,7 +777,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private static ImmutableArray<RequiresCallTarget> GetInvocationCalls(
         IInvocationOperation invocation,
         IReadOnlyDictionary<ILocalSymbol,
-            (IMethodSymbol Method, IOperation? Instance)>?
+            DirectDelegateTarget>?
             delegateTargets)
     {
         var ordinary = new RequiresCallTarget(
@@ -768,7 +788,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             true);
         if (invocation.TargetMethod.MethodKind != MethodKind.DelegateInvoke ||
             !TryResolveDirectDelegateTarget(
-                invocation.Instance,
+                invocation,
                 delegateTargets,
                 out var target))
         {
@@ -781,6 +801,62 @@ internal sealed partial class RequiresCallSiteDiscovery(
             invocation.Arguments,
             ImmutableDictionary<int, IOperation>.Empty,
             true)];
+    }
+
+    private static ImmutableArray<RequiresCallTarget>
+        CreateImplicitOperatorCalls(
+            IMethodSymbol method,
+            IOperation operation,
+            bool isLifted,
+            ManagedFlowResult? flowResult,
+            params IOperation[] operands)
+    {
+        if (isLifted && operands.Any(operand =>
+                DefiniteOperationFacts.IsDefinitelyNull(operand) ||
+                flowResult?.ProvesNull(operation, operand) == true))
+        {
+            return [];
+        }
+
+        return [CreateImplicitOperatorCall(method, operands)];
+    }
+
+    private static bool IsLiftedUserDefinedConversion(
+        IConversionOperation conversion,
+        IMethodSymbol method)
+    {
+        return method.Parameters.Length == 1 &&
+            TryGetNullableUnderlyingType(
+                conversion.Operand.Type,
+                out var operandType) &&
+            TryGetNullableUnderlyingType(
+                conversion.Type,
+                out var resultType) &&
+            SymbolEqualityComparer.Default.Equals(
+                operandType,
+                method.Parameters[0].Type) &&
+            SymbolEqualityComparer.Default.Equals(
+                resultType,
+                method.ReturnType);
+    }
+
+    private static bool TryGetNullableUnderlyingType(
+        ITypeSymbol? type,
+        out ITypeSymbol underlying)
+    {
+        if (type is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType:
+                    SpecialType.System_Nullable_T,
+                TypeArguments.Length: 1
+            } nullable)
+        {
+            underlying = nullable.TypeArguments[0];
+            return true;
+        }
+
+        underlying = null!;
+        return false;
     }
 
     private static RequiresCallTarget CreateImplicitOperatorCall(
@@ -801,15 +877,24 @@ internal sealed partial class RequiresCallSiteDiscovery(
             CanReplay: true);
     }
 
-    private static Dictionary<ILocalSymbol,
-        (IMethodSymbol Method, IOperation? Instance)>
+    private sealed record DirectDelegateTarget(
+        IMethodSymbol Method,
+        IOperation? Instance,
+        ImmutableArray<IOperation> Invalidations,
+        bool HasGoto);
+
+    private static Dictionary<ILocalSymbol, DirectDelegateTarget>
         GetDirectDelegateTargets(IOperation operationRoot)
     {
-        var targets = new Dictionary<ILocalSymbol,
-            (IMethodSymbol Method, IOperation? Instance)>(
+        var targets = new Dictionary<ILocalSymbol, DirectDelegateTarget>(
             SymbolEqualityComparer.Default);
         var ambiguous = new HashSet<ILocalSymbol>(
             SymbolEqualityComparer.Default);
+        var hasGoto = operationRoot.DescendantsAndSelf().Any(
+            static descendant => descendant is IBranchOperation
+            {
+                BranchKind: BranchKind.GoTo
+            });
         foreach (var declarator in operationRoot.DescendantsAndSelf()
                      .OfType<IVariableDeclaratorOperation>())
         {
@@ -829,7 +914,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
             {
                 targets.Add(
                     declarator.Symbol,
-                    (reference.Method, reference.Instance));
+                    new DirectDelegateTarget(
+                        reference.Method,
+                        reference.Instance,
+                        [],
+                        hasGoto));
             }
         }
 
@@ -843,23 +932,32 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 {
                     Parameter.RefKind: not RefKind.None
                 } argument => argument.Value,
+                IVariableDeclaratorOperation
+                {
+                    Symbol.RefKind: not RefKind.None,
+                    Initializer.Value: { } value
+                } => value,
                 _ => null
             };
-            if (TryGetLocalReference(target, out var local))
+            if (TryGetLocalReference(target, out var local) &&
+                targets.TryGetValue(local, out var known))
             {
-                targets.Remove(local);
-                ambiguous.Add(local);
+                targets[local] = known with
+                {
+                    Invalidations = known.Invalidations.Add(operation)
+                };
             }
         }
         return targets;
     }
 
     private static bool TryResolveDirectDelegateTarget(
-        IOperation? instance,
+        IInvocationOperation invocation,
         IReadOnlyDictionary<ILocalSymbol,
-            (IMethodSymbol Method, IOperation? Instance)>? targets,
+            DirectDelegateTarget>? targets,
         out (IMethodSymbol Method, IOperation? Instance) target)
     {
+        var instance = invocation.Instance;
         if (instance != null &&
             TryGetMethodReference(instance, out var reference))
         {
@@ -868,13 +966,61 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
         if (targets != null &&
             TryGetLocalReference(instance, out var local) &&
-            targets.TryGetValue(local, out target))
+            targets.TryGetValue(local, out var known) &&
+            IsStableAtInvocation(invocation, known))
         {
+            target = (known.Method, known.Instance);
             return true;
         }
 
         target = default;
         return false;
+    }
+
+    private static bool IsStableAtInvocation(
+        IInvocationOperation invocation,
+        DirectDelegateTarget target)
+    {
+        foreach (var invalidation in target.Invalidations)
+        {
+            if (invalidation.Syntax.SyntaxTree !=
+                    invocation.Syntax.SyntaxTree ||
+                invalidation.Syntax.SpanStart <=
+                    invocation.Syntax.SpanStart ||
+                IsInsideLoop(invocation) ||
+                IsInsideLoop(invalidation) ||
+                IsInsideNestedCallable(invocation) ||
+                IsInsideNestedCallable(invalidation) ||
+                target.HasGoto)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool IsInsideLoop(IOperation operation)
+    {
+        return Ancestors(operation).Any(static ancestor =>
+            ancestor is ILoopOperation);
+    }
+
+    private static bool IsInsideNestedCallable(IOperation operation)
+    {
+        return Ancestors(operation).Any(static ancestor =>
+            ancestor is IAnonymousFunctionOperation or
+                ILocalFunctionOperation);
+    }
+
+    private static IEnumerable<IOperation> Ancestors(
+        IOperation operation)
+    {
+        for (var current = operation.Parent;
+             current != null;
+             current = current.Parent)
+        {
+            yield return current;
+        }
     }
 
     private static bool TryGetMethodReference(
@@ -952,16 +1098,20 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
         if (info.CurrentProperty?.GetMethod is { } current &&
             (info.MoveNextMethod == null ||
-             operationFacts == null ||
-             operationFacts.MethodCanCompleteNormally(
-                 info.MoveNextMethod)))
+             MethodMayReturnTrue(
+                 info.MoveNextMethod,
+                 semanticModel.Compilation,
+                 cancellationToken) &&
+             (operationFacts == null ||
+              operationFacts.MethodCanCompleteNormally(
+                  info.MoveNextMethod))))
         {
             Add(current, instance: null);
         }
         Add(
             ResolveDisposeMethod(
                 info.GetEnumeratorMethod.ReturnType,
-                isAsynchronous: false,
+                loop.IsAsynchronous,
                 semanticModel.Compilation) ?? info.DisposeMethod,
             instance: null);
         return calls.ToImmutable();
@@ -980,6 +1130,32 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 ImmutableDictionary<int, IOperation>.Empty,
                 true));
         }
+    }
+
+    private static bool MethodMayReturnTrue(
+        IMethodSymbol? method,
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        if (method?.ReturnType.SpecialType !=
+                SpecialType.System_Boolean ||
+            method.DeclaringSyntaxReferences.Length != 1)
+        {
+            return true;
+        }
+
+        var declaration = method.DeclaringSyntaxReferences[0]
+            .GetSyntax(cancellationToken);
+        if (declaration is not MethodDeclarationSyntax methodDeclaration ||
+            methodDeclaration.ExpressionBody?.Expression is not { } expression)
+        {
+            return true;
+        }
+
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, expression.SyntaxTree);
+        var constant = model.GetConstantValue(expression, cancellationToken);
+        return !constant.HasValue || constant.Value is not false;
     }
 
     private static ImmutableArray<RequiresCallTarget> GetUsingCalls(
@@ -1053,8 +1229,41 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private static IMethodSymbol? ResolveDisposeMethod(
         ITypeSymbol resourceType,
         bool isAsynchronous,
-        Compilation compilation)
+        Compilation compilation,
+        HashSet<ITypeSymbol>? visited = null)
     {
+        visited ??= new HashSet<ITypeSymbol>(
+            SymbolEqualityComparer.Default);
+        if (!visited.Add(resourceType))
+        {
+            return null;
+        }
+        if (resourceType is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType:
+                    SpecialType.System_Nullable_T,
+                TypeArguments.Length: 1
+            } nullable)
+        {
+            resourceType = nullable.TypeArguments[0];
+        }
+        if (resourceType is ITypeParameterSymbol typeParameter)
+        {
+            foreach (var constraint in typeParameter.ConstraintTypes)
+            {
+                var constrained = ResolveDisposeMethod(
+                    constraint,
+                    isAsynchronous,
+                    compilation,
+                    visited);
+                if (constrained != null)
+                {
+                    return constrained;
+                }
+            }
+            return null;
+        }
+
         var interfaceName = isAsynchronous
             ? "System.IAsyncDisposable"
             : "System.IDisposable";
@@ -1080,7 +1289,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
         return resourceType.GetMembers(methodName)
             .OfType<IMethodSymbol>()
             .FirstOrDefault(static method =>
-                !method.IsStatic && method.Parameters.IsEmpty);
+                !method.IsStatic &&
+                method.Arity == 0 &&
+                method.Parameters.IsEmpty);
     }
 
     private static ImmutableArray<RequiresCallTarget>
@@ -1090,9 +1301,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
             ManagedFlowResult? flowResult)
     {
         var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
-        if (instance == null ||
-            DefiniteOperationFacts.IsDefinitelyNull(instance) ||
-            flowResult?.ProvesNull(pattern, instance) == true)
+        var governingValue = instance ??
+            GetRootPatternGoverningValue(pattern);
+        if (governingValue != null &&
+            (DefiniteOperationFacts.IsDefinitelyNull(governingValue) ||
+             flowResult?.ProvesNull(pattern, governingValue) == true))
         {
             return [];
         }
@@ -1103,6 +1316,20 @@ internal sealed partial class RequiresCallSiteDiscovery(
             [],
             ImmutableDictionary<int, IOperation>.Empty,
             true)];
+    }
+
+    private static IOperation? GetRootPatternGoverningValue(
+        IPatternOperation pattern)
+    {
+        IOperation current = pattern;
+        while (current.Parent is IPatternOperation or
+               IPropertySubpatternOperation)
+        {
+            current = current.Parent;
+        }
+        return current is IPatternOperation root
+            ? SwitchExpressionFacts.GetGoverningValue(root)
+            : null;
     }
 
     private static ImmutableArray<RequiresCallTarget> GetListPatternCalls(
