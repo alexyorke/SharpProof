@@ -663,13 +663,6 @@ This section records 38 findings from exactly 30 fresh read-only auditors: 20 re
 - Impact: The exact render-canonical snapshot and reproducible-baseline invariant is not enforced; numeric baselines silently depend on enum ordinal ordering.
 - Safe evidence: Replacing `Proven` with `0` or a padded spelling yields the same enum and the gate can pass although corpus printing emits different bytes. Exact `Enum.GetName` plus `IsDefined`, or byte-for-byte rerender validation, is needed.
 
-## Wave 7.38. LOW - Nonfinite JSON limits can disable performance checks
-
-- Files and members: `SharpProof.Gates/Performance/AcceptancePerformanceContract.cs`, `Load`, current lines 30-49; `PerformanceGate.ValidateContract`, lines 1153-1175; threshold comparisons at 182-232 and 306-318.
-- Mechanism: JSON number `1e400` becomes `PositiveInfinity` through `GetDouble`; validation checks only `<= 0`, so infinity passes. Infinite maximum ratios make every finite-regression comparison false.
-- Impact: Malformed or tampered acceptance data can remove effective performance bounds while validation says limits are positive.
-- Safe evidence: `GetDouble` on `1e400` returns Infinity, `IsFinite` is false, and `>0` is true. Every double contract field must require `double.IsFinite`.
-
 # Read-Only Multi-Agent Bug Audit - Wave 8 - 2026-08-29
 
 This section records 19 unique findings from exactly 30 fresh read-only auditors: 14 auditors reported 20 raw findings and 16 reported none. The relay removed one exact duplicate of Wave 5.7 before forwarding. The central writer did not inspect or reverify the code.

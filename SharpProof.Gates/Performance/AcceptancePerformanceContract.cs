@@ -35,17 +35,57 @@ internal sealed record AcceptancePerformanceContract(
             performance.GetProperty("samples").GetInt32(),
             performance.GetProperty("smokeWarmups").GetInt32(),
             performance.GetProperty("smokeSamples").GetInt32(),
-            performance.GetProperty("smokeMaximumRatio").GetDouble(),
-            performance.GetProperty("maximumMedianRatio").GetDouble(),
-            performance.GetProperty("maximumP95Ratio").GetDouble(),
-            performance.GetProperty("maximumRetainedMemoryRatio").GetDouble(),
+            GetPositiveFiniteDouble(
+                performance,
+                "performance",
+                "smokeMaximumRatio"),
+            GetPositiveFiniteDouble(
+                performance,
+                "performance",
+                "maximumMedianRatio"),
+            GetPositiveFiniteDouble(
+                performance,
+                "performance",
+                "maximumP95Ratio"),
+            GetPositiveFiniteDouble(
+                performance,
+                "performance",
+                "maximumRetainedMemoryRatio"),
             performance.GetProperty("maximumRetainedMemoryIncreaseMiB").GetInt32(),
             performance.GetProperty("maximumEnabledRetainedCompilations").GetInt32(),
             performance.GetProperty("maximumEnabledRetainedMemoryIncreaseMiB").GetInt32(),
             performance.GetProperty("ideEdits").GetInt32(),
-            performance.GetProperty("ideEditP95Milliseconds").GetDouble(),
-            performance.GetProperty("ideEditMaximumMilliseconds").GetDouble(),
-            worker.GetProperty("cancellationP95Milliseconds").GetDouble(),
-            worker.GetProperty("forcedTerminationMilliseconds").GetDouble());
+            GetPositiveFiniteDouble(
+                performance,
+                "performance",
+                "ideEditP95Milliseconds"),
+            GetPositiveFiniteDouble(
+                performance,
+                "performance",
+                "ideEditMaximumMilliseconds"),
+            GetPositiveFiniteDouble(
+                worker,
+                "worker",
+                "cancellationP95Milliseconds"),
+            GetPositiveFiniteDouble(
+                worker,
+                "worker",
+                "forcedTerminationMilliseconds"));
+    }
+
+    private static double GetPositiveFiniteDouble(
+        JsonElement section,
+        string sectionName,
+        string propertyName)
+    {
+        var value = section.GetProperty(propertyName).GetDouble();
+        if (!double.IsFinite(value) || value <= 0)
+        {
+            throw new InvalidDataException(
+                $"The performance limit '{sectionName}.{propertyName}' " +
+                "must be a finite positive number.");
+        }
+
+        return value;
     }
 }
