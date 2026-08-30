@@ -937,8 +937,9 @@ if (@($debugCommands | Where-Object {
     throw 'Developer-check command plan has an unsupported build topology.'
 }
 $checkPlanClaims = @(
-    ("The default Debug check performs one Debug solution build, one " +
-        "Release package-product build, and $($debugPacks.Count) Release " +
+    ("The default Debug check concurrently performs one Debug solution " +
+        "build and one Release package-product build, then runs " +
+        "$($debugPacks.Count) Release " +
         "pack commands with ``--no-build``.")
     ("The Release check performs one Release solution build and " +
         "$($releasePacks.Count) Release pack commands with ``--no-build``.")

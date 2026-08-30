@@ -74,8 +74,9 @@ public sealed class DevCheckCommandPlanTests
         Assert.That(script, Does.Contain("Get-SharpProofDevCheckPlan.ps1"));
         Assert.That(script, Does.Contain("[switch]$PlanOnly"));
         Assert.That(script, Does.Contain("package-product-build"));
-        Assert.That(script, Does.Contain("NoBuild = $packagePlanReuse"));
-        Assert.That(script, Does.Contain("NoTestBuild = $true"));
+        Assert.That(script,
+            Does.Contain("Invoke-SharpProofParallelDotnetBuilds"));
+        Assert.That(script, Does.Contain("NoBuild = $true"));
     }
 
     private static async Task<JsonDocument> ReadPlan(string configuration)

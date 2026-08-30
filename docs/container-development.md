@@ -66,7 +66,7 @@ closure from Git and project references.
 After a matching build, `sp test-changed -NoBuild` reuses the existing output
 trees and skips both restore and compilation; use the normal command whenever
 source, project, or configuration changes require a rebuild.
-The default Debug check performs one Debug solution build, one Release package-product build, and 3 Release pack commands with `--no-build`.
+The default Debug check concurrently performs one Debug solution build and one Release package-product build, then runs 3 Release pack commands with `--no-build`.
 The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
 Both run
 duration-aware semantic, Worker, and package shards plus a short performance

@@ -1277,8 +1277,10 @@ public sealed class ArchitectureTests
                 Does.Contain("'/TestCaseFilter:' + $shard.Filter"));
             Assert.That(
                 packageTests,
-                Does.Contain(
-                    "'/ResultsDirectory:' + (Join-Path $results $shard.Name)"));
+                Does.Contain("'/ResultsDirectory:' + ("));
+            Assert.That(
+                packageTests,
+                Does.Contain("Join-Path $results $shard.Name)"));
             Assert.That(
                 mutationDriver,
                 Does.Contain("Get-SharpProofMutationBaselinePlan"));

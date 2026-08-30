@@ -113,6 +113,119 @@ function Get-SharpProofTestAssemblyPath {
     return [IO.Path]::GetFullPath($assembly)
 }
 
+function Invoke-SharpProofParallelDotnetBuilds {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Builds,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 1024)]
+        [int]$Parallelism,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 86400)]
+        [int]$TimeoutSeconds
+    )
+
+    if ($Builds.Count -eq 0) {
+        return
+    }
+    if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
+        throw 'Parallel builds require the canonical Linux container.'
+    }
+
+    $lanesPerBuild = [Math]::Max(
+        1,
+        [Math]::Floor($Parallelism / $Builds.Count))
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $running = [Collections.Generic.List[object]]::new()
+    try {
+        foreach ($build in $Builds) {
+            $name = [string]$build.Name
+            $arguments = @($build.Arguments)
+            if ([string]::IsNullOrWhiteSpace($name) -or
+                $arguments.Count -lt 2 -or
+                [string]$arguments[0] -cne 'build') {
+                throw 'Parallel build entries require a name and build arguments.'
+            }
+            $arguments += @(
+                "/m:$lanesPerBuild",
+                '/nodeReuse:false',
+                '-p:UseSharedCompilation=false')
+            $effectiveArguments = @(
+                Add-SharpProofStaticGraphArgument -Arguments $arguments)
+            $startInfo = [Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = 'dotnet'
+            $startInfo.WorkingDirectory = $RepositoryRoot
+            $startInfo.UseShellExecute = $false
+            $startInfo.CreateNoWindow = $true
+            $startInfo.RedirectStandardOutput = $true
+            $startInfo.RedirectStandardError = $true
+            $startInfo.Environment['UseSharedCompilation'] = 'false'
+            $startInfo.Environment['MSBUILDDISABLENODEREUSE'] = '1'
+            foreach ($argument in $effectiveArguments) {
+                [void]$startInfo.ArgumentList.Add($argument)
+            }
+            $process = [Diagnostics.Process]::new()
+            $process.StartInfo = $startInfo
+            if (-not $process.Start()) {
+                $process.Dispose()
+                throw "Could not start build $name."
+            }
+            $running.Add([pscustomobject]@{
+                Name = $name
+                Arguments = $effectiveArguments
+                Process = $process
+                StandardOutput = $process.StandardOutput.ReadToEndAsync()
+                StandardError = $process.StandardError.ReadToEndAsync()
+            })
+        }
+
+        foreach ($active in $running) {
+            $remaining = $deadline - [DateTime]::UtcNow
+            if ($remaining -le [TimeSpan]::Zero -or
+                -not $active.Process.WaitForExit(
+                    [int][Math]::Ceiling($remaining.TotalMilliseconds))) {
+                throw "Parallel builds exceeded $TimeoutSeconds seconds."
+            }
+        }
+
+        $failures = [Collections.Generic.List[string]]::new()
+        foreach ($active in $running) {
+            $stdout = $active.StandardOutput.GetAwaiter().GetResult()
+            $stderr = $active.StandardError.GetAwaiter().GetResult()
+            Write-Host "--- Build $($active.Name) ---"
+            if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                Write-Host $stdout.TrimEnd()
+            }
+            if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                Write-Host $stderr.TrimEnd()
+            }
+            if ($active.Process.ExitCode -ne 0) {
+                $failures.Add(
+                    "$($active.Name) exited $($active.Process.ExitCode): " +
+                    ($active.Arguments -join ' '))
+            }
+        }
+        if ($failures.Count -ne 0) {
+            throw "Parallel builds failed:`n$($failures -join "`n")"
+        }
+    }
+    finally {
+        foreach ($active in $running) {
+            if (-not $active.Process.HasExited) {
+                $active.Process.Kill($true)
+                $active.Process.WaitForExit()
+            }
+            $active.Process.Dispose()
+        }
+    }
+}
+
 function New-SharpProofIsolatedTestOutput {
     [CmdletBinding()]
     param(
@@ -173,4 +286,5 @@ Export-ModuleMember -Function @(
     'Add-SharpProofStaticGraphArgument',
     'Get-SharpProofTestProjectParallelism',
     'Get-SharpProofTestAssemblyPath',
+    'Invoke-SharpProofParallelDotnetBuilds',
     'New-SharpProofIsolatedTestOutput')

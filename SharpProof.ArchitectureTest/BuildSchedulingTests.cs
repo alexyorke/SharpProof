@@ -69,27 +69,34 @@ public sealed class BuildSchedulingTests
     [Test]
     public void PackageBuildsReuseOutputsAndAvoidTheSharedCompilerBottleneck()
     {
+        var root = FindRepositoryRoot();
         var packageTests = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            root,
             "scripts",
             "Invoke-SharpProofPackageTests.ps1"));
+        var execution = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "SharpProof.ContainerExecution.psm1"));
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(packageTests, Does.Contain("[switch]$NoTestBuild"));
-            Assert.That(packageTests, Does.Contain("$reuseTestBuild"));
             Assert.That(packageTests, Does.Contain("Invoke-RequiredBuilds"));
+            Assert.That(packageTests,
+                Does.Contain("Invoke-SharpProofParallelDotnetBuilds"));
             Assert.That(packageTests,
                 Does.Contain("'package-products-release'"));
             Assert.That(packageTests,
                 Does.Contain("SharpProof.Verifier/SharpProof.Verifier.csproj"));
             Assert.That(packageTests,
-                Does.Contain("'-p:UseSharedCompilation=false'"));
-            Assert.That(packageTests,
-                Does.Contain("'MSBUILDDISABLENODEREUSE'"));
-            Assert.That(packageTests,
                 Does.Contain("'--no-restore', '--no-build', '--nologo'"));
             Assert.That(packageTests, Does.Contain("phases = @($phaseTimings)"));
+            Assert.That(execution,
+                Does.Contain("function Invoke-SharpProofParallelDotnetBuilds"));
+            Assert.That(execution,
+                Does.Contain("'-p:UseSharedCompilation=false'"));
+            Assert.That(execution,
+                Does.Contain("'MSBUILDDISABLENODEREUSE'"));
         }
     }
 
