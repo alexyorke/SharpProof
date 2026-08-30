@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Gates.Performance;
 using SharpProof.Worker.Protocol;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Xml.Linq;
 
@@ -699,9 +700,21 @@ public sealed class PerformanceGateTests
 
     [Test]
     [Category("Performance")]
+    [Explicit(
+        "The release performance contract must run in isolation from a " +
+        "Release build. Use the canonical performance command.")]
     [NonParallelizable]
     public async Task ReleasePerformanceContractPasses()
     {
+        var assemblyConfiguration = typeof(PerformanceGate)
+            .Assembly
+            .GetCustomAttribute<AssemblyConfigurationAttribute>()
+            ?.Configuration;
+        Assume.That(
+            assemblyConfiguration,
+            Is.EqualTo("Release"),
+            "Debug binaries cannot produce release performance evidence.");
+
         var result = await PerformanceGate.RunAsync(
             RepositoryLayout.FindRoot());
 
