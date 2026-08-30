@@ -271,13 +271,37 @@ public static partial class ApiSpecInstantiator
                 return condition;
             }
 
-            var whenTrue = Term(conditional.WhenTrue);
+            TermResult whenTrue;
+            TermResult whenFalse;
+            if (conditional.WhenTrue is SpecNullDeclaration trueNull &&
+                conditional.WhenFalse is not SpecNullDeclaration)
+            {
+                whenFalse = Term(conditional.WhenFalse);
+                if (whenFalse.Failure != null)
+                {
+                    return whenFalse;
+                }
+
+                whenTrue = Null(trueNull, whenFalse);
+            }
+            else
+            {
+                whenTrue = Term(conditional.WhenTrue);
+                whenFalse = default;
+            }
+
             if (whenTrue.Failure != null)
             {
                 return whenTrue;
             }
 
-            var whenFalse = Term(conditional.WhenFalse);
+            if (whenFalse.Term == null)
+            {
+                whenFalse = conditional.WhenFalse is SpecNullDeclaration falseNull &&
+                            conditional.WhenTrue is not SpecNullDeclaration
+                    ? Null(falseNull, whenTrue)
+                    : Term(conditional.WhenFalse);
+            }
             return whenFalse.Failure != null
                 ? whenFalse
                 : new(factory.Conditional(

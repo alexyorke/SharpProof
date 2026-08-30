@@ -160,14 +160,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Complete effect summaries can omit effects that execute before a noncompleting derived initializer.
 - Safe evidence: Direct control-flow and runtime-order reasoning.
 
-## Wave 5.6. MEDIUM - Reference-null conditional branches cannot instantiate against concrete reference substitutions
-
-- File: `SharpProof.Specs/ApiSpecInstantiation.cs`
-- Members: `Instantiation.Null(SpecNullDeclaration)`, lines 172-183; `Instantiation.Conditional`, lines 269-287
-- Mechanism: A standalone `SpecNullDeclaration(Reference)` always materializes as `factory.Null(factory.ObjectType)` at line 177. `Conditional` independently instantiates each branch and directly calls `factory.Conditional`; it does not apply `Binary`'s peer-typed null adaptation at lines 248-266. `ApiSpecTermValidator.ValidateConditional` at lines 172-193 accepts branches based on coarse `IrTypeKind.Reference`, so a template `condition ? null : referenceVariable` is valid. If the variable is substituted with a factory-owned concrete reference type such as `Widget`, `IrFactory.Conditional` at lines 447-451 rejects exact types Object versus Widget; `Term` catches this and returns `InvalidExpression`.
-- Impact: Otherwise valid custom or trusted reference postconditions fail instantiation and are silently not applied when the worker's `ApplySpec` returns null on failed status, losing proof facts and precision.
-- Safe evidence: Direct source-path proof. Existing coverage exercises Boolean conditionals and reference null in binary equality, not this combination.
-
 ## Wave 5.7. HIGH - ExceptionConstructionThrow erases constructor may-effects while sequencing an explicit throw
 
 - Files and members: `SharpProof.Effects/EffectSummaryOperations.cs`, `ExceptionConstructionThrow`, lines 56-69; used by `SharpProof.Effects/OperationEffectScanner.cs`, lines 756-781, for external exception construction without a proven nonthrowing specification.
