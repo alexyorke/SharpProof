@@ -3,31 +3,47 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class BranchingExpressionEffectRegressionTests
 {
-    [Test]
-    public void TerminalConditionalArmDoesNotSuppressReachableSiblingEffects()
+    [TestCase("TerminalTrueInitializer")]
+    [TestCase("TerminalFalseInitializer")]
+    public void TerminalConditionalInitializerArmDoesNotSuppressReachableSiblingEffects(
+        string typeName)
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
             using System;
 
-            public static class Sample {
+            public sealed class TerminalTrueInitializer {
+                private static bool s_condition;
                 private static int s_state;
 
-                public static int Evaluate(bool condition) =>
-                    condition ? Stop() : Mutate();
+                private readonly int _value =
+                    s_condition
+                        ? throw new InvalidOperationException()
+                        : s_state = 1;
 
-                private static int Stop() =>
-                    throw new InvalidOperationException();
+                public TerminalTrueInitializer() {
+                }
+            }
 
-                private static int Mutate() => ++s_state;
+            public sealed class TerminalFalseInitializer {
+                private static bool s_condition;
+                private static int s_state;
+
+                private readonly int _value =
+                    s_condition
+                        ? s_state = 1
+                        : throw new InvalidOperationException();
+
+                public TerminalFalseInitializer() {
+                }
             }
             """);
 
         var summary = new EffectAnalysisSession(compilation)
-            .Analyze(EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "Evaluate"))
+            .Analyze(EffectTestHost.RequireType(compilation, typeName)
+                .InstanceConstructors
+                .Single(static constructor =>
+                    !constructor.IsImplicitlyDeclared))
             .Summary;
 
         Assert.That(
@@ -35,53 +51,50 @@ public sealed class BranchingExpressionEffectRegressionTests
             Is.True);
     }
 
-    [TestCase("ShortCircuitAnd")]
-    [TestCase("ShortCircuitOr")]
-    [TestCase("NonNullCoalesce")]
-    public void InfeasibleBranchEffectsAreNotScanned(string methodName)
+    [TestCase("ShortCircuitAndInitializer")]
+    [TestCase("ShortCircuitOrInitializer")]
+    [TestCase("NonNullCoalesceInitializer")]
+    public void InfeasibleInitializerBranchEffectsAreNotScanned(
+        string typeName)
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
-            public static class Sample {
+            public sealed class ShortCircuitAndInitializer {
                 private static int s_state;
+                private readonly bool _value = false && ++s_state > 0;
 
-                public static bool ShortCircuitAnd() {
-                    var condition = false;
-                    return condition && MutateBoolean();
+                public ShortCircuitAndInitializer() {
                 }
+            }
 
-                public static bool ShortCircuitOr() {
-                    var condition = true;
-                    return condition || MutateBoolean();
+            public sealed class ShortCircuitOrInitializer {
+                private static int s_state;
+                private readonly bool _value = true || ++s_state > 0;
+
+                public ShortCircuitOrInitializer() {
                 }
+            }
 
-                public static object NonNullCoalesce() {
-                    object? value = new object();
-                    return value ?? MutateObject();
-                }
+            public sealed class NonNullCoalesceInitializer {
+                private static object? s_object;
+                private readonly object _value =
+                    new object() ?? (s_object = new object());
 
-                private static bool MutateBoolean() {
-                    s_state++;
-                    return true;
-                }
-
-                private static object MutateObject() {
-                    s_state++;
-                    return new object();
+                public NonNullCoalesceInitializer() {
                 }
             }
             """);
 
         var summary = new EffectAnalysisSession(compilation)
-            .Analyze(EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                methodName))
+            .Analyze(EffectTestHost.RequireType(compilation, typeName)
+                .InstanceConstructors
+                .Single(static constructor =>
+                    !constructor.IsImplicitlyDeclared))
             .Summary;
 
         Assert.That(
             summary.Writes.Contains(EffectRegionId.Static()),
             Is.False,
-            methodName);
+            typeName);
     }
 }
