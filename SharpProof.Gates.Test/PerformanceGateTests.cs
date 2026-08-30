@@ -138,6 +138,45 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public async Task WorkerCancellationWaitObservesTheOuterBoundary()
+    {
+        var releaseCallback = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var verification = new TaskCompletionSource<WorkerVerifyResponse>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource();
+        using var registration = cancellation.Token.Register(() =>
+            releaseCallback.Task.GetAwaiter().GetResult());
+        using var boundary = new CancellationTokenSource(50);
+
+        var wait = WorkerPerformanceProbe.CancelAndAwaitWorkerAsync(
+            verification.Task,
+            cancellation,
+            boundary.Token);
+        var completed = await Task.WhenAny(wait, Task.Delay(500));
+        releaseCallback.SetResult();
+        verification.SetResult(new WorkerVerifyResponse());
+        var canceled = false;
+        try
+        {
+            _ = await wait;
+        }
+        catch (OperationCanceledException)
+        {
+            canceled = true;
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                completed,
+                Is.SameAs(wait),
+                "The outer boundary must release a blocked cancellation wait.");
+            Assert.That(canceled, Is.True);
+        }
+    }
+
+    [Test]
     public void PackageBuildMedianAveragesTheMiddleEvenSamples()
     {
         var median = PackageBuildEstimator.Median([1, 9, 3, 5]);

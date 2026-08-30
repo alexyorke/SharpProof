@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.17. MEDIUM - Worker cancellation measurement can hang indefinitely and ignores outer cancellation
-
-- File: `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs`
-- Member: `MeasureWorkerCancellationAsync`
-- Current lines: 77-96, especially 80-88
-- Mechanism: `VerifyAsync` receives only a private CTS. After the backend signals `Entered`, the method awaits `CancelAsync` and verification without a timeout or `WaitAsync(outer token)`.
-- Impact: The cancellation regression under test can hang the gate forever, and canceling the gate caller cannot release it.
-- Safe reproduction/evidence: Use a controlled backend that reaches `Entered` but does not complete after private cancellation. Cancel the outer token and observe that the verification await remains blocked.
-
 ## Wave 2.18. LOW/MEDIUM - Git child process survives OSS corpus import cancellation
 
 - File: `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs`

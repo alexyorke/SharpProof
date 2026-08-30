@@ -76,7 +76,9 @@ internal static class WorkerPerformanceProbe
             outerCancellationToken.ThrowIfCancellationRequested();
             var backend = new CancellationProbeBackend();
             using var worker = new SharpProofWorker(backend);
-            using var cancellation = new CancellationTokenSource();
+            using var cancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    outerCancellationToken);
             var verification = worker.VerifyAsync(
                 workspace.CreateCancellationRequest(),
                 cancellation.Token);
@@ -84,8 +86,11 @@ internal static class WorkerPerformanceProbe
                 .ConfigureAwait(false);
 
             var stopwatch = Stopwatch.StartNew();
-            await cancellation.CancelAsync().ConfigureAwait(false);
-            var response = await verification.ConfigureAwait(false);
+            var response = await CancelAndAwaitWorkerAsync(
+                    verification,
+                    cancellation,
+                    outerCancellationToken)
+                .ConfigureAwait(false);
             stopwatch.Stop();
             if (!IsCompleteCancellation(response))
             {
@@ -96,6 +101,19 @@ internal static class WorkerPerformanceProbe
             latencies[index] = stopwatch.Elapsed.TotalMilliseconds;
         }
         return latencies;
+    }
+
+    internal static async Task<WorkerVerifyResponse> CancelAndAwaitWorkerAsync(
+        Task<WorkerVerifyResponse> verification,
+        CancellationTokenSource cancellation,
+        CancellationToken outerCancellationToken)
+    {
+        await cancellation.CancelAsync()
+            .WaitAsync(outerCancellationToken)
+            .ConfigureAwait(false);
+        return await verification
+            .WaitAsync(outerCancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static bool IsCompleteCancellation(WorkerVerifyResponse response)
