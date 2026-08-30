@@ -112,6 +112,10 @@ can scan the checkout quickly, and passes that bounded snapshot to the private
 Linux workspace. The regular `sharpproof-loop` command remains the portable
 fallback when host Git is unavailable.
 
+The private clone uses `SHARPPROOF_ORIGIN_URL` (the public SharpProof origin by
+default), so local Release builds retain the same Source Link identity as
+disposable qualification builds. Keep that override credential-free.
+
 Each `sharpproof-loop` command mirrors the current tracked and non-ignored
 untracked source into a private Compose volume, then runs `sp` there. The mirror
 keeps `bin`, `obj`, MSBuild and Roslyn compiler servers, and package caches

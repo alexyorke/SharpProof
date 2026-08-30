@@ -61,6 +61,7 @@ services:
       DOTNET_CLI_USE_MSBUILD_SERVER: "1"
       SHARPPROOF_REPO_ROOT: /workspace/SharpProof
       SHARPPROOF_TEST_PROJECT_PARALLELISM: ${SHARPPROOF_TEST_PROJECT_PARALLELISM:-}
+      SHARPPROOF_ORIGIN_URL: ${SHARPPROOF_ORIGIN_URL:-https://github.com/alexyorke/SharpProof.git}
       SHARPPROOF_LOOP_SOURCE_ROOT: /workspace/HostSource
       SHARPPROOF_LOOP_ARTIFACTS_ROOT: /workspace/LoopArtifacts
     volumes:

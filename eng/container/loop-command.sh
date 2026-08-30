@@ -4,6 +4,7 @@ set -euo pipefail
 source_root="${SHARPPROOF_LOOP_SOURCE_ROOT:-/workspace/HostSource}"
 target_root="${SHARPPROOF_REPO_ROOT:-/workspace/SharpProof}"
 artifacts_root="${SHARPPROOF_LOOP_ARTIFACTS_ROOT:-/workspace/LoopArtifacts}"
+origin_url="${SHARPPROOF_ORIGIN_URL:-}"
 
 if [[ $# -eq 0 ]]; then
   echo "Usage: sharpproof-loop <sp-command> [arguments...]" >&2
@@ -11,6 +12,12 @@ if [[ $# -eq 0 ]]; then
 fi
 if [[ ! -d "${source_root}" ]]; then
   echo "SharpProof loop source is missing: ${source_root}" >&2
+  exit 125
+fi
+if [[ -z "${origin_url}" ||
+  "${origin_url}" == *$'\n'* ||
+  "${origin_url}" == *$'\r'* ]]; then
+  echo "SharpProof loop origin URL is missing or invalid." >&2
   exit 125
 fi
 
@@ -193,6 +200,11 @@ if [[ ! -d "${target_root}/.git" ]]; then
 fi
 
 trust_git_directory "${target_root}"
+if git -C "${target_root}" remote get-url origin >/dev/null 2>&1; then
+  git -C "${target_root}" remote set-url origin "${origin_url}"
+else
+  git -C "${target_root}" remote add origin "${origin_url}"
+fi
 # Unlike the Docker Desktop bind-mounted source, this private Linux volume
 # preserves executable bits. Keep its tracked modes canonical so applying a
 # host-captured patch does not warn about 100755 script inputs appearing 0644.

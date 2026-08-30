@@ -285,6 +285,7 @@ public sealed class BuildSchedulingTests
             "scripts",
             "Invoke-SharpProofLoop.ps1");
         var hostLoop = File.ReadAllText(hostLoopPath);
+        var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
         var containerLoop = File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -309,6 +310,15 @@ public sealed class BuildSchedulingTests
             Assert.That(
                 containerLoop,
                 Does.Contain("source_files_root"));
+            Assert.That(
+                Regex.Matches(
+                    compose,
+                    "^\\s+SHARPPROOF_ORIGIN_URL:",
+                    RegexOptions.Multiline).Count,
+                Is.EqualTo(2));
+            Assert.That(
+                containerLoop,
+                Does.Contain("remote set-url origin"));
         }
     }
 
