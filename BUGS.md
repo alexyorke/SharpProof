@@ -472,14 +472,6 @@ This section records 38 findings from exactly 30 fresh read-only auditors: 20 re
 - Impact: False `WritesArgumentState` and rejection of valid no-write contracts.
 - Safe evidence: `void Rebind(ref int x, ref int y) { x = ref y; }`; no `IsRef` branch exists in the assignment path.
 
-## Wave 7.10. MEDIUM - Multiple module initializers are aggregated without execution ordering
-
-- File: `SharpProof.Effects/EffectAnalysisSession.cs`
-- Members: `Analyze`, current lines 91-101; `AnalyzeAll`, lines 118-139
-- Mechanism: Entry initialization is joined into every source method, including each module initializer. `SummarizeBeforeEntry` skips only the initializer being analyzed and includes all siblings regardless of execution order; the aggregate is then unconditionally joined with its body.
-- Impact: Earlier initializer summaries gain later initializer effects; if an earlier initializer definitely throws, later initializer body effects remain despite being unreachable, producing false throws, writes, and capabilities.
-- Safe evidence: With two `ModuleInitializer` methods, one empty and one doing a static write, analyzing the empty one necessarily receives the sibling write. Tests cover only one initializer.
-
 ## Wave 7.11. HIGH - Delegate arguments do not havoc captured-local facts
 
 - File: `SharpProof.Effects/ManagedAbstractFlow.cs`

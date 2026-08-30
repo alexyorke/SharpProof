@@ -31,7 +31,7 @@ public sealed class EffectAnalysisSession
     private readonly EffectModuleInitialization _moduleInitialization;
     private readonly EffectMethodNodeBuilder _nodeBuilder;
     private readonly object _gate = new();
-    private ImmutableArray<IMethodSymbol> _moduleInitializers;
+    private ImmutableArray<EffectModuleInitializer> _moduleInitializers;
     private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes = new(SymbolEqualityComparer.Default);
     private volatile ImmutableDictionary<IMethodSymbol, EffectSummary> _summaries =
         ImmutableDictionary.Create<IMethodSymbol, EffectSummary>(SymbolEqualityComparer.Default);
@@ -92,7 +92,10 @@ public sealed class EffectAnalysisSession
         }
 
         var moduleInitializers = GetModuleInitializers(cancellationToken);
-        EnsureAnalyzed(moduleInitializers.Add(normalized), cancellationToken);
+        EnsureAnalyzed(
+            moduleInitializers.Select(static initializer => initializer.Method)
+                .Append(normalized),
+            cancellationToken);
         var summaries = _summaries;
         var summary = summaries.TryGetValue(normalized, out var analyzed)
             ? analyzed
@@ -101,12 +104,13 @@ public sealed class EffectAnalysisSession
             normalized,
             moduleInitializers,
             summaries);
-        summary = EffectSummaryDomain.Instance.Join(initialization, summary);
+        summary = initialization.Then(new EffectStep(summary, true)).Summary;
         ImmutableArray<EffectDirectWitness> directWitnesses;
         lock (_gate)
         {
             directWitnesses =
-                !EffectModuleInitialization.CanPreventBodyEntry(initialization) &&
+                !EffectModuleInitialization.CanPreventBodyEntry(
+                    initialization.Summary) &&
                 _nodes.TryGetValue(normalized, out var node)
                 ? node.DirectWitnesses
                 : [];
@@ -133,11 +137,11 @@ public sealed class EffectAnalysisSession
                         summaries);
                 return new EffectMethodResult(
                     method,
-                    EffectSummaryDomain.Instance.Join(
-                        initialization,
-                        summaries[method]),
+                    initialization.Then(new EffectStep(
+                        summaries[method],
+                        true)).Summary,
                     EffectModuleInitialization.CanPreventBodyEntry(
-                        initialization)
+                        initialization.Summary)
                         ? []
                         : _nodes[method].DirectWitnesses);
             })];
@@ -500,7 +504,7 @@ public sealed class EffectAnalysisSession
             static method => method, EffectSymbolComparer<IMethodSymbol>.Instance)];
     }
 
-    private ImmutableArray<IMethodSymbol> GetModuleInitializers(
+    private ImmutableArray<EffectModuleInitializer> GetModuleInitializers(
         CancellationToken cancellationToken)
     {
         lock (_gate)

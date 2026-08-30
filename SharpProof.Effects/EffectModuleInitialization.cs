@@ -1,5 +1,9 @@
 namespace SharpProof.Effects;
 
+internal readonly record struct EffectModuleInitializer(
+    IMethodSymbol Method,
+    bool CompletesNormally);
+
 internal sealed class EffectModuleInitialization
 {
     private readonly INamedTypeSymbol? _attribute;
@@ -20,7 +24,7 @@ internal sealed class EffectModuleInitialization
                 : null;
     }
 
-    internal ImmutableArray<IMethodSymbol> Discover(
+    internal ImmutableArray<EffectModuleInitializer> Discover(
         CancellationToken cancellationToken)
     {
         if (_attribute == null)
@@ -28,7 +32,8 @@ internal sealed class EffectModuleInitialization
             return [];
         }
 
-        var initializers = new HashSet<IMethodSymbol>(
+        var syntaxTrees = _compilation.SyntaxTrees.ToImmutableArray();
+        var initializers = new Dictionary<IMethodSymbol, SyntaxReference>(
             SymbolEqualityComparer.Default);
         var pending = new Queue<INamespaceOrTypeSymbol>();
         pending.Enqueue(_compilation.Assembly.GlobalNamespace);
@@ -56,38 +61,64 @@ internal sealed class EffectModuleInitialization
             {
                 if (method.GetAttributes().Any(IsModuleInitializerAttribute))
                 {
-                    initializers.Add(
-                        EffectAnalysisSession.NormalizeMethod(method));
+                    var normalized =
+                        EffectAnalysisSession.NormalizeMethod(method);
+                    var syntaxReference = method.DeclaringSyntaxReferences[0];
+                    if (!initializers.TryGetValue(
+                            normalized,
+                            out var existingReference) ||
+                        CompareSourceOrder(
+                            syntaxReference,
+                            existingReference,
+                            syntaxTrees) < 0)
+                    {
+                        initializers[normalized] = syntaxReference;
+                    }
                 }
             }
         }
 
-        return [.. initializers.OrderBy(
-            static method => method,
-            EffectSymbolComparer<IMethodSymbol>.Instance)];
+        var completionFacts = new DefiniteOperationFacts(
+            _compilation,
+            cancellationToken);
+        // Roslyn emits the calls in lexical symbol order. For source methods,
+        // that key is the syntax-tree ordinal followed by declaration position.
+        return [.. initializers
+            .OrderBy(pair => GetSyntaxTreeOrdinal(pair.Value, syntaxTrees))
+            .ThenBy(static pair => pair.Value.Span.Start)
+            .ThenBy(
+                static pair => pair.Key.Name,
+                StringComparer.Ordinal)
+            .Select(pair => new EffectModuleInitializer(
+                pair.Key,
+                completionFacts.MethodCanCompleteNormally(pair.Key)))];
     }
 
-    internal static EffectSummary SummarizeBeforeEntry(
+    internal static EffectStep SummarizeBeforeEntry(
         IMethodSymbol method,
-        ImmutableArray<IMethodSymbol> initializers,
+        ImmutableArray<EffectModuleInitializer> initializers,
         IReadOnlyDictionary<IMethodSymbol, EffectSummary> summaries)
     {
-        var result = EffectSummary.Bottom;
+        var result = new EffectStep(EffectSummary.Bottom, true);
         foreach (var initializer in initializers)
         {
             if (SymbolEqualityComparer.Default.Equals(
                     method,
-                    initializer))
+                    initializer.Method))
             {
-                continue;
+                break;
             }
 
-            result = EffectSummaryDomain.Instance.Join(
-                result,
-                summaries.TryGetValue(initializer, out var summary)
+            result = result.Then(new EffectStep(
+                summaries.TryGetValue(initializer.Method, out var summary)
                     ? summary
                     : EffectSummaryOperations.UnknownBoundary(
-                        EffectUncertainty.UnsupportedOperation));
+                        EffectUncertainty.UnsupportedOperation),
+                initializer.CompletesNormally));
+            if (!result.CompletesNormally)
+            {
+                break;
+            }
         }
 
         return result;
@@ -106,5 +137,25 @@ internal sealed class EffectModuleInitialization
         return SymbolEqualityComparer.Default.Equals(
             attribute.AttributeClass?.OriginalDefinition,
             _attribute);
+    }
+
+    private static int CompareSourceOrder(
+        SyntaxReference left,
+        SyntaxReference right,
+        ImmutableArray<SyntaxTree> syntaxTrees)
+    {
+        var result = GetSyntaxTreeOrdinal(left, syntaxTrees).CompareTo(
+            GetSyntaxTreeOrdinal(right, syntaxTrees));
+        return result != 0
+            ? result
+            : left.Span.Start.CompareTo(right.Span.Start);
+    }
+
+    private static int GetSyntaxTreeOrdinal(
+        SyntaxReference syntaxReference,
+        ImmutableArray<SyntaxTree> syntaxTrees)
+    {
+        var ordinal = syntaxTrees.IndexOf(syntaxReference.SyntaxTree);
+        return ordinal >= 0 ? ordinal : int.MaxValue;
     }
 }
