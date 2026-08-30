@@ -46,6 +46,7 @@ sp self-apply
 sp self-apply -Configuration Release -PackageSource artifacts/container-packages
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -NoBuild
+sp test-changed -NoBuild
 sp semantic-tests
 sp semantic-tests -NoBuild
 sp portable-tests
@@ -62,6 +63,9 @@ sp acceptance -Configuration Release
 
 Use `sp test-changed` during an edit loop. It derives the affected test-project
 closure from Git and project references.
+After a matching build, `sp test-changed -NoBuild` reuses the existing output
+trees and skips both restore and compilation; use the normal command whenever
+source, project, or configuration changes require a rebuild.
 The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
 The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
 Both run

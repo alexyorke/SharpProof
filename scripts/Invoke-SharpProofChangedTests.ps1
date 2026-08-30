@@ -7,6 +7,8 @@ param(
 
     [switch]$PlanOnly,
 
+    [switch]$NoBuild,
+
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 1800
 )
@@ -223,14 +225,20 @@ if ($selectedRelative.Count -gt 0) {
             }
         } | ConvertTo-Json -Depth 4 |
             Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
-        Invoke-RequiredDotnet @('restore', $filterPath, '--locked-mode')
-        Invoke-RequiredDotnet @(
+        if (-not $NoBuild) {
+            Invoke-RequiredDotnet @('restore', $filterPath, '--locked-mode')
+        }
+        $testArguments = @(
             'test', $filterPath,
             '-c', $Configuration,
             '--no-restore',
             "/m:$parallelism",
             '--filter',
             'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus')
+        if ($NoBuild) {
+            $testArguments += '--no-build'
+        }
+        Invoke-RequiredDotnet $testArguments
     }
     finally {
         Remove-Item -LiteralPath $filterPath -Force -ErrorAction SilentlyContinue
@@ -238,9 +246,15 @@ if ($selectedRelative.Count -gt 0) {
 }
 
 if ($runPackageTests) {
+    $packageArguments = @{
+        Configuration = $Configuration
+        TimeoutSeconds = $TimeoutSeconds
+    }
+    if ($NoBuild) {
+        $packageArguments.NoBuild = $true
+    }
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
-        -Configuration $Configuration `
-        -TimeoutSeconds $TimeoutSeconds
+        @packageArguments
     if ($LASTEXITCODE -ne 0) {
         throw 'Changed package tests failed.'
     }

@@ -138,6 +138,26 @@ public sealed class BuildSchedulingTests
                 "$packageArguments += '-NoBuild'"));
             Assert.That(container, Does.Contain(
                 "'-NoBuild is supported only for test commands"));
+            Assert.That(container, Does.Contain(
+                "$changedArguments += '-NoBuild'"));
+        }
+    }
+
+    [Test]
+    public void ChangedTestsCanReuseACompletedBuild()
+    {
+        var root = FindRepositoryRoot();
+        var changed = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofChangedTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(changed, Does.Contain("[switch]$NoBuild"));
+            Assert.That(changed, Does.Contain("if (-not $NoBuild)"));
+            Assert.That(changed, Does.Contain(
+                "$testArguments += '--no-build'"));
         }
     }
 

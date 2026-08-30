@@ -34,8 +34,8 @@ if ($env:SHARPPROOF_CONTAINER -cne '1' -or
 }
 
 if ($NoBuild -and $Command -notin @(
-        'test', 'semantic-tests', 'portable-tests', 'worker-tests',
-        'package-tests')) {
+        'test', 'test-changed', 'semantic-tests', 'portable-tests',
+        'worker-tests', 'package-tests')) {
     throw (
         '-NoBuild is supported only for test commands that can reuse an ' +
         'existing build in the current container workspace.')
@@ -230,9 +230,13 @@ switch ($Command) {
         Invoke-DotNet $arguments
     }
     'test-changed' {
+        $changedArguments = @('-Configuration', $Configuration)
+        if ($NoBuild) {
+            $changedArguments += '-NoBuild'
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofChangedTests.ps1') `
-            -Configuration $Configuration
+            @changedArguments
     }
     'semantic-tests' {
         $semanticArguments = @('-Configuration', $Configuration)
