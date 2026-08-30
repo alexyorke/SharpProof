@@ -187,6 +187,21 @@ public sealed partial class ApiSpecTable
         ValidateDefined(target.MemberKind, nameof(target.MemberKind));
         _ = ArgumentNullGuard.RequireNonnegative(
             target.GenericArity, nameof(declaration));
+        if (target.MemberKind == SpecTargetMemberKind.Constructor &&
+            target.IsStatic)
+        {
+            throw new ArgumentException(
+                "Spec constructors must be instance members.",
+                nameof(declaration));
+        }
+
+        if (target.MemberKind == SpecTargetMemberKind.PropertyGet &&
+            target.GenericArity != 0)
+        {
+            throw new ArgumentException(
+                "Spec properties cannot declare generic arity.",
+                nameof(declaration));
+        }
 
         if (target.ParameterTypes.IsDefault)
         {

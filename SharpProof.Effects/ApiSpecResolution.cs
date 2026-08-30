@@ -198,7 +198,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
             {
                 MethodKind: MethodKind.Constructor
             } constructor &&
-                !constructor.IsStatic &&
+                constructor.IsStatic == target.IsStatic &&
                 string.Equals(constructor.MetadataName, target.MemberName, StringComparison.Ordinal) &&
                 constructor.Arity == target.GenericArity &&
                 constructor.Parameters.Length == target.ParameterTypes.Length,
@@ -214,6 +214,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
                 property.GetMethod != null &&
                 property.IsStatic == target.IsStatic &&
                 string.Equals(property.Name, target.MemberName, StringComparison.Ordinal) &&
+                property.GetMethod.Arity == target.GenericArity &&
                 property.Parameters.Length == target.ParameterTypes.Length,
             _ => false
         };
