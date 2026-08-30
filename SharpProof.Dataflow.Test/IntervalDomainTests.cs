@@ -41,6 +41,37 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
+    public void SignedCarrierEndpointsCanonicalizeToUnboundedBounds()
+    {
+        var fullRange = _domain.Range(long.MinValue, long.MaxValue);
+        var lowerEndpoint = _domain.Range(long.MinValue, 0);
+        var upperEndpoint = _domain.Range(0, long.MaxValue);
+
+        Assert.That(fullRange, Is.EqualTo(_domain.Top));
+        Assert.That(fullRange.LowerBound, Is.Null);
+        Assert.That(fullRange.UpperBound, Is.Null);
+        Assert.That(lowerEndpoint.LowerBound, Is.Null);
+        Assert.That(upperEndpoint.UpperBound, Is.Null);
+        Assert.That(_domain.AreEquivalent(fullRange, _domain.Top), Is.True);
+    }
+
+    [Test]
+    public void SignedCarrierEndpointsCanonicalizeForCongruentIntervals()
+    {
+        var explicitLowerEndpoint = _domain.Create(long.MinValue, 0, 3, 0);
+        var explicitUpperEndpoint = _domain.Create(0, long.MaxValue, 3, 0);
+
+        Assert.That(
+            explicitLowerEndpoint,
+            Is.EqualTo(_domain.Create(null, 0, 3, 0)));
+        Assert.That(explicitLowerEndpoint.LowerBound, Is.Null);
+        Assert.That(
+            explicitUpperEndpoint,
+            Is.EqualTo(_domain.Create(0, null, 3, 0)));
+        Assert.That(explicitUpperEndpoint.UpperBound, Is.Null);
+    }
+
+    [Test]
     public void JoinComputesCongruenceHull()
     {
         var joined = _domain.Join(_domain.Constant(2), _domain.Constant(6));

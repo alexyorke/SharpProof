@@ -46,6 +46,19 @@ public sealed class SequenceCardinalityDomainTests
     }
 
     [Test]
+    public void MaximumLengthEndpointCanonicalizesToSequenceTop()
+    {
+        var explicitMaximum = _domain.Create(
+            SequenceCardinalityKind.Top,
+            IntervalValue.Range(0, long.MaxValue));
+
+        Assert.That(explicitMaximum, Is.EqualTo(SequenceCardinalityValue.Top));
+        Assert.That(
+            _domain.AreEquivalent(explicitMaximum, SequenceCardinalityValue.Top),
+            Is.True);
+    }
+
+    [Test]
     public void EmptyAndNonEmptyJoinToTopWithLengthHull()
     {
         var joined = _domain.Join(

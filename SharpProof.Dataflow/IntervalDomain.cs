@@ -51,8 +51,8 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         }
 
         var normalizedRemainder = Normalize(remainder, modulus);
-        var adjustedLower = lowerBound;
-        var adjustedUpper = upperBound;
+        long? adjustedLower = lowerBound == long.MinValue ? null : lowerBound;
+        long? adjustedUpper = upperBound == long.MaxValue ? null : upperBound;
         if (!TryCongruentBoundary(adjustedLower ?? long.MinValue,
                 modulus, normalizedRemainder, atOrAbove: true, out var first))
         {

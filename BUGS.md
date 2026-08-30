@@ -208,13 +208,6 @@ This section records 7 findings from exactly 10 fresh read-only auditors. The re
 - Impact: A refuted `EffectContract` whose violation is a forbidden capability or thrown exception cannot produce a replay witness; `EffectClaimResultAssembler` converts it to `Unknown/CounterexampleReplayFailed` at lines 86-93. Mixed replay streams containing an otherwise valid non-allocation event also fail wholesale.
 - Safe evidence: Static field/use and exhaustive switch trace; no malformed input is required.
 
-## Wave 4.6. LOW - Signed-64 endpoint bounds are not canonicalized to unbounded sentinels
-
-- Files and members: `SharpProof.Dataflow/IntervalValue.cs`, type contract at lines 3-6; `SharpProof.Dataflow/IntervalDomain.cs`, `Range`/`Create`, lines 21-88, especially 54-75 and return at 88, and `LessThanOrEqual`, lines 91-115, especially 103-110; propagation into `SharpProof.Dataflow/SequenceCardinalityDomain.cs`, constructor/`Create`, lines 12-17 and 39-74.
-- Mechanism: The carrier is signed 64-bit integers, and `TryCongruentBoundary` treats `long.MinValue`/`long.MaxValue` as effective universe endpoints. Nevertheless, `Create` preserves an explicitly supplied `long.MinValue` lower bound and `long.MaxValue` upper bound rather than replacing them with null. Thus `Range(long.MinValue, long.MaxValue)` denotes the same long values as `Top`, but `LessThanOrEqual(Top, Range(long.MinValue, long.MaxValue))` returns false at lines 103-106 because `Top` has no stored lower bound. Equality and `AreEquivalent` also report distinct values. The redundancy occurs one-sided and after sequence reduction, such as `Create(Top, Range(0, long.MaxValue))` versus sequence `Top`.
-- Impact: Public construction admits semantically duplicate abstract states. Joins, widening, havoc, and client equality can report an upward change or information loss when the represented set did not change. This primarily creates precision, stability, and API-consistency risk, can add needless fixed-point transitions, and makes semantic equivalence checks unreliable at carrier endpoints.
-- Safe evidence: Both `IntervalValue.Top.Contains(x)` and `IntervalValue.Range(long.MinValue, long.MaxValue).Contains(x)` are true for every possible `long x`; `Create` leaves endpoint fields set, and line 103 rejects `Top <= explicit full range`. The canonical container test passed all 48 tests; generated samples contain the explicit full range but do not assert equivalence with `Top`.
-
 ## Wave 4.7. HIGH - Exceptional verifier exits lose or disable retained-supervisor cleanup authentication
 
 - File and members: `SharpProof.BuildTasks/RunVerifier.cs`, `RunVerifier.Execute`, `TryTerminate`, and `ObserveCleanupAnchorAsync`, current lines 323-375, 694-718, and 939-946.
