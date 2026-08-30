@@ -10,6 +10,8 @@ internal sealed class EffectMethodNodeBuilder
     private readonly EffectAnalysisSession _session;
     private readonly Compilation _compilation;
     private readonly ManagedAbstractFlow _managedFlow;
+    private readonly Dictionary<INamedTypeSymbol, EffectBeforeFieldInitNode>
+        _beforeFieldInitNodes = new(SymbolEqualityComparer.Default);
 
     internal EffectMethodNodeBuilder(
         EffectAnalysisSession session,
@@ -46,12 +48,13 @@ internal sealed class EffectMethodNodeBuilder
             allowDirectWitnesses:
                 graph != null &&
                 HasDefiniteBodyEntry(method, _session.ApiSpecs));
-        var initializers = ScanConstructorMemberInitializers(
+        var constructorInitializers = ScanConstructorMemberInitializers(
             method,
             scanner,
             cancellationToken);
-        var localSummary = initializers.Summary;
-        if (initializers.CompletesNormally)
+        EnsureBeforeFieldInitNode(method, cancellationToken);
+        var localSummary = constructorInitializers.Summary;
+        if (constructorInitializers.CompletesNormally)
         {
             var bodySummary = graph == null
                 ? EffectSummaryOperations.Join(
@@ -116,25 +119,104 @@ internal sealed class EffectMethodNodeBuilder
             return EffectStep.Empty;
         }
 
+        return ScanMemberInitializers(
+            method,
+            scanner,
+            staticInitializers,
+            cancellationToken);
+    }
+
+    private void EnsureBeforeFieldInitNode(
+        IMethodSymbol method,
+        CancellationToken cancellationToken)
+    {
+        if (!CanTriggerBeforeFieldInitInitialization(method) ||
+            !HasPotentialStaticInitialization(
+                method.ContainingType,
+                _session.ApiSpecs) ||
+            _beforeFieldInitNodes.ContainsKey(method.ContainingType))
+        {
+            return;
+        }
+
+        var initializer = method.ContainingType.StaticConstructors
+            .SingleOrDefault(static constructor =>
+                constructor.IsImplicitlyDeclared);
+        if (initializer == null)
+        {
+            _beforeFieldInitNodes.Add(
+                method.ContainingType,
+                new EffectBeforeFieldInitNode(
+                    EffectSummaryOperations.UnknownBoundary(
+                        EffectUncertainty.UnsupportedOperation),
+                    []));
+            return;
+        }
+
+        var calls = new List<EffectCallSite>();
+        var result = EffectStep.Empty;
+        var write = EffectSummaryOperations.Write(EffectRegionSet.Create(
+            EffectRegionId.Static()));
+        foreach (var syntaxReference in GetMemberInitializerReferences(
+                     method.ContainingType,
+                     staticInitializers: true))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var declaration = syntaxReference.GetSyntax(cancellationToken);
+            var expression = EffectProjections.GetInitializerExpression(
+                declaration);
+            if (expression == null)
+            {
+                continue;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(_compilation, expression.SyntaxTree);
+            var operation = model.GetOperation(expression, cancellationToken);
+            if (operation == null)
+            {
+                result = result.Then(new EffectStep(
+                    EffectSummaryOperations.Unsupported(),
+                    true));
+                continue;
+            }
+
+            var scanner = new OperationEffectScanner(
+                _session,
+                initializer,
+                calls,
+                operation,
+                abstractFlow: null,
+                allowDirectWitnesses: false);
+            result = result.Then(scanner.ScanSequence([operation]));
+            if (!result.CompletesNormally)
+            {
+                break;
+            }
+
+            result = result.Then(new EffectStep(write, true));
+        }
+
+        _beforeFieldInitNodes.Add(
+            method.ContainingType,
+            new EffectBeforeFieldInitNode(
+                _session.WrapTypeInitializationFailures(result.Summary),
+                [.. calls]));
+    }
+
+    private EffectStep ScanMemberInitializers(
+        IMethodSymbol method,
+        OperationEffectScanner scanner,
+        bool staticInitializers,
+        CancellationToken cancellationToken)
+    {
+
         var result = EffectStep.Empty;
         var write = EffectSummaryOperations.Write(EffectRegionSet.Create(
             staticInitializers ? EffectRegionId.Static() : EffectRegionId.Receiver));
-        var syntaxTreeOrder = _compilation.SyntaxTrees
-            .Select(static (tree, ordinal) => (tree, ordinal))
-            .ToDictionary(
-                static item => item.tree,
-                static item => item.ordinal);
-        var references = method.ContainingType.GetMembers()
-            .Where(member => !member.IsImplicitlyDeclared &&
-                IsInitializableMember(member, staticInitializers))
-            .SelectMany(static member => member.DeclaringSyntaxReferences)
-            .OrderBy(reference => syntaxTreeOrder.TryGetValue(
-                    reference.SyntaxTree,
-                    out var ordinal)
-                ? ordinal
-                : int.MaxValue)
-            .ThenBy(static reference => reference.Span.Start);
-        foreach (var syntaxReference in references)
+        foreach (var syntaxReference in GetMemberInitializerReferences(
+                     method.ContainingType,
+                     staticInitializers))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var declaration = syntaxReference.GetSyntax(cancellationToken);
@@ -165,6 +247,42 @@ internal sealed class EffectMethodNodeBuilder
         }
 
         return result;
+    }
+
+    internal bool TryGetBeforeFieldInitNode(
+        IMethodSymbol method,
+        out EffectBeforeFieldInitNode node)
+    {
+        if (!CanTriggerBeforeFieldInitInitialization(method))
+        {
+            node = default;
+            return false;
+        }
+
+        return _beforeFieldInitNodes.TryGetValue(
+            method.ContainingType,
+            out node);
+    }
+
+    private IEnumerable<SyntaxReference> GetMemberInitializerReferences(
+        INamedTypeSymbol type,
+        bool staticInitializers)
+    {
+        var syntaxTreeOrder = _compilation.SyntaxTrees
+            .Select(static (tree, ordinal) => (tree, ordinal))
+            .ToDictionary(
+                static item => item.tree,
+                static item => item.ordinal);
+        return type.GetMembers()
+            .Where(member => !member.IsImplicitlyDeclared &&
+                IsInitializableMember(member, staticInitializers))
+            .SelectMany(static member => member.DeclaringSyntaxReferences)
+            .OrderBy(reference => syntaxTreeOrder.TryGetValue(
+                    reference.SyntaxTree,
+                    out var ordinal)
+                ? ordinal
+                : int.MaxValue)
+            .ThenBy(static reference => reference.Span.Start);
     }
 
     internal static bool HasPotentialStaticInitialization(
@@ -284,6 +402,15 @@ internal sealed class EffectMethodNodeBuilder
         return method.MethodKind == MethodKind.Constructor ||
         method.MethodKind != MethodKind.StaticConstructor &&
         (method.IsStatic || method.ContainingType.IsValueType);
+    }
+
+    internal static bool CanTriggerBeforeFieldInitInitialization(
+        IMethodSymbol method)
+    {
+        return method.IsStatic &&
+            method.MethodKind != MethodKind.StaticConstructor &&
+            method.ContainingType.StaticConstructors.All(
+                static constructor => constructor.IsImplicitlyDeclared);
     }
 
     private bool StaticConstructorCanAffectEntry(
@@ -659,3 +786,7 @@ internal sealed class EffectMethodNodeBuilder
         }
     }
 }
+
+internal readonly record struct EffectBeforeFieldInitNode(
+    EffectSummary LocalSummary,
+    ImmutableArray<EffectCallSite> Calls);

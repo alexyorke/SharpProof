@@ -33,6 +33,9 @@ public sealed class EffectAnalysisSession
     private readonly object _gate = new();
     private ImmutableArray<EffectModuleInitializer> _moduleInitializers;
     private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes = new(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<IMethodSymbol, EffectSummary> _bodySummaries =
+        ImmutableDictionary.Create<IMethodSymbol, EffectSummary>(
+            SymbolEqualityComparer.Default);
     private volatile ImmutableDictionary<IMethodSymbol, EffectSummary> _summaries =
         ImmutableDictionary.Create<IMethodSymbol, EffectSummary>(SymbolEqualityComparer.Default);
 
@@ -232,6 +235,17 @@ public sealed class EffectAnalysisSession
         return _external.ResolveExceptionSet(metadataNames);
     }
 
+    internal EffectSummary WrapTypeInitializationFailures(
+        EffectSummary summary)
+    {
+        return summary.Throws.IsEmpty
+            ? summary
+            : EffectSummaryOperations.WithThrows(
+                summary,
+                ResolveExceptionSet(
+                    FrameworkTypeMetadataNames.TypeInitializationException));
+    }
+
     internal bool IsConditionallyElided(IInvocationOperation invocation)
     {
         return _invocationEmission.IsElided(invocation);
@@ -379,21 +393,75 @@ public sealed class EffectAnalysisSession
         CancellationToken cancellationToken)
     {
         var summaries = existing.ToBuilder();
+        var bodySummaries = _bodySummaries.ToBuilder();
         foreach (var method in EffectCallGraph.FindRecursiveMethods(
                      nodes,
                      cancellationToken))
         {
-            summaries[method] = EffectSummaryDomain.Instance.Join(nodes[method].LocalSummary,
+            var recursive = EffectSummaryDomain.Instance.Join(
+                nodes[method].LocalSummary,
                 EffectSummaryOperations.UnknownBoundary(
-                    EffectUncertainty.DirectCall | EffectUncertainty.Recursion));
+                    EffectUncertainty.DirectCall |
+                    EffectUncertainty.Recursion));
+            summaries[method] = recursive;
+            bodySummaries[method] = recursive;
         }
 
         var computeDepth = 0;
+        var activeEntries = new HashSet<IMethodSymbol>(
+            SymbolEqualityComparer.Default);
 
         EffectSummary Compute(IMethodSymbol method)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (summaries.TryGetValue(method, out var cached))
+            {
+                return cached;
+            }
+
+            if (!nodes.ContainsKey(method) || !activeEntries.Add(method))
+            {
+                return EffectSummaryOperations.UnknownBoundary(
+                    EffectUncertainty.UnmodeledCall);
+            }
+
+            var summary = ComputeBody(method);
+            if (_nodeBuilder.TryGetBeforeFieldInitNode(
+                    method,
+                    out var initialization))
+            {
+                var initializationSummary = initialization.LocalSummary;
+                foreach (var call in OrderCalls(initialization.Calls))
+                {
+                    var target = HasSameContainingType(method, call.Target)
+                        ? ComputeBody(call.Target)
+                        : Compute(call.Target);
+                    initializationSummary = EffectSummaryDomain.Instance.Join(
+                        initializationSummary,
+                        EffectExceptionFlow.KeepEscaping(
+                            WrapTypeInitializationFailures(
+                                EffectSummaryOperations.Remap(
+                                    target,
+                                    call.Receiver,
+                                    call.WriteReceiver,
+                                    call.Arguments)),
+                            call.Origin,
+                            _compilation));
+                }
+                summary = EffectSummaryDomain.Instance.Join(
+                    summary,
+                    initializationSummary);
+            }
+
+            activeEntries.Remove(method);
+            summaries[method] = summary;
+            return summary;
+        }
+
+        EffectSummary ComputeBody(IMethodSymbol method)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (bodySummaries.TryGetValue(method, out var cached))
             {
                 return cached;
             }
@@ -404,26 +472,34 @@ public sealed class EffectAnalysisSession
             if (!nodes.TryGetValue(method, out var node) ||
                 computeDepth >= EffectCallGraph.MaximumCallGraphDepth)
             {
-                return EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall);
+                return EffectSummaryOperations.UnknownBoundary(
+                    EffectUncertainty.UnmodeledCall);
             }
 
             computeDepth++;
             var summary = node.LocalSummary;
-            foreach (var call in node.Calls
-                         .OrderBy(static call => call.Target, EffectSymbolComparer<IMethodSymbol>.Instance)
-                         .ThenBy(static call => call.Receiver.GetHashCode()))
+            foreach (var call in OrderCalls(node.Calls))
             {
-                summary = EffectSummaryDomain.Instance.Join(summary,
-                    EffectExceptionFlow.KeepEscaping(EffectSummaryOperations.Remap(
-                        Compute(call.Target),
-                        call.Receiver,
-                        call.WriteReceiver,
-                        call.Arguments),
-                        call.Origin, _compilation));
+                var target =
+                    EffectMethodNodeBuilder
+                        .CanTriggerBeforeFieldInitInitialization(method) &&
+                    HasSameContainingType(method, call.Target)
+                        ? ComputeBody(call.Target)
+                        : Compute(call.Target);
+                summary = EffectSummaryDomain.Instance.Join(
+                    summary,
+                    EffectExceptionFlow.KeepEscaping(
+                        EffectSummaryOperations.Remap(
+                            target,
+                            call.Receiver,
+                            call.WriteReceiver,
+                            call.Arguments),
+                        call.Origin,
+                        _compilation));
             }
 
             computeDepth--;
-            summaries[method] = summary;
+            bodySummaries[method] = summary;
             return summary;
         }
 
@@ -433,7 +509,27 @@ public sealed class EffectAnalysisSession
             Compute(method);
         }
 
+        _bodySummaries = bodySummaries.ToImmutable();
         return summaries.ToImmutable();
+
+        static IOrderedEnumerable<EffectCallSite> OrderCalls(
+            IEnumerable<EffectCallSite> calls)
+        {
+            return calls
+                .OrderBy(
+                    static call => call.Target,
+                    EffectSymbolComparer<IMethodSymbol>.Instance)
+                .ThenBy(static call => call.Receiver.GetHashCode());
+        }
+
+        static bool HasSameContainingType(
+            IMethodSymbol left,
+            IMethodSymbol right)
+        {
+            return SymbolEqualityComparer.Default.Equals(
+                left.ContainingType.OriginalDefinition,
+                right.ContainingType.OriginalDefinition);
+        }
     }
 
     private Dictionary<IMethodSymbol, EffectMethodNode> BuildNodes(
@@ -458,7 +554,12 @@ public sealed class EffectAnalysisSession
                 _nodes.Add(method, node);
             }
             nodes.Add(method, node);
-            foreach (var call in node.Calls)
+            var calls = _nodeBuilder.TryGetBeforeFieldInitNode(
+                    method,
+                    out var initialization)
+                ? node.Calls.Concat(initialization.Calls)
+                : node.Calls;
+            foreach (var call in calls)
             {
                 if (!knownSummaries.ContainsKey(call.Target) && !nodes.ContainsKey(call.Target))
                 {
