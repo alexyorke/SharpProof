@@ -572,6 +572,53 @@ internal sealed class ExceptionHandlerReachability(
                 PushChildren(creation);
                 continue;
             }
+            if (operation is IInterpolationOperation interpolation)
+            {
+                if (canCompleteNormally(interpolation.Expression) &&
+                    (interpolation.Alignment == null ||
+                     canCompleteNormally(interpolation.Alignment)) &&
+                    (interpolation.FormatString == null ||
+                     canCompleteNormally(interpolation.FormatString)))
+                {
+                    Add(
+                        interpolation.Alignment != null ||
+                        interpolation.FormatString != null
+                            ? UnknownPotential
+                            : GetFormattedValueExceptions(
+                                interpolation.Expression,
+                                interpolation,
+                                activeMethods,
+                                depth),
+                        interpolation);
+                }
+                PushChildren(interpolation);
+                continue;
+            }
+            if (operation is IBinaryOperation concatenation &&
+                StringConcatenationEffectResolver
+                    .IsBuiltInStringConcatenation(concatenation))
+            {
+                if (canCompleteNormally(concatenation.LeftOperand) &&
+                    canCompleteNormally(concatenation.RightOperand))
+                {
+                    Add(
+                        GetFormattedValueExceptions(
+                            concatenation.LeftOperand,
+                            concatenation,
+                            activeMethods,
+                            depth),
+                        concatenation);
+                    Add(
+                        GetFormattedValueExceptions(
+                            concatenation.RightOperand,
+                            concatenation,
+                            activeMethods,
+                            depth),
+                        concatenation);
+                }
+                PushChildren(concatenation);
+                continue;
+            }
             if (operation is IBinaryOperation binary &&
                 binary.OperatorMethod is { } binaryOperator)
             {
@@ -2466,6 +2513,40 @@ internal sealed class ExceptionHandlerReachability(
                     method,
                     activeMethods,
                     depth + 1));
+    }
+
+    private PotentialExceptions GetFormattedValueExceptions(
+        IOperation operand,
+        IOperation origin,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth)
+    {
+        if (!StringConcatenationEffectResolver.TryResolveFormattedValueMethod(
+                operand,
+                origin,
+                compilation,
+                abstractFlow,
+                out var target,
+                out var dispatchUncertain))
+        {
+            return EmptyPotential;
+        }
+        if (target == null || dispatchUncertain)
+        {
+            return UnknownPotential;
+        }
+
+        var result = EmptyPotential;
+        if (!AddStaticInitializationPotential(
+                target,
+                origin,
+                (potential, _) => result = Union(result, potential)))
+        {
+            return result;
+        }
+        return Union(
+            result,
+            GetCallableExceptions(target, activeMethods, depth + 1));
     }
 
     private ReturnNullability GetReturnNullability(IMethodSymbol method)

@@ -8,6 +8,15 @@ namespace SharpProof.Effects;
 /// </summary>
 internal static class StringConcatenationEffectResolver
 {
+    internal static bool IsBuiltInStringConcatenation(
+        IBinaryOperation binary)
+    {
+        return binary.OperatorKind == BinaryOperatorKind.Add &&
+            binary.Type?.SpecialType == SpecialType.System_String &&
+            !binary.ConstantValue.HasValue &&
+            binary.OperatorMethod == null;
+    }
+
     internal static EffectSummary Resolve(
         IBinaryOperation binary,
         Compilation compilation,
@@ -102,6 +111,26 @@ internal static class StringConcatenationEffectResolver
                 formatted.Target,
                 formatted.Operand,
                 origin);
+    }
+
+    internal static bool TryResolveFormattedValueMethod(
+        IOperation operand,
+        IOperation origin,
+        Compilation compilation,
+        ManagedFlowResult? flow,
+        out IMethodSymbol? target,
+        out bool dispatchUncertain)
+    {
+        var formatted = ResolveFormattedValueCall(
+            operand,
+            origin,
+            compilation,
+            flow);
+        target = formatted.Target;
+        dispatchUncertain = target != null && IsDispatchUncertain(
+            target,
+            formatted.ReceiverType);
+        return formatted.IsRequired;
     }
 
     private static FormattedValueCall ResolveFormattedValueCall(
