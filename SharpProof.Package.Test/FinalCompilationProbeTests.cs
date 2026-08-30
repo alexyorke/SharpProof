@@ -11,7 +11,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Package.Test;
 
 [TestFixture]
-[NonParallelizable]
+[Parallelizable(ParallelScope.Children)]
 public sealed class FinalCompilationProbeTests
 {
     private const string NetStandardTargetFramework = "netstandard2.0";
