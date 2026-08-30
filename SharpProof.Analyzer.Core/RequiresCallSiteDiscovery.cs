@@ -41,6 +41,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
             cancellationToken);
+        var delegateTargets = GetDirectDelegateTargets(operationRoot);
         foreach (var operation in
                  ExecutableDescendantsAndSelf(operationRoot))
         {
@@ -48,8 +49,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
             var calls = GetCalls(
                 operation,
                 operationFacts,
-                semanticModel.Compilation,
-                cancellationToken);
+                semanticModel,
+                delegateTargets,
+                cancellationToken: cancellationToken);
             if (calls.IsDefaultOrEmpty)
             {
                 continue;
@@ -129,6 +131,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
             cancellationToken);
+        var delegateTargets = GetDirectDelegateTargets(operationRoot!);
         foreach (var block in graph.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -154,7 +157,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 var calls = GetCalls(
                     operation,
                     operationFacts,
-                    semanticModel.Compilation,
+                    semanticModel,
+                    delegateTargets,
+                    flowResult,
                     cancellationToken);
                 if (calls.IsDefaultOrEmpty ||
                     !SymbolEqualityComparer.Default.Equals(
@@ -193,16 +198,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         call.Instance,
                         call.Arguments,
                         call.ExplicitArguments,
-                        call.CanReplay &&
-                        (IsAccessorCall(call.TargetMethod) ||
-                            operation is IListPatternOperation
-                            ? HasReplayableAccessorEvaluation(
-                                call,
-                                operationFacts)
-                            : (hasFlowState || !flowAnalysis.IsComplete) &&
-                                HasReplayablePrefix(
-                                    operation,
-                                    operationFacts)),
+                        call.CanReplay && HasReplayableCallEvaluation(
+                            operation,
+                            call,
+                            operationFacts,
+                            hasFlowState,
+                            flowAnalysis.IsComplete),
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status);
                     var existingIndex = callSites.FindIndex(existing =>
@@ -268,6 +269,63 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     CanReplay: false,
                     Flow: null,
                     ManagedFlowStatus.BudgetExceeded));
+            }
+        }
+
+        foreach (var operation in ExecutableDescendantsAndSelf(
+                     operationRoot!).Where(static candidate =>
+                         candidate is IForEachLoopOperation or
+                             IUsingOperation or
+                             IUsingDeclarationOperation or
+                             IRecursivePatternOperation))
+        {
+            if (!operation.DescendantsAndSelf().Any(candidate =>
+                    reachableOperationSites.Contains((
+                        candidate.Syntax.SyntaxTree,
+                        candidate.Syntax.SpanStart,
+                        candidate.Syntax.Span.Length))))
+            {
+                continue;
+            }
+
+            foreach (var call in GetCalls(
+                         operation,
+                         operationFacts,
+                         semanticModel,
+                         delegateTargets,
+                         flowResult,
+                         cancellationToken))
+            {
+                if (callSites.Any(existing =>
+                        existing.Syntax.SyntaxTree ==
+                            operation.Syntax.SyntaxTree &&
+                        (existing.Syntax.Span == operation.Syntax.Span ||
+                         existing.Operation?.IsImplicit == true &&
+                         operation.Syntax.Span.Contains(
+                             existing.Syntax.Span)) &&
+                        SymbolEqualityComparer.Default.Equals(
+                            existing.TargetMethod,
+                            call.TargetMethod)))
+                {
+                    continue;
+                }
+
+                callSites.Add(new RequiresCallSiteCandidate(
+                    operation,
+                    operation.Syntax,
+                    call.TargetMethod,
+                    call.Instance,
+                    call.Arguments,
+                    call.ExplicitArguments,
+                    call.CanReplay && HasReplayableCallEvaluation(
+                        operation,
+                        call,
+                        operationFacts,
+                        hasFlowState: false,
+                        flowAnalysisIsComplete:
+                            flowAnalysis.IsComplete),
+                    Flow: null,
+                    flowAnalysis.Status));
             }
         }
 
@@ -492,6 +550,50 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationFacts.CompletesNormally);
     }
 
+    private bool HasReplayableCallEvaluation(
+        IOperation operation,
+        RequiresCallTarget call,
+        DefiniteOperationFacts operationFacts,
+        bool hasFlowState,
+        bool flowAnalysisIsComplete)
+    {
+        if (IsAccessorCall(call.TargetMethod) ||
+            operation is IListPatternOperation)
+        {
+            return HasReplayableAccessorEvaluation(call, operationFacts);
+        }
+        if (operation is IForEachLoopOperation)
+        {
+            return HasReplayableAccessorEvaluation(call, operationFacts);
+        }
+        if (operation is IUsingOperation or IUsingDeclarationOperation)
+        {
+            return operationFacts.MayCompleteNormally(
+                operation is IUsingOperation usingOperation
+                    ? usingOperation.Resources
+                    : ((IUsingDeclarationOperation)operation)
+                        .DeclarationGroup);
+        }
+        if (operation is IRecursivePatternOperation)
+        {
+            return HasReplayableAccessorEvaluation(call, operationFacts);
+        }
+        if (operation is IInvocationOperation invocation &&
+            invocation.TargetMethod.MethodKind == MethodKind.DelegateInvoke &&
+            !SymbolEqualityComparer.Default.Equals(
+                call.TargetMethod,
+                invocation.TargetMethod))
+        {
+            return HasReplayableAccessorEvaluation(call, operationFacts);
+        }
+        if (operation.IsImplicit)
+        {
+            return HasReplayableAccessorEvaluation(call, operationFacts);
+        }
+        return (hasFlowState || !flowAnalysisIsComplete) &&
+            HasReplayablePrefix(operation, operationFacts);
+    }
+
     private static bool CanCoalesceGetterComplete(
         IPropertyReferenceOperation property,
         DefiniteOperationFacts operationFacts)
@@ -562,17 +664,18 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private static ImmutableArray<RequiresCallTarget> GetCalls(
         IOperation operation,
         DefiniteOperationFacts? operationFacts = null,
-        Compilation? compilation = null,
+        SemanticModel? semanticModel = null,
+        IReadOnlyDictionary<ILocalSymbol,
+            (IMethodSymbol Method, IOperation? Instance)>?
+            delegateTargets = null,
+        ManagedFlowResult? flowResult = null,
         CancellationToken cancellationToken = default)
     {
         return operation switch
         {
-            IInvocationOperation invocation => [new(
-                invocation.TargetMethod,
-                invocation.Instance,
-                invocation.Arguments,
-                ImmutableDictionary<int, IOperation>.Empty,
-                true)],
+            IInvocationOperation invocation => GetInvocationCalls(
+                invocation,
+                delegateTargets),
             IObjectCreationOperation
             {
                 Constructor: { } constructor
@@ -586,13 +689,420 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 GetPropertyCalls(property),
             IEventReferenceOperation eventReference =>
                 GetEventCalls(eventReference),
+            ICompoundAssignmentOperation
+            {
+                OperatorMethod: { } method
+            } compound => [CreateImplicitOperatorCall(
+                method,
+                compound.Target,
+                compound.Value)],
+            IIncrementOrDecrementOperation
+            {
+                OperatorMethod: { } method
+            } increment => [CreateImplicitOperatorCall(
+                method,
+                increment.Target)],
+            IBinaryOperation
+            {
+                OperatorMethod: { } method
+            } binary => [CreateImplicitOperatorCall(
+                method,
+                binary.LeftOperand,
+                binary.RightOperand)],
+            IUnaryOperation
+            {
+                OperatorMethod: { } method
+            } unary => [CreateImplicitOperatorCall(
+                method,
+                unary.Operand)],
+            IConversionOperation
+            {
+                OperatorMethod: { } method
+            } conversion => [CreateImplicitOperatorCall(
+                method,
+                conversion.Operand)],
+            IForEachLoopOperation forEach => GetForEachCalls(
+                forEach,
+                operationFacts,
+                semanticModel,
+                cancellationToken),
+            IUsingOperation usingOperation => GetUsingCalls(
+                usingOperation.Resources,
+                usingOperation.IsAsynchronous,
+                semanticModel?.Compilation,
+                operationFacts,
+                flowResult),
+            IUsingDeclarationOperation usingDeclaration => GetUsingCalls(
+                usingDeclaration.DeclarationGroup,
+                usingDeclaration.IsAsynchronous,
+                semanticModel?.Compilation,
+                operationFacts,
+                flowResult),
+            IRecursivePatternOperation
+            {
+                DeconstructSymbol: IMethodSymbol deconstruct
+            } recursivePattern => GetRecursivePatternCalls(
+                recursivePattern,
+                deconstruct,
+                flowResult),
             IListPatternOperation listPattern => GetListPatternCalls(
                 listPattern,
                 operationFacts,
-                compilation,
+                semanticModel?.Compilation,
                 cancellationToken),
             _ => []
         };
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetInvocationCalls(
+        IInvocationOperation invocation,
+        IReadOnlyDictionary<ILocalSymbol,
+            (IMethodSymbol Method, IOperation? Instance)>?
+            delegateTargets)
+    {
+        var ordinary = new RequiresCallTarget(
+            invocation.TargetMethod,
+            invocation.Instance,
+            invocation.Arguments,
+            ImmutableDictionary<int, IOperation>.Empty,
+            true);
+        if (invocation.TargetMethod.MethodKind != MethodKind.DelegateInvoke ||
+            !TryResolveDirectDelegateTarget(
+                invocation.Instance,
+                delegateTargets,
+                out var target))
+        {
+            return [ordinary];
+        }
+
+        return [ordinary, new RequiresCallTarget(
+            target.Method,
+            target.Instance,
+            invocation.Arguments,
+            ImmutableDictionary<int, IOperation>.Empty,
+            true)];
+    }
+
+    private static RequiresCallTarget CreateImplicitOperatorCall(
+        IMethodSymbol method,
+        params IOperation[] operands)
+    {
+        var arguments = ImmutableDictionary.CreateBuilder<int, IOperation>();
+        var count = Math.Min(method.Parameters.Length, operands.Length);
+        for (var index = 0; index < count; index++)
+        {
+            arguments.Add(index, operands[index]);
+        }
+        return new RequiresCallTarget(
+            method,
+            Instance: null,
+            Arguments: [],
+            arguments.ToImmutable(),
+            CanReplay: true);
+    }
+
+    private static Dictionary<ILocalSymbol,
+        (IMethodSymbol Method, IOperation? Instance)>
+        GetDirectDelegateTargets(IOperation operationRoot)
+    {
+        var targets = new Dictionary<ILocalSymbol,
+            (IMethodSymbol Method, IOperation? Instance)>(
+            SymbolEqualityComparer.Default);
+        var ambiguous = new HashSet<ILocalSymbol>(
+            SymbolEqualityComparer.Default);
+        foreach (var declarator in operationRoot.DescendantsAndSelf()
+                     .OfType<IVariableDeclaratorOperation>())
+        {
+            if (declarator.Initializer?.Value is not { } value ||
+                !TryGetMethodReference(value, out var reference) ||
+                ambiguous.Contains(declarator.Symbol))
+            {
+                continue;
+            }
+
+            if (targets.ContainsKey(declarator.Symbol))
+            {
+                targets.Remove(declarator.Symbol);
+                ambiguous.Add(declarator.Symbol);
+            }
+            else
+            {
+                targets.Add(
+                    declarator.Symbol,
+                    (reference.Method, reference.Instance));
+            }
+        }
+
+        foreach (var operation in operationRoot.DescendantsAndSelf())
+        {
+            var target = operation switch
+            {
+                IAssignmentOperation assignment => assignment.Target,
+                IIncrementOrDecrementOperation increment => increment.Target,
+                IArgumentOperation
+                {
+                    Parameter.RefKind: not RefKind.None
+                } argument => argument.Value,
+                _ => null
+            };
+            if (TryGetLocalReference(target, out var local))
+            {
+                targets.Remove(local);
+                ambiguous.Add(local);
+            }
+        }
+        return targets;
+    }
+
+    private static bool TryResolveDirectDelegateTarget(
+        IOperation? instance,
+        IReadOnlyDictionary<ILocalSymbol,
+            (IMethodSymbol Method, IOperation? Instance)>? targets,
+        out (IMethodSymbol Method, IOperation? Instance) target)
+    {
+        if (instance != null &&
+            TryGetMethodReference(instance, out var reference))
+        {
+            target = (reference.Method, reference.Instance);
+            return true;
+        }
+        if (targets != null &&
+            TryGetLocalReference(instance, out var local) &&
+            targets.TryGetValue(local, out target))
+        {
+            return true;
+        }
+
+        target = default;
+        return false;
+    }
+
+    private static bool TryGetMethodReference(
+        IOperation operation,
+        out IMethodReferenceOperation reference)
+    {
+        while (true)
+        {
+            switch (operation)
+            {
+                case IMethodReferenceOperation methodReference:
+                    reference = methodReference;
+                    return true;
+                case IDelegateCreationOperation delegateCreation:
+                    operation = delegateCreation.Target;
+                    continue;
+                case IConversionOperation conversion:
+                    operation = conversion.Operand;
+                    continue;
+                default:
+                    reference = null!;
+                    return false;
+            }
+        }
+    }
+
+    private static bool TryGetLocalReference(
+        IOperation? operation,
+        out ILocalSymbol local)
+    {
+        while (operation is IConversionOperation conversion)
+        {
+            operation = conversion.Operand;
+        }
+        if (operation is ILocalReferenceOperation reference)
+        {
+            local = reference.Local;
+            return true;
+        }
+
+        local = null!;
+        return false;
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetForEachCalls(
+        IForEachLoopOperation loop,
+        DefiniteOperationFacts? operationFacts,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
+    {
+        if (semanticModel == null ||
+            loop.Syntax is not CommonForEachStatementSyntax syntax)
+        {
+            return [];
+        }
+
+        var info = semanticModel.GetForEachStatementInfo(syntax);
+        var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>();
+        if (info.GetEnumeratorMethod == null)
+        {
+            return [];
+        }
+
+        Add(info.GetEnumeratorMethod, loop.Collection);
+        if (operationFacts != null &&
+            !operationFacts.MethodCanCompleteNormally(
+                info.GetEnumeratorMethod))
+        {
+            return calls.ToImmutable();
+        }
+
+        if (info.MoveNextMethod != null)
+        {
+            Add(info.MoveNextMethod, instance: null);
+        }
+        if (info.CurrentProperty?.GetMethod is { } current &&
+            (info.MoveNextMethod == null ||
+             operationFacts == null ||
+             operationFacts.MethodCanCompleteNormally(
+                 info.MoveNextMethod)))
+        {
+            Add(current, instance: null);
+        }
+        Add(
+            ResolveDisposeMethod(
+                info.GetEnumeratorMethod.ReturnType,
+                isAsynchronous: false,
+                semanticModel.Compilation) ?? info.DisposeMethod,
+            instance: null);
+        return calls.ToImmutable();
+
+        void Add(IMethodSymbol? method, IOperation? instance)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (method == null)
+            {
+                return;
+            }
+            calls.Add(new RequiresCallTarget(
+                method,
+                instance,
+                [],
+                ImmutableDictionary<int, IOperation>.Empty,
+                true));
+        }
+    }
+
+    private static ImmutableArray<RequiresCallTarget> GetUsingCalls(
+        IOperation resources,
+        bool isAsynchronous,
+        Compilation? compilation,
+        DefiniteOperationFacts? operationFacts,
+        ManagedFlowResult? flowResult)
+    {
+        if (compilation == null)
+        {
+            return [];
+        }
+
+        var acquired = new List<(
+            ITypeSymbol Type,
+            IOperation Resource,
+            IOperation Origin)>();
+        if (resources is IVariableDeclarationGroupOperation group)
+        {
+            foreach (var declarator in group.Declarations.SelectMany(
+                         static declaration => declaration.Declarators))
+            {
+                var resource = declarator.Initializer?.Value;
+                if (resource == null ||
+                    operationFacts != null &&
+                    !operationFacts.MayCompleteNormally(resource))
+                {
+                    break;
+                }
+                acquired.Add((
+                    declarator.Symbol.Type,
+                    resource,
+                    declarator));
+            }
+        }
+        else if ((operationFacts == null ||
+                  operationFacts.MayCompleteNormally(resources)) &&
+                 resources.Type is { } resourceType)
+        {
+            acquired.Add((resourceType, resources, resources));
+        }
+
+        var calls = ImmutableArray.CreateBuilder<RequiresCallTarget>();
+        foreach (var item in acquired.AsEnumerable().Reverse())
+        {
+            if (DefiniteOperationFacts.IsDefinitelyNull(item.Resource) ||
+                flowResult?.ProvesNull(
+                    item.Origin,
+                    item.Resource) == true)
+            {
+                continue;
+            }
+            var method = ResolveDisposeMethod(
+                item.Type,
+                isAsynchronous,
+                compilation);
+            if (method != null)
+            {
+                calls.Add(new RequiresCallTarget(
+                    method,
+                    item.Resource,
+                    Arguments: [],
+                    ImmutableDictionary<int, IOperation>.Empty,
+                    CanReplay: true));
+            }
+        }
+        return calls.ToImmutable();
+    }
+
+    private static IMethodSymbol? ResolveDisposeMethod(
+        ITypeSymbol resourceType,
+        bool isAsynchronous,
+        Compilation compilation)
+    {
+        var interfaceName = isAsynchronous
+            ? "System.IAsyncDisposable"
+            : "System.IDisposable";
+        var methodName = isAsynchronous
+            ? "DisposeAsync"
+            : "Dispose";
+        var disposable = compilation.GetTypeByMetadataName(interfaceName);
+        var interfaceMethod = disposable?.GetMembers(methodName)
+            .OfType<IMethodSymbol>()
+            .SingleOrDefault(static method => method.Parameters.IsEmpty);
+        if (interfaceMethod != null &&
+            resourceType is INamedTypeSymbol named &&
+            named.AllInterfaces.Any(candidate =>
+                SymbolEqualityComparer.Default.Equals(
+                    candidate.OriginalDefinition,
+                    disposable!.OriginalDefinition)))
+        {
+            return named.FindImplementationForInterfaceMember(
+                    interfaceMethod) as IMethodSymbol ??
+                interfaceMethod;
+        }
+
+        return resourceType.GetMembers(methodName)
+            .OfType<IMethodSymbol>()
+            .FirstOrDefault(static method =>
+                !method.IsStatic && method.Parameters.IsEmpty);
+    }
+
+    private static ImmutableArray<RequiresCallTarget>
+        GetRecursivePatternCalls(
+            IRecursivePatternOperation pattern,
+            IMethodSymbol deconstruct,
+            ManagedFlowResult? flowResult)
+    {
+        var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (instance == null ||
+            DefiniteOperationFacts.IsDefinitelyNull(instance) ||
+            flowResult?.ProvesNull(pattern, instance) == true)
+        {
+            return [];
+        }
+
+        return [new RequiresCallTarget(
+            deconstruct,
+            instance,
+            [],
+            ImmutableDictionary<int, IOperation>.Empty,
+            true)];
     }
 
     private static ImmutableArray<RequiresCallTarget> GetListPatternCalls(
@@ -751,9 +1261,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
     }
 
     internal static ImmutableArray<RequiresCallSiteCandidate>
-        CreateUnflowedCandidates(IOperation operation)
+        CreateUnflowedCandidates(
+            IOperation operation,
+            SemanticModel? semanticModel = null)
     {
-        return [.. GetCalls(operation).Select(call =>
+        return [.. GetCalls(
+            operation,
+            semanticModel: semanticModel).Select(call =>
             new RequiresCallSiteCandidate(
                 operation,
                 operation.Syntax,

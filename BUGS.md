@@ -26,14 +26,6 @@ This section records the coordinator's unverified compilation of 26 new findings
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 3.1. MEDIUM - Non-invocation call shapes bypass Requires call-site checking
-
-- File: `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs`
-- Members: `GetPotentialCallOwners`, lines 44-76; `GetCalls`, lines 559-595
-- Mechanism: Discovery recognizes a narrow set of explicit invocation, construction, property, event, and list-pattern shapes. It omits user-defined operator/conversion operation shapes carrying `OperatorMethod`, implicit `foreach` protocol calls, synchronous `using` disposal, positional-pattern `DeconstructSymbol`, and concrete method references behind delegate invocation. A caller containing only one of these calls can be screened out as `NotApplicable`.
-- Impact: Executed `Contract.Requires` or closed parameter attributes can be violated without SP0027, and the caller can be recorded as `NotApplicable`.
-- Safe evidence: The following all execute an omitted target: an overloaded operator or implicit conversion with a `[Positive]` parameter; `foreach` over a type whose `GetEnumerator` requires false; `using` of a type whose `Dispose` requires false; a positional pattern whose `Deconstruct` requires false; and `Action c=Target; c();` where `Target` requires false.
-
 ## Wave 3.2. MEDIUM - Member-initializer reachability does not account for a non-completing base-constructor path
 
 - File: `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs`

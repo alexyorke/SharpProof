@@ -125,7 +125,9 @@ internal static partial class RequiresCallSiteAnalyzer
                              operationFacts))
             {
                 foreach (var call in RequiresCallSiteDiscovery
-                             .CreateUnflowedCandidates(operation))
+                             .CreateUnflowedCandidates(
+                                 operation,
+                                 semanticModel))
                 {
                     if (!nestedCalls.Any(existing =>
                             existing.Syntax.SyntaxTree ==
@@ -193,7 +195,7 @@ internal static partial class RequiresCallSiteAnalyzer
         CancellationToken cancellationToken)
     {
         var calls = RequiresCallSiteDiscovery
-            .CreateUnflowedCandidates(operation);
+            .CreateUnflowedCandidates(operation, semanticModel);
         if (calls.IsDefaultOrEmpty)
         {
             return AnalyzerSemanticOutcome.NotApplicable;

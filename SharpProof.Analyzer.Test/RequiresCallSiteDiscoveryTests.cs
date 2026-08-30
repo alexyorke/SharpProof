@@ -874,19 +874,140 @@ public sealed class RequiresCallSiteDiscoveryTests
                     Contract.Requires(false);
                 }
 
-                public static void Calls() {
+                public static void OperatorCall() {
                     var number = new Number();
                     _ = number + number;
+                }
+                public static void ConversionCall() {
+                    var number = new Number();
                     int converted = number;
+                    _ = converted;
+                }
+                public static void ForEachCall() {
                     foreach (var item in new Sequence()) { _ = item; }
+                }
+                public static void UsingCall() {
                     using (var resource = new Resource()) { }
+                }
+                public static void DeconstructCall() {
                     var point = new Point();
                     if (point is Point(var coordinate)) {
                         _ = coordinate;
                     }
+                }
+                public static void DelegateCall() {
                     Action callback = Target;
                     callback();
-                    _ = converted;
+                }
+            }
+            """,
+            ["SP0027"]);
+        var session = new AnalyzerSession(
+            compilation,
+            AnalyzerConfiguration.AdvisoryAll,
+            CancellationToken.None);
+        foreach (var (callerName, targetName) in new[]
+                 {
+                     ("OperatorCall", "op_Addition"),
+                     ("ConversionCall", "op_Implicit"),
+                     ("ForEachCall", "GetEnumerator"),
+                     ("UsingCall", "Dispose"),
+                     ("DeconstructCall", "Deconstruct"),
+                     ("DelegateCall", "Target")
+                 })
+        {
+            var caller = GetMethod(
+                compilation,
+                "Subject",
+                callerName);
+            var declaration = await caller.DeclaringSyntaxReferences.Single()
+                .GetSyntaxAsync();
+            var semanticModel = compilation.GetSemanticModel(
+                declaration.SyntaxTree);
+            var discovery = new RequiresCallSiteDiscovery(
+                caller,
+                declaration,
+                semanticModel,
+                CancellationToken.None);
+            var owners = discovery.GetPotentialCallOwners(
+                session.HasPotentialCallPreconditions);
+            var candidates = discovery.Get(callerContracts: null);
+            var relevant = candidates?.Where(candidate =>
+                    candidate.TargetMethod.Name == targetName)
+                .ToArray() ?? [];
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(owners, Does.Contain(caller), callerName);
+                Assert.That(relevant, Is.Not.Empty, callerName);
+                Assert.That(
+                    relevant,
+                    Has.Length.EqualTo(1),
+                    callerName + ": " + string.Join(
+                        ", ",
+                        relevant.Select(static candidate =>
+                            candidate.Operation?.Kind + "@" +
+                            candidate.Syntax.Span)));
+                Assert.That(
+                    relevant.All(static candidate => candidate.CanReplay),
+                    Is.True,
+                    callerName + ": " + string.Join(
+                        ", ",
+                        candidates?.Select(static candidate =>
+                            candidate.TargetMethod.Name + ":" +
+                            candidate.CanReplay + ":" +
+                            candidate.FlowStatus) ?? []));
+            }
+        }
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", 6)),
+            string.Join(
+                Environment.NewLine,
+                diagnostics.Select(static diagnostic =>
+                    diagnostic.Id + ": " + diagnostic.GetMessage(
+                        System.Globalization.CultureInfo.InvariantCulture))));
+        var messages = diagnostics
+            .Select(static diagnostic => diagnostic.GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture))
+            .ToHashSet(StringComparer.Ordinal);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(messages, Has.Count.EqualTo(6));
+            Assert.That(messages, Does.Contain(
+                "Call to 'op_Addition' violates precondition 'false'"));
+            Assert.That(messages, Does.Contain(
+                "Call to 'op_Implicit' violates precondition 'false'"));
+            Assert.That(messages, Does.Contain(
+                "Call to 'GetEnumerator' violates precondition 'false'"));
+            Assert.That(messages, Does.Contain(
+                "Call to 'Dispose' violates precondition 'false'"));
+            Assert.That(messages, Does.Contain(
+                "Call to 'Deconstruct' violates precondition 'false'"));
+            Assert.That(messages, Does.Contain(
+                "Call to 'Target' violates precondition 'false'"));
+        }
+    }
+
+    [Test]
+    public async Task DirectDelegateTargetsUseInvocationArguments()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Target([Positive] int value) { }
+
+                public static void Call() {
+                    Action<int> callback = Target;
+                    callback(-1);
                 }
             }
             """,
@@ -896,28 +1017,140 @@ public sealed class RequiresCallSiteDiscoveryTests
             compilation,
             mode: "CONTRACTS");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 6)));
-        var messages = diagnostics
-            .Select(static diagnostic => diagnostic.GetMessage(
-                System.Globalization.CultureInfo.InvariantCulture))
-            .ToHashSet(StringComparer.Ordinal);
+        Assert.That(diagnostics, Has.Length.EqualTo(1));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(messages, Has.Count.EqualTo(6));
-            Assert.That(messages, Does.Contain(
-                "Requires clause for 'op_Addition' is not proven: false."));
-            Assert.That(messages, Does.Contain(
-                "Requires clause for 'op_Implicit' is not proven: false."));
-            Assert.That(messages, Does.Contain(
-                "Requires clause for 'GetEnumerator' is not proven: false."));
-            Assert.That(messages, Does.Contain(
-                "Requires clause for 'Dispose' is not proven: false."));
-            Assert.That(messages, Does.Contain(
-                "Requires clause for 'Deconstruct' is not proven: false."));
-            Assert.That(messages, Does.Contain(
-                "Requires clause for 'Target' is not proven: false."));
+            Assert.That(diagnostics[0].Id, Is.EqualTo("SP0027"));
+            Assert.That(
+                diagnostics[0].GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture),
+                Is.EqualTo(
+                    "Call to 'Target' violates precondition 'false'"));
+        }
+    }
+
+    [Test]
+    public async Task DelegateReferencesWithoutOneStableInvocationTargetAreIgnored()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Subject {
+                private static void Target([Positive] int value) { }
+                private static void Safe(int value) { }
+                private static void Replace(ref Action<int> callback) {
+                    callback = Safe;
+                }
+
+                public static void NeverInvoked() {
+                    Action<int> callback = Target;
+                    _ = callback;
+                }
+
+                public static void Reassigned() {
+                    Action<int> callback = Target;
+                    callback = Safe;
+                    callback(-1);
+                }
+
+                public static void PassedByReference() {
+                    Action<int> callback = Target;
+                    Replace(ref callback);
+                    callback(-1);
+                }
+            }
+            """,
+            ["SP0027"]);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task DefinitelyNullConditionalImplicitCallsAreIgnored()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Resource : IDisposable {
+                public void Dispose() { Contract.Requires(false); }
+            }
+
+            public sealed class Point {
+                public void Deconstruct(out int value) {
+                    Contract.Requires(false);
+                    value = 0;
+                }
+            }
+
+            public static class Subject {
+                public static void Call() {
+                    Resource? resource = null;
+                    using (resource) { }
+
+                    Point? point = null;
+                    if (point is Point(var coordinate)) {
+                        _ = coordinate;
+                    }
+                }
+            }
+            """,
+            ["SP0027"]);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task ForeachDisposesAfterMoveNextFailsToComplete()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Sequence {
+                public Enumerator GetEnumerator() => new Enumerator();
+            }
+
+            public sealed class Enumerator : IDisposable {
+                public int Current => 0;
+                public bool MoveNext() => throw new Exception();
+                public void Dispose() { Contract.Requires(false); }
+            }
+
+            public static class Subject {
+                public static void Call() {
+                    foreach (var item in new Sequence()) { _ = item; }
+                }
+            }
+            """,
+            ["SP0027"]);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(diagnostics, Has.Length.EqualTo(1));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(diagnostics[0].Id, Is.EqualTo("SP0027"));
+            Assert.That(
+                diagnostics[0].GetMessage(
+                    System.Globalization.CultureInfo.InvariantCulture),
+                Is.EqualTo(
+                    "Call to 'Dispose' violates precondition 'false'"));
         }
     }
 

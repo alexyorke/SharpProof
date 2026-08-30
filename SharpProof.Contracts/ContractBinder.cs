@@ -79,7 +79,9 @@ public sealed class ContractBinder(
                 MethodKind.PropertySet or
                 MethodKind.EventAdd or
                 MethodKind.EventRemove or
-                MethodKind.ExplicitInterfaceImplementation))
+                MethodKind.ExplicitInterfaceImplementation or
+                MethodKind.UserDefinedOperator or
+                MethodKind.Conversion))
         {
             return ContractBindingResult.Fail(ContractBindingFailure.UnsupportedTarget);
         }
