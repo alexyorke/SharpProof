@@ -172,6 +172,86 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void AwaitRegistrationExceptionsReachMatchingHandlers()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+
+            public static class Sample {
+                private static int state;
+
+                public static async Task NotifyCompletion() {
+                    try {
+                        await new NotifyAwaitable();
+                    }
+                    catch (InvalidOperationException) {
+                        state++;
+                    }
+                }
+
+                public static async Task CriticalNotifyCompletion() {
+                    try {
+                        await new CriticalAwaitable();
+                    }
+                    catch (InvalidOperationException) {
+                        state++;
+                    }
+                }
+
+                public sealed class NotifyAwaitable {
+                    public NotifyAwaiter GetAwaiter() => new();
+                }
+
+                public sealed class NotifyAwaiter : INotifyCompletion {
+                    public bool IsCompleted => false;
+
+                    public void OnCompleted(Action continuation) =>
+                        throw new InvalidOperationException();
+
+                    public void GetResult() { }
+                }
+
+                public sealed class CriticalAwaitable {
+                    public CriticalAwaiter GetAwaiter() => new();
+                }
+
+                public sealed class CriticalAwaiter :
+                    ICriticalNotifyCompletion {
+                    public bool IsCompleted => false;
+
+                    public void OnCompleted(Action continuation) =>
+                        throw new ApplicationException();
+
+                    public void UnsafeOnCompleted(Action continuation) =>
+                        throw new InvalidOperationException();
+
+                    public void GetResult() { }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var methodName in new[] {
+                         "NotifyCompletion",
+                         "CriticalNotifyCompletion"
+                     })
+            {
+                var result = session.Analyze(Method(compilation, methodName));
+
+                Assert.That(
+                    result.Summary.Writes.Contains(EffectRegionId.Static()),
+                    Is.True,
+                    methodName);
+            }
+        }
+    }
+
+    [Test]
     public void RecordClassWithAllocatesAndMapsCopyConstructorRegions()
     {
         var result = Analyze(
