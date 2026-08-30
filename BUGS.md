@@ -27,15 +27,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 22. MEDIUM - Const string fields in SharpProof.Ir bypass SPMETA006
-
-- File: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`
-- Member: `AnalyzeField`
-- Lines: 343-360; the const early return is at 346-349 and precedes the string-in-IR check at 356-359.
-- Mechanism: Const semantic string identity is untyped but receives no diagnostic, although the descriptor forbids string fields.
-- Impact: Semantic identities can bypass the typed-ID enforcement intended by SPMETA006.
-- Safe reproduction/evidence: Declare `internal const string Unknown="ir_unknown"` in `SharpProof.Ir`.
-
 ## 23. MEDIUM - SPMETA004 misses semantic string comparisons in catch filters and switch guards
 
 - File: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`

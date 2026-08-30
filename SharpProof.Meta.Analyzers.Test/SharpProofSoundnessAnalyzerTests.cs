@@ -575,6 +575,24 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsConstStringFieldInIr()
+    {
+        const string source =
+            """
+            namespace SharpProof.Ir;
+            static class C {
+                internal const string Unknown = "ir_unknown";
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task AllowsStaticImmutableAndNonStorageMemberForms()
     {
         const string source =

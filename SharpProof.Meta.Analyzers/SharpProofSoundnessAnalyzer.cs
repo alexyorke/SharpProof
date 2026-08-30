@@ -343,6 +343,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeField(SymbolAnalysisContext context)
     {
         var field = (IFieldSymbol)context.Symbol;
+        if (field.Type.SpecialType == SpecialType.System_String &&
+            IsNamespaceOrNested(field.ContainingNamespace, "SharpProof", "Ir"))
+        {
+            Report(context, MetaDiagnosticDescriptors.StringFieldInIr, field.Locations.FirstOrDefault(), field.Name);
+        }
+
         if (field.IsConst || field.ContainingType?.TypeKind == TypeKind.Enum)
         {
             return;
@@ -352,12 +358,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             IsForbiddenMutableStaticStorage(field))
         {
             Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
-        }
-
-        if (field.Type.SpecialType == SpecialType.System_String &&
-            IsNamespaceOrNested(field.ContainingNamespace, "SharpProof", "Ir"))
-        {
-            Report(context, MetaDiagnosticDescriptors.StringFieldInIr, field.Locations.FirstOrDefault(), field.Name);
         }
     }
 
