@@ -79,10 +79,10 @@ function Invoke-RequiredDotnet {
     }
 }
 
-function Get-WorkerMethodTimings {
+function Get-TestMethodTimings {
     param(
         [Parameter(Mandatory = $true)][string]$ResultsRoot,
-        [Parameter(Mandatory = $true)][string]$WorkerClass
+        [Parameter(Mandatory = $true)][string]$ClassName
     )
 
     $milliseconds = @{}
@@ -112,7 +112,7 @@ function Get-WorkerMethodTimings {
                 continue
             }
             $definition = $definitions[$testId]
-            if ($definition.ClassName -cne $WorkerClass) {
+            if ($definition.ClassName -cne $ClassName) {
                 continue
             }
             $match = [regex]::Match(
@@ -140,6 +140,35 @@ function Get-WorkerMethodTimings {
         } | Sort-Object name)
 }
 
+function Get-DiscoveredTestMethods {
+    param(
+        [Parameter(Mandatory = $true)][string]$Assembly,
+        [Parameter(Mandatory = $true)][string]$ClassName,
+        [Parameter(Mandatory = $true)][int]$MinimumCount,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    $list = & dotnet vstest $Assembly `
+        /ListTests `
+        "/TestCaseFilter:FullyQualifiedName~$ClassName" 2>&1 |
+        Out-String
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not discover $Description tests."
+    }
+    $methods = @(
+        [regex]::Matches(
+            $list,
+            '(?m)^\s{4}(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|\s*$)') |
+            ForEach-Object { $_.Groups['method'].Value } |
+            Sort-Object -Unique)
+    if ($methods.Count -lt $MinimumCount) {
+        throw (
+            "$Description discovery returned only " +
+            "$($methods.Count) test methods.")
+    }
+    return $methods
+}
+
 $root = Join-Path ([IO.Path]::GetTempPath()) (
     'sharpproof-package-tests-' + [Guid]::NewGuid().ToString('N'))
 $feed = if ([string]::IsNullOrWhiteSpace($PackageSource)) {
@@ -165,6 +194,7 @@ $timingOutput = Join-Path $timingDirectory (
     'package-tests-' + $Configuration.ToLowerInvariant() +
     $(if ($coverageEnabled) { '-coverage' } else { '' }) + '.json')
 $priorMethodMilliseconds = @{}
+$priorPackageLayoutMethodMilliseconds = @{}
 $priorFilterMilliseconds = @{}
 if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
     try {
@@ -182,6 +212,21 @@ if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
             $elapsed = [long]$method.elapsedMilliseconds
             if ($elapsed -gt 0) {
                 $priorMethodMilliseconds[[string]$method.name] = $elapsed
+            }
+        }
+        $packageLayoutMethodHistory = if ($hasScheduler -and
+            $priorTiming.scheduler.PSObject.Properties.Name -contains
+                'packageLayoutMethods') {
+            @($priorTiming.scheduler.packageLayoutMethods)
+        }
+        else {
+            @()
+        }
+        foreach ($method in $packageLayoutMethodHistory) {
+            $elapsed = [long]$method.elapsedMilliseconds
+            if ($elapsed -gt 0) {
+                $priorPackageLayoutMethodMilliseconds[
+                    [string]$method.name] = $elapsed
             }
         }
         $filterHistory = if ($hasScheduler) {
@@ -231,24 +276,11 @@ try {
             -ProjectPath $testProject `
             -Configuration $Configuration
     }
-    $workerList = & dotnet vstest $testAssembly `
-        /ListTests `
-        "/TestCaseFilter:FullyQualifiedName~$workerClass" 2>&1 |
-        Out-String
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Could not discover Worker MSBuild integration tests.'
-    }
-    $workerMethods = @(
-        [regex]::Matches(
-            $workerList,
-            '(?m)^\s{4}(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|\s*$)') |
-            ForEach-Object { $_.Groups['method'].Value } |
-            Sort-Object -Unique)
-    if ($workerMethods.Count -lt 40) {
-        throw (
-            'Worker MSBuild integration discovery returned only ' +
-            "$($workerMethods.Count) test methods.")
-    }
+    $workerMethods = @(Get-DiscoveredTestMethods `
+        -Assembly $testAssembly `
+        -ClassName $workerClass `
+        -MinimumCount 40 `
+        -Description 'Worker MSBuild integration')
     $workerBuckets = @(
         for ($index = 0; $index -lt $parallelism; $index++) {
             [pscustomobject]@{
@@ -281,6 +313,58 @@ try {
                 1L
             })
     }
+    $packageLayoutClass =
+        'SharpProof.Package.Test.PackageLayoutSmokeTests'
+    $packageLayoutMethods = @(Get-DiscoveredTestMethods `
+        -Assembly $testAssembly `
+        -ClassName $packageLayoutClass `
+        -MinimumCount 15 `
+        -Description 'package-layout')
+    $packageLayoutFilter =
+        "FullyQualifiedName~$packageLayoutClass"
+    $defaultPackageLayoutMethodMilliseconds =
+        if ($priorFilterMilliseconds.ContainsKey($packageLayoutFilter)) {
+            [long][Math]::Max(
+                1,
+                [Math]::Ceiling(
+                    [long]$priorFilterMilliseconds[$packageLayoutFilter] /
+                        [double]$packageLayoutMethods.Count))
+        }
+        else {
+            1L
+        }
+    $packageLayoutBuckets = @(
+        for ($index = 0; $index -lt [Math]::Min(4, $parallelism); $index++) {
+            [pscustomobject]@{
+                Index = $index
+                Methods = [Collections.Generic.List[string]]::new()
+                EstimatedMilliseconds = 0L
+            }
+        })
+    $orderedPackageLayoutMethods = @($packageLayoutMethods | Sort-Object `
+        @{ Expression = {
+                if ($priorPackageLayoutMethodMilliseconds.ContainsKey($_)) {
+                    [long]$priorPackageLayoutMethodMilliseconds[$_]
+                }
+                else {
+                    $defaultPackageLayoutMethodMilliseconds
+                }
+            }; Descending = $true }, `
+        @{ Expression = { $_ }; Descending = $false })
+    foreach ($method in $orderedPackageLayoutMethods) {
+        $bucket = $packageLayoutBuckets | Sort-Object `
+            EstimatedMilliseconds, `
+            @{ Expression = { $_.Methods.Count } }, `
+            Index | Select-Object -First 1
+        $bucket.Methods.Add($method)
+        $bucket.EstimatedMilliseconds +=
+            $(if ($priorPackageLayoutMethodMilliseconds.ContainsKey($method)) {
+                [long]$priorPackageLayoutMethodMilliseconds[$method]
+            }
+            else {
+                $defaultPackageLayoutMethodMilliseconds
+            })
+    }
 
     $shards = [Collections.Generic.List[object]]::new()
     if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
@@ -302,7 +386,6 @@ try {
             'DependencyAuditScriptTests',
             'FinalCompilationProbeTests',
             'LauncherArgumentTests',
-            'PackageLayoutSmokeTests',
             'ReleasePublicationScriptTests')
         foreach ($fixtureClass in $fixtureClasses) {
             $filter =
@@ -316,6 +399,23 @@ try {
                     }
                     else {
                         1L
+                    })
+                })
+        }
+        foreach ($bucket in $packageLayoutBuckets) {
+            $filter = @($bucket.Methods | ForEach-Object {
+                    "FullyQualifiedName~$packageLayoutClass.$_"
+                }) -join '|'
+            $shards.Add([pscustomobject]@{
+                Name = 'package-layout-' + ($bucket.Index + 1).ToString(
+                    'D2', [Globalization.CultureInfo]::InvariantCulture)
+                Filter = $filter
+                EstimatedMilliseconds =
+                    $(if ($priorFilterMilliseconds.ContainsKey($filter)) {
+                        [long]$priorFilterMilliseconds[$filter]
+                    }
+                    else {
+                        $bucket.EstimatedMilliseconds
                     })
             })
         }
@@ -458,15 +558,28 @@ try {
     }
 
     $campaign.Stop()
-    $workerMethodTimings = Get-WorkerMethodTimings `
+    $workerMethodTimings = Get-TestMethodTimings `
         -ResultsRoot $results `
-        -WorkerClass $workerClass
+        -ClassName $workerClass
+    $packageLayoutMethodTimings = Get-TestMethodTimings `
+        -ResultsRoot $results `
+        -ClassName $packageLayoutClass
     $schedulerMethodMilliseconds = @{}
     foreach ($entry in $priorMethodMilliseconds.GetEnumerator()) {
         $schedulerMethodMilliseconds[[string]$entry.Key] = [long]$entry.Value
     }
     foreach ($entry in $workerMethodTimings) {
         $schedulerMethodMilliseconds[[string]$entry.name] =
+            [long]$entry.elapsedMilliseconds
+    }
+    $schedulerPackageLayoutMethodMilliseconds = @{}
+    foreach ($entry in
+        $priorPackageLayoutMethodMilliseconds.GetEnumerator()) {
+        $schedulerPackageLayoutMethodMilliseconds[[string]$entry.Key] =
+            [long]$entry.Value
+    }
+    foreach ($entry in $packageLayoutMethodTimings) {
+        $schedulerPackageLayoutMethodMilliseconds[[string]$entry.name] =
             [long]$entry.elapsedMilliseconds
     }
     $schedulerFilterMilliseconds = @{}
@@ -487,9 +600,18 @@ try {
         totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
         shards = @($shardTimings | Sort-Object name)
         workerMethods = $workerMethodTimings
+        packageLayoutMethods = $packageLayoutMethodTimings
         scheduler = [ordered]@{
             workerMethods = @(
                 $schedulerMethodMilliseconds.GetEnumerator() |
+                    ForEach-Object {
+                        [pscustomobject]@{
+                            name = [string]$_.Key
+                            elapsedMilliseconds = [long]$_.Value
+                        }
+                    } | Sort-Object name)
+            packageLayoutMethods = @(
+                $schedulerPackageLayoutMethodMilliseconds.GetEnumerator() |
                     ForEach-Object {
                         [pscustomobject]@{
                             name = [string]$_.Key

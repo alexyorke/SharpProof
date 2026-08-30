@@ -38,6 +38,34 @@ public sealed class BuildSchedulingTests
         }
     }
 
+    [Test]
+    public void PackageLayoutFixtureUsesIsolatedProcessShards()
+    {
+        var packageTests = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(packageTests, Does.Contain("$packageLayoutClass"));
+            Assert.That(packageTests, Does.Contain("$packageLayoutBuckets"));
+            Assert.That(
+                packageTests,
+                Does.Contain("$priorPackageLayoutMethodMilliseconds"));
+            Assert.That(
+                packageTests,
+                Does.Contain("packageLayoutMethods ="));
+            Assert.That(packageTests, Does.Contain("'package-layout-'"));
+            Assert.That(
+                packageTests,
+                Does.Contain("-MinimumCount 15"));
+            Assert.That(
+                packageTests,
+                Does.Not.Contain("'PackageLayoutSmokeTests',"));
+        }
+    }
+
     private static readonly string[] BuildSolution =
         ["build", "SharpProof.sln", "--no-restore", "-graphBuild"];
     private static readonly string[] TestFilter =
@@ -216,7 +244,9 @@ public sealed class BuildSchedulingTests
         {
             Assert.That(package,
                 Does.Contain("Get-SharpProofTestAssemblyPath"));
-            Assert.That(package, Does.Contain("dotnet vstest $testAssembly"));
+            Assert.That(package, Does.Contain("& dotnet vstest $Assembly"));
+            Assert.That(package,
+                Does.Contain("-Assembly $testAssembly"));
             Assert.That(package, Does.Contain("/ListTests"));
             Assert.That(package,
                 Does.Not.Contain("$workerList = & dotnet test $testProject"));
