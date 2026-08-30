@@ -601,7 +601,7 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
-    public void ActiveCancellationInterruptsTheNativeContext()
+    public void ActiveCancellationDoesNotPoisonTheBackend()
     {
         var factory = new IrFactory();
         var operation = factory.CreateOperation("repeated");
@@ -636,9 +636,19 @@ public sealed class IrSmtBackendTests
 
         Func<Task> action = async () => await check;
         Assert.ThrowsAsync<OperationCanceledException>(action);
-        var retired = backend.CheckAsync(query, CancellationToken.None)
+        var healthyQuery = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        var healthy = backend.CheckAsync(healthyQuery, CancellationToken.None)
             .GetAwaiter().GetResult();
-        Assert.That(retired.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
+        Assert.That(
+            healthy.Status,
+            Is.EqualTo(BackendCheckStatus.Unsatisfiable));
     }
 
     [Test]

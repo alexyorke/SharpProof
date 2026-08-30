@@ -9,7 +9,6 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         ArgumentNullGuard.NotNull(options, nameof(options));
     private long _consumedResourceCount;
     private int _activeCheckCount;
-    private bool _interrupted;
     private bool _disposed;
 
     public IrSmtBackend()
@@ -43,7 +42,7 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
                 lock (_gate)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (_disposed || Volatile.Read(ref _interrupted))
+                    if (_disposed)
                     {
                         return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
                     }
@@ -83,7 +82,6 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
 
     private void Interrupt()
     {
-        Volatile.Write(ref _interrupted, true);
         _context.Interrupt();
     }
 
