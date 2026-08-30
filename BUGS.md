@@ -1,6 +1,6 @@
 # Bug backlog
 
-445 open bugs, reprioritized by impact, reachability, and affected scope.
+444 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,12 +9,11 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (157)
+## P0 - Critical (156)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-012 [P0] - Branching expressions are scanned as linear sequences:** OperationEffectScanner evaluates short-circuit, conditional, and coalesce children as unconditional sequences instead of selecting and joining feasible branches. It can add impossible effects and, more critically, stop before a reachable sibling and omit its effects.
 - **BUG-013 [P0] - By-value structs erase writes to referenced heap state:** Effects ownership mapping treats nonref value-type parameters as empty even when a copied struct contains references. Callee writes through those references disappear during remapping, so a trusted boundary can mutate caller heap while the caller appears pure.
-- **BUG-014 [P0] - Call scanning checks null receivers before arguments:** OperationEffectScanner stops at a proven-null receiver before scanning call arguments, although C# evaluates arguments before the callvirt null dereference. Argument writes, calls, and exceptions can be omitted from complete summaries.
 - **BUG-015 [P0] - Cancellation exemption permits arbitrary semantic fallback:** CancellationBoundaryAnalyzer accepts VerifyTarget catches that merely rethrow caller cancellation and never validates the remaining fallback. Backend or timeout cancellation can therefore be converted into any CallableVerificationResult, including a proven result, without SPMETA003.
 - **BUG-016 [P0] - Catch reachability omits implicit formatting calls:** ExceptionHandlerReachability traverses interpolation and concatenation operands but never models implicit ToString or formatting calls, unlike the effect scanner. A real formatting exception can leave its catch unreachable, omitting catch effects while treating the exception as handled.
 - **BUG-017 [P0] - Closure calls do not havoc captured locals:** RoslynProgramLowerer derives call-mutated variables only from explicit ref and out arguments. An impure closure can mutate a captured local while lowering preserves its old IR value as Exact, making downstream reasoning unsound.

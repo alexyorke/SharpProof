@@ -628,21 +628,21 @@ internal sealed partial class OperationEffectScanner
             }
         }
 
-        if (instance != null && method.ReducedFrom == null)
+        foreach (var argument in arguments)
         {
-            var receiverCheck = new EffectStep(
-                PotentialNullReceiver(instance, origin),
-                !_nullnessEvaluator.IsProvenNull(instance, origin));
-            result = result.Then(receiverCheck);
+            result = result.Then(ScanStep(argument.Value));
             if (!result.CompletesNormally)
             {
                 return result;
             }
         }
 
-        foreach (var argument in arguments)
+        if (instance != null && method.ReducedFrom == null)
         {
-            result = result.Then(ScanStep(argument.Value));
+            var receiverCheck = new EffectStep(
+                PotentialNullReceiver(instance, origin),
+                !_nullnessEvaluator.IsProvenNull(instance, origin));
+            result = result.Then(receiverCheck);
             if (!result.CompletesNormally)
             {
                 return result;
