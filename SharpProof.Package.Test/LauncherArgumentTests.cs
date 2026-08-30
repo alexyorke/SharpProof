@@ -248,6 +248,36 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    [NonParallelizable]
+    public async Task UnsupportedPreflightReturnsControlledContainmentExit()
+    {
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        try
+        {
+            Console.SetError(error);
+            var exitCode = await Program.RunMain(
+                ValidArguments(),
+                static _ => string.Empty,
+                validatePreflight: static _ =>
+                    throw new PlatformNotSupportedException(
+                        "SharpProof containment is unsupported."));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(125));
+                Assert.That(
+                    error.ToString(),
+                    Does.Contain("SharpProof containment is unsupported."));
+            }
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    [Test]
     public void SarifRequiresTheAtomicPublicationTriple()
     {
         string[] arguments = [

@@ -22,16 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.15. MEDIUM - Unsupported platform or container preflight escapes unhandled
-
-- File: `SharpProof.Worker.Launcher/Program.cs`
-- Member: `RunMain` preflight
-- Current lines: 48-87, especially `ValidatePreflight` at 50 and the catch filter at 75-79
-- Related member: `ClassifyLauncherFailure`, lines 187-207
-- Mechanism: `ContainerContract.ValidateRequired` can throw `PlatformNotSupportedException`, but the preflight catch omits it. The classifier that maps it to exit 125 is used only later.
-- Impact: An unhandled stack trace appears instead of a controlled `containment.unsupported` response and exit.
-- Safe reproduction/evidence: Invoke a valid launcher fixture outside the required platform or container marker and observe that the exception escapes `RunMain`.
-
 ## Wave 2.16. MEDIUM - Cooperative launcher probe accepts partial or invalid timeout evidence
 
 - File: `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs`

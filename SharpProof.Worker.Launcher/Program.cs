@@ -26,7 +26,8 @@ internal static class Program
     internal static async Task<int> RunMain(
         string[] args,
         Func<string, string> computeWorkerSha256,
-        Func<LauncherArguments, WorkerVerifyRequest, string, string, int>? runWorker = null)
+        Func<LauncherArguments, WorkerVerifyRequest, string, string, int>? runWorker = null,
+        Action<LauncherArguments>? validatePreflight = null)
     {
         if (!LauncherArguments.TryParse(args, out var arguments))
         {
@@ -47,7 +48,14 @@ internal static class Program
         WorkerRuntimeClosureSnapshot? runtimeSnapshot = null;
         try
         {
-            arguments.ValidatePreflight();
+            if (validatePreflight == null)
+            {
+                arguments.ValidatePreflight();
+            }
+            else
+            {
+                validatePreflight(arguments);
+            }
             arguments.ValidateDistinctPaths(runtimeSnapshot);
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
@@ -71,6 +79,14 @@ internal static class Program
             await AtomicFile.WriteUtf8Async(arguments.RequestPath,
                 WorkerProtocolJson.SerializeRequest(request)).ConfigureAwait(false);
             DeleteIfExists(arguments.ResultPath);
+        }
+        catch (PlatformNotSupportedException exception)
+        {
+            runtimeSnapshot?.Dispose();
+            runtimeSnapshot = null;
+            var failure = ClassifyLauncherFailure(exception);
+            Console.Error.WriteLine(failure.ConsoleMessage);
+            return failure.ExitCode;
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or
