@@ -1,13 +1,12 @@
 namespace SharpProof.Smt;
 
-public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDisposable
+public sealed class IrSmtBackend : ISmtBackend, IDisposable
 {
     private const int MaximumEncodingDepth = 256;
-    private readonly Context _context = new();
+    private readonly Context _context;
     private readonly object _gate = new();
     private readonly SemaphoreSlim _queryGate = new(1, 1);
-    private readonly IrSmtBackendOptions _options =
-        ArgumentNullGuard.NotNull(options, nameof(options));
+    private readonly IrSmtBackendOptions _options;
     private long _consumedResourceCount;
     private int _activeCheckCount;
     private int _disposeStarted;
@@ -16,6 +15,22 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
     public IrSmtBackend()
         : this(new IrSmtBackendOptions())
     {
+    }
+
+    public IrSmtBackend(IrSmtBackendOptions options)
+        : this(options, static () => new Context())
+    {
+    }
+
+    internal IrSmtBackend(
+        IrSmtBackendOptions options,
+        Func<Context> createContext)
+    {
+        _options = ArgumentNullGuard.NotNull(options, nameof(options));
+        var validatedFactory = ArgumentNullGuard.NotNull(
+            createContext, nameof(createContext));
+        _context = ArgumentNullGuard.NotNull(
+            validatedFactory(), nameof(createContext));
     }
 
     public long ConsumedResourceCount

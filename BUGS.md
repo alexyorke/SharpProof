@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.8. LOW - Invalid options allocate native Z3 Context before validation
-
-- File: `SharpProof.Smt/IrSmtBackend.cs`
-- Location: Primary-constructor field initialization
-- Current lines: 6, 8-9
-- Mechanism: `_context=new()` executes before `_options=NotNull(options)`. Null construction throws after the native owner is allocated, and the partially constructed `IDisposable` cannot be explicitly disposed.
-- Impact: Repeated invalid construction leaves transient native cleanup to garbage collection and finalization.
-- Safe reproduction/evidence: Repeatedly construct with null in an isolated memory test and observe native pressure before collection.
-
 ## Wave 2.9. LOW - Z3 rlimit symbol wrapper lacks deterministic per-query ownership
 
 - File: `SharpProof.Smt/IrSmtBackend.cs`

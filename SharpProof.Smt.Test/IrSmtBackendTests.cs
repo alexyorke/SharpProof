@@ -430,6 +430,28 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public void NullOptionsAreRejectedBeforeContextCreation()
+    {
+        using var context = new Z3Context();
+        var contextFactoryCalls = 0;
+        Action action = () => _ = new IrSmtBackend(
+            null!,
+            () =>
+            {
+                contextFactoryCalls++;
+                return context;
+            });
+
+        var exception = Assert.Throws<ArgumentNullException>(action);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.ParamName, Is.EqualTo("options"));
+            Assert.That(contextFactoryCalls, Is.Zero);
+        }
+    }
+
+    [Test]
     public async Task ResourceAccountingTreatsEachSolverSnapshotAsFresh()
     {
         const uint queryLimit = 1_000_000;
