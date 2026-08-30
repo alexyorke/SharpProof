@@ -128,4 +128,56 @@ public sealed class StaticFieldTypeInitializationTests
                 Is.EqualTo(EffectCompleteness.Complete));
         }
     }
+
+    [Test]
+    public void SourceExceptionInitializationFailureReachesTypedCatch()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class InitializationEffects {
+                internal static int Writes;
+            }
+
+            public sealed class SourceException : Exception {
+                static SourceException() =>
+                    throw new InvalidOperationException();
+            }
+
+            public static class Sample {
+                public static void CatchInitializationFailure() {
+                    try {
+                        _ = new SourceException();
+                    }
+                    catch (TypeInitializationException) {
+                        InitializationEffects.Writes++;
+                    }
+                }
+            }
+            """);
+        var method = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            "CatchInitializationFailure");
+        var catchClause = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<CatchClauseSyntax>().Single();
+        var session = new EffectAnalysisSession(compilation);
+        var reachability = new ExceptionHandlerReachability(
+            compilation: compilation,
+            caller: method,
+            abstractFlow: null,
+            canCompleteNormally: static _ => true,
+            canMethodCompleteNormally: static _ => true,
+            canCompoundValueComplete: static _ => true,
+            canIncrementValueComplete: static _ => true,
+            canWithCloneComplete: static _ => true,
+            getReachableListPatternMembers: static _ => [],
+            apiSpecs: session.ApiSpecs,
+            knownSymbols: session.KnownSymbols,
+            isKnownNonThrowing: static _ => true);
+
+        Assert.That(reachability.IsReachable(catchClause, inFilter: false),
+            Is.True);
+    }
 }
