@@ -1,0 +1,155 @@
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
+using NUnit.Framework;
+using SharpProof.Attributes;
+using SharpProof.CompilerProbe.TestAsset;
+
+namespace SharpProof.Package.Test;
+
+[TestFixture]
+public sealed class CompilerProbeInputConsistencyTests
+{
+    [Test]
+    public async Task StatefulAdditionalTextCannotAuthenticateDifferentGeneratorInput()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-probe-input-consistency-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var outputPath = Path.Combine(root, "probe.json");
+            var input = new StatefulAdditionalText(
+                Path.Combine(root, CompilerProbeContract.AdditionalFileName),
+                "generator-value",
+                "later-value");
+            var options = new ProbeOptionsProvider(
+                outputPath,
+                input,
+                metadataValue: "metadata");
+            var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(
+                LanguageVersion.CSharp12);
+            var compilation = CreateCompilation(parseOptions);
+            GeneratorDriver driver = CSharpGeneratorDriver.Create(
+                generators: [new CompilerProbeGenerator().AsSourceGenerator()],
+                additionalTexts: [input],
+                parseOptions: parseOptions,
+                optionsProvider: options);
+
+            driver.RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out var generatedCompilation,
+                out var generatorDiagnostics);
+
+            Assert.That(generatorDiagnostics, Is.Empty);
+            var analyzerOptions = new AnalyzerOptions([input], options);
+            var diagnostics = await generatedCompilation.WithAnalyzers(
+                    [new CompilerProbeAnalyzer()],
+                    new CompilationWithAnalyzersOptions(
+                        analyzerOptions,
+                        onAnalyzerException: null,
+                        concurrentAnalysis: false,
+                        logAnalyzerExecutionTime: false,
+                        reportSuppressedDiagnostics: false))
+                .GetAnalyzerDiagnosticsAsync();
+
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EquivalentTo([CompilerProbeContract.FailureDiagnosticId]));
+            Assert.That(File.Exists(outputPath), Is.False);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static CSharpCompilation CreateCompilation(
+        CSharpParseOptions parseOptions)
+    {
+        var trustedAssemblies =
+            AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string ??
+            throw new InvalidOperationException(
+                "The runtime did not expose trusted platform assemblies.");
+        var references = trustedAssemblies
+            .Split(Path.PathSeparator)
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .Append(MetadataReference.CreateFromFile(
+                typeof(Contract).Assembly.Location));
+        return CSharpCompilation.Create(
+            "ProbeInputConsistency",
+            [CSharpSyntaxTree.ParseText(
+                "internal static class Subject { }",
+                parseOptions,
+                "Subject.cs")],
+            references,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                deterministic: true));
+    }
+
+    private sealed class StatefulAdditionalText(
+        string path,
+        string first,
+        string later) : AdditionalText
+    {
+        private int _readCount;
+
+        public override string Path { get; } = path;
+
+        public override SourceText GetText(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return SourceText.From(
+                Interlocked.Increment(ref _readCount) == 1 ? first : later);
+        }
+    }
+
+    private sealed class ProbeOptionsProvider(
+        string outputPath,
+        AdditionalText input,
+        string metadataValue) : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _global = new DictionaryOptions(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [CompilerProbeContract.OutputPathOptionKey] = outputPath
+            });
+        private readonly AnalyzerConfigOptions _input = new DictionaryOptions(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [CompilerProbeContract.AdditionalFileMetadataOptionKey] =
+                    metadataValue
+            });
+
+        public override AnalyzerConfigOptions GlobalOptions => _global;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
+        {
+            return DictionaryOptions.Empty;
+        }
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
+        {
+            return ReferenceEquals(textFile, input)
+                ? _input
+                : DictionaryOptions.Empty;
+        }
+    }
+
+    private sealed class DictionaryOptions(
+        IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
+    {
+        internal static DictionaryOptions Empty { get; } = new(
+            ImmutableDictionary<string, string>.Empty);
+
+        public override bool TryGetValue(string key, out string value)
+        {
+            return values.TryGetValue(key, out value!);
+        }
+    }
+}
