@@ -246,6 +246,7 @@ internal sealed class ManagedAbstractFlow
                 }
                 break;
             case IFlowCaptureOperation capture:
+                result.RecordCoalesceAssignmentCapture(capture);
                 var captureHasMutation = ManagedMutationFacts.HasMutation(
                     capture.Value);
                 state = Transfer(state, capture.Value, result, cancellationToken);
@@ -259,12 +260,17 @@ internal sealed class ManagedAbstractFlow
                 var valueHasMutation = ManagedMutationFacts.HasMutation(
                     assignment.Value);
                 state = TransferMany(state, assignment.ChildOperations, result, cancellationToken);
+                var assignedValue = valueHasMutation
+                    ? TopForType(assignment.Type)
+                    : EvaluateCore(assignment.Value, state);
                 state = SetStorage(
                     state,
                     assignment.Target,
-                    valueHasMutation
-                        ? TopForType(assignment.Type)
-                        : EvaluateCore(assignment.Value, state));
+                    assignedValue);
+                state = SetStorage(
+                    state,
+                    result.ResolveCoalesceAssignmentTarget(assignment.Target),
+                    assignedValue);
                 break;
             case ICompoundAssignmentOperation compound:
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
@@ -1169,7 +1175,19 @@ internal sealed class ManagedFlowAnalysis
 
 internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 {
+    private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
     private readonly Dictionary<object, ManagedFlowState> _states = new(ManagedKeyComparer.Instance);
+
+    internal void RecordCoalesceAssignmentCapture(
+        IFlowCaptureOperation capture)
+    {
+        _coalesceCaptures.Record(capture);
+    }
+
+    internal IOperation ResolveCoalesceAssignmentTarget(IOperation target)
+    {
+        return _coalesceCaptures.Resolve(target);
+    }
 
     internal void Record(IOperation operation, ManagedFlowState state)
     {
