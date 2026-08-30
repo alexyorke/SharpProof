@@ -111,6 +111,8 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteWriteTarget(increment.Target),
             IConditionalOperation conditional =>
                 CanCompleteConditional(conditional),
+            ICoalesceOperation coalesce =>
+                CanCompleteCoalesce(coalesce),
             ITryOperation @try => CanCompleteTry(@try),
             ISwitchExpressionOperation switchExpression =>
                 CanCompleteSwitchExpression(switchExpression),
@@ -809,6 +811,22 @@ internal sealed class OperationCompletionEvaluator
         return !_isProvenNull(assignment.Target, assignment) ||
             CanCompleteNormally(assignment.Value) &&
             CanCompleteWriteTarget(assignment.Target);
+    }
+
+    private bool CanCompleteCoalesce(ICoalesceOperation coalesce)
+    {
+        if (!CanCompleteNormally(coalesce.Value))
+        {
+            return false;
+        }
+
+        if (_isProvenNonNull(coalesce.Value, coalesce))
+        {
+            return true;
+        }
+
+        return !_isProvenNull(coalesce.Value, coalesce) ||
+            CanCompleteNormally(coalesce.WhenNull);
     }
 
     private bool CanCompleteDeconstruction(

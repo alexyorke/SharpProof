@@ -381,19 +381,39 @@ internal sealed partial class OperationEffectScanner
 
     private EffectSummary ScanBinary(IBinaryOperation binary)
     {
-        var operands = ScanStep(binary.LeftOperand);
-        if (!operands.CompletesNormally)
+        var left = ScanStep(binary.LeftOperand);
+        if (!left.CompletesNormally)
         {
-            return operands.Summary;
+            return left.Summary;
         }
 
-        operands = operands.Then(ScanStep(binary.RightOperand));
-        if (!operands.CompletesNormally)
+        var isConditional = binary.OperatorKind is
+            BinaryOperatorKind.ConditionalAnd or
+            BinaryOperatorKind.ConditionalOr;
+        if (isConditional &&
+            TryGetBoolean(binary, binary.LeftOperand, out var leftValue))
         {
-            return operands.Summary;
+            var shortCircuits = binary.OperatorKind ==
+                BinaryOperatorKind.ConditionalAnd
+                    ? !leftValue
+                    : leftValue;
+            if (shortCircuits)
+            {
+                return left.Summary;
+            }
         }
 
-        var operation = EffectSummaryOperations.Join(
+        var right = ScanStep(binary.RightOperand);
+        var result = EffectSummaryOperations.Join(
+            left.Summary,
+            right.Summary);
+        if (!right.CompletesNormally)
+        {
+            return result;
+        }
+
+        return EffectSummaryOperations.Join(
+            result,
             StringConcatenationEffectResolver.Resolve(
                 binary,
                 _session.Compilation,
@@ -407,9 +427,77 @@ internal sealed partial class OperationEffectScanner
                 binary.OperatorMethod,
                 [binary.LeftOperand, binary.RightOperand],
                 binary));
-        return operands.Then(new EffectStep(
-            operation,
-            _completionEvaluator.CanCompleteNormally(binary))).Summary;
+    }
+
+    private EffectSummary ScanConditional(IConditionalOperation conditional)
+    {
+        var condition = ScanStep(conditional.Condition);
+        if (!condition.CompletesNormally)
+        {
+            return condition.Summary;
+        }
+
+        if (conditional.WhenFalse is not { } whenFalse)
+        {
+            return EffectSummaryOperations.Join(
+                condition.Summary,
+                Scan(conditional.WhenTrue),
+                EffectSummaryOperations.Unsupported());
+        }
+
+        if (TryGetBoolean(
+                conditional,
+                conditional.Condition,
+                out var conditionValue))
+        {
+            return EffectSummaryOperations.Join(
+                condition.Summary,
+                Scan(conditionValue
+                    ? conditional.WhenTrue
+                    : whenFalse));
+        }
+
+        return EffectSummaryOperations.Join(
+            condition.Summary,
+            Scan(conditional.WhenTrue),
+            Scan(whenFalse));
+    }
+
+    private EffectSummary ScanCoalesce(ICoalesceOperation coalesce)
+    {
+        var value = ScanStep(coalesce.Value);
+        if (!value.CompletesNormally ||
+            _nullnessEvaluator.IsProvenNonNull(
+                coalesce.Value,
+                coalesce))
+        {
+            return value.Summary;
+        }
+
+        return EffectSummaryOperations.Join(
+            value.Summary,
+            Scan(coalesce.WhenNull));
+    }
+
+    private bool TryGetBoolean(
+        IOperation origin,
+        IOperation value,
+        out bool result)
+    {
+        if (value.ConstantValue is { HasValue: true, Value: bool constant })
+        {
+            result = constant;
+            return true;
+        }
+
+        if (_abstractFlow?.TryEvaluate(origin, value, out var abstractValue) ==
+            true && abstractValue.TryGetBoolean(out result))
+        {
+            return true;
+        }
+
+        result = false;
+        return false;
     }
 
     private EffectSummary ScanInterpolatedString(
@@ -566,6 +654,8 @@ internal sealed partial class OperationEffectScanner
             IBinaryOperation binary => ScanBinary(binary),
             IUnaryOperation unary => ScanUnary(unary),
             IConversionOperation conversion => ScanConversion(conversion),
+            IConditionalOperation conditional => ScanConditional(conditional),
+            ICoalesceOperation coalesce => ScanCoalesce(coalesce),
             IConditionalAccessOperation conditional =>
                 ScanConditionalAccess(conditional),
             ISwitchExpressionOperation switchExpression =>
