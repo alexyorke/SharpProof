@@ -1,6 +1,6 @@
 # Bug backlog
 
-454 open bugs, reprioritized by impact, reachability, and affected scope.
+453 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,11 +9,10 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (166)
+## P0 - Critical (165)
 
 - **BUG-003 [P0] - AdditionalText provenance can bind a different read than generation:** The generator consumes AdditionalText once, while the probe and compiler collector independently read it again afterward for provenance. A stateful or changed provider can generate code from value A while both trusted artifacts authenticate value B.
 - **BUG-005 [P0] - Async and iterator calls inherit deferred body completion:** Completion analysis uses async and iterator body termination to classify the call expression itself. Unawaited async calls and iterator creation can be marked terminal even though they return immediately, causing reachable caller effects to disappear from complete summaries.
-- **BUG-006 [P0] - Await continuation exceptions cannot reach matching catches:** ExceptionHandlerReachability models GetAwaiter, IsCompleted, and GetResult but omits OnCompleted or UnsafeOnCompleted. A continuation-registration exception can be caught at runtime while the matching handler and its effects are removed from the Complete summary.
 - **BUG-007 [P0] - Bare rethrow loses the runtime exception subtype:** EffectExceptionFlow replaces a bare rethrow's actual exception type with the enclosing catch declaration. Outer subtype catches can be marked unreachable, dropping their writes, allocations, and exceptions from complete effect analysis.
 - **BUG-008 [P0] - Beforefieldinit method summaries omit type-initializer effects:** EffectMethodNodeBuilder ignores implicit beforefieldinit static initialization when summarizing same-assembly static methods. A complete summary can omit initializer effects and TypeInitializationException, allowing false effect or exception-contract proofs.
 - **BUG-009 [P0] - Binary pattern short-circuiting is ignored:** ManagedAbstractFlow requires both arms of and/or patterns to complete instead of modeling left-to-right short-circuiting. A genuinely returning helper can be classified nonreturning, causing real caller suffix effects to disappear from a Complete summary and enabling unsound effect proofs.

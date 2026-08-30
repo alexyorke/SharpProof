@@ -15,6 +15,7 @@ internal sealed class ExceptionHandlerReachability(
     Func<IListPatternOperation, IReadOnlyList<IMethodSymbol>>
         getReachableListPatternMembers,
     ResolvedApiSpecTable apiSpecs,
+    EffectKnownSymbols knownSymbols,
     Func<IMethodSymbol, bool> isKnownNonThrowing)
 {
     private readonly Dictionary<CatchClauseSyntax, CatchReachability> _cache = new();
@@ -944,6 +945,22 @@ internal sealed class ExceptionHandlerReachability(
                             awaitOperation);
                         phaseCompletes = isCompleted == null ||
                             canMethodCompleteNormally(isCompleted);
+                    }
+                    if (phaseCompletes && getAwaiter != null)
+                    {
+                        var continuation =
+                            knownSymbols.FindAwaitContinuationMethod(
+                                getAwaiter.ReturnType);
+                        Add(
+                            continuation == null ||
+                            continuation.IsVirtual ||
+                            continuation.IsAbstract
+                                ? UnknownPotential
+                                : GetCallableExceptions(
+                                    continuation,
+                                    activeMethods,
+                                    depth + 1),
+                            awaitOperation);
                     }
                     var getResult = info.GetResultMethod;
                     if (phaseCompletes)

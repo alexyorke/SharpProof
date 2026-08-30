@@ -176,7 +176,7 @@ internal sealed partial class OperationEffectScanner
         // effects are therefore possible, rather than an unconditional step.
         // Join its summary without making a possibly skipped throw block the
         // path that resumes directly to GetResult.
-        var continuation = FindAwaitContinuationMethod(
+        var continuation = _session.KnownSymbols.FindAwaitContinuationMethod(
             getAwaiter.ReturnType);
         if (continuation == null)
         {
@@ -199,40 +199,6 @@ internal sealed partial class OperationEffectScanner
             getResult,
             awaiter,
             awaitOperation)).Summary;
-    }
-
-    private IMethodSymbol? FindAwaitContinuationMethod(
-        ITypeSymbol awaiterType)
-    {
-        if (awaiterType is not INamedTypeSymbol namedAwaiter)
-        {
-            return null;
-        }
-
-        var critical = FindInterfaceImplementation(
-            namedAwaiter,
-            _session.KnownSymbols.CriticalNotifyCompletionUnsafeOnCompleted);
-        if (critical != null)
-        {
-            return critical;
-        }
-
-        return FindInterfaceImplementation(
-            namedAwaiter,
-            _session.KnownSymbols.NotifyCompletionOnCompleted);
-    }
-
-    private static IMethodSymbol? FindInterfaceImplementation(
-        INamedTypeSymbol awaiterType,
-        IMethodSymbol? interfaceMethod)
-    {
-        if (interfaceMethod == null)
-        {
-            return null;
-        }
-
-        return awaiterType.FindImplementationForInterfaceMember(
-            interfaceMethod) as IMethodSymbol;
     }
 
     private EffectStep ScanAwaitProtocolCall(

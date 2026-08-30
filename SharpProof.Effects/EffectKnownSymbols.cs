@@ -21,6 +21,22 @@ internal sealed class EffectKnownSymbols
 
     internal IMethodSymbol? NotifyCompletionOnCompleted { get; }
 
+    internal IMethodSymbol? FindAwaitContinuationMethod(
+        ITypeSymbol awaiterType)
+    {
+        if (awaiterType is not INamedTypeSymbol namedAwaiter)
+        {
+            return null;
+        }
+
+        return FindInterfaceImplementation(
+                namedAwaiter,
+                CriticalNotifyCompletionUnsafeOnCompleted) ??
+            FindInterfaceImplementation(
+                namedAwaiter,
+                NotifyCompletionOnCompleted);
+    }
+
     private static IMethodSymbol? FindMethod(
         INamedTypeSymbol? containingType,
         string name)
@@ -28,5 +44,18 @@ internal sealed class EffectKnownSymbols
         return containingType?.GetMembers(name)
             .OfType<IMethodSymbol>()
             .SingleOrDefault();
+    }
+
+    private static IMethodSymbol? FindInterfaceImplementation(
+        INamedTypeSymbol awaiterType,
+        IMethodSymbol? interfaceMethod)
+    {
+        if (interfaceMethod == null)
+        {
+            return null;
+        }
+
+        return awaiterType.FindImplementationForInterfaceMember(
+            interfaceMethod) as IMethodSymbol;
     }
 }
