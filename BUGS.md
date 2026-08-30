@@ -182,24 +182,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Event subscription and unsubscription call-site verification can silently omit direct preconditions; resolution differs depending on definition versus implementation accessor.
 - Safe evidence: Microsoft.CodeAnalysis 4.14 API documentation exposes event counterpart links; `ContractBinder` supports `EventAdd`/`EventRemove`, and repository parsing uses preview language.
 
-## Wave 5.9. HIGH - Nonexhaustive switch expression is treated as having no normal path when an unmatched path exists
-
-- File: `SharpProof.Effects/ManagedAbstractFlow.cs`
-- Member: `DefiniteOperationFacts.MayCompleteSwitchExpression`
-- Current lines: 2061-2082, especially 2069-2075
-- Mechanism: After confirming that the governing value may complete, the method returns false whenever `SwitchExpressionFacts.HasReachableUnmatchedPath` is true, before checking reachable arms. For `static int Choose(int x) => x switch { 0 => 1 };`, the unmatched path throws while `x==0` returns normally.
-- Impact: `MethodCanCompleteNormally` reports `Choose` false; `OperationCompletionEvaluator.CanCompleteInvocation` at lines 588-609 then treats every call as nonreturning, so downstream source-order effects in callers can be suppressed even on the `x==0` path.
-- Safe evidence: Direct control-flow counterexample.
-
-## Wave 5.10. HIGH - Null-to-nullable and user-defined null-to-struct conversions are falsely marked noncompleting
-
-- File: `SharpProof.Effects/OperationCompletionEvaluator.cs`
-- Member: `CanCompleteConversion`
-- Current lines: 1011-1028, especially 1018-1023
-- Mechanism: Any value-type result whose operand `ConstantValue` is null returns false. `(int?)null` and `default(int?)` complete normally; a user-defined `string? -> S` conversion may likewise accept null and return `S`.
-- Impact: `ScanCallStep` gates the call phase on argument completion, so `MayThrow((int?)null)` loses the callee's effects and throws. A `finally` containing `int? x = null;` can be treated as noncompleting, blocking real successors.
-- Safe evidence: Language semantics plus the exact predicate. Existing nullable-boxing tests exercise `(int?)null` effects but not completion and sequencing.
-
 ## Wave 5.11. MEDIUM - ApiSpecTable has no expression-depth bound before recursive processing
 
 - Files and members: `SharpProof.Specs/ApiSpecTable.cs`, `CompileTemplate`, lines 128-140; `SharpProof.Specs/ApiSpecContentDigest.cs`, `Add(term, variables)`, lines 75-106; `SharpProof.Specs/ApiSpecInstantiation.cs`, `Term`, lines 136-151.

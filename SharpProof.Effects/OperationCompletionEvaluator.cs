@@ -1015,7 +1015,9 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        if (conversion.Type?.IsValueType == true &&
+        if (conversion.OperatorMethod == null &&
+            conversion.Type?.IsValueType == true &&
+            !ManagedAbstractValue.IsNullableType(conversion.Type) &&
             conversion.Operand.ConstantValue is
             { HasValue: true, Value: null })
         {
