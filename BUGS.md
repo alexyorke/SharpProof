@@ -263,15 +263,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Legitimate partial or trusted effect-analysis `Unknown` results become `worker.malformed_result` failed runs instead of semantic `Unknown`, breaking effect verification under resource limits, unsupported bodies, and trusted-summary uncertainty.
 - Safe evidence: `EffectClaimResultAssembler.Assemble` passes valid effect-certainty tuples through; `CompilerEffectEvidenceCatalog.SupportedEffectTuples` explicitly includes the six states; `CompilerWireMappings` maps real `ResourceLimit` and `UnsupportedBody` analyzer outcomes. `ProtocolJsonTests.ResourceLimitIncompleteEffectTupleIsAProtocolState` tests only `HasValidEffectCertainty`, not whole-response validation.
 
-## Wave 5.22. LOW - Public capability-set constructor admits invalid partial-Unknown values
-
-- File: `SharpProof.Effects/EffectValues.cs`
-- Member: `EffectCapabilitySet` constructor
-- Current lines: 5-13; `IsUnknown` at 22-23
-- Mechanism: Validation rejects only bits outside `EffectCapabilityKind.Unknown` value 16383, so the reserved unknown-marker bit alone and marker plus arbitrary known subsets are accepted. The enum defines `Unknown` as marker plus `AllKnown=8191`; analogous `EffectSummary` validation requires its unknown marker to equal full `Unknown`. The malformed set reports `IsUnknown=true` while `Kinds` is neither a defined capability combination nor full `Unknown`; `Union` and `IsSubsetOf` preserve and order these partial-unknown states as ordinary bitsets.
-- Impact: The public value/domain API exposes invalid lattice elements and inconsistent unknown semantics. Downstream projection fails closed, making this a robustness and API-correctness issue rather than a false-negative analyzer issue.
-- Safe evidence: Generated enum values and the constructor mask directly establish the accepted partial patterns.
-
 ## Wave 5.23. HIGH - Structural package-policy validation does not model evaluated MSBuild behavior
 
 - File and member: `SharpProof.Gates/Performance/PerformanceGate.cs`, `ValidateAdvisoryPackagePolicy(XDocument portableProps, XDocument portableTargets, XDocument verifierProps, XDocument verifierTargets)`, current lines 1209-1451, and `HasAnalyzerItem`, lines 1460-1477.
