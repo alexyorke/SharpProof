@@ -43,7 +43,7 @@ public sealed class FuzzRunnerEvidenceTests
             Assert.That(
                 campaign,
                 Does.Contain("Assert-SharpProofFuzzRunnerResult"));
-            Assert.That(campaign, Does.Contain("schemaVersion = 3"));
+            Assert.That(campaign, Does.Contain("schemaVersion = 4"));
         }
     }
 
@@ -79,6 +79,10 @@ public sealed class FuzzRunnerEvidenceTests
             root,
             "scripts",
             "Invoke-SharpProofFuzzCampaign.ps1"));
+        var lifecycle = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "SharpProof.FuzzEvidenceLifecycle.ps1"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -86,6 +90,9 @@ public sealed class FuzzRunnerEvidenceTests
                 Does.Contain("Initialize-SharpProofFuzzEvidence"));
             Assert.That(
                 campaign,
+                Does.Contain("Complete-SharpProofFuzzEvidence"));
+            Assert.That(
+                lifecycle,
                 Does.Contain("Publish-SharpProofFuzzEvidence"));
             Assert.That(
                 campaign.IndexOf(
