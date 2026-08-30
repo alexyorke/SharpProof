@@ -5,10 +5,12 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
     private const int MaximumEncodingDepth = 256;
     private readonly Context _context = new();
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _queryGate = new(1, 1);
     private readonly IrSmtBackendOptions _options =
         ArgumentNullGuard.NotNull(options, nameof(options));
     private long _consumedResourceCount;
     private int _activeCheckCount;
+    private int _disposeStarted;
     private bool _disposed;
 
     public IrSmtBackend()
@@ -34,50 +36,74 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
         ArgumentNullGuard.NotNull(query, nameof(query));
 
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.Run(() =>
+        if (Volatile.Read(ref _disposeStarted) != 0)
         {
-            Interlocked.Increment(ref _activeCheckCount);
-            try
-            {
-                lock (_gate)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (_disposed)
-                    {
-                        return BackendCheckResult.Unknown(BackendFailureReason.Unavailable);
-                    }
+            return Task.FromResult(BackendCheckResult.Unknown(
+                BackendFailureReason.Unavailable));
+        }
 
-                    using var registration = cancellationToken.Register(
-                        static state => ((IrSmtBackend)state!).Interrupt(),
-                        this);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    try
-                    {
-                        var result = CheckCore(query, cancellationToken);
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return result;
-                    }
-                    catch (UnsupportedIrEncodingException)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return BackendCheckResult.Unknown(BackendFailureReason.UnsupportedEncoding);
-                    }
-                    catch (Exception exception) when (exception is
-                        Z3Exception or
-                        InvalidOperationException or
-                        ArgumentException or
-                        ArithmeticException)
+        return CheckSerializedAsync(query, cancellationToken);
+    }
+
+    private async Task<BackendCheckResult> CheckSerializedAsync(
+        VerificationQuery query,
+        CancellationToken cancellationToken)
+    {
+        await _queryGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(() =>
+            {
+                Interlocked.Increment(ref _activeCheckCount);
+                try
+                {
+                    lock (_gate)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        return BackendCheckResult.Unknown(BackendFailureReason.InfrastructureFailure);
+                        if (_disposed)
+                        {
+                            return BackendCheckResult.Unknown(
+                                BackendFailureReason.Unavailable);
+                        }
+
+                        using var registration = cancellationToken.Register(
+                            static state => ((IrSmtBackend)state!).Interrupt(),
+                            this);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        try
+                        {
+                            var result = CheckCore(query, cancellationToken);
+                            cancellationToken.ThrowIfCancellationRequested();
+                            return result;
+                        }
+                        catch (UnsupportedIrEncodingException)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            return BackendCheckResult.Unknown(
+                                BackendFailureReason.UnsupportedEncoding);
+                        }
+                        catch (Exception exception) when (exception is
+                            Z3Exception or
+                            InvalidOperationException or
+                            ArgumentException or
+                            ArithmeticException)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            return BackendCheckResult.Unknown(
+                                BackendFailureReason.InfrastructureFailure);
+                        }
                     }
                 }
-            }
-            finally
-            {
-                Interlocked.Decrement(ref _activeCheckCount);
-            }
-        }, cancellationToken);
+                finally
+                {
+                    Interlocked.Decrement(ref _activeCheckCount);
+                }
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _queryGate.Release();
+        }
     }
 
     private void Interrupt()
@@ -87,15 +113,23 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
 
     public void Dispose()
     {
-        lock (_gate)
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
         {
-            if (_disposed)
-            {
-                return;
-            }
+            return;
+        }
 
-            _disposed = true;
-            _context.Dispose();
+        _queryGate.Wait();
+        try
+        {
+            lock (_gate)
+            {
+                _disposed = true;
+                _context.Dispose();
+            }
+        }
+        finally
+        {
+            _queryGate.Dispose();
         }
     }
 

@@ -669,6 +669,14 @@ public sealed class IrSmtBackendTests
                 factory.PureOpaque(member, receiver: null),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
+        var healthyQuery = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
         using var backend = new IrSmtBackend();
         using var cancellation = new CancellationTokenSource();
         var gate = typeof(IrSmtBackend).GetField(
@@ -683,31 +691,42 @@ public sealed class IrSmtBackendTests
             System.Reflection.BindingFlags.NonPublic);
         Assert.That(activeChecks, Is.Not.Null);
 
-        Task<BackendCheckResult> check;
+        Task<BackendCheckResult> active;
+        Task<BackendCheckResult> queued;
         lock (gate!)
         {
-            check = backend.CheckAsync(query, cancellation.Token);
+            active = backend.CheckAsync(
+                healthyQuery,
+                CancellationToken.None);
             Assert.That(
                 SpinWait.SpinUntil(
                     () => (int)activeChecks!.GetValue(backend)! == 1,
                     TimeSpan.FromSeconds(5)),
                 Is.True);
+            queued = backend.CheckAsync(query, cancellation.Token);
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => (int)activeChecks!.GetValue(backend)! > 1,
+                    TimeSpan.FromSeconds(1)),
+                Is.False,
+                "A queued check must not occupy another worker thread.");
             cancellation.Cancel();
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => queued.IsCompleted,
+                    TimeSpan.FromSeconds(1)),
+                Is.True,
+                "A canceled queued check must not wait for the active solver.");
         }
 
-        Func<Task> action = async () => await check;
+        Assert.That(
+            active.GetAwaiter().GetResult().Status,
+            Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+        Func<Task> action = async () => await queued;
         Assert.That(
             Assert.CatchAsync(action),
             Is.InstanceOf<OperationCanceledException>());
 
-        var healthyQuery = new VerificationQuery(
-            factory,
-            [],
-            new Goal(
-                factory,
-                factory.Boolean(true),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)));
         var healthy = backend.CheckAsync(healthyQuery, CancellationToken.None)
             .GetAwaiter().GetResult();
         Assert.That(healthy.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
