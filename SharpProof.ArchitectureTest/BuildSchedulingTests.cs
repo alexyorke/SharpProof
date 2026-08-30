@@ -860,10 +860,16 @@ public sealed class BuildSchedulingTests
     [Test]
     public void SemanticShardingAlwaysSplitsTheCoverageHotspot()
     {
+        var root = FindRepositoryRoot();
         var semantic = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            root,
             "scripts",
             "Invoke-SharpProofSemanticTests.ps1"));
+        var runSettings = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "test",
+            "architecture-parallel.runsettings"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -884,6 +890,14 @@ public sealed class BuildSchedulingTests
                 semantic,
                 Does.Not.Contain(
                     "$ArchitectureOnly -and $fixture -ceq 'CoverageScriptTests'"));
+            Assert.That(semantic, Does.Contain("$architectureParallelRunSettings"));
+            Assert.That(
+                semantic,
+                Does.Contain("RunSettings = $architectureParallelRunSettings"));
+            Assert.That(semantic, Does.Contain("'/Settings:' + $task.RunSettings"));
+            Assert.That(
+                runSettings,
+                Does.Contain("<NumberOfTestWorkers>8</NumberOfTestWorkers>"));
         }
     }
 

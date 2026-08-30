@@ -35,6 +35,8 @@ Import-Module (Join-Path `
 $parallelism = Get-SharpProofSemanticTestParallelism `
     -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+$architectureParallelRunSettings = Join-Path `
+    $repositoryRoot 'eng/test/architecture-parallel.runsettings'
 $semanticSolutionFilter = Join-Path `
     $repositoryRoot 'SharpProof.Semantic.Tests.slnf'
 $semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
@@ -350,7 +352,8 @@ if ($architectureShardingEnabled) {
                     $semanticFilter + ')'
                 ProjectParallelism = 0
                 IsolateOutput = $false
-                Slots = [Math]::Min($parallelism, 4)
+                Slots = [Math]::Min($parallelism, 8)
+                RunSettings = $architectureParallelRunSettings
                 DefaultEstimatedMilliseconds = 20000L
             })
             $tasks.Add([pscustomobject]@{
@@ -361,7 +364,8 @@ if ($architectureShardingEnabled) {
                     $semanticFilter + ')'
                 ProjectParallelism = 0
                 IsolateOutput = $false
-                Slots = [Math]::Min($parallelism, 4)
+                Slots = [Math]::Min($parallelism, 8)
+                RunSettings = $architectureParallelRunSettings
                 DefaultEstimatedMilliseconds = 20000L
             })
             continue
@@ -462,6 +466,9 @@ try {
                 $arguments += "/logger:trx;LogFileName=$($task.Name).trx"
                 $arguments += '/ResultsDirectory:' + (
                     Join-Path $resultsRoot $task.Name)
+                if ($task.PSObject.Properties.Name -contains 'RunSettings') {
+                    $arguments += '/Settings:' + $task.RunSettings
+                }
             }
             else {
                 $arguments = @(
