@@ -1,6 +1,6 @@
 # Bug backlog
 
-449 open bugs, reprioritized by impact, reachability, and affected scope.
+448 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (161)
+## P0 - Critical (160)
 
 - **BUG-008 [P0] - Beforefieldinit method summaries omit type-initializer effects:** EffectMethodNodeBuilder ignores implicit beforefieldinit static initialization when summarizing same-assembly static methods. A complete summary can omit initializer effects and TypeInitializationException, allowing false effect or exception-contract proofs.
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
@@ -22,7 +22,6 @@ Priority definitions:
 - **BUG-017 [P0] - Closure calls do not havoc captured locals:** RoslynProgramLowerer derives call-mutated variables only from explicit ref and out arguments. An impure closure can mutate a captured local while lowering preserves its old IR value as Exact, making downstream reasoning unsound.
 - **BUG-018 [P0] - Coalesce and compound cache writes bypass soundness analysis:** SharpProofSoundnessAnalyzer registers only simple assignments, so coalesce and compound assignments to cache properties or indexers are never inspected. These direct setters can persist explicitly unsafe semantic answers without the required SPMETA010 error.
 - **BUG-019 [P0] - Coalesce assignment leaves stale flow facts:** ManagedAbstractFlow writes a coalesce-assignment result only to Roslyn's synthetic flow capture instead of the captured local, field, or property. Stale null facts can suppress a real later static write while analysis remains Complete, allowing a false purity result.
-- **BUG-020 [P0] - Compiler evidence drops recursive metadata-reference aliases:** CompilerCompilationCapture never copies HasRecursiveAliases from metadata-reference properties into the evidence snapshot. Fingerprints then conflate distinct alias scopes and misstate transitive symbol visibility and binding.
 - **BUG-021 [P0] - Compiler probe omits CompilationReference inputs:** CompilerProbeSnapshot records only PortableExecutableReference instances and silently drops legal source CompilationReference inputs. Compilations with different semantic reference closures can produce indistinguishable probe snapshots and conceal an incomplete collector view.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
 - **BUG-023 [P0] - Compiler snapshots omit executable entry-point selection:** CompilerProbeSnapshot omits CSharpCompilationOptions.MainTypeName from authenticated options. Two executable compilations can serialize identically while selecting different Main methods and producing programs with different behavior.

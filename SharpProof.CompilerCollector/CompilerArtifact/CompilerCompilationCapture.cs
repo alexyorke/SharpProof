@@ -300,6 +300,9 @@ internal static class CompilerCompilationCapture
         {
             Kind = reference.Properties.Kind.ToString(),
             EmbedInteropTypes = reference.Properties.EmbedInteropTypes,
+            HasRecursiveAliases = CompilerOptionWireMappings.ReadInternalBoolean(
+                reference.Properties,
+                "HasRecursiveAliases"),
             Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value, StringComparer.Ordinal)],
             Identity = identity ?? throw new InvalidDataException(
                 "A compiler reference contains no modules."),
