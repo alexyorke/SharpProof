@@ -27,15 +27,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 27. MEDIUM - Differential C# oracle permanently loads one assembly per comparison
-
-- File: `SharpProof.Testing/IrCSharpDifferentialOracle.cs`
-- Member: `Compare`
-- Lines: 43-74, especially 71
-- Mechanism: `Assembly.Load(image)` uses the default noncollectible load context. The property test invokes it 200 times at `SharpProof.Testing.Test/IrCSharpDifferentialOracleTests.cs` lines 17-27.
-- Impact: Process-lifetime assembly and metadata retention causes monotonic memory growth and can make large fuzz or property runs infrastructure-bound.
-- Safe reproduction/evidence: Make repeated `Compare` calls with unique terms and observe the loaded assembly count after garbage collection. `Tools/SharpProof.Fuzz/FrontendFuzzing.cs` lines 1044-1109 demonstrates a collectible context and `Unload`.
-
 ## 28. HIGH - Production inventory silently drops repository-local analyzer identities when binaries are absent or unreadable
 
 - File: `scripts/Get-SharpProofProductionInventory.ps1`
