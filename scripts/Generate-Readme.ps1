@@ -878,7 +878,8 @@ if ($containerCpuLimit -ne 0 -or
 $resourceClaims = @(
     ("Containers use all CPUs available to Docker and up to " +
         "$containerMemoryMiB MiB by default.")
-    ("Test-project concurrency auto-detects the available CPUs " +
+    "Semantic-test scheduling uses every container-visible CPU."
+    ("Other test-project concurrency auto-detects the available CPUs " +
         "and uses one lane per $testProjectCpuDivisor CPUs.")
     ("Parallel prerequisite builds use $buildCpuPercent% of " +
         "container-visible CPU lanes by default.")

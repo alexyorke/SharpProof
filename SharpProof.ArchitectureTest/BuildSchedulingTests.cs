@@ -420,6 +420,64 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public async Task SemanticSchedulerUsesAllVisibleProcessorsUnlessCapped()
+    {
+        var root = FindRepositoryRoot();
+        var module = Path.Combine(
+            root, "scripts", "SharpProof.ContainerExecution.psm1");
+        var escapedModule = module.Replace("'", "''", StringComparison.Ordinal);
+        var escapedRoot = root.Replace("'", "''", StringComparison.Ordinal);
+        var command = $$"""
+            Import-Module '{{escapedModule}}' -Force
+            $env:SHARPPROOF_TEST_PROJECT_PARALLELISM = $null
+            $automatic = Get-SharpProofSemanticTestParallelism -RepositoryRoot '{{escapedRoot}}'
+            $env:SHARPPROOF_TEST_PROJECT_PARALLELISM = '1'
+            $capped = Get-SharpProofSemanticTestParallelism -RepositoryRoot '{{escapedRoot}}'
+            [ordered]@{
+                visible = [Environment]::ProcessorCount
+                automatic = $automatic
+                capped = $capped
+            } | ConvertTo-Json -Compress
+            """;
+
+        var info = new ProcessStartInfo
+        {
+            FileName = "pwsh",
+            WorkingDirectory = root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        info.ArgumentList.Add("-NoLogo");
+        info.ArgumentList.Add("-NoProfile");
+        info.ArgumentList.Add("-Command");
+        info.ArgumentList.Add(command);
+
+        using var process = Process.Start(info)!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        Assert.That(process.ExitCode, Is.Zero, await error);
+
+        using var document = JsonDocument.Parse(await output);
+        var result = document.RootElement;
+        var semantic = await File.ReadAllTextAsync(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.GetProperty("automatic").GetInt32(),
+                Is.EqualTo(result.GetProperty("visible").GetInt32()));
+            Assert.That(result.GetProperty("capped").GetInt32(), Is.EqualTo(1));
+            Assert.That(
+                semantic,
+                Does.Contain("Get-SharpProofSemanticTestParallelism"));
+        }
+    }
+
+    [Test]
     public void WorkerTestsRestoreOnlyTheWorkerProjectClosure()
     {
         var root = FindRepositoryRoot();

@@ -62,6 +62,28 @@ function Get-SharpProofTestProjectParallelism {
     return [Math]::Max(1, [Math]::Floor($visibleProcessors / $divisor))
 }
 
+function Get-SharpProofSemanticTestParallelism {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $override = [Environment]::GetEnvironmentVariable(
+        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
+        [EnvironmentVariableTarget]::Process)
+    if (-not [string]::IsNullOrWhiteSpace($override)) {
+        return Get-SharpProofTestProjectParallelism `
+            -RepositoryRoot $RepositoryRoot
+    }
+
+    $visibleProcessors = [Environment]::ProcessorCount
+    if ($visibleProcessors -lt 1) {
+        throw 'The container did not expose a positive processor count.'
+    }
+    return $visibleProcessors
+}
+
 function Get-SharpProofBuildParallelism {
     [CmdletBinding()]
     param(
@@ -401,6 +423,7 @@ function New-SharpProofIsolatedTestOutput {
 Export-ModuleMember -Function @(
     'Add-SharpProofStaticGraphArgument',
     'Get-SharpProofBuildParallelism',
+    'Get-SharpProofSemanticTestParallelism',
     'Get-SharpProofTestProjectParallelism',
     'Get-SharpProofTestAssemblyPath',
     'Invoke-SharpProofParallelDotnetBuilds',

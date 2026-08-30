@@ -32,7 +32,7 @@ if ($Fast -and $NoBuild) {
 
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-$parallelism = Get-SharpProofTestProjectParallelism `
+$parallelism = Get-SharpProofSemanticTestParallelism `
     -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $semanticSolutionFilter = Join-Path `

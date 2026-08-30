@@ -198,7 +198,8 @@ workspace isolation, test targets, resource overrides, and when a disposable
 docker compose run --rm tooling qualification command is preferable.
 
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
-Test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
+Semantic-test scheduling uses every container-visible CPU.
+Other test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
 Parallel prerequisite builds use 75% of container-visible CPU lanes by default.
 Trusted mutations use 4 deterministic weighted lanes.
 The default Debug check concurrently performs one Debug solution build and one Release package-product build, then runs 3 Release pack commands with `--no-build`.
