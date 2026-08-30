@@ -461,6 +461,33 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task DelegateSubtractionDoesNotReachRemovedLocalFunctions()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    Func<int> callback = () => 1;
+                    callback -= Removed;
+                    return callback();
+
+                    int Removed() => Positive(-1);
+                }
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task ObservingMethodGroupsDoesNotReachLocalFunctions()
     {
         const string source =
