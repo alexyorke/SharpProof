@@ -267,6 +267,57 @@ public sealed class CorpusGateTests
         }
     }
 
+    [Test]
+    public void CorpusSnapshotFormatRequiresCanonicalEnumNames()
+    {
+        const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
+        static byte[] Snapshot(string header, string data)
+        {
+            return Encoding.UTF8.GetBytes(header + data + "\n");
+        }
+        static void AssertAccepted(string header, string data)
+        {
+            Assert.That(
+                CorpusSnapshotFormat.Render([data]),
+                Is.EqualTo(header + data + "\n"));
+            Assert.That(
+                CorpusSnapshotFormat.Parse(Snapshot(header, data)),
+                Is.EqualTo(new[] { data }));
+        }
+
+        foreach (var verdict in new[]
+                 {
+                     "Proven", "Refuted", "Unknown", "SilentUnknown"
+                 })
+        {
+            AssertAccepted(header, $"case|{verdict}|Proven|");
+        }
+        foreach (var semanticOutcome in new[]
+                 {
+                     "NotApplicable", "Proven", "Suppressed", "Abstained",
+                     "Unknown", "Refuted"
+                 })
+        {
+            AssertAccepted(header, $"case|Proven|{semanticOutcome}|");
+        }
+
+        foreach (var noncanonical in new[]
+                 {
+                     "case|0|Proven|",
+                     "case| Proven|Proven|",
+                     "case|Proven |Proven|",
+                     "case|Proven|1|",
+                     "case|Proven| Proven|",
+                     "case|Proven|Proven |"
+                 })
+        {
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CorpusSnapshotFormat.Parse(Snapshot(header, noncanonical))));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CorpusSnapshotFormat.Render([noncanonical])));
+        }
+    }
+
     private static bool ProcessExists(int processId)
     {
         try
