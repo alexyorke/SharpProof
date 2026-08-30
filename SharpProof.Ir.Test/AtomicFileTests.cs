@@ -51,6 +51,28 @@ public sealed class AtomicFileTests
     }
 
     [Test]
+    public void WriteUtf8SupportsValidLongDestinationBasename()
+    {
+        var path = LongDestinationPath();
+
+        AtomicFile.WriteUtf8(path, "content\n");
+
+        Assert.That(File.ReadAllText(path), Is.EqualTo("content\n"));
+        Assert.That(TemporaryFiles(path), Is.Empty);
+    }
+
+    [Test]
+    public async Task WriteUtf8AsyncSupportsValidLongDestinationBasename()
+    {
+        var path = LongDestinationPath();
+
+        await AtomicFile.WriteUtf8Async(path, "content\n");
+
+        Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("content\n"));
+        Assert.That(TemporaryFiles(path), Is.Empty);
+    }
+
+    [Test]
     public void CanceledWritePreservesDestinationAndCleansTemporaryFile()
     {
         var path = Path.Combine(_root, "result.txt");
@@ -98,6 +120,11 @@ public sealed class AtomicFileTests
 
     private static string[] TemporaryFiles(string path)
     {
-        return Directory.GetFiles(Path.GetDirectoryName(path)!, Path.GetFileName(path) + ".*.tmp");
+        return Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp");
+    }
+
+    private string LongDestinationPath()
+    {
+        return Path.Combine(_root, new string('s', 220) + ".sarif");
     }
 }

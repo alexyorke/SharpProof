@@ -254,14 +254,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Complete effect summaries can omit effects that execute before a noncompleting derived initializer.
 - Safe evidence: Direct control-flow and runtime-order reasoning.
 
-## Wave 5.5. MEDIUM - AtomicFile ordinary writes reject valid long destination basenames
-
-- File: `SharpProof.Ir/AtomicFile.cs`
-- Members: `WriteUtf8`, lines 70-76; `WriteBytesAsync`, lines 92-105; `Prepare`, lines 115-121, especially line 121
-- Mechanism: The staging component is `destination + "." + 32-character GUID + ".tmp"`, adding 37 ASCII characters to the destination basename. A valid 220-character basename plus `.sarif` produces a 263-character temporary component, exceeding the 255-character component limit on the canonical Linux filesystem and typical Windows filesystems. The write fails before publication even though the destination is valid.
-- Impact: Compiler-manifest emission at `FinalCompilationCollector.cs` line 35, worker request/response writes, and verification-cache writes can fail solely because of a valid long output or cache filename.
-- Safe evidence: `AtomicFileTests.cs` lines 78-96 uses 220 `s` characters plus `.sarif` to verify `PrepareStaged` uses a short stable temporary name, while `WriteUtf8`/async tests at lines 29-50 cover only short names. The private `Prepare` used by those APIs retains the suffixing strategy.
-
 ## Wave 5.6. MEDIUM - Reference-null conditional branches cannot instantiate against concrete reference substitutions
 
 - File: `SharpProof.Specs/ApiSpecInstantiation.cs`
