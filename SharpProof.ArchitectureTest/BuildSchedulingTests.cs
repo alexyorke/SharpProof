@@ -96,7 +96,7 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
-    public void PackageBuildsReuseOutputsAndAvoidTheSharedCompilerBottleneck()
+    public void PackageBuildsReuseOutputsAndUseScopedCompilerServers()
     {
         var root = FindRepositoryRoot();
         var packageTests = File.ReadAllText(Path.Combine(
@@ -126,7 +126,19 @@ public sealed class BuildSchedulingTests
             Assert.That(execution,
                 Does.Contain("function Invoke-SharpProofParallelDotnetBuilds"));
             Assert.That(execution,
-                Does.Contain("'-p:UseSharedCompilation=false'"));
+                Does.Not.Contain("UseSharedCompilation=false"));
+            Assert.That(execution,
+                Does.Contain("SharedCompilationId"));
+            Assert.That(execution,
+                Does.Contain("$compilerServerScope"));
+            Assert.That(execution,
+                Does.Contain("Stop-SharpProofCompilerServer"));
+            Assert.That(execution,
+                Does.Contain("'-shutdown'"));
+            Assert.That(execution,
+                Does.Contain("Select-Object -First 1"));
+            Assert.That(execution,
+                Does.Contain("ResolveLinkTarget($true)"));
             Assert.That(execution,
                 Does.Contain("'MSBUILDDISABLENODEREUSE'"));
         }

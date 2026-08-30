@@ -145,6 +145,79 @@ function Get-SharpProofTestAssemblyPath {
     return [IO.Path]::GetFullPath($assembly)
 }
 
+function Stop-SharpProofCompilerServer {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SharedCompilationId
+    )
+
+    $dotnetCommand = Get-Command `
+        dotnet `
+        -CommandType Application `
+        -ErrorAction Stop | Select-Object -First 1
+    $dotnetItem = Get-Item -LiteralPath $dotnetCommand.Source
+    $dotnetTarget = $dotnetItem.ResolveLinkTarget($true)
+    $dotnetPath = if ($null -eq $dotnetTarget) {
+        $dotnetItem.FullName
+    }
+    else {
+        $dotnetTarget.FullName
+    }
+    $sdkVersionOutput = @(& $dotnetPath --version)
+    if ($LASTEXITCODE -ne 0 -or $sdkVersionOutput.Count -ne 1) {
+        throw 'Could not resolve the active .NET SDK compiler server.'
+    }
+    $sdkVersion = ([string]$sdkVersionOutput[0]).Trim()
+    if ([string]::IsNullOrWhiteSpace($sdkVersion)) {
+        throw 'The active .NET SDK version was empty.'
+    }
+    $compilerServer = Join-Path `
+        ([IO.Path]::GetDirectoryName($dotnetPath)) `
+        "sdk/$sdkVersion/Roslyn/bincore/VBCSCompiler.dll"
+    if (-not (Test-Path -LiteralPath $compilerServer -PathType Leaf)) {
+        throw "The active Roslyn compiler server was not found: $compilerServer"
+    }
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $dotnetPath
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in @(
+            'exec',
+            $compilerServer,
+            "-pipename:$SharedCompilationId",
+            '-shutdown')) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw "Could not stop compiler server $SharedCompilationId."
+        }
+        $standardOutput = $process.StandardOutput.ReadToEndAsync()
+        $standardError = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(10000)) {
+            $process.Kill($true)
+            $process.WaitForExit()
+            throw "Compiler server $SharedCompilationId did not stop promptly."
+        }
+        $stdout = $standardOutput.GetAwaiter().GetResult()
+        $stderr = $standardError.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            throw (
+                "Compiler server $SharedCompilationId shutdown failed with " +
+                "exit code $($process.ExitCode): $stdout$stderr")
+        }
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
 function Invoke-SharpProofParallelDotnetBuilds {
     [CmdletBinding()]
     param(
@@ -175,6 +248,7 @@ function Invoke-SharpProofParallelDotnetBuilds {
         [Math]::Floor($Parallelism / $Builds.Count))
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     $running = [Collections.Generic.List[object]]::new()
+    $compilerServerScope = [Guid]::NewGuid().ToString('N')
     try {
         foreach ($build in $Builds) {
             $name = [string]$build.Name
@@ -184,10 +258,13 @@ function Invoke-SharpProofParallelDotnetBuilds {
                 [string]$arguments[0] -cne 'build') {
                 throw 'Parallel build entries require a name and build arguments.'
             }
+            $sharedCompilationId =
+                "sharpproof-parallel-$compilerServerScope-$name"
             $arguments += @(
                 "/m:$lanesPerBuild",
                 '/nodeReuse:false',
-                '-p:UseSharedCompilation=false')
+                '-p:UseSharedCompilation=true',
+                "-p:SharedCompilationId=$sharedCompilationId")
             $effectiveArguments = @(
                 Add-SharpProofStaticGraphArgument -Arguments $arguments)
             $startInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -197,7 +274,9 @@ function Invoke-SharpProofParallelDotnetBuilds {
             $startInfo.CreateNoWindow = $true
             $startInfo.RedirectStandardOutput = $true
             $startInfo.RedirectStandardError = $true
-            $startInfo.Environment['UseSharedCompilation'] = 'false'
+            $startInfo.Environment['UseSharedCompilation'] = 'true'
+            $startInfo.Environment['SharedCompilationId'] =
+                $sharedCompilationId
             $startInfo.Environment['MSBUILDDISABLENODEREUSE'] = '1'
             foreach ($argument in $effectiveArguments) {
                 [void]$startInfo.ArgumentList.Add($argument)
@@ -211,6 +290,7 @@ function Invoke-SharpProofParallelDotnetBuilds {
             $running.Add([pscustomobject]@{
                 Name = $name
                 Arguments = $effectiveArguments
+                SharedCompilationId = $sharedCompilationId
                 Process = $process
                 StandardOutput = $process.StandardOutput.ReadToEndAsync()
                 StandardError = $process.StandardError.ReadToEndAsync()
@@ -245,6 +325,10 @@ function Invoke-SharpProofParallelDotnetBuilds {
         }
         if ($failures.Count -ne 0) {
             throw "Parallel builds failed:`n$($failures -join "`n")"
+        }
+        foreach ($active in $running) {
+            Stop-SharpProofCompilerServer `
+                -SharedCompilationId $active.SharedCompilationId
         }
     }
     finally {

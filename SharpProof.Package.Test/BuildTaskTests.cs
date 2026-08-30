@@ -888,6 +888,8 @@ public sealed class BuildTaskTests
         var containmentFailure = string.Empty;
         try
         {
+            const int projectWallTimeMilliseconds = 2000;
+            const int terminationGraceMilliseconds = 1000;
             var helper = CreateTimedProcessAssembly(directory.FullName);
             using var task = new RunVerifier
             {
@@ -898,15 +900,20 @@ public sealed class BuildTaskTests
                 Arguments = [new TaskItem(helper)],
                 // Let the instrumented supervisor and child finish managed
                 // startup before exercising the whole-process deadline.
-                ProjectWallTimeMilliseconds = 2000,
+                ProjectWallTimeMilliseconds = projectWallTimeMilliseconds,
                 // Container scheduling can delay authenticated descendant
                 // cleanup beyond a single scheduler quantum. Keep the
-                // fixture's cleanup reserve realistic while retaining the
-                // strict whole-process wall assertion below.
-                TerminationGraceMilliseconds = 1000,
+                // fixture's cleanup reserve realistic while retaining a
+                // bounded wall assertion with one second of scheduler slack.
+                TerminationGraceMilliseconds = terminationGraceMilliseconds,
                 ContainmentAuthenticationFailureOverride = message =>
                     Volatile.Write(ref containmentFailure, message)
             };
+            var maximumElapsed = TimeSpan.FromMilliseconds(
+                RunVerifier.ComputeProcessTimeout(
+                    projectWallTimeMilliseconds,
+                    terminationGraceMilliseconds)) +
+                TimeSpan.FromSeconds(1);
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             Assert.That(task.Execute(), Is.True);
@@ -917,7 +924,7 @@ public sealed class BuildTaskTests
                 Assert.That(task.ExitCode, Is.EqualTo(124));
                 Assert.That(
                     stopwatch.Elapsed,
-                    Is.LessThan(TimeSpan.FromSeconds(4)));
+                    Is.LessThan(maximumElapsed));
             }
             Assert.That(
                 SpinWait.SpinUntil(
