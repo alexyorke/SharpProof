@@ -22,16 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.10. MEDIUM - Unsignaled backend cancellation is misreported as method timeout and retires a healthy lane
-
-- File: `SharpProof.Worker/CallableVerificationPolicy.cs`
-- Member: `VerifyTargetAsync`
-- Current lines: 48-59
-- Downstream: `SharpProof.Worker/SharpProofWorker.cs`, `RunLane`, lines 257-279
-- Mechanism: Every `OperationCanceledException` becomes `ProjectTimeout` if the project token is canceled and otherwise becomes `MethodTimeout`; the code never checks `methodBoundary.IsCancellationRequested` or the exception token. An internal backend abort while all boundaries are live is labeled `MethodTimeout`, and the worker renews and disposes the lane.
-- Impact: Telemetry and coverage falsely report `TimedOut`/`MethodTimeout`; an unnecessary lane replacement occurs, with possible work loss if renewal fails.
-- Safe reproduction/evidence: Use a test backend that immediately throws `OperationCanceledException` while all time boundaries remain generous and uncanceled. Expected behavior is infrastructure failure or propagation; actual behavior is `MethodTimeout`.
-
 ## Wave 2.11. MEDIUM - Dependency provenance deduplication key is delimiter-ambiguous
 
 - File: `SharpProof.Summaries/IrRelationalSummaryBuilder.cs`

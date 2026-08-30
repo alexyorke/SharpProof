@@ -53,10 +53,20 @@ internal static class CallableVerificationPolicy
                     WorkerCallableCoverageReason.Canceled);
             }
 
-            var timeout = projectBoundary.IsCancellationRequested
-                ? (WorkerClaimReason.ProjectTimeout, WorkerCallableCoverageReason.ProjectTimeout)
-                : (WorkerClaimReason.MethodTimeout, WorkerCallableCoverageReason.MethodTimeout);
-            return Unknown(target, timeout.Item1, timeout.Item2);
+            if (projectBoundary.IsCancellationRequested)
+            {
+                return Unknown(target, WorkerClaimReason.ProjectTimeout,
+                    WorkerCallableCoverageReason.ProjectTimeout);
+            }
+
+            if (methodBoundary.IsCancellationRequested)
+            {
+                return Unknown(target, WorkerClaimReason.MethodTimeout,
+                    WorkerCallableCoverageReason.MethodTimeout);
+            }
+
+            return Unknown(target, WorkerClaimReason.InfrastructureFailure,
+                WorkerCallableCoverageReason.InfrastructureFailure);
         }
         catch (Exception exception) when (
             exception is not OutOfMemoryException and not StackOverflowException)

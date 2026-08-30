@@ -451,6 +451,44 @@ public sealed class CompilerCallableLowererTests
             Throws.InstanceOf<OperationCanceledException>());
     }
 
+    [Test]
+    public async Task UnsignaledBackendCancellationIsInfrastructureFailure()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """,
+            "Identity");
+        using var projectBoundary = new CancellationTokenSource();
+
+        var verification = await CallableVerificationPolicy.VerifyTargetAsync(
+            new CallableVerifier(
+                new UnsignaledCancellationBackend(),
+                WorkerBudgets.DefaultMaximumExpressionDepth),
+            preparation,
+            new WorkerBudgets(),
+            null,
+            WorkerBudgets.DefaultMethodWallTimeMilliseconds,
+            projectBoundary,
+            CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                verification.Callable.Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.InfrastructureFailure));
+            Assert.That(
+                verification.Claims.Select(static claim => claim.Reason),
+                Is.All.EqualTo(WorkerClaimReason.InfrastructureFailure));
+        }
+    }
+
     private static CompilerCallablePreparation Prepare(
         string source,
         string methodName)
@@ -535,6 +573,17 @@ public sealed class CompilerCallableLowererTests
             Interlocked.Increment(ref _callCount);
             throw new AssertionException(
                 "A zero-claim callable reached the SMT backend.");
+        }
+    }
+
+    private sealed class UnsignaledCancellationBackend : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromException<BackendCheckResult>(
+                new OperationCanceledException());
         }
     }
 }
