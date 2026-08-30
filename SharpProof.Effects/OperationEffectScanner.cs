@@ -69,7 +69,8 @@ internal sealed partial class OperationEffectScanner
             method,
             _nullnessEvaluator.IsProvenNull,
             _nullnessEvaluator.IsProvenNonNull,
-            _nullnessEvaluator.IsImplicitLockEnterWithNullValue);
+            _nullnessEvaluator.IsImplicitLockEnterWithNullValue,
+            abstractFlow);
         _handlerReachability = new ExceptionHandlerReachability(
             session.Compilation,
             _method,

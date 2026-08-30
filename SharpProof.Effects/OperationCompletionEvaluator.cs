@@ -5,6 +5,7 @@ namespace SharpProof.Effects;
 
 internal sealed class OperationCompletionEvaluator
 {
+    private readonly ManagedFlowResult? _abstractFlow;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly IMethodSymbol _caller;
     private readonly Compilation _compilation;
@@ -19,8 +20,10 @@ internal sealed class OperationCompletionEvaluator
         IMethodSymbol caller,
         Func<IOperation?, IOperation, bool> isProvenNull,
         Func<IOperation?, IOperation, bool> isProvenNonNull,
-        Func<IInvocationOperation, bool> isImplicitLockEnterWithNullValue)
+        Func<IInvocationOperation, bool> isImplicitLockEnterWithNullValue,
+        ManagedFlowResult? abstractFlow = null)
     {
+        _abstractFlow = abstractFlow;
         _apiSpecs = session.ApiSpecs;
         _caller = caller;
         _compilation = session.Compilation;
@@ -734,7 +737,38 @@ internal sealed class OperationCompletionEvaluator
     {
         return CanCompleteNormally(element.ArrayReference) &&
             !_isProvenNull(element.ArrayReference, element) &&
-            element.Indices.All(CanCompleteNormally);
+            element.Indices.All(CanCompleteNormally) &&
+            ArrayAccessMayComplete(element);
+    }
+
+    private bool ArrayAccessMayComplete(
+        IArrayElementReferenceOperation element)
+    {
+        if (_abstractFlow == null ||
+            element.Indices.Length != 1 ||
+            !_abstractFlow.TryEvaluate(
+                element,
+                element.ArrayReference,
+                out var array) ||
+            !_abstractFlow.TryEvaluate(
+                element,
+                element.Indices[0],
+                out var index) ||
+            !array.TryGetCardinality(out var length) ||
+            !index.TryGetInteger(out var interval))
+        {
+            return true;
+        }
+
+        if (interval.UpperBound is { } maximumIndex && maximumIndex < 0)
+        {
+            return false;
+        }
+
+        return length.UpperBound is not { } maximumLength ||
+            maximumLength > 0 &&
+            (interval.LowerBound is not { } minimumIndex ||
+             minimumIndex < maximumLength);
     }
 
     private bool CanCompleteWriteTarget(IOperation target)

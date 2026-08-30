@@ -501,13 +501,6 @@ This section records 38 findings from exactly 30 fresh read-only auditors: 20 re
 - Impact: A genuinely nonreturning method is classified as completing, so callers retain unreachable suffix writes, calls, allocations, and exceptions and can receive false effect diagnostics or witnesses.
 - Safe evidence: `try { throw new Exception(); } catch (Exception) when (false) { } Mutate();` never reaches `Mutate`. Likewise, a try that always throws sealed `A` followed only by `catch (B)` for unrelated sealed `B` always propagates, yet both predicates return true.
 
-## Wave 7.13. MEDIUM - Definitely out-of-range array access is considered normally completing
-
-- Files and members: `SharpProof.Effects/OperationCompletionEvaluator.cs`, `CanCompleteArrayElement`, current lines 733-737; existing bounds reasoning in `SharpProof.Effects/ManagedAbstractFlow.cs`, `ProvesArrayAccess`, lines 1300-1309.
-- Mechanism: Completion checks receiver, indices, and nullness but never proves bounds. Even exact empty-array index 0 is considered completing although effect scanning records `IndexOutOfRangeException`.
-- Impact: Effects after a provably terminal access are retained, causing false summaries and contract diagnostics.
-- Safe evidence: `_ = (new int[0])[0]; Mutate();`; `Mutate` cannot execute but remains reachable.
-
 ## Wave 7.14. HIGH - DecodeBody accepts coordinated same-typed parameter permutations
 
 - File: `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs`
