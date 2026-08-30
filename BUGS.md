@@ -230,15 +230,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Actual executable static methods in self-cycles or mutual cycles evade implementation verification while their bodies are accepted as specifications; calls can resolve contracts through the cycle or self edge.
 - Safe evidence: Deterministic trace: `ResolveCompanions` accepts the self descriptor; `FindOverlappingCompanions` excludes identical type at lines 135-140; `Validate` compares each method to itself; `IsContractCompanion` skips its operation block.
 
-## Wave 5.19. MEDIUM - SupportsProperty over-requires ApiSpecs for an accessor the operation does not execute
-
-- File: `SharpProof.Analyzer.Core/LanguageSubsetGate.cs`
-- Member: `SupportsProperty`
-- Current lines: 196-208, especially 205-208
-- Mechanism: For any property on a generic containing type, the method collects both `GetMethod` and `SetMethod` and requires `hasResolvedGenericApiSpec` for every available accessor. A read executes only the getter; a simple write executes only the setter. A read with an exact getter specification but no setter specification, or a write with a setter specification but no getter specification, is therefore classified `UnsupportedOperationShape`.
-- Impact: Selected otherwise-supported effects or contracts abstain, and compiler-artifact selection is marked unsupported, although downstream effect scanning is accessor-specific.
-- Safe evidence: `SharpProof.Effects/OperationEffectScanner.cs` lines 328-330 explicitly selects the getter for `EffectAccess.Read` and setter for `Write`.
-
 ## Wave 5.20. HIGH - SMT encoding truncates string literals at embedded NUL
 
 - File: `SharpProof.Smt/IrSmtBackend.cs`

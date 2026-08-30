@@ -202,10 +202,38 @@ internal static class LanguageSubsetGate
             return true;
         }
 
-        var accessors = new[] { property.Property.GetMethod, property.Property.SetMethod };
-        var availableAccessors = accessors.Where(static accessor => accessor != null).ToArray();
-        return availableAccessors.Length != 0 &&
-               availableAccessors.All(accessor => hasResolvedGenericApiSpec(accessor!));
+        return GetAccessedPropertyAccessors(property).All(accessor =>
+            accessor != null && hasResolvedGenericApiSpec(accessor));
+    }
+
+    private static IEnumerable<IMethodSymbol?> GetAccessedPropertyAccessors(
+        IPropertyReferenceOperation property)
+    {
+        if (property.Parent is INameOfOperation)
+        {
+            yield break;
+        }
+
+        if (property.Parent is ISimpleAssignmentOperation assignment &&
+            ReferenceEquals(assignment.Target, property))
+        {
+            yield return property.Property.SetMethod;
+            yield break;
+        }
+
+        if ((property.Parent is ICoalesceAssignmentOperation coalesce &&
+             ReferenceEquals(coalesce.Target, property)) ||
+            (property.Parent is ICompoundAssignmentOperation compound &&
+             ReferenceEquals(compound.Target, property)) ||
+            (property.Parent is IIncrementOrDecrementOperation increment &&
+             ReferenceEquals(increment.Target, property)))
+        {
+            yield return property.Property.GetMethod;
+            yield return property.Property.SetMethod;
+            yield break;
+        }
+
+        yield return property.Property.GetMethod;
     }
 
     private static bool SupportsCall(
