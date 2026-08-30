@@ -116,14 +116,18 @@ changes so the Worker dependency closure is rebuilt.
 The same `-NoBuild` fast path is available on `sp test`, `sp semantic-tests`,
 `sp portable-tests`, and `sp package-tests`; use it only when the matching
 configuration and package outputs already exist in this workspace.
-For a single test project, `sp test -NoBuild` runs the built test assembly
-directly through VSTest, avoiding another MSBuild project-graph evaluation.
+For a single test project, `sp test` performs the required incremental build
+and then runs the built assembly directly through VSTest, avoiding a second
+MSBuild project-graph evaluation. `-NoBuild` skips that build as well.
+`sp worker-tests` uses the same build-then-VSTest path.
 Non-coverage semantic shards and ordinary package shards use the same
 direct-assembly path. Package process-containment postflight shards retain the
-project-aware runner and run exclusively after the parallel wave. Coverage also
-keeps the project-aware runner so each shard can receive isolated instrumented
-outputs. Solution commands retain their project-aware runner because they
-coordinate multiple outputs.
+project-aware runner and run exclusively after the parallel wave. The generic
+single-project command also retains the project-aware runner for
+`SharpProof.Package.Test` because callers can select those containment tests.
+Coverage keeps the project-aware runner so each shard can receive isolated
+instrumented outputs. Solution commands retain their project-aware runner
+because they coordinate multiple outputs.
 Commands that compare revisions or certify exact-commit evidence (`test-changed`,
 acceptance, mutation, packaging, pilots, fuzz, coverage, and release commands)
 require a Git-backed source workspace. Start the persistent Dev Container to

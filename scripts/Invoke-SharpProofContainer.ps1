@@ -228,8 +228,20 @@ switch ($Command) {
         }
     }
     'test' {
-        if ($NoBuild -and
-            $Target.EndsWith('.csproj', [StringComparison]::OrdinalIgnoreCase)) {
+        $directProjectTest =
+            $Target.EndsWith(
+                '.csproj', [StringComparison]::OrdinalIgnoreCase) -and
+            [IO.Path]::GetFileName($Target) -cne
+                'SharpProof.Package.Test.csproj'
+        if ($directProjectTest) {
+            if (-not $NoBuild) {
+                Invoke-DotNet @('restore', $Target, '--locked-mode')
+                $directProjectBuildArguments = @(
+                    'build', $Target, '--configuration', $Configuration,
+                    '--no-restore')
+                $directProjectBuildArguments += $fastBuildArguments
+                Invoke-DotNet $directProjectBuildArguments
+            }
             $assembly = Get-SharpProofTestAssemblyPath `
                 -ProjectPath $Target `
                 -Configuration $Configuration
@@ -307,33 +319,25 @@ switch ($Command) {
         Invoke-DotNet $arguments
     }
     'worker-tests' {
+        $workerTestProject =
+            'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj'
         if (-not $NoBuild) {
             Invoke-DotNet @(
                 'restore',
-                'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',
+                $workerTestProject,
                 '--locked-mode')
+            $directWorkerTestArguments = @(
+                'build', $workerTestProject,
+                '--configuration', $Configuration, '--no-restore')
+            $directWorkerTestArguments += $fastBuildArguments
+            Invoke-DotNet $directWorkerTestArguments
         }
-        if ($NoBuild) {
-            $assembly = Get-SharpProofTestAssemblyPath `
-                -ProjectPath 'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj' `
-                -Configuration $Configuration
-            $arguments = @('vstest', $assembly)
-            if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-                $arguments += '/TestCaseFilter:' + $TestFilter
-            }
-            Invoke-DotNet $arguments
-            break
-        }
-        $arguments = @(
-            'test',
-            'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',
-            '--configuration', $Configuration, '--no-restore')
-        $arguments += $fastBuildArguments
-        if ($NoBuild) {
-            $arguments += '--no-build'
-        }
+        $assembly = Get-SharpProofTestAssemblyPath `
+            -ProjectPath $workerTestProject `
+            -Configuration $Configuration
+        $arguments = @('vstest', $assembly)
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $arguments += @('--filter', $TestFilter)
+            $arguments += '/TestCaseFilter:' + $TestFilter
         }
         Invoke-DotNet $arguments
     }
