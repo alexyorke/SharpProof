@@ -194,6 +194,26 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void SemanticWorkerShardsUseBuiltAssembliesOutsideCoverage()
+    {
+        var root = FindRepositoryRoot();
+        var semantic = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(semantic, Does.Contain("$directVstest"));
+            Assert.That(semantic,
+                Does.Contain("Get-SharpProofTestAssemblyPath"));
+            Assert.That(semantic, Does.Contain("'vstest', $assembly"));
+            Assert.That(semantic,
+                Does.Contain("-not $coverageEnabled"));
+        }
+    }
+
+    [Test]
     public void ChangedTestsCanReuseACompletedBuild()
     {
         var root = FindRepositoryRoot();

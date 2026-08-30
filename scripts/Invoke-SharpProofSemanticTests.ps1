@@ -222,24 +222,40 @@ try {
                         $isolatedOutputRoot (
                             $task.Name + '/' + $Configuration + '/net9.0'))
             }
-            $arguments = @(
-                'test', $task.Target, '-c', $Configuration,
-                '--no-build', '--no-restore')
-            if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
-                $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+            $directVstest = -not $coverageEnabled -and
+                $task.Target.EndsWith(
+                    '.csproj', [StringComparison]::OrdinalIgnoreCase)
+            if ($directVstest) {
+                $assembly = Get-SharpProofTestAssemblyPath `
+                    -ProjectPath $task.Target `
+                    -Configuration $Configuration
+                $arguments = @('vstest', $assembly)
+                $arguments += '/TestCaseFilter:' + $task.Filter
+                $arguments += '/logger:console;verbosity=minimal'
+                $arguments += "/logger:trx;LogFileName=$($task.Name).trx"
+                $arguments += '/ResultsDirectory:' + (
+                    Join-Path $resultsRoot $task.Name)
             }
-            $arguments += @(
-                '--filter', $task.Filter,
-                '--logger', 'console;verbosity=minimal',
-                '--logger', "trx;LogFileName=$($task.Name).trx",
-                '--results-directory', (Join-Path $resultsRoot $task.Name))
-            if ($task.ProjectParallelism -gt 0) {
-                $arguments += "/m:$($task.ProjectParallelism)"
-            }
-            if ($coverageEnabled) {
+            else {
+                $arguments = @(
+                    'test', $task.Target, '-c', $Configuration,
+                    '--no-build', '--no-restore')
+                if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
+                    $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+                }
                 $arguments += @(
-                    '--settings', $resolvedCoverageSettings,
-                    '--collect', 'Code Coverage;Format=Cobertura')
+                    '--filter', $task.Filter,
+                    '--logger', 'console;verbosity=minimal',
+                    '--logger', "trx;LogFileName=$($task.Name).trx",
+                    '--results-directory', (Join-Path $resultsRoot $task.Name))
+                if ($task.ProjectParallelism -gt 0) {
+                    $arguments += "/m:$($task.ProjectParallelism)"
+                }
+                if ($coverageEnabled) {
+                    $arguments += @(
+                        '--settings', $resolvedCoverageSettings,
+                        '--collect', 'Code Coverage;Format=Cobertura')
+                }
             }
             foreach ($argument in $arguments) {
                 [void]$startInfo.ArgumentList.Add($argument)

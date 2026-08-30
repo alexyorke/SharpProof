@@ -88,6 +88,9 @@ The same `-NoBuild` fast path is available on `sp test`, `sp semantic-tests`,
 configuration and package outputs already exist in this workspace.
 For a single test project, `sp test -NoBuild` runs the built test assembly
 directly through VSTest, avoiding another MSBuild project-graph evaluation.
+The non-coverage semantic worker shards use the same direct-assembly path;
+coverage keeps the project-aware runner so each shard can receive isolated
+instrumented outputs.
 Solution and sharded semantic/package commands retain their project-aware
 runner because they coordinate multiple outputs and fixtures.
 Commands that compare revisions or certify exact-commit evidence (`test-changed`,
