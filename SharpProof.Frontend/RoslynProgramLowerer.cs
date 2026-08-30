@@ -320,8 +320,17 @@ public sealed class RoslynProgramLowerer(
                 .Distinct()
                 .OrderBy(static variable => variable.Value)
                 .ToArray();
-            if (mutated.Length != 0 || !isDirect || !IsStaticallyBound(invocation.TargetMethod) || !_isKnownPure(invocation.TargetMethod))
+            if (mutated.Length != 0 || !isDirect ||
+                !IsStaticallyBound(invocation.TargetMethod) ||
+                !_isKnownPure(invocation.TargetMethod))
             {
+                if (IsClosureInvocation(invocation.TargetMethod))
+                {
+                    mutated = [.. mutated
+                        .Concat(CreateKnownStateVariables())
+                        .Distinct()
+                        .OrderBy(static variable => variable.Value)];
+                }
                 Havoc(block, operation, mutated.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory, mutated);
             }
 
@@ -499,14 +508,18 @@ public sealed class RoslynProgramLowerer(
 
         private void HavocKnownState(IrBlockId block, OperationId operation)
         {
-            var variables = _expressions.CreateVariableBindings()
+            var variables = CreateKnownStateVariables();
+            Havoc(block, operation,
+                variables.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory, variables);
+        }
+
+        private IrVarId[] CreateKnownStateVariables()
+        {
+            return [.. _expressions.CreateVariableBindings()
                 .Select(static binding => binding.Variable)
                 .Concat(_expressions.CreateCaptureBindings())
                 .Distinct()
-                .OrderBy(static variable => variable.Value)
-                .ToArray();
-            Havoc(block, operation,
-                variables.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory, variables);
+                .OrderBy(static variable => variable.Value)];
         }
 
         private void LowerReturn(
@@ -574,6 +587,12 @@ public sealed class RoslynProgramLowerer(
             !method.IsVirtual &&
             !method.IsAbstract &&
             !method.IsOverride;
+        }
+
+        private static bool IsClosureInvocation(IMethodSymbol method)
+        {
+            return method.MethodKind == MethodKind.LocalFunction ||
+                method.ContainingType.TypeKind == TypeKind.Delegate;
         }
 
         private static bool IsExceptional(ControlFlowBranchSemantics? semantics)
