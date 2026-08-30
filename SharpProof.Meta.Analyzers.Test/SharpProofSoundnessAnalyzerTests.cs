@@ -1093,6 +1093,46 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task CallerCancellationRethrowCheckDoesNotAuthorizeArbitraryFallback()
+    {
+        const string source =
+            """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace SharpProof.Worker {
+                sealed class CallableVerificationResult { }
+
+                static class CallableVerificationPolicy {
+                    private static async Task<CallableVerificationResult>
+                        VerifyTargetAsync(
+                            object verifier,
+                            object target,
+                            object budgets,
+                            object parallelism,
+                            object resourceGate,
+                            object projectBoundary,
+                            CancellationToken callerCancellation) {
+                        await Task.Yield();
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            callerCancellation.ThrowIfCancellationRequested();
+                            return new CallableVerificationResult();
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task RejectsBodyBlindWorkerVerifyAsyncCancellationTranslation()
     {
         const string source =
