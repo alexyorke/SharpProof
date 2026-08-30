@@ -11,6 +11,8 @@ $fixture = Join-Path ([IO.Path]::GetTempPath()) (
     'SharpProof-release-configuration-' + [Guid]::NewGuid().ToString('N'))
 $mockBin = Join-Path $fixture 'mock-bin'
 $apiRoot = Join-Path $fixture 'api'
+$releaseConfigurationScript = Join-Path $fixture (
+    'scripts/Test-SharpProofReleaseConfiguration.ps1')
 New-Item -ItemType Directory -Path `
     (Join-Path $fixture 'scripts'), `
     (Join-Path $fixture 'eng/release'), `
@@ -116,10 +118,17 @@ function Invoke-Case {
         [string]$state.Workflow,
         [Text.UTF8Encoding]::new($false))
 
-    $output = & pwsh -NoLogo -NoProfile -File (
-        Join-Path $fixture 'scripts/Test-SharpProofReleaseConfiguration.ps1') `
-        -OutputPath "artifacts/$Name.json" 2>&1
-    $success = $LASTEXITCODE -eq 0
+    $output = [Collections.Generic.List[object]]::new()
+    $success = $true
+    try {
+        @(& $releaseConfigurationScript `
+                -OutputPath "artifacts/$Name.json" 2>&1) |
+            ForEach-Object { $output.Add($_) }
+    }
+    catch {
+        $success = $false
+        $output.Add($_)
+    }
     if ($success -ne $ExpectedSuccess) {
         throw "Release configuration fixture '$Name' expected success=${ExpectedSuccess}: $output"
     }
