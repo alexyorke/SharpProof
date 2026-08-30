@@ -99,6 +99,37 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task StatefulAdditionalTextCannotAuthenticateALaterValue()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("stateful-additional-text");
+        var additional = new StatefulAdditionalText(
+            "proof.inputs",
+            "generator-value",
+            "later-value");
+
+        Assert.That(
+            additional.GetText().ToString(),
+            Is.EqualTo("generator-value"));
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(path),
+            [additional]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(
+                diagnostics.FirstOrDefault()?.GetMessage(
+                    CultureInfo.InvariantCulture) ?? string.Empty,
+                Does.Contain("stable compiler input"));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
     public async Task ValidPairAndReplacementRoundTripWithDistinctFingerprints()
     {
         using var workspace = new CollectorWorkspace();
@@ -1233,6 +1264,25 @@ public sealed class FinalCompilationCollectorTests
             CancellationToken cancellationToken = default)
         {
             return SourceText.From(content, Encoding.UTF8);
+        }
+    }
+
+    private sealed class StatefulAdditionalText(
+        string path,
+        string first,
+        string later) : AdditionalText
+    {
+        private int _readCount;
+
+        public override string Path { get; } = path;
+
+        public override SourceText GetText(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return SourceText.From(
+                Interlocked.Increment(ref _readCount) == 1 ? first : later,
+                Encoding.UTF8);
         }
     }
 
