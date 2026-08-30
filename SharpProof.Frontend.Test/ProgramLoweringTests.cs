@@ -147,6 +147,47 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void ImpureLocalFunctionCallHavocsCapturedLocals()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                long captured = value;
+                void Mutate() {
+                    captured++;
+                }
+                Mutate();
+                return captured;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var call = instructions
+            .OfType<IrCallInstruction>()
+            .Single();
+        var captured = lowered.Result.Variables.Single(
+            static binding =>
+                binding.Symbol is ILocalSymbol
+                {
+                    Name: "captured"
+                });
+        var havoc = instructions
+            .OfType<IrHavocInstruction>()
+            .Single(instruction => instruction.Operation == call.Operation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                havoc.HavocKind,
+                Is.EqualTo(IrHavocKind.VariablesAndMemory));
+            Assert.That(
+                havoc.Variables,
+                Does.Contain(captured.Variable));
+        }
+    }
+
+    [Test]
     public void OnlySpecBackedPureCallsAvoidMemoryHavoc()
     {
         const string source =
