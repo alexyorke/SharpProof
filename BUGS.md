@@ -724,15 +724,6 @@ This section records 19 unique findings from exactly 30 fresh read-only auditors
 - Impact: Legitimate in-memory Roslyn hosts cannot use SharpProof contracts or effects and instead abstain or diagnose rejected API.
 - Safe evidence: The same `SharpProof.Attributes.dll` resolves `Contract=true` through `CreateFromFile` and false after reading the identical bytes and using `CreateFromImage`.
 
-## Wave 8.5. MEDIUM - Lowercase build-property spelling of retired sharpproof_mode is silently accepted
-
-- File: `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs`
-- Member: `TryGetRetiredMode`
-- Current lines: 183-192, especially 187-190; normal resolver spellings at 199-203
-- Mechanism: Retired-option detection recognizes `sharpproof_mode` and `build_property.SharpProofMode` but omits `build_property.sharpproof_mode`. Case-sensitive `AnalyzerConfigOptions` providers therefore miss it.
-- Impact: Global and tree validation emit no SP0025, and analysis proceeds with defaults instead of failing closed on the removed option.
-- Safe evidence: An ordinal dictionary containing only `build_property.sharpproof_mode=everything` should produce Off plus one removed-option invalid value, but current code returns no retired-mode error.
-
 ## Wave 8.6. MEDIUM - Catch-filter exclusion prover rejects multiple forms that provably exclude cancellation
 
 - File and members: `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs`, `AnalyzeCatchClause`, `FilterExcludesCancellation`, `PatternExcludesCancellation`, and `Unwrap`, current lines 14-42 and 169-265.

@@ -181,6 +181,7 @@ internal sealed class AnalyzerConfiguration
     {
         foreach (var key in new[] {
                      "sharpproof_mode",
+                     "build_property.sharpproof_mode",
                      "build_property.SharpProofMode"
                  })
         {

@@ -260,6 +260,33 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task LowercaseRetiredBuildPropertyFailsClosed()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            ModeFixture,
+            ["SP0025"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["build_property.sharpproof_mode"] = "everything"
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0025"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("option was removed"));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("everything"));
+        }
+    }
+
+    [Test]
     public async Task BlankRetiredEditorConfigAliasDoesNotHideMsBuildAlias()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
