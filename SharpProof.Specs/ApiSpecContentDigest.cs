@@ -30,8 +30,16 @@ internal static class ApiSpecContentDigest
             var facets = template.Facets;
             Add(hash, facets.Effects.Evidence, facets.Effects.Effects);
             Add(hash, facets.Allocation.Evidence, facets.Allocation.Behavior);
-            Add(hash, facets.Throws.Evidence, facets.Throws.Behavior, facets.Throws.ExceptionMetadataNames.Length);
-            foreach (var exception in facets.Throws.ExceptionMetadataNames)
+            var exceptionMetadataNames = facets.Throws.ExceptionMetadataNames
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static name => name, StringComparer.Ordinal)
+                .ToImmutableArray();
+            Add(
+                hash,
+                facets.Throws.Evidence,
+                facets.Throws.Behavior,
+                exceptionMetadataNames.Length);
+            foreach (var exception in exceptionMetadataNames)
             {
                 hash.Add(exception);
             }

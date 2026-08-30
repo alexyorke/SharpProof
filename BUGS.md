@@ -102,13 +102,6 @@ This section records 37 findings from exactly 10 fresh read-only auditors after 
 - Impact: Semantically total short-circuit specifications are rejected, forcing weaker or absent specifications.
 - Safe evidence: `false && ((1/0)==0)` and `true ? true : ((1/0)==0)` are rejected.
 
-## Wave 3.22. LOW - MayThrow exception metadata names are not canonicalized before semantic content hashing
-
-- Files and members: `SharpProof.Specs/ApiSpecContentDigest.cs`, `Compute`, lines 33-37; `SharpProof.Specs/ApiSpecTable.cs`, `NormalizeFacets`, lines 280-294.
-- Mechanism: `ExceptionMetadataNames` are hashed in supplied order and duplicates are accepted, although downstream semantics are set-valued. `[A,B]` and `[B,A]` differ, as do `[A]` and `[A,A]`.
-- Impact: Equivalent declarations have unstable `ContentSha256`, weakening content-keyed cache and version identity.
-- Safe evidence: Otherwise identical `MayThrow` declarations with reversed exception arrays produce different hashes.
-
 ## Wave 3.23. MEDIUM - Manifest validation accepts failed callables retaining lowered payloads that hydration rejects
 
 - Files and members: `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs`, `HasFeatureScopeParity`, lines 532-535, and `HasValidCallableStates`, lines 775-787; contrasting `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs`, `Decode`, lines 264-271.
