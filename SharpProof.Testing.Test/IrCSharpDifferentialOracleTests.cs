@@ -31,6 +31,31 @@ public sealed class IrCSharpDifferentialOracleTests
     }
 
     [Test]
+    public void GeneratedOracleAssembliesAreCollectible()
+    {
+        var factory = new IrFactory();
+        var oracle = new IrCSharpDifferentialOracle(factory);
+        var before = CountGeneratedOracleAssemblies();
+
+        for (var index = 0; index < 20; index++)
+        {
+            var term = factory.Integer(index);
+            var result = oracle.Compare(
+                term,
+                new Dictionary<IrVarId, IrValue>());
+            Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Agreement));
+        }
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+
+        Assert.That(CountGeneratedOracleAssemblies(), Is.EqualTo(before));
+    }
+
+    [Test]
     public void ShortCircuitSkipsDivisionByZero()
     {
         var factory = new IrFactory();
@@ -185,5 +210,14 @@ public sealed class IrCSharpDifferentialOracleTests
                 nullElement.Status
             },
             Is.All.EqualTo(DifferentialStatus.Agreement));
+    }
+
+    private static int CountGeneratedOracleAssemblies()
+    {
+        return AppDomain.CurrentDomain.GetAssemblies()
+            .Count(static assembly =>
+                assembly.GetName().Name?.StartsWith(
+                    "SharpProofOracle_",
+                    StringComparison.Ordinal) == true);
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -67,13 +68,14 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 "Generated C# did not compile: " + errors);
         }
 
-        image.Position = 0;
-        var assembly = Assembly.Load(image.ToArray());
-        var method = assembly.GetType("SharpProofGeneratedOracle")!.GetMethod(
-            "Evaluate",
-            BindingFlags.Public | BindingFlags.Static)!;
+        var loadContext = new DifferentialOracleLoadContext();
         try
         {
+            image.Position = 0;
+            var assembly = loadContext.LoadFromStream(image);
+            var method = assembly.GetType("SharpProofGeneratedOracle")!.GetMethod(
+                "Evaluate",
+                BindingFlags.Public | BindingFlags.Static)!;
             var runtimeValues = new Dictionary<IrValue, object?>(
                 ReferenceEqualityComparer.Instance);
             var actual = method.Invoke(
@@ -85,6 +87,21 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         catch (TargetInvocationException exception) when (exception.InnerException != null)
         {
             return CompareException(interpreted, exception.InnerException);
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    private sealed class DifferentialOracleLoadContext() :
+        AssemblyLoadContext(
+            "SharpProofDifferentialOracle",
+            isCollectible: true)
+    {
+        protected override Assembly? Load(AssemblyName assemblyName)
+        {
+            return null;
         }
     }
 
