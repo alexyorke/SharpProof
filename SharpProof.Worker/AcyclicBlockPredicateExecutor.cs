@@ -232,6 +232,16 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return false;
             }
 
+            var constrainedPredicate = ConstrainNormalExecution(
+                predicate,
+                condition);
+            if (constrainedPredicate == null)
+            {
+                return false;
+            }
+
+            predicate = constrainedPredicate;
+
             var order = predecessor.Value << 1;
             if (condition is IrBooleanTerm literal)
             {

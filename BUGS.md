@@ -1,6 +1,6 @@
 # Bug backlog
 
-447 open bugs, reprioritized by impact, reachability, and affected scope.
+446 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,11 +9,10 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (159)
+## P0 - Critical (158)
 
 - **BUG-008 [P0] - Beforefieldinit method summaries omit type-initializer effects:** EffectMethodNodeBuilder ignores implicit beforefieldinit static initialization when summarizing same-assembly static methods. A complete summary can omit initializer effects and TypeInitializationException, allowing false effect or exception-contract proofs.
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
-- **BUG-011 [P0] - Branch transfer omits normal-evaluation constraints:** AcyclicBlockPredicateExecutor branches on substituted partial terms without adding witnesses that evaluation completed normally. Throwing executions can enter normal return paths in SMT reasoning, producing spurious obligations or accepted refutations.
 - **BUG-012 [P0] - Branching expressions are scanned as linear sequences:** OperationEffectScanner evaluates short-circuit, conditional, and coalesce children as unconditional sequences instead of selecting and joining feasible branches. It can add impossible effects and, more critically, stop before a reachable sibling and omit its effects.
 - **BUG-013 [P0] - By-value structs erase writes to referenced heap state:** Effects ownership mapping treats nonref value-type parameters as empty even when a copied struct contains references. Callee writes through those references disappear during remapping, so a trusted boundary can mutate caller heap while the caller appears pure.
 - **BUG-014 [P0] - Call scanning checks null receivers before arguments:** OperationEffectScanner stops at a proven-null receiver before scanning call arguments, although C# evaluates arguments before the callvirt null dereference. Argument writes, calls, and exceptions can be omitted from complete summaries.
