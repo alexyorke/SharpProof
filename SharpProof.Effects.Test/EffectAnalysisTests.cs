@@ -2267,6 +2267,98 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void EventAssignmentsPreserveHandlerAndAccessorEvaluationOrder()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            #nullable enable
+            using System;
+
+            public sealed class EventTarget {
+                private int _state;
+
+                public event Action Changed {
+                    add {
+                        _state++;
+                        throw new InvalidOperationException();
+                    }
+                    remove {
+                        _state--;
+                        throw new ApplicationException();
+                    }
+                }
+            }
+
+            public static class Sample {
+                private static int s_handlerState;
+
+                private static Action CreateHandler() {
+                    s_handlerState++;
+                    return static () => { };
+                }
+
+                private static Action ThrowHandler() {
+                    s_handlerState++;
+                    throw new ArgumentException();
+                }
+
+                public static void HandlerBeforeReceiverCheck() {
+                    EventTarget target = null!;
+                    target.Changed += ThrowHandler();
+                }
+
+                public static void Add(EventTarget? target) =>
+                    target.Changed += CreateHandler();
+
+                public static void Remove(EventTarget? target) =>
+                    target.Changed -= CreateHandler();
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var handlerFirst = session.Analyze(
+            Method(compilation, "HandlerBeforeReceiverCheck"));
+        var add = session.Analyze(Method(compilation, "Add"));
+        var remove = session.Analyze(Method(compilation, "Remove"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                handlerFirst.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            AssertContainsThrows(
+                handlerFirst.Summary,
+                "System.ArgumentException");
+            AssertDoesNotThrow(
+                handlerFirst.Summary,
+                "System.NullReferenceException");
+
+            Assert.That(
+                add.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                "add handler");
+            Assert.That(
+                add.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True,
+                "add accessor");
+            AssertContainsThrows(
+                add.Summary,
+                "System.InvalidOperationException");
+
+            Assert.That(
+                remove.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                "remove handler");
+            Assert.That(
+                remove.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True,
+                "remove accessor");
+            AssertContainsThrows(
+                remove.Summary,
+                "System.ApplicationException");
+        }
+    }
+
+    [Test]
     public void CoalesceAssignmentRetainsObservableTargetWrites()
     {
         var compilation = EffectTestHost.CreateCompilation(
