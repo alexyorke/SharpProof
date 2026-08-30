@@ -167,13 +167,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Falsely complete summaries can omit allocation, state effects, and earlier constructor exceptions.
 - Safe evidence: The helper's constructor arguments at lines 60-69 directly zero these fields and replace `construction.Throws`.
 
-## Wave 5.8. HIGH - Partial-event accessor contracts disappear when callers resolve the definition accessor
-
-- Files and members: `SharpProof.Contracts/ContractClauseInventoryBuilder.cs`, `GetPartialImplementation`, lines 263-279, `NormalizeCallable`, lines 327-337, and `HaveSameDefinition`/`GetPartialDefinition`, lines 339-359; `SharpProof.Contracts/EffectiveContractSourceResolver.cs`, `Resolve`, lines 49-58, and `ResolveCore`, line 71.
-- Mechanism: Roslyn 4.14 exposes `IEventSymbol.PartialDefinitionPart` and `PartialImplementationPart`, but all three partial-member bridges special-case only `IPropertySymbol` after checking `IMethodSymbol` partial parts. Accessor `IMethodSymbol` partial links are not event links. A partial event's definition add/remove accessor is not normalized to the implementation accessor; `GetDeclaredBodies(definition accessor)` has no body, and `GetPartialImplementation` returns null. `HaveSameDefinition` cannot equate definition and implementation event accessors. References bind through the defining event symbol, so add/remove preconditions yield an empty inventory even when the implementing accessor begins with `Contract.Requires` or `Ensures`.
-- Impact: Event subscription and unsubscription call-site verification can silently omit direct preconditions; resolution differs depending on definition versus implementation accessor.
-- Safe evidence: Microsoft.CodeAnalysis 4.14 API documentation exposes event counterpart links; `ContractBinder` supports `EventAdd`/`EventRemove`, and repository parsing uses preview language.
-
 ## Wave 5.11. MEDIUM - ApiSpecTable has no expression-depth bound before recursive processing
 
 - Files and members: `SharpProof.Specs/ApiSpecTable.cs`, `CompileTemplate`, lines 128-140; `SharpProof.Specs/ApiSpecContentDigest.cs`, `Add(term, variables)`, lines 75-106; `SharpProof.Specs/ApiSpecInstantiation.cs`, `Term`, lines 136-151.

@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.Ir;
@@ -239,6 +240,122 @@ public sealed class PartialMethodContractTests
                 result.Contracts.Source.ContainingType.TypeArguments[0]
                     .SpecialType,
                 Is.EqualTo(SpecialType.System_String));
+        }
+    }
+
+    [TestCase(MethodKind.EventAdd)]
+    [TestCase(MethodKind.EventRemove)]
+    public void ReferencedPartialEventAccessorsUseImplementationBodies(
+        MethodKind accessorKind)
+    {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                public partial class Subject {
+                    public partial event System.Action Changed;
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                using SharpProof.Attributes;
+                public partial class Subject {
+                    public partial event System.Action Changed {
+                        add {
+                            Contract.Requires(value != null);
+                        }
+                        remove {
+                            Contract.Requires(value != null);
+                            Contract.Requires(true);
+                        }
+                    }
+                }
+                """),
+            (
+                "Consumer.cs",
+                """
+                public static class Consumer {
+                    public static void Subscribe(
+                        Subject subject,
+                        System.Action handler) {
+                        subject.Changed += handler;
+                    }
+
+                    public static void Unsubscribe(
+                        Subject subject,
+                        System.Action handler) {
+                        subject.Changed -= handler;
+                    }
+                }
+                """));
+        var definition = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Changed")
+            .OfType<IEventSymbol>()
+            .Single(static @event =>
+                @event.PartialImplementationPart != null);
+        var implementation = definition.PartialImplementationPart!;
+        var consumerTree = compilation.SyntaxTrees.Single(static tree =>
+            Path.GetFileName(tree.FilePath) == "Consumer.cs");
+        var assignmentKind = accessorKind == MethodKind.EventAdd
+            ? SyntaxKind.AddAssignmentExpression
+            : SyntaxKind.SubtractAssignmentExpression;
+        var eventReference = consumerTree.GetRoot().DescendantNodes()
+            .OfType<AssignmentExpressionSyntax>()
+            .Single(assignment => assignment.IsKind(assignmentKind))
+            .Left;
+        var referencedEvent = (IEventSymbol)compilation
+            .GetSemanticModel(consumerTree)
+            .GetSymbolInfo(eventReference)
+            .Symbol!;
+        var definitionAccessor = accessorKind == MethodKind.EventAdd
+            ? referencedEvent.AddMethod!
+            : referencedEvent.RemoveMethod!;
+        var implementationAccessor = accessorKind == MethodKind.EventAdd
+            ? implementation.AddMethod!
+            : implementation.RemoveMethod!;
+        var builder = new ContractClauseInventoryBuilder(compilation);
+        var expectedClauseCount = accessorKind == MethodKind.EventAdd ? 1 : 2;
+
+        var fromDefinition = builder.Create(definitionAccessor);
+        var fromImplementation = builder.Create(implementationAccessor);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    referencedEvent,
+                    definition),
+                Is.True);
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    definitionAccessor,
+                    implementationAccessor),
+                Is.False);
+            Assert.That(fromDefinition.ImplementationBody, Is.Not.Null);
+            Assert.That(
+                fromDefinition.Clauses,
+                Has.Length.EqualTo(expectedClauseCount));
+            Assert.That(
+                fromDefinition.Clauses.All(static clause => clause.IsValid),
+                Is.True);
+            Assert.That(fromImplementation.ImplementationBody, Is.Not.Null);
+            Assert.That(
+                fromImplementation.Clauses,
+                Has.Length.EqualTo(expectedClauseCount));
+            Assert.That(
+                fromImplementation.Clauses.All(static clause => clause.IsValid),
+                Is.True);
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    fromDefinition.Callable,
+                    implementationAccessor),
+                Is.True);
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    fromImplementation.Callable,
+                    implementationAccessor),
+                Is.True);
         }
     }
 
