@@ -465,6 +465,10 @@ public sealed class BuildSchedulingTests
             root,
             "scripts",
             "Invoke-SharpProofSemanticTests.ps1"));
+        var changed = await File.ReadAllTextAsync(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofChangedTests.ps1"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -473,6 +477,9 @@ public sealed class BuildSchedulingTests
             Assert.That(result.GetProperty("capped").GetInt32(), Is.EqualTo(1));
             Assert.That(
                 semantic,
+                Does.Contain("Get-SharpProofSemanticTestParallelism"));
+            Assert.That(
+                changed,
                 Does.Contain("Get-SharpProofSemanticTestParallelism"));
         }
     }
