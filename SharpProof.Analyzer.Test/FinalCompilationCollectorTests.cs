@@ -1257,13 +1257,21 @@ public sealed class FinalCompilationCollectorTests
 
     private sealed class MemoryAdditionalText(
         string path,
-        string content) : AdditionalText
+        string content) : AdditionalText, ICompilerAdditionalTextSnapshot
     {
+        private readonly SourceText _text = SourceText.From(
+            content,
+            Encoding.UTF8);
+
         public override string Path { get; } = path;
+
+        SourceText ICompilerAdditionalTextSnapshot.CapturedText => _text;
+
         public override SourceText GetText(
             CancellationToken cancellationToken = default)
         {
-            return SourceText.From(content, Encoding.UTF8);
+            cancellationToken.ThrowIfCancellationRequested();
+            return _text;
         }
     }
 

@@ -6,8 +6,16 @@ using System.Reflection.PortableExecutable;
 namespace SharpProof.CompilerArtifact;
 #pragma warning disable RS1035 // Build-only compiler evidence must hash final reference images.
 
+internal interface ICompilerAdditionalTextSnapshot
+{
+    SourceText CapturedText { get; }
+}
+
 internal static class CompilerCompilationCapture
 {
+    private const string CommandLineAdditionalTextTypeName =
+        "Microsoft.CodeAnalysis.AdditionalTextFile";
+
     internal readonly struct ReferenceCaptureLimits
     {
         internal ReferenceCaptureLimits(
@@ -332,13 +340,42 @@ internal static class CompilerCompilationCapture
     {
         cancellationToken.ThrowIfCancellationRequested();
         var path = Path.IsPathRooted(file.Path) ? file.Path : Path.Combine(projectDirectory, file.Path);
-        var text = file.GetText(cancellationToken) ??
-            throw new InvalidOperationException("An additional file has no compiler text.");
+        var text = GetStableAdditionalText(file, cancellationToken);
         return new CompilerAdditionalFileSnapshot
         {
             Path = CompilerCaptureAuthority.NormalizePath(path),
             Sha256 = ComputeTextSha256(text)
         };
+    }
+
+    private static SourceText GetStableAdditionalText(
+        AdditionalText file,
+        CancellationToken cancellationToken)
+    {
+        // Analyzer tests provide an already captured immutable value. The
+        // supported command-line compiler uses AdditionalTextFile, whose
+        // Lazy<SourceText> is shared by generators and analyzers. Do not
+        // authenticate arbitrary providers after generation has completed:
+        // a later GetText call need not return the value a generator consumed.
+        if (file is ICompilerAdditionalTextSnapshot snapshot)
+        {
+            return snapshot.CapturedText;
+        }
+
+        var providerType = file.GetType();
+        if (providerType.Assembly != typeof(AdditionalText).Assembly ||
+            !string.Equals(
+                providerType.FullName,
+                CommandLineAdditionalTextTypeName,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "An additional file does not expose a stable compiler input snapshot.");
+        }
+
+        return file.GetText(cancellationToken) ??
+            throw new InvalidOperationException(
+                "An additional file has no compiler text.");
     }
 
     internal static string ComputeTextSha256(SourceText text)
