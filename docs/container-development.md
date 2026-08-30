@@ -120,6 +120,8 @@ For a single test project, `sp test` performs the required incremental build
 and then runs the built assembly directly through VSTest, avoiding a second
 MSBuild project-graph evaluation. `-NoBuild` skips that build as well.
 `sp worker-tests` uses the same build-then-VSTest path.
+`sp test-changed` also uses it when the dependency analysis selects exactly
+one test project.
 Non-coverage semantic shards and ordinary package shards use the same
 direct-assembly path. Package process-containment postflight shards retain the
 project-aware runner and run exclusively after the parallel wave. The generic

@@ -230,12 +230,30 @@ if ($selectedRelative.Count -gt 0) {
             }
         } | ConvertTo-Json -Depth 4 |
             Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
+        $directChangedProject = $selectedRelative.Count -eq 1
         if (-not $NoBuild) {
-            Invoke-RequiredDotnet @('restore', $filterPath, '--locked-mode')
+            $restoreTarget = if ($directChangedProject) {
+                $selectedRelative[0]
+            }
+            else {
+                $filterPath
+            }
+            Invoke-RequiredDotnet @(
+                'restore', $restoreTarget, '--locked-mode')
         }
         $semanticFilter =
             'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
-        if ($NoBuild -and $selectedRelative.Count -eq 1) {
+        if ($directChangedProject) {
+            if (-not $NoBuild) {
+                $changedProjectBuildArguments = @(
+                    'build', $selectedRelative[0],
+                    '-c', $Configuration, '--no-restore')
+                if ($Fast) {
+                    $changedProjectBuildArguments +=
+                        '-p:RunAnalyzersDuringBuild=false'
+                }
+                Invoke-RequiredDotnet $changedProjectBuildArguments
+            }
             $assembly = Get-SharpProofTestAssemblyPath `
                 -ProjectPath $selectedRelative[0] `
                 -Configuration $Configuration

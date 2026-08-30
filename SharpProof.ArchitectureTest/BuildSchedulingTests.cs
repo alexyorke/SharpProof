@@ -702,9 +702,15 @@ public sealed class BuildSchedulingTests
             Assert.That(changed, Does.Contain(
                 "$testArguments += '--no-build'"));
             Assert.That(changed, Does.Contain(
-                "$NoBuild -and $selectedRelative.Count -eq 1"));
+                "$directChangedProject = $selectedRelative.Count -eq 1"));
+            Assert.That(changed, Does.Contain(
+                "$changedProjectBuildArguments"));
+            Assert.That(changed, Does.Contain(
+                "'build', $selectedRelative[0]"));
             Assert.That(changed, Does.Contain(
                 "Get-SharpProofTestAssemblyPath"));
+            Assert.That(changed, Does.Not.Contain(
+                "$NoBuild -and $selectedRelative.Count -eq 1"));
         }
     }
 
