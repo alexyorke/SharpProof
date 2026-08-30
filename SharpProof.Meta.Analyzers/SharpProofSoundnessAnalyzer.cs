@@ -63,7 +63,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             var symbols = new KnownSymbols(startContext.Compilation);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
-            startContext.RegisterOperationAction(CacheSoundnessRules.AnalyzeAssignment, OperationKind.SimpleAssignment);
+            startContext.RegisterOperationAction(
+                CacheSoundnessRules.AnalyzeAssignment,
+                OperationKind.SimpleAssignment,
+                OperationKind.CoalesceAssignment,
+                OperationKind.CompoundAssignment);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
             startContext.RegisterOperationAction(
