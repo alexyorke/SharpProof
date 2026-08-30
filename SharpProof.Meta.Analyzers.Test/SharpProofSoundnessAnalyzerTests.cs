@@ -593,6 +593,32 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsSemanticStringControlFlowInCatchFiltersAndSwitchGuards()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static bool CatchFilter(string reason) {
+                    try { throw new Exception(); }
+                    catch (Exception) when (reason == "ir_unknown") { return true; }
+                }
+                static bool SwitchGuard(string reason) => reason switch {
+                    _ when reason.Equals("ir_unknown") => true,
+                    _ => false
+                };
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA004"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task AllowsStaticImmutableAndNonStorageMemberForms()
     {
         const string source =

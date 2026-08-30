@@ -27,14 +27,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 23. MEDIUM - SPMETA004 misses semantic string comparisons in catch filters and switch guards
-
-- File: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`
-- Members and lines: `AnalyzeSemanticString`, lines 189-204; `AnalyzeSemanticEquals`, lines 207-224; `IsInsideCondition`, lines 330-340.
-- Mechanism: Recognized conditional ancestors include only if, while, do, for, and conditional expressions, omitting `CatchFilterClauseSyntax` and `WhenClauseSyntax`.
-- Impact: Reason or provenance literals can control behavior without a diagnostic.
-- Safe reproduction/evidence: Use a catch filter `when (reason == "ir_unknown")` or a switch case guard calling `reason.Equals(...)`.
-
 ## 24. HIGH - Partial-term SMT oracle treats generic replay failure as undefined semantics
 
 - Files and members: `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs`, `PartialTermSmtDifferentialOracle.Classify(ProofOutcome)`, lines 280-292, especially 287-290; related `SharpProof.Verify/ProofKernel.cs`, `ReplayCounterexample`, lines 59-72 and 83-85.

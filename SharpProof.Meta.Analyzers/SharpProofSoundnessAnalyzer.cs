@@ -336,6 +336,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             DoStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
             ForStatementSyntax { Condition: not null } statement => statement.Condition.Span.Contains(syntax.Span),
             ConditionalExpressionSyntax conditional => conditional.Condition.Span.Contains(syntax.Span),
+            CatchFilterClauseSyntax filter => filter.FilterExpression.Span.Contains(syntax.Span),
+            WhenClauseSyntax whenClause => whenClause.Condition.Span.Contains(syntax.Span),
             _ => false
         });
     }
