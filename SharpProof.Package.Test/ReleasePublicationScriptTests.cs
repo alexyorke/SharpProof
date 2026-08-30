@@ -154,67 +154,81 @@ public sealed class ReleasePublicationScriptTests
                 symbolsAction: "Push");
         }
 
-        var fixtures = feed.Packages
-            .Select(static package => (Package: package, Kind: "main"))
-            .Concat(feed.SymbolPackages.Select(static package =>
-                (Package: package, Kind: "symbol")));
-        foreach (var fixture in fixtures)
+        var fixtureSets = new[]
         {
-            var remotePath = Path.Combine(
-                workspace.RemoteSource,
-                Path.GetFileName(fixture.Package.Path));
-            File.Copy(fixture.Package.Path, remotePath);
+            (Packages: feed.Packages, Kind: "main"),
+            (Packages: feed.SymbolPackages, Kind: "symbol")
+        };
+        foreach (var fixtureSet in fixtureSets)
+        {
+            foreach (var fixture in fixtureSet.Packages)
+            {
+                File.Copy(
+                    fixture.Path,
+                    Path.Combine(
+                        workspace.RemoteSource,
+                        Path.GetFileName(fixture.Path)));
+            }
             try
             {
                 var planPath = Path.Combine(
                     workspace.Root,
-                    "existing-" + fixture.Kind + "-" +
-                    fixture.Package.Id + "-plan.json");
+                    "existing-" + fixtureSet.Kind + "-plan.json");
                 var existing = await RunPublicationScriptAsync(
                     workspace,
                     planPath);
+                Assert.That(existing.ExitCode, Is.Zero, existing.Output);
                 using var existingPlan = JsonDocument.Parse(
                     await File.ReadAllBytesAsync(planPath));
-                var package = existingPlan.RootElement
-                    .GetProperty("packages")
-                    .EnumerateArray()
-                    .Single(candidate =>
-                        candidate.GetProperty("packageId").GetString() ==
-                        fixture.Package.Id);
-                using (Assert.EnterMultipleScope())
+                foreach (var fixture in fixtureSet.Packages)
                 {
-                    Assert.That(
-                        existing.ExitCode,
-                        Is.Zero,
-                        existing.Output);
-                    Assert.That(
-                        package.GetProperty("remoteState").ValueKind,
-                        Is.EqualTo(JsonValueKind.Null));
-                    Assert.That(
-                        package.GetProperty("mainState").GetString(),
-                        Is.EqualTo(fixture.Kind == "main"
-                            ? "FixturePresent"
-                            : "FixtureAbsent"));
-                    Assert.That(
-                        package.GetProperty("mainAction").GetString(),
-                        Is.EqualTo(fixture.Kind == "main"
-                            ? "Collision"
-                            : "Push"));
-                    Assert.That(
-                        package.GetProperty("symbolsState").GetString(),
-                        Is.EqualTo(fixture.Kind == "symbol"
-                            ? "FixturePresent"
-                            : "FixtureAbsent"));
-                    Assert.That(
-                        package.GetProperty("symbolsAction").GetString(),
-                        Is.EqualTo(fixture.Kind == "symbol"
-                            ? "Collision"
-                            : "Push"));
+                    var package = existingPlan.RootElement
+                        .GetProperty("packages")
+                        .EnumerateArray()
+                        .Single(candidate =>
+                            candidate.GetProperty("packageId").GetString() ==
+                            fixture.Id);
+                    using (Assert.EnterMultipleScope())
+                    {
+                        Assert.That(
+                            package.GetProperty("remoteState").ValueKind,
+                            Is.EqualTo(JsonValueKind.Null),
+                            fixture.Id);
+                        Assert.That(
+                            package.GetProperty("mainState").GetString(),
+                            Is.EqualTo(fixtureSet.Kind == "main"
+                                ? "FixturePresent"
+                                : "FixtureAbsent"),
+                            fixture.Id);
+                        Assert.That(
+                            package.GetProperty("mainAction").GetString(),
+                            Is.EqualTo(fixtureSet.Kind == "main"
+                                ? "Collision"
+                                : "Push"),
+                            fixture.Id);
+                        Assert.That(
+                            package.GetProperty("symbolsState").GetString(),
+                            Is.EqualTo(fixtureSet.Kind == "symbol"
+                                ? "FixturePresent"
+                                : "FixtureAbsent"),
+                            fixture.Id);
+                        Assert.That(
+                            package.GetProperty("symbolsAction").GetString(),
+                            Is.EqualTo(fixtureSet.Kind == "symbol"
+                                ? "Collision"
+                                : "Push"),
+                            fixture.Id);
+                    }
                 }
             }
             finally
             {
-                File.Delete(remotePath);
+                foreach (var fixture in fixtureSet.Packages)
+                {
+                    File.Delete(Path.Combine(
+                        workspace.RemoteSource,
+                        Path.GetFileName(fixture.Path)));
+                }
             }
         }
     }
