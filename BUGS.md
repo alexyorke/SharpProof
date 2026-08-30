@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.6. MEDIUM - Large model-variable phases ignore cancellation and resource metering
-
-- File: `SharpProof.Smt/IrSmtBackend.cs`
-- Members: `QueryEncoder` constructor, `CheckCore` bound loop, `CreateSatisfiable` decode loop
-- Current lines: 314-345, 117-126, 249-260
-- Mechanism: The loops do not poll the token. `Context.Interrupt` targets the native solve, not managed AST construction or enumeration, and rlimit meters only `solver.Check`.
-- Impact: A canceled query may continue allocating and evaluating for a long time and bypass the query budget.
-- Safe reproduction/evidence: Supply many explicit bool/int model variables, cancel after the gate is acquired, and observe delayed completion through the loops.
-
 ## Wave 2.7. MEDIUM - Depth validation rewalks a shared DAG for every assumption
 
 - File: `SharpProof.Smt/IrSmtBackend.cs`

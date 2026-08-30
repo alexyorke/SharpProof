@@ -758,6 +758,45 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task ManagedModelVariableWorkIsResourceAccounted()
+    {
+        const int variableCount = 512;
+        var query = CreateUnusedBooleanModelQuery(variableCount);
+        using var backend = new IrSmtBackend();
+
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Status,
+                Is.EqualTo(BackendCheckStatus.Satisfiable));
+            Assert.That(
+                backend.ConsumedResourceCount,
+                Is.GreaterThanOrEqualTo(variableCount));
+        }
+    }
+
+    [Test]
+    public async Task ManagedModelVariableWorkHonorsTheQueryResourceLimit()
+    {
+        const uint queryLimit = 100;
+        var query = CreateUnusedBooleanModelQuery(512);
+        using var backend = new IrSmtBackend(new IrSmtBackendOptions(queryLimit));
+
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+            Assert.That(
+                result.FailureReason,
+                Is.EqualTo(BackendFailureReason.ResourceLimit));
+            Assert.That(backend.ConsumedResourceCount, Is.LessThanOrEqualTo(queryLimit));
+        }
+    }
+
+    [Test]
     public async Task PublicBackendBoundsRecursiveEncodingDepth()
     {
         var factory = new IrFactory();
@@ -812,6 +851,25 @@ public sealed class IrSmtBackendTests
 
         Monitor.Exit(gate);
         return false;
+    }
+
+    private static VerificationQuery CreateUnusedBooleanModelQuery(int variableCount)
+    {
+        var factory = new IrFactory();
+        var variables = System.Collections.Immutable.ImmutableArray.CreateRange(
+            Enumerable.Range(0, variableCount)
+                .Select(index => factory.CreateVariable(
+                    "unused-model-" + index,
+                    factory.BooleanType)));
+        return new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(false),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)),
+            variables);
     }
 
     private static bool IsLiveNativeObject(Z3Expr expression)
