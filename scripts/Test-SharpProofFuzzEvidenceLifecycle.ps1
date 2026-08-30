@@ -148,6 +148,41 @@ try {
         throw 'A failed run retained stable campaign evidence.'
     }
 
+    $failedSummary = [pscustomobject][ordered]@{
+        schemaVersion = 3
+        status = 'failed'
+        commit = ('0' * 40)
+        runs = @([pscustomobject][ordered]@{
+                name = 'rotating-1'
+                exitCode = 1
+                validationPassed = $false
+                validationError = 'runner exited with code 1'
+            })
+        passed = $false
+    }
+    $failureMessage = $null
+    try {
+        $null = Complete-SharpProofFuzzEvidence `
+            -OutputDirectory $root `
+            -Summary $failedSummary
+    }
+    catch {
+        $failureMessage = $_.Exception.Message
+    }
+    if ($failureMessage -cne
+            "SharpProof fuzz campaign failed. Evidence: $campaign" -or
+        -not [IO.File]::Exists($campaign)) {
+        throw 'Failed campaign evidence was not published before failure.'
+    }
+    $failedEvidence = Get-Content -LiteralPath $campaign -Raw |
+        ConvertFrom-Json
+    if ([string]$failedEvidence.status -cne 'failed' -or
+        [bool]$failedEvidence.passed -or
+        @($failedEvidence.runs).Count -ne 1) {
+        throw 'Published failed campaign evidence lost its failure details.'
+    }
+
+    Initialize-SharpProofFuzzEvidence -OutputDirectory $root
     $first = "{`"schemaVersion`":3,`"passed`":true}`n"
     Publish-SharpProofFuzzEvidence -OutputDirectory $root -Json $first
     if ([IO.File]::ReadAllText($campaign) -cne $first -or
@@ -164,7 +199,7 @@ try {
         throw 'Retry did not replace only the owned stable evidence.'
     }
 
-    Write-Host 'Fuzz evidence lifecycle fixtures: 22'
+    Write-Host 'Fuzz evidence lifecycle fixtures: 23'
 }
 finally {
     if ([IO.Directory]::Exists($root)) {

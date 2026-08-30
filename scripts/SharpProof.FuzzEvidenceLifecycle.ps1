@@ -195,3 +195,24 @@ function Publish-SharpProofFuzzEvidence {
         }
     }
 }
+
+function Complete-SharpProofFuzzEvidence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [object]$Summary
+    )
+
+    $json = ($Summary | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
+    Write-Output $json
+    Publish-SharpProofFuzzEvidence `
+        -OutputDirectory $OutputDirectory `
+        -Json ($json + "`n")
+    if (-not [bool]$Summary.passed) {
+        $destination = Join-Path $OutputDirectory 'campaign.json'
+        throw "SharpProof fuzz campaign failed. Evidence: $destination"
+    }
+}

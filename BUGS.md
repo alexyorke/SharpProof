@@ -22,13 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.24. MEDIUM - Failed fuzz campaigns withhold the campaign evidence named in the error
-
-- Files and members: `scripts/Invoke-SharpProofFuzzCampaign.ps1`, `Invoke-FuzzRun` and campaign finalization, current lines 193-220, especially 212-220; `scripts/SharpProof.FuzzEvidenceLifecycle.ps1`, `Initialize-SharpProofFuzzEvidence`, lines 141-170.
-- Mechanism: Initialization deletes prior `campaign.json`. The finalizer builds the summary and JSON but throws on any failed run before `Publish-SharpProofFuzzEvidence`, while the exception points to `summaryPath`.
-- Impact: A failed nightly run loses aggregate commit, seed, count, run, and error evidence, and the reported path is absent.
-- Safe reproduction/evidence: Use a disposable output with a runner that returns nonzero or invalid JSON. The thrown message names `campaign.json`, but that file does not exist.
-
 ## Wave 2.25. MEDIUM - Fuzz evidence labels dirty or stale execution as the HEAD commit
 
 - File: `scripts/Invoke-SharpProofFuzzCampaign.ps1`

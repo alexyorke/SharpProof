@@ -209,12 +209,6 @@ $summary = [pscustomobject][ordered]@{
             $_.exitCode -ne 0 -or -not $_.validationPassed
         }).Count -eq 0
 }
-$summaryPath = Join-Path $resolvedOutput 'campaign.json'
-$json = ($summary | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
-$summary | ConvertTo-Json -Depth 6
-if (-not $summary.passed) {
-    throw "SharpProof fuzz campaign failed. Evidence: $summaryPath"
-}
-Publish-SharpProofFuzzEvidence `
+Complete-SharpProofFuzzEvidence `
     -OutputDirectory $resolvedOutput `
-    -Json ($json + "`n")
+    -Summary $summary
