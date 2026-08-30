@@ -50,12 +50,17 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             ContractClausePlacement Placement,
             IInvocationOperation Invocation,
             int TreeOrdinal)>();
-        var resolvedBody = implementationBody;
+        IOperation? resolvedBody = null;
         var hasRejectedContractApiUsage = false;
         foreach (var body in GetBodies(callable, implementationBody))
         {
-            var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(_compilation, body.SyntaxTree);
+            if (!TryGetSemanticModel(body.SyntaxTree, out var model))
+            {
+                hasRejectedContractApiUsage = true;
+                continue;
+            }
+
+            resolvedBody ??= implementationBody;
             var root = model.GetOperation(body);
             if (root == null)
             {
@@ -68,6 +73,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                 if (_api?.GetClauseKind(invocation.TargetMethod) is not { } kind)
                 {
                     hasRejectedContractApiUsage |=
+                        IsOwnedByCallable(callable, invocation, model) &&
                         _identity.IsRejectedClauseMethod(
                             invocation.TargetMethod);
                     continue;
@@ -101,6 +107,23 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             clauses);
     }
 
+    private bool TryGetSemanticModel(
+        SyntaxTree tree,
+        out SemanticModel model)
+    {
+        try
+        {
+            model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(_compilation, tree);
+            return true;
+        }
+        catch (ArgumentException exception) when (exception.ParamName == "tree")
+        {
+            model = null!;
+            return false;
+        }
+    }
+
     private static int NextOrdinal(
         BoundContractKind kind,
         ref int requiresOrdinal,
@@ -122,9 +145,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         SemanticModel model,
         SyntaxNode body)
     {
-        var enclosing = model.GetEnclosingSymbol(invocation.Syntax.SpanStart);
-        if (enclosing is not IMethodSymbol method ||
-            !HaveSameDefinition(callable, method))
+        if (!IsOwnedByCallable(callable, invocation, model))
         {
             return ContractClausePlacement.NestedCallable;
         }
@@ -144,6 +165,16 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             .Any(IsConditional)
             ? ContractClausePlacement.Conditional
             : ContractClausePlacement.Misplaced;
+    }
+
+    private static bool IsOwnedByCallable(
+        IMethodSymbol callable,
+        IInvocationOperation invocation,
+        SemanticModel model)
+    {
+        return model.GetEnclosingSymbol(invocation.Syntax.SpanStart) is
+                IMethodSymbol method &&
+            HaveSameDefinition(callable, method);
     }
 
     private bool TryGetDirectPlacement(

@@ -226,6 +226,47 @@ public sealed class ContractClauseInventoryTests
     }
 
     [Test]
+    public void NestedRejectedContractApiUsageBelongsToNestedCallable()
+    {
+        const string source =
+            """
+            namespace SharpProof.Attributes {
+                public static class Contract {
+                    public static void Requires(bool value) { }
+                    public static void Ensures(bool value) { }
+                    public static void Assume(bool value) { }
+                }
+            }
+            public static class Target {
+                public static void Analyze(bool condition) {
+                    void Local() {
+                        SharpProof.Attributes.Contract.Requires(condition);
+                    }
+                    Local();
+                }
+            }
+            """;
+        var compilation = CreateCompilation(
+            source,
+            includeSharpProofReference: false);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var target = compilation.GetTypeByMetadataName("Target")!;
+        var outer = target.GetMembers("Analyze").OfType<IMethodSymbol>().Single();
+        var localSyntax = tree.GetRoot().DescendantNodes()
+            .OfType<LocalFunctionStatementSyntax>()
+            .Single();
+        var local = model.GetDeclaredSymbol(localSyntax)!;
+        var builder = new ContractClauseInventoryBuilder(compilation);
+
+        var outerInventory = builder.Create(outer);
+        var localInventory = builder.Create(local);
+
+        Assert.That(outerInventory.HasRejectedContractApiUsage, Is.False);
+        Assert.That(localInventory.HasRejectedContractApiUsage, Is.True);
+    }
+
+    [Test]
     public void ConditionalAncestorsOutsideLocalCallableAreIgnored()
     {
         const string source =
@@ -275,6 +316,71 @@ public sealed class ContractClauseInventoryTests
             includeSharpProofReference: false);
 
         Assert.That(inventory.ImplementationBody, Is.Not.Null);
+        Assert.That(inventory.Clauses, Is.Empty);
+    }
+
+    [Test]
+    public void ForeignCallableReturnsRejectedInventoryWithoutRetainingBody()
+    {
+        var ownerCompilation = CreateCompilation(
+            "public static class Owner { public static void Analyze() { } }",
+            includeSharpProofReference: true);
+        var foreignCompilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Foreign {
+                public static void Analyze(bool condition) {
+                    Contract.Requires(condition);
+                }
+            }
+            """,
+            includeSharpProofReference: true);
+        var foreign = foreignCompilation.GetTypeByMetadataName("Foreign")!
+            .GetMembers("Analyze")
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        var inventory = new ContractClauseInventoryBuilder(ownerCompilation)
+            .Create(foreign);
+
+        Assert.That(inventory.HasRejectedContractApiUsage, Is.True);
+        Assert.That(inventory.ImplementationBody, Is.Null);
+        Assert.That(inventory.Clauses, Is.Empty);
+    }
+
+    [Test]
+    public void ForeignImplementationBodyReturnsRejectedInventoryWithoutRetainingBody()
+    {
+        var ownerCompilation = CreateCompilation(
+            "public static class Owner { public static void Analyze() { } }",
+            includeSharpProofReference: true);
+        var owner = ownerCompilation.GetTypeByMetadataName("Owner")!
+            .GetMembers("Analyze")
+            .OfType<IMethodSymbol>()
+            .Single();
+        var foreignCompilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public static class Foreign {
+                public static void Analyze(bool condition) {
+                    Contract.Requires(condition);
+                }
+            }
+            """,
+            includeSharpProofReference: true);
+        var foreignTree = foreignCompilation.SyntaxTrees.Single();
+        var foreignBody = foreignTree.GetRoot().DescendantNodes()
+            .OfType<MethodDeclarationSyntax>()
+            .Single()
+            .Body!;
+        var foreignOperation = foreignCompilation.GetSemanticModel(foreignTree)
+            .GetOperation(foreignBody)!;
+
+        var inventory = new ContractClauseInventoryBuilder(ownerCompilation)
+            .Create(owner, foreignOperation);
+
+        Assert.That(inventory.HasRejectedContractApiUsage, Is.True);
+        Assert.That(inventory.ImplementationBody, Is.Null);
         Assert.That(inventory.Clauses, Is.Empty);
     }
 

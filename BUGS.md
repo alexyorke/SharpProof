@@ -26,35 +26,6 @@ This section records the coordinator's unverified compilation of 26 new findings
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 3.15. MEDIUM - Nested rejected contract-API calls mark the containing method as rejected usage
-
-- Files and members: `SharpProof.Contracts/ContractClauseInventoryBuilder.cs`, `CreateCore`, lines 55-79, especially 66-73; downstream `SharpProof.Contracts/EffectiveContractSourceResolver.cs`, `HasSelectedContractIntent`, lines 7-14.
-- Mechanism: Descendant traversal classifies accepted nested calls as `NestedCallable`, but rejected or lookalike calls update one callable-wide flag without checking enclosing-callable ownership. `HasSelectedContractIntent` consumes it directly.
-- Impact: An outer callable with no contract usage can be attributed a nested callable's invalid usage.
-- Safe evidence: An outer method contains local `void Local(bool x){ RejectedOrShadowContract.Requires(x); }`; the outer inventory can set `HasRejectedContractApiUsage` and `HasSelectedContractIntent` true.
-
-## Wave 3.16. MEDIUM - Full binding skips closed return-contract validation on void methods
-
-- Files and members: `SharpProof.Contracts/ContractBinder.cs`, `BindClosedAttributes`, lines 252-262 at the `Result.HasValue` guard; `SharpProof.Contracts/ContractCanonicalization.cs`, `CreateVariables`, lines 289-299; `SharpProof.Contracts/ContractSelectionInventory.cs`, `Select`, lines 141-146.
-- Mechanism: A void method creates no result variable, and return attributes bind only when a result exists, although selection sees recognized return attributes.
-- Impact: Malformed declared intent disappears instead of producing `InvalidClosedAttribute`; binding may succeed without a return clause.
-- Safe evidence: `[return: NotNull] static void M(){}` followed by `Bind(M)`. `System.Void` is not reference-capable, but validation is skipped.
-
-## Wave 3.17. MEDIUM - Closed attributes on partial methods depend on which partial symbol is supplied
-
-- Files and members: `SharpProof.Contracts/ContractBinder.cs`, `BindCore`, lines 87-113, 119-126, and 148, plus `BindClosedAttributes`, lines 241-262; `SharpProof.Contracts/ContractSelectionInventory.cs`, `Select`, lines 135-160, and `GetRejectedCallableSelectionFeatures`, lines 179-200.
-- Mechanism: Direct clause inventory normalizes a partial definition to its implementation, but closed-attribute paths inspect only the supplied symbol. Distinct Roslyn method and parameter symbols make behavior depend on definition versus implementation and attribute location.
-- Impact: `Positive`, `NotNull`, `InRange`, or rejected identity may be omitted; `Bind(definition)` and `Bind(implementation)` can differ for one logical method.
-- Safe evidence: Place `[Positive]` on only one partial declaration and the body on the other; compare bind/select for both parts, then repeat with a return attribute.
-
-## Wave 3.18. LOW/MEDIUM - Public contract inventory and binder can throw for symbols or operations from another Compilation
-
-- File: `SharpProof.Contracts/ContractClauseInventoryBuilder.cs`
-- Members: `Create`, lines 27-37, and `CreateCore`, lines 55-59, especially `CompilationModelProvider.GetSemanticModel(_compilation, body.SyntaxTree)`; downstream `ContractBinder.Bind` via `EffectiveContractSourceResolver`
-- Mechanism: Public APIs accept `IMethodSymbol`/`IOperation` and request a semantic model for `body.SyntaxTree` without checking compilation ownership or `ContainsSyntaxTree`. Roslyn rejects a tree not owned by that compilation.
-- Impact: Cross-wired analyzer input yields an unhandled `ArgumentException` instead of a typed `ContractBindingFailure`, potentially aborting analysis.
-- Safe evidence: Use a builder or binder for compilation A with a source method symbol or implementation body from compilation B.
-
 ## Wave 3.19. MEDIUM - Ill-formed UTF-16 constants enter trusted spec tables, fail instantiation, and collide in digest input
 
 - Files and members: `SharpProof.Specs/ApiSpecTermValidator.cs`, `Validate`, lines 50-58; `SharpProof.Specs/ApiSpecInstantiation.cs`, `Instantiation.Term`, line 145; `SharpProof.Specs/ApiSpecContentDigest.cs`, `Add(SpecTermDeclaration,...)`, lines 79-90.

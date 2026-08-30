@@ -87,6 +87,13 @@ public sealed class ContractBinder(
         }
 
         var resolution = _contractSources.Resolve(target, implementationBody);
+        if (resolution.DirectInventory.HasRejectedContractApiUsage &&
+            resolution.DirectInventory.ImplementationBody == null &&
+            resolution.DirectInventory.Clauses.IsEmpty)
+        {
+            return ContractBindingResult.Fail(
+                ContractBindingFailure.UnsupportedTarget);
+        }
         if (!resolution.HasValidDirectClause &&
             target.MethodKind == MethodKind.Ordinary)
         {
@@ -251,11 +258,13 @@ public sealed class ContractBinder(
                 return ClauseBindingResult.Fail(result);
             }
         }
-        if (!requiresOnly && variables.Result.HasValue)
+        if (!requiresOnly)
         {
             var result = BindValueAttributes(
                 target.GetReturnTypeAttributes(), target.ReturnType, RefKind.None,
-                _factory.Variable(variables.Result.Value),
+                variables.Result.HasValue
+                    ? _factory.Variable(variables.Result.Value)
+                    : null,
                 BoundContractKind.Ensures, clauses);
             if (result != ContractBindingFailure.None)
             {
@@ -269,7 +278,7 @@ public sealed class ContractBinder(
         ImmutableArray<AttributeData> attributes,
         ITypeSymbol sourceType,
         RefKind refKind,
-        IrTerm value,
+        IrTerm? value,
         BoundContractKind kind,
         ImmutableArray<BoundContractClause>.Builder clauses)
     {
@@ -291,6 +300,10 @@ public sealed class ContractBinder(
             }
 
             if (!validation.IsValid)
+            {
+                return ContractBindingFailure.InvalidClosedAttribute;
+            }
+            if (value == null)
             {
                 return ContractBindingFailure.InvalidClosedAttribute;
             }

@@ -885,6 +885,33 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void VoidReturnClosedContractFailsAtReturnBinding()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                [return: NotNull]
+                public static void Read() {
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var full = subject.Bind("Target", "Read");
+        var requires = subject.BindRequires("Target", "Read");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                full.Failure,
+                Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+            Assert.That(requires.IsSuccess, Is.True, requires.Failure.ToString());
+            Assert.That(requires.Contracts!.Clauses, Is.Empty);
+        }
+    }
+
+    [Test]
     public void ExactGenericCompanionIsDiscoveredAndBound()
     {
         const string source =
@@ -1431,6 +1458,39 @@ public sealed class ContractBinderTests
             Is.EqualTo(ContractBindingFailure.ContractApiUnavailable));
     }
 
+    [Test]
+    public void ForeignCallableFailsClosedInsteadOfBindingEmptyContracts()
+    {
+        using var owner = ContractSubject.Create(
+            """
+            public static class Owner {
+                public static void Analyze() {
+                }
+            }
+            """);
+        using var foreign = ContractSubject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Foreign {
+                public static void Analyze(bool condition) {
+                    Contract.Requires(condition);
+                }
+            }
+            """);
+
+        var result = owner.Bind(
+            foreign.GetMethodSymbol("Foreign", "Analyze"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(
+                result.Failure,
+                Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
+            Assert.That(result.Contracts, Is.Null);
+        }
+    }
+
     [TestCase(
         """
         [ContractFor(typeof(Target))]
@@ -1565,6 +1625,18 @@ public sealed class ContractBinderTests
         {
             var method = GetMethod(typeName, methodName);
             return _binder.Bind(method);
+        }
+
+        internal ContractBindingResult Bind(IMethodSymbol method)
+        {
+            return _binder.Bind(method);
+        }
+
+        internal IMethodSymbol GetMethodSymbol(
+            string typeName,
+            string methodName)
+        {
+            return GetMethod(typeName, methodName);
         }
 
         internal ContractBindingResult Bind(

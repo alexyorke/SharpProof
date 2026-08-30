@@ -76,6 +76,70 @@ public sealed class PartialMethodContractTests
         Assert.That(inventory.Clauses[0].IsValid, Is.True);
     }
 
+    [Test]
+    public void ParameterClosedAttributesBindFromEitherPartialPart()
+    {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                using SharpProof.Attributes;
+                public static partial class Subject {
+                    public static partial long Identity(
+                        [Positive] long value);
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                public static partial class Subject {
+                    public static partial long Identity(long value) => value;
+                }
+                """));
+        var definition = GetMethod(compilation, "Subject", "Identity");
+        var implementation = definition.PartialImplementationPart!;
+
+        var fromDefinition = new ContractBinder(compilation, new IrFactory())
+            .Bind(definition);
+        var fromImplementation = new ContractBinder(compilation, new IrFactory())
+            .Bind(implementation);
+
+        AssertSingleClosedClause(fromDefinition, BoundContractKind.Requires);
+        AssertSingleClosedClause(fromImplementation, BoundContractKind.Requires);
+    }
+
+    [Test]
+    public void ReturnClosedAttributesBindFromEitherPartialPart()
+    {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                public static partial class Subject {
+                    public static partial string Identity(string value);
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                using SharpProof.Attributes;
+                public static partial class Subject {
+                    [return: NotNull]
+                    public static partial string Identity(string value) => value;
+                }
+                """));
+        var definition = GetMethod(compilation, "Subject", "Identity");
+        var implementation = definition.PartialImplementationPart!;
+
+        var fromDefinition = new ContractBinder(compilation, new IrFactory())
+            .Bind(definition);
+        var fromImplementation = new ContractBinder(compilation, new IrFactory())
+            .Bind(implementation);
+
+        AssertSingleClosedClause(fromDefinition, BoundContractKind.Ensures);
+        AssertSingleClosedClause(fromImplementation, BoundContractKind.Ensures);
+    }
+
     [TestCase(MethodKind.PropertyGet)]
     [TestCase(MethodKind.PropertySet)]
     public void PartialPropertyAccessorsUseImplementationBodies(
@@ -248,6 +312,21 @@ public sealed class PartialMethodContractTests
                         .Single()
                         .SyntaxTree.FilePath),
                 Does.Contain("Implementation.cs"));
+        }
+    }
+
+    private static void AssertSingleClosedClause(
+        ContractBindingResult result,
+        BoundContractKind kind)
+    {
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var clause = result.Contracts!.Clauses.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(clause.Kind, Is.EqualTo(kind));
+            Assert.That(
+                clause.Evidence,
+                Is.EqualTo(BoundContractEvidence.ClosedAttribute));
         }
     }
 
