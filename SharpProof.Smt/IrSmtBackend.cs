@@ -358,11 +358,12 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
             _owner = owner;
             _factory = query.Factory;
             _meter = meter;
+            var maximumDepths = new Dictionary<IrId, int>();
             foreach (var assumption in query.Assumptions)
             {
-                ValidateDepth(assumption.Predicate, meter);
+                ValidateDepth(assumption.Predicate, maximumDepths, meter);
             }
-            ValidateDepth(query.Goal.Predicate, meter);
+            ValidateDepth(query.Goal.Predicate, maximumDepths, meter);
             Variables = query.ModelVariables;
             var integerVariables = ImmutableArray.CreateBuilder<IrVarId>();
             foreach (var variable in Variables)
@@ -408,9 +409,9 @@ public sealed class IrSmtBackend(IrSmtBackendOptions options) : ISmtBackend, IDi
 
         private static void ValidateDepth(
             IrTerm root,
+            Dictionary<IrId, int> maximumDepths,
             QueryResourceMeter meter)
         {
-            var maximumDepths = new Dictionary<IrId, int>();
             var pending = new Stack<(IrTerm Term, int Depth)>();
             pending.Push((root, 1));
             while (pending.Count != 0)

@@ -797,6 +797,43 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task SharedAssumptionDagIsDepthValidatedOnce()
+    {
+        const uint queryLimit = 10_000;
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("shared-depth", factory.BooleanType);
+        IrTerm sharedPredicate = factory.Variable(variable);
+        for (var index = 0; index < 127; index++)
+        {
+            sharedPredicate = factory.Unary(IrUnaryOperator.Not, sharedPredicate);
+        }
+        var operation = factory.CreateOperation("shared-depth");
+        var assumption = new Assumption(
+            factory,
+            sharedPredicate,
+            new LoweredJustification(operation));
+        var query = new VerificationQuery(
+            factory,
+            Enumerable.Repeat(assumption, 100),
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend(new IrSmtBackendOptions(queryLimit));
+
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Status,
+                Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+            Assert.That(backend.ConsumedResourceCount, Is.LessThan(queryLimit));
+        }
+    }
+
+    [Test]
     public async Task PublicBackendBoundsRecursiveEncodingDepth()
     {
         var factory = new IrFactory();
