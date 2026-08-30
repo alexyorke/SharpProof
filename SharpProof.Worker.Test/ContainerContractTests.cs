@@ -11,6 +11,18 @@ namespace SharpProof.Worker.Test;
 public sealed class ContainerContractTests
 {
     [Test]
+    public void RequiredContractNormalizesMalformedJsonAsInvalidData()
+    {
+        AssertInvalidContractPayload("{");
+    }
+
+    [Test]
+    public void RequiredContractNormalizesNonObjectJsonAsInvalidData()
+    {
+        AssertInvalidContractPayload("[]");
+    }
+
+    [Test]
     public void RequiredContractRejectsMissingAndMalformedMarkers()
     {
         Assert.That(RuntimeInformation.ProcessArchitecture, Is.EqualTo(
@@ -130,5 +142,40 @@ public sealed class ContainerContractTests
             "SharpProof.ContainerContract." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static void AssertInvalidContractPayload(string payload)
+    {
+        var originalContainer = Environment.GetEnvironmentVariable(
+            "SHARPPROOF_CONTAINER");
+        var originalContract = Environment.GetEnvironmentVariable(
+            "SHARPPROOF_CONTAINER_CONTRACT");
+        var root = CreateTemporaryDirectory();
+        var candidate = Path.Combine(root, "contract.json");
+
+        try
+        {
+            File.WriteAllText(candidate, payload);
+            Environment.SetEnvironmentVariable("SHARPPROOF_CONTAINER", "1");
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER_CONTRACT",
+                candidate);
+
+            var exception = Assert.Throws<InvalidDataException>(
+                (Action)(() => ContainerContract.ValidateRequired()));
+            Assert.That(
+                exception!.Message,
+                Does.StartWith("The SharpProof container contract"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER",
+                originalContainer);
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER_CONTRACT",
+                originalContract);
+            Directory.Delete(root, recursive: true);
+        }
     }
 }

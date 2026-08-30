@@ -75,6 +75,11 @@ public static class ContainerContract
         using var actualDocument = ReadBoundedJson(contractPath);
         var expected = expectedDocument.RootElement;
         var actual = actualDocument.RootElement;
+        if (actual.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException(
+                "The SharpProof container contract root is not a JSON object.");
+        }
         RequireInteger(actual, "schemaVersion", 1);
         RequireInteger(
             actual,
@@ -183,11 +188,20 @@ public static class ContainerContract
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read);
-        return JsonDocument.Parse(stream, new JsonDocumentOptions
+        try
         {
-            CommentHandling = JsonCommentHandling.Disallow,
-            AllowTrailingCommas = false
-        });
+            return JsonDocument.Parse(stream, new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Disallow,
+                AllowTrailingCommas = false
+            });
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException(
+                "The SharpProof container contract JSON is invalid.",
+                exception);
+        }
     }
 
     private static int RequireInteger(JsonElement element, string name)

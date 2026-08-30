@@ -574,14 +574,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Impact: Lowered results are unsound. `long x=0; void Mutate(){x=1;} Mutate(); return x;` continues to read IR variable 0 although C# returns 1.
 - Safe evidence: Direct CFG and lowering trace. Captured-local variables must be included in `VariablesAndMemory` havoc or such invocations conservatively abstained.
 
-## Wave 6.22. LOW - Malformed nonempty contract JSON escapes the contract-invalid exception path
-
-- File: `SharpProof.Host/ContainerContract.cs`
-- Members: `ValidateRequired`, lines 74-75; `ReadBoundedJson`, lines 173-190, especially `JsonDocument.Parse` at line 186
-- Mechanism: Malformed nonempty JSON throws `JsonException` directly; a valid nonobject root can make `TryGetProperty` throw `InvalidOperationException`. Neither is normalized to the type's contract-specific `InvalidDataException`.
-- Impact: Callers cannot consistently classify corrupt markers. Worker `Program` startup handling at lines 31-37 does not catch `JsonException`, so corruption between launcher preflight and startup, or direct invocation, can terminate unhandled instead of exiting 125. Normal launcher preflight limits severity.
-- Safe evidence: Payload `{` deterministically throws `JsonException`; existing tests cover empty and valid-but-invalid-property payloads, not malformed or nonobject roots.
-
 ## Wave 6.23. MEDIUM - ResetPublicationSet decides marker state before acquiring publication locks
 
 - File: `SharpProof.Host/LinuxPathIdentity.cs`
