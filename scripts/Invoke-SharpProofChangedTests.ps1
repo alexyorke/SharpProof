@@ -257,9 +257,8 @@ if ($selectedRelative.Count -gt 0) {
             $assembly = Get-SharpProofTestAssemblyPath `
                 -ProjectPath $selectedRelative[0] `
                 -Configuration $Configuration
-            $testArguments = @(
-                'vstest', $assembly,
-                '/TestCaseFilter:' + $semanticFilter)
+            $testArguments = @('vstest', $assembly)
+            $testArguments += '/TestCaseFilter:' + $semanticFilter
         }
         else {
             $testArguments = @(

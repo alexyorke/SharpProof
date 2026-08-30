@@ -709,6 +709,8 @@ public sealed class BuildSchedulingTests
                 "'build', $selectedRelative[0]"));
             Assert.That(changed, Does.Contain(
                 "Get-SharpProofTestAssemblyPath"));
+            Assert.That(changed, Does.Contain(
+                "$testArguments += '/TestCaseFilter:' + $semanticFilter"));
             Assert.That(changed, Does.Not.Contain(
                 "$NoBuild -and $selectedRelative.Count -eq 1"));
         }
