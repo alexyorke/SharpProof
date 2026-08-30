@@ -466,10 +466,13 @@ public static class IrRelationalSummaryBuilder
                 return null;
             }
 
-            predicate = Factory.Binary(
-                IrBinaryOperator.AndAlso,
-                predicate,
-                instantiated.NormalRelation);
+            predicate = IrSemanticTerms.Conjoin(
+                Factory,
+                [
+                    predicate,
+                    instantiated.NormalCompletion,
+                    instantiated.NormalRelation
+                ]);
             if (!Supported(predicate))
             {
                 return null;
