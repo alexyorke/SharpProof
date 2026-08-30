@@ -45,7 +45,7 @@ public sealed class CoverageScriptTests
         var repository = await CreateMultiCommitFixtureAsync();
         try
         {
-            var result = await RunCoverageAsync(
+            var result = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: "HEAD^",
                 reportOnly: true);
@@ -93,16 +93,17 @@ public sealed class CoverageScriptTests
         var repository = await CreateSingleCommitFixtureAsync();
         try
         {
-            var missing = await RunCoverageAsync(
+            var missing = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: null,
                 reportOnly: false);
-            var unusable = await RunCoverageAsync(
+            var unusable = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: "missing-comparison-ref",
                 reportOnly: false,
                 includeWorkingTree: true);
-            var localReport = await RunCoverageAsync(
+            await PrepareCoverageFixtureAsync(repository);
+            var localReport = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: null,
                 reportOnly: true);
@@ -129,7 +130,7 @@ public sealed class CoverageScriptTests
         var repository = await CreateSingleCommitFixtureAsync();
         try
         {
-            var result = await RunCoverageAsync(
+            var result = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: "HEAD^",
                 reportOnly: true);
