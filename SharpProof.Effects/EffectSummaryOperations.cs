@@ -57,16 +57,19 @@ internal static class EffectSummaryOperations
         EffectSummary construction,
         EffectThrowSet exceptions)
     {
+        var sequence = Domain.Join(
+            construction,
+            Throw(exceptions));
         return new EffectSummary(
-            EffectRegionSet.Empty,
-            EffectRegionSet.Empty,
-            EffectAllocationKind.None,
-            construction.Capabilities,
-            exceptions,
+            sequence.Reads,
+            sequence.Writes,
+            sequence.Allocation,
+            sequence.Capabilities,
+            sequence.Throws,
             EffectTermination.Unknown,
-            construction.Completeness,
-            construction.Uncertainty,
-            construction.AnalysisIncompleteReason);
+            sequence.Completeness,
+            sequence.Uncertainty,
+            sequence.AnalysisIncompleteReason);
     }
 
     internal static EffectSummary Capability(EffectCapabilityKind capabilities)

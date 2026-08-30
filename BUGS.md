@@ -160,13 +160,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Complete effect summaries can omit effects that execute before a noncompleting derived initializer.
 - Safe evidence: Direct control-flow and runtime-order reasoning.
 
-## Wave 5.7. HIGH - ExceptionConstructionThrow erases constructor may-effects while sequencing an explicit throw
-
-- Files and members: `SharpProof.Effects/EffectSummaryOperations.cs`, `ExceptionConstructionThrow`, lines 56-69; used by `SharpProof.Effects/OperationEffectScanner.cs`, lines 756-781, for external exception construction without a proven nonthrowing specification.
-- Mechanism: The helper discards `construction.Reads`, `Writes`, `Allocation`, and `Throws`, retaining only capabilities, completeness, and uncertainty, then replaces the throw set with the explicitly thrown exception. A trusted complete external constructor contract can state that it writes ambient or static state and may throw `ArgumentException`; analyzing `throw new ExternalException()` then returns a complete summary with empty writes/allocation and only `ExternalException`, although allocation and constructor writes occur and the constructor may throw `ArgumentException` before the explicit throw. Even for unmodeled constructors, it erases Unknown reads, writes, and allocation.
-- Impact: Falsely complete summaries can omit allocation, state effects, and earlier constructor exceptions.
-- Safe evidence: The helper's constructor arguments at lines 60-69 directly zero these fields and replace `construction.Throws`.
-
 ## Wave 5.11. MEDIUM - ApiSpecTable has no expression-depth bound before recursive processing
 
 - Files and members: `SharpProof.Specs/ApiSpecTable.cs`, `CompileTemplate`, lines 128-140; `SharpProof.Specs/ApiSpecContentDigest.cs`, `Add(term, variables)`, lines 75-106; `SharpProof.Specs/ApiSpecInstantiation.cs`, `Term`, lines 136-151.
