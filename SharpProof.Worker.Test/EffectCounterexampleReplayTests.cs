@@ -258,6 +258,60 @@ public sealed class EffectCounterexampleReplayTests
     }
 
     [Test]
+    public void ResponseAuthorityRejectsAllocationOnlyEnforcePureRefutation()
+    {
+        var fixture = CreateFixture(
+            CompilerEffectReplayEventKind.ManagedObjectAllocation);
+        fixture.Evidence.ContractKind =
+            WorkerEffectContractKind.EnforcePure;
+        CompilerEffectClaimArtifactCodec.Seal(fixture.Evidence);
+
+        var replayed = EffectClaimResultAssembler.Assemble(
+            fixture.Target,
+            fixture.Evidence);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                replayed.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                replayed.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleReplayFailed));
+            Assert.That(replayed.EffectWitness, Is.Null);
+        }
+
+        var response = new WorkerVerifyResponse
+        {
+            CallableResults = [new WorkerCallableResult
+            {
+                CallableId = fixture.Target.Entry.CallableId,
+                Assumptions = fixture.Target.Entry.Assumptions
+            }],
+            ClaimResults = [new WorkerClaimResult
+            {
+                ClaimId = fixture.Evidence.ClaimId,
+                Outcome = WorkerClaimOutcome.Refuted,
+                Reason = WorkerClaimReason.None,
+                EffectCertainty =
+                    WorkerEffectEvidenceCertainty.DefiniteViolation,
+                ProofCore = [],
+                Model = [],
+                EffectWitness = fixture.Evidence.Witness,
+                Assumptions = fixture.Target.Entry.Assumptions
+            }]
+        };
+        var errors = new CompilerResponseEvidenceAuthority(
+                [fixture.Target])
+            .Validate(response)
+            .ToArray();
+
+        Assert.That(
+            errors,
+            Does.Contain("response.effect_witness_authority"));
+    }
+
+    [Test]
     public void CapabilityReplayRefutesACombinedContractWhenItsEffectIsAllowed()
     {
         foreach (var kind in new[]
