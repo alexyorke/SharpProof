@@ -590,14 +590,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Impact: Publication proceeds while assuming local flock, rename, and durability semantics on unsupported shared storage.
 - Safe evidence: `bestType` is returned verbatim, and acceptance depends only on absence from the short blacklist.
 
-## Wave 6.26. MEDIUM - Malformed numeric diagnostic fields can throw FormatException out of TryDeserialize
-
-- File: `SharpProof.Host/VerifierDiagnosticTransport.cs`
-- Location: Current lines 65, 74-75, 81-83
-- Mechanism: `JsonElement.GetInt32` for schema, line, or column throws `FormatException` for fractional or Int32-out-of-range numeric values; the catch filter includes `OverflowException` but not `FormatException`.
-- Impact: A structured-looking malformed stderr line can abort diagnostic processing and the MSBuild task because `RunVerifier.LogStandardError` does not catch it.
-- Safe evidence: In the canonical tooling container, `GetInt32` on 2147483648 throws `FormatException`. Schema, line, and column cases require regression coverage.
-
 ## Wave 6.27. LOW - Analyzer semantic outcome keys collapse distinct methods in different syntax trees
 
 - File: `SharpProof.Gates/AnalyzerGateHost.cs`
