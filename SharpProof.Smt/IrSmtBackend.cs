@@ -196,7 +196,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 owner.Own(_context.MkNot(
                     owner.Own(_context.MkAnd(goal.Defined, goal.Value)))));
             using var parameters = _context.MkParams();
-            parameters.Add("rlimit", meter.GetRemainingBudget());
+            AddOwnedParameter(
+                parameters,
+                _context.MkSymbol("rlimit"),
+                meter.GetRemainingBudget());
             solver.Parameters = parameters;
             cancellationToken.ThrowIfCancellationRequested();
             var status = solver.Check();
@@ -256,6 +259,17 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
 
         return 0;
+    }
+
+    internal static void AddOwnedParameter(
+        Params parameters,
+        Symbol name,
+        uint value)
+    {
+        using (name)
+        {
+            parameters.Add(name, value);
+        }
     }
 
     private void AddResourceCount(long observed)

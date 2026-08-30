@@ -1,6 +1,6 @@
-using Z3Ast = Microsoft.Z3.AST;
 using Z3Context = Microsoft.Z3.Context;
 using Z3Expr = Microsoft.Z3.Expr;
+using Z3Object = Microsoft.Z3.Z3Object;
 using Z3Status = Microsoft.Z3.Status;
 
 namespace SharpProof.Smt.Test;
@@ -449,6 +449,19 @@ public sealed class IrSmtBackendTests
             Assert.That(exception!.ParamName, Is.EqualTo("options"));
             Assert.That(contextFactoryCalls, Is.Zero);
         }
+    }
+
+    [Test]
+    public void ResourceLimitSymbolIsDisposedAfterConfiguration()
+    {
+        using var context = new Z3Context();
+        using var parameters = context.MkParams();
+        var symbol = context.MkSymbol("rlimit");
+        Assert.That(NativeObject(symbol), Is.Not.EqualTo(IntPtr.Zero));
+
+        IrSmtBackend.AddOwnedParameter(parameters, symbol, 100);
+
+        Assert.That(NativeObject(symbol), Is.EqualTo(IntPtr.Zero));
     }
 
     [Test]
@@ -936,9 +949,9 @@ public sealed class IrSmtBackendTests
         return NativeObject(expression) != IntPtr.Zero;
     }
 
-    private static IntPtr NativeObject(Z3Expr expression)
+    private static IntPtr NativeObject(Z3Object expression)
     {
-        var property = typeof(Z3Ast).GetProperty(
+        var property = typeof(Z3Object).GetProperty(
             "NativeObject",
             System.Reflection.BindingFlags.Instance |
             System.Reflection.BindingFlags.NonPublic |

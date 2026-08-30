@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.9. LOW - Z3 rlimit symbol wrapper lacks deterministic per-query ownership
-
-- File: `SharpProof.Smt/IrSmtBackend.cs`
-- Member: `CheckCore`
-- Current line: 114
-- Mechanism: The string overload `parameters.Add("rlimit",...)` internally creates a symbol wrapper, unlike the explicitly disposed solver, parameters, statistics, model, and expressions.
-- Impact: Many queries retain wrappers until finalization.
-- Safe reproduction/evidence: Run repeated trivial checks without forced garbage collection and compare wrapper or native growth with an explicitly owned symbol.
-
 ## Wave 2.10. MEDIUM - Unsignaled backend cancellation is misreported as method timeout and retires a healthy lane
 
 - File: `SharpProof.Worker/CallableVerificationPolicy.cs`
