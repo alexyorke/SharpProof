@@ -4,6 +4,9 @@ internal static class EffectTestHost
 {
     private static readonly ImmutableArray<MetadataReference> PlatformReferences =
         CreatePlatformReferences();
+    private static readonly ImmutableArray<MetadataReference> DefaultReferences =
+        PlatformReferences.Add(MetadataReference.CreateFromFile(
+            typeof(EffectContractAttribute).Assembly.Location));
 
     internal static CSharpCompilation CreateCompilation(
         string source,
@@ -23,10 +26,7 @@ internal static class EffectTestHost
         string assemblyName = "EffectsTest",
         params MetadataReference[] additionalReferences)
     {
-        var references = PlatformReferences
-            .Add(MetadataReference.CreateFromFile(
-                typeof(EffectContractAttribute).Assembly.Location))
-            .AddRange(additionalReferences);
+        var references = DefaultReferences.AddRange(additionalReferences);
         var compilation = CSharpCompilation.Create(
             assemblyName,
             syntaxTrees,

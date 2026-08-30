@@ -6522,6 +6522,10 @@ public sealed class WorkerTests
 
     private sealed class TestProject : IDisposable
     {
+        private static readonly ImmutableArray<MetadataReference>
+            DefaultReferences = CreateReferences();
+        private static readonly ImmutableArray<MetadataReference>
+            NetCoreReferencePack = CreateNetCoreReferencePack();
         private readonly List<string> _additionalReferencePaths = [];
         private bool _useNetCoreReferencePack;
 
@@ -6644,8 +6648,7 @@ public sealed class WorkerTests
             var compilation = CSharpCompilation.Create(
                 "Implementation" + Guid.NewGuid().ToString("N"),
                 [syntax],
-                GetReferences().Select(static referencePath =>
-                    MetadataReference.CreateFromFile(referencePath)),
+                DefaultReferences,
                 CreateRoslynOptions().WithOptimizationLevel(
                     optimizationLevel));
             using var stream = new FileStream(
@@ -6685,7 +6688,7 @@ public sealed class WorkerTests
             }
         }
 
-        private static string[] GetReferences()
+        private static ImmutableArray<MetadataReference> CreateReferences()
         {
             var trusted = ((string)AppContext.GetData(
                     "TRUSTED_PLATFORM_ASSEMBLIES")!)
@@ -6697,10 +6700,12 @@ public sealed class WorkerTests
                 .Where(path => names.Contains(Path.GetFileName(path)))
                 .Append(typeof(Contract).Assembly.Location)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static path => path, StringComparer.Ordinal)];
+                .OrderBy(static path => path, StringComparer.Ordinal)
+                .Select(static path => MetadataReference.CreateFromFile(path))];
         }
 
-        private static string[] GetNetCoreReferencePack()
+        private static ImmutableArray<MetadataReference>
+            CreateNetCoreReferencePack()
         {
             var runtimeDirectory = Path.GetDirectoryName(
                 typeof(object).Assembly.Location) ??
@@ -6735,7 +6740,8 @@ public sealed class WorkerTests
             return [.. references
                 .Append(typeof(Contract).Assembly.Location)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static path => path, StringComparer.Ordinal)];
+                .OrderBy(static path => path, StringComparer.Ordinal)
+                .Select(static path => MetadataReference.CreateFromFile(path))];
         }
 
         internal CSharpCompilation CreateCompilation(
@@ -6753,11 +6759,10 @@ public sealed class WorkerTests
                     effectiveParseOptions,
                     path));
             var references = (_useNetCoreReferencePack
-                    ? GetNetCoreReferencePack()
-                    : GetReferences())
-                .Concat(_additionalReferencePaths)
-                .Select(static path =>
-                    MetadataReference.CreateFromFile(path));
+                    ? NetCoreReferencePack
+                    : DefaultReferences)
+                .AddRange(_additionalReferencePaths.Select(static path =>
+                    MetadataReference.CreateFromFile(path)));
             return CSharpCompilation.Create(
                 "WorkerTest",
                 syntaxTrees,

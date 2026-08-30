@@ -104,13 +104,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
         var compilation = CSharpCompilation.Create(
             "CompilerRuntimeSymbolArtifactTests",
             [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")],
-            ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-                .Split(Path.PathSeparator)
-                .Append(typeof(Contract).Assembly.Location)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(static path =>
-                    MetadataReference.CreateFromFile(path)),
+            WorkerTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions:

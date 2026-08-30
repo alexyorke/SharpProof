@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -309,7 +308,9 @@ public sealed class ContractClauseInventoryTests
         var compilation = CSharpCompilation.Create(
             "ClauseInventory_" + Guid.NewGuid().ToString("N"),
             [syntaxTree],
-            GetReferences(includeSharpProofReference),
+            includeSharpProofReference
+                ? ContractTestMetadataReferences.WithSharpProof
+                : ContractTestMetadataReferences.Platform,
             new CSharpCompilationOptions(
                 outputKind,
                 nullableContextOptions: NullableContextOptions.Enable));
@@ -325,20 +326,4 @@ public sealed class ContractClauseInventoryTests
         return compilation;
     }
 
-    private static ImmutableArray<MetadataReference> GetReferences(
-        bool includeSharpProofReference)
-    {
-        var paths = ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator);
-        if (includeSharpProofReference)
-        {
-            paths = [.. paths, typeof(Contract).Assembly.Location];
-        }
-
-        return [.. paths.Select(static path =>
-            MetadataReference.CreateFromFile(path))
-            .DistinctBy(static reference => reference.Display,
-                StringComparer.OrdinalIgnoreCase)];
-    }
 }

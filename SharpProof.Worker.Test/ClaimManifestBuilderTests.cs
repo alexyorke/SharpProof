@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -1869,7 +1868,7 @@ public sealed class ClaimManifestBuilderTests
         var compilation = CSharpCompilation.Create(
             "MalformedBaseTypeTests",
             [tree],
-            GetReferences(),
+            WorkerTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions:
@@ -2305,7 +2304,7 @@ public sealed class ClaimManifestBuilderTests
                 source.Source,
                 parseOptions,
                 source.FileName)),
-            GetReferences(),
+            WorkerTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 outputKind,
                 nullableContextOptions: NullableContextOptions.Enable));
@@ -2323,14 +2322,4 @@ public sealed class ClaimManifestBuilderTests
         return compilation;
     }
 
-    private static ImmutableArray<MetadataReference> GetReferences()
-    {
-        var paths = ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Append(typeof(Contract).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-        return [.. paths.Select(static path =>
-            MetadataReference.CreateFromFile(path))];
-    }
 }

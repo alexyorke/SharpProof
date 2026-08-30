@@ -349,18 +349,6 @@ public sealed class CompilerSourceLocationAuthorityTests
         string source,
         bool includeContractReference)
     {
-        var paths = ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Where(path => includeContractReference ||
-                string.Equals(
-                    path,
-                    typeof(object).Assembly.Location,
-                    StringComparison.OrdinalIgnoreCase))
-            .Append(includeContractReference
-                ? typeof(Contract).Assembly.Location
-                : typeof(object).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
         return CSharpCompilation.Create(
             "CompilerSourceLocationAuthorityTest",
             [CSharpSyntaxTree.ParseText(
@@ -369,7 +357,9 @@ public sealed class CompilerSourceLocationAuthorityTests
                 Path.Combine(
                     TestContext.CurrentContext.WorkDirectory,
                     "SourceAuthoritySubject.cs"))],
-            paths.Select(static path => MetadataReference.CreateFromFile(path)),
+            includeContractReference
+                ? WorkerTestMetadataReferences.WithSharpProof
+                : WorkerTestMetadataReferences.CoreLibraryOnly,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 }

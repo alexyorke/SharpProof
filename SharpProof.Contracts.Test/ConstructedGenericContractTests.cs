@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -602,7 +601,7 @@ public sealed class ConstructedGenericContractTests
         var compilation = CSharpCompilation.Create(
             "ConstructedContracts_" + Guid.NewGuid().ToString("N"),
             [syntaxTree],
-            GetReferences(),
+            ContractTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable,
@@ -621,14 +620,4 @@ public sealed class ConstructedGenericContractTests
         return compilation;
     }
 
-    private static ImmutableArray<MetadataReference> GetReferences()
-    {
-        var paths = ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Append(typeof(Contract).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-        return [.. paths.Select(static path =>
-            MetadataReference.CreateFromFile(path))];
-    }
 }

@@ -8015,11 +8015,12 @@ public sealed class EffectAnalysisTests
     [Test]
     public void DeepCallChainsAbstainInsteadOfExhaustingTheStack()
     {
+        var methodCount = EffectCallGraph.MaximumCallGraphDepth + 1;
         var methods = string.Join(
             Environment.NewLine,
-            Enumerable.Range(0, 600).Select(static index =>
+            Enumerable.Range(0, methodCount).Select(index =>
                 $"    public static long Step{index}(long value) => " +
-                (index == 599
+                (index == methodCount - 1
                     ? "value;"
                     : $"Step{index + 1}(value);")));
         var compilation = EffectTestHost.CreateCompilation(

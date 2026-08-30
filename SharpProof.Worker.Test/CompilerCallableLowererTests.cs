@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -203,14 +202,10 @@ public sealed class CompilerCallableLowererTests
                 parse,
                 "generated/helper.g.cs")
         };
-        var paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Append(typeof(Contract).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
         var compilation = CSharpCompilation.Create(
             "RelativeSourceSummaryTreePath",
             trees,
-            paths.Select(static path => MetadataReference.CreateFromFile(path)),
+            WorkerTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
@@ -603,14 +598,10 @@ public sealed class CompilerCallableLowererTests
         var parse = new CSharpParseOptions(
             LanguageVersion.CSharp12,
             preprocessorSymbols: [Contract.ConditionalSymbol]);
-        var paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Append(typeof(Contract).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
         var compilation = CSharpCompilation.Create(
             "CompilerCallableLowererTests",
             [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")],
-            paths.Select(static path => MetadataReference.CreateFromFile(path)),
+            WorkerTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

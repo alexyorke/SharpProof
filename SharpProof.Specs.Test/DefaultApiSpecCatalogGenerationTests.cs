@@ -7,6 +7,7 @@ using SharpProof.Ir;
 namespace SharpProof.Specs.Test;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class DefaultApiSpecCatalogGenerationTests
 {
     private const string ExpectedContentSha256 =
