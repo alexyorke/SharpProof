@@ -376,12 +376,13 @@ internal static class OpenSourceCorpusImporter
         return selected.ToImmutable();
     }
 
-    private static async Task<string> ReadGitAsync(
+    internal static async Task<string> ReadGitAsync(
         string workingDirectory,
         IReadOnlyList<string> arguments,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string gitExecutable = "git")
     {
-        var startInfo = new ProcessStartInfo("git")
+        var startInfo = new ProcessStartInfo(gitExecutable)
         {
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
@@ -398,7 +399,28 @@ internal static class OpenSourceCorpusImporter
             throw new InvalidOperationException("Could not start Git.");
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            if (!process.HasExited)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
+            await process.WaitForExitAsync(CancellationToken.None)
+                .ConfigureAwait(false);
+            throw;
+        }
         var output = (await outputTask.ConfigureAwait(false)).Trim();
         var error = (await errorTask.ConfigureAwait(false)).Trim();
         if (process.ExitCode != 0)

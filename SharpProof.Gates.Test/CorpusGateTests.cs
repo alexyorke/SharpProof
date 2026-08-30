@@ -8,6 +8,83 @@ namespace SharpProof.Gates.Test;
 public sealed class CorpusGateTests
 {
     [Test]
+    [Platform("Linux")]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public async Task CanceledGitReadTerminatesTheChildProcess()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var executable = Path.Combine(root, "git-probe.sh");
+        var pidPath = Path.Combine(root, "child.pid");
+        await File.WriteAllTextAsync(
+            executable,
+            "#!/bin/sh\nprintf '%s\\n' \"$$\" > child.pid\n" +
+            "while :; do sleep 1; done\n");
+        File.SetUnixFileMode(
+            executable,
+            UnixFileMode.UserRead |
+            UnixFileMode.UserWrite |
+            UnixFileMode.UserExecute);
+        var processId = -1;
+        try
+        {
+            using var cancellation = new CancellationTokenSource();
+            var read = OpenSourceCorpusImporter.ReadGitAsync(
+                root,
+                ["status", "--porcelain"],
+                cancellation.Token,
+                executable);
+            for (var attempt = 0;
+                 attempt < 100 && !File.Exists(pidPath);
+                 attempt++)
+            {
+                await Task.Delay(10);
+            }
+            Assert.That(File.Exists(pidPath), Is.True);
+            processId = int.Parse(
+                await File.ReadAllTextAsync(pidPath),
+                System.Globalization.CultureInfo.InvariantCulture);
+
+            await cancellation.CancelAsync();
+            var canceled = false;
+            try
+            {
+                _ = await read;
+            }
+            catch (OperationCanceledException)
+            {
+                canceled = true;
+            }
+
+            for (var attempt = 0;
+                 attempt < 100 && ProcessExists(processId);
+                 attempt++)
+            {
+                await Task.Delay(10);
+            }
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(canceled, Is.True);
+                Assert.That(ProcessExists(processId), Is.False);
+            }
+        }
+        finally
+        {
+            if (processId > 0 && ProcessExists(processId))
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(
+                    processId);
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
     public void CorpusSnapshotFormatRequiresExactSchemaThreeBytes()
     {
         const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
@@ -36,6 +113,20 @@ public sealed class CorpusGateTests
         foreach (var bytes in invalid)
         {
             Assert.Throws<InvalidDataException>((Action)(() => CorpusSnapshotFormat.Parse(bytes)));
+        }
+    }
+
+    private static bool ProcessExists(int processId)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(
+                processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
         }
     }
 
