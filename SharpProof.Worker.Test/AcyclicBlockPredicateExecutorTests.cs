@@ -162,6 +162,57 @@ public sealed class AcyclicBlockPredicateExecutorTests
     }
 
     [Test]
+    public void BranchPredicatesRequireTheConditionToCompleteNormally()
+    {
+        var factory = new IrFactory();
+        var divisor = factory.CreateVariable("divisor", factory.IntegerType);
+        var condition = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Binary(
+                IrBinaryOperator.Divide,
+                factory.Integer(1),
+                factory.Variable(divisor)),
+            factory.Integer(1));
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var whenTrue = builder.CreateBlock("true");
+        var whenFalse = builder.CreateBlock("false");
+        builder.Branch(
+            entry,
+            factory.CreateOperation(),
+            condition,
+            whenTrue,
+            whenFalse);
+        builder.Return(whenTrue, factory.CreateOperation(), factory.Integer(1));
+        builder.Return(whenFalse, factory.CreateOperation(), factory.Integer(2));
+
+        var execution = Execute(factory, builder.Build(), [divisor]);
+        var completion = IrSemanticTerms.ConstrainSuccessfulEvaluation(
+            factory,
+            factory.Boolean(true),
+            condition);
+        var expectedTrue = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            completion,
+            condition);
+        var expectedFalse = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            completion,
+            factory.Unary(IrUnaryOperator.Not, condition));
+        var predicatesByResult = execution.Returns.ToDictionary(
+            static returned => ((IrIntegerTerm)returned.ReturnTerm!).Value,
+            static returned => returned.Predicate);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(execution.Returns, Has.Length.EqualTo(2));
+            Assert.That(predicatesByResult[1], Is.SameAs(expectedTrue));
+            Assert.That(predicatesByResult[2], Is.SameAs(expectedFalse));
+        }
+    }
+
+    [Test]
     public async Task CycleProducesTypedUnknownWithoutInvokingTheBackend()
     {
         var factory = new IrFactory();
