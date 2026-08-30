@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -8,6 +9,36 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    [Test]
+    public void UnassignedCorpusDiagnosticFailsTheGate()
+    {
+        var descriptor = new DiagnosticDescriptor(
+            "SPTEST",
+            "Test diagnostic",
+            "Test diagnostic",
+            "Test",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+        var diagnostic = Diagnostic.Create(descriptor, Location.None);
+
+        Assert.That(
+            (Action)(() =>
+                OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment(
+                    [diagnostic],
+                    [0])),
+            Throws.TypeOf<InvalidDataException>());
+        Assert.DoesNotThrow((Action)(() =>
+            OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment(
+                [diagnostic],
+                [1])));
+        Assert.That(
+            (Action)(() =>
+                OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment(
+                    [diagnostic],
+                    [2])),
+            Throws.TypeOf<InvalidDataException>());
+    }
+
     [Test]
     public async Task CorpusBatchRollsBackACommitFailure()
     {

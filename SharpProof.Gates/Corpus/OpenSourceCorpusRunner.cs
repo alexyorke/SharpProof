@@ -131,6 +131,7 @@ internal static class OpenSourceCorpusRunner
         var outcomes = factory.GetOutcomes();
         var observations = ImmutableArray.CreateBuilder<CorpusObservation>(
             document.Methods.Length);
+        var diagnosticAssignments = new int[diagnostics.Length];
         foreach (var method in document.Methods)
         {
             if (!outcomes.TryGetValue(method.Id, out var semanticOutcome))
@@ -145,12 +146,20 @@ internal static class OpenSourceCorpusRunner
                     method.Id,
                     StringComparison.Ordinal));
             var canonicalDiagnostics = diagnostics
-                .Where(diagnostic =>
-                    ReferenceEquals(diagnostic.Location.SourceTree, target.Tree) &&
-                    target.Span.Contains(diagnostic.Location.SourceSpan))
-                .Select(diagnostic => CorpusGate.CanonicalizeDiagnostic(
-                    diagnostic,
-                    compilation.Options))
+                .Select((diagnostic, index) => (Diagnostic: diagnostic, Index: index))
+                .Where(item =>
+                    ReferenceEquals(
+                        item.Diagnostic.Location.SourceTree,
+                        target.Tree) &&
+                    target.Span.Contains(
+                        item.Diagnostic.Location.SourceSpan))
+                .Select(item =>
+                {
+                    diagnosticAssignments[item.Index]++;
+                    return CorpusGate.CanonicalizeDiagnostic(
+                        item.Diagnostic,
+                        compilation.Options);
+                })
                 .OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal)
                 .ToImmutableArray();
             observations.Add(
@@ -162,7 +171,42 @@ internal static class OpenSourceCorpusRunner
                     semanticOutcome,
                     canonicalDiagnostics));
         }
+        RequireCompleteDiagnosticAssignment(
+            diagnostics,
+            diagnosticAssignments);
         return observations.ToImmutable();
+    }
+
+    internal static void RequireCompleteDiagnosticAssignment(
+        ImmutableArray<Diagnostic> diagnostics,
+        int[] assignmentCounts)
+    {
+        if (assignmentCounts.Length != diagnostics.Length)
+        {
+            throw new ArgumentException(
+                "Diagnostic assignment counts do not match the diagnostics.",
+                nameof(assignmentCounts));
+        }
+
+        var invalid = diagnostics
+            .Select((diagnostic, index) =>
+                (Diagnostic: diagnostic, Count: assignmentCounts[index]))
+            .Where(static item => item.Count != 1)
+            .ToArray();
+        if (invalid.Length == 0)
+        {
+            return;
+        }
+
+        throw new InvalidDataException(
+            $"{invalid.Length} analyzer diagnostics were not assigned " +
+            "to exactly one selected OSS method:" +
+            Environment.NewLine +
+            string.Join(
+                Environment.NewLine,
+                invalid.Take(25).Select(static item =>
+                    $"{item.Diagnostic.Id} [{item.Count}] " +
+                    item.Diagnostic.Location)));
     }
 
     private static MethodDeclarationSyntax Instrument(
