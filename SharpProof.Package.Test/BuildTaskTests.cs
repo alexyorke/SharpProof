@@ -18,6 +18,30 @@ namespace SharpProof.Package.Test;
 public sealed class BuildTaskTests
 {
     [Test]
+    public async System.Threading.Tasks.Task
+        MissingCompilerHostVersionFailsClosedUnlessProfileIsOff()
+    {
+        var enabled = await RunCompilerHostGateAsync(profile: null);
+        var disabled = await RunCompilerHostGateAsync(profile: "off");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                enabled.ExitCode,
+                Is.Not.Zero,
+                enabled.Output);
+            Assert.That(
+                enabled.Output,
+                Does.Contain("NETCoreSdkVersion is unset")
+                    .And.Contain("Roslyn 4.14 or newer"));
+            Assert.That(
+                disabled.ExitCode,
+                Is.Zero,
+                disabled.Output);
+        }
+    }
+
+    [Test]
     public void GeneratedSupervisorNoncePassesSupervisorGateValidation()
     {
         var nonce = RunVerifier.CreateSupervisorNonce();
@@ -2136,6 +2160,57 @@ public sealed class BuildTaskTests
         {
             return false;
         }
+    }
+
+    private static async System.Threading.Tasks.Task<
+        (int ExitCode, string Output)> RunCompilerHostGateAsync(
+            string? profile)
+    {
+        var repository = PackagedProductFeed.FindRepositoryRoot();
+        var targets = Path.Combine(
+            repository,
+            "SharpProof.Package",
+            "buildTransitive",
+            "SharpProof.targets");
+        var placeholder = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.CompilerHostGate");
+        var start = new ProcessStartInfo
+        {
+            FileName = Environment.GetEnvironmentVariable(
+                "DOTNET_HOST_PATH") ?? "dotnet",
+            WorkingDirectory = repository,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (var argument in new[]
+                 {
+                     "msbuild",
+                     targets,
+                     "-t:_SharpProofValidateConfiguration",
+                     "-p:SharpProofAnalyzerDirectory=" + placeholder,
+                     "-p:SharpProofCollectorDirectory=" + placeholder,
+                     "-p:_SharpProofSharedDirectory=" + placeholder,
+                     "--nologo",
+                     "--verbosity:minimal"
+                 })
+        {
+            start.ArgumentList.Add(argument);
+        }
+        if (profile != null)
+        {
+            start.ArgumentList.Add("-p:SharpProofProfile=" + profile);
+        }
+
+        using var process = Process.Start(start) ??
+            throw new InvalidOperationException(
+                "The compiler-host gate process could not be started.");
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = await standardOutput + await standardError;
+        return (process.ExitCode, output);
     }
 
     private sealed class GatedTextReader(string initialText) : TextReader

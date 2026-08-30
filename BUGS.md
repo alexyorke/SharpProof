@@ -201,14 +201,6 @@ This section records 37 findings from exactly 10 fresh read-only auditors after 
 
 This section records 7 findings from exactly 10 fresh read-only auditors. The relay compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 4.1. MEDIUM - Minimum compiler-host gate fails open when NETCoreSdkVersion is unset
-
-- File: `SharpProof.Package/buildTransitive/SharpProof.targets`
-- Members/locations: Analyzer `ItemGroup`s at current lines 20-62; target `_SharpProofValidateConfiguration` at lines 64-68, especially line 67
-- Mechanism: The default profile is `advisory` at line 11, so analyzer and generator items are added whenever the profile is not `off` at lines 20-46. The minimum-host check requires both a nonempty `NETCoreSdkVersion` and a version below 9.0.300. On an MSBuild/Roslyn host that does not define `NETCoreSdkVersion`, such as a non-SDK-style project using `PackageReference` under Visual Studio/MSBuild, the second conjunct is false, so the target emits no error even though the package requires Roslyn 4.14 or newer. Analyzer assemblies are still passed to the compiler.
-- Impact: Unsupported compiler hosts proceed into analyzer and source-generator loading instead of receiving the intended actionable configuration error. This can degrade to loader diagnostics or leave requested analysis unavailable; in strict configurations, it undermines the package's effort to reject unsupported hosts before compilation.
-- Safe evidence: The line 67 truth table is sufficient: with `NETCoreSdkVersion=''`, `'$(NETCoreSdkVersion)' != ''` is false and the `<Error>` cannot execute, while item conditions at lines 20 and 47 do not test that property.
-
 ## Wave 4.2. MEDIUM - Invalid variable bindings escape Compare as host exceptions or false mismatches
 
 - Files and members: `SharpProof.Testing/IrCSharpDifferentialOracle.cs`, `IrCSharpDifferentialOracle.Compare`, lines 37-38 and 75-87; `TryCreateProgram`, lines 107-115; `ToRuntimeValue`, lines 347-368. Related: `SharpProof.Ir/IrInterpreter.cs`, binding validation at lines 174-189.

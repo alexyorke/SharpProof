@@ -64,6 +64,8 @@
   <Target Name="_SharpProofValidateConfiguration"
           BeforeTargets="CoreCompile"
           Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' == ''"
+           Text="SharpProof could not verify the compiler host because NETCoreSdkVersion is unset. SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer when the compiler host cannot be verified." />
     <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '9.0.300'))"
            Text="SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer on an older compiler host." />
     <Error Condition="'$(SharpProofMode)' != ''"
