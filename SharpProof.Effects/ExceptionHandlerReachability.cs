@@ -995,180 +995,11 @@ internal sealed class ExceptionHandlerReachability(
 
         void PushChildren(IOperation operation)
         {
-            switch (operation)
-            {
-                case INameOfOperation or ITypeOfOperation or
-                    ISizeOfOperation:
-                    return;
-                case IBlockOperation block:
-                    PushSequential(block.Operations);
-                    return;
-                case ISimpleAssignmentOperation assignment:
-                    var inputs = GetSimpleAssignmentTargetInputs(
-                        assignment.Target).ToArray();
-                    if (inputs.All(canCompleteNormally))
-                    {
-                        remaining.Push(assignment.Value);
-                    }
-                    PushSequential(inputs);
-                    return;
-                case IBinaryOperation
-                {
-                    OperatorMethod: null,
-                    OperatorKind: BinaryOperatorKind.ConditionalAnd or
-                            BinaryOperatorKind.ConditionalOr
-                } binary:
-                    var leftCompletes = canCompleteNormally(
-                        binary.LeftOperand);
-                    var leftConstant = binary.LeftOperand.ConstantValue is
-                    { HasValue: true, Value: bool leftValue }
-                            ? leftValue
-                            : (bool?)null;
-                    var evaluatesRight = leftCompletes &&
-                        (binary.OperatorKind ==
-                            BinaryOperatorKind.ConditionalAnd
-                                ? leftConstant != false
-                                : leftConstant != true);
-                    if (evaluatesRight)
-                    {
-                        remaining.Push(binary.RightOperand);
-                    }
-                    remaining.Push(binary.LeftOperand);
-                    return;
-                case IConditionalOperation conditional:
-                    if (!canCompleteNormally(conditional.Condition))
-                    {
-                        remaining.Push(conditional.Condition);
-                        return;
-                    }
-                    var condition = conditional.Condition.ConstantValue is
-                    { HasValue: true, Value: bool conditionValue }
-                            ? conditionValue
-                            : (bool?)null;
-                    if (condition != true &&
-                        conditional.WhenFalse is { } whenFalse)
-                    {
-                        remaining.Push(whenFalse);
-                    }
-                    if (condition != false)
-                    {
-                        remaining.Push(conditional.WhenTrue);
-                    }
-                    remaining.Push(conditional.Condition);
-                    return;
-                case ICoalesceOperation coalesce:
-                    var valueCompletes = canCompleteNormally(coalesce.Value);
-                    var definitelyNonNull =
-                        DefiniteOperationFacts.IsDefinitelyNonNull(
-                            coalesce.Value) ||
-                        abstractFlow?.ProvesNonNull(
-                            coalesce,
-                            coalesce.Value) == true;
-                    if (valueCompletes && !definitelyNonNull)
-                    {
-                        remaining.Push(coalesce.WhenNull);
-                    }
-                    remaining.Push(coalesce.Value);
-                    return;
-                case ICoalesceAssignmentOperation coalesce:
-                    var targetCompletes = canCompleteNormally(
-                        coalesce.Target);
-                    var targetIsNonNull =
-                        DefiniteOperationFacts.IsDefinitelyNonNull(
-                            coalesce.Target) ||
-                        abstractFlow?.ProvesNonNull(
-                            coalesce,
-                            coalesce.Target) == true;
-                    if (targetCompletes && !targetIsNonNull)
-                    {
-                        remaining.Push(coalesce.Value);
-                    }
-                    remaining.Push(coalesce.Target);
-                    return;
-                case IConditionalAccessOperation access:
-                    var receiverCompletes = canCompleteNormally(
-                        access.Operation);
-                    var receiverIsNull =
-                        DefiniteOperationFacts.IsDefinitelyNull(
-                            access.Operation) ||
-                        abstractFlow?.ProvesNull(
-                            access,
-                            access.Operation) == true;
-                    if (receiverCompletes && !receiverIsNull)
-                    {
-                        remaining.Push(access.WhenNotNull);
-                    }
-                    remaining.Push(access.Operation);
-                    return;
-                case IWithOperation withOperation:
-                    if (canWithCloneComplete(withOperation) &&
-                        withOperation.Initializer is { } initializer)
-                    {
-                        remaining.Push(initializer);
-                    }
-                    remaining.Push(withOperation.Operand);
-                    return;
-                case IObjectCreationOperation creation:
-                    if (creation.Initializer != null &&
-                        creation.Arguments.All(argument =>
-                            canCompleteNormally(argument.Value)) &&
-                        creation.Constructor is { } constructor &&
-                        canMethodCompleteNormally(constructor))
-                    {
-                        remaining.Push(creation.Initializer);
-                    }
-                    PushSequential(creation.Arguments);
-                    return;
-                case ILockOperation @lock:
-                    if (canCompleteNormally(@lock.LockedValue) &&
-                        !IsDefinitelyNull(@lock, @lock.LockedValue))
-                    {
-                        remaining.Push(@lock.Body);
-                    }
-                    remaining.Push(@lock.LockedValue);
-                    return;
-                case ISwitchOperation @switch:
-                    if (canCompleteNormally(@switch.Value))
-                    {
-                        var constant = @switch.Value.ConstantValue;
-                        var cases = GetReachableSwitchCases(
-                            @switch,
-                            constant.HasValue,
-                            constant.Value,
-                            scheduledSwitchBodies,
-                            switchCaseReachability);
-                        PushAll(cases);
-                    }
-                    remaining.Push(@switch.Value);
-                    return;
-                case ISwitchCaseOperation @case
-                    when switchCaseReachability.TryGetValue(
-                        @case,
-                    out var reachability):
-                    if (reachability.BodyReachable)
-                    {
-                        PushSequential(@case.Body);
-                    }
-                    PushAll(reachability.Clauses);
-                    return;
-                case ISwitchExpressionOperation @switch:
-                    if (canCompleteNormally(@switch.Value))
-                    {
-                        PushAll(SwitchExpressionFacts.GetReachableArms(
-                            @switch,
-                            canCompleteNormally,
-                            DefiniteOperationFacts.IsDefinitelyNonNull(
-                                @switch.Value) ||
-                            abstractFlow?.ProvesNonNull(
-                                @switch,
-                                @switch.Value) == true));
-                    }
-                    remaining.Push(@switch.Value);
-                    return;
-                default:
-                    PushSequential(operation.ChildOperations);
-                    return;
-            }
+            PushChildrenCore(
+                operation,
+                remaining,
+                scheduledSwitchBodies,
+                switchCaseReachability);
         }
 
         void PushSequential(IEnumerable<IOperation> children)
@@ -1191,6 +1022,216 @@ internal sealed class ExceptionHandlerReachability(
             {
                 remaining.Push(child);
             }
+        }
+    }
+
+    // Keep this large control-flow dispatcher out of the captured traversal
+    // closure. CA1508 otherwise constructs an expensive interprocedural flow
+    // graph for the local function during every qualifying build.
+    private void PushChildrenCore(
+        IOperation operation,
+        Stack<IOperation> remaining,
+        HashSet<ISwitchCaseOperation> scheduledSwitchBodies,
+        Dictionary<ISwitchCaseOperation, SwitchCaseReachability>
+            switchCaseReachability)
+    {
+        switch (operation)
+        {
+            case INameOfOperation or ITypeOfOperation or ISizeOfOperation:
+                return;
+            case IBlockOperation block:
+                PushSequentialCore(block.Operations, remaining);
+                return;
+            case ISimpleAssignmentOperation assignment:
+                var inputs = GetSimpleAssignmentTargetInputs(
+                    assignment.Target).ToArray();
+                if (inputs.All(canCompleteNormally))
+                {
+                    remaining.Push(assignment.Value);
+                }
+                PushSequentialCore(inputs, remaining);
+                return;
+            case IBinaryOperation
+            {
+                OperatorMethod: null,
+                OperatorKind: BinaryOperatorKind.ConditionalAnd or
+                        BinaryOperatorKind.ConditionalOr
+            } binary:
+                var leftCompletes = canCompleteNormally(binary.LeftOperand);
+                var leftConstant = binary.LeftOperand.ConstantValue is
+                { HasValue: true, Value: bool leftValue }
+                        ? leftValue
+                        : (bool?)null;
+                var evaluatesRight = leftCompletes &&
+                    (binary.OperatorKind == BinaryOperatorKind.ConditionalAnd
+                        ? leftConstant != false
+                        : leftConstant != true);
+                if (evaluatesRight)
+                {
+                    remaining.Push(binary.RightOperand);
+                }
+                remaining.Push(binary.LeftOperand);
+                return;
+            case IConditionalOperation conditional:
+                if (!canCompleteNormally(conditional.Condition))
+                {
+                    remaining.Push(conditional.Condition);
+                    return;
+                }
+                var condition = conditional.Condition.ConstantValue is
+                { HasValue: true, Value: bool conditionValue }
+                        ? conditionValue
+                        : (bool?)null;
+                if (condition != true &&
+                    conditional.WhenFalse is { } whenFalse)
+                {
+                    remaining.Push(whenFalse);
+                }
+                if (condition != false)
+                {
+                    remaining.Push(conditional.WhenTrue);
+                }
+                remaining.Push(conditional.Condition);
+                return;
+            case ICoalesceOperation coalesce:
+                var valueCompletes = canCompleteNormally(coalesce.Value);
+                var definitelyNonNull =
+                    DefiniteOperationFacts.IsDefinitelyNonNull(
+                        coalesce.Value) ||
+                    abstractFlow?.ProvesNonNull(
+                        coalesce,
+                        coalesce.Value) == true;
+                if (valueCompletes && !definitelyNonNull)
+                {
+                    remaining.Push(coalesce.WhenNull);
+                }
+                remaining.Push(coalesce.Value);
+                return;
+            case ICoalesceAssignmentOperation coalesce:
+                var targetCompletes = canCompleteNormally(coalesce.Target);
+                var targetIsNonNull =
+                    DefiniteOperationFacts.IsDefinitelyNonNull(
+                        coalesce.Target) ||
+                    abstractFlow?.ProvesNonNull(
+                        coalesce,
+                        coalesce.Target) == true;
+                if (targetCompletes && !targetIsNonNull)
+                {
+                    remaining.Push(coalesce.Value);
+                }
+                remaining.Push(coalesce.Target);
+                return;
+            case IConditionalAccessOperation access:
+                var receiverCompletes = canCompleteNormally(
+                    access.Operation);
+                var receiverIsNull =
+                    DefiniteOperationFacts.IsDefinitelyNull(
+                        access.Operation) ||
+                    abstractFlow?.ProvesNull(
+                        access,
+                        access.Operation) == true;
+                if (receiverCompletes && !receiverIsNull)
+                {
+                    remaining.Push(access.WhenNotNull);
+                }
+                remaining.Push(access.Operation);
+                return;
+            case IWithOperation withOperation:
+                if (canWithCloneComplete(withOperation) &&
+                    withOperation.Initializer is { } initializer)
+                {
+                    remaining.Push(initializer);
+                }
+                remaining.Push(withOperation.Operand);
+                return;
+            case IObjectCreationOperation creation:
+                if (creation.Initializer != null &&
+                    creation.Arguments.All(argument =>
+                        canCompleteNormally(argument.Value)) &&
+                    creation.Constructor is { } constructor &&
+                    canMethodCompleteNormally(constructor))
+                {
+                    remaining.Push(creation.Initializer);
+                }
+                PushSequentialCore(creation.Arguments, remaining);
+                return;
+            case ILockOperation @lock:
+                if (canCompleteNormally(@lock.LockedValue) &&
+                    !IsDefinitelyNull(@lock, @lock.LockedValue))
+                {
+                    remaining.Push(@lock.Body);
+                }
+                remaining.Push(@lock.LockedValue);
+                return;
+            case ISwitchOperation @switch:
+                if (canCompleteNormally(@switch.Value))
+                {
+                    var constant = @switch.Value.ConstantValue;
+                    var cases = GetReachableSwitchCases(
+                        @switch,
+                        constant.HasValue,
+                        constant.Value,
+                        scheduledSwitchBodies,
+                        switchCaseReachability);
+                    PushAllCore(cases, remaining);
+                }
+                remaining.Push(@switch.Value);
+                return;
+            case ISwitchCaseOperation @case
+                when switchCaseReachability.TryGetValue(
+                    @case,
+                    out var reachability):
+                if (reachability.BodyReachable)
+                {
+                    PushSequentialCore(@case.Body, remaining);
+                }
+                PushAllCore(reachability.Clauses, remaining);
+                return;
+            case ISwitchExpressionOperation @switch:
+                if (canCompleteNormally(@switch.Value))
+                {
+                    PushAllCore(
+                        SwitchExpressionFacts.GetReachableArms(
+                            @switch,
+                            canCompleteNormally,
+                            DefiniteOperationFacts.IsDefinitelyNonNull(
+                                @switch.Value) ||
+                            abstractFlow?.ProvesNonNull(
+                                @switch,
+                                @switch.Value) == true),
+                        remaining);
+                }
+                remaining.Push(@switch.Value);
+                return;
+            default:
+                PushSequentialCore(operation.ChildOperations, remaining);
+                return;
+        }
+    }
+
+    private void PushSequentialCore(
+        IEnumerable<IOperation> children,
+        Stack<IOperation> remaining)
+    {
+        var reachable = new List<IOperation>();
+        foreach (var child in children)
+        {
+            reachable.Add(child);
+            if (!canCompleteNormally(child))
+            {
+                break;
+            }
+        }
+        PushAllCore(reachable, remaining);
+    }
+
+    private static void PushAllCore(
+        IEnumerable<IOperation> children,
+        Stack<IOperation> remaining)
+    {
+        foreach (var child in children.Reverse())
+        {
+            remaining.Push(child);
         }
     }
 
