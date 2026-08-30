@@ -8,10 +8,10 @@ internal static class CompilationFingerprint
         "SHARPPROOF_CONTRACTS";
     private const string SyntaxTreeSnapshotDomain =
         "SharpProof.CompilerSyntaxTreeSnapshot";
-    private const int SyntaxTreeSnapshotVersion = 1;
+    private const int SyntaxTreeSnapshotVersion = 2;
     private const string SourceLineMapDomain =
         "SharpProof.CompilerSourceLineMap";
-    private const int SourceLineMapVersion = 1;
+    private const int SourceLineMapVersion = 2;
 
     internal static string ComputeLineMapSha256(
         CompilerSourceLineMapEntry[] entries)
@@ -52,7 +52,7 @@ internal static class CompilationFingerprint
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            9,
+            10,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
             JsonSerializer.Serialize(
                 CompilerDiagnosticArtifactOrdering.Canonicalize(

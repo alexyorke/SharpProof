@@ -135,6 +135,60 @@ public sealed class CompilerSourceLocationAuthorityTests
     }
 
     [Test]
+    public void LineMapPreservesEnhancedDirectiveCharacterOffsets()
+    {
+        const string source =
+            "internal static class Subject { static void M() {\n" +
+            "#line (5,3)-(5,17) 11 \"template.dsl\"\n" +
+            "output.Add(Greet(\"Hello\"));\n" +
+            "#line default\n" +
+            "} }\n";
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "EnhancedLineDirective.g.cs"));
+        var token = tree.GetRoot().DescendantTokens()
+            .Single(static candidate => candidate.ValueText == "Greet");
+        var expected = tree.GetMappedLineSpan(token.Span);
+        var snapshot = CompilerCompilationCapture.CaptureTree(
+            tree,
+            CancellationToken.None);
+
+        Assert.That(
+            CompilerSourceLocationAuthority.TryMap(
+                snapshot.LineMap,
+                token.SpanStart,
+                out var mappedPath,
+                out var mappedLine,
+                out var mappedColumn),
+            Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(mappedPath, Is.EqualTo(expected.Path));
+            Assert.That(mappedLine, Is.EqualTo(expected.StartLinePosition.Line));
+            Assert.That(mappedColumn, Is.EqualTo(expected.StartLinePosition.Character));
+        }
+
+        var artifact = CreateArtifact(source);
+        var mappedDiagnostics = artifact.CompilerDiagnostics
+            .Where(static diagnostic => diagnostic.Location.Path == "template.dsl")
+            .ToArray();
+        Assert.That(mappedDiagnostics, Is.Not.Empty);
+        Assert.That(
+            mappedDiagnostics.All(diagnostic =>
+                CompilerSourceLocationAuthority.IsBound(
+                    diagnostic.Location,
+                    diagnostic.SourceTreeOrdinal,
+                    diagnostic.SourceTreePath,
+                    diagnostic.SourceTreeSha256,
+                    diagnostic.SourceLineMapSha256,
+                    artifact.Compilation)),
+            Is.True);
+    }
+
+    [Test]
     public void OnlyAllZeroLocationIsTheNonSourceSentinel()
     {
         Assert.That(

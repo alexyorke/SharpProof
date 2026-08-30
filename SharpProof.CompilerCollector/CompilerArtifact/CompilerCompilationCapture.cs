@@ -122,7 +122,16 @@ internal static class CompilerCompilationCapture
         cancellationToken.ThrowIfCancellationRequested();
         var parse = (CSharpParseOptions)tree.Options;
         var text = tree.GetText(cancellationToken);
-        CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select(line =>
+        var characterOffsets = new Dictionary<int, int>();
+        foreach (var mapping in tree.GetLineMappings(cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (mapping.CharacterOffset is { } characterOffset)
+            {
+                characterOffsets[mapping.Span.Start.Line] = characterOffset;
+            }
+        }
+        CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select((line, lineIndex) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var mapped = tree.GetMappedLineSpan(
@@ -133,7 +142,11 @@ internal static class CompilerCompilationCapture
                 SourceLength = line.Span.Length,
                 MappedPath = MappedPath(tree, mapped),
                 MappedLine = mapped.StartLinePosition.Line,
-                MappedColumn = mapped.StartLinePosition.Character
+                MappedColumn = mapped.StartLinePosition.Character,
+                CharacterOffset = characterOffsets.TryGetValue(
+                    lineIndex, out var characterOffset)
+                    ? characterOffset
+                    : 0
             };
         })];
         return new CompilerSyntaxTreeSnapshot

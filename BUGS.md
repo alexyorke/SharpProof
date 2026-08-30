@@ -22,16 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.12. MEDIUM - Enhanced `#line` character offsets make authenticated source locations unreconstructable
-
-- Primary file: `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs`
-- Member: `CaptureTree`
-- Current lines: 125-137, especially 128-136
-- Downstream: `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs`, `CreateLocationAuthorities`/`CreateDiagnostic`, lines 84-86, 180-199, 202-245
-- Mechanism: Capture samples only the mapped path, line, and column at a physical line start, then authority reconstructs later columns linearly. Enhanced C# `#line` mapping uses `startColumn + max(c-characterOffset,0)`, so the first generated line is not captured by that linear rule. Exact Roslyn mapped locations disagree and binding fails.
-- Impact: Legal generated or Razor-style code with a selected location or diagnostic aborts manifest emission.
-- Safe reproduction/evidence: Use a syntax tree containing `#line (5,3)-(5,17) 11 "template.dsl"` and a selected call or diagnostic after the character offset; capture reconstruction differs from Roslyn.
-
 ## Wave 2.13. MEDIUM - Relative syntax-tree paths are normalized only on the snapshot side
 
 - Files and members: `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs`, `CaptureTree`, lines 139-145, especially 141; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs`, `CreateAuthority`, lines 343-363, especially 358; `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs`, `BuildSummaryEvidence`, lines 116-127, especially 118-125.
