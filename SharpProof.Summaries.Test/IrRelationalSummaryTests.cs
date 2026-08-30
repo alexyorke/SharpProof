@@ -731,6 +731,93 @@ public sealed class IrRelationalSummaryTests
     }
 
     [Test]
+    public void CallCompositionConjoinsDependencyNormalCompletion()
+    {
+        var fixture = new SummaryFixture("PartialDependency");
+        var calleeBodyParameter = fixture.Factory.CreateVariable(
+            "callee:body-value",
+            fixture.Factory.IntegerType);
+        var calleeBuilder = new IrProgramBuilder(fixture.Factory);
+        var calleeEntry = calleeBuilder.CreateBlock("callee:entry");
+        calleeBuilder.Return(
+            calleeEntry,
+            fixture.Factory.CreateOperation("callee:return"),
+            fixture.Factory.Binary(
+                IrBinaryOperator.Divide,
+                fixture.Factory.Integer(10),
+                fixture.Factory.Variable(calleeBodyParameter)));
+        var calleeSummary = IrRelationalSummaryBuilder.Build(
+            calleeBuilder.Build(),
+            fixture.Signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [calleeBodyParameter] =
+                    fixture.Factory.Variable(fixture.Parameter)
+            }).Summary!;
+
+        var callerBodyParameter = fixture.Factory.CreateVariable(
+            "caller:body-value",
+            fixture.Factory.IntegerType);
+        var callResult = fixture.Factory.CreateVariable(
+            "caller:call-result",
+            fixture.Factory.IntegerType);
+        var callerBuilder = new IrProgramBuilder(fixture.Factory);
+        var callerEntry = callerBuilder.CreateBlock("caller:entry");
+        var call = callerBuilder.Call(
+            callerEntry,
+            fixture.Factory.CreateOperation("caller:call"),
+            callResult,
+            fixture.Member,
+            receiver: null,
+            fixture.Factory.Variable(callerBodyParameter));
+        callerBuilder.Return(
+            callerEntry,
+            fixture.Factory.CreateOperation("caller:return"),
+            fixture.Factory.Variable(callResult));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            callerBuilder.Build(),
+            new IrSummarySignature(
+                fixture.CreateMember("Caller"),
+                receiver: null,
+                [fixture.Parameter],
+                fixture.Result,
+                Provenance('b')),
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [callerBodyParameter] =
+                    fixture.Factory.Variable(fixture.Parameter)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [call.Id] = calleeSummary
+            });
+
+        Assert.That(built.IsSuccess, Is.True, built.Reason.ToString());
+        var callValue = built.Summary!.ExistentialVariables.Single();
+        var replacements = new Dictionary<IrVarId, IrTerm>
+        {
+            [fixture.Parameter] = fixture.Factory.Variable(fixture.Parameter),
+            [fixture.Result] = fixture.Factory.Variable(callValue)
+        };
+        var expectedCompletion = IrSubstitution.Substitute(
+            fixture.Factory,
+            calleeSummary.NormalCompletion,
+            replacements);
+        var expectedRelation = IrSubstitution.Substitute(
+            fixture.Factory,
+            calleeSummary.NormalRelation,
+            replacements);
+
+        Assert.That(
+            built.Summary.NormalCompletion,
+            Is.EqualTo(fixture.Factory.Binary(
+                IrBinaryOperator.AndAlso,
+                expectedCompletion,
+                expectedRelation)));
+    }
+
+    [Test]
     public void DependencyProvenanceIdentityComponentsAreDeduplicatedStructurally()
     {
         var fixture = new SummaryFixture("Caller");
