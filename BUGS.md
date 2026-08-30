@@ -1,6 +1,6 @@
 # Bug backlog
 
-452 open bugs, reprioritized by impact, reachability, and affected scope.
+451 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,9 +9,8 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (164)
+## P0 - Critical (163)
 
-- **BUG-003 [P0] - AdditionalText provenance can bind a different read than generation:** The generator consumes AdditionalText once, while the probe and compiler collector independently read it again afterward for provenance. A stateful or changed provider can generate code from value A while both trusted artifacts authenticate value B.
 - **BUG-007 [P0] - Bare rethrow loses the runtime exception subtype:** EffectExceptionFlow replaces a bare rethrow's actual exception type with the enclosing catch declaration. Outer subtype catches can be marked unreachable, dropping their writes, allocations, and exceptions from complete effect analysis.
 - **BUG-008 [P0] - Beforefieldinit method summaries omit type-initializer effects:** EffectMethodNodeBuilder ignores implicit beforefieldinit static initialization when summarizing same-assembly static methods. A complete summary can omit initializer effects and TypeInitializationException, allowing false effect or exception-contract proofs.
 - **BUG-009 [P0] - Binary pattern short-circuiting is ignored:** ManagedAbstractFlow requires both arms of and/or patterns to complete instead of modeling left-to-right short-circuiting. A genuinely returning helper can be classified nonreturning, causing real caller suffix effects to disappear from a Complete summary and enabling unsound effect proofs.

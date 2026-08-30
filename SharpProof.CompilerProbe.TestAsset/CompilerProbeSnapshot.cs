@@ -4,6 +4,9 @@ namespace SharpProof.CompilerProbe.TestAsset;
 
 internal static class CompilerProbeSnapshot
 {
+    private const string CommandLineAdditionalTextTypeName =
+        "Microsoft.CodeAnalysis.AdditionalTextFile";
+
     internal static string Create(CompilationAnalysisContext context)
     {
         var compilation = (CSharpCompilation)context.Compilation;
@@ -408,8 +411,9 @@ internal static class CompilerProbeSnapshot
         return context.Options.AdditionalFiles
             .Select(file =>
             {
-                var text = file.GetText(context.CancellationToken)?
-                    .ToString() ?? string.Empty;
+                var text = GetStableAdditionalText(
+                    file,
+                    context.CancellationToken).ToString();
                 var builder = new StringBuilder();
                 var first = true;
                 builder.Append('{');
@@ -435,6 +439,30 @@ internal static class CompilerProbeSnapshot
                 return builder.ToString();
             })
             .OrderBy(static row => row, StringComparer.Ordinal);
+    }
+
+    private static SourceText GetStableAdditionalText(
+        AdditionalText file,
+        CancellationToken cancellationToken)
+    {
+        // The command-line compiler's AdditionalTextFile caches one
+        // Lazy<SourceText> for both generators and analyzers. A custom provider
+        // has no equivalent consistency guarantee, so it cannot back this
+        // final-compilation authority.
+        var providerType = file.GetType();
+        if (providerType.Assembly != typeof(AdditionalText).Assembly ||
+            !string.Equals(
+                providerType.FullName,
+                CommandLineAdditionalTextTypeName,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "An additional file does not expose a stable compiler input snapshot.");
+        }
+
+        return file.GetText(cancellationToken) ??
+            throw new InvalidOperationException(
+                "An additional file has no compiler text.");
     }
 
     private static string GetOption(
