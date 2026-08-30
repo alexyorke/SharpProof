@@ -1269,6 +1269,17 @@ public sealed class ArchitectureTests
                 packageTests,
                 Does.Contain("workerMethods = $workerMethodTimings"));
             Assert.That(
+                packageTests,
+                Does.Contain(
+                    "$directVstest = $NoBuild -and -not $coverageEnabled"));
+            Assert.That(
+                packageTests,
+                Does.Contain("'/TestCaseFilter:' + $shard.Filter"));
+            Assert.That(
+                packageTests,
+                Does.Contain(
+                    "'/ResultsDirectory:' + (Join-Path $results $shard.Name)"));
+            Assert.That(
                 mutationDriver,
                 Does.Contain("Get-SharpProofMutationBaselinePlan"));
             Assert.That(

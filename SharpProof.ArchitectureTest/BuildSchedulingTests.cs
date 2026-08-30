@@ -168,6 +168,8 @@ public sealed class BuildSchedulingTests
                 Does.Contain("$arguments = @('vstest', $assembly)"));
             Assert.That(container,
                 Does.Contain("'/TestCaseFilter:' + $TestFilter"));
+            Assert.That(container,
+                Does.Contain("'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj'"));
         }
     }
 

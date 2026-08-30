@@ -285,6 +285,17 @@ switch ($Command) {
                 'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',
                 '--locked-mode')
         }
+        if ($NoBuild) {
+            $assembly = Get-SharpProofTestAssemblyPath `
+                -ProjectPath 'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj' `
+                -Configuration $Configuration
+            $arguments = @('vstest', $assembly)
+            if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+                $arguments += '/TestCaseFilter:' + $TestFilter
+            }
+            Invoke-DotNet $arguments
+            break
+        }
         $arguments = @(
             'test',
             'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',

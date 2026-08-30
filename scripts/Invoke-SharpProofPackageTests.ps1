@@ -54,6 +54,14 @@ $resolvedCoverageResults = if ($coverageEnabled) {
 else {
     ''
 }
+$testAssembly = if ($NoBuild -and -not $coverageEnabled) {
+    Get-SharpProofTestAssemblyPath `
+        -ProjectPath $testProject `
+        -Configuration $Configuration
+}
+else {
+    ''
+}
 $isolatedOutputRoot = if ($coverageEnabled) {
     Join-Path $repositoryRoot (
         '.sharpproof-coverage-output-' + [Guid]::NewGuid().ToString('N'))
@@ -353,17 +361,33 @@ try {
                         $isolatedOutputRoot (
                             $shard.Name + '/' + $Configuration + '/net9.0'))
             }
-            $arguments = @(
-                'test', $testProject, '-c', $Configuration,
-                '--no-build', '--no-restore')
-            if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
+            $directVstest = $NoBuild -and -not $coverageEnabled
+            $arguments = if ($directVstest) {
+                @('vstest', $testAssembly)
+            }
+            else {
+                @(
+                    'test', $testProject, '-c', $Configuration,
+                    '--no-build', '--no-restore')
+            }
+            if (-not $directVstest -and
+                -not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
                 $arguments += '-p:OutDir=' + $isolatedOutput + '/'
             }
-            $arguments += @(
+            if ($directVstest) {
+                $arguments += '/TestCaseFilter:' + $shard.Filter
+                $arguments += '/logger:console;verbosity=minimal'
+                $arguments += "/logger:trx;LogFileName=$($shard.Name).trx"
+                $arguments += '/ResultsDirectory:' + (
+                    Join-Path $results $shard.Name)
+            }
+            else {
+                $arguments += @(
                     '--filter', $shard.Filter,
                     '--logger', 'console;verbosity=minimal',
                     '--logger', "trx;LogFileName=$($shard.Name).trx",
                     '--results-directory', (Join-Path $results $shard.Name))
+            }
             if ($coverageEnabled) {
                 $arguments += @(
                     '--settings', $resolvedCoverageSettings,
