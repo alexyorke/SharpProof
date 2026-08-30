@@ -77,6 +77,11 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                             return FromEvaluation(tested, instruction, values, steps);
                         }
 
+                        if (tested.Value!.Kind != IrValueKind.Boolean)
+                        {
+                            return InvalidCondition(instruction, values, steps);
+                        }
+
                         if (!tested.Value!.Boolean)
                         {
                             return Result(instruction is IrAssumeInstruction
@@ -90,6 +95,11 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         if (condition.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(condition, branch, values, steps);
+                        }
+
+                        if (condition.Value!.Kind != IrValueKind.Boolean)
+                        {
+                            return InvalidCondition(branch, values, steps);
                         }
 
                         current = condition.Value!.Boolean ? branch.WhenTrue : branch.WhenFalse;
@@ -238,6 +248,20 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             evaluation.Status == IrEvaluationStatus.Exception ? null : evaluation.Unsupported,
             evaluation.Status == IrEvaluationStatus.Exception ? evaluation.Exception : null,
             values.ToImmutable(), steps);
+    }
+
+    private static IrProgramExecutionResult InvalidCondition(
+        IrInstruction instruction,
+        ImmutableDictionary<IrVarId, IrValue>.Builder values,
+        int steps)
+    {
+        return FromEvaluation(
+            IrEvaluationResult.FromUnsupported(
+                IrUnsupportedReason.InvalidVariableValue,
+                "Program conditions require boolean values."),
+            instruction,
+            values,
+            steps);
     }
 
     private static IrProgramExecutionResult Unsupported(IrInstruction instruction,
