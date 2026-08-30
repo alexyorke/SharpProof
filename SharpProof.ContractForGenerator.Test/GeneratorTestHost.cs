@@ -64,16 +64,52 @@ internal static class GeneratorTestHost
         IReadOnlyDictionary<string, string>? globalOptions = null)
     {
         var driver = previousDriver ?? CreateDriver(globalOptions);
+        return RunCore(compilation, driver, globalOptions);
+    }
+
+    internal static GeneratorRun RunWithGenerator(
+        CSharpCompilation compilation,
+        IIncrementalGenerator generator,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
+    {
+        ArgumentNullException.ThrowIfNull(generator);
+        return RunCore(
+            compilation,
+            CreateDriver(generator, globalOptions),
+            globalOptions);
+    }
+
+    internal static GeneratorRun RunWithAnalyzer(
+        CSharpCompilation compilation,
+        DiagnosticAnalyzer analyzer,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
+    {
+        ArgumentNullException.ThrowIfNull(analyzer);
+        return RunCore(
+            compilation,
+            CreateDriver(globalOptions),
+            globalOptions,
+            analyzer);
+    }
+
+    private static GeneratorRun RunCore(
+        CSharpCompilation compilation,
+        GeneratorDriver driver,
+        IReadOnlyDictionary<string, string>? globalOptions,
+        DiagnosticAnalyzer? analyzer = null)
+    {
         driver = driver.RunGeneratorsAndUpdateCompilation(
             compilation,
             out var outputCompilation,
             out var driverDiagnostics);
+        RequireNoErrors((CSharpCompilation)outputCompilation);
         var runResult = driver.GetRunResult();
         var diagnostics = runResult.Diagnostics
             .Concat(driverDiagnostics)
             .Concat(AnalyzeFinalCompilation(
                 (CSharpCompilation)outputCompilation,
-                globalOptions))
+                globalOptions,
+                analyzer))
             .Distinct(DiagnosticIdentityComparer.Instance)
             .OrderBy(
                 static diagnostic =>
@@ -96,7 +132,8 @@ internal static class GeneratorTestHost
 
     private static ImmutableArray<Diagnostic> AnalyzeFinalCompilation(
         CSharpCompilation compilation,
-        IReadOnlyDictionary<string, string>? globalOptions)
+        IReadOnlyDictionary<string, string>? globalOptions,
+        DiagnosticAnalyzer? analyzer)
     {
         var options = new AnalyzerOptions(
             [],
@@ -104,7 +141,7 @@ internal static class GeneratorTestHost
                 globalOptions ??
                 new Dictionary<string, string>(StringComparer.Ordinal)));
         var withAnalyzers = compilation.WithAnalyzers(
-            [new SharpProofAnalyzer()],
+            [analyzer ?? new SharpProofAnalyzer()],
             new CompilationWithAnalyzersOptions(
                 options,
                 onAnalyzerException: null,
@@ -114,9 +151,9 @@ internal static class GeneratorTestHost
         return [.. withAnalyzers.GetAnalyzerDiagnosticsAsync()
             .GetAwaiter()
             .GetResult()
-            .Where(static diagnostic => diagnostic.Id.StartsWith(
-                "SPCF",
-                StringComparison.Ordinal))];
+            .Where(static diagnostic =>
+                diagnostic.Id.StartsWith("SPCF", StringComparison.Ordinal) ||
+                diagnostic.Id == "AD0001")];
     }
 
     internal static ImmutableArray<string> DiagnosticKeys(
@@ -132,9 +169,18 @@ internal static class GeneratorTestHost
     private static CSharpGeneratorDriver CreateDriver(
         IReadOnlyDictionary<string, string>? globalOptions)
     {
+        return CreateDriver(
+            new ContractForValidatorGenerator(),
+            globalOptions);
+    }
+
+    private static CSharpGeneratorDriver CreateDriver(
+        IIncrementalGenerator generator,
+        IReadOnlyDictionary<string, string>? globalOptions)
+    {
         return CSharpGeneratorDriver.Create(
             generators: [
-                new ContractForValidatorGenerator().AsSourceGenerator()
+                generator.AsSourceGenerator()
             ],
             parseOptions: ParseOptions,
             optionsProvider: globalOptions == null

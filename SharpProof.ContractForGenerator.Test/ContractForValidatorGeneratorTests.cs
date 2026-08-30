@@ -3,6 +3,39 @@ namespace SharpProof.ContractForGenerator.Test;
 [TestFixture]
 public sealed class ContractForValidatorGeneratorTests
 {
+    [Test]
+    public void InvalidGeneratedSourceIsRejectedByTheTestHost()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs", "public sealed class Subject { }"));
+
+        Action action = () =>
+        {
+            _ = GeneratorTestHost.RunWithGenerator(
+                compilation,
+                new InvalidOutputGenerator());
+        };
+        var exception = Assert.Throws<InvalidOperationException>(action);
+
+        Assert.That(exception, Is.Not.Null);
+        Assert.That(exception!.Message, Does.Contain("CS1513"));
+    }
+
+    [Test]
+    public void AnalyzerCrashesRemainVisibleToTheTestHost()
+    {
+        var compilation = GeneratorTestHost.CreateCompilation(
+            ("Subject.cs", "public sealed class Subject { }"));
+
+        var run = GeneratorTestHost.RunWithAnalyzer(
+            compilation,
+            new ThrowingAnalyzer());
+
+        Assert.That(
+            run.Diagnostics.Any(static diagnostic => diagnostic.Id == "AD0001"),
+            Is.True);
+    }
+
     [TestCase("double", "-0.0", "0.0")]
     [TestCase("double", "0.0", "-0.0")]
     [TestCase("float", "-0.0f", "0.0f")]
@@ -2045,3 +2078,39 @@ public sealed class ContractForValidatorGeneratorTests
             "Repository root was not found.");
     }
 }
+
+internal sealed class InvalidOutputGenerator : IIncrementalGenerator
+{
+    public void Initialize(IncrementalGeneratorInitializationContext context)
+    {
+        context.RegisterPostInitializationOutput(static postInitialization =>
+            postInitialization.AddSource(
+                "Invalid.g.cs",
+                "public sealed class Generated {"));
+    }
+}
+
+#pragma warning disable RS1036, RS1041, RS2008
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
+internal sealed class ThrowingAnalyzer : DiagnosticAnalyzer
+{
+    private static readonly DiagnosticDescriptor FailureRule = new(
+        "SPTEST0001",
+        "Throwing test analyzer",
+        "Throwing test analyzer",
+        "SharpProof.Tests",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        [FailureRule];
+
+    public override void Initialize(AnalysisContext context)
+    {
+        context.EnableConcurrentExecution();
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.RegisterCompilationAction(static _ =>
+            throw new InvalidOperationException("Intentional analyzer failure."));
+    }
+}
+#pragma warning restore RS1036, RS1041, RS2008
