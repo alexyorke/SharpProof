@@ -145,6 +145,35 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void SemanticBuildUsesOnlyItsRequiredProjectClosure()
+    {
+        var semantic = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(semantic, Does.Contain("$semanticBuildProjects"));
+            Assert.That(semantic,
+                Does.Contain(
+                    "SharpProof.Worker.Test\\SharpProof.Worker.Test.csproj"));
+            Assert.That(semantic,
+                Does.Contain("'.sharpproof-semantic-build-'"));
+            Assert.That(semantic,
+                Does.Contain("'restore', $semanticBuildFilter"));
+            Assert.That(semantic,
+                Does.Contain("'build', $semanticBuildFilter"));
+            Assert.That(semantic,
+                Does.Contain("Remove-Item -LiteralPath $semanticBuildFilter"));
+            Assert.That(semantic,
+                Does.Not.Contain("'restore', 'SharpProof.sln'"));
+            Assert.That(semantic,
+                Does.Not.Contain("'build', 'SharpProof.sln'"));
+        }
+    }
+
+    [Test]
     public void NestedPackageConsumersUseClosureScopedCompilerServers()
     {
         var root = FindRepositoryRoot();

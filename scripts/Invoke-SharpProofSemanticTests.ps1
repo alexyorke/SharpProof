@@ -33,6 +33,12 @@ Import-Module (Join-Path `
 $parallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+$semanticSolutionFilter = Join-Path `
+    $repositoryRoot 'SharpProof.Semantic.Tests.slnf'
+$semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
+    ConvertFrom-Json
+$semanticProjects = @($semanticSolution.solution.projects |
+        ForEach-Object { ([string]$_).Replace('\', '/') })
 $coverageEnabled =
     -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
     -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
@@ -76,13 +82,36 @@ function Invoke-RequiredDotnet {
 }
 
 if (-not $NoBuild) {
-    Invoke-RequiredDotnet @('restore', 'SharpProof.sln', '--locked-mode')
-    $buildArguments = @(
-        'build', 'SharpProof.sln', '-c', $Configuration, '--no-restore')
-    if ($Fast) {
-        $buildArguments += '-p:RunAnalyzersDuringBuild=false'
+    $semanticBuildProjects = @($semanticSolution.solution.projects) + @(
+        'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj')
+    $semanticBuildFilter = Join-Path $repositoryRoot (
+        '.sharpproof-semantic-build-' +
+        [Guid]::NewGuid().ToString('N') + '.slnf')
+    try {
+        [pscustomobject]@{
+            solution = [ordered]@{
+                path = 'SharpProof.sln'
+                projects = $semanticBuildProjects
+            }
+        } | ConvertTo-Json -Depth 4 |
+            Set-Content `
+                -LiteralPath $semanticBuildFilter `
+                -Encoding utf8NoBOM
+        Invoke-RequiredDotnet @(
+            'restore', $semanticBuildFilter, '--locked-mode')
+        $buildArguments = @(
+            'build', $semanticBuildFilter,
+            '-c', $Configuration, '--no-restore')
+        if ($Fast) {
+            $buildArguments += '-p:RunAnalyzersDuringBuild=false'
+        }
+        Invoke-RequiredDotnet $buildArguments
     }
-    Invoke-RequiredDotnet $buildArguments
+    finally {
+        if (Test-Path -LiteralPath $semanticBuildFilter) {
+            Remove-Item -LiteralPath $semanticBuildFilter -Force
+        }
+    }
 }
 
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
@@ -178,11 +207,6 @@ $architectureShardingEnabled =
     -not $coverageEnabled -and
     [string]::IsNullOrWhiteSpace($TestFilter)
 $semanticProjectShardingEnabled = $architectureShardingEnabled
-$semanticProjects = @(
-    (Get-Content -LiteralPath (Join-Path `
-        $repositoryRoot 'SharpProof.Semantic.Tests.slnf') -Raw |
-        ConvertFrom-Json).solution.projects |
-        ForEach-Object { ([string]$_).Replace('\', '/') })
 $workerClassPrefix = 'SharpProof.Worker.Test.'
 $claimFilter =
     'FullyQualifiedName~' + $workerClassPrefix + 'ClaimManifestBuilderTests'

@@ -1274,7 +1274,7 @@ public sealed class ArchitectureTests
             Assert.That(
                 packageTests,
                 Does.Contain(
-                    "$directVstest = $NoBuild -and -not $coverageEnabled"));
+                    "$directVstest = -not $coverageEnabled -and"));
             Assert.That(
                 packageTests,
                 Does.Contain("'/TestCaseFilter:' + $shard.Filter"));
