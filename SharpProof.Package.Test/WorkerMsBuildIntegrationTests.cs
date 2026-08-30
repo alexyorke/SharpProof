@@ -1719,6 +1719,90 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task AbnormalWorkerExitCannotPublishCompleteEvidence()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+        var requestPath = project.VerifyOutputPath(
+            "net8.0", "abnormal-exit-request.json");
+        var resultPath = project.VerifyOutputPath(
+            "net8.0", "abnormal-exit-result.json");
+        var publicationDirectory = Path.Combine(
+            project.Root,
+            "abnormal-exit-publication");
+        Directory.CreateDirectory(publicationDirectory);
+        var publishRequestPath = Path.Combine(
+            publicationDirectory,
+            "request.json");
+        var publishResultPath = Path.Combine(
+            publicationDirectory,
+            "result.json");
+        var publishManifestPath = Path.Combine(
+            publicationDirectory,
+            "compiler-manifest.json");
+        var publishSarifPath = Path.Combine(
+            publicationDirectory,
+            "result.sarif");
+
+        var exitCode = await Program.RunMain(
+            [
+                "verify",
+                "--worker", WorkerOutputPath(),
+                "--request", requestPath,
+                "--result", resultPath,
+                "--compiler-manifest", project.CompilerManifestPath,
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow",
+                "--publish-request", publishRequestPath,
+                "--publish-result", publishResultPath,
+                "--publish-compiler-manifest", publishManifestPath,
+                "--publish-sarif", publishSarifPath
+            ],
+            static path => WorkerBinaryIdentity.ComputeSha256(path),
+            (arguments, _, _, _) =>
+            {
+                var request = WorkerProtocolJson.DeserializeRequest(
+                    File.ReadAllText(arguments.RequestPath))!;
+                var response = WorkerProtocolJson.DeserializeResponse(
+                    File.ReadAllText(project.ResultPath))!;
+                response.RequestHash = WorkerProtocolJson.ComputeRequestHash(request);
+                response.InputHash = Program.ComputeExpectedInputHash(
+                    arguments.WorkerPath,
+                    request,
+                    File.ReadAllBytes(arguments.CompilerManifestPath));
+                File.WriteAllText(
+                    arguments.ResultPath,
+                    WorkerProtocolJson.SerializeResponse(response));
+                return 42;
+            });
+
+        var publishedResponse = WorkerProtocolJson.DeserializeResponse(
+            await File.ReadAllTextAsync(publishResultPath))!;
+        using var sarif = JsonDocument.Parse(
+            await File.ReadAllTextAsync(publishSarifPath));
+        var invocation = sarif.RootElement.GetProperty("runs")[0]
+            .GetProperty("invocations")[0];
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exitCode, Is.EqualTo(3));
+            Assert.That(
+                publishedResponse.RunStatus,
+                Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                publishedResponse.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.MalformedResult));
+            Assert.That(
+                publishedResponse.Errors.Select(static error => error.Code),
+                Does.Contain("worker.malformed_result"));
+            Assert.That(
+                invocation.GetProperty("executionSuccessful").GetBoolean(),
+                Is.False);
+        }
+    }
+
+    [Test]
     [SupportedOSPlatform("linux")]
     public async Task LauncherReportsInProcessPublicationFailure()
     {
