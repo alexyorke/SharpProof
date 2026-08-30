@@ -18,16 +18,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 28. HIGH - Production inventory silently drops repository-local analyzer identities when binaries are absent or unreadable
-
-- File: `scripts/Get-SharpProofProductionInventory.ps1`
-- Member: Main analyzer loop
-- Lines: 346-359, especially the try at 351-355 and catch at 356
-- Related locations: `eng/acceptance/Verify.ps1` lines 235-247; `eng/container/entrypoint.sh` lines 134-145; `SharpProof.AnalyzerConsumer.props` lines 39-66.
-- Mechanism: Exceptions from `Resolve-RepositoryPath` or `Get-Sha256Hex` are blanket-caught and produce a blank path and hash, indistinguishable from an expected external analyzer. The canonical task copy excludes `bin` and `obj`, and acceptance inventories after restore but before build, so real local analyzer outputs can be absent.
-- Impact: `sourceUniverseSha256` and `generatorInputs` omit the path and bytes of analyzers influencing production; missing, stale, permission, and hashing failures fail open.
-- Safe reproduction/evidence: Run inventory in an isolated clean task copy after restore, or evaluate a repository-local Analyzer `FullPath` pointing to an absent fixture. The output contains blank path and hash rather than failing.
-
 # Read-Only Multi-Agent Bug Audit - Wave 2 - 2026-08-29
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).

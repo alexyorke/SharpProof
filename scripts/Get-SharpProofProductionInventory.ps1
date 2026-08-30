@@ -401,11 +401,21 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
         $relative = ''
         $sha = ''
         if (-not [string]::IsNullOrWhiteSpace($fullPath)) {
-            try {
-                $relative = Resolve-RepositoryPath -Candidate $fullPath -Description ("analyzer '" + $identity + "'")
-                $sha = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($relative.Replace('/', $pathSeparator)))
+            $normalizedAnalyzerPath = $fullPath.Replace('\', '/')
+            $resolvedAnalyzerPath = if (
+                [IO.Path]::IsPathRooted($normalizedAnalyzerPath)) {
+                [IO.Path]::GetFullPath($normalizedAnalyzerPath)
             }
-            catch { $relative = '' }
+            else {
+                [IO.Path]::GetFullPath((Join-Path `
+                    $resolvedRepositoryRoot $normalizedAnalyzerPath))
+            }
+            if ($resolvedAnalyzerPath.StartsWith(
+                    $repositoryPrefix,
+                    [StringComparison]::Ordinal)) {
+                $relative = Resolve-RepositoryPath -Candidate $fullPath -Description ("analyzer '" + $identity + "'")
+                $sha = Get-Sha256Hex -Path $resolvedAnalyzerPath
+            }
         }
         if ([IO.Path]::IsPathRooted($identity)) { $identity = [IO.Path]::GetFileName($identity) }
         [void]$analyzerRecords.Add([pscustomobject][ordered]@{ project = $projectName; identity = $identity; path = $relative; sha256 = $sha })

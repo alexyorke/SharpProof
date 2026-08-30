@@ -99,6 +99,48 @@ public sealed class ProductionInventoryAuthorityTests
     }
 
     [Test]
+    public async Task InventoryRejectsMissingRepositoryAnalyzer()
+    {
+        var repository = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-production-inventory-analyzer-" +
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(repository);
+        try
+        {
+            await InitializeRepositoryAsync(repository);
+            await WriteFixtureAsync(repository);
+            var projectPath = Path.Combine(
+                repository,
+                "Project",
+                "Project.csproj");
+            var project = await File.ReadAllTextAsync(projectPath);
+            await File.WriteAllTextAsync(
+                projectPath,
+                project.Replace(
+                    "    <Compile Include=\"**/*.cs\" Exclude=\"bin/**/*.cs;obj/**/*.cs\" />",
+                    "    <Compile Include=\"**/*.cs\" Exclude=\"bin/**/*.cs;obj/**/*.cs\" />\n" +
+                    "    <Analyzer Include=\"../tools/MissingAnalyzer.dll\" />",
+                    StringComparison.Ordinal));
+            await CommitAllAsync(repository, "missing analyzer fixture");
+
+            var result = await RunInventoryProcessAsync(repository);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Not.Zero);
+                Assert.That(
+                    result.Error + result.Output,
+                    Does.Contain("MissingAnalyzer.dll"));
+            }
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    [Test]
     public void ProductionConsumersUseOneInventoryAuthority()
     {
         var root = RepositoryRoot();
