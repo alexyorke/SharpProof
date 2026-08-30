@@ -123,10 +123,18 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         orderedVariables = [.. variables.Values];
         foreach (var variable in orderedVariables)
         {
-            if (!values.ContainsKey(variable))
+            if (!values.TryGetValue(variable, out var value))
             {
                 program = "";
                 reason = "A referenced variable has no concrete value.";
+                return false;
+            }
+
+            var variableType = _factory.GetVariableInfo(variable).Type;
+            if (value == null || value.Type != variableType)
+            {
+                program = "";
+                reason = "A referenced variable has an invalid concrete value.";
                 return false;
             }
         }

@@ -201,13 +201,6 @@ This section records 37 findings from exactly 10 fresh read-only auditors after 
 
 This section records 7 findings from exactly 10 fresh read-only auditors. The relay compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 4.2. MEDIUM - Invalid variable bindings escape Compare as host exceptions or false mismatches
-
-- Files and members: `SharpProof.Testing/IrCSharpDifferentialOracle.cs`, `IrCSharpDifferentialOracle.Compare`, lines 37-38 and 75-87; `TryCreateProgram`, lines 107-115; `ToRuntimeValue`, lines 347-368. Related: `SharpProof.Ir/IrInterpreter.cs`, binding validation at lines 174-189.
-- Mechanism: `IrInterpreter.Evaluate` converts a null or wrong-type binding into `IrEvaluationStatus.Unsupported`, but `TryCreateProgram` checks only that every referenced variable key exists. `Compare` then evaluates `ToRuntimeValue(variables[binding], ...)` and performs reflection argument binding inside a try that catches only `TargetInvocationException`. A null value dereferences `value.Kind` and throws `NullReferenceException`; a wrong-type value such as Boolean `IrValue` for a long parameter reaches `MethodInfo.Invoke` and throws an uncaught `ArgumentException`. If reflection accepts the mismatch, such as a string object supplied to an object parameter despite incompatible `IrValue.Type`, compiled execution can instead report a misleading `Mismatch` against the interpreter's `Unsupported` result.
-- Impact: A public differential comparison can terminate a fuzz or test run instead of returning `DifferentialResult`, or can report a semantic mismatch caused only by an invalid test environment.
-- Safe evidence: Source-path proof: `IrInterpreter` lines 174-189 returns `Unsupported` for missing, wrong, or null values; oracle lines 107-115 check only `ContainsKey`; lines 81-82 convert and invoke; lines 85-87 catch only exceptions thrown by the generated target.
-
 ## Wave 4.4. MEDIUM - Contradictory entry conditions do not short-circuit callable postcondition verification
 
 - Files and members: `SharpProof.Worker/CallableVerifier.cs`, `VerifyPostconditionsAsync`, lines 96-101, 103-131, and 187-218; intended contradictory-vacuity handling at lines 251-292. Related: `EffectClaimResultAssembler.Assemble`, lines 62-77.

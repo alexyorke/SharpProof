@@ -99,6 +99,81 @@ public sealed class IrCSharpDifferentialOracleTests
     }
 
     [Test]
+    public void NullVariableBindingAbstainsWithoutEscaping()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+
+        var result = new IrCSharpDifferentialOracle(factory).Compare(
+            factory.Variable(value),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [value] = null!
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Abstained));
+            Assert.That(
+                result.Interpreted.Status,
+                Is.EqualTo(IrEvaluationStatus.Unsupported));
+            Assert.That(
+                result.Interpreted.Unsupported!.Reason,
+                Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
+        }
+    }
+
+    [Test]
+    public void WrongTypeVariableBindingAbstainsWithoutEscaping()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+
+        var result = new IrCSharpDifferentialOracle(factory).Compare(
+            factory.Variable(value),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [value] = factory.CreateBooleanValue(true)
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Abstained));
+            Assert.That(
+                result.Interpreted.Status,
+                Is.EqualTo(IrEvaluationStatus.Unsupported));
+            Assert.That(
+                result.Interpreted.Unsupported!.Reason,
+                Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
+        }
+    }
+
+    [Test]
+    public void RuntimeCompatibleWrongTypeBindingAbstainsInsteadOfMismatching()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.ObjectType);
+
+        var result = new IrCSharpDifferentialOracle(factory).Compare(
+            factory.Variable(value),
+            new Dictionary<IrVarId, IrValue>
+            {
+                [value] = factory.CreateStringValue("text")
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Abstained));
+            Assert.That(
+                result.Interpreted.Status,
+                Is.EqualTo(IrEvaluationStatus.Unsupported));
+            Assert.That(
+                result.Interpreted.Unsupported!.Reason,
+                Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
+        }
+    }
+
+    [Test]
     public void RenderableSequenceAccessChecksValueAndExceptionEdges()
     {
         var factory = new IrFactory();
