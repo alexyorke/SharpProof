@@ -51,6 +51,24 @@ services:
       - sharpproof-dotnet-home:/home/sharpproof/.dotnet
     command: ["dev", "-lc", "while sleep 1000; do :; done"]
 
+  loop:
+    <<: *sharpproof-common
+    user: "${SHARPPROOF_USER_UID:-1000}:${SHARPPROOF_USER_GID:-1000}"
+    environment:
+      NUGET_PACKAGES: /home/sharpproof/.nuget/packages
+      DOTNET_CLI_HOME: /home/sharpproof/.dotnet
+      SHARPPROOF_REPO_ROOT: /workspace/SharpProof
+      SHARPPROOF_TEST_PROJECT_PARALLELISM: ${SHARPPROOF_TEST_PROJECT_PARALLELISM:-}
+      SHARPPROOF_LOOP_SOURCE_ROOT: /workspace/HostSource
+      SHARPPROOF_LOOP_ARTIFACTS_ROOT: /workspace/LoopArtifacts
+    volumes:
+      - .:/workspace/HostSource:ro
+      - sharpproof-loop-workspace:/workspace/SharpProof
+      - sharpproof-nuget:/home/sharpproof/.nuget/packages
+      - sharpproof-dotnet-home:/home/sharpproof/.dotnet
+      - ./artifacts:/workspace/LoopArtifacts
+    command: ["dev", "-lc", "while sleep 1000; do :; done"]
+
   tooling:
     <<: *sharpproof-common
     command: ["dev"]
@@ -147,5 +165,6 @@ services:
 
 volumes:
   sharpproof-workspace:
+  sharpproof-loop-workspace:
   sharpproof-nuget:
   sharpproof-dotnet-home:

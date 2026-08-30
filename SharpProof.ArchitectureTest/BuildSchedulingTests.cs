@@ -174,6 +174,59 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void PersistentLoopReusesPrivateBuildOutputsAndSerializesCommands()
+    {
+        var root = FindRepositoryRoot();
+        var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
+        var dockerfile = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "Dockerfile"));
+        var loop = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "loop-command.sh"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(compose, Does.Contain("  loop:"));
+            Assert.That(
+                compose,
+                Does.Contain(".:/workspace/HostSource:ro"));
+            Assert.That(
+                compose,
+                Does.Contain(
+                    "sharpproof-loop-workspace:/workspace/SharpProof"));
+            Assert.That(
+                compose,
+                Does.Contain("./artifacts:/workspace/LoopArtifacts"));
+            Assert.That(
+                compose,
+                Does.Contain("sharpproof-loop-workspace:"));
+            Assert.That(
+                dockerfile,
+                Does.Contain("/usr/local/bin/sharpproof-loop"));
+            Assert.That(loop, Does.Contain("mkdir \"${lock_directory}\""));
+            Assert.That(loop, Does.Contain("kill -0 \"${owner_pid}\""));
+            Assert.That(loop, Does.Contain("trap release_lock"));
+            Assert.That(loop, Does.Contain("ls-files -z"));
+            Assert.That(loop, Does.Contain("reset --hard --quiet"));
+            Assert.That(
+                loop,
+                Does.Contain("--binary --full-index --no-ext-diff HEAD"));
+            Assert.That(
+                loop,
+                Does.Contain("--binary --whitespace=nowarn"));
+            Assert.That(loop, Does.Contain("/workspace/HostSource"));
+            Assert.That(loop, Does.Contain("/workspace/SharpProof"));
+            Assert.That(loop, Does.Contain("--absolute-git-dir"));
+            Assert.That(loop, Does.Contain("sp \"$@\""));
+        }
+    }
+
+    [Test]
     public void NestedPackageConsumersUseClosureScopedCompilerServers()
     {
         var root = FindRepositoryRoot();

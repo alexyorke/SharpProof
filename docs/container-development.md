@@ -87,6 +87,28 @@ Finite `docker compose run --rm tooling ...` commands materialize the current
 source snapshot in a private temporary workspace and pay a cold build; use them
 for qualification, not for every edit. `contract`, `build`, and ordinary test
 commands work when the source directory came from an archive without `.git`.
+
+For a host-edited Git checkout, the separate `loop` service provides the same
+warm-build behavior without writing Linux outputs into the host tree:
+
+```text
+docker compose up -d loop
+docker compose exec loop sharpproof-loop test-changed -Fast
+docker compose exec loop sharpproof-loop test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -Fast
+```
+
+Each `sharpproof-loop` command mirrors the current tracked and non-ignored
+untracked source into a private Compose volume, then runs `sp` there. The mirror
+keeps `bin`, `obj`, compiler servers, and package caches between commands. A
+non-blocking workspace lock rejects overlapping commands, so multiple agents
+cannot corrupt the shared incremental outputs. Use a distinct
+`COMPOSE_PROJECT_NAME` for an independent checkout or independent build lane.
+The loop source must be a Git checkout that is directly visible inside Docker;
+use the ordinary persistent Dev Container for a linked Git worktree whose
+administrative Git directory is outside the mounted checkout. The loop volume
+is a disposable mirror: edit and commit only in the host checkout. Continue to
+use finite `tooling` containers for final qualification.
+
 After a completed build in the permanent workspace, `sp worker-tests -NoBuild`
 reuses those outputs and skips the restore/build phase for fast filtered runs.
 Use the normal `sp worker-tests` command after source, project, or configuration

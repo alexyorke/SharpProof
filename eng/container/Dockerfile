@@ -50,9 +50,11 @@ RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Prepare-NativePayload.ps1 \
 COPY eng/container/entrypoint.sh /usr/local/bin/sharpproof-container
 COPY eng/container/dev-command.sh /usr/local/bin/sp
 COPY eng/container/dev-init.sh /usr/local/bin/sharpproof-dev-init
+COPY eng/container/loop-command.sh /usr/local/bin/sharpproof-loop
 RUN chmod 0755 \
     /usr/local/bin/sharpproof-container \
     /usr/local/bin/sharpproof-dev-init \
+    /usr/local/bin/sharpproof-loop \
     /usr/local/bin/sp
 
 ENV HOME=/home/sharpproof \
