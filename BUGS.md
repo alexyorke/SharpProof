@@ -224,14 +224,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Reachable call-precondition violations can be missed, and semantic outcome is attached only to an arbitrary constructor.
 - Safe evidence: A class has `int value = Guard.Positive(-1)`, a first parameterless constructor requiring false, and a reachable second constructor. The bad initializer executes through the second path while analysis uses only the impossible first entry. `RequiresAndControlTests.cs` lines 1540-1583 establishes that caller contracts seed flow; member-initializer tests do not cover differing constructor preconditions.
 
-## Wave 5.14. LOW - Public abstention value objects accept undefined FrontendAbstention discriminants
-
-- File: `SharpProof.Frontend/FrontendSubset.cs`
-- Members: `FrontendSubsetClassification` constructor, lines 31-51, with decision validity switch at 35-40; `Abstain`, lines 70-72; `FrontendProgramAbstention` constructor, lines 103-122, with reason check at 114-118
-- Mechanism: Both boundaries test only that abstention or reason is not `FrontendAbstention.None`; neither applies `Enum.IsDefined`. Undefined cast values construct successfully. The same classification constructor rejects undefined `FrontendSubsetDecision` values while admitting undefined reasons.
-- Impact: Public value objects can claim closed abstention with a reason outside the documented finite enum. External serializers, displays, exhaustive switches, and aggregations receive corrupt state. Current production creation uses named values, so this is an API-invariant issue.
-- Safe evidence: Direct constructor and factory control flow. `FrontendLoweringTests.cs` around lines 363-381 tests unknown decisions only.
-
 ## Wave 5.15. HIGH - Pure opaque identity aliases operandless operations with distinct semantic operands
 
 - File: `SharpProof.Frontend/CompilerIdentityBridge.cs`
