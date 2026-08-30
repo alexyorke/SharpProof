@@ -24,6 +24,10 @@ public static class FrameworkTypeMetadataNames
     public const string InvalidOperationException =
         "System.InvalidOperationException";
     public const string IDisposable = "System.IDisposable";
+    public const string ICriticalNotifyCompletion =
+        "System.Runtime.CompilerServices.ICriticalNotifyCompletion";
+    public const string INotifyCompletion =
+        "System.Runtime.CompilerServices.INotifyCompletion";
     public const string ModuleInitializerAttribute =
         "System.Runtime.CompilerServices.ModuleInitializerAttribute";
     public static readonly string Monitor = "System.Threading.Monitor";

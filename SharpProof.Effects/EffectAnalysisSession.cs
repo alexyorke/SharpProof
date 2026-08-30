@@ -25,6 +25,7 @@ public sealed class EffectAnalysisSession
     private readonly Compilation _compilation;
     private readonly InvocationEmissionPolicy _invocationEmission;
     private readonly ExternalEffectResolver _external;
+    private readonly EffectKnownSymbols _knownSymbols;
     private readonly IEffectCallPreconditionPolicy
         _callPreconditions;
     private readonly EffectModuleInitialization _moduleInitialization;
@@ -53,6 +54,7 @@ public sealed class EffectAnalysisSession
         _invocationEmission = new InvocationEmissionPolicy(compilation);
         _external = new ExternalEffectResolver(compilation,
             ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs)));
+        _knownSymbols = new EffectKnownSymbols(compilation);
         _callPreconditions =
             callPreconditions ??
             new ConservativeEffectCallPreconditionPolicy(
@@ -66,6 +68,7 @@ public sealed class EffectAnalysisSession
 
     public Compilation Compilation => _compilation;
     internal ResolvedApiSpecTable ApiSpecs => _external.ApiSpecs;
+    internal EffectKnownSymbols KnownSymbols => _knownSymbols;
 
     internal EffectContractResolution ResolveExternalContract(IMethodSymbol method)
     {

@@ -211,8 +211,7 @@ internal sealed partial class OperationEffectScanner
 
         var critical = FindInterfaceImplementation(
             namedAwaiter,
-            "System.Runtime.CompilerServices.ICriticalNotifyCompletion",
-            "UnsafeOnCompleted");
+            _session.KnownSymbols.CriticalNotifyCompletionUnsafeOnCompleted);
         if (critical != null)
         {
             return critical;
@@ -220,20 +219,13 @@ internal sealed partial class OperationEffectScanner
 
         return FindInterfaceImplementation(
             namedAwaiter,
-            "System.Runtime.CompilerServices.INotifyCompletion",
-            "OnCompleted");
+            _session.KnownSymbols.NotifyCompletionOnCompleted);
     }
 
-    private IMethodSymbol? FindInterfaceImplementation(
+    private static IMethodSymbol? FindInterfaceImplementation(
         INamedTypeSymbol awaiterType,
-        string interfaceMetadataName,
-        string methodName)
+        IMethodSymbol? interfaceMethod)
     {
-        var interfaceType = _session.Compilation.GetTypeByMetadataName(
-            interfaceMetadataName);
-        var interfaceMethod = interfaceType?.GetMembers(methodName)
-            .OfType<IMethodSymbol>()
-            .SingleOrDefault();
         if (interfaceMethod == null)
         {
             return null;
