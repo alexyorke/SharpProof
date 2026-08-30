@@ -641,6 +641,44 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ImplicitFormattingExceptionsKeepHandlersReachable()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class ThrowingValue {
+                public override string ToString() =>
+                    throw new InvalidOperationException();
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                public static void Interpolated(ThrowingValue value) {
+                    try { _ = $"{value}"; }
+                    catch (InvalidOperationException) { s_state++; }
+                }
+
+                public static void Concatenated(ThrowingValue value) {
+                    try { _ = "value=" + value; }
+                    catch (InvalidOperationException) { s_state++; }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        foreach (var methodName in new[] { "Interpolated", "Concatenated" })
+        {
+            Assert.That(
+                session.Analyze(Method(compilation, methodName))
+                    .Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                methodName);
+        }
+    }
+
+    [Test]
     public void StringConcatenationKeepsExactNoFormattingControls()
     {
         var compilation = EffectTestHost.CreateCompilation(
