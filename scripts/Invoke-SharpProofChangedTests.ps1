@@ -228,15 +228,26 @@ if ($selectedRelative.Count -gt 0) {
         if (-not $NoBuild) {
             Invoke-RequiredDotnet @('restore', $filterPath, '--locked-mode')
         }
-        $testArguments = @(
-            'test', $filterPath,
-            '-c', $Configuration,
-            '--no-restore',
-            "/m:$parallelism",
-            '--filter',
-            'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus')
-        if ($NoBuild) {
-            $testArguments += '--no-build'
+        $semanticFilter =
+            'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+        if ($NoBuild -and $selectedRelative.Count -eq 1) {
+            $assembly = Get-SharpProofTestAssemblyPath `
+                -ProjectPath $selectedRelative[0] `
+                -Configuration $Configuration
+            $testArguments = @(
+                'vstest', $assembly,
+                '/TestCaseFilter:' + $semanticFilter)
+        }
+        else {
+            $testArguments = @(
+                'test', $filterPath,
+                '-c', $Configuration,
+                '--no-restore',
+                "/m:$parallelism",
+                '--filter', $semanticFilter)
+            if ($NoBuild) {
+                $testArguments += '--no-build'
+            }
         }
         Invoke-RequiredDotnet $testArguments
     }

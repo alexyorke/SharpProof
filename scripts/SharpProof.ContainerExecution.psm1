@@ -73,11 +73,12 @@ function Get-SharpProofTestAssemblyPath {
         [string]$Configuration
     )
 
-    $project = if ([IO.Path]::IsPathRooted($ProjectPath)) {
-        [IO.Path]::GetFullPath($ProjectPath)
+    $normalizedProjectPath = $ProjectPath.Replace('\', '/')
+    $project = if ([IO.Path]::IsPathRooted($normalizedProjectPath)) {
+        [IO.Path]::GetFullPath($normalizedProjectPath)
     }
     else {
-        [IO.Path]::GetFullPath((Join-Path (Get-Location) $ProjectPath))
+        [IO.Path]::GetFullPath((Join-Path (Get-Location) $normalizedProjectPath))
     }
     if (-not (Test-Path -LiteralPath $project -PathType Leaf)) {
         throw "Test project was not found: '$ProjectPath'."
