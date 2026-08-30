@@ -432,20 +432,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Impact: Interpreter semantics diverge from C#; `IrCSharpDifferentialOracle` reports `Mismatch`, and exception-sensitive consumers receive false evidence.
 - Safe evidence: Bind an `ObjectType` variable to `CreateNullValue(ObjectType)`, cast to `IntegerType`, and evaluate. Current result is Exception/InvalidCast while compiled C# throws `NullReferenceException`.
 
-## Wave 6.19. MEDIUM - Pure opaque identity conflates `as` conversions with throwing reference casts
-
-- Files and members: `SharpProof.Frontend/RoslynOperationLowerer.cs`, `VisitConversion`, current lines 786-835, exact string-only path 826-832 and fallback 834-835, plus `Opaque`/`IsDemonstrablyPure`, lines 279-357; `SharpProof.Frontend/CompilerIdentityProjections.generated.cs`, lines 12-22; `CompilerIdentityBridge.CreateSemanticOperationIdentity`, lines 124-137.
-- Mechanism: Nonstring reference conversions such as `obj as Widget` and `(Widget)obj` both fall to pure opaque lowering. Semantic identity records checked, lifted, and other metadata but omits `IConversionOperation.IsTryCast` or conversion flavor. With identical operand and result types, both intern the same term although one returns null and the other throws on incompatible input.
-- Impact: Fallback terms erase definedness and value differences and spuriously correlate expressions for consumers retaining abstained terms. Exact-contract exposure is limited by `ConversionMayChangeValue` classification.
-- Safe evidence: Lower both descendants of `static bool Target(object value) => (value as C) == (C)value;` through one factory and compare opaque term IDs.
-
-## Wave 6.20. MEDIUM - Noncatalog const fields of the same type collapse to one pure opaque term
-
-- Files and members: `SharpProof.Frontend/RoslynOperationLowerer.cs`, `VisitFieldReference`, lines 461-466, `DefaultVisit`, lines 433-446, `Opaque`, lines 284-307, and `IsDemonstrablyPure`, lines 319-323; `CompilerIdentityBridge.CreateSemanticOperationIdentity`, lines 124-137.
-- Mechanism: Constant fields outside narrow catalog integer boundaries go through `DefaultVisit` with no arguments and without passing `operation.Field`. `ConstantValue` makes them demonstrably pure, while structural identity contains neither value nor field symbol or occurrence. Same-type constants such as `const long One=1, Two=2` therefore intern the same `PureOpaque` term.
-- Impact: Returned fallback terms falsely correlate distinct values. Exact-only binding limits accepted-proof exposure, but frontend and program consumers retaining abstained terms can observe spurious equality.
-- Safe evidence: Direct lowering and interning trace.
-
 ## Wave 6.21. HIGH - Calls fail to havoc locals captured and mutated by local functions or closures
 
 - File: `SharpProof.Frontend/RoslynProgramLowerer.cs`

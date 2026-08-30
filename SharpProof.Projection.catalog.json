@@ -511,6 +511,19 @@
             {"pattern": "IUnaryOperation unary", "expression": "unary.IsLifted"}
           ],
           "fallback": "false"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "bool",
+          "name": "IsTryCast",
+          "parameters": [{"type": "IOperation", "name": "operation"}],
+          "switchMode": "type",
+          "target": "operation",
+          "cases": [
+            {"pattern": "IConversionOperation conversion", "expression": "conversion.IsTryCast"}
+          ],
+          "fallback": "false"
         }
       ]
     }

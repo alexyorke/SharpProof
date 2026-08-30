@@ -33,4 +33,15 @@ internal static class CompilerIdentityProjections
             _ => false
         };
     }
+
+    internal static bool IsTryCast(
+        IOperation operation
+    )
+    {
+        return operation switch
+        {
+            IConversionOperation conversion => conversion.IsTryCast,
+            _ => false
+        };
+    }
 }
