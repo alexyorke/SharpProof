@@ -383,14 +383,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Impact: An otherwise loadable malformed reference can throw out of the collector rather than returning `InvalidImage/UnsupportedIl`, causing build-time denial of service.
 - Safe evidence: A long branch with `NextOffset` 5 and displacement 2,147,483,647 necessarily overflows checked Int32 addition.
 
-## Wave 6.7. LOW - Relational summary cache conflates closed forms nested inside generic outer types
-
-- File: `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs`
-- Members: `IsSourceCandidate`, current lines 283-300, especially 290-292; `Normalize`, lines 308-312; `TryGet` cache, lines 93-100
-- Mechanism: Generic exclusion checks only `method.ContainingType.TypeParameters.IsEmpty`; a nongeneric nested type within a generic outer passes. `Normalize(...).OriginalDefinition` collapses constructed forms to one cache key, while lowering creates distinct `IrMemberId`s. The first cached form makes another closed outer instantiation mismatch and return false; a failed attempt can similarly poison `_failed`.
-- Impact: Exactly lowerable calls using two closed outer instantiations can abstain or fail depending on call order.
-- Safe evidence: Use generic `Outer<T>` with nongeneric `Inner` and static scalar `F`; invoke `Outer<int>.Inner.F` and `Outer<long>.Inner.F` and require both summaries to prepare.
-
 ## Wave 6.9. MEDIUM - Result-domain assumptions do not rewrite returns through available spec projections
 
 - Files and members: `SharpProof.Worker/PostconditionObligationBuilder.cs`, `TryAddSourceDomainAssumptions`, current lines 32-46, especially 39-46; `CallableEvidenceBuilder.Build`, lines 153-160 and domain check at 195-198; `PostconditionObligationBuilder.IsSupportedProofDomain`, lines 114-117.
