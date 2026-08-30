@@ -483,6 +483,35 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task ExecutableEntryPointSelectionChangesAuthenticatedSnapshot()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            internal static class FirstEntryPoint {
+                public static void Main() { }
+            }
+            internal static class SecondEntryPoint {
+                public static void Main() { }
+            }
+            """);
+        var executable = compilation.Options.WithOutputKind(
+            OutputKind.ConsoleApplication);
+        var firstHash = await EmitHash(
+            compilation.WithOptions(executable.WithMainTypeName(
+                "FirstEntryPoint")),
+            workspace.SealPath("first-entry-point"),
+            additional: "value=1");
+        var secondHash = await EmitHash(
+            compilation.WithOptions(executable.WithMainTypeName(
+                "SecondEntryPoint")),
+            workspace.SealPath("second-entry-point"),
+            additional: "value=1");
+
+        Assert.That(secondHash, Is.Not.EqualTo(firstHash));
+    }
+
+    [Test]
     public async Task DiagnosticPolicyAndRealizedErrorsInvalidateTheSeal()
     {
         using var workspace = new CollectorWorkspace();
