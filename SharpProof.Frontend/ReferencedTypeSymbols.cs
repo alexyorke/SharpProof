@@ -28,26 +28,33 @@ internal static class ReferencedTypeSymbols
         INamespaceOrTypeSymbol container,
         CancellationToken cancellationToken)
     {
-        foreach (var type in container.GetTypeMembers())
+        var pending = new Stack<INamespaceOrTypeSymbol>();
+        pending.Push(container);
+
+        while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return type;
-            foreach (var nested in GetAll(type, cancellationToken))
-            {
-                yield return nested;
-            }
-        }
 
-        if (container is not INamespaceSymbol @namespace)
-        {
-            yield break;
-        }
-
-        foreach (var child in @namespace.GetNamespaceMembers())
-        {
-            foreach (var type in GetAll(child, cancellationToken))
+            var current = pending.Pop();
+            if (current is INamedTypeSymbol type)
             {
                 yield return type;
+            }
+
+            if (current is INamespaceSymbol @namespace)
+            {
+                var namespaces = @namespace.GetNamespaceMembers()
+                    .ToImmutableArray();
+                for (var index = namespaces.Length - 1; index >= 0; index--)
+                {
+                    pending.Push(namespaces[index]);
+                }
+            }
+
+            var types = current.GetTypeMembers();
+            for (var index = types.Length - 1; index >= 0; index--)
+            {
+                pending.Push(types[index]);
             }
         }
     }

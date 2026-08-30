@@ -670,15 +670,6 @@ This section records 19 unique findings from exactly 30 fresh read-only auditors
 - Impact: Large stale or hostile regular files at publication destinations can cause proportional allocations and OOM before staging or commit, denying verification and publication.
 - Safe evidence: Source semantics; modest sparse files show heap and working-set scaling. Artifact caps or bounded streaming backups to temporary files are needed.
 
-## Wave 8.2. MEDIUM - Referenced-type namespace traversal ignores cancellation and uses unbounded recursion
-
-- File: `SharpProof.Frontend/ReferencedTypeSymbols.cs`
-- Member: Private `GetAll`
-- Current lines: 41-52, especially 46-48; cancellation occurs only inside the type loop at line 33
-- Mechanism: Namespace descent recursively calls `GetAll` without checking the token. A precanceled token is ignored through empty or type-free trees, and deeply nested namespaces consume the call stack before any type or cancellation check.
-- Impact: Discovery can be unresponsive or terminate with `StackOverflowException` on deeply nested generated or metadata namespaces; the cancellation contract is violated.
-- Safe evidence: A canceled token plus only empty namespaces completes normally; a deep type-free chain recurses. Cancellation should be checked on descent or traversal made iterative.
-
 ## Wave 8.3. MEDIUM - SARIF URI projection corrupts valid relative compiler-mapped paths
 
 - File: `SharpProof.Worker.Launcher/SarifProjection.cs`
