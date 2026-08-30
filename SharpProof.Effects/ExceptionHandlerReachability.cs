@@ -177,8 +177,10 @@ internal sealed class ExceptionHandlerReachability(
                 if (thrown.Exception is not { } exception)
                 {
                     Add(
-                        FromThrowSet(
-                            EffectExceptionFlow.ResolveRethrow(thrown)),
+                        GetRethrowExceptions(
+                            thrown,
+                            activeMethods,
+                            depth),
                         thrown);
                     continue;
                 }
@@ -1615,6 +1617,60 @@ internal sealed class ExceptionHandlerReachability(
         return canCompleteNormally(finallyOperation)
             ? Union(result, finallyExceptions)
             : finallyExceptions;
+    }
+
+    internal EffectThrowSet ResolveRethrow(IThrowOperation thrown)
+    {
+        var potential = GetRethrowExceptions(
+            thrown,
+            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+            depth: 0);
+        return EffectThrowSet.Create(potential.Known, potential.Unknown);
+    }
+
+    private PotentialExceptions GetRethrowExceptions(
+        IThrowOperation thrown,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth)
+    {
+        ICatchClauseOperation? catchOperation = null;
+        for (var current = thrown.Parent; current != null; current = current.Parent)
+        {
+            if (current is IAnonymousFunctionOperation or ILocalFunctionOperation)
+            {
+                return UnknownPotential;
+            }
+            if (current is ICatchClauseOperation @catch)
+            {
+                catchOperation = @catch;
+                break;
+            }
+        }
+
+        if (catchOperation?.Syntax is not CatchClauseSyntax target ||
+            target.Parent is not TryStatementSyntax @try)
+        {
+            return UnknownPotential;
+        }
+
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, @try.SyntaxTree);
+        if (model.GetOperation(@try.Block) is not { } protectedBlock)
+        {
+            return UnknownPotential;
+        }
+
+        var incoming = GetPotentialExceptions(
+            protectedBlock,
+            activeMethods,
+            depth,
+            keepEscaping: false);
+        return new PotentialExceptions(
+            incoming.Known
+                .Where(type => CanKnownReach(type, target, @try, model))
+                .ToImmutableHashSet<INamedTypeSymbol>(
+                    SymbolEqualityComparer.Default),
+            incoming.Unknown && CanUnknownReach(target, @try, model));
     }
 
     private PotentialExceptions GetPotentialNullReceiver(

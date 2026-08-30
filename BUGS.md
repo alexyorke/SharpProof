@@ -1,6 +1,6 @@
 # Bug backlog
 
-450 open bugs, reprioritized by impact, reachability, and affected scope.
+449 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,9 +9,8 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (162)
+## P0 - Critical (161)
 
-- **BUG-007 [P0] - Bare rethrow loses the runtime exception subtype:** EffectExceptionFlow replaces a bare rethrow's actual exception type with the enclosing catch declaration. Outer subtype catches can be marked unreachable, dropping their writes, allocations, and exceptions from complete effect analysis.
 - **BUG-008 [P0] - Beforefieldinit method summaries omit type-initializer effects:** EffectMethodNodeBuilder ignores implicit beforefieldinit static initialization when summarizing same-assembly static methods. A complete summary can omit initializer effects and TypeInitializationException, allowing false effect or exception-contract proofs.
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-011 [P0] - Branch transfer omits normal-evaluation constraints:** AcyclicBlockPredicateExecutor branches on substituted partial terms without adding witnesses that evaluation completed normally. Throwing executions can enter normal return paths in SMT reasoning, producing spurious obligations or accepted refutations.

@@ -11,7 +11,7 @@ internal static class EffectExceptionFlow
     {
         if (thrown.Exception == null)
         {
-            return ResolveRethrow(thrown);
+            return EffectThrowSet.Unknown;
         }
 
         if (abstractFlow?.ProvesNull(thrown, thrown.Exception) == true)
@@ -49,21 +49,6 @@ internal static class EffectExceptionFlow
         return escaping == summary.Throws
             ? summary
             : EffectSummaryOperations.WithThrows(summary, escaping);
-    }
-
-    internal static EffectThrowSet ResolveRethrow(IOperation operation)
-    {
-        for (var current = operation.Parent; current != null; current = current.Parent)
-        {
-            if (current is ICatchClauseOperation @catch)
-            {
-                return @catch.ExceptionType is INamedTypeSymbol type
-                    ? EffectThrowSet.Create([type])
-                    : EffectThrowSet.Unknown;
-            }
-        }
-
-        return EffectThrowSet.Unknown;
     }
 
     internal static EffectThrowSet KeepEscapingThroughTry(

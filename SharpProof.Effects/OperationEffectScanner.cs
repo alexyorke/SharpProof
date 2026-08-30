@@ -14,6 +14,7 @@ internal sealed partial class OperationEffectScanner
     private readonly SyntaxNode? _directSyntax;
     private readonly ImmutableArray<EffectDirectWitness>.Builder _directWitnesses =
         ImmutableArray.CreateBuilder<EffectDirectWitness>();
+    private readonly INamedTypeSymbol? _contractType;
     private readonly INamedTypeSymbol? _exceptionType;
     private readonly ExceptionHandlerReachability _handlerReachability;
     private readonly Dictionary<int, IArrayTypeSymbol> _freshArrayTypes = new();
@@ -57,6 +58,8 @@ internal sealed partial class OperationEffectScanner
             _creationCaptures);
         _allowDirectWitnesses = allowDirectWitnesses;
         _directSyntax = GetDirectSyntax(root.Syntax);
+        _contractType = session.Compilation.GetTypeByMetadataName(
+            ContractApiCatalog.Contract);
         _exceptionType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
         _monitorType = session.Compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Monitor);
         _nullnessEvaluator = new OperationNullnessEvaluator(
@@ -83,7 +86,7 @@ internal sealed partial class OperationEffectScanner
             _completionEvaluator.GetReachableImplicitListPatternMembers,
             session.ApiSpecs,
             session.KnownSymbols,
-            HasNonThrowingMethodSpec);
+            IsKnownNonThrowing);
         // ManagedAbstractFlow currently follows regular CFG edges. Its facts
         // remain useful in a try body, but absence of a fact cannot prove an
         // operation unreachable after a normally completing handler. The
@@ -1092,6 +1095,11 @@ internal sealed partial class OperationEffectScanner
 
     private EffectThrowSet ResolveThrownException(IThrowOperation thrown)
     {
+        if (thrown.Exception == null)
+        {
+            return _handlerReachability.ResolveRethrow(thrown);
+        }
+
         return EffectExceptionFlow.ResolveThrownException(
             thrown,
             _session,
@@ -1284,6 +1292,18 @@ internal sealed partial class OperationEffectScanner
                SpecThrowBehavior.DoesNotThrow &&
                spec.Template.Facets.Termination?.Behavior ==
                SpecTerminationBehavior.Terminates;
+    }
+
+    private bool IsKnownNonThrowing(IMethodSymbol method)
+    {
+        return _contractType != null &&
+            SymbolEqualityComparer.Default.Equals(
+                method.ContainingType.OriginalDefinition,
+                _contractType.OriginalDefinition) &&
+            ContractApiCatalog.ContractMethodCandidateNames.Contains(
+                method.Name,
+                StringComparer.Ordinal) ||
+            HasNonThrowingMethodSpec(method);
     }
 
     private void AddWitness(
