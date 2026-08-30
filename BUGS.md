@@ -22,13 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.14. HIGH - Launcher can hang on a non-regular result path after worker supervision ends
-
-- Files and members: `SharpProof.Worker.Protocol/ProtocolJson.cs`, `WorkerProtocolJson.OpenJsonReader`, lines 71-87, especially `FileStream` at 73-79; `SharpProof.Worker.Launcher/Program.cs`, `ValidateAndReport`, lines 334-349.
-- Mechanism: The result path is opened before the regular-file metadata check. Opening a FIFO for reading can block with no writer. Validation occurs after worker `WaitForExit` and has no timeout or cancellation, so the hard limit no longer bounds it.
-- Impact: The launcher or build can hang indefinitely.
-- Safe reproduction/evidence: In a bounded Linux integration fixture, present a FIFO as `resultPath` at `ValidateAndReport` with no writer and observe that open blocks.
-
 ## Wave 2.15. MEDIUM - Unsupported platform or container preflight escapes unhandled
 
 - File: `SharpProof.Worker.Launcher/Program.cs`

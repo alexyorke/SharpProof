@@ -70,6 +70,21 @@ public static partial class WorkerProtocolJson
 
     private static StreamReader OpenJsonReader(string path)
     {
+        // Inspect the directory entry before FileStream opens it. On Unix,
+        // opening a FIFO for reading waits for a writer, so a zero-length
+        // non-file must fail before the potentially blocking open.
+        var fileLength = new FileInfo(path).Length;
+        if (fileLength <= 0)
+        {
+            throw new InvalidDataException(
+                "The JSON file must be a nonempty regular file.");
+        }
+        if (fileLength > MaximumJsonBytes)
+        {
+            throw new InvalidDataException(
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
         var stream = new FileStream(
             path,
             FileMode.Open,
@@ -77,11 +92,11 @@ public static partial class WorkerProtocolJson
             FileShare.Read,
             bufferSize: 81920,
             options: FileOptions.SequentialScan);
-        if (stream.Length > MaximumJsonBytes)
+        if (stream.Length != fileLength)
         {
             stream.Dispose();
             throw new InvalidDataException(
-                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+                "The JSON file changed while it was opened.");
         }
 
         return new StreamReader(stream, s_strictUtf8, detectEncodingFromByteOrderMarks: false);

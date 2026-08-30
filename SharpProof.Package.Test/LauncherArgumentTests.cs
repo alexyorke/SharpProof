@@ -1073,6 +1073,68 @@ public sealed class LauncherArgumentTests
 
     [Test]
     [Platform("Linux")]
+    public void WorkerResultFifoIsRejectedBeforeBlockingOpen()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".fifo");
+        try
+        {
+            using (var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "mkfifo",
+                    UseShellExecute = false,
+                    ArgumentList = { path }
+                })!)
+            {
+                process.WaitForExit();
+                Assert.That(process.ExitCode, Is.Zero);
+            }
+
+            var validation = Task.Run(() => Program.ValidateAndReport(
+                path,
+                new WorkerVerifyRequest(),
+                null,
+                null,
+                null,
+                out _,
+                out _));
+            var completed = Task.WhenAny(validation, Task.Delay(500))
+                .GetAwaiter()
+                .GetResult();
+            if (!ReferenceEquals(completed, validation))
+            {
+                using (var writer = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.ReadWrite))
+                {
+                    writer.WriteByte((byte)'{');
+                }
+
+                var unblocked = Task.WhenAny(validation, Task.Delay(5000))
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.That(unblocked, Is.SameAs(validation));
+                _ = validation.Exception;
+            }
+
+            Assert.That(
+                completed,
+                Is.SameAs(validation),
+                "Worker-result validation must not wait for a FIFO writer.");
+            Assert.That(validation.GetAwaiter().GetResult(), Is.EqualTo(3));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
     {
         var project = Path.Combine(

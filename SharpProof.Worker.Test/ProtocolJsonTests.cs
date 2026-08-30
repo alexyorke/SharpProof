@@ -53,6 +53,63 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void BoundedUtf8FileReaderRejectsFifoBeforeBlockingOpen()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "protocol-json-" + Guid.NewGuid().ToString("N") + ".fifo");
+        try
+        {
+            using (var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "mkfifo",
+                    UseShellExecute = false,
+                    ArgumentList = { path }
+                })!)
+            {
+                process.WaitForExit();
+                Assert.That(process.ExitCode, Is.Zero);
+            }
+
+            var read = Task.Run(() => WorkerProtocolJson.ReadUtf8File(path));
+            var completed = Task.WhenAny(read, Task.Delay(500))
+                .GetAwaiter()
+                .GetResult();
+            if (!ReferenceEquals(completed, read))
+            {
+                using (var writer = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.ReadWrite))
+                {
+                    writer.WriteByte((byte)'{');
+                }
+
+                var unblocked = Task.WhenAny(read, Task.Delay(5000))
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.That(unblocked, Is.SameAs(read));
+                _ = read.Exception;
+            }
+
+            Assert.That(
+                completed,
+                Is.SameAs(read),
+                "Opening a FIFO must not wait for a writer.");
+            Assert.That(
+                (Action)(() => _ = read.GetAwaiter().GetResult()),
+                Throws.TypeOf<InvalidDataException>());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
     public void VersionNineRequestCarriesOnlyArtifactAndRuntimeControls()
     {
         var request = CreateRequest();
