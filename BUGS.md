@@ -564,14 +564,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Impact: Publication proceeds while assuming local flock, rename, and durability semantics on unsupported shared storage.
 - Safe evidence: `bestType` is returned verbatim, and acceptance depends only on absence from the short blacklist.
 
-## Wave 6.27. LOW - Analyzer semantic outcome keys collapse distinct methods in different syntax trees
-
-- File: `SharpProof.Gates/AnalyzerGateHost.cs`
-- Location: Current lines 314-331
-- Mechanism: `MethodOutcomeKey` contains only `MetadataName`, `DeclaredAccessibility`, and the first in-source `SourceSpan.Start`; it omits syntax-tree or file identity, containing symbol, and signature. Same-name and accessibility methods at the same offset in different trees collide and their outcomes are combined.
-- Impact: A multi-tree `Compilation` can produce a false combined outcome, omit a method, or report an incorrect target count. Current direct `CorpusGate` replay is single-tree, limiting present exposure; the `Compilation` overload is unconstrained.
-- Safe evidence: `OpenSourceCorpusRunner`'s multi-tree recorder keys by `SyntaxTree` plus `SourceStart`, demonstrating that tree identity is needed.
-
 # Read-Only Multi-Agent Bug Audit - Wave 7 - 2026-08-29
 
 This section records 38 findings from exactly 30 fresh read-only auditors: 20 reported findings and 10 reported none. The relay reported no exact title/mechanism duplicates. The central writer did not inspect or reverify the code.
