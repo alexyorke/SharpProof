@@ -2687,7 +2687,6 @@ public sealed class WorkerMsBuildIntegrationTests
         var firstJson = await File.ReadAllTextAsync(project.ResultPath);
         var firstWrite = File.GetLastWriteTimeUtc(project.ResultPath);
 
-        await Task.Delay(1_100);
         var second = await project.BuildAsync(verify: true);
         Assert.That(second.ExitCode, Is.Zero, second.Output);
         var secondJson = await File.ReadAllTextAsync(project.ResultPath);
@@ -2717,7 +2716,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 Is.GreaterThanOrEqualTo(0));
         }
 
-        await Task.Delay(1_100);
         var changedMethodRlimit =
             WorkerBudgets.DefaultMethodRlimit - 1;
         var changed = await project.BuildAsync(
@@ -2753,7 +2751,6 @@ public sealed class WorkerMsBuildIntegrationTests
             await File.ReadAllTextAsync(project.ResultPath))!;
         var firstWrite = File.GetLastWriteTimeUtc(project.ResultPath);
 
-        await Task.Delay(1_100);
         var changed = await project.BuildAsync(
             verify: true,
             ("LangVersion", "13.0"),
