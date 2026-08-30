@@ -22,16 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.16. MEDIUM - Cooperative launcher probe accepts partial or invalid timeout evidence
-
-- File: `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs`
-- Member: `VerifyCooperativeLauncherCancellationAsync`
-- Current lines: 156-173
-- Related validation: `SharpProof.Worker.Protocol/ProtocolJson.cs`, `DeserializeResponse`, lines 56-59, and `ValidateResponse`, lines 265-290
-- Mechanism: The probe checks only no errors, `TimedOut`, and any one `ProjectTimeout` claim or callable. It never runs `WorkerProtocolJson.Validate` or checks that every manifest item has a terminal result.
-- Impact: A launcher regression that publishes a partial response can still pass-certify the timeout path.
-- Safe reproduction/evidence: Provide a deserializable `TimedOut` response with no errors and one `ProjectTimeout`, but omissions that make `Validate` false. The current guard accepts it.
-
 ## Wave 2.17. MEDIUM - Worker cancellation measurement can hang indefinitely and ignores outer cancellation
 
 - File: `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs`

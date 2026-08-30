@@ -160,17 +160,24 @@ internal static class WorkerPerformanceProbe
                 .ConfigureAwait(false)) ??
             throw new InvalidOperationException(
                 "The real worker produced no timeout response.");
-        if (response.Errors.Length != 0 ||
-            response.RunStatus != WorkerRunStatus.TimedOut ||
-            !response.ClaimResults.Any(static result =>
-                result.Reason == WorkerClaimReason.ProjectTimeout) &&
-            !response.CallableResults.Any(static result =>
-                result.Reason ==
-                WorkerCallableCoverageReason.ProjectTimeout))
+        if (!IsCompleteProjectTimeout(response))
         {
             throw new InvalidOperationException(
                 "The real worker did not report a cooperative project timeout.");
         }
+    }
+
+    internal static bool IsCompleteProjectTimeout(
+        WorkerVerifyResponse response)
+    {
+        return response.Errors.Length == 0 &&
+            response.RunStatus == WorkerRunStatus.TimedOut &&
+            WorkerProtocolJson.Validate(response).IsValid &&
+            (response.ClaimResults.Any(static result =>
+                result.Reason == WorkerClaimReason.ProjectTimeout) ||
+            response.CallableResults.Any(static result =>
+                result.Reason ==
+                WorkerCallableCoverageReason.ProjectTimeout));
     }
 
     private static async Task<double> MeasureForcedTerminationCoreAsync(

@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Gates.Performance;
+using SharpProof.Worker.Protocol;
 using System.Security.Cryptography;
 using System.Xml.Linq;
 
@@ -34,6 +35,105 @@ public sealed class PerformanceGateTests
             Assert.That(contract.IdeEditMaximumMilliseconds, Is.EqualTo(250));
             Assert.That(contract.CancellationP95Milliseconds, Is.EqualTo(250));
             Assert.That(contract.ForcedTerminationMilliseconds, Is.EqualTo(1000));
+        }
+    }
+
+    [Test]
+    public void CooperativeTimeoutProbeRejectsPartialProtocolEvidence()
+    {
+        var location = new WorkerSourceLocation
+        {
+            Path = "Subject.cs",
+            Start = 0,
+            Length = 1,
+            Line = 1,
+            Column = 1
+        };
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = [
+                new WorkerCallableManifestEntry {
+                    CallableId = "M:Subject.Verify()",
+                    SelectedFeatures = [WorkerSelectedFeature.Contracts],
+                    SelectionReasons = [
+                        WorkerSelectionReason.DiscoveredPostcondition
+                    ],
+                    Location = location,
+                    ClaimIds = ["claim.verify.0"]
+                }
+            ],
+            Claims = [
+                new WorkerClaimManifestEntry {
+                    ClaimId = "claim.verify.0",
+                    CallableId = "M:Subject.Verify()",
+                    Kind = WorkerClaimKind.Postcondition,
+                    Evidence = WorkerClaimEvidence.DirectClause,
+                    Location = location
+                }
+            ]
+        };
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            RequestHash = WorkerProtocolVersions.EmptySha256,
+            InputHash = WorkerProtocolVersions.EmptySha256,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.TimedOut,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = [
+                new WorkerCallableResult {
+                    CallableId = "M:Subject.Verify()",
+                    Coverage = WorkerCallableCoverage.Incomplete,
+                    Reason = WorkerCallableCoverageReason.ProjectTimeout
+                }
+            ],
+            ClaimResults = [
+                new WorkerClaimResult {
+                    ClaimId = "claim.verify.0",
+                    Outcome = WorkerClaimOutcome.Unknown,
+                    Reason = WorkerClaimReason.ProjectTimeout
+                }
+            ],
+            Summary = new WorkerVerificationSummary
+            {
+                CallableCount = 1,
+                ClaimCount = 1,
+                OutcomeCounts = [
+                    new WorkerClaimOutcomeCount {
+                        Outcome = WorkerClaimOutcome.Unknown,
+                        Count = 1
+                    }
+                ],
+                ReasonCounts = [
+                    new WorkerClaimReasonCount {
+                        Reason = WorkerClaimReason.ProjectTimeout,
+                        Count = 1
+                    }
+                ],
+                CacheStatus = WorkerCacheStatus.Disabled,
+                Versions = new WorkerVersionSummary
+                {
+                    WorkerVersion = "test-worker",
+                    ApiSpecVersion = "test-spec"
+                },
+                Budgets = new WorkerBudgets()
+            }
+        };
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        Assert.That(
+            WorkerPerformanceProbe.IsCompleteProjectTimeout(response),
+            Is.True);
+
+        response.CallableResults = [];
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.False);
+            Assert.That(
+                WorkerPerformanceProbe.IsCompleteProjectTimeout(response),
+                Is.False);
         }
     }
 
