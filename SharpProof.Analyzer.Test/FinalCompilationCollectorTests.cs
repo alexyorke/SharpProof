@@ -846,6 +846,33 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task ReferenceCapturePreservesRecursiveAliases()
+    {
+        using var workspace = new CollectorWorkspace();
+        var referencePath = Path.Combine(
+            workspace.Path,
+            "RecursiveAlias.dll");
+        var image = EmitImage(
+            "internal static class RecursiveAlias {}",
+            "RecursiveAlias");
+        await File.WriteAllBytesAsync(referencePath, image);
+        var properties = new MetadataReferenceProperties(
+                MetadataImageKind.Assembly,
+                aliases: ["recursive"])
+            .WithRecursiveAliases(true);
+        var reference = MetadataReference.CreateFromFile(
+            referencePath,
+            properties);
+
+        var captured = CompilerCompilationCapture.CaptureReferences(
+            [reference],
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            CancellationToken.None);
+
+        Assert.That(captured.Single().HasRecursiveAliases, Is.True);
+    }
+
+    [Test]
     public async Task ReferenceCaptureEnforcesModuleClosureAndCountLimits()
     {
         using var workspace = new CollectorWorkspace();
