@@ -118,8 +118,11 @@ internal sealed partial class OperationEffectScanner
                 EffectSummaryOperations.Unsupported());
         }
 
-        var awaitableReceiver = _conversionOwnership.ClassifyRegion(
-            awaitOperation.Operation);
+        var awaitableReceiver = getAwaiter.ReducedFrom == null
+            ? _conversionOwnership.ClassifyRegion(
+                awaitOperation.Operation)
+            : _conversionOwnership.ClassifyCallArgumentRegion(
+                awaitOperation.Operation);
         var awaitableCheck = getAwaiter.IsStatic ||
             getAwaiter.ReducedFrom != null
                 ? EffectStep.Empty
@@ -529,7 +532,9 @@ internal sealed partial class OperationEffectScanner
         return _callResolver.ResolveOperator(
             method,
             EffectRegionSet.Empty,
-            [.. operands.Select(operand => _conversionOwnership.ClassifyRegion(operand))],
+            [.. operands.Select(
+                operand => _conversionOwnership
+                    .ClassifyCallArgumentRegion(operand))],
             operands,
             origin);
     }
