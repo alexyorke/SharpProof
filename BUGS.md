@@ -27,15 +27,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 25. MEDIUM - Analyzer test host ignores C# compiler errors
-
-- File: `SharpProof.Analyzer.Test/AnalyzerTestHost.cs`
-- Members: `CreateCompilation` and analyzer-facing `AnalyzeAsync` overloads
-- Lines: 41-70, 119-158
-- Mechanism: The host never checks `compilation.GetDiagnostics`; `GetAnalyzerDiagnosticsAsync` returns analyzer diagnostics only.
-- Impact: Negative tests can pass when the fixture fails syntax, binding, or type checks and the relevant operation or symbol never exists.
-- Safe reproduction/evidence: Use source with `MissingType` and assert that SharpProof diagnostics are empty; CS0246 is hidden. `EmitImage` at lines 160-173 correctly fails on compilation errors.
-
 ## 26. MEDIUM - ContractFor generator host omits generated-compilation errors and filters analyzer crashes
 
 - File: `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs`

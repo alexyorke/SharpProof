@@ -20,6 +20,7 @@ public sealed class DocumentationSupportContractTests
     [TestCase("resource-claim-case", false)]
     [TestCase("resource-claim-spacing", false)]
     [TestCase("catalog-resource-drift", false)]
+    [TestCase("duplicate-acceptance-property", false)]
     [TestCase("check-plan-drift", false)]
     [TestCase("missing-vacuous-entry", false)]
     [TestCase("wrong-unavailable-meaning", false)]

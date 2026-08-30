@@ -405,7 +405,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return true;
         }
 
-        if (type.SpecialType != SpecialType.None ||
+        if (type.IsValueType ||
+            type.SpecialType != SpecialType.None ||
             type is not INamedTypeSymbol named ||
             named.Name.StartsWith("Immutable", StringComparison.Ordinal) ||
             named.Name.StartsWith("ReadOnly", StringComparison.Ordinal))
@@ -421,9 +422,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         return named.GetMembers().OfType<IFieldSymbol>().Any(static field =>
+                field.DeclaringSyntaxReferences.Length != 0 &&
                 !field.IsStatic && !field.IsConst && !field.IsReadOnly) ||
             named.GetMembers().OfType<IPropertySymbol>().Any(static property =>
-                !property.IsStatic && property.SetMethod != null);
+                property.DeclaringSyntaxReferences.Length != 0 &&
+                !property.IsStatic && property.SetMethod is { IsInitOnly: false });
     }
 
     private static bool IsAutoProperty(

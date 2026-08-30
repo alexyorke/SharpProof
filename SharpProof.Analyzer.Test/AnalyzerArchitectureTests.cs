@@ -38,6 +38,22 @@ public sealed class AnalyzerArchitectureTests
     ];
 
     [Test]
+    public void AnalyzerHostRejectsCompilationErrors()
+    {
+        Func<Task> analyze = async () =>
+        {
+            await AnalyzerTestHost.AnalyzeAsync(
+                "public sealed class Fixture { MissingType Value; }",
+                mode: null,
+                enabledIds: []);
+        };
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(analyze);
+
+        Assert.That(exception, Is.Not.Null);
+        Assert.That(exception!.Message, Does.Contain("CS0246"));
+    }
+
+    [Test]
     public async Task ConcurrentRunsProduceTheSameDiagnostics()
     {
         const string source = """

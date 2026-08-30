@@ -122,6 +122,7 @@ internal static class AnalyzerTestHost
         ImmutableArray<AdditionalText> additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null)
     {
+        EnsureCompilationHasNoErrors(compilation);
         var analyzerOptions = new AnalyzerOptions(
             additionalFiles.IsDefault ? [] : additionalFiles,
             new TestOptionsProvider(values));
@@ -143,6 +144,7 @@ internal static class AnalyzerTestHost
         AnalyzerConfigOptionsProvider optionsProvider,
         DiagnosticAnalyzer? analyzer = null)
     {
+        EnsureCompilationHasNoErrors(compilation);
         var analyzerOptions = new AnalyzerOptions([], optionsProvider);
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer ?? new SharpProofAnalyzer()],
@@ -155,6 +157,22 @@ internal static class AnalyzerTestHost
         return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
             .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
+    }
+
+    private static void EnsureCompilationHasNoErrors(CSharpCompilation compilation)
+    {
+        var errors = compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToImmutableArray();
+        if (errors.IsEmpty)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Analyzer fixture compilation failed:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, errors.Select(static error => error.ToString())));
     }
 
     internal static byte[] EmitImage(CSharpCompilation compilation)
