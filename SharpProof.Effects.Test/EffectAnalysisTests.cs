@@ -5940,6 +5940,46 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void BareRethrowPreservesRuntimeSubtypeForOuterCatch()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Sample {
+                private static int s_state;
+
+                public static void RuntimeSubtypeReachesOuterHandler(
+                    [NotNull] InvalidOperationException exception) {
+                    try {
+                        try {
+                            throw exception;
+                        }
+                        catch (Exception) {
+                            throw;
+                        }
+                    }
+                    catch (InvalidOperationException) {
+                        s_state++;
+                    }
+                }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation)
+            .Analyze(Method(compilation, "RuntimeSubtypeReachesOuterHandler"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(result.Summary.Throws.IsEmpty, Is.True);
+        }
+    }
+
+    [Test]
     public void BareRethrowBelongsOnlyToItsNearestCatch()
     {
         var compilation = EffectTestHost.CreateCompilation(
