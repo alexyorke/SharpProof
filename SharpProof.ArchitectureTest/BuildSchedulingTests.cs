@@ -188,6 +188,12 @@ public sealed class BuildSchedulingTests
             "eng",
             "container",
             "loop-command.sh"));
+        var staleUntrackedCleanup = loop.IndexOf(
+            "done < \"${target_manifest}\"",
+            StringComparison.Ordinal);
+        var commitCheckout = loop.IndexOf(
+            "checkout --quiet --detach \"${source_head}\"",
+            StringComparison.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
@@ -223,6 +229,8 @@ public sealed class BuildSchedulingTests
             Assert.That(loop, Does.Contain("/workspace/SharpProof"));
             Assert.That(loop, Does.Contain("--absolute-git-dir"));
             Assert.That(loop, Does.Contain("sp \"$@\""));
+            Assert.That(staleUntrackedCleanup, Is.GreaterThanOrEqualTo(0));
+            Assert.That(commitCheckout, Is.GreaterThan(staleUntrackedCleanup));
         }
     }
 

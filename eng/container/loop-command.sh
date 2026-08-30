@@ -161,9 +161,6 @@ target_fingerprint="$(get_source_fingerprint \
   "${target_manifest}")"
 if [[ "${target_fingerprint}" != "${source_fingerprint}" ]]; then
   git -C "${target_root}" reset --hard --quiet
-  git -C "${target_root}" checkout --quiet --detach "${source_head}"
-  git -C "${target_root}" reset --hard --quiet "${source_head}"
-
   while IFS= read -r -d '' relative_path; do
     case "${relative_path}" in
       ""|/*|../*|*/../*)
@@ -175,6 +172,9 @@ if [[ "${target_fingerprint}" != "${source_fingerprint}" ]]; then
       rm -f -- "${target_root}/${relative_path}"
     fi
   done < "${target_manifest}"
+
+  git -C "${target_root}" checkout --quiet --detach "${source_head}"
+  git -C "${target_root}" reset --hard --quiet "${source_head}"
 
   if [[ -s "${source_patch}" ]]; then
     git -C "${target_root}" apply \
