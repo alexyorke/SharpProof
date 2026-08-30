@@ -22,13 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.22. MEDIUM - Publication tasks resolve relative paths against the ambient process directory
-
-- Files and members: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`, `SharpProofResetPublishedVerification`, lines 239-253; `SharpProof.BuildTasks/ResetPublishedVerification.cs`, `Execute`, lines 19-25; `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs`, properties and `Execute`, lines 10-28 and 51-65.
-- Mechanism: Clean passes relative user paths unchanged, and both reset and final-result validation lack a `ProjectDirectory` base. Their path normalization therefore uses `Environment.CurrentDirectory`, unlike invalidation and launcher, which explicitly resolve against the project directory.
-- Impact: Clean can leave the real owned artifacts while inspecting or deleting a same-named ambient set; final validation can reject valid project publication or examine an ambient trio instead.
-- Safe reproduction/evidence: Configure publication under `project/obj`, build from the project directory, then invoke reset or validation from its parent using `obj/...` properties; the tasks resolve under `parent/obj`.
-
 ## Wave 2.23. LOW - Verification policy normalization lowercases but does not trim
 
 - File: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`

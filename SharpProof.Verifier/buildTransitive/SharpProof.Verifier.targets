@@ -226,7 +226,8 @@
     <SharpProof.BuildTasks.ValidatePublishedVerificationResult
         RequestPath="$(_SharpProofEffectiveRequestFile)"
         ResultPath="$(_SharpProofEffectiveResultFile)"
-        ManifestPath="$(_SharpProofEffectiveCompilerManifestFile)" />
+        ManifestPath="$(_SharpProofEffectiveCompilerManifestFile)"
+        ProjectDirectory="$(MSBuildProjectDirectory)" />
     <Message Importance="High"
              Text="SharpProof verifier result: $(_SharpProofEffectiveResultFile)" />
     <Message Condition="'$(_SharpProofEffectiveSarifFile)' != ''"
@@ -268,7 +269,8 @@
         RequestPath="$(_SharpProofCleanRequestFile)"
         ResultPath="$(_SharpProofCleanResultFile)"
         ManifestPath="$(_SharpProofCleanManifestFile)"
-        SarifPath="$(_SharpProofCleanSarifFile)" />
+        SarifPath="$(_SharpProofCleanSarifFile)"
+        ProjectDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"

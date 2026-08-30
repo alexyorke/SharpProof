@@ -639,6 +639,42 @@ public sealed class BuildTaskTests
     }
 
     [Test]
+    [Platform("Linux")]
+    public void PublishedResultValidatorResolvesRelativePathsAgainstProjectDirectory()
+    {
+        var parent = Directory.CreateTempSubdirectory(
+            "sharpproof-result-relative-");
+        try
+        {
+            var project = Directory.CreateDirectory(
+                Path.Combine(parent.FullName, "project"));
+            var evidence = Directory.CreateDirectory(
+                Path.Combine(project.FullName, "evidence"));
+            File.WriteAllText(Path.Combine(evidence.FullName, "request.json"), "{}");
+            var engine = new RecordingBuildEngine();
+            var task = new ValidatePublishedVerificationResult
+            {
+                BuildEngine = engine,
+                ProjectDirectory = project.FullName,
+                RequestPath = Path.Combine("evidence", "request.json"),
+                ResultPath = Path.Combine("evidence", "result.json"),
+                ManifestPath = Path.Combine("evidence", "manifest.json")
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            Assert.That(
+                engine.Errors.Single().Message,
+                Does.Contain(
+                        "SharpProof verification did not publish a valid current result")
+                    .And.Not.Contain("Could not find file"));
+        }
+        finally
+        {
+            parent.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void CanceledVerifierTaskDoesNotLaunchAProcess()
     {
         var engine = new RecordingBuildEngine();
@@ -1846,6 +1882,53 @@ public sealed class BuildTaskTests
         finally
         {
             directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public async System.Threading.Tasks.Task PublicationResetResolvesRelativePathsAgainstProjectDirectory()
+    {
+        var parent = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-relative-");
+        try
+        {
+            var project = Directory.CreateDirectory(
+                Path.Combine(parent.FullName, "project"));
+            var evidence = Directory.CreateDirectory(
+                Path.Combine(project.FullName, "evidence"));
+            var names = new[]
+            {
+                "request.json", "result.json", "manifest.json"
+            };
+            var paths = names
+                .Select(name => Path.Combine(evidence.FullName, name))
+                .ToArray();
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       paths,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            foreach (var path in paths)
+            {
+                await File.WriteAllTextAsync(path, Path.GetFileName(path));
+            }
+
+            var reset = new ResetPublishedVerification
+            {
+                BuildEngine = new RecordingBuildEngine(),
+                ProjectDirectory = project.FullName,
+                RequestPath = Path.Combine("evidence", names[0]),
+                ResultPath = Path.Combine("evidence", names[1]),
+                ManifestPath = Path.Combine("evidence", names[2])
+            };
+
+            Assert.That(reset.Execute(), Is.True);
+            Assert.That(paths.Any(File.Exists), Is.False);
+        }
+        finally
+        {
+            parent.Delete(recursive: true);
         }
     }
 

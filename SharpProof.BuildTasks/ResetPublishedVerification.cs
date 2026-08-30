@@ -16,12 +16,27 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task
 
     public string? SarifPath { get; set; }
 
+    public string? ProjectDirectory { get; set; }
+
     public override bool Execute()
     {
         try
         {
+            var projectDirectory = Path.GetFullPath(
+                string.IsNullOrWhiteSpace(ProjectDirectory)
+                    ? Environment.CurrentDirectory
+                    : ProjectDirectory);
+            string ResolvePath(string path)
+            {
+                return LinuxPathIdentity.RequireLocalPath(
+                    Path.IsPathRooted(path)
+                        ? path
+                        : Path.Combine(projectDirectory, path));
+            }
+
             LinuxPathIdentity.ResetPublicationSet(
-                Present(RequestPath, ResultPath, ManifestPath, SarifPath),
+                Present(RequestPath, ResultPath, ManifestPath, SarifPath)
+                    .Select(ResolvePath),
                 TimeSpan.FromSeconds(30));
             return true;
         }

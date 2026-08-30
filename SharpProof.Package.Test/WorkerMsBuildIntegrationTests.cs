@@ -2925,6 +2925,11 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static target =>
                 target.Attribute("Name")?.Value ==
                 "_SharpProofVerifyCore");
+        var reset = targets
+            .Descendants("Target")
+            .Single(static target =>
+                target.Attribute("Name")?.Value ==
+                "SharpProofResetPublishedVerification");
         var cleanup = targets
             .Descendants("Target")
             .Single(static target =>
@@ -2932,6 +2937,13 @@ public sealed class WorkerMsBuildIntegrationTests
                 "_SharpProofCleanupInvocation");
         var invocation = verifyCore
             .Descendants("SharpProof.BuildTasks.RunVerifier")
+            .Single();
+        var validation = verifyCore
+            .Descendants(
+                "SharpProof.BuildTasks.ValidatePublishedVerificationResult")
+            .Single();
+        var resetTask = reset
+            .Descendants("SharpProof.BuildTasks.ResetPublishedVerification")
             .Single();
         var cleanupCall = verifyCore
             .Elements("CallTarget")
@@ -2999,7 +3011,14 @@ public sealed class WorkerMsBuildIntegrationTests
                 Does.Contain("--compiler-manifest")
                     .And.Contain("$(_SharpProofCompilerManifestPath)")
                     .And.Contain("--publish-compiler-manifest")
-                    .And.Contain("$(SharpProofCompilerManifestFile)"));
+                    .And.Contain(
+                        "$(_SharpProofEffectiveCompilerManifestFile)"));
+            Assert.That(
+                validation.Attribute("ProjectDirectory")?.Value,
+                Is.EqualTo("$(MSBuildProjectDirectory)"));
+            Assert.That(
+                resetTask.Attribute("ProjectDirectory")?.Value,
+                Is.EqualTo("$(MSBuildProjectDirectory)"));
             Assert.That(
                 s_reconstructionArguments.Where(arguments.Contains),
                 Is.Empty);
