@@ -426,6 +426,7 @@ public sealed class BuildTaskTests
     {
         var directory = Directory.CreateTempSubdirectory(
             "sharpproof-output-limit-");
+        var containmentFailure = string.Empty;
         try
         {
             var helper = CreateTimedProcessAssembly(
@@ -442,7 +443,9 @@ public sealed class BuildTaskTests
                 WorkingDirectory = directory.FullName,
                 Arguments = [new TaskItem(helper)],
                 ProjectWallTimeMilliseconds = 5000,
-                TerminationGraceMilliseconds = 1000
+                TerminationGraceMilliseconds = 1000,
+                ContainmentAuthenticationFailureOverride = message =>
+                    Volatile.Write(ref containmentFailure, message)
             };
             var stopwatch = Stopwatch.StartNew();
 
@@ -455,6 +458,15 @@ public sealed class BuildTaskTests
                     stopwatch.Elapsed,
                     Is.LessThan(TimeSpan.FromSeconds(3)));
             }
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                    TimeSpan.FromSeconds(6)),
+                Is.True,
+                "The bounded output cleanup anchor did not drain.");
+            Assert.That(
+                Volatile.Read(ref containmentFailure),
+                Is.Empty);
         }
         finally
         {
@@ -873,6 +885,7 @@ public sealed class BuildTaskTests
     {
         var directory = Directory.CreateTempSubdirectory(
             "sharpproof-launcher-timeout-");
+        var containmentFailure = string.Empty;
         try
         {
             var helper = CreateTimedProcessAssembly(directory.FullName);
@@ -886,7 +899,13 @@ public sealed class BuildTaskTests
                 // Let the instrumented supervisor and child finish managed
                 // startup before exercising the whole-process deadline.
                 ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 50
+                // Container scheduling can delay authenticated descendant
+                // cleanup beyond a single scheduler quantum. Keep the
+                // fixture's cleanup reserve realistic while retaining the
+                // strict whole-process wall assertion below.
+                TerminationGraceMilliseconds = 1000,
+                ContainmentAuthenticationFailureOverride = message =>
+                    Volatile.Write(ref containmentFailure, message)
             };
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
@@ -900,6 +919,15 @@ public sealed class BuildTaskTests
                     stopwatch.Elapsed,
                     Is.LessThan(TimeSpan.FromSeconds(4)));
             }
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => RunVerifier.RetainedCleanupAnchorCount == 0,
+                    TimeSpan.FromSeconds(6)),
+                Is.True,
+                "The launcher timeout cleanup anchor did not drain.");
+            Assert.That(
+                Volatile.Read(ref containmentFailure),
+                Is.Empty);
         }
         finally
         {

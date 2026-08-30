@@ -45,7 +45,9 @@ sp build
 sp self-apply
 sp self-apply -Configuration Release -PackageSource artifacts/container-packages
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj
+sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -Fast
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -NoBuild
+sp test-changed -Fast
 sp test-changed -NoBuild
 sp semantic-tests
 sp semantic-tests -NoBuild
@@ -63,6 +65,12 @@ sp acceptance -Configuration Release
 
 Use `sp test-changed` during an edit loop. It derives the affected test-project
 closure from Git and project references.
+Use `-Fast` while iterating on code. It asks Roslyn to skip diagnostic-analyzer
+execution for that build while still compiling and running the selected tests.
+It is non-qualifying: run the same command without `-Fast`, or run `sp check`,
+before delivery. Roslyn records the skipped-analyzer build so a later normal
+build reruns analyzers even when outputs are otherwise up to date. `-Fast` and
+`-NoBuild` are mutually exclusive.
 After a matching build, `sp test-changed -NoBuild` reuses the existing output
 trees and skips both restore and compilation; use the normal command whenever
 source, project, or configuration changes require a rebuild.
@@ -103,6 +111,7 @@ through MSBuild's project scheduler.
 
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
 Test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
+Parallel prerequisite builds use 75% of container-visible CPU lanes by default.
 Finite task workspaces use an 8 GiB `/tmp` tmpfs by default, keeping source
 snapshots, compiler scratch, and test outputs off the host filesystem. Set
 `SHARPPROOF_TMPFS_SIZE` higher for unusually large package or coverage runs.
@@ -113,6 +122,8 @@ Docker budget with
 `SHARPPROOF_CONTAINER_CPU_LIMIT` and `SHARPPROOF_CONTAINER_MEMORY_LIMIT`; the
 lane count follows the CPUs visible to .NET. Use
 `SHARPPROOF_TEST_PROJECT_PARALLELISM` only for profiling or diagnosis.
+When set, that override caps both test-project concurrency and parallel
+prerequisite-build lanes.
 The lane count is per container: when several agents share one Docker VM, cap
 each heavy container with that override (typically 1-2 lanes) and keep the
 aggregate build-capable containers within the VM memory budget.

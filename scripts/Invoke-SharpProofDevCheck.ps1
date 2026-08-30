@@ -20,7 +20,7 @@ $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-$parallelism = Get-SharpProofTestProjectParallelism `
+$buildParallelism = Get-SharpProofBuildParallelism `
     -RepositoryRoot $repositoryRoot
 $commandPlanJson = & $planScript -Configuration $Configuration
 if ($PlanOnly) {
@@ -81,7 +81,7 @@ Invoke-TimedPhase -Name 'build' -Action {
     Invoke-SharpProofParallelDotnetBuilds `
         -Builds @($builds) `
         -RepositoryRoot $repositoryRoot `
-        -Parallelism $parallelism `
+        -Parallelism $buildParallelism `
         -TimeoutSeconds $TimeoutSeconds
 }
 Invoke-TimedPhase -Name 'semantic-tests' -Action {

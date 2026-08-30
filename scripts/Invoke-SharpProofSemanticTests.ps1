@@ -5,6 +5,8 @@ param(
 
     [switch]$NoBuild,
 
+    [switch]$Fast,
+
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 1800,
 
@@ -21,6 +23,9 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'Semantic test sharding requires the canonical Linux container.'
+}
+if ($Fast -and $NoBuild) {
+    throw '-Fast and -NoBuild cannot be combined.'
 }
 
 Import-Module (Join-Path `
@@ -72,19 +77,35 @@ function Invoke-RequiredDotnet {
 
 if (-not $NoBuild) {
     Invoke-RequiredDotnet @('restore', 'SharpProof.sln', '--locked-mode')
-    Invoke-RequiredDotnet @(
+    $buildArguments = @(
         'build', 'SharpProof.sln', '-c', $Configuration, '--no-restore')
+    if ($Fast) {
+        $buildArguments += '-p:RunAnalyzersDuringBuild=false'
+    }
+    Invoke-RequiredDotnet $buildArguments
 }
 
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
+$timingStem = 'semantic-tests-' + $Configuration.ToLowerInvariant()
+$timingSuffix = if ($coverageEnabled) { '-coverage' } else { '' }
+$canonicalTimingOutput = Join-Path $timingDirectory (
+    $timingStem + $timingSuffix + '.json')
 $timingOutput = Join-Path $timingDirectory (
-    'semantic-tests-' + $Configuration.ToLowerInvariant() +
-    $(if ($coverageEnabled) { '-coverage' } else { '' }) + '.json')
+    $timingStem + $(if ($Fast) { '-fast' } else { '' }) +
+    $timingSuffix + '.json')
 $priorDurations = @{}
-if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
+foreach ($priorTimingPath in $(if ($Fast) {
+            @($canonicalTimingOutput, $timingOutput)
+        }
+        else {
+            @($timingOutput)
+        })) {
+    if (-not (Test-Path -LiteralPath $priorTimingPath -PathType Leaf)) {
+        continue
+    }
     try {
-        $prior = Get-Content -LiteralPath $timingOutput -Raw |
+        $prior = Get-Content -LiteralPath $priorTimingPath -Raw |
             ConvertFrom-Json
         foreach ($task in @($prior.tasks)) {
             $elapsed = [long]$task.elapsedMilliseconds
@@ -95,7 +116,7 @@ if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
     }
     catch {
         Write-Warning (
-            'Ignoring malformed prior semantic timing evidence: ' +
+            "Ignoring malformed semantic timing '$priorTimingPath': " +
             $_.Exception.Message)
     }
 }
@@ -482,6 +503,7 @@ $temporaryTiming =
     schemaVersion = 1
     command = 'semantic-tests'
     configuration = $Configuration
+    fast = [bool]$Fast
     parallelism = $parallelism
     totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
     tasks = @($timings | Sort-Object name)

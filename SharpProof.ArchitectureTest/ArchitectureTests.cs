@@ -1224,6 +1224,9 @@ public sealed class ArchitectureTests
                 automation.GetProperty("testProjectCpuDivisor").GetInt32(),
                 Is.EqualTo(2));
             Assert.That(
+                automation.GetProperty("buildCpuPercent").GetInt32(),
+                Is.EqualTo(75));
+            Assert.That(
                 automation.GetProperty("mutationParallelism").GetInt32(),
                 Is.EqualTo(4));
             Assert.That(

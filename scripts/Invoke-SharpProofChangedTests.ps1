@@ -9,6 +9,8 @@ param(
 
     [switch]$NoBuild,
 
+    [switch]$Fast,
+
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 1800
 )
@@ -19,6 +21,9 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'Changed-project testing requires the canonical Linux container.'
+}
+if ($Fast -and $NoBuild) {
+    throw '-Fast and -NoBuild cannot be combined.'
 }
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
@@ -245,6 +250,9 @@ if ($selectedRelative.Count -gt 0) {
                 '--no-restore',
                 "/m:$parallelism",
                 '--filter', $semanticFilter)
+            if ($Fast) {
+                $testArguments += '-p:RunAnalyzersDuringBuild=false'
+            }
             if ($NoBuild) {
                 $testArguments += '--no-build'
             }
@@ -263,6 +271,9 @@ if ($runPackageTests) {
     }
     if ($NoBuild) {
         $packageArguments.NoBuild = $true
+    }
+    if ($Fast) {
+        $packageArguments.Fast = $true
     }
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments

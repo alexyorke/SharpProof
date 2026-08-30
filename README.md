@@ -185,9 +185,13 @@ For an incremental edit loop, use the persistent development container:
 docker compose up -d dev
 docker compose exec dev sharpproof-dev-init
 docker compose exec dev bash
-sp test-changed
+sp test-changed -Fast
 sp check
 ~~~
+
+`-Fast` keeps source generation and test execution but skips diagnostic
+analyzers during the iterative build. It is not qualification evidence; run
+the command without `-Fast`, or run `sp check`, before delivery.
 
 The [container development guide](docs/container-development.md) explains
 workspace isolation, test targets, resource overrides, and when a disposable
@@ -195,6 +199,7 @@ docker compose run --rm tooling qualification command is preferable.
 
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
 Test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
+Parallel prerequisite builds use 75% of container-visible CPU lanes by default.
 Trusted mutations use 4 deterministic weighted lanes.
 The default Debug check concurrently performs one Debug solution build and one Release package-product build, then runs 3 Release pack commands with `--no-build`.
 The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.

@@ -863,11 +863,15 @@ $containerCpuLimit = [int]$acceptanceContract.container.defaultCpuLimit
 $containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
 $testProjectCpuDivisor =
     [int]$acceptanceContract.automation.testProjectCpuDivisor
+$buildCpuPercent =
+    [int]$acceptanceContract.automation.buildCpuPercent
 $mutationParallelism =
     [int]$acceptanceContract.automation.mutationParallelism
 if ($containerCpuLimit -ne 0 -or
     $containerMemoryMiB -le 0 -or
     $testProjectCpuDivisor -le 0 -or
+    $buildCpuPercent -le 0 -or
+    $buildCpuPercent -gt 100 -or
     $mutationParallelism -le 0) {
     throw 'Acceptance resource and concurrency authority is invalid.'
 }
@@ -876,6 +880,8 @@ $resourceClaims = @(
         "$containerMemoryMiB MiB by default.")
     ("Test-project concurrency auto-detects the available CPUs " +
         "and uses one lane per $testProjectCpuDivisor CPUs.")
+    ("Parallel prerequisite builds use $buildCpuPercent% of " +
+        "container-visible CPU lanes by default.")
     ("Trusted mutations use $mutationParallelism deterministic weighted lanes.")
 )
 foreach ($resourceDocument in @(

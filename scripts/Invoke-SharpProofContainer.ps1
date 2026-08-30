@@ -13,7 +13,9 @@ param(
 
     [string]$TestFilter = '',
 
-    [switch]$NoBuild
+    [switch]$NoBuild,
+
+    [switch]$Fast
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,6 +41,20 @@ if ($NoBuild -and $Command -notin @(
     throw (
         '-NoBuild is supported only for test commands that can reuse an ' +
         'existing build in the current container workspace.')
+}
+if ($Fast -and $Command -notin @(
+        'test', 'test-changed', 'semantic-tests', 'portable-tests',
+        'worker-tests', 'package-tests')) {
+    throw '-Fast is supported only for non-qualifying test commands.'
+}
+if ($Fast -and $NoBuild) {
+    throw '-Fast and -NoBuild cannot be combined.'
+}
+$fastBuildArguments = if ($Fast) {
+    @('-p:RunAnalyzersDuringBuild=false')
+}
+else {
+    @()
 }
 
 function Invoke-DotNet([string[]]$Arguments) {
@@ -229,6 +245,7 @@ switch ($Command) {
         }
         $arguments = @(
             'test', $Target, '--configuration', $Configuration, '--no-restore')
+        $arguments += $fastBuildArguments
         if ($NoBuild) {
             $arguments += '--no-build'
         }
@@ -248,6 +265,9 @@ switch ($Command) {
         if ($NoBuild) {
             $changedArguments.NoBuild = $true
         }
+        if ($Fast) {
+            $changedArguments.Fast = $true
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofChangedTests.ps1') `
             @changedArguments
@@ -262,6 +282,9 @@ switch ($Command) {
         if ($NoBuild) {
             $semanticArguments.NoBuild = $true
         }
+        if ($Fast) {
+            $semanticArguments.Fast = $true
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofSemanticTests.ps1') `
             @semanticArguments
@@ -274,6 +297,7 @@ switch ($Command) {
         $arguments = @(
             'test', $target, '--configuration', $Configuration,
             '--no-restore', "/m:$testProjectParallelism")
+        $arguments += $fastBuildArguments
         if ($NoBuild) {
             $arguments += '--no-build'
         }
@@ -304,6 +328,7 @@ switch ($Command) {
             'test',
             'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',
             '--configuration', $Configuration, '--no-restore')
+        $arguments += $fastBuildArguments
         if ($NoBuild) {
             $arguments += '--no-build'
         }
@@ -320,6 +345,9 @@ switch ($Command) {
         }
         if ($NoBuild) {
             $packageArguments.NoBuild = $true
+        }
+        if ($Fast) {
+            $packageArguments.Fast = $true
         }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `

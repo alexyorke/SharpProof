@@ -62,6 +62,38 @@ function Get-SharpProofTestProjectParallelism {
     return [Math]::Max(1, [Math]::Floor($visibleProcessors / $divisor))
 }
 
+function Get-SharpProofBuildParallelism {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $sharedOverride = [Environment]::GetEnvironmentVariable(
+        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
+        [EnvironmentVariableTarget]::Process)
+    if (-not [string]::IsNullOrWhiteSpace($sharedOverride)) {
+        return Get-SharpProofTestProjectParallelism `
+            -RepositoryRoot $RepositoryRoot
+    }
+
+    $visibleProcessors = [Environment]::ProcessorCount
+    if ($visibleProcessors -lt 1) {
+        throw 'The container did not expose a positive processor count.'
+    }
+    $contract = Get-Content -LiteralPath (Join-Path `
+        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
+        ConvertFrom-Json
+    $percent = [int]$contract.automation.buildCpuPercent
+    if ($percent -lt 1 -or $percent -gt 100) {
+        throw 'The build CPU percentage must be between 1 and 100.'
+    }
+
+    return [Math]::Max(
+        1,
+        [Math]::Floor($visibleProcessors * $percent / 100.0))
+}
+
 function Get-SharpProofTestAssemblyPath {
     [CmdletBinding()]
     param(
@@ -284,6 +316,7 @@ function New-SharpProofIsolatedTestOutput {
 
 Export-ModuleMember -Function @(
     'Add-SharpProofStaticGraphArgument',
+    'Get-SharpProofBuildParallelism',
     'Get-SharpProofTestProjectParallelism',
     'Get-SharpProofTestAssemblyPath',
     'Invoke-SharpProofParallelDotnetBuilds',

@@ -67,6 +67,35 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void ContainmentTestsUseExclusiveFreshProcesses()
+    {
+        var packageTests = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(packageTests,
+                Does.Contain("Name = 'postflight-buildtask-main'"));
+            Assert.That(packageTests,
+                Does.Contain("$isolatedBuildTaskMethods"));
+            Assert.That(packageTests,
+                Does.Contain("OversizedVerifierOutputTriggersPromptBoundedContainment"));
+            Assert.That(packageTests,
+                Does.Contain("VerifierExecutionRetainsLiveIncompleteCleanupAnchor"));
+            Assert.That(packageTests,
+                Does.Contain("VerifierTaskBoundsTheWholeLauncherProcess"));
+            Assert.That(packageTests,
+                Does.Contain("FullyQualifiedName!~$buildTaskClass.$method"));
+            Assert.That(packageTests,
+                Does.Contain("Exclusive = $true"));
+            Assert.That(packageTests,
+                Does.Contain("$nextIsExclusive"));
+        }
+    }
+
+    [Test]
     public void PackageBuildsReuseOutputsAndAvoidTheSharedCompilerBottleneck()
     {
         var root = FindRepositoryRoot();
@@ -82,6 +111,7 @@ public sealed class BuildSchedulingTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(packageTests, Does.Contain("Invoke-RequiredBuilds"));
+            Assert.That(packageTests, Does.Contain("$buildParallelism"));
             Assert.That(packageTests,
                 Does.Contain("Invoke-SharpProofParallelDotnetBuilds"));
             Assert.That(packageTests,
@@ -91,6 +121,8 @@ public sealed class BuildSchedulingTests
             Assert.That(packageTests,
                 Does.Contain("'--no-restore', '--no-build', '--nologo'"));
             Assert.That(packageTests, Does.Contain("phases = @($phaseTimings)"));
+            Assert.That(execution,
+                Does.Contain("function Get-SharpProofBuildParallelism"));
             Assert.That(execution,
                 Does.Contain("function Invoke-SharpProofParallelDotnetBuilds"));
             Assert.That(execution,
@@ -232,6 +264,53 @@ public sealed class BuildSchedulingTests
                 "'-NoBuild is supported only for test commands"));
             Assert.That(container, Does.Contain(
                 "$changedArguments.NoBuild = $true"));
+        }
+    }
+
+    [Test]
+    public void FastTestBuildsSkipAnalyzersWithoutWeakeningQualification()
+    {
+        var root = FindRepositoryRoot();
+        var container = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var semantic = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
+        var package = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+        var changed = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofChangedTests.ps1"));
+        var documentation = File.ReadAllText(Path.Combine(
+            root,
+            "docs",
+            "container-development.md"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var script in new[] {
+                         container,
+                         semantic,
+                         package,
+                         changed
+                     })
+            {
+                Assert.That(script,
+                    Does.Contain("RunAnalyzersDuringBuild=false"));
+            }
+            Assert.That(container,
+                Does.Contain("-Fast is supported only for non-qualifying"));
+            Assert.That(container,
+                Does.Contain("-Fast and -NoBuild cannot be combined"));
+            Assert.That(documentation, Does.Contain("sp test-changed -Fast"));
+            Assert.That(documentation,
+                Does.Contain("It is non-qualifying"));
         }
     }
 
