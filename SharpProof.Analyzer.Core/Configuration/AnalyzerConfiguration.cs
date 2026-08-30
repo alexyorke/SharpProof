@@ -90,11 +90,6 @@ internal sealed class AnalyzerConfiguration
             builder.Add(new(option.Key, value.Trim(),
                 "expected one of: " + string.Join(", ", option.AllowedValues)));
         }
-        if (builder.Count != 0)
-        {
-            return builder.ToImmutable();
-        }
-
         if (TryGetRetiredMode(options, out var retiredMode))
         {
             builder.Add(new(

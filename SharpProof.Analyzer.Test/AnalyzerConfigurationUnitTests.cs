@@ -58,6 +58,28 @@ public sealed class AnalyzerConfigurationUnitTests
     }
 
     [Test]
+    public void InvalidCurrentOptionDoesNotHideRetiredMode()
+    {
+        var configuration = AnalyzerConfiguration.FromOptions(
+            new DictionaryProvider(new DictionaryOptions(
+                ("sharpproof_profile", "everything"),
+                ("sharpproof_mode", "effects"))));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(configuration.Profile, Is.EqualTo(SharpProofProfile.Off));
+            Assert.That(
+                configuration.InvalidConfigurationValues.Select(
+                    static invalid => invalid.Key),
+                Is.EqualTo(["sharpproof_profile", "sharpproof_mode"]));
+            Assert.That(
+                configuration.InvalidConfigurationValues.Select(
+                    static invalid => invalid.Value),
+                Is.EqualTo(["everything", "effects"]));
+        }
+    }
+
+    [Test]
     public void ConflictingTreeAliasesCannotHideBehindMatchingGlobalValue()
     {
         var tree = new DictionaryOptions(

@@ -228,15 +228,6 @@ This section records 34 findings from exactly 30 fresh read-only auditors. The r
 - Impact: Analyzer failure or AD0001 prevents SPMETA cancellation and soundness enforcement instead of merely declining the audited-boundary exemption.
 - Safe evidence: `RefKind` is absent from lines 516-522, and `SingleOrDefault` throws when more than one element matches.
 
-## Wave 5.2. LOW - Global validation hides a retired-mode error whenever any current option is invalid
-
-- File: `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs`
-- Member: `GetInvalidGlobalConfigurationValues`
-- Current lines: 93-104, especially the early return at 93-96 before `TryGetRetiredMode` at 98-104
-- Mechanism: After collecting invalid or conflicting `sharpproof_profile` or `sharpproof_features` entries, the method immediately returns when `builder.Count != 0`, so it never checks `sharpproof_mode` or `build_property.SharpProofMode` during that run. For example, `sharpproof_profile=everything` with `sharpproof_mode=effects` yields only the profile diagnostic; after fixing the profile, a second build reveals the retired-mode diagnostic.
-- Impact: Configuration repair becomes needlessly iterative, and CI/editor output presents an incomplete set of invalid compilation-global settings. Analysis is already fail-closed.
-- Safe evidence: Direct control flow at lines 93-104. `GetInvalidTreeConfigurationValues` at lines 147-180 does not early-return and appends the retired-mode diagnostic after current-option diagnostics. Existing tests at `AnalyzerModeAndEffectTests.cs` lines 185-209 and 239-259 cover each error only in isolation.
-
 ## Wave 5.3. HIGH - Compiler response evidence authority does not bind effect outcome, reason, or certainty
 
 - File: `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs`
