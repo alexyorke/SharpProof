@@ -115,6 +115,7 @@ value accompanies backend `Unknown` and is mapped through the proof kernel.
 | `MalformedBackendResult` | Status, core, or model shape is invalid |
 | `CounterexampleReplayFailed` | A SAT model failed exact assignment-closure or lowered-term replay |
 | `PostconditionMayBeUndefined` | A candidate input makes the postcondition expression throw instead of yielding a Boolean value |
+| `InternalConsistencyMayBeUndefined` | A candidate input makes an internal-consistency expression throw instead of yielding a Boolean value; this is distinct from malformed counterexample replay |
 
 Only the proof kernel constructs proof outcomes. Backend UNSAT becomes
 `Proven` only after evidence-core hygiene. Backend SAT becomes `Refuted` only

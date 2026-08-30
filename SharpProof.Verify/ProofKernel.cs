@@ -74,10 +74,16 @@ public sealed class ProofKernel(ISmtBackend backend)
         }
         cancellationToken.ThrowIfCancellationRequested();
         var goal = interpreter.Evaluate(query.Goal.Predicate, result.Model.Assignments, cancellationToken);
-        if (goal.Status == IrEvaluationStatus.Exception &&
-            query.Goal.Diagnostic == ProofDiagnosticKind.Postcondition)
+        if (goal.Status == IrEvaluationStatus.Exception)
         {
-            return Unknown(AbstentionReason.PostconditionMayBeUndefined);
+            return Unknown(query.Goal.Diagnostic switch
+            {
+                ProofDiagnosticKind.InternalConsistency =>
+                    AbstentionReason.InternalConsistencyMayBeUndefined,
+                ProofDiagnosticKind.Postcondition =>
+                    AbstentionReason.PostconditionMayBeUndefined,
+                _ => AbstentionReason.CounterexampleReplayFailed
+            });
         }
 
         return IsBoolean(goal, expected: false)

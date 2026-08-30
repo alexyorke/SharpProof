@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Fuzz;
+using SharpProof.Verify;
 
 namespace SharpProof.Fuzz.Test;
 
@@ -400,6 +401,43 @@ public sealed class FuzzRunnerTests
             Assert.That(result.DefinedTrueCount, Is.EqualTo(expectedTrue));
             Assert.That(result.DefinedFalseCount, Is.EqualTo(expectedFalse));
             Assert.That(result.UndefinedCount, Is.EqualTo(expectedUndefined));
+        }
+    }
+
+    [Test]
+    public async Task PartialTermOracleAbstainsOnGenericCounterexampleReplayFailure()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var goal = new Goal(
+            factory,
+            factory.Boolean(true),
+            ProofDiagnosticKind.Postcondition,
+            new SourceLocationId(0));
+        var query = new VerificationQuery(factory, [], goal, [variable]);
+        var outcome = await new ProofKernel(
+                new StubBackend(BackendCheckResult.Satisfiable(new BackendModel([]))))
+            .VerifyAsync(query);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+            Assert.That(
+                ((UnknownOutcome)outcome).Reason,
+                Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+            Assert.That(
+                PartialTermSmtDifferentialOracle.Classify(outcome),
+                Is.Null);
+        }
+    }
+
+    private sealed class StubBackend(BackendCheckResult result) : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(result);
         }
     }
 

@@ -202,6 +202,31 @@ public sealed class ProofKernelTests
     }
 
     [Test]
+    public async Task UndefinedInternalConsistencyIsTypedSeparatelyFromReplayFailure()
+    {
+        var factory = new IrFactory();
+        var divisor = factory.CreateVariable("divisor", factory.IntegerType);
+        var predicate = factory.Binary(IrBinaryOperator.Equal,
+            factory.Binary(IrBinaryOperator.Divide,
+                factory.Integer(0), factory.Variable(divisor)),
+            factory.Integer(0));
+        var query = new VerificationQuery(factory, [],
+            new Goal(factory, predicate, ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)),
+            [divisor]);
+        var model = new BackendModel([
+            KeyValuePair.Create(divisor, factory.CreateIntegerValue(0))
+        ]);
+
+        var outcome = await new ProofKernel(
+            new StubBackend(BackendCheckResult.Satisfiable(model))).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.InternalConsistencyMayBeUndefined));
+    }
+
+    [Test]
     public async Task OpaqueEvidenceCannotValidateARefutation()
     {
         var fixture = CreateFixture();

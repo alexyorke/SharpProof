@@ -277,7 +277,7 @@ public sealed class PartialTermSmtDifferentialOracle
         };
     }
 
-    private static PartialTermSemanticOutcome? Classify(
+    internal static PartialTermSemanticOutcome? Classify(
         ProofOutcome outcome)
     {
         return outcome switch
@@ -286,7 +286,7 @@ public sealed class PartialTermSmtDifferentialOracle
             RefutedOutcome => PartialTermSemanticOutcome.DefinedFalse,
             UnknownOutcome
             {
-                Reason: AbstentionReason.CounterexampleReplayFailed
+                Reason: AbstentionReason.InternalConsistencyMayBeUndefined
             } => PartialTermSemanticOutcome.Undefined,
             _ => null
         };
