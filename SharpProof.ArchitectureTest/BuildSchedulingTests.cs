@@ -841,7 +841,7 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
-    public void ArchitectureOnlyShardingSplitsTheCoverageHotspot()
+    public void SemanticShardingAlwaysSplitsTheCoverageHotspot()
     {
         var semantic = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
@@ -863,6 +863,10 @@ public sealed class BuildSchedulingTests
             Assert.That(
                 semantic,
                 Does.Contain("FullyQualifiedName!~$architectureCoverageHotspot"));
+            Assert.That(
+                semantic,
+                Does.Not.Contain(
+                    "$ArchitectureOnly -and $fixture -ceq 'CoverageScriptTests'"));
         }
     }
 

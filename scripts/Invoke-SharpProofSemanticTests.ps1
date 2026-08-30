@@ -342,7 +342,7 @@ if ($architectureShardingEnabled) {
     $architectureProject = Join-Path $repositoryRoot (
         'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')
     foreach ($fixture in $architectureFixtures) {
-        if ($ArchitectureOnly -and $fixture -ceq 'CoverageScriptTests') {
+        if ($fixture -ceq 'CoverageScriptTests') {
             $tasks.Add([pscustomobject]@{
                 Name = 'architecture-coveragescripttests-hotspot'
                 Target = $architectureProject
