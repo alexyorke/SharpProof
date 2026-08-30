@@ -13,7 +13,7 @@ namespace SharpProof.Worker.Test;
 public sealed class ExceptionIdentityReplayTests
 {
     [Test]
-    public void AliasedExceptionIdentitiesRemainDistinctWhenEffectReplayIsUnavailable()
+    public void AliasedExceptionIdentitiesRemainDistinctWhileFrameworkThrowsReplay()
     {
         var allowedReference = CreateExceptionReference(
             "Collision.Exceptions",
@@ -50,7 +50,8 @@ public sealed class ExceptionIdentityReplayTests
                     throw new System.InvalidOperationException();
             }
             """,
-            new CSharpParseOptions(LanguageVersion.CSharp12));
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            path: "ExceptionIdentityReplay.cs");
         var compilation = CSharpCompilation.Create(
             "Collision.Consumer",
             [tree],
@@ -158,13 +159,20 @@ public sealed class ExceptionIdentityReplayTests
             Assert.That(aliasedEvidence.Witness, Is.Null);
             Assert.That(
                 frameworkEvidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 frameworkEvidence.Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                frameworkEvidence.Witness?.Kind,
+                Is.EqualTo("explicit-throw"));
+            Assert.That(
+                frameworkEvidence.Witness?.ExactExceptionTypeHierarchy,
+                Is.Not.Empty);
+            Assert.That(
+                frameworkEvidence.Replay?.Events.Single().Kind,
                 Is.EqualTo(
-                    WorkerClaimReason.CounterexampleNotReplayable));
-            Assert.That(frameworkEvidence.Witness, Is.Null);
-            Assert.That(frameworkEvidence.Replay, Is.Null);
+                    CompilerEffectReplayEventKind.ExplicitThrow));
         }
 
         const string claimId = "effect-exception-identity";

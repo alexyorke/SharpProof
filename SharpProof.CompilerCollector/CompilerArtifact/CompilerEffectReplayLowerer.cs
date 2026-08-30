@@ -18,7 +18,7 @@ internal static class CompilerEffectReplayLowerer
 
         replay = null;
         witnessDetail = string.Empty;
-        if (!HasAllocationShape(witness) ||
+        if (!HasReplayableShape(witness) ||
             !TryCreateEvent(
                 compilation,
                 apiSpecs,
@@ -42,13 +42,32 @@ internal static class CompilerEffectReplayLowerer
         return true;
     }
 
-    private static bool HasAllocationShape(EffectDirectWitness witness)
+    private static bool HasReplayableShape(EffectDirectWitness witness)
     {
-        return witness is
+        return witness.EventKind switch
         {
-            Effects: EffectContractKind.Allocates,
-            Capabilities: EffectContractCapabilityKind.None,
-            ExceptionType: null
+            EffectDirectEventKind.ManagedObjectAllocation or
+            EffectDirectEventKind.ManagedArrayAllocation => witness is
+            {
+                Effects: EffectContractKind.Allocates,
+                Capabilities: EffectContractCapabilityKind.None,
+                ExceptionType: null
+            },
+            EffectDirectEventKind.ExplicitThrow => witness is
+            {
+                Effects: EffectContractKind.Throws,
+                Capabilities: EffectContractCapabilityKind.None,
+                ExceptionType: not null
+            },
+            EffectDirectEventKind.MonitorCall or
+            EffectDirectEventKind.EmptyLock => witness is
+            {
+                Effects: EffectContractKind.Synchronizes,
+                Capabilities:
+                    EffectContractCapabilityKind.Synchronization,
+                ExceptionType: null
+            },
+            _ => false
         };
     }
 
@@ -86,6 +105,7 @@ internal static class CompilerEffectReplayLowerer
         string? memberDocumentationId;
         string typeIdentity;
         string? typeDocumentationId;
+        string[] exactExceptionTypeHierarchy = [];
         CompilerEffectReplayEventKind eventKind;
         switch (witness.EventKind, operation)
         {
@@ -134,6 +154,81 @@ internal static class CompilerEffectReplayLowerer
                     ? typeDocumentationId!
                     : typeIdentity;
                 break;
+            case (
+                EffectDirectEventKind.ExplicitThrow,
+                IThrowOperation { Exception: { } exception }) when
+                witness.Kind == "explicit-throw" &&
+                witness.ExceptionType is { } exactExceptionType &&
+                DefiniteOperationFacts.UnwrapHarmlessValue(exception) is
+                    IObjectCreationOperation
+                {
+                    Constructor: { } constructor,
+                    Type: INamedTypeSymbol exceptionType
+                } creation &&
+                SymbolEqualityComparer.Default.Equals(
+                    exactExceptionType,
+                    exceptionType) &&
+                IsExactFrameworkException(
+                    compilation,
+                    exceptionType) &&
+                HasNonThrowingConstructorSpec(creation, apiSpecs):
+                eventKind = CompilerEffectReplayEventKind.ExplicitThrow;
+                memberIdentity =
+                    CompilerIdentityBridge.CreateSymbolDisplay(constructor);
+                memberDocumentationId =
+                    DocumentationCommentId.CreateDeclarationId(constructor);
+                typeIdentity =
+                    CompilerIdentityBridge.CreateTypeDisplay(exceptionType);
+                typeDocumentationId =
+                    DocumentationCommentId.CreateReferenceId(exceptionType);
+                exactExceptionTypeHierarchy =
+                    CompilerExceptionTypeIdentity.EncodeHierarchy(
+                        exceptionType);
+                witnessDetail = !string.IsNullOrWhiteSpace(
+                    typeDocumentationId)
+                    ? typeDocumentationId!
+                    : typeIdentity;
+                break;
+            case (
+                EffectDirectEventKind.MonitorCall,
+                IInvocationOperation invocation) when
+                witness.Kind == "synchronization-call" &&
+                IsDefiniteMonitorCall(compilation, invocation):
+                eventKind = CompilerEffectReplayEventKind.MonitorCall;
+                memberIdentity = CompilerIdentityBridge.CreateSymbolDisplay(
+                    invocation.TargetMethod);
+                memberDocumentationId =
+                    DocumentationCommentId.CreateDeclarationId(
+                        invocation.TargetMethod);
+                typeIdentity = CompilerIdentityBridge.CreateTypeDisplay(
+                    invocation.TargetMethod.ContainingType);
+                typeDocumentationId =
+                    DocumentationCommentId.CreateReferenceId(
+                        invocation.TargetMethod.ContainingType);
+                witnessDetail = !string.IsNullOrWhiteSpace(
+                    memberDocumentationId)
+                    ? memberDocumentationId!
+                    : memberIdentity;
+                break;
+            case (
+                EffectDirectEventKind.EmptyLock,
+                ILockOperation @lock) when
+                witness.Kind == "synchronization-lock" &&
+                IsDefiniteEmptyLock(@lock, apiSpecs) &&
+                compilation.GetTypeByMetadataName(
+                    FrameworkTypeMetadataNames.Monitor) is { } monitorType:
+                eventKind = CompilerEffectReplayEventKind.EmptyLock;
+                memberIdentity = string.Empty;
+                memberDocumentationId = null;
+                typeIdentity =
+                    CompilerIdentityBridge.CreateTypeDisplay(monitorType);
+                typeDocumentationId =
+                    DocumentationCommentId.CreateReferenceId(monitorType);
+                witnessDetail = !string.IsNullOrWhiteSpace(
+                    typeDocumentationId)
+                    ? typeDocumentationId!
+                    : typeIdentity;
+                break;
             default:
                 return false;
         }
@@ -160,7 +255,7 @@ internal static class CompilerEffectReplayLowerer
             TypeDocumentationId = typeDocumentationId,
             SpecWitnessIdentifier = null,
             ScalarOperands = [],
-            ExactExceptionTypeHierarchy = [],
+            ExactExceptionTypeHierarchy = exactExceptionTypeHierarchy,
             Location = location,
             SourceTreeOrdinal = sourceTreeOrdinal,
             SourceTreePath = sourceTreePath,
@@ -185,6 +280,79 @@ internal static class CompilerEffectReplayLowerer
         creation.Initializer == null &&
         creation.Arguments.All(static argument =>
             DefiniteOperationFacts.IsHarmlessValue(argument.Value));
+    }
+
+    private static bool HasNonThrowingConstructorSpec(
+        IObjectCreationOperation creation,
+        ResolvedApiSpecTable apiSpecs)
+    {
+        return creation.Constructor is { } constructor &&
+            apiSpecs.TryGet(constructor, out var spec) &&
+            spec.Template.Facets.Throws.Behavior ==
+                SpecThrowBehavior.DoesNotThrow &&
+            spec.Template.Facets.Termination?.Behavior ==
+                SpecTerminationBehavior.Terminates;
+    }
+
+    private static bool IsExactFrameworkException(
+        CSharpCompilation compilation,
+        INamedTypeSymbol type)
+    {
+        var exceptionType = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.Exception);
+        return exceptionType != null &&
+            SymbolEqualityComparer.Default.Equals(
+                type.ContainingAssembly,
+                exceptionType.ContainingAssembly) &&
+            EffectTypeFacts.IsDerivedFrom(type, exceptionType);
+    }
+
+    private static bool IsDefiniteMonitorCall(
+        CSharpCompilation compilation,
+        IInvocationOperation invocation)
+    {
+        var monitorType = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.Monitor);
+        return !invocation.IsImplicit &&
+            invocation.Instance == null &&
+            !invocation.Arguments.IsDefaultOrEmpty &&
+            invocation.Arguments.All(static argument =>
+                DefiniteOperationFacts.IsHarmlessValue(argument.Value)) &&
+            DefiniteOperationFacts.IsDefinitelyNonNull(
+                invocation.Arguments[0].Value) &&
+            invocation.TargetMethod.Name is
+                "Enter" or "Exit" or "Pulse" or "PulseAll" or
+                "TryEnter" or "Wait" &&
+            monitorType != null &&
+            SymbolEqualityComparer.Default.Equals(
+                invocation.TargetMethod.ContainingType.OriginalDefinition,
+                monitorType.OriginalDefinition);
+    }
+
+    private static bool IsDefiniteEmptyLock(
+        ILockOperation @lock,
+        ResolvedApiSpecTable apiSpecs)
+    {
+        if (@lock.Body is not IBlockOperation { Operations.Length: 0 })
+        {
+            return false;
+        }
+
+        var receiver = DefiniteOperationFacts.UnwrapHarmlessValue(
+            @lock.LockedValue);
+        return receiver switch
+        {
+            IObjectCreationOperation creation =>
+                IsDefiniteObjectAllocation(creation, apiSpecs) &&
+                HasNonThrowingConstructorSpec(creation, apiSpecs),
+            IArrayCreationOperation array =>
+                DefiniteOperationFacts.IsDirectArrayCreationComplete(array),
+            IInstanceReferenceOperation or
+            IConditionalAccessInstanceOperation or
+            ITypeOfOperation => true,
+            _ => receiver.ConstantValue is
+            { HasValue: true, Value: not null }
+        };
     }
 
     private static bool TryResolveSource(

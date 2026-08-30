@@ -1925,6 +1925,10 @@ public sealed class ClaimManifestBuilderTests
                 }
 
                 [AllowedCapabilities(SharpProofCapability.None)]
+                public static void SafeMonitor() =>
+                    System.Threading.Monitor.Enter(typeof(Subject));
+
+                [AllowedCapabilities(SharpProofCapability.None)]
                 public static void ThrowingConstructor() {
                     lock (new ThrowingGate()) {
                     }
@@ -1952,8 +1956,18 @@ public sealed class ClaimManifestBuilderTests
 
         using (Assert.EnterMultipleScope())
         {
-            AssertUnsupportedDirectCandidate(evidence["SafeObject"]);
-            AssertUnsupportedDirectCandidate(evidence["SafeArray"]);
+            AssertReplayableSynchronization(
+                evidence["SafeObject"],
+                CompilerEffectReplayEventKind.EmptyLock,
+                "synchronization-lock");
+            AssertReplayableSynchronization(
+                evidence["SafeArray"],
+                CompilerEffectReplayEventKind.EmptyLock,
+                "synchronization-lock");
+            AssertReplayableSynchronization(
+                evidence["SafeMonitor"],
+                CompilerEffectReplayEventKind.MonitorCall,
+                "synchronization-call");
             Assert.That(
                 evidence["ThrowingConstructor"].Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Proven));
@@ -1964,20 +1978,51 @@ public sealed class ClaimManifestBuilderTests
         }
         return;
 
-        static void AssertUnsupportedDirectCandidate(
-            CompilerEffectClaimArtifact value)
+        static void AssertReplayableSynchronization(
+            CompilerEffectClaimArtifact value,
+            CompilerEffectReplayEventKind expectedEventKind,
+            string expectedWitnessKind)
         {
-            Assert.That(value.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            var effectEvent = value.Replay?.Events.Single();
+            Assert.That(
+                value.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 value.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.CounterexampleNotReplayable));
+                Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 value.Certainty,
                 Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.Unavailable));
-            Assert.That(value.Witness, Is.Null);
-            Assert.That(value.Replay, Is.Null);
+                    WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(
+                value.Witness?.Kind,
+                Is.EqualTo(expectedWitnessKind));
+            Assert.That(
+                value.Witness?.Effects,
+                Is.EqualTo(WorkerEffectSet.Synchronizes));
+            Assert.That(
+                value.Witness?.Capabilities,
+                Is.EqualTo(
+                    WorkerEffectCapabilitySet.Synchronization));
+            Assert.That(
+                effectEvent?.Kind,
+                Is.EqualTo(expectedEventKind));
+            Assert.That(
+                string.IsNullOrEmpty(effectEvent?.MemberIdentity),
+                Is.EqualTo(
+                    expectedEventKind ==
+                    CompilerEffectReplayEventKind.EmptyLock));
+            Assert.That(
+                string.IsNullOrEmpty(
+                    effectEvent?.MemberDocumentationId),
+                Is.EqualTo(
+                    expectedEventKind ==
+                    CompilerEffectReplayEventKind.EmptyLock));
+            Assert.That(
+                effectEvent?.ExactExceptionTypeHierarchy,
+                Is.Empty);
+            Assert.DoesNotThrow((Action)(() =>
+                CompilerEffectClaimArtifactCodec.Validate(value)));
         }
 
         static void AssertUnknownWithoutWitness(
@@ -2042,21 +2087,35 @@ public sealed class ClaimManifestBuilderTests
                 Is.Null);
             Assert.That(
                 evidence["DefiniteWrongThrow"].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 evidence["DefiniteWrongThrow"].Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.CounterexampleNotReplayable));
+                Is.EqualTo(WorkerClaimReason.None));
             Assert.That(
                 evidence["DefiniteWrongThrow"].Certainty,
                 Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.Unavailable));
+                    WorkerEffectEvidenceCertainty.DefiniteViolation));
             Assert.That(
-                evidence["DefiniteWrongThrow"].Witness,
-                Is.Null);
+                evidence["DefiniteWrongThrow"].Witness?.Kind,
+                Is.EqualTo("explicit-throw"));
             Assert.That(
-                evidence["DefiniteWrongThrow"].Replay,
-                Is.Null);
+                evidence["DefiniteWrongThrow"].Witness?.Effects,
+                Is.EqualTo(WorkerEffectSet.Throws));
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Witness?
+                    .ExactExceptionTypeHierarchy,
+                Is.Not.Empty);
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Replay?.Events.Single()
+                    .Kind,
+                Is.EqualTo(
+                    CompilerEffectReplayEventKind.ExplicitThrow));
+            Assert.That(
+                evidence["DefiniteWrongThrow"].Replay?.Events.Single()
+                    .ExactExceptionTypeHierarchy,
+                Is.EqualTo(
+                    evidence["DefiniteWrongThrow"].Witness?
+                        .ExactExceptionTypeHierarchy));
             Assert.That(
                 evidence["UnmodeledThrow"].Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));

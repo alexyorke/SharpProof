@@ -202,6 +202,8 @@ internal static class CompilerLoweredArtifact
                 CompilerScalarDomain.Int,
             { Minimum: uint.MinValue, Maximum: uint.MaxValue } =>
                 CompilerScalarDomain.UInt,
+            { Minimum: long.MinValue, Maximum: long.MaxValue } =>
+                CompilerScalarDomain.Long,
             _ => throw new InvalidDataException(
                 "A compiler integer interval is not a primitive scalar domain.")
         };
@@ -551,7 +553,8 @@ internal static class CompilerLoweredArtifact
     {
         return (value.Minimum, value.Maximum) is
         (sbyte.MinValue, sbyte.MaxValue) or (byte.MinValue, byte.MaxValue) or (short.MinValue, short.MaxValue) or
-        (ushort.MinValue, ushort.MaxValue) or (int.MinValue, int.MaxValue) or (uint.MinValue, uint.MaxValue);
+        (ushort.MinValue, ushort.MaxValue) or (int.MinValue, int.MaxValue) or (uint.MinValue, uint.MaxValue) or
+        (long.MinValue, long.MaxValue);
     }
 
     private static CompilerPreparedBody? DecodeBody(

@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 16
+    "version": 17
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 16
+          "value": 17
         }
       ]
     },
@@ -192,6 +192,10 @@
         {
           "name": "UInt",
           "value": 6
+        },
+        {
+          "name": "Long",
+          "value": 7
         }
       ]
     },
@@ -4384,7 +4388,7 @@
   },
   "effectEvidence": {
     "domain": "SharpProof.CompilerEffectClaimEvidence",
-    "version": 8,
+    "version": 9,
     "constraintKinds": {
       "capabilities": "AllowedCapabilities",
       "exceptions": "AllowedExceptions",
@@ -4395,7 +4399,10 @@
       "maximumEvents": 256,
       "supportedEventKinds": [
         "ManagedObjectAllocation",
-        "ManagedArrayAllocation"
+        "ManagedArrayAllocation",
+        "ExplicitThrow",
+        "MonitorCall",
+        "EmptyLock"
       ]
     },
     "sortAllowedExceptionTypes": true,

@@ -117,7 +117,7 @@ replace the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During container verification, the production analyzer emits a deterministic
-schema-16 compiler artifact from the final post-generator Roslyn
+schema-17 compiler artifact from the final post-generator Roslyn
 `Compilation`. It contains the selected-claim manifest and portable lowered
 whole-body CFG/IR for supported selected callables, plus bounded relational
 source/implementation-IL/audited-pack calls, bound contract/spec
@@ -134,14 +134,15 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body postcondition-counterexample replay is implemented for
 the admitted scalar program subset. The proof kernel checks exact model closure
 and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Schema 16 retains the independently
-replayable event for an unconditional definite managed object/array allocation.
-The worker can use it to refute `ZeroAllocations` or an `EffectContract`
-excluding `Allocates`; other effect candidates still fail closed as typed
-`Unknown`. Effect results remain noncacheable. Worker protocol 11, cache schema
-13, relational-summary schema version 2, and specification-pack schema version
-1 carry the
-current wire contract. The three-package split, portable SourceLink symbols,
+compiler-produced whole-body CFG. Schema 17 carries independently replayable
+events for unconditional definite managed object/array allocation, exact
+framework explicit throw, empty `lock`, and exact `Monitor` calls. The worker
+authenticates the selected effect, capability, and exception constraints,
+derives the replayed witness, and publishes only matching violations. Other
+effect candidates still fail closed as typed `Unknown`, and effect results
+remain noncacheable. Worker protocol 11, cache schema 13, relational-summary
+schema version 2, and specification-pack schema version 1 carry the current
+wire contract. The three-package split, portable SourceLink symbols,
 package validation, deterministic hashes, SPDX 2.3 package/component SBOM
 generation, separately permissioned GitHub build/SBOM attestations, immutable
 tagged-byte validation, trusted-publishing workflow, package-backed sample

@@ -423,7 +423,8 @@ internal sealed partial class ClaimManifestBuilder(
             Effects = ToWorkerEffects(witness.Effects),
             Capabilities =
                 ToWorkerCapabilities(witness.Capabilities),
-            ExactExceptionTypeHierarchy = [],
+            ExactExceptionTypeHierarchy =
+                [.. replay!.Events[0].ExactExceptionTypeHierarchy],
             Location = replay!.Events[0].Location
         };
         evidence.Replay = replay;

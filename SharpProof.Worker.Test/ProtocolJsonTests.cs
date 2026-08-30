@@ -229,7 +229,7 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(16));
+            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(17));
             Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));

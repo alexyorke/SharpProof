@@ -224,7 +224,7 @@ models are not cacheable.
 
 During container verification, the build-only compiler collector observes the
 final post-generator Roslyn `Compilation` and atomically emits compiler
-artifact schema version 16. The compiler owns selection, contract/spec binding,
+artifact schema version 17. The compiler owns selection, contract/spec binding,
 effect evaluation, relational-summary inference, and body lowering. Every selected callable has either a
 typed failure record or a portable graph containing its bound clauses,
 canonical variables, whole-body CFG/IR, body start, initial environment,
@@ -291,17 +291,17 @@ inconsistent replay state is a fatal `CounterexampleReplayFailed`. Result JSON
 includes only canonical user-model variables, not temporary lowered variables.
 
 Effect replay is a separate worker-owned interpreter and does not invoke SMT
-or execute user code. It currently derives only `Allocates` from the admitted
-unconditional object/array event, then compares that observation against the
-selected constraint and sealed witness. It can refute `ZeroAllocations` and an
-`EffectContract` excluding `Allocates`; observable `EnforcePure` permits fresh
-allocation. Explicit throw, receiver field access, empty `lock`, exact
-`Monitor`, static-initialization-sensitive allocation, and other unsupported
-direct candidates become `Unknown(CounterexampleNotReplayable)`.
+or execute user code. It derives effects, capabilities, and exact exception
+hierarchy from admitted unconditional allocation, exact-framework-throw, and
+synchronization events, then evaluates the authenticated selected constraint
+and sealed witness. Fresh allocation remains compatible with observable
+`EnforcePure`. Receiver-field access, user-constructed exception types,
+static-initialization-sensitive allocation, and other unsupported direct
+candidates become `Unknown(CounterexampleNotReplayable)`.
 Conditional/path-dependent and may-only conflicts remain
 `Unknown(EffectContractNotEstablished)`. A semantic replay disagreement
 becomes `Unknown(CounterexampleReplayFailed)` and fails the run. Effect results
-remain noncacheable. Under compiler artifact schema 16, worker protocol version
+remain noncacheable. Under compiler artifact schema 17, worker protocol version
 11 and cache schema version 13 carry the current request and cache wire break.
 
 Optional deterministic SARIF 2.1.0 projects the validated response under the

@@ -52,16 +52,16 @@ Project timeout and caller cancellation use the separate `TimedOut` and
 `Canceled` run statuses.
 
 Effect refutation replay is independent of this SMT lifecycle. Compiler
-artifact schema 16 retains schema 10's unconditional definite managed object/array
-allocation event. A worker-owned interpreter validates the event identity,
-source-tree span, selected constraint, and sealed witness, then derives
-`Allocates` without trusting compiler effect bits or executing user code. That
-evidence can refute `ZeroAllocations` or an `EffectContract` excluding
-`Allocates`; observable `EnforcePure` permits fresh allocation. Unsupported
-definite effect candidates become `CounterexampleNotReplayable`, while an
-otherwise valid semantic replay disagreement becomes the fatal
-`CounterexampleReplayFailed`. Effect results remain outside cache schema 13.
-Protocol version 11 carries relational-summary evidence.
+artifact schema 17 admits unconditional definite managed object/array
+allocation, exact framework explicit-throw, empty-`lock`, and exact-`Monitor`
+events. A worker-owned interpreter validates event identity, source-tree span,
+the authenticated selected constraint, and the sealed witness, then derives
+effects, capabilities, and exact exception hierarchy without trusting compiler
+witness bits or executing user code. Unsupported definite effect candidates
+become `CounterexampleNotReplayable`, while an otherwise valid semantic replay
+disagreement becomes the fatal `CounterexampleReplayFailed`. Effect results
+remain outside cache schema 13. Protocol version 11 carries relational-summary
+evidence.
 
 `SharpProofVerifyPolicy` controls whether otherwise valid incomplete selected
 analysis is informational, warning, or error SP0047 output.

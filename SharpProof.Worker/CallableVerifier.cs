@@ -171,14 +171,21 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             noModeledNormalReturn = completionOutcome is ProvenOutcome;
             if (completionOutcome is ProvenOutcome proven)
             {
-                normalCompletionProofCore = CallableProofCore.Create(
+                var backendProofCore = CallableProofCore.Create(
                     proven,
                     assumptionLabels);
-                if (normalCompletionProofCore.IsDefaultOrEmpty)
+                if (backendProofCore.IsDefaultOrEmpty)
                 {
                     noModeledNormalReturn = false;
                     normalCompletionUnknown =
                         WorkerClaimReason.MalformedBackendResult;
+                }
+                else
+                {
+                    normalCompletionProofCore =
+                        [.. CallableProofCore.Merge(
+                            backendProofCore,
+                            ["body:normal-completion"])];
                 }
             }
             else if (completionOutcome is UnknownOutcome unknown)

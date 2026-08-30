@@ -119,13 +119,6 @@ This section records 37 findings from exactly 10 fresh read-only auditors after 
 
 This section records 7 findings from exactly 10 fresh read-only auditors. The relay compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 4.5. MEDIUM - Effect replay authenticates capability and exception constraints but validates only allocation violations
-
-- Files and members: `SharpProof.Worker/EffectCounterexampleReplayer.cs`, `Replay`, lines 34-56; `Interpret`, lines 117-155; `IsViolation`, lines 158-169; `ComputeConstraintIdentity`, lines 223-241. Downstream: `SharpProof.Worker/EffectClaimResultAssembler.cs`, `Assemble`, lines 80-103.
-- Mechanism: `Interpret` recognizes only `ManagedObjectAllocation` and `ManagedArrayAllocation` at lines 122-135, rejects events carrying `SpecWitnessIdentifier`, `ScalarOperands`, or `ExactExceptionTypeHierarchy` at 137-143, and always constructs `Effects=Allocates` with no capability or exception witness at 146-155. `IsViolation` checks only `ZeroAllocations` or `AllowedEffects` at 162-168, never `AllowedCapabilities` or `AllowedExceptionTypes`, even though those dimensions are authenticated in `ComputeConstraintIdentity` at 233-238. `Replay` also returns null as soon as any event cannot be interpreted at 39-43.
-- Impact: A refuted `EffectContract` whose violation is a forbidden capability or thrown exception cannot produce a replay witness; `EffectClaimResultAssembler` converts it to `Unknown/CounterexampleReplayFailed` at lines 86-93. Mixed replay streams containing an otherwise valid non-allocation event also fail wholesale.
-- Safe evidence: Static field/use and exhaustive switch trace; no malformed input is required.
-
 ## Wave 4.7. HIGH - Exceptional verifier exits lose or disable retained-supervisor cleanup authentication
 
 - File and members: `SharpProof.BuildTasks/RunVerifier.cs`, `RunVerifier.Execute`, `TryTerminate`, and `ObserveCleanupAnchorAsync`, current lines 323-375, 694-718, and 939-946.
@@ -330,24 +323,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Impact: Baseline, cache, and cross-build correlation churn after unrelated edits.
 - Safe evidence: Compare a contract-bearing local function before and after inserting an unused noncontract lambda earlier in the containing method; `CallableId` and `ClaimId` differ.
 
-## Wave 6.3. MEDIUM - Int64 is excluded from source integer interval projection
-
-- File: `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs`
-- Member: `IntegerInterval`
-- Current lines: 267-270
-- Mechanism: `semantics.BitWidth < 64` excludes `System_Int64` even though signed Int64 semantics and exact long bounds are available.
-- Impact: Long receiver, parameter, and result variables lack CLR-domain assumptions; valid long-domain proofs can become `Unknown` or spurious over unconstrained mathematical integers.
-- Safe evidence: The predicate excludes exactly 64-bit semantics; signed Int64 bounds fit `CompilerIntegerInterval`, while UInt64 is not supported.
-
-## Wave 6.4. MEDIUM - Expression-bodied contract-only void methods are always UnsupportedBody
-
-- File: `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs`
-- Members: `PrepareBody`, `ContainsOnlyContractStatements`
-- Current lines: 121-125 and 576-590
-- Mechanism: Every void method uses `ContainsOnlyContractStatements`, which requires `VerifierDeclaration.Body` and recognizes only block-body statements. A legal expression-bodied member such as `static void M(int x) => Contract.Requires(x > 0);` has a null block body despite inventory support for expression-bodied base method declarations.
-- Impact: These callables abstain while equivalent block-bodied forms are admitted as trivial bodies.
-- Safe evidence: Direct syntax and control-flow distinction.
-
 ## Wave 6.5. MEDIUM - Per-claim full-compilation source recapture causes superlinear collector work
 
 - Files and members: `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs`, `TryResolveSource`, lines 234-251, especially loop 246-251, and `TryCreate`, lines 21-29; caller `ClaimManifestBuilder.CreateEffectEvidence`, lines 391-402.
@@ -362,13 +337,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Mechanism: `BranchTarget` performs `checked(NextOffset + (int)Operand)` before bounds validation. A malformed Int32 displacement can overflow, and `TryBuild` does not catch `OverflowException`.
 - Impact: An otherwise loadable malformed reference can throw out of the collector rather than returning `InvalidImage/UnsupportedIl`, causing build-time denial of service.
 - Safe evidence: A long branch with `NextOffset` 5 and displacement 2,147,483,647 necessarily overflows checked Int32 addition.
-
-## Wave 6.9. MEDIUM - Result-domain assumptions do not rewrite returns through available spec projections
-
-- Files and members: `SharpProof.Worker/PostconditionObligationBuilder.cs`, `TryAddSourceDomainAssumptions`, current lines 32-46, especially 39-46; `CallableEvidenceBuilder.Build`, lines 153-160 and domain check at 195-198; `PostconditionObligationBuilder.IsSupportedProofDomain`, lines 114-117.
-- Mechanism: For primitive-integer Result, the interval predicate uses raw `path.ReturnTerm`; projection rewrite is applied only to the path guard, not the interval predicate or return term. An integer return derived from a projected spec result, such as `Array.Empty<int>().Length`, retains the sequence variable although a valid length proxy exists, then proof-domain validation rejects sequence or reference variables.
-- Impact: Otherwise-supported postconditions become `Unknown/UnsupportedExpression`, defeating existing spec cardinality and nullness projections.
-- Safe evidence: `static int EmptyLength() { Contract.Ensures(Contract.Result<int>() == 0); return System.Array.Empty<int>().Length; }`. The catalog marks `Array.Empty` NonNull and Empty; the synthesized range predicate retains the sequence variable.
 
 ## Wave 6.10. MEDIUM - Interrupted cache transactions escape recovery and the configured byte cap
 

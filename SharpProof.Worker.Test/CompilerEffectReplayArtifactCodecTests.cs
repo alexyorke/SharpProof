@@ -142,6 +142,42 @@ public sealed class CompilerEffectReplayArtifactCodecTests
         });
     }
 
+    [TestCase((int)CompilerEffectReplayEventKind.ExplicitThrow)]
+    [TestCase((int)CompilerEffectReplayEventKind.MonitorCall)]
+    [TestCase((int)CompilerEffectReplayEventKind.EmptyLock)]
+    public void CodecAcceptsAuthenticatedCapabilityAndExceptionReplayShapes(
+        int kindValue)
+    {
+        var kind = (CompilerEffectReplayEventKind)kindValue;
+        var evidence = RefutedEvidence(kind);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerEffectClaimArtifactCodec.Validate(evidence)));
+    }
+
+    [Test]
+    public void CodecRejectsMalformedCapabilityAndExceptionReplayShapes()
+    {
+        AssertRejected(
+            CompilerEffectReplayEventKind.ExplicitThrow,
+            static value =>
+                value.Replay!.Events[0].ExactExceptionTypeHierarchy =
+                [ExceptionIdentity]);
+        AssertRejected(
+            CompilerEffectReplayEventKind.ExplicitThrow,
+            static value => Array.Reverse(
+                value.Replay!.Events[0]
+                    .ExactExceptionTypeHierarchy));
+        AssertRejected(
+            CompilerEffectReplayEventKind.MonitorCall,
+            static value =>
+                value.Replay!.Events[0].MemberIdentity = string.Empty);
+        AssertRejected(
+            CompilerEffectReplayEventKind.EmptyLock,
+            static value =>
+                value.Replay!.Events[0].MemberIdentity = "member");
+    }
+
     [Test]
     public void CodecRejectsNoncanonicalAllowedExceptionOrdering()
     {
@@ -179,6 +215,100 @@ public sealed class CompilerEffectReplayArtifactCodecTests
         Assert.Throws<InvalidDataException>(
             (Action)(() =>
                 CompilerEffectClaimArtifactCodec.Validate(evidence)));
+    }
+
+    private static void AssertRejected(
+        CompilerEffectReplayEventKind kind,
+        Action<CompilerEffectClaimArtifact> mutate)
+    {
+        var evidence = RefutedEvidence(kind);
+        mutate(evidence);
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() =>
+                CompilerEffectClaimArtifactCodec.Validate(evidence)));
+    }
+
+    private static CompilerEffectClaimArtifact RefutedEvidence(
+        CompilerEffectReplayEventKind kind)
+    {
+        var evidence = RefutedEvidence();
+        var effectEvent = evidence.Replay!.Events[0];
+        switch (kind)
+        {
+            case CompilerEffectReplayEventKind.ExplicitThrow:
+                effectEvent.Kind = kind;
+                effectEvent.MemberIdentity =
+                    "assembly::M:System.InvalidOperationException.#ctor";
+                effectEvent.MemberDocumentationId =
+                    "M:System.InvalidOperationException.#ctor";
+                effectEvent.TypeIdentity =
+                    InvalidOperationExceptionIdentity;
+                effectEvent.TypeDocumentationId =
+                    "T:System.InvalidOperationException";
+                effectEvent.ExactExceptionTypeHierarchy =
+                    [ExceptionIdentity, InvalidOperationExceptionIdentity];
+                evidence.ContractKind =
+                    WorkerEffectContractKind.EffectContract;
+                evidence.Constraint.AllowedEffects =
+                    WorkerEffectSet.Throws;
+                evidence.Constraint.AllowedExceptionTypes =
+                    [ArgumentExceptionIdentity];
+                evidence.Witness!.Kind = "explicit-throw";
+                evidence.Witness.Detail =
+                    effectEvent.TypeDocumentationId;
+                evidence.Witness.Effects = WorkerEffectSet.Throws;
+                evidence.Witness.ExactExceptionTypeHierarchy =
+                    [.. effectEvent.ExactExceptionTypeHierarchy];
+                break;
+            case CompilerEffectReplayEventKind.MonitorCall:
+                effectEvent.Kind = kind;
+                effectEvent.MemberIdentity =
+                    "assembly::M:System.Threading.Monitor.Enter";
+                effectEvent.MemberDocumentationId =
+                    "M:System.Threading.Monitor.Enter(System.Object)";
+                effectEvent.TypeIdentity = MonitorIdentity;
+                effectEvent.TypeDocumentationId =
+                    "T:System.Threading.Monitor";
+                SetSynchronizationWitness(
+                    evidence,
+                    "synchronization-call",
+                    effectEvent.MemberDocumentationId);
+                break;
+            case CompilerEffectReplayEventKind.EmptyLock:
+                effectEvent.Kind = kind;
+                effectEvent.MemberIdentity = string.Empty;
+                effectEvent.MemberDocumentationId = null;
+                effectEvent.TypeIdentity = MonitorIdentity;
+                effectEvent.TypeDocumentationId =
+                    "T:System.Threading.Monitor";
+                SetSynchronizationWitness(
+                    evidence,
+                    "synchronization-lock",
+                    effectEvent.TypeDocumentationId);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+        return evidence;
+    }
+
+    private static void SetSynchronizationWitness(
+        CompilerEffectClaimArtifact evidence,
+        string kind,
+        string detail)
+    {
+        evidence.ContractKind = WorkerEffectContractKind.EffectContract;
+        evidence.Constraint.AllowedEffects =
+            WorkerEffectSet.Synchronizes;
+        evidence.Witness!.Kind = kind;
+        evidence.Witness.Detail = detail;
+        evidence.Witness.Effects = WorkerEffectSet.Synchronizes;
+        evidence.Witness.Capabilities =
+            WorkerEffectCapabilitySet.Synchronization;
     }
 
     private static CompilerEffectClaimArtifact RefutedEvidence()
@@ -248,4 +378,13 @@ public sealed class CompilerEffectReplayArtifactCodecTests
             Column = 1
         };
     }
+
+    private const string ArgumentExceptionIdentity =
+        "assembly::T:System.ArgumentException";
+    private const string ExceptionIdentity =
+        "assembly::T:System.Exception";
+    private const string InvalidOperationExceptionIdentity =
+        "assembly::T:System.InvalidOperationException";
+    private const string MonitorIdentity =
+        "assembly::T:System.Threading.Monitor";
 }

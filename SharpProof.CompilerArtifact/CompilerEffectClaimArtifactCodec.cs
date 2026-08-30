@@ -175,7 +175,7 @@ internal static class CompilerEffectClaimArtifactCodec
             !HasOptionalText(value.TypeDocumentationId) ||
             !HasOptionalText(value.SpecWitnessIdentifier) ||
             value.ScalarOperands is not { Length: 0 } ||
-            value.ExactExceptionTypeHierarchy is not { Length: 0 } ||
+            value.ExactExceptionTypeHierarchy is not { } ||
             !WorkerProtocolJson.HasValidLocation(value.Location) ||
             value.Location.Start != value.SyntaxStart ||
             value.Location.Length != value.SyntaxLength)
@@ -183,14 +183,31 @@ internal static class CompilerEffectClaimArtifactCodec
             return false;
         }
 
-        return value.Kind == CompilerEffectReplayEventKind.ManagedObjectAllocation
-            ?
+        if (value.SpecWitnessIdentifier != null)
+        {
+            return false;
+        }
+
+        return value.Kind switch
+        {
+            CompilerEffectReplayEventKind.ManagedObjectAllocation or
+            CompilerEffectReplayEventKind.MonitorCall =>
                 !string.IsNullOrWhiteSpace(value.MemberIdentity) &&
-                value.SpecWitnessIdentifier == null
-            :
+                value.ExactExceptionTypeHierarchy.Length == 0,
+            CompilerEffectReplayEventKind.ManagedArrayAllocation or
+            CompilerEffectReplayEventKind.EmptyLock =>
                 string.IsNullOrEmpty(value.MemberIdentity) &&
                 value.MemberDocumentationId == null &&
-                value.SpecWitnessIdentifier == null;
+                value.ExactExceptionTypeHierarchy.Length == 0,
+            CompilerEffectReplayEventKind.ExplicitThrow =>
+                !string.IsNullOrWhiteSpace(value.MemberIdentity) &&
+                value.ExactExceptionTypeHierarchy.Length > 0 &&
+                HasCanonicalStrings(value.ExactExceptionTypeHierarchy) &&
+                value.ExactExceptionTypeHierarchy.Contains(
+                    value.TypeIdentity,
+                    StringComparer.Ordinal),
+            _ => false
+        };
     }
 
     private static bool HasOptionalText(string? value)

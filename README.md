@@ -121,7 +121,7 @@ Current preview wire contracts are:
 - protocol version 11
 - cache schema version 13
 - manifest schema version 4
-- compiler artifact schema version 16
+- compiler artifact schema version 17
 - relational-summary schema version 2
 - specification-pack schema version 1
 
@@ -132,7 +132,7 @@ SharpProof reports one of three semantic outcomes for each worker claim:
 | Outcome | Meaning |
 |---|---|
 | Proven | The goal follows from exact lowering, accountable evidence, and the proof kernel. |
-| Refuted | An executable postcondition counterexample or admitted allocation-effect violation was independently replayed. |
+| Refuted | An executable postcondition counterexample or admitted allocation, capability, or exception effect violation was independently replayed. |
 | Unknown | The language, model, evidence, or resource budget was insufficient. It is not a proof. |
 
 The schema-owned typed result table includes `VacuousEntry` and the full

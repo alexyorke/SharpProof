@@ -646,21 +646,27 @@ public sealed class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 result.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.CounterexampleNotReplayable));
+                Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.EffectCertainty,
                 Is.EqualTo(
-                    WorkerEffectEvidenceCertainty.Unavailable));
-            Assert.That(result.EffectWitness, Is.Null);
+                    WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(
+                result.EffectWitness?.Kind,
+                Is.EqualTo("explicit-throw"));
+            Assert.That(
+                result.EffectWitness?.Effects,
+                Is.EqualTo(WorkerEffectSet.Throws));
+            Assert.That(
+                result.EffectWitness?.ExactExceptionTypeHierarchy,
+                Is.Not.Empty);
             Assert.That(result.Model, Is.Empty);
             Assert.That(response.CallableResults.Single().Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(response.CallableResults.Single().Reason,
-                Is.EqualTo(
-                    WorkerCallableCoverageReason.SemanticUnknown));
+                Is.EqualTo(WorkerCallableCoverageReason.None));
             Assert.That(
                 response.RunStatus,
                 Is.EqualTo(WorkerRunStatus.Complete));
@@ -798,23 +804,46 @@ public sealed class WorkerTests
         {
             Assert.That(
                 results.Select(static result => result.Outcome),
-                Is.All.EqualTo(WorkerClaimOutcome.Unknown),
+                Is.EqualTo(new[]
+                {
+                    WorkerClaimOutcome.Unknown,
+                    WorkerClaimOutcome.Refuted
+                }),
                 responseJson);
             Assert.That(
                 results.Select(static result => result.EffectCertainty),
-                Is.All.EqualTo(
-                    WorkerEffectEvidenceCertainty.Unavailable));
+                Is.EqualTo(new[]
+                {
+                    WorkerEffectEvidenceCertainty.Unavailable,
+                    WorkerEffectEvidenceCertainty.DefiniteViolation
+                }));
             Assert.That(
                 results.Select(static result => result.Reason),
-                Is.All.EqualTo(
-                    WorkerClaimReason.CounterexampleNotReplayable));
+                Is.EqualTo(new[]
+                {
+                    WorkerClaimReason.CounterexampleNotReplayable,
+                    WorkerClaimReason.None
+                }));
+            Assert.That(results[0].EffectWitness, Is.Null);
             Assert.That(
-                results.Select(static result => result.EffectWitness),
-                Is.All.Null);
+                results[1].EffectWitness?.Kind,
+                Is.EqualTo("synchronization-lock"));
             Assert.That(
-                response.CallableResults.Select(static result =>
-                    result.Coverage),
-                Is.All.EqualTo(WorkerCallableCoverage.Incomplete));
+                results[1].EffectWitness?.Capabilities,
+                Is.EqualTo(
+                    WorkerEffectCapabilitySet.Synchronization));
+            Assert.That(
+                response.CallableResults.Single(result =>
+                    result.CallableId.Contains(
+                        ".Synchronize",
+                        StringComparison.Ordinal)).Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Complete));
+            Assert.That(
+                response.CallableResults.Single(result =>
+                    result.CallableId.Contains(
+                        ".Write",
+                        StringComparison.Ordinal)).Coverage,
+                Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(
                 response.RunStatus,
                 Is.EqualTo(WorkerRunStatus.Complete));
@@ -3887,8 +3916,8 @@ public sealed class WorkerTests
                     record.Outcome + " / " +
                     record.Reason)));
         Assert.That(
-            response.ClaimResults.SelectMany(static record => record.ProofCore),
-            Does.Contain("body:normal-completion"));
+            response.ClaimResults.Select(static record => record.ProofCore),
+            Is.All.Contain("body:normal-completion"));
         Assert.That(
             response.ClaimResults.Select(static record => record.Vacuity),
             Is.All.EqualTo(WorkerVacuityKind.NoModeledNormalReturn));

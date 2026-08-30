@@ -318,26 +318,22 @@ internal static class CallableEvidenceBuilder
                 continue;
             }
 
-            var interval = IntervalDomain.Instance.Range(
-                sourceInterval.Minimum,
-                sourceInterval.Maximum);
             var term = factory.Variable(variable.Variable);
-            if (interval.IsBottom ||
-                term.Type != factory.IntegerType ||
-                !SpecResultDomainProjection.TryCreateIntervalPredicate(
+            if (!TryCreateSourceDomainPredicate(
                     factory,
                     term,
-                    interval,
+                    sourceInterval,
                     out var predicate) ||
-                predicate == null ||
-                GetDepth(predicate) > maximumExpressionDepth ||
-                !IsSupportedProofDomain(factory, predicate))
+                predicate != null &&
+                (GetDepth(predicate) > maximumExpressionDepth ||
+                 !IsSupportedProofDomain(factory, predicate)))
             {
                 return CallableEntryEvidenceBuildResult.Fail(
                     WorkerClaimReason.UnsupportedExpression);
             }
 
-            if (predicate is not IrBooleanTerm { Value: true })
+            if (predicate != null &&
+                predicate is not IrBooleanTerm { Value: true })
             {
                 Add(
                     predicate,

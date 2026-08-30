@@ -1687,22 +1687,30 @@ public sealed class CompilerManifestArtifactTests
 
         Assert.That(
             evidence.Outcome,
-            Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(
             evidence.Reason,
-            Is.EqualTo(
-                WorkerClaimReason.CounterexampleNotReplayable));
+            Is.EqualTo(WorkerClaimReason.None));
         Assert.That(
             evidence.Certainty,
             Is.EqualTo(
-                WorkerEffectEvidenceCertainty.Unavailable));
-        Assert.That(evidence.Witness, Is.Null);
-        Assert.That(evidence.Replay, Is.Null);
+                WorkerEffectEvidenceCertainty.DefiniteViolation));
+        Assert.That(
+            evidence.Witness?.Kind,
+            Is.EqualTo("explicit-throw"));
+        Assert.That(
+            evidence.Witness?.Effects,
+            Is.EqualTo(WorkerEffectSet.Throws));
+        Assert.That(
+            evidence.Witness?.ExactExceptionTypeHierarchy,
+            Is.Not.Empty);
+        Assert.That(
+            evidence.Replay?.Events.Single().Kind,
+            Is.EqualTo(CompilerEffectReplayEventKind.ExplicitThrow));
         Assert.That(
             CompilerManifestArtifactJson.DecodeCallables(artifact)
                 .Single().EffectClaims.Single().Reason,
-            Is.EqualTo(
-                WorkerClaimReason.CounterexampleNotReplayable));
+            Is.EqualTo(WorkerClaimReason.None));
     }
 
     [Test]

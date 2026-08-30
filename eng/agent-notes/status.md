@@ -11,7 +11,7 @@ Current architecture:
 - container-only verifier package and Core MSBuild host;
 - one analyzer Core implementation shared by the analyzer, generator, and
   compiler collector;
-- compiler artifact schema 16 and worker protocol 11;
+- compiler artifact schema 17 and worker protocol 11;
 - exact three-package release graph: `SharpProof.Attributes`, `SharpProof`, and
   `SharpProof.Verifier`.
 

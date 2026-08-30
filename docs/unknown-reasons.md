@@ -211,7 +211,7 @@ Every manifest claim has exactly one non-`Unspecified` outcome.
 | `MalformedBackendResult` | The backend result cannot pass structural/kernel validation |
 | `CounterexampleReplayFailed` | Exact term/whole-body postcondition replay or structurally valid effect-event replay disagreed with its candidate; the assembled run fails |
 | `PostconditionMayBeUndefined` | Evaluating the postcondition can throw for a candidate input, so its Boolean truth value is not defined on every modeled normal-return state |
-| `CounterexampleNotReplayable` | A postcondition candidate depends on an executed modeled call, or a definite effect candidate is outside the admitted allocation-event replay subset |
+| `CounterexampleNotReplayable` | A postcondition candidate depends on an executed modeled call, or a definite effect candidate is outside the admitted unconditional effect-event replay subset |
 | `EffectSummaryIncomplete` | The compiler-produced effect summary has an unknown facet or is otherwise incomplete |
 | `EffectContractNotEstablished` | A complete may-effect summary does not establish the selected effect contract and no definite replayable violation witness is available |
 
@@ -263,18 +263,19 @@ The exact typed outcome and effect-certainty authority follows.
 A may-effect summary is suitable for proving the absence of a disallowed
 effect, but the presence of a may-effect is not itself a concrete trace.
 Consequently a complete summary that does not establish the contract remains
-`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 16 can seal
-one unconditional definite managed object/array allocation event for
-independent worker replay. The worker validates its order, source-tree
-identity/span, selected-constraint and semantic-operation hashes, and sealed
-witness, then derives `Allocates` itself. A match can refute
-`ZeroAllocations` or an `EffectContract` that excludes `Allocates`.
-`EnforcePure` remains observable purity and permits fresh allocation.
+`Unknown(EffectContractNotEstablished)`. Compiler artifact schema 17 can seal
+unconditional definite managed object/array allocation, exact framework
+explicit-throw, empty-`lock`, and exact-`Monitor` events for independent worker
+replay. The worker validates event order, source-tree identity/span,
+selected-constraint and semantic-operation hashes, and the sealed witness. It
+then derives effects, capabilities, and exact exception hierarchy itself and
+checks all three authenticated constraint dimensions. Fresh allocation remains
+compatible with observable `EnforcePure`.
 The operation hash checks canonical agreement among compiler-produced event
 fields; source discovery, analysis, and event lowering remain trusted rather
 than being independently reconstructed by the worker.
 
-Definite explicit-throw, receiver-field, empty-lock, exact-`Monitor`,
+Definite receiver-field, user-constructed exception,
 static-initialization-sensitive allocation, and other unsupported direct
 candidates become `Unknown(CounterexampleNotReplayable)`.
 Conditional/path-dependent and may-only conflicts without a definite replay

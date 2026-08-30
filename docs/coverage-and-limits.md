@@ -13,7 +13,7 @@ unsupported expressions, approximate facts, and exhausted budgets remain
 
 | Surface | Runs where | Implemented behavior | Current boundary |
 |---|---|---|---|
-| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all`; independent replay in the opt-in container worker | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute; independently replays unconditional definite managed object/array allocation events | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. Replayed allocation can refute `ZeroAllocations` or an `EffectContract` that excludes `Allocates`; observable purity permits fresh allocation. Other definite candidates become `CounterexampleNotReplayable`; possible effects, exhausted budgets, and unresolved boundaries remain typed `Unknown` |
+| Effect contracts | Analyzer with `SharpProofFeatures=effects` or `all`; independent replay in the opt-in container worker | Runs a bounded acyclic scalar CFG pass, then computes conservative may summaries for reads, writes, allocation, capabilities, exceptions, termination, and completeness; checks `[EnforcePure]`, `[ZeroAllocations]`, `[AllowedCapabilities]`, `[DoesNotThrow]`, `[AllowedExceptions]`, and `[EffectContract]`; emits one accountable worker claim per selected attribute; independently replays unconditional definite managed object/array allocation, exact framework explicit-throw, empty-`lock`, and exact-`Monitor` events | Impossible refined branches are excluded. A loop disables scalar refinement but the conservative all-block scan can still prove effect absence. The worker authenticates the selected effect, capability, and exception constraints and derives each replayed witness independently. Fresh allocation remains observably pure; receiver-field, user-exception, conditional, and may-only candidates remain typed `Unknown` |
 | Call-site preconditions | Analyzer with `SharpProofFeatures=contracts` or `all` | Binds source `Contract.Requires` clauses and closed parameter attributes with compiler symbols for ordinary calls and object creation; follows executable local-function, lambda, and anonymous-method child CFGs exactly once; combines exact IR replay with compilation-scoped Boolean, nullness, interval, cardinality, explicitly trusted return-annotation, approved API-spec result, and effect facts at definite call sites | Unknown or captured values, possible throws, cycles, quoted expression-tree lambdas, and exhausted analysis budgets do not become violations or proofs; unsupported explicitly selected methods report SP0047 |
 | Postconditions | Optional container worker with `SharpProofFeatures=contracts` or `all`; strict enables the worker by default | Manifests `Contract.Ensures` and return attributes, including directly owned local-function, lambda, anonymous-method, and top-level claims, then proves admitted bounded obligations over normal-return paths with Boolean logic, bounded integer comparisons, checked `long` arithmetic, and replay-gated counterexamples | The additional callable forms are currently visible as `UnsupportedCallable`; `effects` excludes postcondition claims; this is bounded `Ensures` verification, not arbitrary deep, recursive, looping, heap, or sequence verification |
 | Relational callees | Build-time compiler collector plus the container worker | Infers quantifier-free relations for direct acyclic static scalar source methods and exact implementation IL, or imports an explicitly enabled schema-1 audited pack; composes every relation into the caller's Z3 obligation with a sealed transitive evidence closure | Boolean/supported-integer inputs and results only; no virtual/instance dispatch, generics, `ref`, heap, loops, recursion, reference-assembly body authority, or arbitrary pack files; unsupported cases remain `Unknown` |
@@ -191,13 +191,14 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 16 currently admits one
-  unconditional definite managed object/array allocation event. The worker
-  recomputes its constraint and operation identities, checks its source-tree
-  identity/span and sealed witness, and independently derives `Allocates`.
-  This can refute `ZeroAllocations` or an `EffectContract` whose allowed
-  effects exclude `Allocates`; it cannot refute observable `EnforcePure`,
-  which permits fresh allocation.
+  For an effect candidate, compiler artifact schema 17 admits unconditional
+  definite managed object/array allocation, exact framework explicit-throw,
+  empty-`lock`, and exact-`Monitor` events. The worker recomputes each event's
+  constraint and operation identities, checks its source-tree identity/span
+  and sealed witness, and independently derives its effects, capabilities, and
+  exact exception hierarchy. It evaluates the authenticated allowed-effect,
+  capability, and exception constraints before publishing `Refuted`. Fresh
+  allocation remains compatible with observable `EnforcePure`.
 - `Unknown` covers unsupported, unresolved, approximate, method-time-limited,
   or resource-exhausted claim analysis. Unsupported unannotated analyzer
   callables are silent; unsupported selected callables produce SP0047.
@@ -215,7 +216,7 @@ ghost specification evidence.
   trusted complete boundaries, definite direct violations, and unavailable
   evidence. A disallowed effect in a may-effect summary is not a replayed
   counterexample, so it remains `Unknown(EffectContractNotEstablished)`.
-  Definite explicit-throw, receiver-field, empty-lock, `Monitor`,
+  Definite receiver-field, user-constructed exception,
   static-initialization-sensitive allocation, and other unsupported direct
   candidates are not published as refutations; they become
   `Unknown(CounterexampleNotReplayable)`. Conditional, path-dependent, and
@@ -243,7 +244,7 @@ ghost specification evidence.
 ## Closed compiler artifact and remaining limits
 
 During container verification, the production analyzer captures compiler
-artifact schema version 16 from the post-generator compilation. The artifact
+artifact schema version 17 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;
@@ -255,9 +256,10 @@ contains:
   specification-pack summary calls, including complete transitive evidence
   closure under relational-summary schema version 2 and specification-pack
   schema version 1;
-- compiler-neutral ordered replay evidence for the admitted unconditional
-  managed object/array allocation, including the selected-constraint and
-  semantic-operation hashes plus source-tree identity and span;
+- compiler-neutral ordered replay evidence for admitted unconditional
+  allocation, exact-framework-throw, and synchronization events, including
+  authenticated selected-constraint and semantic-operation hashes plus
+  source-tree identity and span;
 - compiler error diagnostics with mapped locations;
 - handwritten and generated tree hashes with language version, documentation
   mode, source kind, preprocessor symbols, and parse features;
@@ -319,9 +321,9 @@ symbol service has no symmetric V3 download surface, so a symbol-package
 collision is detected by the push and fails the release. Any partial or
 conflicting publication requires a new version. These limits are not
 worker-side compilation reconstruction, postcondition-counterexample replay,
-the admitted allocation-effect replay, package separation, SARIF, or
-release-artifact provenance work. Replay support for throw, field,
-synchronization, conditional, and other effect events remains an explicit
+the admitted allocation/capability/exception effect replay, package separation,
+SARIF, or release-artifact provenance work. Replay support for receiver-field,
+user-exception, conditional, and other effect events remains an explicit
 preview.2 blocker.
 
 See [Typed abstention reasons](unknown-reasons.md) for the exact enums and

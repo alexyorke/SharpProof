@@ -43,7 +43,7 @@ internal static class EffectCounterexampleReplayer
             }
 
             if (violation == null &&
-                IsViolation(evidence, observed.Effects))
+                IsViolation(evidence, observed))
             {
                 violation = observed;
             }
@@ -117,56 +117,156 @@ internal static class EffectCounterexampleReplayer
     private static WorkerEffectViolationWitness? Interpret(
         CompilerEffectReplayEventArtifact effectEvent)
     {
-        var detail = effectEvent.Kind switch
-        {
-            CompilerEffectReplayEventKind.ManagedObjectAllocation
-                when !string.IsNullOrWhiteSpace(
-                    effectEvent.MemberIdentity) =>
-                FirstNonblank(
-                    effectEvent.MemberDocumentationId,
-                    effectEvent.MemberIdentity),
-            CompilerEffectReplayEventKind.ManagedArrayAllocation
-                when string.IsNullOrEmpty(
-                    effectEvent.MemberIdentity) &&
-                effectEvent.MemberDocumentationId == null =>
-                FirstNonblank(
-                    effectEvent.TypeDocumentationId,
-                    effectEvent.TypeIdentity),
-            _ => null
-        };
-        if (detail == null ||
-            string.IsNullOrWhiteSpace(effectEvent.TypeIdentity) ||
+        if (string.IsNullOrWhiteSpace(effectEvent.TypeIdentity) ||
             effectEvent.SpecWitnessIdentifier != null ||
-            effectEvent.ScalarOperands.Length != 0 ||
-            effectEvent.ExactExceptionTypeHierarchy.Length != 0)
+            effectEvent.ScalarOperands.Length != 0)
         {
             return null;
         }
 
-        return new WorkerEffectViolationWitness
+        return effectEvent.Kind switch
         {
-            Kind = effectEvent.Kind ==
-                CompilerEffectReplayEventKind.ManagedObjectAllocation
-                    ? "managed-allocation"
-                    : "managed-array-allocation",
-            Detail = detail,
-            Effects = WorkerEffectSet.Allocates,
-            Location = Copy(effectEvent.Location)
+            CompilerEffectReplayEventKind.ManagedObjectAllocation when
+                !string.IsNullOrWhiteSpace(effectEvent.MemberIdentity) &&
+                effectEvent.ExactExceptionTypeHierarchy.Length == 0 =>
+                CreateWitness(
+                    effectEvent,
+                    "managed-allocation",
+                    FirstNonblank(
+                        effectEvent.MemberDocumentationId,
+                        effectEvent.MemberIdentity),
+                    WorkerEffectSet.Allocates),
+            CompilerEffectReplayEventKind.ManagedArrayAllocation when
+                string.IsNullOrEmpty(effectEvent.MemberIdentity) &&
+                effectEvent.MemberDocumentationId == null &&
+                effectEvent.ExactExceptionTypeHierarchy.Length == 0 =>
+                CreateWitness(
+                    effectEvent,
+                    "managed-array-allocation",
+                    FirstNonblank(
+                        effectEvent.TypeDocumentationId,
+                        effectEvent.TypeIdentity),
+                    WorkerEffectSet.Allocates),
+            CompilerEffectReplayEventKind.ExplicitThrow when
+                !string.IsNullOrWhiteSpace(effectEvent.MemberIdentity) &&
+                effectEvent.ExactExceptionTypeHierarchy.Length > 0 &&
+                effectEvent.ExactExceptionTypeHierarchy.Contains(
+                    effectEvent.TypeIdentity,
+                    StringComparer.Ordinal) =>
+                CreateWitness(
+                    effectEvent,
+                    "explicit-throw",
+                    FirstNonblank(
+                        effectEvent.TypeDocumentationId,
+                        effectEvent.TypeIdentity),
+                    WorkerEffectSet.Throws,
+                    exceptions:
+                        effectEvent.ExactExceptionTypeHierarchy),
+            CompilerEffectReplayEventKind.MonitorCall when
+                !string.IsNullOrWhiteSpace(effectEvent.MemberIdentity) &&
+                effectEvent.ExactExceptionTypeHierarchy.Length == 0 =>
+                CreateWitness(
+                    effectEvent,
+                    "synchronization-call",
+                    FirstNonblank(
+                        effectEvent.MemberDocumentationId,
+                        effectEvent.MemberIdentity),
+                    WorkerEffectSet.Synchronizes,
+                    WorkerEffectCapabilitySet.Synchronization),
+            CompilerEffectReplayEventKind.EmptyLock when
+                string.IsNullOrEmpty(effectEvent.MemberIdentity) &&
+                effectEvent.MemberDocumentationId == null &&
+                effectEvent.ExactExceptionTypeHierarchy.Length == 0 =>
+                CreateWitness(
+                    effectEvent,
+                    "synchronization-lock",
+                    FirstNonblank(
+                        effectEvent.TypeDocumentationId,
+                        effectEvent.TypeIdentity),
+                    WorkerEffectSet.Synchronizes,
+                    WorkerEffectCapabilitySet.Synchronization),
+            _ => null
         };
+    }
+
+    private static WorkerEffectViolationWitness? CreateWitness(
+        CompilerEffectReplayEventArtifact effectEvent,
+        string kind,
+        string? detail,
+        WorkerEffectSet effects,
+        WorkerEffectCapabilitySet capabilities =
+            WorkerEffectCapabilitySet.None,
+        string[]? exceptions = null)
+    {
+        return detail == null
+            ? null
+            : new WorkerEffectViolationWitness
+            {
+                Kind = kind,
+                Detail = detail,
+                Effects = effects,
+                Capabilities = capabilities,
+                ExactExceptionTypeHierarchy = exceptions == null
+                    ? []
+                    : [.. exceptions],
+                Location = Copy(effectEvent.Location)
+            };
     }
 
     private static bool IsViolation(
         CompilerEffectClaimArtifact evidence,
-        WorkerEffectSet observed)
+        WorkerEffectViolationWitness observed)
     {
+        var unexpectedEffects =
+            observed.Effects & ~evidence.Constraint.AllowedEffects;
+        var unexpectedCapabilities =
+            observed.Capabilities &
+            ~evidence.Constraint.AllowedCapabilities;
+        var forbiddenException =
+            HasForbiddenException(evidence.Constraint, observed);
+        const WorkerEffectSet impureState =
+            WorkerEffectSet.ReadsCapturedState |
+            WorkerEffectSet.ReadsStaticState |
+            WorkerEffectSet.ReadsAmbientState |
+            WorkerEffectSet.WritesReceiverState |
+            WorkerEffectSet.WritesArgumentState |
+            WorkerEffectSet.WritesCapturedState |
+            WorkerEffectSet.WritesStaticState |
+            WorkerEffectSet.WritesAmbientState;
+
         return evidence.ContractKind switch
         {
+            WorkerEffectContractKind.EnforcePure =>
+                observed.Capabilities !=
+                    WorkerEffectCapabilitySet.None ||
+                (observed.Effects & impureState) != 0,
             WorkerEffectContractKind.ZeroAllocations =>
-                (observed & WorkerEffectSet.Allocates) != 0,
+                (observed.Effects & WorkerEffectSet.Allocates) != 0,
+            WorkerEffectContractKind.AllowedCapabilities =>
+                unexpectedCapabilities !=
+                    WorkerEffectCapabilitySet.None,
+            WorkerEffectContractKind.DoesNotThrow =>
+                (observed.Effects & WorkerEffectSet.Throws) != 0,
+            WorkerEffectContractKind.AllowedExceptions =>
+                forbiddenException,
             WorkerEffectContractKind.EffectContract =>
-                (observed & ~evidence.Constraint.AllowedEffects) != 0,
+                unexpectedEffects != WorkerEffectSet.None ||
+                unexpectedCapabilities !=
+                    WorkerEffectCapabilitySet.None ||
+                forbiddenException,
             _ => false
         };
+    }
+
+    private static bool HasForbiddenException(
+        CompilerEffectConstraintArtifact constraint,
+        WorkerEffectViolationWitness observed)
+    {
+        return (observed.Effects & WorkerEffectSet.Throws) != 0 &&
+            !observed.ExactExceptionTypeHierarchy.Any(type =>
+                constraint.AllowedExceptionTypes.Contains(
+                    type,
+                    StringComparer.Ordinal));
     }
 
     private static bool WitnessesEqual(

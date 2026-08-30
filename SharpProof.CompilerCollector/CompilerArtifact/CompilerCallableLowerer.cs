@@ -266,7 +266,7 @@ internal sealed class CompilerCallableLowerer
 
     private static CompilerIntegerInterval? IntegerInterval(SpecialType? type)
     {
-        return type.HasValue && CSharpScalarSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth < 64
+        return type.HasValue && CSharpScalarSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth <= 64
             ? new(semantics.Minimum, semantics.Maximum) : null;
     }
 
@@ -575,8 +575,12 @@ internal sealed class CompilerCallableLowerer
 
     private bool ContainsOnlyContractStatements(ManifestCallableTarget target)
     {
-        return target.VerifierDeclaration.Body is { } body &&
-            body.Statements.All(statement => IsContractStatement(target, statement));
+        var declaration = target.VerifierDeclaration;
+        return declaration.Body is { } body
+            ? body.Statements.All(statement =>
+                IsContractStatement(target, statement))
+            : declaration.ExpressionBody is { Expression: { } expression } &&
+                IsContractExpression(target, expression);
     }
 
     private bool IsContractStatement(ManifestCallableTarget target, StatementSyntax statement)
@@ -586,8 +590,19 @@ internal sealed class CompilerCallableLowerer
             return true;
         }
 
-        return statement is ExpressionStatementSyntax expression && _contracts.GetClauseInventory(target.Method).Clauses.Any(clause =>
-            clause.Invocation.Syntax.SyntaxTree == expression.SyntaxTree && clause.Invocation.Syntax.Span == expression.Expression.Span);
+        return statement is ExpressionStatementSyntax expression &&
+            IsContractExpression(target, expression.Expression);
+    }
+
+    private bool IsContractExpression(
+        ManifestCallableTarget target,
+        ExpressionSyntax expression)
+    {
+        return _contracts.GetClauseInventory(target.Method).Clauses.Any(
+            clause =>
+                clause.Invocation.Syntax.SyntaxTree ==
+                    expression.SyntaxTree &&
+                clause.Invocation.Syntax.Span == expression.Span);
     }
 
     private static WorkerClaimReason MapBindingFailure(ContractBindingFailure failure)
