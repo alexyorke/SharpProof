@@ -646,6 +646,32 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void ArchitectureOnlyShardingSplitsTheCoverageHotspot()
+    {
+        var semantic = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofSemanticTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(semantic, Does.Contain("$architectureCoverageHotspot"));
+            Assert.That(
+                semantic,
+                Does.Contain("AuthenticatedCoverageRejectsReportMutations"));
+            Assert.That(
+                semantic,
+                Does.Contain("architecture-coveragescripttests-hotspot"));
+            Assert.That(
+                semantic,
+                Does.Contain("architecture-coveragescripttests-remainder"));
+            Assert.That(
+                semantic,
+                Does.Contain("FullyQualifiedName!~$architectureCoverageHotspot"));
+        }
+    }
+
+    [Test]
     public void ExpensiveScriptFixturesUseBoundedCaseParallelism()
     {
         var fixtures = new[]

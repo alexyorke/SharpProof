@@ -166,6 +166,9 @@ $mainParallelism = [Math]::Max(
     1,
     [Math]::Floor($parallelism / 2))
 $architectureClassPrefix = 'SharpProof.ArchitectureTest.'
+$architectureCoverageHotspot =
+    $architectureClassPrefix +
+    'CoverageScriptTests.AuthenticatedCoverageRejectsReportMutations'
 $architectureFixtures = @(
     'AcceptanceScriptTests',
     'ArchitectureTests',
@@ -339,6 +342,30 @@ if ($architectureShardingEnabled) {
     $architectureProject = Join-Path $repositoryRoot (
         'SharpProof.ArchitectureTest/SharpProof.ArchitectureTest.csproj')
     foreach ($fixture in $architectureFixtures) {
+        if ($ArchitectureOnly -and $fixture -ceq 'CoverageScriptTests') {
+            $tasks.Add([pscustomobject]@{
+                Name = 'architecture-coveragescripttests-hotspot'
+                Target = $architectureProject
+                Filter = "(FullyQualifiedName~$architectureCoverageHotspot)&(" +
+                    $semanticFilter + ')'
+                ProjectParallelism = 0
+                IsolateOutput = $false
+                Slots = [Math]::Min($parallelism, 4)
+                DefaultEstimatedMilliseconds = 20000L
+            })
+            $tasks.Add([pscustomobject]@{
+                Name = 'architecture-coveragescripttests-remainder'
+                Target = $architectureProject
+                Filter = '(FullyQualifiedName~' + $architectureClassPrefix +
+                    $fixture + ".)&(FullyQualifiedName!~$architectureCoverageHotspot)&(" +
+                    $semanticFilter + ')'
+                ProjectParallelism = 0
+                IsolateOutput = $false
+                Slots = [Math]::Min($parallelism, 4)
+                DefaultEstimatedMilliseconds = 20000L
+            })
+            continue
+        }
         $requestedSlots = if (
             $architectureFixtureSlots.ContainsKey($fixture)) {
             [int]$architectureFixtureSlots[$fixture]
