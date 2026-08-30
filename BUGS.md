@@ -492,15 +492,6 @@ This section records 38 findings from exactly 30 fresh read-only auditors: 20 re
 - Impact: False `WritesArgumentState` and rejection of valid no-write contracts.
 - Safe evidence: `void Rebind(ref int x, ref int y) { x = ref y; }`; no `IsRef` branch exists in the assignment path.
 
-## Wave 7.9. MEDIUM - EffectSummary domain equivalence ignores AnalysisIncompleteReason
-
-- File: `SharpProof.Effects/EffectSummary.cs`
-- Member: `EffectSummaryDomain.LessThanOrEqual`/`AreEquivalent`
-- Current lines: 160-188, predicate at 175-182; `Join` at 206-217
-- Mechanism: The order compares every component except `AnalysisIncompleteReason`, although `Join` unions it and diagnostics consume it. Otherwise identical incomplete summaries with `BlockBudgetExceeded` versus `CallPreconditionNotProven` compare less-than-or-equal both ways.
-- Impact: Fixpoint or worklist clients can suppress a reason-only state change and lose the correct incompleteness explanation.
-- Safe evidence: Construct the two internal summaries; `AreEquivalent` returns true while record inequality and `Join` preserve distinct or combined reasons.
-
 ## Wave 7.10. MEDIUM - Multiple module initializers are aggregated without execution ordering
 
 - File: `SharpProof.Effects/EffectAnalysisSession.cs`
