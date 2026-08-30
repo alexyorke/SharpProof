@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Configuration.Assemblies;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
@@ -82,8 +81,8 @@ public sealed class ContractForMetadataSignatureTests
             new Version(1, 0, 0, 0),
             default,
             default,
-            AssemblyFlags.None,
-            AssemblyHashAlgorithm.None);
+            (AssemblyFlags)0,
+            System.Reflection.AssemblyHashAlgorithm.None);
 
         var coreAssemblyName = typeof(object).Assembly.GetName();
         var coreAssembly = metadata.AddAssemblyReference(
@@ -91,7 +90,7 @@ public sealed class ContractForMetadataSignatureTests
             coreAssemblyName.Version!,
             default,
             metadata.GetOrAddBlob(coreAssemblyName.GetPublicKeyToken() ?? []),
-            AssemblyFlags.None,
+            (AssemblyFlags)0,
             default);
         var objectType = metadata.AddTypeReference(
             coreAssembly,
