@@ -22,13 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.13. MEDIUM - Relative syntax-tree paths are normalized only on the snapshot side
-
-- Files and members: `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs`, `CaptureTree`, lines 139-145, especially 141; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs`, `CreateAuthority`, lines 343-363, especially 358; `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs`, `BuildSummaryEvidence`, lines 116-127, especially 118-125.
-- Mechanism: The snapshot uses `Path.GetFullPath(tree.FilePath)`, while source-summary authority stores the raw relative path; exact ordinal comparison cannot bind them.
-- Impact: A compilation with relative-path generated trees and an inferred source summary aborts compiler manifest creation.
-- Safe reproduction/evidence: Use syntax-tree path `generated/helper.g.cs` defining a scalar helper called by the selected method. The snapshot path is absolute while the authority path is relative.
-
 ## Wave 2.14. HIGH - Launcher can hang on a non-regular result path after worker supervision ends
 
 - Files and members: `SharpProof.Worker.Protocol/ProtocolJson.cs`, `WorkerProtocolJson.OpenJsonReader`, lines 71-87, especially `FileStream` at 73-79; `SharpProof.Worker.Launcher/Program.cs`, `ValidateAndReport`, lines 334-349.

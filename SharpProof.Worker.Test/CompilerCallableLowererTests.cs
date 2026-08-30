@@ -169,6 +169,71 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void RelativeSourceSummaryTreePathBindsToCapturedSnapshot()
+    {
+        var parse = new CSharpParseOptions(
+            LanguageVersion.CSharp12,
+            preprocessorSymbols: [Contract.ConditionalSymbol]);
+        var mainPath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "RelativeSummarySubject.cs");
+        var trees = new[]
+        {
+            CSharpSyntaxTree.ParseText(
+                """
+                #undef SHARPPROOF_CONTRACTS
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    internal static bool Verify(bool value) {
+                        Contract.Ensures(
+                            Contract.Result<bool>() == value);
+                        return Helper.Read(value);
+                    }
+                }
+                """,
+                parse,
+                mainPath),
+            CSharpSyntaxTree.ParseText(
+                """
+                #undef SHARPPROOF_CONTRACTS
+                internal static class Helper {
+                    internal static bool Read(bool value) => value;
+                }
+                """,
+                parse,
+                "generated/helper.g.cs")
+        };
+        var paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+            .Split(Path.PathSeparator)
+            .Append(typeof(Contract).Assembly.Location)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        var compilation = CSharpCompilation.Create(
+            "RelativeSourceSummaryTreePath",
+            trees,
+            paths.Select(static path => MetadataReference.CreateFromFile(path)),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+
+        var artifact = CompilerManifestArtifactProducer.Create(
+            compilation,
+            TestContext.CurrentContext.WorkDirectory,
+            "net8.0",
+            WorkerFeatureSet.All,
+            discovery,
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
+
+        var evidence = artifact.Compilation.SummaryEvidence.Single(row =>
+            row.Origin == CompilerSummaryOrigin.Source);
+        Assert.That(
+            evidence.SourcePath,
+            Is.EqualTo(CompilerCaptureAuthority.NormalizePath(
+                "generated/helper.g.cs")));
+    }
+
+    [Test]
     public void ConstructorAndRefBodyAreTypedUnsupported()
     {
         var constructor = Prepare(

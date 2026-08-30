@@ -355,7 +355,8 @@ internal sealed class CompilerRelationalSummaryProvider
                 callIdentity,
                 provenance.EvidenceSha256,
                 provenance.EvidenceIdentity,
-                declaration.SyntaxTree.FilePath ?? string.Empty,
+                CompilerCaptureAuthority.NormalizePath(
+                    declaration.SyntaxTree.FilePath ?? string.Empty),
                 CompilerCompilationCapture.ComputeTextSha256(sourceText),
                 declaration.FullSpan.Start,
                 declaration.FullSpan.Length,
