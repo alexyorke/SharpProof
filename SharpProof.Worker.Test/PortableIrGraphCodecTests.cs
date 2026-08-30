@@ -849,7 +849,7 @@ public sealed class PortableIrGraphCodecTests
             factory.Unary(IrUnaryOperator.Not, flagTerm),
             factory.Binary(IrBinaryOperator.Add, numberTerm, factory.Integer(1)),
             conditional,
-            factory.Cast(factory.ObjectType, numberTerm),
+            factory.Cast(factory.ObjectType, boxTerm),
             factory.Length(sequenceTerm),
             factory.SequenceAccess(sequenceTerm, numberTerm)
         ];

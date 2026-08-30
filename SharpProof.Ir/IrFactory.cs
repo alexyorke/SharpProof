@@ -4,7 +4,7 @@ public sealed class IrFactory
 {
     private static long s_nextScope;
     private readonly object _gate = new();
-    private readonly Dictionary<ExternalIdentityKey, IrIdentityId> _externalIdentityIds = [];
+    private readonly Dictionary<ExternalIdentityBucketKey, ExternalIdentityBucket> _externalIdentityBuckets = [];
     private readonly Dictionary<string, IrStringId> _stringIds = new(StringComparer.Ordinal);
     private readonly List<string> _strings = [];
     private readonly Dictionary<(IrTypeKind Kind, int Identity, int ElementType), IrTypeId> _typeIds = [];
@@ -57,23 +57,68 @@ public sealed class IrFactory
         ArgumentNullGuard.NotNull(identity, nameof(identity));
         ArgumentNullGuard.NotNull(comparer, nameof(comparer));
 
-        if (typeof(T) == typeof(string))
+        if (identity is string)
         {
             throw new ArgumentException(
             "Semantic identities cannot be interned from strings.", nameof(identity));
         }
 
+        var valueHashCode = comparer.GetHashCode(identity);
+        var bucketKey = new ExternalIdentityBucketKey(
+            typeof(T),
+            comparer,
+            valueHashCode);
+        ExternalIdentityBucket<T> bucket;
         lock (_gate)
         {
-            var key = new ExternalIdentityKey<T>(identity, comparer);
-            if (_externalIdentityIds.TryGetValue(key, out var existing))
+            if (_externalIdentityBuckets.TryGetValue(
+                    bucketKey,
+                    out var existingBucket))
             {
-                return existing;
+                bucket = (ExternalIdentityBucket<T>)existingBucket;
+            }
+            else
+            {
+                bucket = new ExternalIdentityBucket<T>();
+                _externalIdentityBuckets.Add(bucketKey, bucket);
+            }
+        }
+
+        var comparedCount = 0;
+        while (true)
+        {
+            ExternalIdentityEntry<T>[] candidates;
+            lock (_gate)
+            {
+                var candidateCount = bucket.Entries.Count - comparedCount;
+                candidates = new ExternalIdentityEntry<T>[candidateCount];
+                bucket.Entries.CopyTo(
+                    comparedCount,
+                    candidates,
+                    0,
+                    candidateCount);
             }
 
-            var id = CreateIdentityCore();
-            _externalIdentityIds.Add(key, id);
-            return id;
+            foreach (var candidate in candidates)
+            {
+                if (comparer.Equals(candidate.Value, identity))
+                {
+                    return candidate.Id;
+                }
+            }
+
+            comparedCount += candidates.Length;
+            lock (_gate)
+            {
+                if (bucket.Entries.Count != comparedCount)
+                {
+                    continue;
+                }
+
+                var id = CreateIdentityCore();
+                bucket.Entries.Add(new ExternalIdentityEntry<T>(identity, id));
+                return id;
+            }
         }
     }
 
@@ -282,6 +327,7 @@ public sealed class IrFactory
     {
         ArgumentNullGuard.NotNull(elements, nameof(elements));
 
+        IrTypeId elementType;
         lock (_gate)
         {
             var info = GetTypeInfoCore(type, nameof(type));
@@ -290,14 +336,16 @@ public sealed class IrFactory
                 throw new ArgumentException("Sequence values require a sequence type.", nameof(type));
             }
 
-            var values = elements.ToImmutableArray();
-            if (values.Any(value => value == null || value.Type != info.ElementType.Value))
-            {
-                throw new ArgumentException("Every sequence element must match the sequence element type.", nameof(elements));
-            }
-
-            return new IrValue(type, IrValueKind.Sequence, values);
+            elementType = info.ElementType.Value;
         }
+
+        var values = elements.ToImmutableArray();
+        if (values.Any(value => value == null || value.Type != elementType))
+        {
+            throw new ArgumentException("Every sequence element must match the sequence element type.", nameof(elements));
+        }
+
+        return new IrValue(type, IrValueKind.Sequence, values);
     }
 
     public IrBooleanTerm Boolean(bool value)
@@ -481,7 +529,22 @@ public sealed class IrFactory
                 return operand;
             }
 
-            if (operand is IrNullTerm && IrTermServices.IsNullable(target.Kind))
+            var source = GetTypeInfoCore(operand.Type, nameof(operand));
+            if (!IrTermServices.IsNullable(source.Kind))
+            {
+                throw new ArgumentException(
+                    "Non-identity casts require a string, reference, or sequence operand.",
+                    nameof(operand));
+            }
+
+            if (!IrTermServices.IsNullable(target.Kind))
+            {
+                throw new ArgumentException(
+                    "Non-identity casts require a string, reference, or sequence target.",
+                    nameof(targetType));
+            }
+
+            if (operand is IrNullTerm)
             {
                 return Null(targetType);
             }
@@ -661,13 +724,13 @@ public sealed class IrFactory
 
     private IrTypeId GetOrCreateTypeCore(IrIdentityId identity, string name, IrTypeKind kind, IrTypeId? elementType)
     {
-        var nameId = InternStringCore(name);
         var key = (kind, identity.IsDefault ? -1 : identity.Value, elementType?.Value ?? -1);
         if (_typeIds.TryGetValue(key, out var existing))
         {
             return existing;
         }
 
+        var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);
         _types.Add(new IrTypeInfo(id, nameId, kind, elementType));
@@ -736,27 +799,58 @@ public sealed class IrFactory
             parameterName)];
     }
 
-    private abstract class ExternalIdentityKey;
+    private abstract class ExternalIdentityBucket;
 
-    private sealed class ExternalIdentityKey<T>(T value, IEqualityComparer<T> comparer) :
-        ExternalIdentityKey, IEquatable<ExternalIdentityKey<T>> where T : notnull
+    private sealed class ExternalIdentityBucket<T> : ExternalIdentityBucket where T : notnull
     {
-        private readonly T _value = value;
-        private readonly IEqualityComparer<T> _comparer = comparer;
-        public bool Equals(ExternalIdentityKey<T>? other)
+        public List<ExternalIdentityEntry<T>> Entries
         {
-            return other != null && ReferenceEquals(_comparer, other._comparer) && _comparer.Equals(_value, other._value);
+            get;
+        } = [];
+    }
+
+    private sealed class ExternalIdentityEntry<T>(T value, IrIdentityId id) where T : notnull
+    {
+        public T Value
+        {
+            get;
+        } = value;
+
+        public IrIdentityId Id
+        {
+            get;
+        } = id;
+    }
+
+    private readonly struct ExternalIdentityBucketKey(
+        Type identityType,
+        object comparer,
+        int valueHashCode) : IEquatable<ExternalIdentityBucketKey>
+    {
+        private readonly Type _identityType = identityType;
+        private readonly object _comparer = comparer;
+        private readonly int _valueHashCode = valueHashCode;
+
+        public bool Equals(ExternalIdentityBucketKey other)
+        {
+            return ReferenceEquals(_identityType, other._identityType) &&
+                ReferenceEquals(_comparer, other._comparer) &&
+                _valueHashCode == other._valueHashCode;
         }
 
         public override bool Equals(object? obj)
         {
-            return Equals(obj as ExternalIdentityKey<T>);
+            return obj is ExternalIdentityBucketKey other && Equals(other);
         }
 
         public override int GetHashCode()
         {
-            return unchecked(
-                    System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_comparer) * 397 ^ _comparer.GetHashCode(_value));
+            unchecked
+            {
+                var hash = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_identityType);
+                hash = hash * 397 ^ System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(_comparer);
+                return hash * 397 ^ _valueHashCode;
+            }
         }
     }
 
