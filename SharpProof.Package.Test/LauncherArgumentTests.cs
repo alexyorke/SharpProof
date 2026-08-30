@@ -14,6 +14,8 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class LauncherArgumentTests
 {
+    private const string SarifProjectDirectory = "/source";
+
     [Test]
     [NonParallelizable]
     public void LinuxWorkerReceivesTheExactStartupRelease()
@@ -1583,8 +1585,10 @@ public sealed class LauncherArgumentTests
             AssumptionPolicy = WorkerAssumptionPolicy.Error
         };
 
-        var first = SarifProjection.Serialize(request, response);
-        var second = SarifProjection.Serialize(request, response);
+        var first = SarifProjection.Serialize(
+            request, response, SarifProjectDirectory);
+        var second = SarifProjection.Serialize(
+            request, response, SarifProjectDirectory);
 
         Assert.That(second, Is.EqualTo(first));
         using var document = JsonDocument.Parse(first);
@@ -1683,7 +1687,8 @@ public sealed class LauncherArgumentTests
         var request = new WorkerVerifyRequest();
 
         using var vacuity = JsonDocument.Parse(
-            SarifProjection.Serialize(request, response));
+            SarifProjection.Serialize(
+                request, response, SarifProjectDirectory));
         Assert.That(
             ResultEvidence(vacuity).GetProperty("vacuity").GetString(),
             Is.EqualTo("NoModeledNormalReturn"));
@@ -1703,7 +1708,8 @@ public sealed class LauncherArgumentTests
             WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
 
         using var certainty = JsonDocument.Parse(
-            SarifProjection.Serialize(request, response));
+            SarifProjection.Serialize(
+                request, response, SarifProjectDirectory));
         Assert.That(
             ResultEvidence(certainty).GetProperty("effectCertainty").GetString(),
             Is.EqualTo("CompleteMayEffectSummary"));
@@ -1731,7 +1737,8 @@ public sealed class LauncherArgumentTests
                 }
             };
         using var refuted = JsonDocument.Parse(
-            SarifProjection.Serialize(request, response));
+            SarifProjection.Serialize(
+                request, response, SarifProjectDirectory));
         var projected = refuted.RootElement.GetProperty("runs")[0]
             .GetProperty("results")[0];
         using (Assert.EnterMultipleScope())
@@ -1807,7 +1814,8 @@ public sealed class LauncherArgumentTests
         using var document = JsonDocument.Parse(
             SarifProjection.Serialize(
                 new WorkerVerifyRequest { VerifyPolicy = policy },
-                response));
+                response,
+                SarifProjectDirectory));
         var result = document.RootElement.GetProperty("runs")[0]
             .GetProperty("results")[0];
 
@@ -1943,7 +1951,8 @@ public sealed class LauncherArgumentTests
                 {
                     AssumptionPolicy = WorkerAssumptionPolicy.Warn
                 },
-                response));
+                response,
+                SarifProjectDirectory));
         var invocation = document.RootElement.GetProperty("runs")[0]
             .GetProperty("invocations")[0];
 

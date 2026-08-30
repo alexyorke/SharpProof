@@ -648,15 +648,6 @@ This section records 19 unique findings from exactly 30 fresh read-only auditors
 - Impact: Large stale or hostile regular files at publication destinations can cause proportional allocations and OOM before staging or commit, denying verification and publication.
 - Safe evidence: Source semantics; modest sparse files show heap and working-set scaling. Artifact caps or bounded streaming backups to temporary files are needed.
 
-## Wave 8.3. MEDIUM - SARIF URI projection corrupts valid relative compiler-mapped paths
-
-- File: `SharpProof.Worker.Launcher/SarifProjection.cs`
-- Member: `LocationUri`
-- Current lines: 179-183; consumed by `Result`, lines 148-152
-- Mechanism: Nonabsolute paths only replace backslashes, without URI escaping or a base declaration. Valid mapped names may contain reserved characters or be relative; `mapped#source.cs` is interpreted as file `mapped` plus a fragment, and ordinary relative paths resolve against the SARIF location rather than project or source base.
-- Impact: SARIF consumers can attach proof or refutation to the wrong file or fail source lookup.
-- Safe evidence: Resolve emitted `mapped#source.cs` against `file:///artifact/result.sarif`; `LocalPath` is `/artifact/mapped` and Fragment is `#source.cs`, not the intended filename.
-
 ## Wave 8.4. MEDIUM - Authentic in-memory SharpProof.Attributes references are rejected
 
 - File: `SharpProof.Frontend/ContractApiIdentityResolver.cs`
