@@ -554,6 +554,27 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsReadonlyReferencesToMutableStaticStorage()
+    {
+        const string source =
+            """
+            using System.Collections.Concurrent;
+            using System.Collections.Generic;
+            namespace SharpProof.Analyzer;
+            sealed class C {
+                internal static readonly Dictionary<string, int> Table = new();
+                internal static ConcurrentDictionary<string, int> Cache { get; } = new();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task AllowsStaticImmutableAndNonStorageMemberForms()
     {
         const string source =

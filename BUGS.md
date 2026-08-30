@@ -27,14 +27,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 21. HIGH - SPMETA002 permits mutable process-global contents behind a readonly or get-only reference
-
-- File: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`
-- Members and lines: `AnalyzeField`, lines 343-354, especially 351; `AnalyzeProperty`, lines 363-375, especially 366; `IsForbiddenMutableStaticStorage`, lines 392-395.
-- Mechanism: Fields are reported only when `!IsReadOnly`, and properties only when a setter exists. Readonly or get-only freezes the reference, not dictionary contents.
-- Impact: Mutable static state can cross-contaminate compilations despite the rule's intent.
-- Safe reproduction/evidence: Declare a static readonly `Dictionary` or get-only `ConcurrentDictionary` in the `SharpProof.Analyzer` namespace, then mutate its contents.
-
 ## 22. MEDIUM - Const string fields in SharpProof.Ir bypass SPMETA006
 
 - File: `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs`

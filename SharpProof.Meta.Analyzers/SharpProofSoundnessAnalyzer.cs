@@ -348,7 +348,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (!field.IsReadOnly && IsForbiddenMutableStaticStorage(field))
+        if ((!field.IsReadOnly || IsMutableStorageType(field.Type)) &&
+            IsForbiddenMutableStaticStorage(field))
         {
             Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
         }
@@ -363,7 +364,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeProperty(SymbolAnalysisContext context)
     {
         var property = (IPropertySymbol)context.Symbol;
-        if (property.SetMethod != null &&
+        if ((property.SetMethod != null || IsMutableStorageType(property.Type)) &&
             IsForbiddenMutableStaticStorage(property) &&
             IsAutoProperty(property, context.CancellationToken))
         {
@@ -393,6 +394,34 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         return symbol.IsStatic &&
             IsCriticalStateNamespace(symbol.ContainingNamespace);
+    }
+
+    private static bool IsMutableStorageType(ITypeSymbol type)
+    {
+        if (type is IArrayTypeSymbol)
+        {
+            return true;
+        }
+
+        if (type.SpecialType != SpecialType.None ||
+            type is not INamedTypeSymbol named ||
+            named.Name.StartsWith("Immutable", StringComparison.Ordinal) ||
+            named.Name.StartsWith("ReadOnly", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (named.AllInterfaces.Any(static candidate => candidate.Name is
+            "ICollection" or "IDictionary" or "IList" or "ISet" or
+            "IProducerConsumerCollection"))
+        {
+            return true;
+        }
+
+        return named.GetMembers().OfType<IFieldSymbol>().Any(static field =>
+                !field.IsStatic && !field.IsConst && !field.IsReadOnly) ||
+            named.GetMembers().OfType<IPropertySymbol>().Any(static property =>
+                !property.IsStatic && property.SetMethod != null);
     }
 
     private static bool IsAutoProperty(
