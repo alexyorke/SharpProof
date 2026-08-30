@@ -368,12 +368,7 @@ internal static class CancellationBoundaryAnalyzer
             return false;
         }
 
-        return ThrowsIfCallerCancellationRequested(
-                   clause,
-                   context,
-                   method,
-                   symbols) ||
-               ReifiesCallerCancellation(clause, context, method, symbols);
+        return ReifiesCallerCancellation(clause, context, method, symbols);
     }
 
     private static bool ReifiesWorkerProgramCancellation(
@@ -617,28 +612,6 @@ internal static class CancellationBoundaryAnalyzer
                field.Field is { IsStatic: true } &&
                string.Equals(field.Field.Name, name, StringComparison.Ordinal) &&
                IsSameType(field.Field.ContainingType, expectedType);
-    }
-
-    private static bool ThrowsIfCallerCancellationRequested(
-        CatchClauseSyntax clause,
-        SyntaxNodeAnalysisContext context,
-        IMethodSymbol method,
-        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
-    {
-        if (clause.Block.Statements.FirstOrDefault() is not
-                ExpressionStatementSyntax expression ||
-            context.SemanticModel.GetOperation(
-                expression.Expression,
-                context.CancellationToken) is not IInvocationOperation invocation ||
-            invocation.TargetMethod.Name != "ThrowIfCancellationRequested" ||
-            !IsSameType(
-                invocation.TargetMethod.ContainingType,
-                symbols[SharpProofSoundnessAnalyzer.KnownType.CancellationToken]))
-        {
-            return false;
-        }
-
-        return ReferencesParameter(invocation.Instance, method.Parameters[6]);
     }
 
     private static bool ReifiesCallerCancellation(
