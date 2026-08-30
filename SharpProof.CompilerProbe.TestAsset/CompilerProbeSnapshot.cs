@@ -38,7 +38,7 @@ internal static class CompilerProbeSnapshot
             builder,
             ref first,
             "portableReferences",
-            CreateReferenceRows(compilation));
+            CreateReferenceRows(compilation, context.CancellationToken));
         ProbeJson.RawArrayProperty(
             builder,
             ref first,
@@ -331,16 +331,38 @@ internal static class CompilerProbeSnapshot
     }
 
     private static IEnumerable<string> CreateReferenceRows(
-        CSharpCompilation compilation)
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
     {
         return compilation.References
-            .OfType<PortableExecutableReference>()
             .Select(reference =>
-                CreateReferenceRow(compilation, reference))
+                CreateReferenceRow(
+                    compilation,
+                    reference,
+                    cancellationToken))
             .OrderBy(static row => row, StringComparer.Ordinal);
     }
 
     private static string CreateReferenceRow(
+        CSharpCompilation compilation,
+        MetadataReference reference,
+        CancellationToken cancellationToken)
+    {
+        return reference switch
+        {
+            PortableExecutableReference portable =>
+                CreatePortableReferenceRow(compilation, portable),
+            CompilationReference source =>
+                CreateCompilationReferenceRow(
+                    compilation,
+                    source,
+                    cancellationToken),
+            _ => throw new InvalidOperationException(
+                "The C# compiler probe encountered an unsupported reference.")
+        };
+    }
+
+    private static string CreatePortableReferenceRow(
         CSharpCompilation compilation,
         PortableExecutableReference reference)
     {
@@ -389,9 +411,98 @@ internal static class CompilerProbeSnapshot
         return builder.ToString();
     }
 
+    private static string CreateCompilationReferenceRow(
+        CSharpCompilation compilation,
+        CompilationReference reference,
+        CancellationToken cancellationToken)
+    {
+        var builder = new StringBuilder();
+        var first = true;
+        builder.Append('{');
+        ProbeJson.StringArrayProperty(
+            builder,
+            ref first,
+            "aliases",
+            reference.Properties.Aliases.OrderBy(
+                static alias => alias,
+                StringComparer.Ordinal));
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "assemblyOrModuleIdentity",
+            GetReferenceIdentity(compilation, reference));
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "compilationSha256",
+            CreateCompilationReferenceSha256(
+                GetReferencedCompilation(reference),
+                cancellationToken));
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "display",
+            NormalizePath(reference.Display ?? string.Empty));
+        ProbeJson.BooleanProperty(
+            builder,
+            ref first,
+            "embedInteropTypes",
+            reference.Properties.EmbedInteropTypes);
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "kind",
+            reference.Properties.Kind.ToString());
+        builder.Append('}');
+        return builder.ToString();
+    }
+
+    private static CSharpCompilation GetReferencedCompilation(
+        CompilationReference reference)
+    {
+        const System.Reflection.BindingFlags flags =
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic;
+        var property = reference.GetType()
+            .GetProperties(flags)
+            .SingleOrDefault(static candidate =>
+                candidate.Name == "Compilation" &&
+                typeof(CSharpCompilation).IsAssignableFrom(
+                    candidate.PropertyType));
+        return property?.GetValue(reference) as CSharpCompilation ??
+            throw new InvalidOperationException(
+                "The C# compiler probe encountered a non-C# compilation reference.");
+    }
+
+    private static string CreateCompilationReferenceSha256(
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
+    {
+        var builder = new StringBuilder();
+        var first = true;
+        builder.Append('{');
+        ProbeJson.PropertyName(builder, ref first, "assembly");
+        AppendAssembly(builder, compilation);
+        ProbeJson.PropertyName(builder, ref first, "options");
+        AppendOptions(builder, compilation);
+        ProbeJson.RawArrayProperty(
+            builder,
+            ref first,
+            "syntaxTrees",
+            CreateSyntaxTreeRows(compilation, cancellationToken));
+        ProbeJson.RawArrayProperty(
+            builder,
+            ref first,
+            "references",
+            CreateReferenceRows(compilation, cancellationToken));
+        builder.Append('}');
+        return ProbeHash.Text(builder.ToString());
+    }
+
     private static string GetReferenceIdentity(
         CSharpCompilation compilation,
-        PortableExecutableReference reference)
+        MetadataReference reference)
     {
         return compilation.GetAssemblyOrModuleSymbol(reference) switch
         {
