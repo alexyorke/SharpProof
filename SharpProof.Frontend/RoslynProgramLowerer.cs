@@ -362,8 +362,21 @@ public sealed class RoslynProgramLowerer(
                 {
                     case IFieldReferenceOperation field:
                         var fieldReceiver = LowerOptionalValue(block, operation, field.Instance);
+                        if (!CompilerIdentityBridge.IsSupportedValueDomain(field.Type))
+                        {
+                            return LocationLowering.Abstain(
+                                FrontendAbstention.UnsupportedType);
+                        }
                         var fieldMember = _expressions.GetMember(field.Field, ref fieldReceiver, "field:", field.Type);
                         return LocationLowering.FromLocation(_builder.MemberLocation(fieldMember, fieldReceiver));
+                    case IInvocationOperation invocation:
+                        _ = LowerInvocation(
+                            block,
+                            operation,
+                            invocation,
+                            wantsResult: false);
+                        return LocationLowering.Abstain(
+                            FrontendAbstention.UnsupportedMutation);
                     case IPropertyReferenceOperation property:
                         _ = LowerOptionalValue(block, operation, property.Instance);
                         foreach (var argument in property.Arguments)

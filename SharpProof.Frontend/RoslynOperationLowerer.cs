@@ -384,9 +384,16 @@ public sealed class RoslynOperationLowerer
             return Opaque(operation, FrontendAbstention.UnsupportedType);
         }
 
+        var sourceType = operation.Type ??
+            operation.SemanticModel?.GetTypeInfo(operation.Syntax).ConvertedType;
+        if (!IsSupportedValueDomain(sourceType))
+        {
+            return Opaque(operation, FrontendAbstention.UnsupportedType);
+        }
+
         var value = operation.ConstantValue.Value;
-        var type = GetTypeId(operation.Type);
-        if (operation.Type is { IsValueType: true, SpecialType: SpecialType.None })
+        var type = GetTypeId(sourceType);
+        if (sourceType is { IsValueType: true, SpecialType: SpecialType.None })
         {
             return Opaque(operation, FrontendAbstention.UnsupportedType);
         }
@@ -536,7 +543,11 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitInstanceReference(
             IInstanceReferenceOperation operation, LoweringContext argument)
         {
-            return LoweredExpression.Exact(_owner.GetInstance(operation));
+            return _owner.IsSupportedValueDomain(operation.Type)
+                ? LoweredExpression.Exact(_owner.GetInstance(operation))
+                : _owner.Opaque(
+                    operation,
+                    FrontendAbstention.UnsupportedType);
         }
 
         public override LoweredExpression VisitDefaultValue(
@@ -817,6 +828,14 @@ public sealed class RoslynOperationLowerer
             {
                 return OpaqueOperand(operation, operation.Operand,
                     FrontendAbstention.UserDefinedOperator, operation.OperatorMethod);
+            }
+
+            if (!_owner.IsSupportedValueDomain(operation.Type))
+            {
+                return OpaqueOperand(
+                    operation,
+                    operation.Operand,
+                    FrontendAbstention.UnsupportedType);
             }
 
             var operand = _owner.LowerCore(operation.Operand);

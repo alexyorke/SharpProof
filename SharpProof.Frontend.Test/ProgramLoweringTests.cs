@@ -335,6 +335,34 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void RefReturnAssignmentTargetsAreEvaluatedBeforeValues()
+    {
+        var lowered = Lower(
+            """
+            private static long cell;
+            private static ref long Pick() => ref cell;
+            private static long Probe() => 2L;
+            public static long Target() {
+                Pick() = Probe();
+                return cell;
+            }
+            """);
+        var calls = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrCallInstruction>()
+            .Select(call => lowered.Factory.GetString(
+                lowered.Factory.GetMemberInfo(call.Member).Name))
+            .ToArray();
+
+        Assert.That(calls, Has.Length.EqualTo(2));
+        Assert.That(calls[0], Does.Contain("Pick"));
+        Assert.That(calls[1], Does.Contain("Probe"));
+        Assert.That(
+            lowered.Result.Abstentions.Select(static value => value.Reason),
+            Does.Contain(FrontendAbstention.UnsupportedMutation));
+    }
+
+    [Test]
     public void OrdinaryPropertyAccessAbstainsInsteadOfModelingPassiveMemory()
     {
         var lowered = Lower(
@@ -460,6 +488,26 @@ public sealed class ProgramLoweringTests
         Assert.That(
             lowered.Result.Abstentions.Select(static value => value.Reason),
             Does.Contain(FrontendAbstention.UnsupportedType));
+    }
+
+    [Test]
+    public void UnsupportedFieldValueDomainsAbstainBeforeMemoryLoads()
+    {
+        var lowered = Lower(
+            """
+            private struct Token { public long Value; }
+            private static Token value;
+            private static Token Target() => value;
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+
+        Assert.That(lowered.Result.IsExact, Is.False);
+        Assert.That(
+            lowered.Result.Abstentions.Select(static value => value.Reason),
+            Does.Contain(FrontendAbstention.UnsupportedType));
+        Assert.That(instructions.OfType<IrLoadInstruction>(), Is.Empty);
     }
 
     [Test]

@@ -26,28 +26,6 @@ This section records the coordinator's unverified compilation of 26 new findings
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 3.4. HIGH - Field loads and struct `this` bypass supported-value-domain admission
-
-- Files and members: `SharpProof.Frontend/RoslynProgramLowerer.cs`, `LowerValue`, `LowerLocation`, `LowerReturn`, and `LowerOptionalValue`; `SharpProof.Frontend/RoslynOperationLowerer.cs`, `VisitInstanceReference`, `GetInstance`, and `GetTypeId`; intended check in `SharpProof.Frontend/CompilerIdentityBridge.cs`, `IsSupportedValueDomain`.
-- Mechanism: Field references are special-cased to `MemberLocation` plus `Load`, and instance references are always classified `Exact`; neither path checks the value domain before `GetTypeId` maps an unsupported struct to an IR reference type.
-- Impact: Mutable struct copy/value and alias semantics are represented as references while program lowering remains `Exact`.
-- Safe evidence: Both `static Token Target()=>value;` for a struct-typed static field and `Token Target()=>this;` inside a struct escape unsupported values through these paths.
-
-## Wave 3.6. MEDIUM-HIGH - Side-effecting ref-return assignment targets are skipped before the RHS
-
-- File: `SharpProof.Frontend/RoslynProgramLowerer.cs`
-- Members: `LowerAssignment`, lines 223-229; `LowerLocation`, lines 333-366; `LowerValue`, lines 241-263
-- Mechanism: A ref-return invocation target is unsupported by `LowerLocation`, which returns without traversing the target. `LowerAssignment` lowers only the RHS and then havocs. C# evaluates the target call before the RHS.
-- Impact: The target call, its side effects and exceptions, and evaluation order are absent; final havoc cannot restore call or RHS observations.
-- Safe evidence: `Pick() = Probe();`, where `Pick` calls `Touch(1)` and returns a ref cell while `Probe` calls `Touch(2)`. Runtime order is 1 then 2, but lowering skips `Pick`.
-
-## Wave 3.7. HIGH - Null-to-pointer conversions are admitted as exact null references
-
-- Files and members: `SharpProof.Frontend/RoslynOperationLowerer.cs`, `VisitConversion`, lines 786-835, especially 821-824, `LowerConstant`, lines 361-397, and `GetTypeId`, lines 78-109; pointer rejection in `SharpProof.Frontend/CompilerIdentityBridge.cs`, `IsSupportedValueDomain`, lines 56-76.
-- Mechanism: A null literal conversion to pointer routes to `LowerConstant`; `GetTypeId` creates an IR reference type, and the constant guard does not reject pointer kinds, returning exact null.
-- Impact: Pointer or function-pointer domain enters exact reference IR despite explicit exclusion elsewhere.
-- Safe evidence: `public static unsafe int* Target()=>null;` yields `factory.Null(pointerReferenceType)` with `Exact`.
-
 ## Wave 3.11. MEDIUM - Public string-value construction accepts malformed UTF-16
 
 - File: `SharpProof.Ir/IrFactory.cs`

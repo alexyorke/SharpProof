@@ -311,6 +311,39 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void StructThisCannotMasqueradeAsAnExactReferenceValue()
+    {
+        AssertClassification(
+            """
+            public struct Token {
+                public Token Target() => this;
+            }
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
+    public void NullPointerConversionCannotMasqueradeAsAnExactNullReference()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            public static unsafe int* Target() => null;
+            """,
+            allowUnsafe: true);
+
+        var result = compiled.Lower();
+
+        Assert.That(result.Term, Is.Not.TypeOf<IrNullTerm>());
+        Assert.That(
+            result.Classification.Decision,
+            Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
+        Assert.That(
+            result.Classification.Abstention,
+            Is.EqualTo(FrontendAbstention.UnsupportedType));
+    }
+
+    [Test]
     public void BoxingConversionsOfConstantsCannotLowerToNull()
     {
         foreach (var expression in new[] { "(object)5", "(object)\"x\"", "(object)true" })
@@ -1090,7 +1123,8 @@ public sealed class FrontendLoweringTests
 
         internal static CompiledMethod Create(
             string members,
-            bool returnExpressionOnly = true)
+            bool returnExpressionOnly = true,
+            bool allowUnsafe = false)
         {
             var source =
                 """
@@ -1112,6 +1146,7 @@ public sealed class FrontendLoweringTests
                     OutputKind.DynamicallyLinkedLibrary,
                     optimizationLevel: OptimizationLevel.Release,
                     checkOverflow: false,
+                    allowUnsafe: allowUnsafe,
                     nullableContextOptions: NullableContextOptions.Enable));
             var diagnostics = compilation.GetDiagnostics()
                 .Where(static diagnostic =>
