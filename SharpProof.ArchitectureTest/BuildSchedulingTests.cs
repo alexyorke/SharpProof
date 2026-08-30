@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 
 namespace SharpProof.ArchitectureTest;
@@ -76,6 +77,68 @@ public sealed class BuildSchedulingTests
             Does.Contain("Add-SharpProofStaticGraphArgument"));
         Assert.That(wrapper,
             Does.Contain("Add-SharpProofStaticGraphArgument"));
+    }
+
+    [Test]
+    public void WorkerTestsRestoreOnlyTheWorkerProjectClosure()
+    {
+        var root = FindRepositoryRoot();
+        var container = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var match = Regex.Match(
+            container,
+            @"(?s)'worker-tests'\s*\{.*?Invoke-DotNet\s+@\(\s*'restore',\s*'([^']+)'");
+
+        Assert.That(match.Success, Is.True,
+            "worker-tests must have an explicit project-scoped restore.");
+        Assert.That(match.Groups[1].Value, Is.EqualTo(
+            "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj"));
+    }
+
+    [Test]
+    public void WorkerTestsCanReuseACompletedBuild()
+    {
+        var root = FindRepositoryRoot();
+        var container = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+        var match = Regex.Match(
+            container,
+            @"(?s)'worker-tests'\s*\{(?<body>.*?)\r?\n\s*'package-tests'\s*\{");
+
+        Assert.That(container, Does.Contain("[switch]$NoBuild"));
+        Assert.That(match.Success, Is.True,
+            "worker-tests must remain a distinct command block.");
+        Assert.That(match.Groups["body"].Value,
+            Does.Contain("if (-not $NoBuild)"));
+        Assert.That(match.Groups["body"].Value,
+            Does.Contain("'--no-build'"));
+    }
+
+    [Test]
+    public void WarmTestCommandsForwardTheNoBuildSwitch()
+    {
+        var root = FindRepositoryRoot();
+        var container = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofContainer.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(container, Does.Contain("$arguments += '--no-build'"));
+            Assert.That(container, Does.Contain(
+                "$semanticArguments += '-NoBuild'"));
+            Assert.That(container, Does.Contain(
+                "$semanticArguments += @('-TestFilter', $TestFilter)"));
+            Assert.That(container, Does.Contain(
+                "$packageArguments += '-NoBuild'"));
+            Assert.That(container, Does.Contain(
+                "'-NoBuild is supported only for test commands"));
+        }
     }
 
     private static string[] Read(JsonElement root, string property)

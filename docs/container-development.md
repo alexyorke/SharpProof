@@ -45,10 +45,15 @@ sp build
 sp self-apply
 sp self-apply -Configuration Release -PackageSource artifacts/container-packages
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj
+sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -NoBuild
 sp semantic-tests
+sp semantic-tests -NoBuild
 sp portable-tests
+sp portable-tests -NoBuild
 sp worker-tests
+sp worker-tests -NoBuild
 sp package-tests
+sp package-tests -NoBuild
 sp corpus -Configuration Release
 sp coverage
 sp mutation -Configuration Release
@@ -70,6 +75,13 @@ Finite `docker compose run --rm tooling ...` commands materialize the current
 source snapshot in a private temporary workspace and pay a cold build; use them
 for qualification, not for every edit. `contract`, `build`, and ordinary test
 commands work when the source directory came from an archive without `.git`.
+After a completed build in the permanent workspace, `sp worker-tests -NoBuild`
+reuses those outputs and skips the restore/build phase for fast filtered runs.
+Use the normal `sp worker-tests` command after source, project, or configuration
+changes so the Worker dependency closure is rebuilt.
+The same `-NoBuild` fast path is available on `sp test`, `sp semantic-tests`,
+`sp portable-tests`, and `sp package-tests`; use it only when the matching
+configuration and package outputs already exist in this workspace.
 Commands that compare revisions or certify exact-commit evidence (`test-changed`,
 acceptance, mutation, packaging, pilots, fuzz, coverage, and release commands)
 require a Git-backed source workspace. Start the persistent Dev Container to
@@ -87,6 +99,9 @@ Docker budget with
 `SHARPPROOF_CONTAINER_CPU_LIMIT` and `SHARPPROOF_CONTAINER_MEMORY_LIMIT`; the
 lane count follows the CPUs visible to .NET. Use
 `SHARPPROOF_TEST_PROJECT_PARALLELISM` only for profiling or diagnosis.
+The lane count is per container: when several agents share one Docker VM, cap
+each heavy container with that override (typically 1-2 lanes) and keep the
+aggregate build-capable containers within the VM memory budget.
 
 NUnit tests within a project are not globally forced parallel. Several package
 tests intentionally mutate process-local environment variables; those fixtures

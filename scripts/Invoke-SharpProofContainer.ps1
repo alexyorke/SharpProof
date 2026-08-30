@@ -11,7 +11,9 @@ param(
 
     [string]$PackageSource = '',
 
-    [string]$TestFilter = ''
+    [string]$TestFilter = '',
+
+    [switch]$NoBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,6 +31,14 @@ if (-not $IsLinux -or [System.Runtime.InteropServices.RuntimeInformation]::OSArc
 if ($env:SHARPPROOF_CONTAINER -cne '1' -or
     -not (Test-Path -LiteralPath '/etc/sharpproof/container-contract.json' -PathType Leaf)) {
     throw 'SharpProof container commands require the canonical container contract.'
+}
+
+if ($NoBuild -and $Command -notin @(
+        'test', 'semantic-tests', 'portable-tests', 'worker-tests',
+        'package-tests')) {
+    throw (
+        '-NoBuild is supported only for test commands that can reuse an ' +
+        'existing build in the current container workspace.')
 }
 
 function Invoke-DotNet([string[]]$Arguments) {
@@ -202,9 +212,14 @@ switch ($Command) {
         }
     }
     'test' {
-        Invoke-DotNet @('restore', $Target, '--locked-mode')
+        if (-not $NoBuild) {
+            Invoke-DotNet @('restore', $Target, '--locked-mode')
+        }
         $arguments = @(
             'test', $Target, '--configuration', $Configuration, '--no-restore')
+        if ($NoBuild) {
+            $arguments += '--no-build'
+        }
         if ($Target.EndsWith('.sln', [StringComparison]::OrdinalIgnoreCase) -or
             $Target.EndsWith('.slnf', [StringComparison]::OrdinalIgnoreCase)) {
             $arguments += "/m:$testProjectParallelism"
@@ -220,38 +235,63 @@ switch ($Command) {
             -Configuration $Configuration
     }
     'semantic-tests' {
+        $semanticArguments = @('-Configuration', $Configuration)
+        if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+            $semanticArguments += @('-TestFilter', $TestFilter)
+        }
+        if ($NoBuild) {
+            $semanticArguments += '-NoBuild'
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofSemanticTests.ps1') `
-            -Configuration $Configuration
+            @semanticArguments
     }
     'portable-tests' {
         $target = 'SharpProof.Portable.Tests.slnf'
-        Invoke-DotNet @('restore', $target, '--locked-mode')
+        if (-not $NoBuild) {
+            Invoke-DotNet @('restore', $target, '--locked-mode')
+        }
         $arguments = @(
             'test', $target, '--configuration', $Configuration,
             '--no-restore', "/m:$testProjectParallelism")
+        if ($NoBuild) {
+            $arguments += '--no-build'
+        }
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $arguments += @('--filter', $TestFilter)
         }
         Invoke-DotNet $arguments
     }
     'worker-tests' {
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+        if (-not $NoBuild) {
+            Invoke-DotNet @(
+                'restore',
+                'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',
+                '--locked-mode')
+        }
         $arguments = @(
             'test',
             'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',
             '--configuration', $Configuration, '--no-restore')
+        if ($NoBuild) {
+            $arguments += '--no-build'
+        }
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $arguments += @('--filter', $TestFilter)
         }
         Invoke-DotNet $arguments
     }
     'package-tests' {
+        $packageArguments = @(
+            '-Configuration', $Configuration,
+            '-TestFilter', $TestFilter,
+            '-PackageSource', $PackageSource)
+        if ($NoBuild) {
+            $packageArguments += '-NoBuild'
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
-            -Configuration $Configuration `
-            -TestFilter $TestFilter `
-            -PackageSource $PackageSource
+            @packageArguments
         if ($LASTEXITCODE -ne 0) { throw 'Package tests failed.' }
     }
     'package-consumers' {
