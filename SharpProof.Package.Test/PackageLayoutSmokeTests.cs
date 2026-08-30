@@ -12,6 +12,7 @@ using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
 using SharpProof.CompilerProbe.TestAsset;
 using SharpProof.Worker;
 
@@ -935,7 +936,7 @@ public sealed class PackageLayoutSmokeTests
                 manifest.RootElement
                     .GetProperty("schemaVersion")
                     .GetInt32(),
-                Is.EqualTo(15));
+                Is.EqualTo(CompilerManifestArtifactVersions.Current));
             var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()
