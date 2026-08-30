@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.26. MEDIUM - Parallel mutation shard cache does not authenticate receipt contents before merge
-
-- File: `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1`
-- Members/locations: `Test-CompleteShard`, current lines 83-109; reuse branch 234-244; merge/write 326-368
-- Related file: `scripts/SharpProof.MutationEvidence.psm1`, lines 4-40
-- Mechanism: Cached-shard validation checks schema, commit, configuration, catalog, counts, a hash-shaped string, and nonempty ledger, but does not hash the log, TRX, or baseline TRX and does not call `Read-SharpProofMutationTestEvidence`. A reused shard is merged and final evidence is written without `Test-SharpProofMutationCatalog`.
-- Impact: A stale or corrupt cache can be published as a complete campaign; detection depends on a separately invoked validator.
-- Safe reproduction/evidence: Use an isolated cached-shard fixture with internally inconsistent receipt contents but unchanged top-level descriptor, count, and hash-shaped fields. The producer reuses and merges it without rerun, while the standalone validator rejects it.
-
 # Read-Only Multi-Agent Bug Audit - Wave 3 - 2026-08-29
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.

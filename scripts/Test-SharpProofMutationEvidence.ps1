@@ -416,6 +416,75 @@ function Test-MutationReuseValidation {
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
         Join-Path $shardRoot 'baseline.json') -Encoding utf8NoBOM
 
+    $cachedRows = @($results | ForEach-Object {
+            $_ | ConvertTo-Json -Depth 5 | ConvertFrom-Json
+        })
+    for ($index = 0; $index -lt $cachedRows.Count; $index++) {
+        foreach ($property in @('log', 'trx', 'baselineTrx')) {
+            $receipt = Join-Path `
+                $evidenceDirectory ([string]$cachedRows[$index].$property)
+            $cachedRows[$index].$property = [IO.Path]::GetRelativePath(
+                $shardRoot,
+                $receipt).Replace('\', '/')
+        }
+        $cachedRows[$index] | Add-Member `
+            -NotePropertyName catalogOrdinal `
+            -NotePropertyValue $index
+    }
+    $shardPath = Join-Path $shardRoot 'shard-01.json'
+    [pscustomobject][ordered]@{
+        schemaVersion = 2
+        commit = $commit
+        configuration = 'Release'
+        selection = 'selected'
+        catalogCount = $catalog.Count
+        catalogSha256 = $catalogSha256
+        mutationCount = $cachedRows.Count
+        killedCount = $cachedRows.Count
+        mutations = $cachedRows
+    } | ConvertTo-Json -Depth 6 | Set-Content `
+        -LiteralPath $shardPath -Encoding utf8NoBOM
+
+    Remove-Item -LiteralPath $campaignSentinel `
+        -Force -ErrorAction SilentlyContinue
+    $caseOutput = & pwsh -NoLogo -NoProfile -File (
+        Join-Path $scripts 'Invoke-SharpProofTrustedMutationsParallel.ps1') `
+        -Configuration Release `
+        -OutputPath 'artifacts/mutation/trusted-mutations.json' `
+        -ExpectedCommit $commit `
+        -Parallelism 1 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0 -or
+        -not (Test-Path -LiteralPath $evidencePath) -or
+        (Test-Path -LiteralPath $campaignSentinel)) {
+        throw "Valid cached mutation receipts were not reused: $caseOutput"
+    }
+    Remove-Item -LiteralPath $evidencePath -Force
+
+    $corruptLog = Join-Path $receiptDirectory 'first-mutation.log'
+    $originalLogBytes = [IO.File]::ReadAllBytes($corruptLog)
+    try {
+        [IO.File]::AppendAllText($corruptLog, "corrupt`n")
+        Remove-Item -LiteralPath $campaignSentinel `
+            -Force -ErrorAction SilentlyContinue
+        $caseOutput = & pwsh -NoLogo -NoProfile -File (
+            Join-Path $scripts 'Invoke-SharpProofTrustedMutationsParallel.ps1') `
+            -Configuration Release `
+            -OutputPath 'artifacts/mutation/trusted-mutations.json' `
+            -ExpectedCommit $commit `
+            -Parallelism 1 2>&1
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) {
+            throw 'A cached mutation shard with a corrupt receipt was accepted.'
+        }
+        if (Test-Path -LiteralPath $evidencePath) {
+            throw 'A corrupt cached mutation shard published full evidence.'
+        }
+    }
+    finally {
+        [IO.File]::WriteAllBytes($corruptLog, $originalLogBytes)
+    }
+
     $syntheticRows = @($results | ForEach-Object {
             $_ | ConvertTo-Json -Depth 5 | ConvertFrom-Json
         })
@@ -441,7 +510,7 @@ function Test-MutationReuseValidation {
         killedCount = $syntheticRows.Count
         mutations = $syntheticRows
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (
-        Join-Path $shardRoot 'shard-01.json') -Encoding utf8NoBOM
+        $shardPath) -Encoding utf8NoBOM
 
     Remove-Item -LiteralPath $campaignSentinel `
         -Force -ErrorAction SilentlyContinue
@@ -455,15 +524,11 @@ function Test-MutationReuseValidation {
     if ($exitCode -eq 0) {
         throw 'Synthetic cached mutation shard rows were accepted as full evidence.'
     }
-    if ([string]::Join("`n", @($caseOutput)) -notlike `
-            '*do not cover the exact mutation catalog*') {
-        throw "Unexpected cached-shard rejection: $caseOutput"
-    }
     if (Test-Path -LiteralPath $evidencePath) {
         throw 'Rejected cached mutation shards published full evidence.'
     }
-    if (Test-Path -LiteralPath $campaignSentinel) {
-        throw 'Mutation campaign launched while validating cached shards.'
+    if (-not (Test-Path -LiteralPath $campaignSentinel)) {
+        throw 'Rejected cached mutation shards were not scheduled to rerun.'
     }
 }
 
