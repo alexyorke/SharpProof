@@ -26,7 +26,7 @@ internal static class ManagedContractFacts
     internal static ManagedAbstractValue Evaluate(
         IrTerm term, IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables)
     {
-        return Evaluate(term, variables, []);
+        return Evaluate(term, variables, [], default);
     }
 
     internal static bool ContainsPotentiallyFailingCast(IrTerm term)
@@ -59,7 +59,8 @@ internal static class ManagedContractFacts
     internal static ManagedAbstractValue Evaluate(
         IrTerm term,
         IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables,
-        IReadOnlyCollection<IrVarId> definitelyStrings)
+        IReadOnlyCollection<IrVarId> definitelyStrings,
+        IrTypeId stringType)
     {
         return term switch
         {
@@ -72,32 +73,49 @@ internal static class ManagedContractFacts
                 : ManagedAbstractValue.Unknown,
             IrUnaryTerm { Operator: IrUnaryOperator.Not } unary =>
                 ManagedAbstractValue.NegateBoolean(
-                    Evaluate(unary.Operand, variables, definitelyStrings)),
+                    Evaluate(
+                        unary.Operand,
+                        variables,
+                        definitelyStrings,
+                        stringType)),
             IrBinaryTerm binary => ManagedAbstractValue.BinaryOverIrScalars(
                 CSharpScalarSemantics.MapBinaryToRoslyn(binary.Operator),
-                Evaluate(binary.Left, variables, definitelyStrings),
-                Evaluate(binary.Right, variables, definitelyStrings)),
+                Evaluate(
+                    binary.Left,
+                    variables,
+                    definitelyStrings,
+                    stringType),
+                Evaluate(
+                    binary.Right,
+                    variables,
+                    definitelyStrings,
+                    stringType)),
             IrConditionalTerm conditional => Evaluate(
                     conditional.Condition,
                     variables,
-                    definitelyStrings).TryGetBoolean(out var condition)
+                    definitelyStrings,
+                    stringType).TryGetBoolean(out var condition)
                 ? Evaluate(
                     condition ? conditional.WhenTrue : conditional.WhenFalse,
                     variables,
-                    definitelyStrings)
+                    definitelyStrings,
+                    stringType)
                 : ManagedAbstractValue.Join(
                     Evaluate(
                         conditional.WhenTrue,
                         variables,
-                        definitelyStrings),
+                        definitelyStrings,
+                        stringType),
                     Evaluate(
                         conditional.WhenFalse,
                         variables,
-                        definitelyStrings)),
+                        definitelyStrings,
+                        stringType)),
             IrCastTerm cast => EvaluateCast(
                 cast,
                 variables,
-                definitelyStrings),
+                definitelyStrings,
+                stringType),
             _ => ManagedAbstractValue.Unknown
         };
     }
@@ -105,13 +123,19 @@ internal static class ManagedContractFacts
     private static ManagedAbstractValue EvaluateCast(
         IrCastTerm cast,
         IReadOnlyDictionary<IrVarId, ManagedAbstractValue> variables,
-        IReadOnlyCollection<IrVarId> definitelyStrings)
+        IReadOnlyCollection<IrVarId> definitelyStrings,
+        IrTypeId stringType)
     {
-        var operand = Evaluate(cast.Operand, variables, definitelyStrings);
+        var operand = Evaluate(
+            cast.Operand,
+            variables,
+            definitelyStrings,
+            stringType);
         if (operand.IsDefinitelyNull ||
-            cast.Operand is IrVariableTerm variable &&
-            definitelyStrings.Contains(variable.Variable) ||
-            cast.Operand is IrStringTerm)
+            cast.Type == stringType &&
+            (cast.Operand is IrVariableTerm variable &&
+             definitelyStrings.Contains(variable.Variable) ||
+             cast.Operand is IrStringTerm))
         {
             return operand;
         }

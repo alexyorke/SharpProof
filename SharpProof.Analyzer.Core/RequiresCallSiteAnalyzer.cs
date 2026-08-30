@@ -402,7 +402,8 @@ internal static partial class RequiresCallSiteAnalyzer
                     var value = ManagedContractFacts.Evaluate(
                         clause.Condition,
                         variables,
-                        definitelyStrings);
+                        definitelyStrings,
+                        _factory.StringType);
                     return new ClauseEvaluation(
                         value.TryGetBoolean(out var proven) ? proven : null,
                         clause.Condition);

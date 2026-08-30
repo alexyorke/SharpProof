@@ -2933,7 +2933,8 @@ public sealed class RequiresAndControlTests
                 [value] = SharpProof.Effects.ManagedAbstractValue.Reference(
                     SharpProof.Dataflow.NullnessValue.NonNull)
             },
-            [value]);
+            [value],
+            factory.StringType);
 
         Assert.That(evaluated.TryGetBoolean(out _), Is.False);
     }

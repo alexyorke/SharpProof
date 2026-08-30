@@ -101,6 +101,7 @@ internal sealed class AnalyzerSession
                 new AnalyzerEffectCallPreconditionPolicy(
                     _contractBinder.Value,
                     _contractClauses.Value,
+                    IrFactory,
                     new ConservativeEffectCallPreconditionPolicy(
                         compilation,
                         includeSourceCompanions: false))),
