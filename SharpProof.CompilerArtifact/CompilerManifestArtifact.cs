@@ -529,8 +529,35 @@ internal static class CompilerManifestArtifactJson
                 }
             }
 
+            var loweredAuthorities = lowered.EffectAuthorities;
+            if (loweredAuthorities == null ||
+                loweredAuthorities.Length != effects.Length)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < effects.Length; index++)
+            {
+                if (!CompilerEffectAuthority.Matches(
+                        loweredEffects[index],
+                        loweredAuthorities[index],
+                        effects[index]!,
+                        value.Compilation))
+                {
+                    return false;
+                }
+            }
+
             if (lowered.FailureReason != CompilerCallableArtifactReasonCatalog.SuccessReason)
             {
+                if (lowered.Graph != null ||
+                    lowered.Body != null ||
+                    lowered.Clauses is not { Length: 0 } ||
+                    lowered.Variables is not { Length: 0 })
+                {
+                    return false;
+                }
+
                 continue;
             }
 

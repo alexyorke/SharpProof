@@ -472,6 +472,21 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void FailedCallablesCannotRetainExecutablePayloadAcrossWireBoundary()
+    {
+        var artifact = CreateContractArtifact();
+        artifact.Callables.Single().FailureReason =
+            WorkerClaimReason.UnsupportedBody;
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
     public void CompilerDiagnosticCallableStateIsProducerCanonical()
     {
         var artifact = CreateContractArtifact(
@@ -1138,6 +1153,34 @@ public sealed class CompilerManifestArtifactTests
         authority.SourceTreeSha256 = new string('a', 64);
         Assert.Throws<InvalidDataException>((Action)(() =>
             CompilerManifestArtifactJson.DecodeCallables(changedOrigin)));
+    }
+
+    [Test]
+    public void EffectAuthoritiesContributeToFeatureScopeFingerprint()
+    {
+        var artifact = CreateEffectArtifact();
+        var original = artifact.FeatureScopeSha256;
+        artifact.Callables.Single().EffectAuthorities.Single()
+            .SourceTreeSha256 = new string('0', 64);
+
+        Assert.That(
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact),
+            Is.Not.EqualTo(original));
+    }
+
+    [Test]
+    public void EffectAuthorityMismatchIsRejectedAtWireAndHydrationBoundaries()
+    {
+        var artifact = CreateEffectArtifact();
+        artifact.Callables.Single().EffectAuthorities.Single()
+            .SourceTreeSha256 = new string('0', 64);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
     }
 
     [Test]
@@ -1846,6 +1889,35 @@ public sealed class CompilerManifestArtifactTests
         artifact.FeatureScopeSha256 =
             CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
 
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.Serialize(artifact)));
+    }
+
+    [Test]
+    public void AllocationReplaySyntaxTreeLineMapIsRejectedAtWireAndHydrationBoundaries()
+    {
+        var artifact = CreateContractArtifact(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                [ZeroAllocations]
+                internal static object Allocate() =>
+                    new object();
+            }
+            """);
+        var callable = artifact.Callables.Single();
+        var evidence = callable.EffectClaims.Single();
+        var authority = callable.EffectAuthorities.Single();
+        evidence.Replay!.Events.Single().SyntaxTreeLineMapSha256 =
+            new string('0', 64);
+        authority.Replay!.Events.Single().SyntaxTreeLineMapSha256 =
+            new string('0', 64);
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
+        artifact.FeatureScopeSha256 =
+            CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
+
+        Assert.Throws<JsonException>((Action)(() =>
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Serialize(artifact)));
     }

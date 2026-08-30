@@ -102,27 +102,6 @@ This section records 37 findings from exactly 10 fresh read-only auditors after 
 - Impact: Semantically total short-circuit specifications are rejected, forcing weaker or absent specifications.
 - Safe evidence: `false && ((1/0)==0)` and `true ? true : ((1/0)==0)` are rejected.
 
-## Wave 3.23. MEDIUM - Manifest validation accepts failed callables retaining lowered payloads that hydration rejects
-
-- Files and members: `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs`, `HasFeatureScopeParity`, lines 532-535, and `HasValidCallableStates`, lines 775-787; contrasting `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs`, `Decode`, lines 264-271.
-- Mechanism: An allowed producer failure reason can retain Graph, Body, Clauses, and Variables. Parity skips payload after failure and state validation checks only the reason, while hydration requires null graph/body and empty clauses/variables.
-- Impact: The wire validator accepts artifacts that downstream hydration rejects, causing a late failure and inconsistent cache/input admission.
-- Safe evidence: Start from a valid successful artifact, set callable `FailureReason=UnsupportedBody`, retain the payload, recompute `FeatureScopeSha256`, and round-trip. `Deserialize` accepts while `DecodeCallables` rejects.
-
-## Wave 3.24. MEDIUM - Manifest replay validation does not bind SyntaxTreeLineMapSha256 to the selected syntax-tree snapshot
-
-- Files and members: `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs`, `HasValidEffectReplayTrees`, lines 820-828, and `HasFeatureScopeParity`, lines 522-525; stricter `SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs`, `HasValidReplayGeometry`, lines 65-75, especially 70.
-- Mechanism: Manifest validation compares tree hash, snapshot, and geometry but omits the event line-map hash. Resealed evidence and self-hashes pass the manifest, while compilation-bound hydration rejects it.
-- Impact: The canonical manifest admits replay evidence that is rejected as unbound later.
-- Safe evidence: Replace an allocation replay's `SyntaxTreeLineMapSha256` with another 64-hex value, mirror the authority replay, seal the evidence, and recompute the feature hash. Serialization/deserialization passes; hydration rejects.
-
-## Wave 3.25. MEDIUM - EffectAuthorities are outside the feature-scope fingerprint and manifest validation
-
-- Files and members: `SharpProof.CompilerArtifact/CompilerFeatureScopeFingerprint.cs`, `AddCallable`, lines 39-93; `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs`, `Validate`, lines 381-389, `HasFeatureScopeParity`, lines 504-530, and `HasValidEffectReplayTrees`, lines 799-833; later `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs`, `DecodeEffects`, lines 439-474.
-- Mechanism: Authority fields are neither hashed nor manifest-validated; they are checked only later by `CompilerEffectAuthority.Matches`.
-- Impact: Different authority metadata shares feature-scope identity and passes the boundary, while malformed variants fail only during hydration.
-- Safe evidence: Mutate `EffectAuthorities[0].SourceTreeSha256` in a valid artifact without hash changes. Round-trip does not inspect it, but `DecodeCallables` rejects.
-
 ## Wave 3.26. HIGH - Publication lock pathname can be replaced while the original inode remains locked
 
 - File: `SharpProof.Host/LinuxPathIdentity.cs`
