@@ -172,6 +172,50 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void RecordClassWithAllocatesAndMapsCopyConstructorRegions()
+    {
+        var result = Analyze(
+            """
+            public sealed record Sample {
+                private int _value;
+
+                private Sample(Sample original) {
+                    _value = original._value;
+                }
+
+                public static Sample Copy(Sample source) =>
+                    source with { };
+            }
+            """,
+            "Sample",
+            "Copy");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                result.Summary.Reads.IsUnknown,
+                Is.False);
+            Assert.That(
+                result.Summary.Reads.Contains(
+                    EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(result.Summary.Reads.Regions, Has.Length.EqualTo(1));
+            Assert.That(result.Summary.Writes.IsUnknown, Is.False);
+            Assert.That(
+                result.Summary.Writes.Regions,
+                Has.All.Property(nameof(EffectRegionId.Kind))
+                    .EqualTo(EffectRegionKind.Fresh));
+            Assert.That(result.Summary.Writes.Regions, Has.Length.EqualTo(1));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void MetadataListPatternAccessorsRemainConservative()
     {
         var external = EffectTestHost.EmitImage(
@@ -208,6 +252,60 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 result.Summary.Completeness,
                 Is.EqualTo(EffectCompleteness.Incomplete));
+        }
+    }
+
+    [Test]
+    public void PatternSubpatternsRespectImplicitEvaluationGates()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class PatternItem {
+                public int P {
+                    get { Sample.State++; return 1; }
+                }
+            }
+
+            public sealed class ThrowingLengthList {
+                public int Length => throw new InvalidOperationException();
+                public PatternItem this[int index] => new();
+            }
+
+            public static class Sample {
+                public static int State;
+
+                public static bool AfterThrowingLength(
+                    ThrowingLengthList value) =>
+                    value is [{ P: 1 }];
+
+                public static bool KnownNullPropertyPattern() {
+                    PatternItem value = null!;
+                    return value is { P: 1 };
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var afterThrowingLength = session.Analyze(
+            Method(compilation, "AfterThrowingLength"));
+        var knownNull = session.Analyze(
+            Method(compilation, "KnownNullPropertyPattern"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                afterThrowingLength.Summary.Throws.Types.Select(
+                    static type => type.ToDisplayString()),
+                Does.Contain("System.InvalidOperationException"));
+            Assert.That(
+                afterThrowingLength.Summary.Writes.Contains(
+                    EffectRegionId.Static()),
+                Is.False);
+            Assert.That(
+                knownNull.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
         }
     }
 

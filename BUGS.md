@@ -26,31 +26,6 @@ This section records the coordinator's unverified compilation of 26 new findings
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 3.12. HIGH - Record-class `with` expressions omit guaranteed allocation and mis-map copy-constructor regions
-
-- File: `SharpProof.Effects/OperationEffectScanner.Expressions.cs`
-- Member: `ScanWith`
-- Lines: 105-132, especially 110-119
-- Mechanism: The scanner maps `<Clone>$` to the copy constructor, passes `withOperation.Operand` as the constructor receiver, and supplies empty argument-region and actual-argument arrays. Runtime creates a fresh record and passes the old record as copy-constructor `original`; the code does not join `Allocate(Managed)`.
-- Impact: A pure source copy constructor can make `R Copy(R r) => r with { X=2 };` appear nonallocating; receiver writes may map onto `r`, while `original` effects map `Unknown`.
-- Safe evidence: Analyze a reference record `R` with an explicit protected `R(R original)` and a method returning `r with { ... }`.
-
-## Wave 3.13. HIGH - Definitely failing source type initialization contributes no exception effect to static field access
-
-- File: `SharpProof.Effects/EffectAnalysisSession.cs`
-- Member: `ResolveStaticFieldTypeInitialization`
-- Lines: 253-293, especially 282-289
-- Mechanism: `StaticInitializationCannotComplete` returns `EffectSummary.Empty`; the completion evaluator separately makes the access non-completing.
-- Impact: Later operations are suppressed, but the runtime `TypeInitializationException` and initialization boundary are absent.
-- Safe evidence: `class C { internal static int X=Fail(); static int Fail()=>throw new Exception(); } int M()=>C.X;`.
-
-## Wave 3.14. MEDIUM - Pattern subpatterns are scanned before and independently of implicit Length/indexer calls and null gates
-
-- Files and members: `SharpProof.Effects/OperationEffectScanner.cs`, `ScanListPattern`, lines 899-934, especially 901 and 906-932; `SharpProof.Effects/OperationEffectScanner.Expressions.cs`, dispatch at 366-372 and `ScanPropertySubpattern`, lines 5-13.
-- Mechanism: `ScanMany` eagerly scans nested getters before `GetReachableImplicitListPatternMembers`; summaries are independently joined without respecting the governing nullness or completion gate.
-- Impact: Nested getter effects may be reported even when a proven-null governing object or non-completing `Length` prevents evaluation.
-- Safe evidence: Use a custom list-like type whose `Length` always throws and whose element `P` getter mutates state in `x is [{ P: 1 }]`; alternatively, use known-null `x is { P: 1 }`.
-
 ## Wave 3.15. MEDIUM - Nested rejected contract-API calls mark the containing method as rejected usage
 
 - Files and members: `SharpProof.Contracts/ContractClauseInventoryBuilder.cs`, `CreateCore`, lines 55-79, especially 66-73; downstream `SharpProof.Contracts/EffectiveContractSourceResolver.cs`, `HasSelectedContractIntent`, lines 7-14.

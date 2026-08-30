@@ -1,0 +1,41 @@
+namespace SharpProof.Effects.Test;
+
+[TestFixture]
+public sealed class StaticFieldTypeInitializationTests
+{
+    [Test]
+    public void DefinitelyFailingSourceInitializerThrowsTypeInitializationException()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public static class FailingInitialization {
+                internal static int Value = Fail();
+
+                private static int Fail() => throw new Exception();
+            }
+
+            public static class Sample {
+                public static int Read() => FailingInitialization.Value;
+            }
+            """);
+        var method = EffectTestHost.RequireMethod(compilation, "Sample", "Read");
+
+        var result = new EffectAnalysisSession(compilation).Analyze(method);
+
+        var exceptionTypes = result.Summary.Throws.Types.Select(static type =>
+            type.ToDisplayString()).ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Throws.IncludesUnknown, Is.False);
+            Assert.That(exceptionTypes, Has.Length.EqualTo(1));
+            Assert.That(
+                exceptionTypes,
+                Does.Contain("System.TypeInitializationException"));
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+}

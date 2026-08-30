@@ -262,16 +262,23 @@ internal sealed partial class OperationEffectScanner
         EffectStep clone;
         if (withOperation.CloneMethod is { } cloneMethod)
         {
-            var callMethod = OperationCompletionEvaluator
-                .GetRecordCopyConstructor(cloneMethod) ?? cloneMethod;
-            clone = ScanCallStep(
-                callMethod,
-                withOperation.Operand,
-                [],
-                [],
-                [],
-                dispatchUncertain: false,
-                withOperation);
+            var copyConstructor = OperationCompletionEvaluator
+                .GetRecordCopyConstructor(cloneMethod);
+            clone = copyConstructor == null
+                ? ScanCallStep(
+                    cloneMethod,
+                    withOperation.Operand,
+                    [],
+                    [],
+                    [],
+                    dispatchUncertain: false,
+                    withOperation)
+                : ScanRecordCopyConstruction(
+                    withOperation.Operand,
+                    copyConstructor,
+                    withOperation,
+                    _completionEvaluator.CanCompleteWithClone(
+                        withOperation));
         }
         else
         {
@@ -285,6 +292,51 @@ internal sealed partial class OperationEffectScanner
         return withOperation.Initializer != null && clone.CompletesNormally
             ? clone.Then(ScanStep(withOperation.Initializer)).Summary
             : clone.Summary;
+    }
+
+    private EffectStep ScanRecordCopyConstruction(
+        IOperation original,
+        IMethodSymbol copyConstructor,
+        IOperation origin,
+        bool completesNormally)
+    {
+        var result = ScanStep(original);
+        if (!result.CompletesNormally)
+        {
+            return result;
+        }
+
+        result = result.Then(new EffectStep(
+            PotentialNullReceiver(
+                original,
+                origin),
+            !_nullnessEvaluator.IsProvenNull(
+                original,
+                origin)));
+        if (!result.CompletesNormally)
+        {
+            return result;
+        }
+
+        var receiver = EffectRegionSet.Create(
+            EffectRegionId.Fresh(origin.Syntax.SpanStart));
+        var originalRegion = _conversionOwnership.ClassifyRegion(
+            original);
+        var construction = _callResolver.Resolve(
+            copyConstructor,
+            receiver,
+            receiver,
+            [originalRegion],
+            [original],
+            dispatchUncertain: false,
+            origin,
+            instance: null);
+        return result.Then(new EffectStep(
+            EffectSummaryOperations.Join(
+                EffectSummaryOperations.Allocate(
+                    EffectAllocationKind.Managed),
+                construction),
+            completesNormally));
     }
 
     private EffectSummary ScanLock(ILockOperation @lock)

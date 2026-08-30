@@ -544,17 +544,14 @@ internal sealed partial class OperationEffectScanner
         if (invocation.TargetMethod.Name == "<Clone>$" &&
             invocation.Syntax.ToString().IndexOf("with", StringComparison.Ordinal) >= 0 &&
             OperationCompletionEvaluator.GetRecordCopyConstructor(
-                invocation.TargetMethod) is { } copyConstructor)
+                invocation.TargetMethod) is { } copyConstructor &&
+            invocation.Instance is { } original)
         {
-            var cloneCallStep = ScanCallStep(
+            return ScanRecordCopyConstruction(
+                original,
                 copyConstructor,
-                invocation.Instance,
-                [],
-                [],
-                [],
-                dispatchUncertain: false,
-                invocation);
-            return cloneCallStep.Summary;
+                invocation,
+                _completionEvaluator.CanCompleteNormally(invocation)).Summary;
         }
         if (UsingDisposalEffectResolver
             .IsSynthesizedSynchronousDispose(invocation))
@@ -898,44 +895,135 @@ internal sealed partial class OperationEffectScanner
 
     private EffectSummary ScanListPattern(IListPatternOperation pattern)
     {
-        var summary = ScanMany(pattern.Patterns);
         var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (_nullnessEvaluator.IsProvenNull(instance, pattern))
+        {
+            return EffectSummary.Empty;
+        }
+
         var receiver = _conversionOwnership.ClassifyRegion(
             instance,
             aliasSource: true);
-        foreach (var method in _completionEvaluator
-                     .GetReachableImplicitListPatternMembers(pattern))
+        var reachableMembers = _completionEvaluator
+            .GetReachableImplicitListPatternMembers(pattern);
+        var memberIndex = 0;
+        var result = EffectStep.Empty;
+
+        if (SwitchExpressionFacts.GetCallableListPatternMember(
+                pattern.LengthSymbol) is { } lengthMember)
         {
-            if (SwitchExpressionFacts
-                .IsCompilerIntrinsicListPatternMember(pattern, method))
+            if (!TryScanReachableListPatternMember(
+                    pattern,
+                    instance,
+                    receiver,
+                    reachableMembers,
+                    ref memberIndex,
+                    lengthMember,
+                    ref result) ||
+                !result.CompletesNormally)
+            {
+                return result.Summary;
+            }
+        }
+
+        foreach (var item in pattern.Patterns)
+        {
+            var nestedPattern = item is ISlicePatternOperation slice
+                ? slice.Pattern
+                : item;
+            var member = item is ISlicePatternOperation sliceMember
+                ? sliceMember.Pattern == null
+                    ? null
+                    : SwitchExpressionFacts.GetCallableListPatternMember(
+                        sliceMember.SliceSymbol)
+                : SwitchExpressionFacts.GetCallableListPatternMember(
+                    pattern.IndexerSymbol);
+            if (member != null &&
+                (!TryScanReachableListPatternMember(
+                        pattern,
+                        instance,
+                        receiver,
+                        reachableMembers,
+                        ref memberIndex,
+                        member,
+                        ref result) ||
+                 !result.CompletesNormally))
+            {
+                return result.Summary;
+            }
+
+            if (nestedPattern == null)
             {
                 continue;
             }
-            var argumentRegions = Enumerable.Repeat(
-                    EffectRegionSet.Empty,
-                    method.Parameters.Length)
-                .ToImmutableArray();
-            var actualArguments = Enumerable.Repeat<IOperation?>(
-                    null,
-                    method.Parameters.Length)
-                .ToImmutableArray();
-            var call = _callResolver.Resolve(
-                method,
-                receiver,
-                receiver,
-                argumentRegions,
-                actualArguments,
-                method.IsVirtual || method.IsAbstract,
-                pattern,
-                instance,
-                ImmutableArray<IArgumentOperation>.Empty);
-            summary = EffectSummaryDomain.Instance.Join(summary, call);
+            result = result.Then(ScanStep(nestedPattern));
+            if (!result.CompletesNormally)
+            {
+                return result.Summary;
+            }
         }
-        return summary;
+        return result.Summary;
+    }
+
+    private bool TryScanReachableListPatternMember(
+        IListPatternOperation pattern,
+        IOperation? instance,
+        EffectRegionSet receiver,
+        IReadOnlyList<IMethodSymbol> reachableMembers,
+        ref int memberIndex,
+        IMethodSymbol method,
+        ref EffectStep result)
+    {
+        if (memberIndex >= reachableMembers.Count ||
+            !SymbolEqualityComparer.Default.Equals(
+                reachableMembers[memberIndex],
+                method))
+        {
+            return false;
+        }
+        memberIndex++;
+
+        if (SwitchExpressionFacts
+            .IsCompilerIntrinsicListPatternMember(pattern, method))
+        {
+            return true;
+        }
+
+        var argumentRegions = Enumerable.Repeat(
+                EffectRegionSet.Empty,
+                method.Parameters.Length)
+            .ToImmutableArray();
+        var actualArguments = Enumerable.Repeat<IOperation?>(
+                null,
+                method.Parameters.Length)
+            .ToImmutableArray();
+        var call = _callResolver.Resolve(
+            method,
+            receiver,
+            receiver,
+            argumentRegions,
+            actualArguments,
+            method.IsVirtual || method.IsAbstract,
+            pattern,
+            instance,
+            ImmutableArray<IArgumentOperation>.Empty);
+        var completesNormally = method.IsAbstract ||
+            method.IsVirtual && !method.IsSealed ||
+            _completionEvaluator.CanMethodCompleteNormally(method);
+        result = result.Then(new EffectStep(call, completesNormally));
+        return true;
     }
 
     private EffectSummary ScanDefaultPattern(IOperation pattern)
     {
+        if (_nullnessEvaluator.IsProvenNull(
+                SwitchExpressionFacts.GetGoverningValue(
+                    (IPatternOperation)pattern),
+                pattern))
+        {
+            return EffectSummary.Empty;
+        }
+
         return ScanChildren(pattern);
     }
 
