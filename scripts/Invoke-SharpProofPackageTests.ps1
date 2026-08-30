@@ -37,6 +37,22 @@ $parallelism = Get-SharpProofTestProjectParallelism `
 $buildParallelism = Get-SharpProofBuildParallelism `
     -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+$dotnetCommand = Get-Command `
+    dotnet `
+    -CommandType Application `
+    -ErrorAction Stop | Select-Object -First 1
+$dotnetItem = Get-Item -LiteralPath $dotnetCommand.Source
+$dotnetTarget = $dotnetItem.ResolveLinkTarget($true)
+$resolvedDotnetHost = if ($null -eq $dotnetTarget) {
+    $dotnetItem.FullName
+}
+else {
+    $dotnetTarget.FullName
+}
+if (-not [IO.Path]::IsPathRooted($resolvedDotnetHost) -or
+    -not (Test-Path -LiteralPath $resolvedDotnetHost -PathType Leaf)) {
+    throw "Could not resolve the canonical dotnet host: $resolvedDotnetHost"
+}
 $testProject = Join-Path `
     $repositoryRoot 'SharpProof.Package.Test/SharpProof.Package.Test.csproj'
 $coverageEnabled =
@@ -582,7 +598,12 @@ try {
                         $isolatedOutputRoot (
                             $shard.Name + '/' + $Configuration + '/net9.0'))
             }
-            $directVstest = $NoBuild -and -not $coverageEnabled
+            $directVstest = -not $coverageEnabled -and
+                -not $nextIsExclusive
+            if ($directVstest) {
+                $startInfo.Environment['DOTNET_HOST_PATH'] =
+                    $resolvedDotnetHost
+            }
             $arguments = if ($directVstest) {
                 @('vstest', $testAssembly)
             }

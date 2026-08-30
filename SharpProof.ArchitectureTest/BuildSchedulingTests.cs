@@ -415,6 +415,35 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void PackageShardsUseBuiltAssembliesOutsideCoverage()
+    {
+        var package = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "scripts",
+            "Invoke-SharpProofPackageTests.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(package,
+                Does.Contain("$directVstest = -not $coverageEnabled -and"));
+            Assert.That(package,
+                Does.Not.Contain(
+                    "$directVstest = $NoBuild -and -not $coverageEnabled"));
+            Assert.That(package,
+                Does.Contain("-not $nextIsExclusive"));
+            Assert.That(package,
+                Does.Contain("@('vstest', $testAssembly)"));
+            Assert.That(package,
+                Does.Contain("$resolvedDotnetHost"));
+            Assert.That(package,
+                Does.Contain("ResolveLinkTarget($true)"));
+            Assert.That(package,
+                Does.Contain(
+                    "$startInfo.Environment['DOTNET_HOST_PATH']"));
+        }
+    }
+
+    [Test]
     public void SemanticWorkerShardsUseBuiltAssembliesOutsideCoverage()
     {
         var root = FindRepositoryRoot();
