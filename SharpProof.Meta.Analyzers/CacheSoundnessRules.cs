@@ -38,7 +38,7 @@ internal static class CacheSoundnessRules
 
     internal static void AnalyzeAssignment(OperationAnalysisContext context)
     {
-        var assignment = (ISimpleAssignmentOperation)context.Operation;
+        var assignment = (IAssignmentOperation)context.Operation;
         var root = Root(assignment);
         if (assignment.Target is not IPropertyReferenceOperation property ||
             !IsCacheReceiver(
