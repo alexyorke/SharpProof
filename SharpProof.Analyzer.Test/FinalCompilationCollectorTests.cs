@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
@@ -856,10 +857,17 @@ public sealed class FinalCompilationCollectorTests
             "internal static class RecursiveAlias {}",
             "RecursiveAlias");
         await File.WriteAllBytesAsync(referencePath, image);
-        var properties = new MetadataReferenceProperties(
+        var withRecursiveAliases = typeof(MetadataReferenceProperties)
+            .GetMethod(
+                "WithRecursiveAliases",
+                BindingFlags.Instance | BindingFlags.NonPublic) ??
+            throw new InvalidOperationException(
+                "Recursive reference aliases are unavailable.");
+        var properties = (MetadataReferenceProperties)withRecursiveAliases.Invoke(
+            new MetadataReferenceProperties(
                 MetadataImageKind.Assembly,
-                aliases: ["recursive"])
-            .WithRecursiveAliases(true);
+                aliases: ["recursive"]),
+            [true])!;
         var reference = MetadataReference.CreateFromFile(
             referencePath,
             properties);
