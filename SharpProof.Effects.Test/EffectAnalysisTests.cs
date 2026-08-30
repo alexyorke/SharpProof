@@ -2354,6 +2354,37 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void CoalesceAssignmentUpdatesLocalFactsBeforeLaterBranches()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int s_state;
+
+                public static void Calls() {
+                    string? value = null;
+                    value ??= "assigned";
+                    if (value is not null) {
+                        s_state++;
+                    }
+                }
+            }
+            """);
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            Method(compilation, "Calls"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+        }
+    }
+
+    [Test]
     public void UsingFormsIncludeImplicitDisposeEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(
