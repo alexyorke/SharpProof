@@ -4,6 +4,48 @@ namespace SharpProof.Effects.Test;
 public sealed class StaticFieldTypeInitializationTests
 {
     [Test]
+    public void DivergingStaticConstructorPreventsMethodEntryAndBodyEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class DivergingInitialization {
+                static DivergingInitialization() {
+                    while (true) { }
+                }
+
+                public static void Run() {
+                    Probe.Writes++;
+                    _ = new object();
+                }
+            }
+
+            public static class Probe {
+                public static int Writes;
+            }
+            """);
+        var method = EffectTestHost.RequireMethod(
+            compilation,
+            "DivergingInitialization",
+            "Run");
+
+        var result = new EffectAnalysisSession(compilation).Analyze(method);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Termination,
+                Is.EqualTo(EffectTermination.MayDiverge));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.None));
+            Assert.That(result.DirectWitnesses, Is.Empty);
+        }
+    }
+
+    [Test]
     public void BeforeFieldInitStaticMethodIncludesInitializerEffectsAndFailure()
     {
         var compilation = EffectTestHost.CreateCompilation(
