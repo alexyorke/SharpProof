@@ -99,6 +99,19 @@ docker compose exec loop sharpproof-loop test-changed -Fast
 docker compose exec loop sharpproof-loop test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -Fast
 ```
 
+When PowerShell and Git are available on the host, use the optional snapshot
+wrapper for the shortest host-edited cycle:
+
+```powershell
+pwsh -File scripts/Invoke-SharpProofLoop.ps1 test-changed -Fast
+pwsh -File scripts/Invoke-SharpProofLoop.ps1 test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -Fast
+```
+
+The wrapper captures the Git patch and untracked files on the host, where Git
+can scan the checkout quickly, and passes that bounded snapshot to the private
+Linux workspace. The regular `sharpproof-loop` command remains the portable
+fallback when host Git is unavailable.
+
 Each `sharpproof-loop` command mirrors the current tracked and non-ignored
 untracked source into a private Compose volume, then runs `sp` there. The mirror
 keeps `bin`, `obj`, MSBuild and Roslyn compiler servers, and package caches

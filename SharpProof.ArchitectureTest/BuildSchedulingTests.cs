@@ -277,6 +277,42 @@ public sealed class BuildSchedulingTests
     }
 
     [Test]
+    public void HostLoopSnapshotAvoidsBindMountGitDiffScanning()
+    {
+        var root = FindRepositoryRoot();
+        var hostLoopPath = Path.Combine(
+            root,
+            "scripts",
+            "Invoke-SharpProofLoop.ps1");
+        var hostLoop = File.ReadAllText(hostLoopPath);
+        var containerLoop = File.ReadAllText(Path.Combine(
+            root,
+            "eng",
+            "container",
+            "loop-command.sh"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                hostLoop,
+                Does.Contain("$gitPath -C $repositoryRoot diff"));
+            Assert.That(hostLoop, Does.Contain("--output="));
+            Assert.That(hostLoop, Does.Contain("ls-files"));
+            Assert.That(hostLoop, Does.Contain("-z"));
+            Assert.That(
+                hostLoop,
+                Does.Contain("SHARPPROOF_LOOP_SNAPSHOT_ROOT="));
+            Assert.That(hostLoop, Does.Contain("& docker compose exec"));
+            Assert.That(
+                containerLoop,
+                Does.Contain("SHARPPROOF_LOOP_SNAPSHOT_ROOT"));
+            Assert.That(
+                containerLoop,
+                Does.Contain("source_files_root"));
+        }
+    }
+
+    [Test]
     public void NestedPackageConsumersUseClosureScopedCompilerServers()
     {
         var root = FindRepositoryRoot();

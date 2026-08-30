@@ -15,6 +15,7 @@ if [[ ! -d "${source_root}" ]]; then
 fi
 
 source_root="$(realpath -e "${source_root}")"
+artifacts_root="$(realpath -e "${artifacts_root}")"
 target_parent="$(realpath -e "$(dirname "${target_root}")")"
 target_root="${target_parent}/$(basename "${target_root}")"
 if [[ "${target_root}" = "/" || "${target_root}" = "${source_root}" ]]; then
@@ -69,14 +70,17 @@ source_git_directory="$(git -C "${source_root}" rev-parse --absolute-git-dir)"
 trust_git_directory "${source_git_directory}"
 source_head="$(git -C "${source_root}" rev-parse HEAD)"
 
-source_patch="$(mktemp /tmp/sharpproof-loop-source-patch.XXXXXXXX)"
-source_manifest="$(mktemp /tmp/sharpproof-loop-source-files.XXXXXXXX)"
+source_patch_temp="$(mktemp /tmp/sharpproof-loop-source-patch.XXXXXXXX)"
+source_manifest_temp="$(mktemp /tmp/sharpproof-loop-source-files.XXXXXXXX)"
+source_patch="${source_patch_temp}"
+source_manifest="${source_manifest_temp}"
+source_files_root="${source_root}"
 target_patch="$(mktemp /tmp/sharpproof-loop-target-patch.XXXXXXXX)"
 target_manifest="$(mktemp /tmp/sharpproof-loop-target-files.XXXXXXXX)"
 cleanup() {
   rm -f -- \
-    "${source_patch}" \
-    "${source_manifest}" \
+    "${source_patch_temp}" \
+    "${source_manifest_temp}" \
     "${target_patch}" \
     "${target_manifest}"
   release_lock
@@ -91,16 +95,39 @@ get_source_fingerprint() {
   local head="$2"
   local patch_path="$3"
   local manifest_path="$4"
-  local patch_hash
-  local untracked_hash
 
   git -C "${root}" diff \
     --binary --full-index --no-ext-diff HEAD -- . > "${patch_path}"
   git -C "${root}" ls-files -z \
     --others --exclude-standard -- > "${manifest_path}"
+  calculate_source_fingerprint \
+    "${root}" \
+    "${head}" \
+    "${patch_path}" \
+    "${manifest_path}"
+}
+
+calculate_source_fingerprint() {
+  local root="$1"
+  local head="$2"
+  local patch_path="$3"
+  local manifest_path="$4"
+  local patch_hash
+  local untracked_hash
   patch_hash="$(sha256sum "${patch_path}" | cut -d ' ' -f 1)"
   untracked_hash="$(
     while IFS= read -r -d '' relative_path; do
+      case "${relative_path}" in
+        ""|/*|../*|*/../*|*/..)
+          echo "Invalid path in the SharpProof loop source inventory." >&2
+          exit 125
+          ;;
+      esac
+      if [[ ! -f "${root}/${relative_path}" &&
+        ! -L "${root}/${relative_path}" ]]; then
+        echo "Missing file in the SharpProof loop source inventory." >&2
+        exit 125
+      fi
       printf '%s\0' "${relative_path}"
       if [[ -L "${root}/${relative_path}" ]]; then
         printf '120000\0'
@@ -117,11 +144,42 @@ get_source_fingerprint() {
     sha256sum | cut -d ' ' -f 1
 }
 
-source_fingerprint="$(get_source_fingerprint \
-  "${source_root}" \
-  "${source_head}" \
-  "${source_patch}" \
-  "${source_manifest}")"
+snapshot_root="${SHARPPROOF_LOOP_SNAPSHOT_ROOT:-}"
+if [[ -n "${snapshot_root}" ]]; then
+  snapshot_root="$(realpath -e "${snapshot_root}")"
+  case "${snapshot_root}" in
+    "${artifacts_root}"/.sharpproof-loop-input-*) ;;
+    *)
+      echo "SharpProof loop snapshot escaped the artifacts input root." >&2
+      exit 125
+      ;;
+  esac
+  snapshot_head="$(tr -d '\r\n' < "${snapshot_root}/head")"
+  if [[ "${snapshot_head}" != "${source_head}" ]]; then
+    echo "SharpProof loop snapshot does not match the host HEAD." >&2
+    exit 2
+  fi
+  source_patch="${snapshot_root}/source.patch"
+  source_manifest="${snapshot_root}/source-files"
+  source_files_root="${snapshot_root}/files"
+  if [[ ! -f "${source_patch}" ||
+    ! -f "${source_manifest}" ||
+    ! -d "${source_files_root}" ]]; then
+    echo "SharpProof loop snapshot is incomplete." >&2
+    exit 125
+  fi
+  source_fingerprint="$(calculate_source_fingerprint \
+    "${source_files_root}" \
+    "${source_head}" \
+    "${source_patch}" \
+    "${source_manifest}")"
+else
+  source_fingerprint="$(get_source_fingerprint \
+    "${source_root}" \
+    "${source_head}" \
+    "${source_patch}" \
+    "${source_manifest}")"
+fi
 
 if [[ ! -d "${target_root}/.git" ]]; then
   if [[ -d "${target_root}" ]] &&
@@ -132,10 +190,13 @@ if [[ ! -d "${target_root}/.git" ]]; then
   fi
   git clone --quiet --shared --no-checkout \
     "${source_root}" "${target_root}"
-  git -C "${target_root}" config core.filemode false
 fi
 
 trust_git_directory "${target_root}"
+# Unlike the Docker Desktop bind-mounted source, this private Linux volume
+# preserves executable bits. Keep its tracked modes canonical so applying a
+# host-captured patch does not warn about 100755 script inputs appearing 0644.
+git -C "${target_root}" config core.filemode true
 
 if [[ -e "${target_root}/artifacts" &&
   ! -L "${target_root}/artifacts" ]]; then
@@ -187,7 +248,7 @@ if [[ "${target_fingerprint}" != "${source_fingerprint}" ]]; then
         exit 125
         ;;
     esac
-    source_path="${source_root}/${relative_path}"
+    source_path="${source_files_root}/${relative_path}"
     target_path="${target_root}/${relative_path}"
     mkdir -p -- "$(dirname "${target_path}")"
     if [[ -d "${target_path}" && ! -L "${target_path}" ]]; then
