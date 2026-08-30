@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "rationale": "These formatting-invariant complexity ratchets keep algorithm files and members reviewable. Raise a cap only with a reviewed decomposition or a soundness note explaining why the added executable structure belongs in the existing layer. Assignment evaluation is separated from the core effect scanner so both layers retain independent reviewable ceilings.",
+  "rationale": "These formatting-invariant complexity ratchets keep algorithm files and members reviewable. Raise a cap only with a reviewed decomposition or a soundness note explaining why the added executable structure belongs in the existing layer. Assignment evaluation is separated from the core effect scanner so both layers retain independent reviewable ceilings. The current file caps include supported constant and instance field lowering and complete reachable dataflow transfer evaluation; the independently measured member and decision ceilings remain unchanged.",
   "measurement": {
     "fileExpressionNodes": "Roslyn expression-node count for the complete file, excluding trivia and optional block syntax.",
     "memberExpressionNodes": "Roslyn expression-node count for each measured member, excluding trivia and optional block syntax.",
@@ -10,7 +10,7 @@
   "files": [
     {
       "path": "SharpProof.Frontend/RoslynOperationLowerer.cs",
-      "maximumFileExpressionNodes": 2792,
+      "maximumFileExpressionNodes": 2868,
       "maximumMemberExpressionNodes": 340,
       "maximumFileDecisionPoints": 150,
       "maximumMemberDecisionPoints": 30
@@ -38,7 +38,7 @@
     },
     {
       "path": "SharpProof.Dataflow/ForwardDataflowAnalysis.cs",
-      "maximumFileExpressionNodes": 495,
+      "maximumFileExpressionNodes": 514,
       "maximumMemberExpressionNodes": 350,
       "maximumFileDecisionPoints": 30,
       "maximumMemberDecisionPoints": 25

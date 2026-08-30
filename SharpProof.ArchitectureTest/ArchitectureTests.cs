@@ -163,7 +163,10 @@ public sealed class ArchitectureTests
                 "SharpProof.Specs"
             ],
             ["SharpProof.Attributes"] = [],
-            ["SharpProof.BuildTasks"] = ["SharpProof.Host"],
+            ["SharpProof.BuildTasks"] = [
+                "SharpProof.Host",
+                "SharpProof.Worker.Protocol"
+            ],
             ["SharpProof.Host"] = [],
             ["SharpProof.Ir"] = [],
             ["SharpProof.Meta.Analyzers"] = [],
@@ -2382,7 +2385,7 @@ public sealed class ArchitectureTests
                     .And.Contain("$retained.Seeds")
                     .And.Contain("Invoke-FuzzRun")
                     .And.Contain("yyyyMMdd")
-                    .And.Contain("schemaVersion = 3")
+                    .And.Contain("schemaVersion = 4")
                     .And.Contain("commit = $sourceCommit")
                     .And.Contain("rotatingCases = $effectiveRotatingCases")
                     .And.Contain("retainedCasesPerSeed = $effectiveRetainedCases")
