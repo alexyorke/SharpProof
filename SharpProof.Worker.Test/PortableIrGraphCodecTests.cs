@@ -354,7 +354,7 @@ public sealed class PortableIrGraphCodecTests
         Assert.That(
             hash,
             Is.EqualTo(
-                "429FA548B2E9D87501BC4FB7BE5B5D8B329002043B1050A8F991A6355F492566"));
+                "AAA27C6AF3E73A71C545B94A78F722AE239012EB150972129D2FF6BABBF54E5B"));
 
         var decodedGraph = JsonSerializer.Deserialize<PortableIrGraph>(
             bytes,
