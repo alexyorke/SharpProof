@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.1. MEDIUM - Public forward dataflow solver silently assumes bottom-strict transfers
-
-- File: `SharpProof.Dataflow/ForwardDataflowAnalysis.cs`
-- Member: `ForwardDataflowAnalysis.AnalyzeCore<T>`
-- Current lines: 120, 138-150, 158-197
-- Mechanism: Only the entry is initially scheduled; successors run only after predecessor output changes, and enqueue only when joined input changes from bottom. The accepted `Func<T,T>` can validly and monotonically map bottom to nonbottom, but such a block is never evaluated when its input stays bottom, so the result is not a fixed point.
-- Impact: The public API returns incorrect states without warning. The exhaustive oracle privately restricts itself to bottom-strict transfers, but the production contract does not.
-- Safe reproduction/evidence: With `NullnessDomain`, use block 0 `AssumeNonNull`, block 1 `_ => NullnessValue.Null`, edge 0 to 1, and initial `Null`. Block 0 output equals initialized bottom, so block 1 never runs even though `transfer(bottom)=Null`.
-
 ## Wave 2.2. HIGH - Resource accounting treats an ordinary lower solver snapshot as 32-bit wrap
 
 - File: `SharpProof.Smt/IrSmtBackend.cs`

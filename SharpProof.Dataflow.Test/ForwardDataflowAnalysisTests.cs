@@ -33,6 +33,33 @@ public sealed class ForwardDataflowAnalysisTests
     }
 
     [Test]
+    public void ReachableNonBottomStrictTransferRunsAtBottomInput()
+    {
+        var domain = NullnessDomain.Instance;
+        var graph = new DataflowGraph<NullnessValue>(
+            [
+                new(0, domain.AssumeNonNull),
+                new(1, _ => NullnessValue.Null)
+            ],
+            [new(0, 1)]);
+
+        var result = ForwardDataflowAnalysis.Analyze(
+            graph,
+            domain,
+            NullnessValue.Null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.GetInputState(1),
+                Is.EqualTo(NullnessValue.Bottom));
+            Assert.That(
+                result.GetOutputState(1),
+                Is.EqualTo(NullnessValue.Null));
+        }
+    }
+
+    [Test]
     public void LoopUsesWideningAndTerminates()
     {
         var domain = IntervalDomain.Instance;
