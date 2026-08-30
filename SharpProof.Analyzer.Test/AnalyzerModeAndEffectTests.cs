@@ -500,6 +500,46 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task IncompatibleCastCannotEstablishCalleePrecondition()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Need(object value) {
+                    Contract.Requires((IDisposable)value != null);
+                }
+
+                [DoesNotThrow]
+                public static void Call() => Need("text");
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics[0].GetMessage(
+                    CultureInfo.InvariantCulture),
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                factory.Outcomes["Call"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task LaterArgumentMutationCannotProveEarlierCalleeArgument()
     {
         var factory = new RecordingSessionFactory();

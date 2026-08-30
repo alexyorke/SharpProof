@@ -2910,4 +2910,31 @@ public sealed class RequiresAndControlTests
             interval,
             Is.EqualTo(SharpProof.Dataflow.IntervalValue.Constant(3)));
     }
+
+    [Test]
+    public void IncompatibleReferenceCastCannotProveRequiresAtUnitLevel()
+    {
+        var factory = new SharpProof.Ir.IrFactory();
+        var disposableType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(),
+            "System.IDisposable");
+        var value = factory.CreateVariable("value", factory.ObjectType);
+        var condition = factory.Binary(
+            SharpProof.Ir.IrBinaryOperator.NotEqual,
+            factory.Cast(disposableType, factory.Variable(value)),
+            factory.Null(disposableType));
+
+        var evaluated = SharpProof.Analyzer.ManagedContractFacts.Evaluate(
+            condition,
+            new Dictionary<
+                SharpProof.Ir.ScopedIrId<SharpProof.Ir.IrVariableTag>,
+                SharpProof.Effects.ManagedAbstractValue>
+            {
+                [value] = SharpProof.Effects.ManagedAbstractValue.Reference(
+                    SharpProof.Dataflow.NullnessValue.NonNull)
+            },
+            [value]);
+
+        Assert.That(evaluated.TryGetBoolean(out _), Is.False);
+    }
 }
