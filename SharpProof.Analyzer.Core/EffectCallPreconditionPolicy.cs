@@ -3,6 +3,7 @@ namespace SharpProof.Analyzer;
 internal sealed class AnalyzerEffectCallPreconditionPolicy(
     ContractBinder binder,
     ContractClauseInventoryBuilder clauses,
+    IrFactory factory,
     ConservativeEffectCallPreconditionPolicy fallback)
     : IEffectCallPreconditionPolicy
 {
@@ -11,6 +12,8 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
     private readonly ContractClauseInventoryBuilder
         _clauses =
             ArgumentNullGuard.NotNull(clauses, nameof(clauses));
+    private readonly IrFactory _factory =
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly ConservativeEffectCallPreconditionPolicy
         _fallback =
             ArgumentNullGuard.NotNull(fallback, nameof(fallback));
@@ -114,7 +117,8 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
             ManagedContractFacts.Evaluate(
                     clause.Condition,
                     variables,
-                    definitelyStrings)
+                    definitelyStrings,
+                    _factory.StringType)
                 .TryGetBoolean(out var established) &&
             established)
                 ? EffectCallPreconditionStatus.Proven

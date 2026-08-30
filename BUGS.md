@@ -1,6 +1,6 @@
 # Bug backlog
 
-456 open bugs, reprioritized by impact, reachability, and affected scope.
+455 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,9 +9,8 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (168)
+## P0 - Critical (167)
 
-- **BUG-002 [P0] - Abstract precondition evaluation assumes incompatible casts succeed:** ManagedContractFacts returns definitely-string operands unchanged for every IR cast without checking the cast target type. An incompatible cast that throws at runtime can therefore make a Requires clause evaluate as proven and incorrectly certify the call.
 - **BUG-003 [P0] - AdditionalText provenance can bind a different read than generation:** The generator consumes AdditionalText once, while the probe and compiler collector independently read it again afterward for provenance. A stateful or changed provider can generate code from value A while both trusted artifacts authenticate value B.
 - **BUG-004 [P0] - API specifications ignore constructor staticness and property arity:** ApiSpecTable accepts contradictory constructor staticness and nonzero property generic arity, while ApiSpecResolver omits the corresponding target checks. Trusted facets and postconditions can be attached to a symbol that does not satisfy the authenticated member shape.
 - **BUG-005 [P0] - Async and iterator calls inherit deferred body completion:** Completion analysis uses async and iterator body termination to classify the call expression itself. Unawaited async calls and iterator creation can be marked terminal even though they return immediately, causing reachable caller effects to disappear from complete summaries.
