@@ -37,14 +37,15 @@ internal static class ApiSpecTermValidator
 
                 var nonNull = info.Role == SpecVariableRole.Receiver ||
                     info.Role == SpecVariableRole.Result &&
-                    (facets.Nullness.Result == SpecNullness.NonNull ||
-                     facets.Cardinality.Result is
-                         SpecCardinality.Empty or
-                         SpecCardinality.NonEmpty or
-                         SpecCardinality.Exact);
+                    facets.Nullness.Result == SpecNullness.NonNull;
                 return new(info.Type, true, nonNull, null);
             case SpecBooleanDeclaration boolean:
-                return new(boolean.Type, true, false, null);
+                return new(
+                    boolean.Type,
+                    true,
+                    false,
+                    null,
+                    boolean.Value);
             case SpecIntegerDeclaration integer:
                 return new(integer.Type, true, false, integer.Value);
             case SpecStringDeclaration text:
@@ -52,6 +53,13 @@ internal static class ApiSpecTermValidator
                 {
                     throw new ArgumentException(
                         "String constants cannot be null.",
+                        nameof(declaration));
+                }
+
+                if (!Utf16WellFormedness.IsWellFormed(text.Value))
+                {
+                    throw new ArgumentException(
+                        "String constants require well-formed UTF-16.",
                         nameof(declaration));
                 }
 
@@ -121,7 +129,11 @@ internal static class ApiSpecTermValidator
                 ? operand.IsTotal
                 : integer.HasValue,
             false,
-            integer);
+            integer,
+            unary.Operator == IrUnaryOperator.Not &&
+            operand.Boolean is { } boolean
+                ? !boolean
+                : null);
     }
 
     private static TermFacts ValidateBinary(
@@ -162,11 +174,22 @@ internal static class ApiSpecTermValidator
             integer = result;
         }
 
+        var boolean = binary.Operator switch
+        {
+            IrBinaryOperator.AndAlso when left.Boolean == false => false,
+            IrBinaryOperator.AndAlso when left.Boolean == true => right.Boolean,
+            IrBinaryOperator.OrElse when left.Boolean == true => true,
+            IrBinaryOperator.OrElse when left.Boolean == false => right.Boolean,
+            _ => null
+        };
         return new(
             shape.Result,
-            arithmetic ? integer.HasValue : left.IsTotal && right.IsTotal,
+            arithmetic
+                ? integer.HasValue
+                : IsBinaryTotal(binary.Operator, left, right),
             binary.Operator == IrBinaryOperator.StringConcat,
-            integer);
+            integer,
+            boolean);
     }
 
     private static TermFacts ValidateConditional(
@@ -186,11 +209,41 @@ internal static class ApiSpecTermValidator
                 nameof(conditional));
         }
 
-        return new(
-            conditional.Type,
-            condition.IsTotal && whenTrue.IsTotal && whenFalse.IsTotal,
-            whenTrue.IsNonNull && whenFalse.IsNonNull,
-            null);
+        var selected = condition.Boolean switch
+        {
+            true => whenTrue,
+            false => whenFalse,
+            null => (TermFacts?)null
+        };
+        return selected is { } branch
+            ? new(
+                conditional.Type,
+                condition.IsTotal && branch.IsTotal,
+                branch.IsNonNull,
+                branch.Integer,
+                branch.Boolean)
+            : new(
+                conditional.Type,
+                condition.IsTotal && whenTrue.IsTotal && whenFalse.IsTotal,
+                whenTrue.IsNonNull && whenFalse.IsNonNull,
+                null);
+    }
+
+    private static bool IsBinaryTotal(
+        IrBinaryOperator @operator,
+        TermFacts left,
+        TermFacts right)
+    {
+        return @operator switch
+        {
+            IrBinaryOperator.AndAlso =>
+                left.IsTotal &&
+                (left.Boolean == false || right.IsTotal),
+            IrBinaryOperator.OrElse =>
+                left.IsTotal &&
+                (left.Boolean == true || right.IsTotal),
+            _ => left.IsTotal && right.IsTotal
+        };
     }
 
     private static bool TryNegate(long value, out long result)
@@ -222,5 +275,6 @@ internal static class ApiSpecTermValidator
         IrTypeKind Type,
         bool IsTotal,
         bool IsNonNull,
-        long? Integer);
+        long? Integer,
+        bool? Boolean = null);
 }

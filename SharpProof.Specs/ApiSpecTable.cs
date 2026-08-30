@@ -119,7 +119,9 @@ public sealed partial class ApiSpecTable
         var variableArray = variables.ToImmutable();
         var bySlot = variableArray.ToImmutableDictionary(
             static variable => (variable.Role, variable.Ordinal));
-        var facets = NormalizeFacets(declaration.Facets);
+        var facets = NormalizeFacets(
+            declaration.Facets,
+            declaration.Target.ResultType);
         var postconditions = declaration.Postconditions.Select(postcondition =>
         {
             if (postcondition == null)
@@ -248,7 +250,9 @@ public sealed partial class ApiSpecTable
         }
     }
 
-    private static ApiSpecFacets NormalizeFacets(ApiSpecFacets facets)
+    private static ApiSpecFacets NormalizeFacets(
+        ApiSpecFacets facets,
+        IrTypeKind? resultType)
     {
         ValidateEvidence(facets.Effects?.Evidence, nameof(facets));
         ValidateEvidence(facets.Allocation?.Evidence, nameof(facets));
@@ -277,6 +281,27 @@ public sealed partial class ApiSpecTable
         ValidateDefined(throws.Behavior, nameof(facets));
         ValidateDefined(nullness.Result, nameof(facets));
         ValidateDefined(cardinality.Result, nameof(facets));
+        if (nullness.Result is not (
+                SpecNullness.Unknown or
+                SpecNullness.NotApplicable) &&
+            (!resultType.HasValue ||
+             !IrTermServices.IsNullable(resultType.Value)))
+        {
+            throw new ArgumentException(
+                "The nullness facet does not apply to the declared result type.",
+                nameof(facets));
+        }
+
+        if (cardinality.Result is not (
+                SpecCardinality.Unknown or
+                SpecCardinality.NotApplicable) &&
+            resultType != IrTypeKind.Sequence)
+        {
+            throw new ArgumentException(
+                "The cardinality facet does not apply to the declared result type.",
+                nameof(facets));
+        }
+
         if (throws.ExceptionMetadataNames.IsDefault)
         {
             throw new ArgumentException("Throw exception names must be initialized.", nameof(facets));

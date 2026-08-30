@@ -134,23 +134,25 @@ public sealed class SpecResultDomainProjectionTests
     }
 
     [Test]
-    public void CardinalityWithoutNonNullOrSequenceTypeFailsClosed()
+    public void InvalidCardinalityFailsClosedAtTheEarliestBoundary()
     {
         var factory = new IrFactory();
         var sequence = factory.CreateVariable(
             "sequence",
             factory.GetOrCreateSequenceType(factory.IntegerType));
-        var reference = factory.CreateVariable(
-            "reference",
-            factory.ObjectType);
         var nullableCardinality = CreateTemplate(
             IrTypeKind.Sequence,
             SpecNullness.MaybeNull,
             SpecCardinality.Empty);
-        var referenceCardinality = CreateTemplate(
-            IrTypeKind.Reference,
-            SpecNullness.NonNull,
-            SpecCardinality.Empty);
+        Action createInapplicableCardinality = () =>
+        {
+            _ = CreateTemplate(
+                IrTypeKind.Reference,
+                SpecNullness.NonNull,
+                SpecCardinality.Empty);
+        };
+        var inapplicableCardinality = Assert.Throws<ArgumentException>(
+            createInapplicableCardinality);
 
         using (Assert.EnterMultipleScope())
         {
@@ -163,13 +165,8 @@ public sealed class SpecResultDomainProjectionTests
                     out _),
                 Is.False);
             Assert.That(
-                SpecResultDomainProjection.TryCreate(
-                    factory,
-                    referenceCardinality,
-                    reference,
-                    out _,
-                    out _),
-                Is.False);
+                inapplicableCardinality!.Message,
+                Does.Contain("cardinality facet"));
         }
     }
 

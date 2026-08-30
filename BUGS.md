@@ -26,28 +26,6 @@ This section records the coordinator's unverified compilation of 26 new findings
 
 This section records 37 findings from exactly 10 fresh read-only auditors after title/mechanism-only deduplication against Waves 1-2 and within Wave 3. The coordinator compiled the findings without reverification, and the central writer did not inspect or reverify the code.
 
-## Wave 3.19. MEDIUM - Ill-formed UTF-16 constants enter trusted spec tables, fail instantiation, and collide in digest input
-
-- Files and members: `SharpProof.Specs/ApiSpecTermValidator.cs`, `Validate`, lines 50-58; `SharpProof.Specs/ApiSpecInstantiation.cs`, `Instantiation.Term`, line 145; `SharpProof.Specs/ApiSpecContentDigest.cs`, `Add(SpecTermDeclaration,...)`, lines 79-90.
-- Mechanism: `SpecStringDeclaration` accepts lone surrogates and marks them total and non-null; `IrFactory.String` later rejects them. UTF-8 replacement fallback maps distinct lone surrogates such as D800 and D801 identically.
-- Impact: Trusted table creation succeeds while instantiation returns `InvalidExpression`; distinct accepted content can share `ContentSha256` input without a cryptographic collision.
-- Safe evidence: Equality between identical `SpecStringDeclaration("\uD800")` operands passes `Create`, but `InstantiatePostconditions` fails. Compare otherwise identical D800 and D801 table digests.
-
-## Wave 3.20. MEDIUM - Result facets are not validated against target result type before cardinality proves non-null
-
-- Files and members: `SharpProof.Specs/ApiSpecTable.cs`, `CompileTemplate`/`NormalizeFacets`, lines 122-145 and 251-307; `SharpProof.Specs/ApiSpecTermValidator.cs`, variable case, lines 38-45.
-- Mechanism: `NormalizeFacets` lacks `ResultType`; a String result can have `MaybeNull+Empty`. The validator treats cardinality as non-null for any result and certifies `Length(result)` as total.
-- Impact: An inapplicable facet certifies a potentially null string operation as a trusted total postcondition.
-- Safe evidence: Define a static String result with `MaybeNull+Empty` and postcondition `Length(Result)>=0`; table creation accepts it.
-
-## Wave 3.21. LOW - Spec totality validation ignores statically unreachable branches
-
-- File: `SharpProof.Specs/ApiSpecTermValidator.cs`
-- Members: `ValidateBinary`, lines 127-169; `ValidateConditional`, lines 172-193
-- Mechanism: `AndAlso` and `OrElse` require both operands to be total, and conditional requires both branches, even when constant control makes the partial subtree unreachable.
-- Impact: Semantically total short-circuit specifications are rejected, forcing weaker or absent specifications.
-- Safe evidence: `false && ((1/0)==0)` and `true ? true : ((1/0)==0)` are rejected.
-
 ## Wave 3.26. HIGH - Publication lock pathname can be replaced while the original inode remains locked
 
 - File: `SharpProof.Host/LinuxPathIdentity.cs`
