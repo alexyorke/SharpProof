@@ -2017,6 +2017,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             IPropertySubpatternOperation propertySubpattern =>
                 MayCompleteNormally(propertySubpattern.Member) &&
                 MayCompleteNormally(propertySubpattern.Pattern),
+            IBinaryPatternOperation binaryPattern =>
+                MayCompleteBinaryPattern(binaryPattern),
             IListPatternOperation listPattern =>
                 MayCompleteListPattern(listPattern),
             IRecursivePatternOperation recursivePattern =>
@@ -2079,6 +2081,29 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             ILoopOperation or ISwitchOperation => true,
             _ => true
         };
+    }
+
+    private bool MayCompleteBinaryPattern(
+        IBinaryPatternOperation pattern)
+    {
+        if (!MayCompleteNormally(pattern.LeftPattern))
+        {
+            return false;
+        }
+
+        var input = SwitchExpressionFacts.GetGoverningValue(pattern);
+        var leftSelection =
+            SwitchExpressionFacts.GetPatternSelectionForUnknownValue(
+                pattern.LeftPattern,
+                pattern.LeftPattern.InputType,
+                input != null && IsDefinitelyNonNull(input));
+        var rightIsRequired =
+            pattern.OperatorKind == BinaryOperatorKind.And &&
+            leftSelection == SwitchExpressionSelection.Always ||
+            pattern.OperatorKind == BinaryOperatorKind.Or &&
+            leftSelection == SwitchExpressionSelection.Never;
+        return !rightIsRequired ||
+            MayCompleteNormally(pattern.RightPattern);
     }
 
     private bool MayCompleteSwitchExpression(
